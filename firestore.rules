@@ -1,0 +1,243 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ───────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserRole() {
+      return userDocExists()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : 'none';
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+
+    function isManager() {
+      return isAuthenticated() && getUserRole() == 'manager';
+    }
+
+    function isAdminOrManager() {
+      return isAuthenticated() && getUserRole() in ['admin', 'manager'];
+    }
+
+    function isViewer() {
+      return isAuthenticated() && getUserRole() in ['admin', 'manager', 'viewer', 'seller'];
+    }
+
+    function isSeller() {
+      return isAuthenticated() && getUserRole() == 'seller';
+    }
+
+    function isWorkerPK() {
+      return isAuthenticated() && getUserRole() == 'worker_pk';
+    }
+
+    function isWorkerKSA() {
+      return isAuthenticated() && getUserRole() == 'worker_ksa';
+    }
+
+    function isOwnDoc(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ─── users ───────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      // Any authenticated user can read their own doc (needed for role resolution)
+      // Admin/manager can read all user docs (for user management)
+      allow read: if isAuthenticated() && (isOwnDoc(userId) || isAdminOrManager());
+      // Bootstrap: allow authenticated user to create their own doc (first-time setup only)
+      allow create: if isAuthenticated() && (isOwnDoc(userId) || isAdmin());
+      allow update: if isAdmin() || isOwnDoc(userId);
+      allow delete: if isAdmin();
+    }
+
+    // ─── products ────────────────────────────────────────────────────────────
+    match /products/{productId} {
+      allow read: if isViewer() || isWorkerPK() || isWorkerKSA();
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdmin();
+    }
+
+    // ─── inventory_batches ───────────────────────────────────────────────────
+    match /inventory_batches/{batchId} {
+      allow read: if isViewer() || isWorkerPK() || isWorkerKSA();
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdmin();
+    }
+
+    // ─── inventory_items ─────────────────────────────────────────────────────
+    match /inventory_items/{itemId} {
+      allow read: if isViewer() || isWorkerPK() || isWorkerKSA();
+      // Items are created by Cloud Functions (onPurchaseOrderReceived, onInventoryBatchComplete)
+      // App may update status (e.g. reserve on order) via manager+
+      allow create: if isAdminOrManager();
+      allow update: if isAdminOrManager();
+      allow delete: if isAdmin();
+    }
+
+    // ─── orders ──────────────────────────────────────────────────────────────
+    match /orders/{orderId} {
+      allow read: if isViewer();
+      allow create, update: if isAdminOrManager() || isSeller();
+      allow delete: if isAdmin();
+    }
+
+    // ─── order_items ─────────────────────────────────────────────────────────
+    match /order_items/{itemId} {
+      allow read: if isViewer();
+      allow create, update: if isAdminOrManager() || isSeller();
+      allow delete: if isAdmin();
+    }
+
+    // ─── customers ───────────────────────────────────────────────────────────
+    match /customers/{customerId} {
+      allow read: if isViewer();
+      allow create, update: if isAdminOrManager() || isSeller();
+      allow delete: if isAdmin();
+    }
+
+    // ─── workers ─────────────────────────────────────────────────────────────
+    match /workers/{workerId} {
+      // Workers can read their own document
+      allow read: if isAdminOrManager()
+                  || (isWorkerPK() && isOwnDoc(workerId))
+                  || (isWorkerKSA() && isOwnDoc(workerId));
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdmin();
+    }
+
+    // ─── worker_payments ─────────────────────────────────────────────────────
+    match /worker_payments/{paymentId} {
+      // Workers can read their own payments
+      allow read: if isAdminOrManager()
+                  || (isAuthenticated()
+                      && resource.data.worker_id == request.auth.uid);
+      allow create: if isAdminOrManager();
+      // Approved payments are immutable — only allow update when status is still draft/pending
+      allow update: if isAdminOrManager()
+                    && resource.data.status in ['draft', 'pending'];
+      allow delete: if isAdmin()
+                    && resource.data.status in ['draft', 'pending'];
+    }
+
+    // ─── expenses ────────────────────────────────────────────────────────────
+    match /expenses/{expenseId} {
+      allow read: if isViewer();
+      allow create: if isAdminOrManager();
+      // Cannot update once approved
+      allow update: if isAdminOrManager()
+                    && resource.data.status in ['draft', 'pending_approval', 'rejected'];
+      allow delete: if isAdmin()
+                    && resource.data.status in ['draft', 'rejected'];
+    }
+
+    // ─── cash_transactions ───────────────────────────────────────────────────
+    match /cash_transactions/{txId} {
+      allow read: if isViewer();
+      allow create: if isAdminOrManager() || isSeller();
+      // Approved transactions are immutable
+      allow update: if isAdmin()
+                    && resource.data.status in ['pending'];
+      allow delete: if isAdmin()
+                    && resource.data.status == 'pending';
+    }
+
+    // ─── cash_approvals ──────────────────────────────────────────────────────
+    match /cash_approvals/{approvalId} {
+      allow read: if isViewer();
+      allow create: if isAdminOrManager() || isSeller();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── expense_approvals ───────────────────────────────────────────────────
+    match /expense_approvals/{approvalId} {
+      allow read: if isViewer();
+      allow create: if isAdminOrManager();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── pnl_snapshots ───────────────────────────────────────────────────────
+    // CRITICAL: No client write access. Written exclusively by Cloud Functions.
+    match /pnl_snapshots/{period} {
+      allow read: if isViewer();
+      allow write: if false;  // Cloud Functions use Admin SDK — bypass rules
+    }
+
+    // ─── suppliers ───────────────────────────────────────────────────────────
+    match /suppliers/{supplierId} {
+      allow read: if isViewer();
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdmin();
+    }
+
+    // ─── purchase_orders ─────────────────────────────────────────────────────
+    match /purchase_orders/{poId} {
+      allow read: if isViewer();
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdmin()
+                    && resource.data.status in ['draft', 'cancelled'];
+    }
+
+    // ─── qc_records ──────────────────────────────────────────────────────────
+    match /qc_records/{qcId} {
+      allow read: if isViewer() || isWorkerPK();
+      allow create: if isAdminOrManager();
+      // QC records are immutable after creation
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── waste_records ───────────────────────────────────────────────────────
+    match /waste_records/{wasteId} {
+      allow read: if isViewer();
+      // Written by Cloud Function onQCReject only; allow admin create for corrections
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── settings ────────────────────────────────────────────────────────────
+    match /settings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ─── order_returns ───────────────────────────────────────────────────────
+    match /order_returns/{returnId} {
+      allow read: if isViewer();
+      allow create: if isAdminOrManager() || isSeller();
+      // Managers can update pending returns (status transitions)
+      // Completed returns are immutable
+      allow update: if isAdminOrManager()
+                    && resource.data.status != 'completed';
+      // Cannot delete returns once created
+      allow delete: if false;
+    }
+
+    // ─── shops ───────────────────────────────────────────────────────────────
+    match /shops/{shopId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdminOrManager();
+      allow update: if isAdminOrManager();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Deny all other paths ────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

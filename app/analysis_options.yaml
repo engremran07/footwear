@@ -1,0 +1,49 @@
+# This file configures the analyzer, which statically analyzes Dart code to
+# check for errors, warnings, and lints.
+#
+# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
+# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
+# invoked from the command line by running `flutter analyze`.
+
+# The following line activates a set of recommended lints for Flutter apps,
+# packages, and plugins designed to encourage good coding practices.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    missing_return: error
+    dead_code: warning
+  language:
+    strict-casts: true
+    strict-raw-types: true
+
+linter:
+  rules:
+    # Errors & safety
+    avoid_print: true
+    avoid_relative_lib_imports: true
+    cancel_subscriptions: true
+    close_sinks: true
+    no_duplicate_case_values: true
+    throw_in_finally: true
+    unnecessary_statements: true
+    
+    # Style
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    prefer_final_fields: true
+    prefer_final_locals: true
+    prefer_single_quotes: true
+    sort_child_properties_last: true
+    use_key_in_widget_constructors: true
+    
+    curly_braces_in_flow_control_structures: true
+    
+    # Readability
+    always_declare_return_types: true
+    annotate_overrides: true
+    prefer_is_empty: true
+    prefer_is_not_empty: true
+    unnecessary_this: true
+    unnecessary_new: true
+    unnecessary_const: true

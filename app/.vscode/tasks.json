@@ -1,0 +1,91 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "flutter: get",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["pub", "get"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": "build",
+      "presentation": {"reveal": "always", "panel": "shared"}
+    },
+    {
+      "label": "flutter: analyze",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["analyze", "--no-fatal-infos"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": "test",
+      "presentation": {"reveal": "always", "panel": "shared"}
+    },
+    {
+      "label": "flutter: test all",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["test", "--reporter", "expanded"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": {"kind": "test", "isDefault": true},
+      "presentation": {"reveal": "always", "panel": "shared"}
+    },
+    {
+      "label": "flutter: test models",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["test", "test/unit/models/", "--reporter", "expanded"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": "test",
+      "presentation": {"reveal": "always", "panel": "shared"}
+    },
+    {
+      "label": "flutter: test core utils",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["test", "test/unit/core/", "--reporter", "expanded"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": "test",
+      "presentation": {"reveal": "always", "panel": "shared"}
+    },
+    {
+      "label": "flutter: test widgets",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["test", "test/widget/", "--reporter", "expanded"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": "test",
+      "presentation": {"reveal": "always", "panel": "shared"}
+    },
+    {
+      "label": "flutter: run web (chrome)",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["run", "-d", "chrome", "--web-port", "5555"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": "build",
+      "isBackground": true,
+      "presentation": {"reveal": "always", "panel": "dedicated"},
+      "problemMatcher": {
+        "pattern": {
+          "regexp": ".",
+          "file": 1,
+          "line": 2,
+          "message": 3
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Launching",
+          "endsPattern": "Running on"
+        }
+      }
+    },
+    {
+      "label": "build_runner: once",
+      "type": "shell",
+      "command": "dart",
+      "args": ["run", "build_runner", "build", "--delete-conflicting-outputs"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": "build",
+      "presentation": {"reveal": "always", "panel": "shared"}
+    }
+  ]
+}
