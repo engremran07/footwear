@@ -1,5 +1,10 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
@@ -20,6 +25,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _companyC = TextEditingController();
   final _currencyC = TextEditingController();
   final _ppcC = TextEditingController();
+  final _myNameC = TextEditingController();
   bool _settingsLoaded = false;
 
   @override
@@ -27,7 +33,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _companyC.dispose();
     _currencyC.dispose();
     _ppcC.dispose();
+    _myNameC.dispose();
     super.dispose();
+  }
+
+  Future<void> _renameMyself() async {
+    final me = ref.read(authUserProvider).valueOrNull;
+    if (me == null) return;
+    final name = _myNameC.text.trim();
+    if (name.isEmpty || name == me.displayName) return;
+    try {
+      await ref
+          .read(userManagementNotifierProvider.notifier)
+          .updateUser(me.id, {'display_name': name});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(tr('saved_successfully', ref))));
+      }
+    } catch (e) {
+      if (mounted) {
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+      }
+    }
   }
 
   void _loadSettings() {
@@ -63,17 +92,65 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
-    final usersAsync = ref.watch(allUsersProvider);
     final currentUser = ref.watch(authUserProvider).valueOrNull;
+    // Only watch allUsersProvider when the current user is confirmed admin.
+    // This prevents permission-denied errors from firing for seller accounts.
+    final usersAsync = currentUser?.isAdmin == true
+        ? ref.watch(allUsersProvider)
+        : const AsyncValue<List<UserModel>>.loading();
     final locale = ref.watch(appLocaleProvider);
 
     settingsAsync.whenData((_) => _loadSettings());
+
+    // Pre-fill my name field once (non-reactive to avoid cursor jumps).
+    if (currentUser != null && _myNameC.text.isEmpty) {
+      _myNameC.text = currentUser.displayName;
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('settings', ref))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // ── My Profile ─────────────────────────────────────────────────────
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'My Profile',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Your name appears in the Entry By column of all PDF reports.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _myNameC,
+                    decoration:
+                        const InputDecoration(labelText: 'Display Name'),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _renameMyself,
+                      child: Text(tr('save', ref)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           // Language selector
           Card(
             child: Padding(
@@ -144,6 +221,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          // Company Logo (admin only)
+          if (currentUser?.isAdmin == true) ...[
+            const _LogoCard(),
+            const SizedBox(height: 16),
+          ],
           // User Management (admin only)
           if (currentUser?.isAdmin == true) ...[
             Card(
@@ -726,6 +808,269 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+// ─── Company Logo Card ────────────────────────────────────────────────────────
+
+class _LogoCard extends ConsumerStatefulWidget {
+  const _LogoCard();
+
+  @override
+  ConsumerState<_LogoCard> createState() => _LogoCardState();
+}
+
+class _LogoCardState extends ConsumerState<_LogoCard> {
+  bool _uploading = false;
+  Uint8List? _pendingBytes;
+  String? _pendingSizeLabel;
+  double? _uploadProgress;
+
+  String _fmtBytes(int n) {
+    if (n < 1024) return '$n B';
+    if (n < 1024 * 1024) return '${(n / 1024).toStringAsFixed(1)} KB';
+    return '${(n / (1024 * 1024)).toStringAsFixed(2)} MB';
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      // Auto-optimise: image_picker resizes + JPEG-compresses before returning bytes.
+      // 800×400 @ quality 75 typically yields 40–120 KB for a logo.
+      maxWidth: 800,
+      maxHeight: 400,
+      imageQuality: 75,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+
+    // Hard guard: reject if still above 300 KB after resize+compress
+    const maxBytes = 300 * 1024;
+    if (bytes.lengthInBytes > maxBytes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            'Image is ${_fmtBytes(bytes.lengthInBytes)} — too large after optimisation. '
+            'Use a simpler image or reduce dimensions below 800×400 px.',
+          ),
+          duration: const Duration(seconds: 5),
+        ));
+      }
+      return;
+    }
+
+    setState(() {
+      _pendingBytes = bytes;
+      _pendingSizeLabel = _fmtBytes(bytes.lengthInBytes);
+    });
+  }
+
+  Future<void> _confirmUpload() async {
+    final bytes = _pendingBytes;
+    if (bytes == null) return;
+    setState(() {
+      _uploading = true;
+      _uploadProgress = null; // null = indeterminate LinearProgressIndicator
+    });
+
+    try {
+      // Encode bytes as Base64 and store directly in Firestore.
+      // The settingsProvider real-time stream propagates the new logo to every
+      // connected device instantly — no Firebase Storage or CDN involved.
+      final encoded = base64Encode(bytes);
+      await ref
+          .read(settingsNotifierProvider.notifier)
+          .save({'logo_base64': encoded, 'logo_url': null});
+
+      if (mounted) {
+        setState(() {
+          _pendingBytes = null;
+          _pendingSizeLabel = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Logo uploaded successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final detail = e is FirebaseException ? ' [${e.plugin}/${e.code}]' : '';
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${tr(key, ref)}$detail'),
+          duration: const Duration(seconds: 8),
+        ));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploading = false;
+          _uploadProgress = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteLogo() async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Remove Logo',
+      message: 'Remove the company logo from all reports?',
+    );
+    if (confirmed != true) return;
+    setState(() => _uploading = true);
+    try {
+      await ref.read(settingsNotifierProvider.notifier).deleteLogo();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Logo removed')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider).valueOrNull;
+    // Logo bytes come straight from Firestore via the real-time stream.
+    // No URL, no CDN, no Firebase Storage needed.
+    final savedLogoBytes = settings?.logoBytes;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Company Logo',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'PDF reports · PNG/JPG · max 800×400 px · max 300 KB',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+
+            // ── Image area: local preview / uploaded logo / placeholder ──
+            if (_pendingBytes != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(
+                  _pendingBytes!,
+                  height: 80,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Preview · $_pendingSizeLabel',
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: Colors.grey.shade600),
+              ),
+            ] else if (savedLogoBytes != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(
+                  savedLogoBytes,
+                  height: 80,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ] else ...[
+              Container(
+                height: 80,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: const Center(
+                  child:
+                      Icon(Icons.image_outlined, size: 40, color: Colors.grey),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+
+            // ── Upload progress bar ──
+            if (_uploading) ...[
+              LinearProgressIndicator(value: _uploadProgress),
+              const SizedBox(height: 6),
+              Text(
+                _uploadProgress != null
+                    ? 'Uploading… ${(_uploadProgress! * 100).round()}%'
+                    : 'Uploading…',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+              const SizedBox(height: 4),
+            ],
+
+            // ── Action buttons ──
+            if (!_uploading)
+              if (_pendingBytes != null)
+                // Confirm / discard flow
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _confirmUpload,
+                      icon: const Icon(Icons.cloud_upload, size: 18),
+                      label: const Text('Upload'),
+                    ),
+                    OutlinedButton(
+                      onPressed: () => setState(() {
+                        _pendingBytes = null;
+                        _pendingSizeLabel = null;
+                      }),
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                )
+              else
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.upload, size: 18),
+                      label: Text(savedLogoBytes != null
+                          ? 'Replace Logo'
+                          : 'Upload Logo'),
+                    ),
+                    if (savedLogoBytes != null)
+                      OutlinedButton.icon(
+                        onPressed: _deleteLogo,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppBrand.errorColor,
+                          side: const BorderSide(color: AppBrand.errorColor),
+                        ),
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('Remove'),
+                      ),
+                  ],
+                ),
+          ],
+        ),
       ),
     );
   }

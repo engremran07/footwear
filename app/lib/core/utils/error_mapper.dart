@@ -36,14 +36,14 @@ class AppErrorMapper {
         _ => 'err_unknown',
       };
     }
-    // ── Firestore errors ───────────────────────────────────────────────
+    // ── Firebase Storage + Firestore errors ───────────────────────────
     if (error is FirebaseException) {
       return switch (error.code) {
-        'permission-denied' => 'err_permission_denied',
-        'not-found' => 'err_not_found',
+        'permission-denied' || 'unauthorized' => 'err_permission_denied',
+        'not-found' || 'object-not-found' => 'err_not_found',
         'already-exists' => 'err_already_exists',
-        'resource-exhausted' => 'err_resource_exhausted',
-        'unavailable' => 'err_service_unavailable',
+        'resource-exhausted' || 'quota-exceeded' => 'err_resource_exhausted',
+        'unavailable' || 'retry-limit-exceeded' => 'err_service_unavailable',
         'cancelled' => 'err_cancelled',
         'deadline-exceeded' => 'err_timeout',
         'unauthenticated' => 'err_unauthenticated',

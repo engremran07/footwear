@@ -316,13 +316,14 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
           .toList()
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
       final user = ref.read(authUserProvider).valueOrNull;
-      final settings = ref.read(settingsProvider).valueOrNull;
+      final settings = await ref.read(settingsProvider.future);
       final allUsers = ref.read(allUsersProvider).valueOrNull ?? [];
       final entryByMap = {for (final u in allUsers) u.id: u.displayName};
+      if (user != null) entryByMap[user.id] = user.displayName;
 
       final bytes = await buildPdfLedger(
         customerName: customer.name,
-        companyName: settings?.companyName ?? 'Footwear',
+        companyName: settings.companyName,
         generatedBy: user?.displayName ?? '',
         openingBalance: 0,
         transactions: txs,
@@ -330,6 +331,8 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
         showEntryBy: true,
         labels: _labels(ref),
         locale: locale,
+        currency: settings.currency,
+        logoBytes: settings.logoBytes,
       );
       await Printing.sharePdf(
           bytes: bytes,
@@ -493,6 +496,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
           .fold<int>(0, (s, item) => s + item.qty);
       final stockRemaining = (stockReceived - stockSold).clamp(0, 999999);
 
+      final settings = await ref.read(settingsProvider.future);
       final bytes = await buildPdfSellerReport(
         sellerName: seller.displayName,
         sellerPhone: seller.phone ?? '',
@@ -503,6 +507,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
         stockRemaining: stockRemaining,
         labels: _labels(ref),
         locale: locale,
+        logoBytes: settings.logoBytes,
       );
       await Printing.sharePdf(
           bytes: bytes,

@@ -23,6 +23,16 @@ Future<pw.Font> _loadUrduFont() async {
   return _cachedUrduFont!;
 }
 
+/// Returns true when [text] contains Arabic/Urdu script characters.
+/// Used to auto-apply RTL direction to individual cells regardless of locale.
+bool _containsRtlChars(String text) => RegExp(
+        r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]')
+    .hasMatch(text);
+
+/// Returns RTL direction when [text] contains RTL chars, otherwise [fallback].
+pw.TextDirection _cellDir(String text, pw.TextDirection fallback) =>
+    _containsRtlChars(text) ? pw.TextDirection.rtl : fallback;
+
 /// Builds a PDF document from tabular data and returns bytes.
 /// When [locale] is Arabic or Urdu, loads the appropriate font and
 /// renders all text RTL.
@@ -32,20 +42,16 @@ Future<Uint8List> buildPdfTable({
   required List<List<dynamic>> rows,
   String? subtitle,
   AppLocale locale = AppLocale.en,
+  Uint8List? logoBytes,
 }) async {
   final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
-  pw.Font? rtlFont;
-  if (locale == AppLocale.ar) {
-    rtlFont = await _loadArabicFont();
-  } else if (locale == AppLocale.ur) {
-    rtlFont = await _loadUrduFont();
-  }
-
-  // Always include both RTL fonts as fallback so that Arabic/Urdu text in
-  // descriptions renders correctly even when the app is in English mode.
+  // Noto Sans Arabic supports Latin + Arabic shaping and is used as the
+  // primary font for all locales.  Noto Nastaliq Urdu is primary for Urdu.
   final arabicFont = await _loadArabicFont();
   final urduFont = await _loadUrduFont();
-  final fontFallback = <pw.Font>[arabicFont, urduFont];
+  final primaryFont = locale == AppLocale.ur ? urduFont : arabicFont;
+  final fontFallback =
+      locale == AppLocale.ur ? <pw.Font>[arabicFont] : <pw.Font>[urduFont];
 
   final pdf = pw.Document();
   final dir = isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr;
@@ -53,18 +59,18 @@ Future<Uint8List> buildPdfTable({
   final headerStyle = pw.TextStyle(
     fontWeight: pw.FontWeight.bold,
     fontSize: 9,
-    font: rtlFont,
+    font: primaryFont,
     fontFallback: fontFallback,
   );
   final cellStyle = pw.TextStyle(
     fontSize: 8,
-    font: rtlFont,
+    font: primaryFont,
     fontFallback: fontFallback,
   );
   final titleStyle = pw.TextStyle(
     fontSize: 16,
     fontWeight: pw.FontWeight.bold,
-    font: rtlFont,
+    font: primaryFont,
     fontFallback: fontFallback,
   );
 
@@ -87,7 +93,17 @@ Future<Uint8List> buildPdfTable({
               isRtl ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
           children: [
             if (page == 0) ...[
-              pw.Text(title, style: titleStyle, textDirection: dir),
+              if (logoBytes != null)
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(bottom: 6),
+                  child: pw.Image(
+                    pw.MemoryImage(logoBytes),
+                    height: 32,
+                    fit: pw.BoxFit.contain,
+                  ),
+                ),
+              pw.Text(title,
+                  style: titleStyle, textDirection: _cellDir(title, dir)),
               if (subtitle != null)
                 pw.Text(subtitle,
                     style: pw.TextStyle(
@@ -106,9 +122,12 @@ Future<Uint8List> buildPdfTable({
                   .toList(),
               headerStyle: headerStyle,
               cellStyle: cellStyle,
-              headerDecoration: const pw.BoxDecoration(color: PdfColors.blue50),
+              headerDecoration:
+                  const pw.BoxDecoration(color: PdfColors.blue800),
               cellHeight: 22,
               headerDirection: dir,
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+              oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey50),
               cellAlignments: {
                 for (var i = 0; i < headers.length; i++)
                   i: isRtl ? pw.Alignment.centerRight : pw.Alignment.centerLeft
@@ -141,6 +160,9 @@ String _fmtDate(DateTime d) =>
     '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
 String _fmtAmt(double v) => v.toStringAsFixed(2);
+String _fmtAmtC(double v, String currency) => currency.isEmpty
+    ? v.toStringAsFixed(2)
+    : '${v.toStringAsFixed(2)} $currency';
 
 /// Builds a CA-grade customer account statement PDF with running balance,
 /// summary totals, and optional Entry By column.
@@ -159,20 +181,25 @@ Future<Uint8List> buildPdfLedger({
   bool showEntryBy = false,
   required Map<String, String> labels,
   AppLocale locale = AppLocale.en,
+  String currency = 'SAR',
+  Uint8List? logoBytes,
 }) async {
   final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
-  pw.Font? rtlFont;
-  if (locale == AppLocale.ar) rtlFont = await _loadArabicFont();
-  if (locale == AppLocale.ur) rtlFont = await _loadUrduFont();
-
-  // Always include both RTL fonts as fallback so Arabic/Urdu descriptions
-  // render correctly regardless of the active UI locale.
+  // Primary font: Noto Sans Arabic (Latin + Arabic shaping).
+  // Urdu locale uses Noto Nastaliq Urdu with Arabic as fallback.
   final arabicFont = await _loadArabicFont();
   final urduFont = await _loadUrduFont();
+  final primaryFont = locale == AppLocale.ur ? urduFont : arabicFont;
+  final ff =
+      locale == AppLocale.ur ? <pw.Font>[arabicFont] : <pw.Font>[urduFont];
 
   final dir = isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr;
   final align = isRtl ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start;
-  final ff = <pw.Font>[arabicFont, urduFont];
+  final currencyStr = locale == AppLocale.ar
+      ? 'ريال'
+      : locale == AppLocale.ur
+          ? 'ریال'
+          : currency;
 
   // ── helpers ──
   pw.TextStyle ts(
@@ -183,7 +210,7 @@ Future<Uint8List> buildPdfLedger({
           fontSize: size,
           fontWeight: fw,
           color: color,
-          font: isRtl ? rtlFont : null,
+          font: primaryFont,
           fontFallback: ff);
 
   // ── build ledger rows ──
@@ -230,22 +257,25 @@ Future<Uint8List> buildPdfLedger({
   }
 
   // ── column widths (portrait A4 usable ≈ 539 pt) ──
-  const double dateW = 52;
-  const double remarkW = 118;
-  const double entryByW = 64;
-  const double modeW = 50;
-  const double amtW = 66;
-  const double balW = 68;
+  // A4 portrait usable width ≈ 539 pt (595 − 28 − 28 margins)
+  const double dateW = 54;
+  const double entryByW = 68;
+  const double amtW = 72;
+  const double balW = 76;
+  // Remark column fills remaining width so rows always span the full page.
+  const double usable = 539;
+  final double remarkW = showEntryBy
+      ? usable - dateW - entryByW - amtW - amtW - balW // 197
+      : usable - dateW - amtW - amtW - balW; // 265
 
   final colWidths = showEntryBy
-      ? [dateW, remarkW, entryByW, modeW, amtW, amtW, balW]
-      : [dateW, remarkW, modeW, amtW, amtW, balW];
+      ? [dateW, remarkW, entryByW, amtW, amtW, balW]
+      : [dateW, remarkW, amtW, amtW, balW];
   final headerLabels = showEntryBy
       ? [
           labels['date'] ?? 'Date',
           labels['description'] ?? 'Remark',
           labels['entry_by'] ?? 'Entry By',
-          labels['mode'] ?? 'Mode',
           labels['credit'] ?? 'Cash In',
           labels['debit'] ?? 'Cash Out',
           labels['running_balance'] ?? 'Balance',
@@ -253,7 +283,6 @@ Future<Uint8List> buildPdfLedger({
       : [
           labels['date'] ?? 'Date',
           labels['description'] ?? 'Remark',
-          labels['mode'] ?? 'Mode',
           labels['credit'] ?? 'Cash In',
           labels['debit'] ?? 'Cash Out',
           labels['running_balance'] ?? 'Balance',
@@ -285,17 +314,31 @@ Future<Uint8List> buildPdfLedger({
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Column(crossAxisAlignment: align, children: [
-                    pw.Text(companyName,
-                        style: ts(size: 16, fw: pw.FontWeight.bold),
-                        textDirection: dir),
-                    pw.Text(labels['account_statement'] ?? 'Account Statement',
-                        style: ts(
-                            size: 11,
-                            fw: pw.FontWeight.bold,
-                            color: PdfColors.blue800),
-                        textDirection: dir),
-                  ]),
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      if (logoBytes != null) ...[
+                        pw.Image(
+                          pw.MemoryImage(logoBytes),
+                          height: 36,
+                          fit: pw.BoxFit.contain,
+                        ),
+                        pw.SizedBox(width: 8),
+                      ],
+                      pw.Column(crossAxisAlignment: align, children: [
+                        pw.Text(companyName,
+                            style: ts(size: 16, fw: pw.FontWeight.bold),
+                            textDirection: _cellDir(companyName, dir)),
+                        pw.Text(
+                            labels['account_statement'] ?? 'Account Statement',
+                            style: ts(
+                                size: 11,
+                                fw: pw.FontWeight.bold,
+                                color: PdfColors.blue800),
+                            textDirection: dir),
+                      ]),
+                    ],
+                  ),
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
@@ -316,7 +359,7 @@ Future<Uint8List> buildPdfLedger({
               pw.SizedBox(height: 6),
               pw.Text(customerName,
                   style: ts(size: 14, fw: pw.FontWeight.bold),
-                  textDirection: dir),
+                  textDirection: _cellDir(customerName, dir)),
               pw.SizedBox(height: 4),
               if (dateFrom != null && dateTo != null)
                 pw.Container(
@@ -344,23 +387,26 @@ Future<Uint8List> buildPdfLedger({
                   children: [
                     _summaryCell(
                         label: labels['cash_in'] ?? 'Total Cash In',
-                        value: _fmtAmt(totalCashIn),
+                        value: _fmtAmtC(totalCashIn, currencyStr),
                         color: PdfColors.green800,
+                        primaryFont: primaryFont,
                         ff: ff),
                     pw.Container(
                         width: 0.5, height: 40, color: PdfColors.blue100),
                     _summaryCell(
                         label: labels['cash_out'] ?? 'Total Cash Out',
-                        value: _fmtAmt(totalCashOut),
+                        value: _fmtAmtC(totalCashOut, currencyStr),
                         color: PdfColors.red800,
+                        primaryFont: primaryFont,
                         ff: ff),
                     pw.Container(
                         width: 0.5, height: 40, color: PdfColors.blue100),
                     _summaryCell(
                         label: labels['net_payable'] ?? 'Final Balance',
-                        value: _fmtAmt(balance.abs()),
+                        value: _fmtAmtC(balance.abs(), currencyStr),
                         color:
                             balance > 0 ? PdfColors.red800 : PdfColors.green800,
+                        primaryFont: primaryFont,
                         ff: ff,
                         isBold: true),
                   ],
@@ -373,24 +419,33 @@ Future<Uint8List> buildPdfLedger({
                 textDirection: dir,
               ),
               pw.SizedBox(height: 8),
-              _buildLedgerHeaderRow(headerLabels, colWidths, colCount, dir, ff),
+              _buildLedgerHeaderRow(
+                  headerLabels, colWidths, colCount, dir, primaryFont, ff),
             ],
             if (!isFirst)
-              _buildLedgerHeaderRow(headerLabels, colWidths, colCount, dir, ff),
+              _buildLedgerHeaderRow(
+                  headerLabels, colWidths, colCount, dir, primaryFont, ff),
 
             // ── Data rows ──
             ...pageRows.asMap().entries.map((e) {
               final i = e.key;
               final r = e.value;
               final bg = i % 2 == 0 ? PdfColors.white : PdfColors.grey50;
-              return _buildLedgerDataRow(
-                  r, colWidths, colCount, bg, dir, ff, showEntryBy);
+              return _buildLedgerDataRow(r, colWidths, colCount, bg, dir,
+                  primaryFont, ff, showEntryBy, currencyStr);
             }),
 
             // ── Final balance row (last page) ──
             if (isLast)
               pw.Container(
-                color: PdfColors.blue50,
+                decoration: const pw.BoxDecoration(
+                  color: PdfColors.blue50,
+                  border: pw.Border(
+                    left: pw.BorderSide(color: PdfColors.grey400, width: 0.5),
+                    right: pw.BorderSide(color: PdfColors.grey400, width: 0.5),
+                    bottom: pw.BorderSide(color: PdfColors.grey400, width: 0.5),
+                  ),
+                ),
                 child: pw.Row(
                   children: [
                     pw.Container(
@@ -399,13 +454,19 @@ Future<Uint8List> buildPdfLedger({
                           .fold<double>(0, (a, b) => a + b),
                       padding: const pw.EdgeInsets.symmetric(
                           horizontal: 4, vertical: 5),
+                      decoration: const pw.BoxDecoration(
+                        border: pw.Border(
+                          right: pw.BorderSide(
+                              color: PdfColors.grey400, width: 0.5),
+                        ),
+                      ),
                       child: pw.Text(
                         labels['net_payable'] ?? 'Final Balance',
                         style: pw.TextStyle(
                             fontSize: 9,
                             fontWeight: pw.FontWeight.bold,
                             color: PdfColors.blue800,
-                            font: isRtl ? rtlFont : null,
+                            font: primaryFont,
                             fontFallback: ff),
                         textDirection: dir,
                       ),
@@ -415,14 +476,14 @@ Future<Uint8List> buildPdfLedger({
                       padding: const pw.EdgeInsets.symmetric(
                           horizontal: 4, vertical: 5),
                       child: pw.Text(
-                        _fmtAmt(balance),
+                        _fmtAmtC(balance, currencyStr),
                         style: pw.TextStyle(
                             fontSize: 9,
                             fontWeight: pw.FontWeight.bold,
                             color: balance > 0
                                 ? PdfColors.red800
                                 : PdfColors.green800,
-                            font: isRtl ? rtlFont : null,
+                            font: primaryFont,
                             fontFallback: ff),
                         textDirection: dir,
                       ),
@@ -471,10 +532,10 @@ pw.Widget _summaryCell({
   required String label,
   required String value,
   required PdfColor color,
+  required pw.Font primaryFont,
   required List<pw.Font> ff,
   bool isBold = false,
 }) {
-  final primaryFont = ff.isNotEmpty ? ff.first : null;
   return pw.Expanded(
     child: pw.Padding(
       padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -509,16 +570,30 @@ pw.Widget _buildLedgerHeaderRow(
   List<double> widths,
   int count,
   pw.TextDirection dir,
+  pw.Font primaryFont,
   List<pw.Font> ff,
 ) {
-  final primaryFont = ff.isNotEmpty ? ff.first : null;
   return pw.Container(
-    color: PdfColors.blue800,
+    decoration: const pw.BoxDecoration(
+      color: PdfColors.blue800,
+      border: pw.Border(
+        top: pw.BorderSide(color: PdfColors.grey400, width: 0.5),
+        bottom: pw.BorderSide(color: PdfColors.grey400, width: 0.5),
+      ),
+    ),
     child: pw.Row(
       children: List.generate(count, (i) {
         return pw.Container(
           width: widths[i],
           padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+          decoration: pw.BoxDecoration(
+            border: pw.Border(
+              left: i == 0
+                  ? const pw.BorderSide(color: PdfColors.grey400, width: 0.5)
+                  : pw.BorderSide.none,
+              right: const pw.BorderSide(color: PdfColors.blue300, width: 0.5),
+            ),
+          ),
           child: pw.Text(
             labels[i],
             style: pw.TextStyle(
@@ -527,7 +602,7 @@ pw.Widget _buildLedgerHeaderRow(
                 color: PdfColors.white,
                 font: primaryFont,
                 fontFallback: ff),
-            textDirection: dir,
+            textDirection: _cellDir(labels[i], dir),
           ),
         );
       }),
@@ -541,33 +616,37 @@ pw.Widget _buildLedgerDataRow(
   int count,
   PdfColor bg,
   pw.TextDirection dir,
+  pw.Font primaryFont,
   List<pw.Font> ff,
   bool showEntryBy,
+  String currencyStr,
 ) {
-  final primaryFont = ff.isNotEmpty ? ff.first : null;
   final cells = showEntryBy
       ? [
           r.date,
           r.desc,
           r.entryBy,
-          r.mode,
-          r.cashIn > 0 ? _fmtAmt(r.cashIn) : '',
-          r.cashOut > 0 ? _fmtAmt(r.cashOut) : '',
-          _fmtAmt(r.balance),
+          r.cashIn > 0 ? _fmtAmtC(r.cashIn, currencyStr) : '',
+          r.cashOut > 0 ? _fmtAmtC(r.cashOut, currencyStr) : '',
+          _fmtAmtC(r.balance, currencyStr),
         ]
       : [
           r.date,
           r.desc,
-          r.mode,
-          r.cashIn > 0 ? _fmtAmt(r.cashIn) : '',
-          r.cashOut > 0 ? _fmtAmt(r.cashOut) : '',
-          _fmtAmt(r.balance),
+          r.cashIn > 0 ? _fmtAmtC(r.cashIn, currencyStr) : '',
+          r.cashOut > 0 ? _fmtAmtC(r.cashOut, currencyStr) : '',
+          _fmtAmtC(r.balance, currencyStr),
         ];
-  final cashInIdx = showEntryBy ? 4 : 3;
-  final cashOutIdx = showEntryBy ? 5 : 4;
+  final cashInIdx = showEntryBy ? 3 : 2;
+  final cashOutIdx = showEntryBy ? 4 : 3;
 
   return pw.Container(
-    color: bg,
+    decoration: pw.BoxDecoration(
+      color: bg,
+      border: const pw.Border(
+        bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+      ),
+    ),
     child: pw.Row(
       children: List.generate(count, (i) {
         PdfColor? color;
@@ -576,11 +655,19 @@ pw.Widget _buildLedgerDataRow(
         return pw.Container(
           width: widths[i],
           padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          decoration: pw.BoxDecoration(
+            border: pw.Border(
+              left: i == 0
+                  ? const pw.BorderSide(color: PdfColors.grey300, width: 0.5)
+                  : pw.BorderSide.none,
+              right: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+            ),
+          ),
           child: pw.Text(
             cells[i],
             style: pw.TextStyle(
                 fontSize: 8, color: color, font: primaryFont, fontFallback: ff),
-            textDirection: dir,
+            textDirection: _cellDir(cells[i], dir),
           ),
         );
       }),
@@ -621,18 +708,16 @@ Future<Uint8List> buildPdfSellerReport({
   required int stockRemaining,
   required Map<String, String> labels,
   AppLocale locale = AppLocale.en,
+  Uint8List? logoBytes,
 }) async {
   final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
-  pw.Font? rtlFont;
-  if (locale == AppLocale.ar) rtlFont = await _loadArabicFont();
-  if (locale == AppLocale.ur) rtlFont = await _loadUrduFont();
-
-  // Always include both RTL fonts as fallback for mixed-content rendering.
   final arabicFont = await _loadArabicFont();
   final urduFont = await _loadUrduFont();
+  final primaryFont = locale == AppLocale.ur ? urduFont : arabicFont;
+  final ff =
+      locale == AppLocale.ur ? <pw.Font>[arabicFont] : <pw.Font>[urduFont];
 
   final dir = isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr;
-  final ff = <pw.Font>[arabicFont, urduFont];
 
   pw.TextStyle ts(
           {double size = 9,
@@ -642,7 +727,7 @@ Future<Uint8List> buildPdfSellerReport({
           fontSize: size,
           fontWeight: fw,
           color: color,
-          font: isRtl ? rtlFont : null,
+          font: primaryFont,
           fontFallback: ff);
 
   double totalRevenue = 0;
@@ -666,25 +751,38 @@ Future<Uint8List> buildPdfSellerReport({
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Column(
-                crossAxisAlignment: isRtl
-                    ? pw.CrossAxisAlignment.end
-                    : pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(
-                    'FOOTWEAR',
-                    style: ts(size: 18, fw: pw.FontWeight.bold),
-                    textDirection: dir,
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                if (logoBytes != null) ...[
+                  pw.Image(
+                    pw.MemoryImage(logoBytes),
+                    height: 32,
+                    fit: pw.BoxFit.contain,
                   ),
-                  pw.Text(
-                    labels['seller_report'] ?? 'Seller Report',
-                    style: ts(
-                        size: 13,
-                        fw: pw.FontWeight.bold,
-                        color: PdfColors.blue800),
-                    textDirection: dir,
-                  ),
-                ]),
+                  pw.SizedBox(width: 8),
+                ],
+                pw.Column(
+                    crossAxisAlignment: isRtl
+                        ? pw.CrossAxisAlignment.end
+                        : pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'FOOTWEAR',
+                        style: ts(size: 18, fw: pw.FontWeight.bold),
+                        textDirection: dir,
+                      ),
+                      pw.Text(
+                        labels['seller_report'] ?? 'Seller Report',
+                        style: ts(
+                            size: 13,
+                            fw: pw.FontWeight.bold,
+                            color: PdfColors.blue800),
+                        textDirection: dir,
+                      ),
+                    ]),
+              ],
+            ),
             pw.Text(
               '${labels['report_date'] ?? 'Date'}: ${_fmtDate(DateTime.now())}',
               style: ts(size: 8, color: PdfColors.grey700),
@@ -738,15 +836,15 @@ Future<Uint8List> buildPdfSellerReport({
           children: [
             _stockCard(labels['stock_received'] ?? 'Received',
                 stockReceived.toString(), PdfColors.blue50,
-                ff: ff),
+                primaryFont: primaryFont, ff: ff),
             pw.SizedBox(width: 8),
             _stockCard(labels['stock_sold'] ?? 'Sold', stockSold.toString(),
                 PdfColors.orange50,
-                ff: ff),
+                primaryFont: primaryFont, ff: ff),
             pw.SizedBox(width: 8),
             _stockCard(labels['stock_remaining'] ?? 'Remaining',
                 stockRemaining.toString(), PdfColors.green50,
-                ff: ff),
+                primaryFont: primaryFont, ff: ff),
           ],
         ),
         pw.SizedBox(height: 14),
@@ -777,13 +875,16 @@ Future<Uint8List> buildPdfSellerReport({
               fontSize: 8,
               fontWeight: pw.FontWeight.bold,
               color: PdfColors.white,
+              font: primaryFont,
               fontFallback: ff),
-          cellStyle: pw.TextStyle(fontSize: 8, fontFallback: ff),
+          cellStyle:
+              pw.TextStyle(fontSize: 8, font: primaryFont, fontFallback: ff),
           headerDecoration: const pw.BoxDecoration(color: PdfColors.blue800),
           rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
           oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey50),
           cellHeight: 22,
           headerDirection: dir,
+          border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
         ),
         pw.SizedBox(height: 8),
 
@@ -829,7 +930,7 @@ Future<Uint8List> buildPdfSellerReport({
 }
 
 pw.Widget _stockCard(String label, String value, PdfColor bg,
-    {required List<pw.Font> ff}) {
+    {required pw.Font primaryFont, required List<pw.Font> ff}) {
   return pw.Expanded(
     child: pw.Container(
       padding: const pw.EdgeInsets.all(8),
@@ -844,10 +945,14 @@ pw.Widget _stockCard(String label, String value, PdfColor bg,
               style: pw.TextStyle(
                   fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
+                  font: primaryFont,
                   fontFallback: ff)),
           pw.Text(label,
               style: pw.TextStyle(
-                  fontSize: 7, color: PdfColors.grey700, fontFallback: ff)),
+                  fontSize: 7,
+                  color: PdfColors.grey700,
+                  font: primaryFont,
+                  fontFallback: ff)),
         ],
       ),
     ),

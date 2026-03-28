@@ -41,7 +41,7 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk
 ## Architecture
 
 | Concern | Choice |
-|---|---|
+| --- | --- |
 | State | Riverpod (`AsyncNotifier`, `StreamProvider`) |
 | Navigation | go_router with role-based redirect guards |
 | Backend | Cloud Firestore (realtime streams) |
@@ -52,7 +52,7 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk
 
 ### Key directories
 
-```
+```text
 lib/
 ├── core/
 │   ├── constants/   # AppBrand, AppCollections
@@ -71,7 +71,7 @@ lib/
 ## Screens
 
 | Route | Screen | Access |
-|---|---|---|
+| --- | --- | --- |
 | `/login` | Login | Public |
 | `/` | Dashboard | All |
 | `/routes` | Routes list | Admin |
@@ -91,7 +91,7 @@ lib/
 ## Roles
 
 | Role value | Access level |
-|---|---|
+| --- | --- |
 | `admin` | Full access |
 | `manager` | Admin-equivalent (legacy) |
 | `seller` | Assigned route only — read + create transactions |

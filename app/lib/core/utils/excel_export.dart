@@ -1,11 +1,10 @@
 import 'package:excel/excel.dart';
 import 'download_helper.dart';
 
-/// Builds an [Excel] workbook with [sheetName] from [headers] + [rows]
-/// and triggers a browser download (web) or saves to Downloads (Android).
-/// When [isRtl] is true, sets the sheet direction to right-to-left.
-void exportToExcel({
-  required String fileName,
+/// Builds a styled Excel workbook and returns raw bytes, or null on failure.
+/// Headers have a blue background with white bold text and thin borders.
+/// All data cells have thin borders and correct RTL alignment when [isRtl].
+List<int>? buildStyledExcelBytes({
   required String sheetName,
   required List<String> headers,
   required List<List<dynamic>> rows,
@@ -14,24 +13,91 @@ void exportToExcel({
   final excel = Excel.createExcel();
   excel.rename('Sheet1', sheetName);
   final sheet = excel[sheetName];
+  if (isRtl) sheet.isRTL = true;
 
-  if (isRtl) {
-    sheet.isRTL = true;
-  }
+  _writeStyledSheet(sheet, headers: headers, rows: rows, isRtl: isRtl);
+  return excel.encode();
+}
 
-  // Header row
-  sheet.appendRow(headers.map((h) => TextCellValue(h)).toList());
-
-  // Data rows
-  for (final row in rows) {
-    sheet.appendRow(row.map((cell) {
-      if (cell == null) return TextCellValue('');
-      if (cell is num) return DoubleCellValue(cell.toDouble());
-      return TextCellValue(cell.toString());
-    }).toList());
-  }
-
-  final bytes = excel.encode();
+/// Builds a styled workbook and triggers a file download / save to device.
+void exportToExcel({
+  required String fileName,
+  required String sheetName,
+  required List<String> headers,
+  required List<List<dynamic>> rows,
+  bool isRtl = false,
+}) {
+  final bytes = buildStyledExcelBytes(
+    sheetName: sheetName,
+    headers: headers,
+    rows: rows,
+    isRtl: isRtl,
+  );
   if (bytes == null) return;
   downloadBytes(bytes, '$fileName.xlsx');
+}
+
+void _writeStyledSheet(
+  Sheet sheet, {
+  required List<String> headers,
+  required List<List<dynamic>> rows,
+  bool isRtl = false,
+}) {
+  final thinBorder = Border(borderStyle: BorderStyle.Thin);
+
+  final headerStyle = CellStyle(
+    bold: true,
+    fontFamily: 'Arial',
+    fontColorHex: ExcelColor.fromHexString('FFFFFFFF'),
+    backgroundColorHex: ExcelColor.fromHexString('FF1565C0'),
+    horizontalAlign: HorizontalAlign.Center,
+    topBorder: thinBorder,
+    bottomBorder: thinBorder,
+    leftBorder: thinBorder,
+    rightBorder: thinBorder,
+  );
+  final dataStyle = CellStyle(
+    fontFamily: 'Arial',
+    horizontalAlign: isRtl ? HorizontalAlign.Right : HorizontalAlign.Left,
+    topBorder: thinBorder,
+    bottomBorder: thinBorder,
+    leftBorder: thinBorder,
+    rightBorder: thinBorder,
+  );
+  final numStyle = CellStyle(
+    fontFamily: 'Arial',
+    horizontalAlign: HorizontalAlign.Right,
+    topBorder: thinBorder,
+    bottomBorder: thinBorder,
+    leftBorder: thinBorder,
+    rightBorder: thinBorder,
+  );
+
+  // Header row
+  for (var col = 0; col < headers.length; col++) {
+    final cell = sheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0));
+    cell.value = TextCellValue(headers[col]);
+    cell.cellStyle = headerStyle;
+  }
+
+  // Data rows
+  for (var rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+    final row = rows[rowIdx];
+    for (var col = 0; col < row.length; col++) {
+      final rawVal = row[col];
+      final cell = sheet.cell(
+          CellIndex.indexByColumnRow(columnIndex: col, rowIndex: rowIdx + 1));
+      if (rawVal == null) {
+        cell.value = TextCellValue('');
+        cell.cellStyle = dataStyle;
+      } else if (rawVal is num) {
+        cell.value = DoubleCellValue(rawVal.toDouble());
+        cell.cellStyle = numStyle;
+      } else {
+        cell.value = TextCellValue(rawVal.toString());
+        cell.cellStyle = dataStyle;
+      }
+    }
+  }
 }

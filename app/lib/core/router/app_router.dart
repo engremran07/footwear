@@ -1,6 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../screens/login_screen.dart';
 import '../../screens/dashboard_screen.dart';
@@ -69,38 +71,66 @@ CustomTransitionPage<void> _fadePage(Widget child, GoRouterState state) {
   );
 }
 
+/// Drives GoRouter redirects in response to auth-state changes.
+///
+/// Uses [ref.listen] (not ref.watch) so this notifier — and the GoRouter
+/// that holds it — are created ONCE and never recreated when auth streams
+/// emit. Only the redirect callback is re-evaluated, keeping the user on
+/// their current screen (e.g. Settings) instead of bouncing to '/'.
+class RouterNotifier extends ChangeNotifier {
+  final Ref _ref;
+
+  RouterNotifier(this._ref) {
+    _ref.listen<AsyncValue<User?>>(
+      authStateProvider,
+      (_, __) => notifyListeners(),
+    );
+    _ref.listen<AsyncValue<UserModel?>>(
+      authUserProvider,
+      (_, __) => notifyListeners(),
+    );
+  }
+
+  String? redirect(BuildContext context, GoRouterState state) {
+    final isLoggedIn = _ref.read(authStateProvider).valueOrNull != null;
+    final isLoginRoute = state.matchedLocation == '/login';
+    final isBootstrapRoute = state.matchedLocation == '/bootstrap-profile';
+
+    if (!isLoggedIn && !isLoginRoute) return '/login';
+    if (!isLoggedIn) return null;
+
+    final appUserState = _ref.read(authUserProvider);
+    if (appUserState.isLoading) return null;
+
+    final appUser = appUserState.valueOrNull;
+    if (appUser == null) {
+      if (!isBootstrapRoute) return '/bootstrap-profile';
+      return null;
+    }
+
+    if (isLoginRoute || isBootstrapRoute) return '/';
+
+    if (_isAdminOnlyPath(state.matchedLocation) && !appUser.isAdmin) {
+      return '/';
+    }
+    if (appUser.isSeller && _isSellerBlockedPath(state.matchedLocation)) {
+      return '/';
+    }
+    return null;
+  }
+}
+
+final _routerNotifierProvider = Provider<RouterNotifier>((ref) {
+  return RouterNotifier(ref);
+});
+
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
-  final appUserState = ref.watch(authUserProvider);
+  final notifier = ref.watch(_routerNotifierProvider);
 
   return GoRouter(
     initialLocation: '/',
-    redirect: (context, state) {
-      final isLoggedIn = authState.valueOrNull != null;
-      final isLoginRoute = state.matchedLocation == '/login';
-      final isBootstrapRoute = state.matchedLocation == '/bootstrap-profile';
-
-      if (!isLoggedIn && !isLoginRoute) return '/login';
-
-      if (!isLoggedIn) return null;
-      if (appUserState.isLoading) return null;
-
-      final appUser = appUserState.valueOrNull;
-      if (appUser == null) {
-        if (!isBootstrapRoute) return '/bootstrap-profile';
-        return null;
-      }
-
-      if (isLoginRoute || isBootstrapRoute) return '/';
-
-      if (_isAdminOnlyPath(state.matchedLocation) && !appUser.isAdmin) {
-        return '/';
-      }
-      if (appUser.isSeller && _isSellerBlockedPath(state.matchedLocation)) {
-        return '/';
-      }
-      return null;
-    },
+    refreshListenable: notifier,
+    redirect: notifier.redirect,
     routes: [
       GoRoute(
         path: '/login',

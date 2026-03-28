@@ -7,6 +7,7 @@ import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
+import '../providers/product_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/seller_inventory_provider.dart';
 import '../providers/settings_provider.dart';
@@ -173,9 +174,10 @@ class DashboardScreen extends ConsumerWidget {
       appBar: AppBar(title: Text(tr('dashboard', ref))),
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(dashboardStatsProvider);
           ref.invalidate(routesProvider);
           ref.invalidate(shopsProvider);
+          ref.invalidate(productsProvider);
+          ref.invalidate(allVariantsProvider);
           ref.invalidate(allTransactionsProvider);
         },
         child: stats.when(

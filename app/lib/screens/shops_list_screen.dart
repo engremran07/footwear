@@ -65,6 +65,11 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
               ],
             ),
           ),
+          // Stats strip — derived from the live shop list
+          shopsAsync
+                  .whenData((shops) => _ShopStatsStrip(shops: shops))
+                  .valueOrNull ??
+              const SizedBox.shrink(),
           Expanded(
             child: shopsAsync.when(
               data: (shops) {
@@ -105,6 +110,94 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
           : null,
     );
   }
+}
+
+// ── Stats strip ───────────────────────────────────────────────────────────────
+
+class _ShopStatsStrip extends StatelessWidget {
+  final List<ShopModel> shops;
+  const _ShopStatsStrip({required this.shops});
+
+  @override
+  Widget build(BuildContext context) {
+    final total = shops.length;
+    final withDebt = shops.where((s) => s.balance > 0).toList();
+    final totalOutstanding = withDebt.fold(0.0, (sum, s) => sum + s.balance);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _Stat(
+            icon: Icons.store,
+            label: 'Total',
+            value: '$total',
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          _Divider(),
+          _Stat(
+            icon: Icons.warning_amber,
+            label: 'Overdue',
+            value: '${withDebt.length}',
+            color: Colors.orange.shade700,
+          ),
+          _Divider(),
+          _Stat(
+            icon: Icons.account_balance_wallet,
+            label: 'Outstanding',
+            value: AppFormatters.compact(totalOutstanding),
+            color: totalOutstanding > 0
+                ? Colors.red.shade700
+                : Colors.green.shade700,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 28,
+        width: 1,
+        color: Theme.of(context).dividerColor,
+      );
+}
+
+class _Stat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  const _Stat(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(height: 2),
+          Text(value,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 13, color: color)),
+          Text(label,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: Colors.grey.shade600)),
+        ],
+      );
 }
 
 class _ShopTile extends ConsumerWidget {

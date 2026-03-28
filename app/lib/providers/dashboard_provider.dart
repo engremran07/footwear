@@ -1,11 +1,14 @@
-import 'dart:async';
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/constants/collections.dart';
 
-/// Dashboard stats computed from Firestore aggregation queries.
+import '../models/product_model.dart';
+import '../models/product_variant_model.dart';
+import '../models/route_model.dart';
+import '../models/shop_model.dart';
+import 'product_provider.dart';
+import 'route_provider.dart';
+import 'shop_provider.dart';
+
+/// Dashboard stats computed reactively from live Firestore stream providers.
 class DashboardStats {
   final int totalRoutes;
   final int totalShops;
@@ -24,90 +27,54 @@ class DashboardStats {
   });
 }
 
-final dashboardStatsCacheProvider =
-    StateProvider<DashboardStats>((ref) => const DashboardStats());
+/// Derives admin dashboard stats reactively from live stream providers.
+/// Updates automatically whenever any underlying Firestore collection changes.
+final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
+  final routes = ref.watch(routesProvider);
+  final shops = ref.watch(shopsProvider);
+  final products = ref.watch(productsProvider);
+  final variants = ref.watch(allVariantsProvider);
 
-final dashboardStatsProvider = FutureProvider<DashboardStats>((ref) async {
-  ref.keepAlive();
-  final db = FirebaseFirestore.instance;
-  final cache = ref.read(dashboardStatsCacheProvider);
-
-  Future<int> safeCount(
-    Query<Map<String, dynamic>> query, {
-    required int fallback,
-  }) async {
-    try {
-      final agg = await query.count().get().timeout(const Duration(seconds: 8));
-      return agg.count ?? 0;
-    } on FirebaseException {
-      return fallback;
-    } on PlatformException {
-      return fallback;
-    } on TimeoutException {
-      return fallback;
-    } catch (e) {
-      return fallback;
-    }
+  if (routes is AsyncLoading ||
+      shops is AsyncLoading ||
+      products is AsyncLoading ||
+      variants is AsyncLoading) {
+    return const AsyncLoading();
   }
 
-  Future<double> safeSum(
-    Query<Map<String, dynamic>> query,
-    String field, {
-    required double fallback,
-  }) async {
-    try {
-      final agg = await query
-          .aggregate(sum(field))
-          .get()
-          .timeout(const Duration(seconds: 8));
-      return (agg.getSum(field) ?? 0).toDouble();
-    } on FirebaseException {
-      return fallback;
-    } on PlatformException {
-      return fallback;
-    } on TimeoutException {
-      return fallback;
-    } catch (e) {
-      return fallback;
-    }
+  if (routes is AsyncError) {
+    return AsyncError(
+        routes.error as Object, routes.stackTrace ?? StackTrace.empty);
+  }
+  if (shops is AsyncError) {
+    return AsyncError(
+        shops.error as Object, shops.stackTrace ?? StackTrace.empty);
+  }
+  if (products is AsyncError) {
+    return AsyncError(
+        products.error as Object, products.stackTrace ?? StackTrace.empty);
+  }
+  if (variants is AsyncError) {
+    return AsyncError(
+        variants.error as Object, variants.stackTrace ?? StackTrace.empty);
   }
 
-  final totalRoutes = await safeCount(
-    db.collection(Collections.routes).where('active', isEqualTo: true),
-    fallback: cache.totalRoutes,
-  );
-  final totalShops = await safeCount(
-    db.collection(Collections.customers).where('active', isEqualTo: true),
-    fallback: cache.totalShops,
-  );
-  final totalProducts = await safeCount(
-    db.collection(Collections.products).where('active', isEqualTo: true),
-    fallback: cache.totalProducts,
-  );
-  final totalVariants = await safeCount(
-    db.collection(Collections.productVariants).where('active', isEqualTo: true),
-    fallback: cache.totalVariants,
-  );
-  final totalOutstanding = await safeSum(
-    db.collection(Collections.customers).where('active', isEqualTo: true),
-    'balance',
-    fallback: cache.totalOutstanding,
-  );
-  final totalStockPairs = await safeSum(
-    db.collection(Collections.productVariants).where('active', isEqualTo: true),
-    'quantity_available',
-    fallback: cache.totalStockPairs.toDouble(),
-  );
+  final routeList = routes.valueOrNull ?? const <RouteModel>[];
+  final shopList = shops.valueOrNull ?? const <ShopModel>[];
+  final productList = products.valueOrNull ?? const <ProductModel>[];
+  final variantList = variants.valueOrNull ?? const <ProductVariantModel>[];
 
-  final result = DashboardStats(
-    totalRoutes: totalRoutes,
-    totalShops: totalShops,
-    totalProducts: totalProducts,
-    totalVariants: totalVariants,
+  final totalOutstanding =
+      shopList.fold<double>(0, (s, shop) => s + shop.balance);
+  final totalStockPairs =
+      variantList.fold<int>(0, (s, v) => s + v.quantityAvailable);
+
+  return AsyncData(DashboardStats(
+    totalRoutes: routeList.length,
+    totalShops: shopList.length,
+    totalProducts: productList.length,
+    totalVariants: variantList.length,
     totalOutstanding: totalOutstanding,
-    totalStockPairs: totalStockPairs.toInt(),
-  );
-
-  ref.read(dashboardStatsCacheProvider.notifier).state = result;
-  return result;
+    totalStockPairs: totalStockPairs,
+  ));
 });

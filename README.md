@@ -7,6 +7,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 ## Features
 
 ### Admin
+
 - **Dashboard** — live stats: revenue, outstanding balances, inventory levels
 - **Products & Variants** — manage SKUs with size/color variants, carton/dozen/pair stock tracking
 - **Routes** — define delivery routes and assign sellers
@@ -18,11 +19,13 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 - **Settings** — company name, pairs-per-carton, business preferences
 
 ### Seller
+
 - View assigned route and customers
 - Record cash-in / cash-out transactions for assigned customers
 - View account statements
 
 ### Multilingual
+
 - English, Arabic (RTL), Urdu (RTL) — fully synced across all screens and PDF exports
 
 ---
@@ -30,7 +33,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 ## Tech Stack
 
 | Layer | Technology |
-|---|---|
+| --- | --- |
 | Mobile app | Flutter 3.x — Android APK only |
 | State management | Riverpod |
 | Navigation | go_router |
@@ -43,7 +46,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 
 ## Project Structure
 
-```
+```text
 shoeserp/
 ├── app/                    # Flutter Android app
 │   ├── lib/
@@ -64,27 +67,32 @@ shoeserp/
 ## Setup
 
 ### Prerequisites
+
 - Flutter SDK 3.x
 - Android Studio / Android SDK
 - Firebase project (`firebase login`)
 - Java 17+
 
 ### Install dependencies
+
 ```bash
 cd app
 flutter pub get
 ```
 
 ### Firebase config
+
 Place your `google-services.json` in `app/android/app/` (not committed — add via Firebase Console).
 
 ### Run (debug)
+
 ```bash
 cd app
 flutter run
 ```
 
 ### Build release APK
+
 ```bash
 cd app
 flutter build apk --release --target-platform android-arm,android-arm64
@@ -110,7 +118,7 @@ firebase deploy --only functions
 ## Roles & Permissions
 
 | Action | Admin | Seller |
-|---|---|---|
+| --- | --- | --- |
 | Manage products / variants | ✅ | ❌ |
 | Manage routes | ✅ | ❌ |
 | Manage users | ✅ | ❌ |
@@ -127,7 +135,7 @@ firebase deploy --only functions
 ## Firestore Collections
 
 | Collection | Purpose |
-|---|---|
+| --- | --- |
 | `users` | Auth user profiles, roles, route assignments |
 | `products` | Product catalogue |
 | `product_variants` | SKU variants with `quantity_available` |
@@ -145,7 +153,6 @@ cd app
 flutter analyze lib --no-pub   # must return "No issues found"
 flutter test -r expanded
 ```
-
 
 1. permission-denied:
 

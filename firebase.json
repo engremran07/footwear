@@ -3,6 +3,10 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "storage": {
+    "bucket": "shoeserp-clean-20260327.firebasestorage.app",
+    "rules": "storage.rules"
+  },
   "functions": [
     {
       "source": "functions",

@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'package:excel/excel.dart' as xl;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
@@ -223,21 +222,12 @@ class _ExportSheetContent extends StatelessWidget {
   }
 
   Future<List<int>?> _buildExcelBytes() async {
-    final excel = xl.Excel.createExcel();
-    excel.rename('Sheet1', title);
-    final sheet = excel[title];
-    if (_isRtl) {
-      sheet.isRTL = true;
-    }
-    sheet.appendRow(headers.map((h) => xl.TextCellValue(h)).toList());
-    for (final row in rows) {
-      sheet.appendRow(row.map((cell) {
-        if (cell == null) return xl.TextCellValue('');
-        if (cell is num) return xl.DoubleCellValue(cell.toDouble());
-        return xl.TextCellValue(cell.toString());
-      }).toList());
-    }
-    return excel.encode();
+    return buildStyledExcelBytes(
+      sheetName: title,
+      headers: headers,
+      rows: rows,
+      isRtl: _isRtl,
+    );
   }
 }
 

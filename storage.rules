@@ -63,9 +63,10 @@ service firebase.storage {
     // Company logo: admin only can upload, all authenticated can read
     match /settings/{fileName} {
       allow read: if isActiveUser();
-      allow write: if isAdmin()
+      allow create, update: if isAdmin()
                    && request.resource.size < 2 * 1024 * 1024  // 2MB max
                    && request.resource.contentType.matches('image/.*');
+      allow delete: if isAdmin();
     }
 
     // Deny everything else

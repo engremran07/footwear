@@ -9,7 +9,7 @@ void main() {
       'company_name': 'Test Co',
       'currency': 'SAR',
       'pairs_per_carton': 12,
-      'logo_url': 'https://example.com/logo.png',
+      'logo_base64': 'aGVsbG8=', // base64('hello')
       'updated_at': ts,
     };
 
@@ -18,7 +18,8 @@ void main() {
       expect(m.companyName, 'Test Co');
       expect(m.currency, 'SAR');
       expect(m.pairsPerCarton, 12);
-      expect(m.logoUrl, 'https://example.com/logo.png');
+      expect(m.logoBase64, 'aGVsbG8=');
+      expect(m.logoBytes, isNotNull);
     });
 
     test('missing fields use defaults', () {
@@ -26,7 +27,8 @@ void main() {
       expect(m.companyName, 'My Business');
       expect(m.currency, 'SAR');
       expect(m.pairsPerCarton, 12);
-      expect(m.logoUrl, isNull);
+      expect(m.logoBase64, isNull);
+      expect(m.logoBytes, isNull);
     });
   });
 

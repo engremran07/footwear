@@ -60,7 +60,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       selected: txType == 'cash_in',
                       onSelected: (_) =>
                           setModalState(() => txType = 'cash_in'),
-                      selectedColor: Colors.green.shade100,
+                      selectedColor: Colors.green.shade600,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -70,7 +70,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       selected: txType == 'cash_out',
                       onSelected: (_) =>
                           setModalState(() => txType = 'cash_out'),
-                      selectedColor: Colors.red.shade100,
+                      selectedColor: Colors.red.shade600,
                     ),
                   ),
                 ],
@@ -102,7 +102,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       label: Text(tr('sale_cash', ref)),
                       selected: saleType == 'cash',
                       onSelected: (_) => setModalState(() => saleType = 'cash'),
-                      selectedColor: Colors.green.shade100,
+                      selectedColor: Colors.green.shade600,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -112,7 +112,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       selected: saleType == 'credit',
                       onSelected: (_) =>
                           setModalState(() => saleType = 'credit'),
-                      selectedColor: Colors.orange.shade100,
+                      selectedColor: Colors.orange.shade600,
                     ),
                   ),
                 ],
@@ -308,7 +308,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       label: Text(tr('sale_cash', ref)),
                       selected: saleType == 'cash',
                       onSelected: (_) => setModalState(() => saleType = 'cash'),
-                      selectedColor: Colors.green.shade100,
+                      selectedColor: Colors.green.shade600,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -318,7 +318,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       selected: saleType == 'credit',
                       onSelected: (_) =>
                           setModalState(() => saleType = 'credit'),
-                      selectedColor: Colors.orange.shade100,
+                      selectedColor: Colors.orange.shade600,
                     ),
                   ),
                 ],
@@ -471,16 +471,20 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                     fileName: 'customer_${customer.name}',
                     pdfBytesBuilder: () async {
                       final locale = ref.read(appLocaleProvider);
-                      final settings = ref.read(settingsProvider).valueOrNull;
+                      final settings = await ref.read(settingsProvider.future);
                       final authUser = ref.read(authUserProvider).valueOrNull;
                       final allUsers =
                           ref.read(allUsersProvider).valueOrNull ?? [];
                       final entryByMap = {
                         for (final u in allUsers) u.id: u.displayName
                       };
+                      if (authUser != null) {
+                        entryByMap[authUser.id] = authUser.displayName;
+                      }
+                      final logoBytes = settings.logoBytes;
                       return buildPdfLedger(
                         customerName: customer.name,
-                        companyName: settings?.companyName ?? 'Footwear',
+                        companyName: settings.companyName,
                         generatedBy: authUser?.displayName ?? '',
                         openingBalance: 0,
                         transactions: txModels,
@@ -505,6 +509,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                           'mode': tr('mode', ref),
                         },
                         locale: locale,
+                        currency: settings.currency,
+                        logoBytes: logoBytes,
                       );
                     },
                   );
@@ -1000,7 +1006,7 @@ class _SellStockSheetState extends ConsumerState<_SellStockSheet> {
                           label: Text(tr('sale_cash', ref)),
                           selected: _saleType == 'cash',
                           onSelected: (_) => setS(() => _saleType = 'cash'),
-                          selectedColor: Colors.green.shade100,
+                          selectedColor: Colors.green.shade600,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1009,7 +1015,7 @@ class _SellStockSheetState extends ConsumerState<_SellStockSheet> {
                           label: Text(tr('sale_credit', ref)),
                           selected: _saleType == 'credit',
                           onSelected: (_) => setS(() => _saleType = 'credit'),
-                          selectedColor: Colors.orange.shade100,
+                          selectedColor: Colors.orange.shade600,
                         ),
                       ),
                     ],

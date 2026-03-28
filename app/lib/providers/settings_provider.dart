@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
@@ -30,6 +32,19 @@ class SettingsNotifier extends AsyncNotifier<void> {
         .collection(Collections.settings)
         .doc('global')
         .set({...data, 'updated_at': Timestamp.now()}, SetOptions(merge: true));
+  }
+
+  /// Encodes [imageBytes] as Base64 and stores it directly in the
+  /// settings/global Firestore document. No Firebase Storage required.
+  /// All connected devices receive the updated logo via the real-time stream.
+  Future<void> uploadLogo(Uint8List imageBytes) async {
+    final encoded = base64Encode(imageBytes);
+    await save({'logo_base64': encoded, 'logo_url': null});
+  }
+
+  /// Clears the company logo from the settings document.
+  Future<void> deleteLogo() async {
+    await save({'logo_base64': null, 'logo_url': null});
   }
 }
 

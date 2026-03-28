@@ -56,7 +56,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('cash_in', ref)),
                       selected: txType == 'cash_in',
                       onSelected: (_) => setS(() => txType = 'cash_in'),
-                      selectedColor: Colors.green.shade100,
+                      selectedColor: Colors.green.shade600,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -65,7 +65,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('cash_out', ref)),
                       selected: txType == 'cash_out',
                       onSelected: (_) => setS(() => txType = 'cash_out'),
-                      selectedColor: Colors.red.shade100,
+                      selectedColor: Colors.red.shade600,
                     ),
                   ),
                 ],
@@ -97,7 +97,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('sale_cash', ref)),
                       selected: saleType == 'cash',
                       onSelected: (_) => setS(() => saleType = 'cash'),
-                      selectedColor: Colors.green.shade100,
+                      selectedColor: Colors.green.shade600,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -106,7 +106,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('sale_credit', ref)),
                       selected: saleType == 'credit',
                       onSelected: (_) => setS(() => saleType = 'credit'),
-                      selectedColor: Colors.orange.shade100,
+                      selectedColor: Colors.orange.shade600,
                     ),
                   ),
                 ],
@@ -230,15 +230,17 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   Future<void> _generatePdf(ShopModel shop, List<TransactionModel> txs) async {
     try {
       final locale = ref.read(appLocaleProvider);
-      final settings = ref.read(settingsProvider).valueOrNull;
+      final settings = await ref.read(settingsProvider.future);
       final user = ref.read(authUserProvider).valueOrNull;
       final allUsers = ref.read(allUsersProvider).valueOrNull ?? [];
       final entryByMap = {for (final u in allUsers) u.id: u.displayName};
+      if (user != null) entryByMap[user.id] = user.displayName;
       final sorted = [...txs]
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      final logoBytes = settings.logoBytes;
       final bytes = await buildPdfLedger(
         customerName: shop.name,
-        companyName: settings?.companyName ?? 'Footwear',
+        companyName: settings.companyName,
         generatedBy: user?.displayName ?? '',
         openingBalance: 0,
         transactions: sorted,
@@ -246,6 +248,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
         locale: locale,
         showEntryBy: true,
         entryByMap: entryByMap,
+        currency: settings.currency,
+        logoBytes: logoBytes,
       );
       await Printing.sharePdf(
         bytes: bytes,
@@ -306,7 +310,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('sale_cash', ref)),
                       selected: saleType == 'cash',
                       onSelected: (_) => setModalState(() => saleType = 'cash'),
-                      selectedColor: Colors.green.shade100,
+                      selectedColor: Colors.green.shade600,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -316,7 +320,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       selected: saleType == 'credit',
                       onSelected: (_) =>
                           setModalState(() => saleType = 'credit'),
-                      selectedColor: Colors.orange.shade100,
+                      selectedColor: Colors.orange.shade600,
                     ),
                   ),
                 ],
@@ -465,16 +469,18 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     fileName: 'shop_${shop.name}',
                     pdfBytesBuilder: () async {
                       final locale = ref.read(appLocaleProvider);
-                      final settings = ref.read(settingsProvider).valueOrNull;
+                      final settings = await ref.read(settingsProvider.future);
                       final user = ref.read(authUserProvider).valueOrNull;
                       final allUsers =
                           ref.read(allUsersProvider).valueOrNull ?? [];
                       final entryByMap = {
                         for (final u in allUsers) u.id: u.displayName
                       };
+                      if (user != null) entryByMap[user.id] = user.displayName;
+                      final logoBytes = settings.logoBytes;
                       return buildPdfLedger(
                         customerName: shop.name,
-                        companyName: settings?.companyName ?? 'Footwear',
+                        companyName: settings.companyName,
                         generatedBy: user?.displayName ?? '',
                         openingBalance: 0,
                         transactions: sorted,
@@ -482,6 +488,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         locale: locale,
                         showEntryBy: true,
                         entryByMap: entryByMap,
+                        currency: settings.currency,
+                        logoBytes: logoBytes,
                       );
                     },
                   );
