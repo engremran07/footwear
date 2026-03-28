@@ -11,6 +11,7 @@ const { onQCReject }                 = require('./src/onQCReject');
 const { onInventoryBatchComplete }   = require('./src/onInventoryBatchComplete');
 const { onPurchaseOrderReceived }    = require('./src/onPurchaseOrderReceived');
 const { onReturnApproved }           = require('./src/onReturnApproved');
+const { manageUserAuth }             = require('./src/manageUserAuth');
 
 module.exports = {
   onOrderCreated,
@@ -22,4 +23,5 @@ module.exports = {
   onInventoryBatchComplete,
   onPurchaseOrderReceived,
   onReturnApproved,
+  manageUserAuth,
 };

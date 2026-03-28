@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { sendToTopic } = require('./notificationHelper');
 
 /**
  * onPurchaseOrderReceived
@@ -125,6 +126,16 @@ exports.onPurchaseOrderReceived = functions.firestore
       functions.logger.info(
         `onPurchaseOrderReceived: PO ${poId} received. batch=${batchId} items_created=${qty_total}`
       );
+
+      // Push notification: PO received
+      const supplierName = after.supplier_name || 'Supplier';
+      await sendToTopic(
+        'managers',
+        'Purchase Order Received',
+        `${supplierName} — ${qty_total} pairs received`,
+        { route: `/purchase-orders/${poId}`, type: 'po_received' }
+      );
+
       return null;
     } catch (err) {
       functions.logger.error(`onPurchaseOrderReceived: failed for PO ${poId}`, err);

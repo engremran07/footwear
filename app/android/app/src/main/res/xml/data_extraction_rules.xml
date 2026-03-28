@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12+ (API 31+) data extraction rules.
+    Excludes ALL app data from both cloud backup (Google Drive) and
+    device-to-device (D2D) migration so that uninstalling the app
+    leaves zero data or credentials on the device.
+-->
+<data-extraction-rules>
+
+    <!-- Cloud backup (Google Drive sync) -->
+    <cloud-backup disableIfNoEncryptionCapabilities="false">
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+
+    <!-- Device-to-device transfer (e.g. Quick Switch setup wizard) -->
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+
+</data-extraction-rules>

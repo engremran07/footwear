@@ -3,15 +3,21 @@ import 'download_helper.dart';
 
 /// Builds an [Excel] workbook with [sheetName] from [headers] + [rows]
 /// and triggers a browser download (web) or saves to Downloads (Android).
+/// When [isRtl] is true, sets the sheet direction to right-to-left.
 void exportToExcel({
   required String fileName,
   required String sheetName,
   required List<String> headers,
   required List<List<dynamic>> rows,
+  bool isRtl = false,
 }) {
   final excel = Excel.createExcel();
   excel.rename('Sheet1', sheetName);
   final sheet = excel[sheetName];
+
+  if (isRtl) {
+    sheet.isRTL = true;
+  }
 
   // Header row
   sheet.appendRow(headers.map((h) => TextCellValue(h)).toList());

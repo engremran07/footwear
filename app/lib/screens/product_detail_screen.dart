@@ -1,14 +1,25 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../providers/product_provider.dart';
-import '../widgets/status_chip.dart';
-import '../widgets/role_guard.dart';
-import '../widgets/confirm_dialog.dart';
-import '../core/utils/formatters.dart';
 import '../core/l10n/app_locale.dart';
-import '../core/utils/app_message.dart';
+import '../core/utils/formatters.dart';
+import '../providers/auth_provider.dart';
+import '../providers/product_provider.dart';
+import '../providers/settings_provider.dart';
+import '../widgets/empty_state.dart';
+
+String _stockLabel(int qty, int ppc) {
+  if (qty <= 0) return '0 prs';
+  final cartons = qty ~/ ppc;
+  final rem1 = qty % ppc;
+  final dozens = rem1 ~/ 12;
+  final pairs = rem1 % 12;
+  final parts = <String>[];
+  if (cartons > 0) parts.add('$cartons ctn');
+  if (dozens > 0) parts.add('$dozens dz');
+  if (pairs > 0 || parts.isEmpty) parts.add('$pairs prs');
+  return parts.join(' ');
+}
 
 class ProductDetailScreen extends ConsumerWidget {
   final String productId;
@@ -16,142 +27,174 @@ class ProductDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final product = ref.watch(productDetailProvider(productId));
+    final productAsync = ref.watch(productDetailProvider(productId));
+    final variantsAsync = ref.watch(productVariantsProvider(productId));
+    final user = ref.watch(authUserProvider).valueOrNull;
+    final settings = ref.watch(settingsProvider).valueOrNull;
+    final cs = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(tr('product', ref)),
-        actions: [
-          RoleGuard(
-            allowed: (u) => u.isManager,
-            child: product.when(
-              data: (p) => p != null
-                  ? Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () =>
-                              context.push('/products/$productId/edit'),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.block),
-                          tooltip: tr('deactivate', ref),
-                          onPressed: () async {
-                            final ok = await ConfirmDialog.show(
-                              context,
-                              title: tr('deactivate', ref),
-                              message: tr('deactivate_product_msg', ref),
-                              confirmLabel: tr('deactivate', ref),
-                              cancelLabel: tr('cancel', ref),
-                              confirmColor: Theme.of(context).colorScheme.error,
-                            );
-                            if (!ok) return;
-                            await ref
-                                .read(productNotifierProvider.notifier)
-                                .deactivate(productId);
-                            if (context.mounted) {
-                              AppMessage.success(
-                                  context, ref, 'success_deactivated');
-                              context.pop();
-                            }
-                          },
-                        ),
-                      ],
-                    )
-                  : const SizedBox.shrink(),
-              loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
-            ),
+    return productAsync.when(
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, _) =>
+          Scaffold(body: Center(child: Text('${tr('error', ref)}: $e'))),
+      data: (product) {
+        if (product == null) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: Center(child: Text(tr('not_found', ref))),
+          );
+        }
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(product.name),
+            actions: [
+              if (user?.isAdmin == true)
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () => context.push('/products/$productId/edit'),
+                ),
+            ],
           ),
-        ],
-      ),
-      body: product.when(
-        data: (p) {
-          if (p == null) {
-            return Center(child: Text(tr('not_found', ref)));
-          }
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (p.imageUrl != null)
-                  Hero(
-                    tag: 'product-img-${p.id}',
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: CachedNetworkImage(
-                        imageUrl: p.imageUrl!,
-                        height: 200,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        memCacheWidth: 800,
+          body: Column(
+            children: [
+              // Product info card
+              Card(
+                margin: const EdgeInsets.all(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      if (product.imageUrl != null)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            product.imageUrl!,
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _productAvatar(cs),
+                          ),
+                        )
+                      else
+                        _productAvatar(cs),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(product.name,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Chip(
+                              label: Text(product.category),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                const SizedBox(height: 16),
-                Row(
+                ),
+              ),
+              // Variants header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
                   children: [
-                    Expanded(
-                        child: Text(p.name,
-                            style: Theme.of(context).textTheme.headlineSmall)),
-                    StatusChip(status: p.active ? 'active' : 'inactive'),
+                    Text(tr('variants', ref),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    const Spacer(),
+                    variantsAsync.whenOrNull(
+                          data: (v) => Text('${v.length}',
+                              style: Theme.of(context).textTheme.bodySmall),
+                        ) ??
+                        const SizedBox.shrink(),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text('${tr('sku', ref)}: ${p.sku}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                const SizedBox(height: 16),
-                const Divider(),
-                _InfoRow(label: tr('category', ref), value: p.category),
-                _InfoRow(
-                    label: tr('sell_price', ref),
-                    value: AppFormatters.sar(p.sellPriceDozenSar)),
-                _InfoRow(
-                    label: tr('cost_price', ref),
-                    value: AppFormatters.pkr(p.costPriceDozenPkr)),
-                _InfoRow(
-                    label: tr('stock_count', ref),
-                    value: p.stockCount.toString()),
-                _InfoRow(label: tr('sizes', ref), value: p.sizes.join(', ')),
-                _InfoRow(
-                    label: tr('created_date', ref),
-                    value: AppFormatters.date(p.createdAt)),
-              ],
-            ),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('${tr('error', ref)}: $e')),
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _InfoRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(label,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              ),
+              const Divider(),
+              // Variants list
+              Expanded(
+                child: variantsAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('$e')),
+                  data: (variants) {
+                    if (variants.isEmpty) {
+                      return EmptyState(
+                        icon: Icons.style,
+                        message: tr('no_variants', ref),
+                      );
+                    }
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      itemCount: variants.length,
+                      itemBuilder: (_, i) {
+                        final v = variants[i];
+                        return Card(
+                          child: ListTile(
+                            title: Text(v.variantName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                                'Quantity: ${AppFormatters.number(v.quantityAvailable)} pairs'),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: v.quantityAvailable > 0
+                                    ? Colors.green.withAlpha(20)
+                                    : Colors.red.withAlpha(20),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                _stockLabel(
+                                    v.quantityAvailable, settings?.pairsPerCarton ?? 12),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: v.quantityAvailable > 0
+                                      ? Colors.green.shade700
+                                      : Colors.red.shade700,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            onTap: user?.isAdmin == true
+                                ? () => context.push(
+                                    '/products/$productId/variants/${v.id}/edit')
+                                : null,
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-          Expanded(
-              child:
-                  Text(value, style: Theme.of(context).textTheme.bodyMedium)),
-        ],
-      ),
+          floatingActionButton: user?.isAdmin == true
+              ? FloatingActionButton(
+                  onPressed: () =>
+                      context.push('/products/$productId/variants/new'),
+                  child: const Icon(Icons.add),
+                )
+              : null,
+        );
+      },
     );
   }
+
+  Widget _productAvatar(ColorScheme cs) => CircleAvatar(
+        radius: 40,
+        backgroundColor: cs.primaryContainer,
+        child: Icon(Icons.inventory_2, size: 32, color: cs.primary),
+      );
 }

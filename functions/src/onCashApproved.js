@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { sendToTopic } = require('./notificationHelper');
 
 /**
  * onCashApproved
@@ -123,6 +124,16 @@ exports.onCashApproved = functions.firestore
       });
 
       functions.logger.info(`onCashApproved: processed approval ${approvalId}`);
+
+      // Push notification: cash transaction approved
+      const amount = Number(after.amount) || 0;
+      const txType = after.type === 'cash_in' ? 'Cash In' : 'Cash Out';
+      await sendToTopic(
+        'managers',
+        `${txType} Approved`,
+        `${amount} SAR — ${after.reference || ''}`,
+        { route: '/cash', type: 'cash_approved' }
+      );
       return null;
     } catch (err) {
       functions.logger.error(`onCashApproved: failed for approval ${approvalId}`, err);

@@ -1,81 +1,113 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
-import '../models/order_model.dart';
-import '../models/cash_transaction_model.dart';
-import '../models/customer_model.dart';
 
-Timestamp _startOfToday() {
-  final now = DateTime.now();
-  return Timestamp.fromDate(DateTime(now.year, now.month, now.day));
+/// Dashboard stats computed from Firestore aggregation queries.
+class DashboardStats {
+  final int totalRoutes;
+  final int totalShops;
+  final int totalProducts;
+  final int totalVariants;
+  final double totalOutstanding;
+  final int totalStockPairs;
+
+  const DashboardStats({
+    this.totalRoutes = 0,
+    this.totalShops = 0,
+    this.totalProducts = 0,
+    this.totalVariants = 0,
+    this.totalOutstanding = 0,
+    this.totalStockPairs = 0,
+  });
 }
 
-/// All orders created today — real-time stream.
-final todaysOrdersProvider = StreamProvider<List<OrderModel>>((ref) {
-  final start = _startOfToday();
-  return FirebaseFirestore.instance
-      .collection(Collections.orders)
-      .where('created_at', isGreaterThanOrEqualTo: start)
-      .orderBy('created_at', descending: true)
-      .limit(200)
-      .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => OrderModel.fromJson(d.data(), d.id)).toList());
-});
+final dashboardStatsCacheProvider =
+    StateProvider<DashboardStats>((ref) => const DashboardStats());
 
-/// Today's cash-in transactions — real-time stream.
-final todaysCashInProvider = StreamProvider<List<CashTransactionModel>>((ref) {
-  final start = _startOfToday();
-  return FirebaseFirestore.instance
-      .collection(Collections.cashTransactions)
-      .where('type', isEqualTo: 'cash_in')
-      .where('created_at', isGreaterThanOrEqualTo: start)
-      .orderBy('created_at', descending: true)
-      .limit(200)
-      .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => CashTransactionModel.fromJson(d.data(), d.id))
-          .toList());
-});
+final dashboardStatsProvider = FutureProvider<DashboardStats>((ref) async {
+  ref.keepAlive();
+  final db = FirebaseFirestore.instance;
+  final cache = ref.read(dashboardStatsCacheProvider);
 
-/// Today's cash-out transactions — real-time stream.
-final todaysCashOutProvider = StreamProvider<List<CashTransactionModel>>((ref) {
-  final start = _startOfToday();
-  return FirebaseFirestore.instance
-      .collection(Collections.cashTransactions)
-      .where('type', isEqualTo: 'cash_out')
-      .where('created_at', isGreaterThanOrEqualTo: start)
-      .orderBy('created_at', descending: true)
-      .limit(200)
-      .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => CashTransactionModel.fromJson(d.data(), d.id))
-          .toList());
-});
-
-/// Top 10 customers by outstanding credit (balance desc).
-final topCreditCustomersProvider = StreamProvider<List<CustomerModel>>((ref) {
-  return FirebaseFirestore.instance
-      .collection(Collections.customers)
-      .orderBy('balance', descending: true)
-      .limit(10)
-      .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => CustomerModel.fromJson(d.data(), d.id))
-          .toList());
-});
-
-/// UID → display name lookup map — built from users collection.
-final userNameMapProvider = StreamProvider<Map<String, String>>((ref) {
-  return FirebaseFirestore.instance
-      .collection(Collections.users)
-      .limit(100)
-      .snapshots()
-      .map((snap) {
-    final map = <String, String>{};
-    for (final doc in snap.docs) {
-      map[doc.id] = (doc.data()['display_name'] as String?) ?? doc.id;
+  Future<int> safeCount(
+    Query<Map<String, dynamic>> query, {
+    required int fallback,
+  }) async {
+    try {
+      final agg = await query.count().get().timeout(const Duration(seconds: 8));
+      return agg.count ?? 0;
+    } on FirebaseException {
+      return fallback;
+    } on PlatformException {
+      return fallback;
+    } on TimeoutException {
+      return fallback;
+    } catch (e) {
+      return fallback;
     }
-    return map;
-  });
+  }
+
+  Future<double> safeSum(
+    Query<Map<String, dynamic>> query,
+    String field, {
+    required double fallback,
+  }) async {
+    try {
+      final agg = await query
+          .aggregate(sum(field))
+          .get()
+          .timeout(const Duration(seconds: 8));
+      return (agg.getSum(field) ?? 0).toDouble();
+    } on FirebaseException {
+      return fallback;
+    } on PlatformException {
+      return fallback;
+    } on TimeoutException {
+      return fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  final totalRoutes = await safeCount(
+    db.collection(Collections.routes).where('active', isEqualTo: true),
+    fallback: cache.totalRoutes,
+  );
+  final totalShops = await safeCount(
+    db.collection(Collections.customers).where('active', isEqualTo: true),
+    fallback: cache.totalShops,
+  );
+  final totalProducts = await safeCount(
+    db.collection(Collections.products).where('active', isEqualTo: true),
+    fallback: cache.totalProducts,
+  );
+  final totalVariants = await safeCount(
+    db.collection(Collections.productVariants).where('active', isEqualTo: true),
+    fallback: cache.totalVariants,
+  );
+  final totalOutstanding = await safeSum(
+    db.collection(Collections.customers).where('active', isEqualTo: true),
+    'balance',
+    fallback: cache.totalOutstanding,
+  );
+  final totalStockPairs = await safeSum(
+    db.collection(Collections.productVariants).where('active', isEqualTo: true),
+    'quantity_available',
+    fallback: cache.totalStockPairs.toDouble(),
+  );
+
+  final result = DashboardStats(
+    totalRoutes: totalRoutes,
+    totalShops: totalShops,
+    totalProducts: totalProducts,
+    totalVariants: totalVariants,
+    totalOutstanding: totalOutstanding,
+    totalStockPairs: totalStockPairs.toInt(),
+  );
+
+  ref.read(dashboardStatsCacheProvider.notifier).state = result;
+  return result;
 });

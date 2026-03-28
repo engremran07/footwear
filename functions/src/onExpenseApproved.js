@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { sendToTopic, sendToUser } = require('./notificationHelper');
 
 /**
  * onExpenseApproved
@@ -50,6 +51,18 @@ exports.onExpenseApproved = functions.firestore
           updated_at: admin.firestore.FieldValue.serverTimestamp(),
         });
         functions.logger.info(`onExpenseApproved: expense ${expense_id} rejected`);
+
+        // Notify the expense creator about rejection
+        const expDoc = await db.collection('expenses').doc(expense_id).get();
+        if (expDoc.exists && expDoc.data().created_by) {
+          await sendToUser(
+            expDoc.data().created_by,
+            'Expense Rejected',
+            `${after.category || 'Expense'} — ${after.amount || 0} SAR rejected`,
+            { route: '/expenses', type: 'expense_rejected' }
+          );
+        }
+
         return null;
       }
 
@@ -109,6 +122,15 @@ exports.onExpenseApproved = functions.firestore
       });
 
       functions.logger.info(`onExpenseApproved: processed approval ${approvalId}, expense ${expense_id}`);
+
+      // Push notification: expense approved
+      await sendToTopic(
+        'managers',
+        'Expense Approved',
+        `${after.category || 'Expense'} \u2014 ${after.amount || 0} SAR`,
+        { route: '/expenses', type: 'expense_approved' }
+      );
+
       return null;
     } catch (err) {
       functions.logger.error(`onExpenseApproved: failed for approval ${approvalId}`, err);

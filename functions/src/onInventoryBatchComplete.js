@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { sendToTopic } = require('./notificationHelper');
 
 /**
  * onInventoryBatchComplete
@@ -88,6 +89,15 @@ exports.onInventoryBatchComplete = functions.firestore
         `onInventoryBatchComplete: batch ${batchId} complete. ` +
         `cost_per_pair=${cost_per_pair.toFixed(2)}, items_updated=${count}`
       );
+
+      // Push notification: batch completed
+      await sendToTopic(
+        'managers',
+        'Inventory Batch Complete',
+        `Batch ${batchId} — ${count} items at ${cost_per_pair.toFixed(2)}/pair`,
+        { route: `/inventory/${batchId}`, type: 'batch_complete' }
+      );
+
       return null;
     } catch (err) {
       functions.logger.error(`onInventoryBatchComplete: failed for batch ${batchId}`, err);

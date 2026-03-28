@@ -4,41 +4,47 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../screens/login_screen.dart';
 import '../../screens/dashboard_screen.dart';
-import '../../screens/products_list_screen.dart';
-import '../../screens/product_form_screen.dart';
-import '../../screens/product_detail_screen.dart';
-import '../../screens/inventory_batch_list_screen.dart';
-import '../../screens/inventory_batch_form_screen.dart';
-import '../../screens/inventory_batch_detail_screen.dart';
-import '../../screens/orders_list_screen.dart';
-import '../../screens/order_form_screen.dart';
-import '../../screens/order_detail_screen.dart';
+import '../../screens/routes_list_screen.dart';
+import '../../screens/route_form_screen.dart';
+import '../../screens/route_detail_screen.dart';
+import '../../screens/shops_list_screen.dart';
+import '../../screens/shop_form_screen.dart';
+import '../../screens/shop_detail_screen.dart';
 import '../../screens/customers_list_screen.dart';
 import '../../screens/customer_form_screen.dart';
 import '../../screens/customer_detail_screen.dart';
-import '../../screens/workers_list_screen.dart';
-import '../../screens/worker_form_screen.dart';
-import '../../screens/worker_detail_screen.dart';
-import '../../screens/worker_payment_form_screen.dart';
-import '../../screens/expenses_list_screen.dart';
-import '../../screens/expense_form_screen.dart';
-import '../../screens/cash_screen.dart';
-import '../../screens/approvals_screen.dart';
-import '../../screens/purchase_orders_list_screen.dart';
-import '../../screens/purchase_order_form_screen.dart';
-import '../../screens/purchase_order_detail_screen.dart';
-import '../../screens/suppliers_list_screen.dart';
-import '../../screens/supplier_form_screen.dart';
-import '../../screens/supplier_detail_screen.dart';
-import '../../screens/qc_screen.dart';
-import '../../screens/waste_screen.dart';
-import '../../screens/pnl_screen.dart';
+import '../../screens/products_list_screen.dart';
+import '../../screens/product_form_screen.dart';
+import '../../screens/product_detail_screen.dart';
+import '../../screens/variant_form_screen.dart';
+import '../../screens/inventory_screen.dart';
 import '../../screens/reports_screen.dart';
 import '../../screens/settings_screen.dart';
-import '../../screens/returns_list_screen.dart';
-import '../../screens/return_form_screen.dart';
-import '../../screens/return_detail_screen.dart';
+import '../../screens/bootstrap_profile_screen.dart';
 import '../../widgets/app_shell.dart';
+
+bool _isAdminOnlyPath(String path) {
+  if (path == '/settings' || path == '/routes/new' || path == '/products/new') {
+    return true;
+  }
+  return RegExp(r'^/routes/[^/]+/edit$').hasMatch(path) ||
+      RegExp(r'^/products/[^/]+/edit$').hasMatch(path) ||
+      RegExp(r'^/products/[^/]+/variants/new$').hasMatch(path) ||
+      RegExp(r'^/products/[^/]+/variants/[^/]+/edit$').hasMatch(path);
+}
+
+bool _isSellerBlockedPath(String path) {
+  return path == '/routes' ||
+      path == '/customers' ||
+      path == '/reports' ||
+      path == '/settings' ||
+      path == '/routes/new' ||
+      path == '/customers/new' ||
+      RegExp(r'^/routes/[^/]+$').hasMatch(path) ||
+      RegExp(r'^/routes/[^/]+/edit$').hasMatch(path) ||
+      RegExp(r'^/customers/[^/]+$').hasMatch(path) ||
+      RegExp(r'^/customers/[^/]+/edit$').hasMatch(path);
+}
 
 /// Smooth fade+slide transition for all routes.
 CustomTransitionPage<void> _fadePage(Widget child, GoRouterState state) {
@@ -65,15 +71,34 @@ CustomTransitionPage<void> _fadePage(Widget child, GoRouterState state) {
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
+  final appUserState = ref.watch(authUserProvider);
 
   return GoRouter(
     initialLocation: '/',
     redirect: (context, state) {
       final isLoggedIn = authState.valueOrNull != null;
       final isLoginRoute = state.matchedLocation == '/login';
+      final isBootstrapRoute = state.matchedLocation == '/bootstrap-profile';
 
       if (!isLoggedIn && !isLoginRoute) return '/login';
-      if (isLoggedIn && isLoginRoute) return '/';
+
+      if (!isLoggedIn) return null;
+      if (appUserState.isLoading) return null;
+
+      final appUser = appUserState.valueOrNull;
+      if (appUser == null) {
+        if (!isBootstrapRoute) return '/bootstrap-profile';
+        return null;
+      }
+
+      if (isLoginRoute || isBootstrapRoute) return '/';
+
+      if (_isAdminOnlyPath(state.matchedLocation) && !appUser.isAdmin) {
+        return '/';
+      }
+      if (appUser.isSeller && _isSellerBlockedPath(state.matchedLocation)) {
+        return '/';
+      }
       return null;
     },
     routes: [
@@ -81,52 +106,49 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/login',
         pageBuilder: (_, s) => _fadePage(const LoginScreen(), s),
       ),
+      GoRoute(
+        path: '/bootstrap-profile',
+        pageBuilder: (_, s) => _fadePage(const BootstrapProfileScreen(), s),
+      ),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
           GoRoute(
               path: '/',
               pageBuilder: (_, s) => _fadePage(const DashboardScreen(), s)),
-          // Products
+          // Routes
           GoRoute(
-              path: '/products',
-              pageBuilder: (_, s) => _fadePage(const ProductsListScreen(), s)),
+              path: '/routes',
+              pageBuilder: (_, s) => _fadePage(const RoutesListScreen(), s)),
           GoRoute(
-              path: '/products/new',
-              pageBuilder: (_, s) => _fadePage(const ProductFormScreen(), s)),
+              path: '/routes/new',
+              pageBuilder: (_, s) => _fadePage(const RouteFormScreen(), s)),
           GoRoute(
-              path: '/products/:id/edit',
+              path: '/routes/:id/edit',
               pageBuilder: (_, s) => _fadePage(
-                  ProductFormScreen(productId: s.pathParameters['id']!), s)),
+                  RouteFormScreen(routeId: s.pathParameters['id']!), s)),
           GoRoute(
-              path: '/products/:id',
+              path: '/routes/:id',
               pageBuilder: (_, s) => _fadePage(
-                  ProductDetailScreen(productId: s.pathParameters['id']!), s)),
-          // Inventory
+                  RouteDetailScreen(routeId: s.pathParameters['id']!), s)),
+          // Shops
           GoRoute(
-              path: '/inventory',
-              pageBuilder: (_, s) =>
-                  _fadePage(const InventoryBatchListScreen(), s)),
+              path: '/shops',
+              pageBuilder: (_, s) => _fadePage(const ShopsListScreen(), s)),
           GoRoute(
-              path: '/inventory/new',
-              pageBuilder: (_, s) =>
-                  _fadePage(const InventoryBatchFormScreen(), s)),
-          GoRoute(
-              path: '/inventory/:id',
+              path: '/shops/new',
               pageBuilder: (_, s) => _fadePage(
-                  InventoryBatchDetailScreen(batchId: s.pathParameters['id']!),
+                  ShopFormScreen(
+                      preselectedRouteId: s.uri.queryParameters['routeId']),
                   s)),
-          // Orders
           GoRoute(
-              path: '/orders',
-              pageBuilder: (_, s) => _fadePage(const OrdersListScreen(), s)),
-          GoRoute(
-              path: '/orders/new',
-              pageBuilder: (_, s) => _fadePage(const OrderFormScreen(), s)),
-          GoRoute(
-              path: '/orders/:id',
+              path: '/shops/:id/edit',
               pageBuilder: (_, s) => _fadePage(
-                  OrderDetailScreen(orderId: s.pathParameters['id']!), s)),
+                  ShopFormScreen(shopId: s.pathParameters['id']!), s)),
+          GoRoute(
+              path: '/shops/:id',
+              pageBuilder: (_, s) => _fadePage(
+                  ShopDetailScreen(shopId: s.pathParameters['id']!), s)),
           // Customers
           GoRoute(
               path: '/customers',
@@ -143,94 +165,41 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               pageBuilder: (_, s) => _fadePage(
                   CustomerDetailScreen(customerId: s.pathParameters['id']!),
                   s)),
-          // Workers
+          // Products
           GoRoute(
-              path: '/workers',
-              pageBuilder: (_, s) => _fadePage(const WorkersListScreen(), s)),
+              path: '/products',
+              pageBuilder: (_, s) => _fadePage(const ProductsListScreen(), s)),
           GoRoute(
-              path: '/workers/new',
-              pageBuilder: (_, s) => _fadePage(const WorkerFormScreen(), s)),
+              path: '/products/new',
+              pageBuilder: (_, s) => _fadePage(const ProductFormScreen(), s)),
           GoRoute(
-              path: '/workers/:id/edit',
+              path: '/products/:id/edit',
               pageBuilder: (_, s) => _fadePage(
-                  WorkerFormScreen(workerId: s.pathParameters['id']!), s)),
+                  ProductFormScreen(productId: s.pathParameters['id']!), s)),
           GoRoute(
-              path: '/workers/:id',
+              path: '/products/:id',
               pageBuilder: (_, s) => _fadePage(
-                  WorkerDetailScreen(workerId: s.pathParameters['id']!), s)),
+                  ProductDetailScreen(productId: s.pathParameters['id']!), s)),
           GoRoute(
-              path: '/workers/:id/pay',
+              path: '/products/:id/variants/new',
               pageBuilder: (_, s) => _fadePage(
-                  WorkerPaymentFormScreen(workerId: s.pathParameters['id']!),
+                  VariantFormScreen(productId: s.pathParameters['id']!), s)),
+          GoRoute(
+              path: '/products/:id/variants/:vid/edit',
+              pageBuilder: (_, s) => _fadePage(
+                  VariantFormScreen(
+                      productId: s.pathParameters['id']!,
+                      variantId: s.pathParameters['vid']!),
                   s)),
-          // Expenses
+          // Inventory
           GoRoute(
-              path: '/expenses',
-              pageBuilder: (_, s) => _fadePage(const ExpensesListScreen(), s)),
-          GoRoute(
-              path: '/expenses/new',
-              pageBuilder: (_, s) => _fadePage(const ExpenseFormScreen(), s)),
-          // Financial
-          GoRoute(
-              path: '/cash',
-              pageBuilder: (_, s) => _fadePage(const CashScreen(), s)),
-          GoRoute(
-              path: '/approvals',
-              pageBuilder: (_, s) => _fadePage(const ApprovalsScreen(), s)),
-          // Purchase Orders
-          GoRoute(
-              path: '/purchase-orders',
-              pageBuilder: (_, s) =>
-                  _fadePage(const PurchaseOrdersListScreen(), s)),
-          GoRoute(
-              path: '/purchase-orders/new',
-              pageBuilder: (_, s) =>
-                  _fadePage(const PurchaseOrderFormScreen(), s)),
-          GoRoute(
-              path: '/purchase-orders/:id',
-              pageBuilder: (_, s) => _fadePage(
-                  PurchaseOrderDetailScreen(id: s.pathParameters['id']!), s)),
-          // Suppliers
-          GoRoute(
-              path: '/suppliers',
-              pageBuilder: (_, s) => _fadePage(const SuppliersListScreen(), s)),
-          GoRoute(
-              path: '/suppliers/new',
-              pageBuilder: (_, s) => _fadePage(const SupplierFormScreen(), s)),
-          GoRoute(
-              path: '/suppliers/:id/edit',
-              pageBuilder: (_, s) => _fadePage(
-                  SupplierFormScreen(supplierId: s.pathParameters['id']!), s)),
-          GoRoute(
-              path: '/suppliers/:id',
-              pageBuilder: (_, s) => _fadePage(
-                  SupplierDetailScreen(id: s.pathParameters['id']!), s)),
-          // Returns
-          GoRoute(
-              path: '/returns',
-              pageBuilder: (_, s) => _fadePage(const ReturnsListScreen(), s)),
-          GoRoute(
-              path: '/returns/new',
-              pageBuilder: (_, s) => _fadePage(const ReturnFormScreen(), s)),
-          GoRoute(
-              path: '/returns/:id',
-              pageBuilder: (_, s) => _fadePage(
-                  ReturnDetailScreen(returnId: s.pathParameters['id']!), s)),
-          // Operations
-          GoRoute(
-              path: '/qc',
-              pageBuilder: (_, s) => _fadePage(const QcScreen(), s)),
-          GoRoute(
-              path: '/waste',
-              pageBuilder: (_, s) => _fadePage(const WasteScreen(), s)),
+              path: '/inventory',
+              pageBuilder: (_, s) => _fadePage(const InventoryScreen(), s)),
           // Reports
-          GoRoute(
-              path: '/pnl',
-              pageBuilder: (_, s) => _fadePage(const PnlScreen(), s)),
           GoRoute(
               path: '/reports',
               pageBuilder: (_, s) => _fadePage(const ReportsScreen(), s)),
-          // Admin
+          // Settings
           GoRoute(
               path: '/settings',
               pageBuilder: (_, s) => _fadePage(const SettingsScreen(), s)),

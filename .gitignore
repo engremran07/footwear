@@ -3,48 +3,66 @@
 Thumbs.db
 desktop.ini
 
-# Firebase
-.firebase/
+# Logs
+*.log
+debug.log
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
 database-debug.log
 pubsub-debug.log
 
+# Firebase
+.firebase/
+
 # Node.js (functions)
 functions/node_modules/
 functions/lib/
 functions/package-lock.json
 
-# Flutter
+# Flutter — build outputs
+app/build/
 app/.dart_tool/
 app/.flutter-plugins
 app/.flutter-plugins-dependencies
-app/build/
 app/.packages
 app/pubspec.lock
+
+# Android Gradle
 app/android/.gradle/
 app/android/local.properties
-app/android/app/google-services.json
+
+# iOS (not used)
 app/ios/Flutter/Flutter.framework
 app/ios/Flutter/Flutter.podspec
 app/ios/Pods/
 app/ios/GoogleService-Info.plist
 
-# Generated files
-app/lib/firebase_options.dart
+# Web (no web version)
+app/web/build/
 
-# IDE
-.idea/
-.vscode/settings.json
-*.iml
+# Firebase generated config (contains project IDs — keep tracked)
+# app/lib/firebase_options.dart  <- intentionally tracked
 
-# Env / secrets
+# Secrets / credentials
+app/android/app/google-services.json
+google-services.json
+GoogleService-Info.plist
 .env
 .env.local
 *.key
 *.jks
 *.keystore
-key.properties
-google-services.json
-GoogleService-Info.plist
+app/android/key.properties
+
+# Auth export (contains hashed credentials)
+auth-users.json
+
+# Dev utility scripts (local only)
+check_locale.ps1
+check_locale.py
+
+# IDE
+.idea/
+.vscode/settings.json
+*.iml

@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "footwear-erp-a3e63"
-  }
+    "default": "shoeserp-clean-20260327"
+  },
+  "targets": {},
+  "etags": {}
 }

@@ -1,146 +1,222 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/connectivity_provider.dart';
-import '../providers/notification_provider.dart';
 import '../models/user_model.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
-import '../core/utils/formatters.dart';
+import '../core/services/permissions_service.dart';
+import '../core/utils/error_mapper.dart';
 
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   final Widget child;
   const AppShell({super.key, required this.child});
 
   static const _navItems = [
     (icon: Icons.dashboard, key: 'dashboard', route: '/'),
-    (icon: Icons.inventory_2, key: 'products', route: '/products'),
-    (icon: Icons.layers, key: 'inventory', route: '/inventory'),
-    (icon: Icons.shopping_cart, key: 'orders', route: '/orders'),
+    (icon: Icons.route, key: 'routes', route: '/routes'),
+    (icon: Icons.storefront, key: 'shops', route: '/shops'),
     (icon: Icons.people, key: 'customers', route: '/customers'),
-    (icon: Icons.assignment_return_outlined, key: 'returns', route: '/returns'),
-    (icon: Icons.person, key: 'workers', route: '/workers'),
-    (icon: Icons.receipt_long, key: 'expenses', route: '/expenses'),
-    (icon: Icons.attach_money, key: 'cash', route: '/cash'),
-    (icon: Icons.approval, key: 'approvals', route: '/approvals'),
-    (
-      icon: Icons.local_shipping,
-      key: 'purchase_orders',
-      route: '/purchase-orders'
-    ),
-    (icon: Icons.store, key: 'suppliers', route: '/suppliers'),
-    (icon: Icons.check_circle, key: 'qc', route: '/qc'),
-    (icon: Icons.delete_sweep, key: 'waste', route: '/waste'),
-    (icon: Icons.bar_chart, key: 'pnl', route: '/pnl'),
+    (icon: Icons.inventory_2, key: 'products', route: '/products'),
+    (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
     (icon: Icons.analytics, key: 'reports', route: '/reports'),
     (icon: Icons.settings, key: 'settings', route: '/settings'),
   ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PermissionsService.requestOnFirstRun();
+    });
+  }
+
+  /// Returns the logical parent route for [path], or null when already at root.
+  String? _parentRoute(String path) {
+    final segs = path.split('/').where((s) => s.isNotEmpty).toList();
+    if (segs.isEmpty) return null; // at /
+    if (segs.length == 1) return '/'; // /routes → /
+    // /products/:id/variants/new  or  /products/:id/variants/:vid/edit → /products/:id
+    if (segs.length >= 3 && segs[2] == 'variants') {
+      return '/${segs[0]}/${segs[1]}';
+    }
+    // /routes/:id/edit → /routes/:id
+    if (segs.length == 3 && segs[2] == 'edit') {
+      return '/${segs[0]}/${segs[1]}';
+    }
+    // /routes/:id → /routes
+    if (segs.length == 2) return '/${segs[0]}';
+    return '/';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).valueOrNull;
     final isWide = MediaQuery.of(context).size.width >= 720;
 
     final rawItems = _filteredItems(user);
-    // Resolve translation keys to localized labels
     final navItems = rawItems
         .map((e) => (icon: e.icon, label: tr(e.key, ref), route: e.route))
         .toList();
     final currentLocation = GoRouterState.of(context).uri.path;
 
+    final isOnline = ref.watch(connectivityProvider).valueOrNull ?? false;
+
+    void onPopInvoked(bool didPop, dynamic result) {
+      if (didPop) return;
+      final parent = _parentRoute(currentLocation);
+      if (parent != null) {
+        context.go(parent);
+      } else {
+        SystemNavigator.pop();
+      }
+    }
+
     if (isWide) {
-      return Scaffold(
-        body: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _ScrollableNavRail(
-              extended: MediaQuery.of(context).size.width >= 1024,
-              selectedIndex: _selectedIndex(navItems, currentLocation),
-              items: navItems,
-              onItem: (i) => context.go(navItems[i].route),
-              onLogout: () => ref.read(authNotifierProvider.notifier).signOut(),
-              notificationBell: _NotificationBell(),
-              connectionDot: _ConnectionDot(),
-              user: user,
-              signOutTooltip: tr('sign_out', ref),
-            ),
-            const VerticalDivider(thickness: 1, width: 1),
-            Expanded(child: child),
-          ],
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: onPopInvoked,
+        child: Scaffold(
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _ScrollableNavRail(
+                extended: MediaQuery.of(context).size.width >= 1024,
+                selectedIndex: _selectedIndex(navItems, currentLocation),
+                items: navItems,
+                onItem: (i) => context.go(navItems[i].route),
+                onLogout: () =>
+                    ref.read(authNotifierProvider.notifier).signOut(),
+                user: user,
+                signOutTooltip: tr('sign_out', ref),
+                isOnline: isOnline,
+              ),
+              const VerticalDivider(thickness: 1, width: 1),
+              Expanded(child: widget.child),
+            ],
+          ),
         ),
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppBrand.appName),
-        actions: [
-          _ConnectionDot(),
-          _NotificationBell(),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: tr('sign_out', ref),
-            onPressed: () => ref.read(authNotifierProvider.notifier).signOut(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: onPopInvoked,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(AppBrand.logoAsset, height: 32, fit: BoxFit.contain),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _BreadcrumbTitle(
+                    location: currentLocation, isOnline: isOnline, ref: ref),
+              ),
+            ],
           ),
-        ],
-      ),
-      drawer: NavigationDrawer(
-        selectedIndex: _selectedIndex(navItems, currentLocation),
-        onDestinationSelected: (i) {
-          Navigator.pop(context);
-          context.go(navItems[i].route);
-        },
-        children: [
-          DrawerHeader(
-            child: Center(
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: tr('sign_out', ref),
+              onPressed: () =>
+                  ref.read(authNotifierProvider.notifier).signOut(),
+            ),
+          ],
+        ),
+        drawer: NavigationDrawer(
+          selectedIndex: _selectedIndex(navItems, currentLocation),
+          onDestinationSelected: (i) {
+            Navigator.pop(context);
+            context.go(navItems[i].route);
+          },
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 32, 16, 12),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _UserAvatar(user: user, radius: 28),
-                  const SizedBox(height: 8),
-                  if (user != null) ...[
-                    Text(user.displayName,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 2),
-                    Text(user.email,
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant)),
-                    const SizedBox(height: 4),
-                    _RoleBadge(role: user.role),
-                  ] else ...[
-                    const Text(AppBrand.appName,
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 18)),
-                  ],
+                  Image.asset(AppBrand.logoAsset,
+                      height: 56, fit: BoxFit.contain),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _UserAvatar(user: user, radius: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: user != null
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(user.displayName,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14),
+                                      overflow: TextOverflow.ellipsis),
+                                  Text(user.email,
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant),
+                                      overflow: TextOverflow.ellipsis),
+                                  const SizedBox(height: 4),
+                                  _RoleBadge(role: user.role),
+                                ],
+                              )
+                            : const Text(AppBrand.appName,
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-          ),
-          ...navItems.map((e) => NavigationDrawerDestination(
-                icon: Icon(e.icon),
-                label: Text(e.label),
-              )),
-        ],
+            const Divider(height: 1),
+            ...navItems.map((e) => NavigationDrawerDestination(
+                  icon: Icon(e.icon),
+                  label: Text(e.label),
+                )),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.lock_reset),
+              title: Text(tr('change_password', ref)),
+              onTap: () {
+                Navigator.pop(context);
+                _showChangePasswordDialog();
+              },
+            ),
+          ],
+        ),
+        body: widget.child,
       ),
-      body: child,
     );
   }
 
   List<({IconData icon, String key, String route})> _filteredItems(
       UserModel? user) {
     if (user == null) return [];
-    return _navItems.where((item) {
-      if (item.route == '/workers' ||
-          item.route == '/cash' ||
-          item.route == '/reports') {
-        return user.isManager;
-      }
-      if (item.route == '/approvals' || item.route == '/settings') {
+    if (user.isSeller) {
+      return AppShell._navItems
+          .where((item) =>
+              item.route == '/' ||
+              item.route == '/shops' ||
+              item.route == '/products' ||
+              item.route == '/inventory')
+          .toList();
+    }
+    return AppShell._navItems.where((item) {
+      if (item.route == '/settings') {
         return user.isAdmin;
       }
       return true;
@@ -155,6 +231,84 @@ class AppShell extends ConsumerWidget {
         (e.route != '/' && location.startsWith(e.route)));
     return idx < 0 ? 0 : idx;
   }
+
+  void _showChangePasswordDialog() {
+    final currentC = TextEditingController();
+    final newC = TextEditingController();
+    final confirmC = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('change_password', ref)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: currentC,
+              obscureText: true,
+              autofocus: true,
+              decoration:
+                  InputDecoration(labelText: tr('current_password', ref)),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: newC,
+              obscureText: true,
+              decoration: InputDecoration(labelText: tr('new_password', ref)),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: confirmC,
+              obscureText: true,
+              decoration:
+                  InputDecoration(labelText: tr('confirm_password', ref)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(tr('cancel', ref)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final np = newC.text.trim();
+              if (np.length < 6) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(tr('err_weak_password', ref))),
+                );
+                return;
+              }
+              if (np != confirmC.text.trim()) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(tr('passwords_dont_match', ref))),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              try {
+                await ref
+                    .read(authNotifierProvider.notifier)
+                    .changePassword(currentC.text.trim(), np);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(tr('password_changed', ref))),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  final key = AppErrorMapper.key(e);
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+                }
+              }
+            },
+            child: Text(tr('save', ref)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─── Scrollable side navigation rail ─────────────────────────────────────────
@@ -165,10 +319,9 @@ class _ScrollableNavRail extends StatelessWidget {
   final List<({IconData icon, String label, String route})> items;
   final ValueChanged<int> onItem;
   final VoidCallback onLogout;
-  final Widget? notificationBell;
-  final Widget? connectionDot;
   final UserModel? user;
   final String signOutTooltip;
+  final bool isOnline;
 
   const _ScrollableNavRail({
     required this.extended,
@@ -176,10 +329,9 @@ class _ScrollableNavRail extends StatelessWidget {
     required this.items,
     required this.onItem,
     required this.onLogout,
-    this.notificationBell,
-    this.connectionDot,
     this.user,
     this.signOutTooltip = 'Sign out',
+    this.isOnline = false,
   });
 
   @override
@@ -198,22 +350,28 @@ class _ScrollableNavRail extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 child: extended
-                    ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(AppBrand.logoIcon, size: 26, color: cs.primary),
-                          const SizedBox(width: 8),
-                          Text(AppBrand.appName,
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: cs.primary)),
+                          Image.asset(AppBrand.logoAsset,
+                              width: 160, height: 66, fit: BoxFit.contain),
+                          const SizedBox(height: 4),
+                          _ConnectivityDot(isOnline: isOnline),
                         ],
                       )
-                    : Icon(AppBrand.logoIcon, size: 26, color: cs.primary),
+                    : Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(AppBrand.logoAsset,
+                                width: 52, height: 34, fit: BoxFit.contain),
+                            const SizedBox(height: 4),
+                            _ConnectivityDot(isOnline: isOnline),
+                          ],
+                        ),
+                      ),
               ),
             ),
-            // ── User profile card ──
             if (user != null)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -236,18 +394,10 @@ class _ScrollableNavRail extends StatelessWidget {
                               ],
                             ),
                           ),
-                          if (connectionDot != null) connectionDot!,
                         ],
                       )
-                    : Column(
-                        children: [
-                          _UserAvatar(user: user, radius: 14),
-                          if (connectionDot != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: connectionDot!,
-                            ),
-                        ],
+                    : Center(
+                        child: _UserAvatar(user: user, radius: 14),
                       ),
               ),
             const Divider(height: 1),
@@ -322,154 +472,15 @@ class _ScrollableNavRail extends StatelessWidget {
               top: false,
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (notificationBell != null) notificationBell!,
-                    IconButton(
-                      icon: const Icon(Icons.logout),
-                      tooltip: signOutTooltip,
-                      onPressed: onLogout,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ],
+                child: IconButton(
+                  icon: const Icon(Icons.logout),
+                  tooltip: signOutTooltip,
+                  onPressed: onLogout,
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Notification Bell with Badge ────────────────────────────────────────────
-
-class _NotificationBell extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final badgeCount = ref.watch(notificationBadgeCountProvider);
-
-    return IconButton(
-      icon: Badge(
-        isLabelVisible: badgeCount > 0,
-        label: Text('$badgeCount'),
-        child: const Icon(Icons.notifications_outlined),
-      ),
-      tooltip: tr('notifications', ref),
-      onPressed: () => _showNotificationPanel(context, ref),
-    );
-  }
-
-  void _showNotificationPanel(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.5,
-          minChildSize: 0.3,
-          maxChildSize: 0.85,
-          expand: false,
-          builder: (_, scrollCtrl) {
-            // Use Consumer so the panel watches the stream reactively
-            return Consumer(builder: (context, innerRef, _) {
-              final notifAsync = innerRef.watch(appNotificationsProvider);
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: Row(
-                      children: [
-                        Text(tr('notifications', innerRef),
-                            style: Theme.of(context).textTheme.titleMedium),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(ctx),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: notifAsync.when(
-                      loading: () =>
-                          const Center(child: CircularProgressIndicator()),
-                      error: (e, _) =>
-                          Center(child: Text(tr('error', innerRef))),
-                      data: (notifications) => notifications.isEmpty
-                          ? Center(
-                              child: Text(tr('no_notifications', innerRef)))
-                          : ListView.separated(
-                              controller: scrollCtrl,
-                              itemCount: notifications.length,
-                              separatorBuilder: (_, __) =>
-                                  const Divider(height: 1),
-                              itemBuilder: (_, i) {
-                                final n = notifications[i];
-                                return ListTile(
-                                  leading: CircleAvatar(
-                                    radius: 18,
-                                    backgroundColor: n.id.startsWith('order')
-                                        ? Colors.blue.withValues(alpha: 0.15)
-                                        : Colors.orange.withValues(alpha: 0.15),
-                                    child: Icon(
-                                      n.id.startsWith('order')
-                                          ? Icons.shopping_cart
-                                          : Icons.approval,
-                                      size: 18,
-                                      color: n.id.startsWith('order')
-                                          ? Colors.blue
-                                          : Colors.orange,
-                                    ),
-                                  ),
-                                  title: Text(n.title,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 14)),
-                                  subtitle: Text(n.subtitle,
-                                      style: const TextStyle(fontSize: 12)),
-                                  trailing: Text(
-                                    AppFormatters.dateTime(n.createdAt),
-                                    style:
-                                        Theme.of(context).textTheme.labelSmall,
-                                  ),
-                                  dense: true,
-                                  onTap: () {
-                                    Navigator.pop(ctx);
-                                    context.go(n.route);
-                                  },
-                                );
-                              },
-                            ),
-                    ),
-                  ),
-                ],
-              );
-            });
-          },
-        );
-      },
-    );
-  }
-}
-
-// ─── Connection Status Dot ───────────────────────────────────────────────────
-
-class _ConnectionDot extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final online = ref.watch(isOnlineProvider).valueOrNull ?? true;
-    return Tooltip(
-      message: tr(online ? 'online' : 'offline', ref),
-      child: Container(
-        width: 10,
-        height: 10,
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: online ? Colors.green : Colors.red,
         ),
       ),
     );
@@ -521,18 +532,14 @@ class _RoleBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (role) {
-      UserRole.admin => ('Admin', Colors.deepPurple),
-      UserRole.manager => ('Manager', Colors.blue),
-      UserRole.viewer => ('Viewer', Colors.teal),
-      UserRole.workerPk => ('Worker PK', Colors.orange),
-      UserRole.workerKsa => ('Worker KSA', Colors.orange),
-      UserRole.seller => ('Seller', Colors.green),
+      UserRole.admin => ('Admin', AppBrand.adminRoleColor),
+      UserRole.seller => ('Seller', AppBrand.sellerRoleColor),
     };
     return Container(
       padding: EdgeInsets.symmetric(
           horizontal: small ? 6 : 8, vertical: small ? 1 : 2),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: color.withAlpha(38),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
@@ -541,6 +548,86 @@ class _RoleBadge extends StatelessWidget {
           fontSize: small ? 10 : 11,
           fontWeight: FontWeight.w600,
           color: color,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Breadcrumb Title ─────────────────────────────────────────────────────────
+
+class _BreadcrumbTitle extends StatelessWidget {
+  final String location;
+  final bool isOnline;
+  final WidgetRef ref;
+
+  const _BreadcrumbTitle({
+    required this.location,
+    required this.isOnline,
+    required this.ref,
+  });
+
+  static const _segmentLabels = <String, String>{
+    'customers': 'Customers',
+    'products': 'Products',
+    'routes': 'Routes',
+    'shops': 'Shops',
+    'inventory': 'Inventory',
+    'reports': 'Reports',
+    'settings': 'Settings',
+    'variants': 'Variants',
+    'edit': 'Edit',
+    'new': 'New',
+  };
+
+  String _buildCrumb() {
+    final segments = location.split('/').where((s) => s.isNotEmpty).toList();
+    final labels = <String>[];
+    for (final seg in segments) {
+      final label = _segmentLabels[seg];
+      if (label != null) labels.add(label);
+      // Skip IDs (long alphanumeric strings without spaces)
+    }
+    return labels.isEmpty ? AppBrand.appName : labels.join(' \u203a ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(
+            _buildCrumb(),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
+        _ConnectivityDot(isOnline: isOnline),
+      ],
+    );
+  }
+}
+
+// ─── Connectivity Dot ────────────────────────────────────────────────────────
+
+class _ConnectivityDot extends StatelessWidget {
+  final bool isOnline;
+  const _ConnectivityDot({required this.isOnline});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: isOnline ? 'Online' : 'Offline',
+      child: Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isOnline ? Colors.green : Colors.grey,
+          boxShadow: isOnline
+              ? [BoxShadow(color: Colors.green.withAlpha(100), blurRadius: 4)]
+              : null,
         ),
       ),
     );

@@ -30,6 +30,10 @@ class ExportSheet {
     required List<List<dynamic>> rows,
     required String fileName,
     String? subtitle,
+
+    /// Optional override: when provided, used for PDF / Image / Print instead
+    /// of the generic [buildPdfTable]. Useful for ledger-style exports.
+    Future<Uint8List> Function()? pdfBytesBuilder,
   }) {
     showModalBottomSheet(
       context: context,
@@ -43,6 +47,7 @@ class ExportSheet {
         rows: rows,
         fileName: fileName,
         subtitle: subtitle,
+        pdfBytesBuilder: pdfBytesBuilder,
       ),
     );
   }
@@ -55,6 +60,7 @@ class _ExportSheetContent extends StatelessWidget {
   final List<List<dynamic>> rows;
   final String fileName;
   final String? subtitle;
+  final Future<Uint8List> Function()? pdfBytesBuilder;
 
   const _ExportSheetContent({
     required this.ref,
@@ -63,7 +69,11 @@ class _ExportSheetContent extends StatelessWidget {
     required this.rows,
     required this.fileName,
     this.subtitle,
+    this.pdfBytesBuilder,
   });
+
+  AppLocale get _locale => ref.read(appLocaleProvider);
+  bool get _isRtl => _locale == AppLocale.ar || _locale == AppLocale.ur;
 
   @override
   Widget build(BuildContext context) {
@@ -112,6 +122,7 @@ class _ExportSheetContent extends StatelessWidget {
                 sheetName: title,
                 headers: headers,
                 rows: rows,
+                isRtl: _isRtl,
               );
             },
           ),
@@ -123,16 +134,47 @@ class _ExportSheetContent extends StatelessWidget {
             sublabel: 'PDF',
             onTap: () async {
               Navigator.pop(context);
-              final bytes = await buildPdfTable(
-                title: title,
-                headers: headers,
-                rows: rows,
-                subtitle: subtitle,
-              );
+              final bytes = pdfBytesBuilder != null
+                  ? await pdfBytesBuilder!()
+                  : await buildPdfTable(
+                      title: title,
+                      headers: headers,
+                      rows: rows,
+                      subtitle: subtitle,
+                      locale: _locale,
+                    );
               await shareFile(
                 bytes: bytes,
                 fileName: '$fileName.pdf',
                 mimeType: 'application/pdf',
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          _OptionTile(
+            icon: Icons.image_outlined,
+            color: const Color(0xFFE65100),
+            label: tr('share_image', ref),
+            sublabel: 'PNG',
+            onTap: () async {
+              Navigator.pop(context);
+              final pdfBytes = pdfBytesBuilder != null
+                  ? await pdfBytesBuilder!()
+                  : await buildPdfTable(
+                      title: title,
+                      headers: headers,
+                      rows: rows,
+                      subtitle: subtitle,
+                      locale: _locale,
+                    );
+              // Rasterize first page of PDF to a high-res PNG
+              final pages = Printing.raster(pdfBytes, dpi: 200);
+              final firstPage = await pages.first;
+              final pngBytes = await firstPage.toPng();
+              await shareFile(
+                bytes: pngBytes,
+                fileName: '$fileName.png',
+                mimeType: 'image/png',
               );
             },
           ),
@@ -144,12 +186,15 @@ class _ExportSheetContent extends StatelessWidget {
             sublabel: '',
             onTap: () async {
               Navigator.pop(context);
-              final bytes = await buildPdfTable(
-                title: title,
-                headers: headers,
-                rows: rows,
-                subtitle: subtitle,
-              );
+              final bytes = pdfBytesBuilder != null
+                  ? await pdfBytesBuilder!()
+                  : await buildPdfTable(
+                      title: title,
+                      headers: headers,
+                      rows: rows,
+                      subtitle: subtitle,
+                      locale: _locale,
+                    );
               await Printing.layoutPdf(
                   onLayout: (_) async => Uint8List.fromList(bytes));
             },
@@ -181,6 +226,9 @@ class _ExportSheetContent extends StatelessWidget {
     final excel = xl.Excel.createExcel();
     excel.rename('Sheet1', title);
     final sheet = excel[title];
+    if (_isRtl) {
+      sheet.isRTL = true;
+    }
     sheet.appendRow(headers.map((h) => xl.TextCellValue(h)).toList());
     for (final row in rows) {
       sheet.appendRow(row.map((cell) {

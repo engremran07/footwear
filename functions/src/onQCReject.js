@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { sendToTopic } = require('./notificationHelper');
 
 /**
  * onQCReject
@@ -93,6 +94,17 @@ exports.onQCReject = functions.firestore
         `onQCReject: processed qc ${qcId} for batch ${batch_id} — ` +
         `passed=${numPassed} rejected=${numRejected}`
       );
+
+      // Push notification: QC issues found
+      if (numRejected > 0) {
+        await sendToTopic(
+          'managers',
+          'QC Issues Found',
+          `Batch ${batch_id} — ${numRejected} pairs rejected`,
+          { route: '/qc', type: 'qc_reject' }
+        );
+      }
+
       return null;
     } catch (err) {
       functions.logger.error(`onQCReject: failed for qc_record ${qcId}`, err);

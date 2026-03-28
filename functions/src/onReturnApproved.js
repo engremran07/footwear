@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { sendToTopic } = require('./notificationHelper');
 
 /**
  * onReturnApproved
@@ -111,6 +112,17 @@ exports.onReturnApproved = functions.firestore
       });
 
       functions.logger.info(`onReturnApproved: completed successfully for ${returnId}`);
+
+      // Push notification: return approved
+      const customerName = after.customer_name || 'Unknown';
+      const totalQty = after.total_qty_returned || 0;
+      await sendToTopic(
+        'managers',
+        'Return Approved',
+        `${customerName} \u2014 ${totalQty} pairs returned`,
+        { route: `/returns/${returnId}`, type: 'return_approved' }
+      );
+
       return null;
     } catch (err) {
       functions.logger.error(`onReturnApproved: error for ${returnId}`, err);

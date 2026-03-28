@@ -9,7 +9,7 @@ const { getAuth } = require('firebase-admin/auth');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
 
 // Uses Application Default Credentials (firebase CLI login already authenticated)
-initializeApp({ projectId: 'footwear-erp-a3e63' });
+initializeApp({ projectId: 'shoeserp-clean-20260327' });
 
 const auth = getAuth();
 const db = getFirestore();

@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 /// Maps Firebase and Dart exceptions to user-friendly i18n translation keys.
@@ -26,7 +27,15 @@ class AppErrorMapper {
         _ => 'err_auth_generic',
       };
     }
-
+    // ── Firebase Functions errors ───────────────────────────────────────────
+    if (error is FirebaseFunctionsException) {
+      return switch (error.code) {
+        'not-found' => 'err_function_not_deployed',
+        'permission-denied' => 'err_permission_denied',
+        'unauthenticated' => 'err_unauthenticated',
+        _ => 'err_unknown',
+      };
+    }
     // ── Firestore errors ───────────────────────────────────────────────
     if (error is FirebaseException) {
       return switch (error.code) {

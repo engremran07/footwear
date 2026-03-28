@@ -4,39 +4,12 @@ import '../core/constants/collections.dart';
 import '../models/customer_model.dart';
 
 final customersProvider = StreamProvider<List<CustomerModel>>((ref) {
+  ref.keepAlive();
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('active', isEqualTo: true)
       .orderBy('name')
-      .limit(50)
-      .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => CustomerModel.fromJson(d.data(), d.id))
-          .toList());
-});
-
-final customersByTypeProvider =
-    StreamProvider.family<List<CustomerModel>, String>((ref, type) {
-  return FirebaseFirestore.instance
-      .collection(Collections.customers)
-      .where('active', isEqualTo: true)
-      .where('type', isEqualTo: type)
-      .orderBy('name')
-      .limit(50)
-      .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => CustomerModel.fromJson(d.data(), d.id))
-          .toList());
-});
-
-final customersBySellerProvider =
-    StreamProvider.family<List<CustomerModel>, String>((ref, sellerId) {
-  return FirebaseFirestore.instance
-      .collection(Collections.customers)
-      .where('seller_id', isEqualTo: sellerId)
-      .where('active', isEqualTo: true)
-      .orderBy('name')
-      .limit(50)
+      .limit(500)
       .snapshots()
       .map((snap) => snap.docs
           .map((d) => CustomerModel.fromJson(d.data(), d.id))
@@ -53,73 +26,63 @@ final customerDetailProvider =
           doc.exists ? CustomerModel.fromJson(doc.data()!, doc.id) : null);
 });
 
+final outstandingCustomersProvider = StreamProvider<List<CustomerModel>>((ref) {
+  return FirebaseFirestore.instance
+      .collection(Collections.customers)
+      .where('active', isEqualTo: true)
+      .where('balance', isGreaterThan: 0)
+      .orderBy('balance', descending: true)
+      .limit(100)
+      .snapshots()
+      .map((snap) => snap.docs
+          .map((d) => CustomerModel.fromJson(d.data(), d.id))
+          .toList());
+});
+
+final customerTransactionsProvider =
+    StreamProvider.family<List<dynamic>, String>((ref, customerId) {
+  return FirebaseFirestore.instance
+      .collection(Collections.transactions)
+      .where('customer_id', isEqualTo: customerId)
+      .orderBy('created_at', descending: true)
+      .limit(100)
+      .snapshots()
+      .map((snap) => snap.docs.map((d) {
+            final data = d.data();
+            data['id'] = d.id;
+            return data;
+          }).toList());
+});
+
 class CustomerNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
   Future<void> create(Map<String, dynamic> data) async {
-    state = const AsyncLoading();
-    try {
-      await FirebaseFirestore.instance.collection(Collections.customers).add({
-        ...data,
-        'balance': 0.0,
-        'total_orders': 0,
-        'active': true,
-        'created_at': Timestamp.now(),
-        'updated_at': Timestamp.now(),
-      });
-      state = const AsyncData(null);
-    } catch (e, st) {
-      state = AsyncError(e, st);
-      rethrow;
-    }
+    final db = FirebaseFirestore.instance;
+    await db.collection(Collections.customers).add({
+      ...data,
+      'balance': 0.0,
+      'active': true,
+      'created_at': Timestamp.now(),
+      'updated_at': Timestamp.now(),
+    });
   }
 
-  Future<void> save(String id, Map<String, dynamic> data) async {
-    state = const AsyncLoading();
-    try {
-      await FirebaseFirestore.instance
-          .collection(Collections.customers)
-          .doc(id)
-          .update({...data, 'updated_at': Timestamp.now()});
-      state = const AsyncData(null);
-    } catch (e, st) {
-      state = AsyncError(e, st);
-      rethrow;
-    }
+  Future<void> updateCustomer(String id, Map<String, dynamic> data) async {
+    final db = FirebaseFirestore.instance;
+    await db.collection(Collections.customers).doc(id).update({
+      ...data,
+      'updated_at': Timestamp.now(),
+    });
   }
 
   Future<void> deactivate(String id) async {
-    state = const AsyncLoading();
-    try {
-      await FirebaseFirestore.instance
-          .collection(Collections.customers)
-          .doc(id)
-          .update({'active': false, 'updated_at': Timestamp.now()});
-      state = const AsyncData(null);
-    } catch (e, st) {
-      state = AsyncError(e, st);
-      rethrow;
-    }
-  }
-
-  Future<void> assignSeller(
-      String customerId, String? sellerId, String? sellerName) async {
-    state = const AsyncLoading();
-    try {
-      await FirebaseFirestore.instance
-          .collection(Collections.customers)
-          .doc(customerId)
-          .update({
-        'seller_id': sellerId,
-        'seller_name': sellerName,
-        'updated_at': Timestamp.now(),
-      });
-      state = const AsyncData(null);
-    } catch (e, st) {
-      state = AsyncError(e, st);
-      rethrow;
-    }
+    final db = FirebaseFirestore.instance;
+    await db.collection(Collections.customers).doc(id).update({
+      'active': false,
+      'updated_at': Timestamp.now(),
+    });
   }
 }
 

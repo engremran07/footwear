@@ -18,25 +18,13 @@ void main() {
     });
   });
 
-  group('AppFormatters.pkr', () {
-    test('formats PKR with no decimal places', () {
-      final result = AppFormatters.pkr(5000.0);
-      expect(result, contains('PKR'));
-      expect(result, contains('5,000'));
-    });
-  });
-
   group('AppFormatters.currency', () {
-    test('uses pkr for PKR symbol', () {
-      expect(AppFormatters.currency(1000.0, 'PKR'), contains('PKR'));
-    });
-
     test('uses sar for SAR symbol', () {
       expect(AppFormatters.currency(1000.0, 'SAR'), contains('SAR'));
     });
 
-    test('uses sar for unknown symbol', () {
-      // Fallback to SAR for any other symbol
+    test('uses sar for any symbol', () {
+      // All currencies now format as SAR
       expect(AppFormatters.currency(1000.0, 'USD'), contains('SAR'));
     });
   });

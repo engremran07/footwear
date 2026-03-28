@@ -1,185 +1,215 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/auth_provider.dart';
-import '../core/utils/validators.dart';
-import '../core/utils/app_message.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
+import '../providers/auth_provider.dart';
+import '../providers/network_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
-
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  bool _obscurePassword = true;
-  bool _rememberMe = true;
+  final _emailC = TextEditingController();
+  final _passC = TextEditingController();
+  bool _obscure = true;
+  bool _remember = true;
 
   @override
   void dispose() {
-    _emailCtrl.dispose();
-    _passwordCtrl.dispose();
+    _emailC.dispose();
+    _passC.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    await ref.read(authNotifierProvider.notifier).signIn(
-          _emailCtrl.text.trim(),
-          _passwordCtrl.text,
-        );
 
-    if (!mounted) return;
-    final state = ref.read(authNotifierProvider);
-    if (!state.hasError) {
-      TextInput.finishAutofillContext();
+    try {
+      await ref.read(authNotifierProvider.notifier).signIn(
+            _emailC.text.trim(),
+            _passC.text,
+            rememberMe: _remember,
+          );
+      // After successful sign-in, the router will navigate automatically
+    } catch (e) {
+      if (!mounted) return;
+
+      String errorMessage = tr('err_auth_generic', ref);
+
+      // Interpret Firebase errors
+      if (e is FirebaseAuthException) {
+        errorMessage = switch (e.code) {
+          'user-not-found' => tr('err_user_not_found', ref),
+          'wrong-password' => tr('err_invalid_credentials', ref),
+          'invalid-credential' => tr('err_invalid_credentials', ref),
+          'invalid-login-credentials' => tr('err_invalid_credentials', ref),
+          'invalid-email' => tr('err_invalid_email', ref),
+          'user-disabled' => tr('err_user_disabled', ref),
+          'too-many-requests' => tr('err_too_many_requests', ref),
+          'network-request-failed' => tr('err_network', ref),
+          'operation-not-allowed' => tr('err_operation_not_allowed', ref),
+          'requires-recent-login' => tr('err_requires_recent_login', ref),
+          _ => '${tr('err_auth_generic', ref)}: ${e.message}',
+        };
+      } else if (e.toString().contains('No user found')) {
+        errorMessage = tr('err_user_not_found', ref);
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red.shade700,
+          duration: const Duration(seconds: 5),
+        ),
+      );
     }
-    state.whenOrNull(
-      error: (e, _) => AppMessage.error(context, ref, e),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authNotifierProvider);
-    final isLoading = authState.isLoading;
+    final isLoading = ref.watch(authNotifierProvider).isLoading;
     final theme = Theme.of(context);
     final currentLocale = ref.watch(appLocaleProvider);
+    final isOnline = ref.watch(isOnlineProvider);
 
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // ── Language selector (before login) ───────
-                SegmentedButton<AppLocale>(
-                  segments: const [
-                    ButtonSegment(value: AppLocale.en, label: Text('En')),
-                    ButtonSegment(value: AppLocale.ar, label: Text('عربي')),
-                    ButtonSegment(value: AppLocale.ur, label: Text('اردو')),
-                  ],
-                  selected: {currentLocale},
-                  onSelectionChanged: (sel) {
-                    ref.read(appLocaleProvider.notifier).state = sel.first;
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Online status indicator (top-left)
+            Positioned(
+              top: 8,
+              left: 8,
+              child: isOnline.when(
+                data: (online) => Chip(
+                  avatar: Icon(
+                    online ? Icons.cloud_done : Icons.cloud_off,
+                    size: 18,
+                    color: online ? Colors.green : Colors.grey,
+                  ),
+                  label: Text(
+                    online ? 'Online' : 'Offline',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: online ? Colors.green : Colors.grey,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  backgroundColor: (online ? Colors.green : Colors.grey)
+                      .withValues(alpha: 0.1),
+                ),
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const Chip(
+                  avatar: Icon(Icons.cloud_off, size: 18),
+                  label: Text('Offline', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+            ),
+            // Language selector top-right
+            Positioned(
+              top: 8,
+              right: 8,
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<AppLocale>(
+                  value: currentLocale,
+                  icon: const Icon(Icons.language, size: 20),
+                  borderRadius: BorderRadius.circular(12),
+                  items: AppLocale.values
+                      .map((l) => DropdownMenuItem(
+                            value: l,
+                            child: Text(l.label,
+                                style: const TextStyle(fontSize: 14)),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) {
+                      ref.read(appLocaleProvider.notifier).state = v;
+                    }
                   },
-                  showSelectedIcon: false,
                 ),
-                const SizedBox(height: 32),
-                // ── Logo ───────────────────────────────────
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(AppBrand.logoIcon,
-                      color: Colors.white, size: 48),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  AppBrand.appName,
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  tr('sign_in_continue', ref),
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 40),
-                Form(
-                  key: _formKey,
-                  child: AutofillGroup(
+              ),
+            ),
+            // Main login form
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(32),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: Form(
+                    key: _formKey,
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
+                        Image.asset(
+                          AppBrand.logoAsset,
+                          height: 110,
+                          fit: BoxFit.contain,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(tr('app_name', ref),
+                            style: theme.textTheme.headlineMedium
+                                ?.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Text(tr('sign_in_continue', ref),
+                            style: theme.textTheme.bodyMedium),
+                        const SizedBox(height: 32),
                         TextFormField(
-                          controller: _emailCtrl,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [
-                            AutofillHints.username,
-                            AutofillHints.email
-                          ],
+                          controller: _emailC,
                           decoration: InputDecoration(
-                            labelText: tr('username_or_email', ref),
+                            labelText: tr('email', ref),
                             prefixIcon: const Icon(Icons.person_outline),
                           ),
-                          validator: (v) => (v == null || v.trim().isEmpty)
-                              ? tr('username_required', ref)
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? tr('required', ref)
                               : null,
-                          enabled: !isLoading,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
-                          controller: _passwordCtrl,
-                          obscureText: _obscurePassword,
-                          autocorrect: false,
-                          textInputAction: TextInputAction.done,
-                          autofillHints: const [AutofillHints.password],
+                          controller: _passC,
+                          obscureText: _obscure,
                           decoration: InputDecoration(
                             labelText: tr('password', ref),
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
-                              icon: Icon(_obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined),
-                              onPressed: () => setState(
-                                  () => _obscurePassword = !_obscurePassword),
+                              icon: Icon(_obscure
+                                  ? Icons.visibility_off
+                                  : Icons.visibility),
+                              onPressed: () =>
+                                  setState(() => _obscure = !_obscure),
                             ),
                           ),
-                          validator:
-                              AppValidators.required(tr('password', ref)),
-                          onFieldSubmitted: (_) => _submit(),
-                          enabled: !isLoading,
+                          validator: (v) => v == null || v.isEmpty
+                              ? tr('required', ref)
+                              : null,
                         ),
                         const SizedBox(height: 8),
-                        // ── Remember me ──────────────────────
                         Row(
                           children: [
                             Checkbox(
-                              value: _rememberMe,
-                              onChanged: isLoading
-                                  ? null
-                                  : (v) =>
-                                      setState(() => _rememberMe = v ?? true),
+                              value: _remember,
+                              onChanged: (v) => setState(() => _remember = v!),
                             ),
-                            GestureDetector(
-                              onTap: isLoading
-                                  ? null
-                                  : () => setState(
-                                      () => _rememberMe = !_rememberMe),
-                              child: Text(tr('remember_me', ref),
-                                  style: theme.textTheme.bodyMedium),
-                            ),
+                            Text(tr('remember_me', ref)),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 24),
                         SizedBox(
                           width: double.infinity,
                           height: 48,
-                          child: FilledButton(
+                          child: ElevatedButton(
                             onPressed: isLoading ? null : _submit,
                             child: isLoading
                                 ? const SizedBox(
-                                    height: 20,
                                     width: 20,
+                                    height: 20,
                                     child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Colors.white),
-                                  )
+                                        strokeWidth: 2))
                                 : Text(tr('sign_in', ref)),
                           ),
                         ),
@@ -187,16 +217,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  AppBrand.versionDisplay,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

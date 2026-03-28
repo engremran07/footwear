@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { sendToTopic } = require('./notificationHelper');
 
 /**
  * onOrderCreated
@@ -29,6 +30,16 @@ exports.onOrderCreated = functions.firestore
         status: 'processing',
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      // Push notification to managers: new order received
+      const customerName = order.customer_name || 'Unknown';
+      const total = order.total || 0;
+      await sendToTopic(
+        'managers',
+        'New Order Received',
+        `${customerName} — ${total} SAR`,
+        { route: `/orders/${orderId}`, type: 'new_order' }
+      );
 
       functions.logger.info(`onOrderCreated: order ${orderId} moved to processing`);
       return null;

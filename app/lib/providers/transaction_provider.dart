@@ -1,0 +1,307 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/constants/collections.dart';
+import '../models/transaction_model.dart';
+
+final shopTransactionsProvider =
+    StreamProvider.family<List<TransactionModel>, String>((ref, shopId) {
+  return FirebaseFirestore.instance
+      .collection(Collections.transactions)
+      .where('shop_id', isEqualTo: shopId)
+      .orderBy('created_at', descending: true)
+      .limit(100)
+      .snapshots()
+      .map((snap) => snap.docs
+          .map((d) => TransactionModel.fromJson(d.data(), d.id))
+          .toList());
+});
+
+final allTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
+  ref.keepAlive();
+  return FirebaseFirestore.instance
+      .collection(Collections.transactions)
+      .orderBy('created_at', descending: true)
+      .limit(200)
+      .snapshots()
+      .map((snap) => snap.docs
+          .map((d) => TransactionModel.fromJson(d.data(), d.id))
+          .toList());
+});
+
+class TransactionNotifier extends AsyncNotifier<void> {
+  @override
+  Future<void> build() async {}
+
+  /// Creates a transaction and updates shop balance atomically.
+  /// For cash_out with items, also deducts stock from variants.
+  Future<void> create({
+    required String shopId,
+    required String shopName,
+    required String routeId,
+    required String type,
+    required double amount,
+    String? description,
+    String? customerId,
+    String? customerName,
+    String? saleType,
+    List<TransactionItem> items = const [],
+    required String createdBy,
+    Timestamp? transactionDate,
+  }) async {
+    final normalizedCreatedBy = createdBy.trim();
+    if (normalizedCreatedBy.isEmpty) {
+      throw ArgumentError('createdBy must not be empty');
+    }
+    // shopId and routeId are optional for admin-only customer-level transactions;
+    // balance update logic already guards on isNotEmpty below.
+
+    final db = FirebaseFirestore.instance;
+    final batch = db.batch();
+
+    // Create transaction doc
+    final txRef = db.collection(Collections.transactions).doc();
+    batch.set(txRef, {
+      'shop_id': shopId,
+      'shop_name': shopName,
+      'route_id': routeId,
+      'customer_id': customerId,
+      'customer_name': customerName,
+      'type': type,
+      'sale_type': saleType,
+      'amount': amount,
+      'description': description,
+      'items': items.map((e) => e.toJson()).toList(),
+      'created_by': normalizedCreatedBy,
+      'created_at': transactionDate ?? Timestamp.now(),
+    });
+
+    // Update shop balance: cash_out adds, cash_in subtracts
+    if (shopId.isNotEmpty) {
+      final balanceDelta = type == 'cash_out' ? amount : -amount;
+      batch.update(db.collection(Collections.customers).doc(shopId), {
+        'balance': FieldValue.increment(balanceDelta),
+        'updated_at': Timestamp.now(),
+      });
+    }
+
+    // Update customer balance if customer transaction
+    if (customerId != null && customerId.isNotEmpty) {
+      final balanceDelta = type == 'cash_out' ? amount : -amount;
+      batch.update(db.collection(Collections.customers).doc(customerId), {
+        'balance': FieldValue.increment(balanceDelta),
+        'updated_at': Timestamp.now(),
+      });
+    }
+
+    // If cash_out with items, deduct stock from product_variants
+    if (type == 'cash_out' && items.isNotEmpty) {
+      for (final item in items) {
+        batch.update(
+          db.collection(Collections.productVariants).doc(item.variantId),
+          {'quantity_available': FieldValue.increment(-item.qty)},
+        );
+      }
+    }
+
+    await batch.commit();
+  }
+
+  /// Creates a seller-side sale transaction.
+  /// Deducts stock from [sellerInventoryDeductions] (map of sellerInventoryDocId→qty)
+  /// in the same atomic batch as the transaction + customer balance update.
+  Future<void> createSellerSale({
+    required String routeId,
+    required String customerId,
+    required String customerName,
+    required double amount,
+    String? description,
+    String? saleType,
+    required List<TransactionItem> items,
+    required Map<String, int> sellerInventoryDeductions,
+    required String createdBy,
+    Timestamp? transactionDate,
+  }) async {
+    final normalizedCreatedBy = createdBy.trim();
+    if (normalizedCreatedBy.isEmpty) {
+      throw ArgumentError('createdBy must not be empty');
+    }
+    if (customerId.trim().isEmpty) {
+      throw ArgumentError('customerId must not be empty');
+    }
+
+    final db = FirebaseFirestore.instance;
+    final batch = db.batch();
+
+    final txRef = db.collection(Collections.transactions).doc();
+    batch.set(txRef, {
+      'shop_id': '',
+      'shop_name': '',
+      'route_id': routeId,
+      'customer_id': customerId,
+      'customer_name': customerName,
+      'type': 'cash_out',
+      'sale_type': saleType ?? 'cash',
+      'amount': amount,
+      'description': description,
+      'items': items.map((e) => e.toJson()).toList(),
+      'created_by': normalizedCreatedBy,
+      'created_at': transactionDate ?? Timestamp.now(),
+    });
+
+    // Customer owes more
+    batch.update(db.collection(Collections.customers).doc(customerId), {
+      'balance': FieldValue.increment(amount),
+      'updated_at': Timestamp.now(),
+    });
+
+    // Deduct from seller_inventory docs
+    for (final entry in sellerInventoryDeductions.entries) {
+      if (entry.value > 0) {
+        batch.update(
+          db.collection(Collections.sellerInventory).doc(entry.key),
+          {
+            'quantity_available': FieldValue.increment(-entry.value),
+            'updated_at': Timestamp.now(),
+          },
+        );
+      }
+    }
+
+    await batch.commit();
+  }
+
+  /// Deletes a transaction and reverses its balance impact on the customer.
+  Future<void> deleteTransaction({
+    required String txId,
+    required String? customerId,
+    required double amount,
+    required String type,
+  }) async {
+    if (txId.trim().isEmpty) {
+      throw ArgumentError('txId must not be empty');
+    }
+
+    final db = FirebaseFirestore.instance;
+    final batch = db.batch();
+
+    batch.delete(db.collection(Collections.transactions).doc(txId));
+
+    if (customerId != null && customerId.isNotEmpty) {
+      // Reverse: cash_out added to balance, so subtract; cash_in subtracted, so add
+      final reversalDelta = type == 'cash_out' ? -amount : amount;
+      batch.update(db.collection(Collections.customers).doc(customerId), {
+        'balance': FieldValue.increment(reversalDelta),
+        'updated_at': Timestamp.now(),
+      });
+    }
+
+    await batch.commit();
+  }
+
+  /// Creates a return transaction: reduces what the customer owes and optionally
+  /// restores seller inventory stock. Treated like cash_in (balance goes down).
+  Future<void> createReturn({
+    required String shopId,
+    required String shopName,
+    required String routeId,
+    required double amount,
+    String? description,
+    List<TransactionItem> items = const [],
+    Map<String, int> sellerInventoryRestores = const {},
+    required String createdBy,
+  }) async {
+    final normalizedCreatedBy = createdBy.trim();
+    if (normalizedCreatedBy.isEmpty) {
+      throw ArgumentError('createdBy must not be empty');
+    }
+
+    final db = FirebaseFirestore.instance;
+    final batch = db.batch();
+
+    final txRef = db.collection(Collections.transactions).doc();
+    batch.set(txRef, {
+      'shop_id': shopId,
+      'shop_name': shopName,
+      'route_id': routeId,
+      'customer_id': shopId,
+      'customer_name': shopName,
+      'type': TransactionModel.typeReturn,
+      'sale_type': 'return',
+      'amount': amount,
+      'description': description,
+      'items': items.map((e) => e.toJson()).toList(),
+      'created_by': normalizedCreatedBy,
+      'created_at': Timestamp.now(),
+    });
+
+    // Return reduces balance (customer owes less)
+    if (shopId.isNotEmpty) {
+      batch.update(db.collection(Collections.customers).doc(shopId), {
+        'balance': FieldValue.increment(-amount),
+        'updated_at': Timestamp.now(),
+      });
+    }
+
+    // Restore seller inventory stock for returned items
+    for (final entry in sellerInventoryRestores.entries) {
+      if (entry.value > 0) {
+        batch.update(
+          db.collection(Collections.sellerInventory).doc(entry.key),
+          {
+            'quantity_available': FieldValue.increment(entry.value),
+            'updated_at': Timestamp.now(),
+          },
+        );
+      }
+    }
+
+    await batch.commit();
+  }
+
+  /// Updates a transaction and adjusts customer balance for the change.
+  Future<void> updateTransaction({
+    required String txId,
+    required String? customerId,
+    required double oldAmount,
+    required String oldType,
+    required double newAmount,
+    required String newType,
+    String? description,
+    String? saleType,
+    Timestamp? transactionDate,
+  }) async {
+    if (txId.trim().isEmpty) {
+      throw ArgumentError('txId must not be empty');
+    }
+
+    final db = FirebaseFirestore.instance;
+    final batch = db.batch();
+
+    batch.update(db.collection(Collections.transactions).doc(txId), {
+      'amount': newAmount,
+      'type': newType,
+      if (description != null) 'description': description,
+      if (saleType != null) 'sale_type': saleType,
+      if (transactionDate != null) 'created_at': transactionDate,
+      'updated_at': Timestamp.now(),
+    });
+
+    if (customerId != null && customerId.isNotEmpty) {
+      // Reverse old delta, then apply new delta
+      final oldDelta = oldType == 'cash_out' ? oldAmount : -oldAmount;
+      final newDelta = newType == 'cash_out' ? newAmount : -newAmount;
+      final netChange = -oldDelta + newDelta;
+      if (netChange != 0) {
+        batch.update(db.collection(Collections.customers).doc(customerId), {
+          'balance': FieldValue.increment(netChange),
+          'updated_at': Timestamp.now(),
+        });
+      }
+    }
+
+    await batch.commit();
+  }
+}
+
+final transactionNotifierProvider =
+    AsyncNotifierProvider<TransactionNotifier, void>(TransactionNotifier.new);

@@ -3,239 +3,209 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Helper Functions ───────────────────────────────────────────────────
+    // --- Helper Functions ---------------------------------------------------
 
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function userDocExists() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isActiveUser() {
+      return isAuthenticated() && userDoc().data.active == true;
     }
 
     function getUserRole() {
-      return userDocExists()
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-        : 'none';
+      return userDoc().data.role;
+    }
+
+    function isAdminRole(role) {
+      return role == 'admin' ||
+        role == 'manager' ||
+        role == 'Admin' ||
+        role == 'Manager' ||
+        role == 'ADMIN' ||
+        role == 'MANAGER';
+    }
+
+    function isSellerRole(role) {
+      return role == 'seller' ||
+        role == 'Seller' ||
+        role == 'SELLER';
+    }
+
+    function assignedRouteId() {
+      return userDoc().data.assigned_route_id;
     }
 
     function isAdmin() {
-      return isAuthenticated() && getUserRole() == 'admin';
-    }
-
-    function isManager() {
-      return isAuthenticated() && getUserRole() == 'manager';
-    }
-
-    function isAdminOrManager() {
-      return isAuthenticated() && getUserRole() in ['admin', 'manager'];
-    }
-
-    function isViewer() {
-      return isAuthenticated() && getUserRole() in ['admin', 'manager', 'viewer', 'seller'];
+      return isActiveUser() && isAdminRole(getUserRole());
     }
 
     function isSeller() {
-      return isAuthenticated() && getUserRole() == 'seller';
-    }
-
-    function isWorkerPK() {
-      return isAuthenticated() && getUserRole() == 'worker_pk';
-    }
-
-    function isWorkerKSA() {
-      return isAuthenticated() && getUserRole() == 'worker_ksa';
+      return isActiveUser() && isSellerRole(getUserRole());
     }
 
     function isOwnDoc(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // ─── users ───────────────────────────────────────────────────────────────
+    function isBootstrapAdminCreate(userId) {
+      return isOwnDoc(userId)
+        && !exists(/databases/$(database)/documents/users/$(userId))
+        && request.auth.token.email == 'admin@footwear.pk'
+        && request.resource.data.role == 'admin'
+        && request.resource.data.active == true;
+    }
+
+    function isSellerForRoute(routeId) {
+      return isSeller() && assignedRouteId() != null && assignedRouteId() == routeId;
+    }
+
+    // --- users --------------------------------------------------------------
     match /users/{userId} {
-      // Any authenticated user can read their own doc (needed for role resolution)
-      // Admin/manager can read all user docs (for user management)
-      allow read: if isAuthenticated() && (isOwnDoc(userId) || isAdminOrManager());
-      // Bootstrap: allow authenticated user to create their own doc (first-time setup only)
-      allow create: if isAuthenticated() && (isOwnDoc(userId) || isAdmin());
+      allow read: if isOwnDoc(userId) || isAdmin();
+      allow create: if isAdmin() || isBootstrapAdminCreate(userId) ||
+        (
+          isOwnDoc(userId) &&
+          request.resource.data.role == 'seller' &&
+          request.resource.data.active == true
+        );
       allow update: if isAdmin() || isOwnDoc(userId);
       allow delete: if isAdmin();
     }
 
-    // ─── products ────────────────────────────────────────────────────────────
+    // --- products -----------------------------------------------------------
     match /products/{productId} {
-      allow read: if isViewer() || isWorkerPK() || isWorkerKSA();
-      allow create, update: if isAdminOrManager();
+      allow read: if isActiveUser();
+      allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // ─── inventory_batches ───────────────────────────────────────────────────
-    match /inventory_batches/{batchId} {
-      allow read: if isViewer() || isWorkerPK() || isWorkerKSA();
-      allow create, update: if isAdminOrManager();
-      allow delete: if isAdmin();
-    }
-
-    // ─── inventory_items ─────────────────────────────────────────────────────
-    match /inventory_items/{itemId} {
-      allow read: if isViewer() || isWorkerPK() || isWorkerKSA();
-      // Items are created by Cloud Functions (onPurchaseOrderReceived, onInventoryBatchComplete)
-      // App may update status (e.g. reserve on order) via manager+
-      allow create: if isAdminOrManager();
-      allow update: if isAdminOrManager();
-      allow delete: if isAdmin();
-    }
-
-    // ─── orders ──────────────────────────────────────────────────────────────
-    match /orders/{orderId} {
-      allow read: if isViewer();
-      allow create, update: if isAdminOrManager() || isSeller();
-      allow delete: if isAdmin();
-    }
-
-    // ─── order_items ─────────────────────────────────────────────────────────
-    match /order_items/{itemId} {
-      allow read: if isViewer();
-      allow create, update: if isAdminOrManager() || isSeller();
-      allow delete: if isAdmin();
-    }
-
-    // ─── customers ───────────────────────────────────────────────────────────
-    match /customers/{customerId} {
-      allow read: if isViewer();
-      allow create, update: if isAdminOrManager() || isSeller();
-      allow delete: if isAdmin();
-    }
-
-    // ─── workers ─────────────────────────────────────────────────────────────
-    match /workers/{workerId} {
-      // Workers can read their own document
-      allow read: if isAdminOrManager()
-                  || (isWorkerPK() && isOwnDoc(workerId))
-                  || (isWorkerKSA() && isOwnDoc(workerId));
-      allow create, update: if isAdminOrManager();
-      allow delete: if isAdmin();
-    }
-
-    // ─── worker_payments ─────────────────────────────────────────────────────
-    match /worker_payments/{paymentId} {
-      // Workers can read their own payments
-      allow read: if isAdminOrManager()
-                  || (isAuthenticated()
-                      && resource.data.worker_id == request.auth.uid);
-      allow create: if isAdminOrManager();
-      // Approved payments are immutable — only allow update when status is still draft/pending
-      allow update: if isAdminOrManager()
-                    && resource.data.status in ['draft', 'pending'];
-      allow delete: if isAdmin()
-                    && resource.data.status in ['draft', 'pending'];
-    }
-
-    // ─── expenses ────────────────────────────────────────────────────────────
-    match /expenses/{expenseId} {
-      allow read: if isViewer();
-      allow create: if isAdminOrManager();
-      // Cannot update once approved
-      allow update: if isAdminOrManager()
-                    && resource.data.status in ['draft', 'pending_approval', 'rejected'];
-      allow delete: if isAdmin()
-                    && resource.data.status in ['draft', 'rejected'];
-    }
-
-    // ─── cash_transactions ───────────────────────────────────────────────────
-    match /cash_transactions/{txId} {
-      allow read: if isViewer();
-      allow create: if isAdminOrManager() || isSeller();
-      // Approved transactions are immutable
-      allow update: if isAdmin()
-                    && resource.data.status in ['pending'];
-      allow delete: if isAdmin()
-                    && resource.data.status == 'pending';
-    }
-
-    // ─── cash_approvals ──────────────────────────────────────────────────────
-    match /cash_approvals/{approvalId} {
-      allow read: if isViewer();
-      allow create: if isAdminOrManager() || isSeller();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // ─── expense_approvals ───────────────────────────────────────────────────
-    match /expense_approvals/{approvalId} {
-      allow read: if isViewer();
-      allow create: if isAdminOrManager();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // ─── pnl_snapshots ───────────────────────────────────────────────────────
-    // CRITICAL: No client write access. Written exclusively by Cloud Functions.
-    match /pnl_snapshots/{period} {
-      allow read: if isViewer();
-      allow write: if false;  // Cloud Functions use Admin SDK — bypass rules
-    }
-
-    // ─── suppliers ───────────────────────────────────────────────────────────
-    match /suppliers/{supplierId} {
-      allow read: if isViewer();
-      allow create, update: if isAdminOrManager();
-      allow delete: if isAdmin();
-    }
-
-    // ─── purchase_orders ─────────────────────────────────────────────────────
-    match /purchase_orders/{poId} {
-      allow read: if isViewer();
-      allow create, update: if isAdminOrManager();
-      allow delete: if isAdmin()
-                    && resource.data.status in ['draft', 'cancelled'];
-    }
-
-    // ─── qc_records ──────────────────────────────────────────────────────────
-    match /qc_records/{qcId} {
-      allow read: if isViewer() || isWorkerPK();
-      allow create: if isAdminOrManager();
-      // QC records are immutable after creation
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // ─── waste_records ───────────────────────────────────────────────────────
-    match /waste_records/{wasteId} {
-      allow read: if isViewer();
-      // Written by Cloud Function onQCReject only; allow admin create for corrections
+    // --- product_variants ---------------------------------------------------
+    match /product_variants/{variantId} {
+      allow read: if isActiveUser();
       allow create: if isAdmin();
-      allow update: if isAdmin();
+      // Seller can only increment quantity_available (warehouse returns) — prevents depletion
+      allow update: if isAdmin() ||
+        (
+          isSeller() &&
+          request.resource.data.quantity_available > resource.data.quantity_available &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity_available', 'updated_at'])
+        );
       allow delete: if isAdmin();
     }
 
-    // ─── settings ────────────────────────────────────────────────────────────
+    // --- routes -------------------------------------------------------------
+    match /routes/{routeId} {
+      allow read: if isAdmin() || isSellerForRoute(routeId);
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- customers (consolidates shops and customers) ----
+    match /customers/{customerId} {
+      allow read: if isAdmin() ||
+        (
+          isSeller() &&
+          resource.data.route_id != null &&
+          isSellerForRoute(resource.data.route_id)
+        );
+      allow create: if isAdmin() ||
+        (
+          isSeller() &&
+          request.resource.data.route_id != null &&
+          isSellerForRoute(request.resource.data.route_id)
+        ) ||
+        (isSeller() && request.resource.data.route_id == null);
+      allow update: if isAdmin() || 
+        (
+          isSeller() &&
+          isSellerForRoute(resource.data.route_id)
+        ) ||
+        (
+          // Allow sellers to update ONLY balance+updated_at on customers that
+          // have no route assigned (route_id == '' / null).  This covers atomic
+          // batch writes from createReturn / updateTransaction / deleteTransaction
+          // where the shop was created without a route ("R0" badge).
+          isSeller() &&
+          (resource.data.route_id == null || resource.data.route_id == '') &&
+          assignedRouteId() != null && assignedRouteId() != '' &&
+          request.resource.data.diff(resource.data)
+            .affectedKeys().hasOnly(['balance', 'updated_at'])
+        );
+      allow delete: if isAdmin();
+    }
+
+    // --- transactions -------------------------------------------------------
+    match /transactions/{txId} {
+      allow read: if isAdmin() ||
+        (
+          isSeller() && (
+            (resource.data.route_id != null &&
+             resource.data.route_id != '' &&
+             isSellerForRoute(resource.data.route_id)) ||
+            resource.data.created_by == request.auth.uid ||
+            (resource.data.shop_id != null &&
+             resource.data.shop_id != '' &&
+             isSellerForRoute(
+               get(/databases/$(database)/documents/customers/$(resource.data.shop_id)).data.route_id
+             ))
+          )
+        );
+      allow create: if isAdmin() ||
+        (
+          isSeller() &&
+          request.resource.data.created_by == request.auth.uid &&
+          (
+            (request.resource.data.route_id != null &&
+             request.resource.data.route_id != '' &&
+             isSellerForRoute(request.resource.data.route_id)) ||
+            (request.resource.data.shop_id != null &&
+             request.resource.data.shop_id != '' &&
+             isSellerForRoute(
+               get(/databases/$(database)/documents/customers/$(request.resource.data.shop_id)).data.route_id
+             ))
+          )
+        );
+      allow update: if isAdmin() ||
+        (isSeller() && resource.data.created_by == request.auth.uid);
+      allow delete: if isAdmin() ||
+        (isSeller() && resource.data.created_by == request.auth.uid);
+    }
+
+    // --- seller inventory ---------------------------------------------------
+    match /seller_inventory/{docId} {
+      allow read: if isAdmin() ||
+        (isSeller() && resource.data.seller_id == request.auth.uid);
+      allow create, delete: if isAdmin();
+      // Seller can update quantity_available when executing a sale (stock deduction)
+      allow update: if isAdmin() ||
+        (isSeller() && resource.data.seller_id == request.auth.uid);
+    }
+
+    // --- inventory transactions (audit log for all stock movements) ---------
+    match /inventory_transactions/{docId} {
+      allow read: if isAdmin() ||
+        (isSeller() && resource.data.seller_id == request.auth.uid);
+      allow create: if isAdmin() ||
+        (
+          isSeller() &&
+          request.resource.data.seller_id == request.auth.uid &&
+          request.resource.data.created_by == request.auth.uid
+        );
+      allow update, delete: if isAdmin();
+    }
+
+    // --- settings -----------------------------------------------------------
     match /settings/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isActiveUser();
       allow write: if isAdmin();
     }
 
-    // ─── order_returns ───────────────────────────────────────────────────────
-    match /order_returns/{returnId} {
-      allow read: if isViewer();
-      allow create: if isAdminOrManager() || isSeller();
-      // Managers can update pending returns (status transitions)
-      // Completed returns are immutable
-      allow update: if isAdminOrManager()
-                    && resource.data.status != 'completed';
-      // Cannot delete returns once created
-      allow delete: if false;
-    }
-
-    // ─── shops ───────────────────────────────────────────────────────────────
-    match /shops/{shopId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdminOrManager();
-      allow update: if isAdminOrManager();
-      allow delete: if isAdmin();
-    }
-
-    // ─── Deny all other paths ────────────────────────────────────────────────
+    // --- Deny all other paths -----------------------------------------------
     match /{document=**} {
       allow read, write: if false;
     }

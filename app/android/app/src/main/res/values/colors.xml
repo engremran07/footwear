@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification accent color for Firebase Messaging -->
+    <color name="notification_color">#D32F2F</color>
+	<color name="ic_launcher_background">#FFFFFF</color>
+</resources>

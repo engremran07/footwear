@@ -1,396 +1,585 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/pnl_provider.dart';
-import '../providers/worker_provider.dart';
-import '../providers/qc_provider.dart';
-import '../models/pnl_snapshot_model.dart';
-import '../widgets/error_state.dart';
-import '../core/utils/formatters.dart';
-import '../widgets/export_sheet.dart';
-import '../core/constants/app_brand.dart';
+import 'package:printing/printing.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/utils/formatters.dart';
+import '../core/utils/pdf_export.dart';
+import '../providers/auth_provider.dart';
+import '../providers/customer_provider.dart';
+import '../providers/dashboard_provider.dart';
+import '../providers/product_provider.dart';
+import '../providers/seller_inventory_provider.dart';
+import '../providers/settings_provider.dart';
+import '../providers/shop_provider.dart';
+import '../providers/transaction_provider.dart';
+import '../providers/user_provider.dart';
+import '../widgets/export_sheet.dart';
 
-class ReportsScreen extends ConsumerStatefulWidget {
+class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
 
   @override
-  ConsumerState<ReportsScreen> createState() => _ReportsScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stats = ref.watch(dashboardStatsProvider);
+    final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
+    return Scaffold(
+      appBar: AppBar(title: Text(tr('reports', ref))),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Summary card
+          stats.when(
+            data: (s) => Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tr('summary', ref),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    _Row(
+                        label: tr('total_routes', ref),
+                        value: '${s.totalRoutes}'),
+                    _Row(
+                        label: tr('total_shops', ref),
+                        value: '${s.totalShops}'),
+                    _Row(
+                        label: tr('outstanding_balance', ref),
+                        value: AppFormatters.sar(s.totalOutstanding)),
+                    _Row(
+                        label: tr('total_products', ref),
+                        value: '${s.totalProducts}'),
+                    _Row(
+                        label: tr('total_variants', ref),
+                        value: '${s.totalVariants}'),
+                    _Row(
+                        label: tr('stock_pairs', ref),
+                        value: AppFormatters.stock(s.totalStockPairs, ppc)),
+                  ],
+                ),
+              ),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Text('$e'),
+          ),
+          const SizedBox(height: 16),
+          // Export sections
+          _ExportCard(
+            icon: Icons.storefront,
+            title: tr('shops_report', ref),
+            onExport: () => _exportShops(context, ref),
+          ),
+          _ExportCard(
+            icon: Icons.inventory_2,
+            title: tr('inventory_report', ref),
+            onExport: () => _exportInventory(context, ref, ppc),
+          ),
+          _ExportCard(
+            icon: Icons.receipt_long,
+            title: tr('transactions_report', ref),
+            onExport: () => _exportTransactions(context, ref),
+          ),
+          _ExportCard(
+            icon: Icons.account_balance_wallet,
+            title: tr('outstanding_report', ref),
+            onExport: () => _exportOutstanding(context, ref),
+          ),
+          _ExportCard(
+            icon: Icons.people,
+            title: tr('customers_report', ref),
+            onExport: () => _exportCustomers(context, ref),
+          ),
+          const _AccountStatementCard(),
+          const _SellerReportCard(),
+        ],
+      ),
+    );
+  }
+
+  void _exportShops(BuildContext context, WidgetRef ref) {
+    final shops = ref.read(shopsProvider).valueOrNull ?? [];
+    ExportSheet.show(
+      context,
+      ref,
+      title: tr('shops_report', ref),
+      headers: [
+        tr('name', ref),
+        tr('route', ref),
+        tr('phone', ref),
+        tr('area', ref),
+        tr('city', ref),
+        tr('balance', ref),
+      ],
+      rows: shops
+          .map((s) => [
+                s.name,
+                'R${s.routeNumber}',
+                s.phone ?? '',
+                s.area ?? '',
+                s.city ?? '',
+                AppFormatters.sar(s.balance),
+              ])
+          .toList(),
+      fileName: 'shops_report',
+    );
+  }
+
+  void _exportInventory(BuildContext context, WidgetRef ref, int ppc) {
+    final variants = ref.read(allVariantsProvider).valueOrNull ?? [];
+    ExportSheet.show(
+      context,
+      ref,
+      title: tr('inventory_report', ref),
+      headers: [
+        tr('variant_name', ref),
+        tr('stock_pairs', ref),
+      ],
+      rows: variants
+          .map((v) => [
+                v.variantName,
+                AppFormatters.stock(v.quantityAvailable, ppc),
+              ])
+          .toList(),
+      fileName: 'inventory_report',
+    );
+  }
+
+  void _exportTransactions(BuildContext context, WidgetRef ref) {
+    final txs = ref.read(allTransactionsProvider).valueOrNull ?? [];
+    ExportSheet.show(
+      context,
+      ref,
+      title: tr('transactions_report', ref),
+      headers: [
+        tr('date', ref),
+        tr('shop_name', ref),
+        tr('type', ref),
+        tr('amount', ref),
+        tr('description', ref),
+      ],
+      rows: txs
+          .map((t) => [
+                AppFormatters.dateTime(t.createdAt),
+                t.shopName,
+                t.type == 'cash_in' ? tr('cash_in', ref) : tr('cash_out', ref),
+                AppFormatters.sar(t.amount),
+                t.description ?? '',
+              ])
+          .toList(),
+      fileName: 'transactions_report',
+    );
+  }
+
+  void _exportOutstanding(BuildContext context, WidgetRef ref) {
+    final shops = ref.read(outstandingShopsProvider).valueOrNull ?? [];
+    ExportSheet.show(
+      context,
+      ref,
+      title: tr('outstanding_report', ref),
+      headers: [
+        tr('name', ref),
+        tr('route', ref),
+        tr('phone', ref),
+        tr('balance', ref),
+      ],
+      rows: shops
+          .map((s) => [
+                s.name,
+                'R${s.routeNumber}',
+                s.phone ?? '',
+                AppFormatters.sar(s.balance),
+              ])
+          .toList(),
+      fileName: 'outstanding_report',
+    );
+  }
+
+  void _exportCustomers(BuildContext context, WidgetRef ref) {
+    final customers = ref.read(customersProvider).valueOrNull ?? [];
+    ExportSheet.show(
+      context,
+      ref,
+      title: tr('customers_report', ref),
+      headers: [
+        tr('name', ref),
+        tr('phone', ref),
+        tr('city', ref),
+        tr('balance', ref),
+      ],
+      rows: customers
+          .map((c) => [
+                c.name,
+                c.phone ?? '',
+                c.city ?? '',
+                AppFormatters.sar(c.balance),
+              ])
+          .toList(),
+      fileName: 'customers_report',
+    );
+  }
 }
 
-class _ReportsScreenState extends ConsumerState<ReportsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _Row extends StatelessWidget {
+  final String label;
+  final String value;
+  const _Row({required this.label, required this.value});
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExportCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final VoidCallback onExport;
+  const _ExportCard(
+      {required this.icon, required this.title, required this.onExport});
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        trailing: const Icon(Icons.download),
+        onTap: onExport,
+      ),
+    );
+  }
+}
+
+// ─── Account Statement Card ────────────────────────────────────────────────
+class _AccountStatementCard extends ConsumerStatefulWidget {
+  const _AccountStatementCard();
+  @override
+  ConsumerState<_AccountStatementCard> createState() =>
+      _AccountStatementCardState();
+}
+
+class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
+  String? _selectedCustomerId;
+  bool _generating = false;
+
+  Map<String, String> _labels(WidgetRef ref) {
+    final keys = [
+      'date',
+      'description',
+      'sale_type',
+      'debit',
+      'credit',
+      'running_balance',
+      'account_statement',
+      'opening_balance',
+      'net_payable',
+      'customer',
+      'seller',
+      'total',
+      'page',
+      'report_date',
+      'entry_by',
+      'mode',
+      'cash_in',
+      'cash_out',
+      'total_entries',
+      'generated_by',
+      'duration',
+    ];
+    return {for (final k in keys) k: tr(k, ref)};
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+  Future<void> _generate() async {
+    if (_selectedCustomerId == null) return;
+    setState(() => _generating = true);
+    try {
+      final locale = ref.read(appLocaleProvider);
+      final customers = ref.read(customersProvider).valueOrNull ?? [];
+      final customer = customers.firstWhere((c) => c.id == _selectedCustomerId);
+      final allTxs = ref.read(allTransactionsProvider).valueOrNull ?? [];
+      final txs = allTxs
+          .where((t) =>
+              t.customerId == _selectedCustomerId ||
+              t.shopId == _selectedCustomerId)
+          .toList()
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      final user = ref.read(authUserProvider).valueOrNull;
+      final settings = ref.read(settingsProvider).valueOrNull;
+      final allUsers = ref.read(allUsersProvider).valueOrNull ?? [];
+      final entryByMap = {for (final u in allUsers) u.id: u.displayName};
 
-  void _export(BuildContext context) {
-    switch (_tabController.index) {
-      case 0: // P&L
-        final year = DateTime.now().year;
-        final list = ref.read(yearlyPnlProvider(year)).valueOrNull ?? [];
-        ExportSheet.show(
-          context,
-          ref,
-          title: 'P&L Summary',
-          fileName: 'report_pnl_summary_$year',
-          headers: [
-            'Period',
-            'Revenue',
-            'COGS',
-            'Gross Profit',
-            'Expenses',
-            'Worker Cost',
-            'Net Profit'
-          ],
-          rows: list
-              .map((p) => [
-                    p.period,
-                    p.revenue,
-                    p.cogs,
-                    p.grossProfit,
-                    p.expenses,
-                    p.workerCost,
-                    p.netProfit
-                  ])
-              .toList(),
-        );
-        break;
-      case 1: // Workers
-        final payments = ref.read(allWorkerPaymentsProvider).valueOrNull ?? [];
-        final Map<String, ({String name, String type, double paid, int pairs})>
-            stats = {};
-        for (final p in payments) {
-          final existing = stats[p.workerId];
-          stats[p.workerId] = (
-            name: p.workerName,
-            type: p.workerType,
-            paid: (existing?.paid ?? 0) + p.amount,
-            pairs: (existing?.pairs ?? 0) + p.pairsCount,
-          );
-        }
-        ExportSheet.show(
-          context,
-          ref,
-          title: 'Workers',
-          fileName: 'report_workers',
-          headers: ['Worker', 'Type', 'Total Paid', 'Total Pairs'],
-          rows: stats.values
-              .map((s) => [s.name, s.type, s.paid, s.pairs])
-              .toList(),
-        );
-        break;
-      case 2: // Waste
-        final waste = ref.read(wasteRecordsProvider).valueOrNull ?? [];
-        final Map<String, int> byReason = {};
-        for (final r in waste) {
-          byReason[r.reason] = (byReason[r.reason] ?? 0) + 1;
-        }
-        ExportSheet.show(
-          context,
-          ref,
-          title: 'Waste',
-          fileName: 'report_waste',
-          headers: ['Reason', 'Count'],
-          rows: byReason.entries.map((e) => [e.key, e.value]).toList(),
-        );
-        break;
+      final bytes = await buildPdfLedger(
+        customerName: customer.name,
+        companyName: settings?.companyName ?? 'Footwear',
+        generatedBy: user?.displayName ?? '',
+        openingBalance: 0,
+        transactions: txs,
+        entryByMap: entryByMap,
+        showEntryBy: true,
+        labels: _labels(ref),
+        locale: locale,
+      );
+      await Printing.sharePdf(
+          bytes: bytes,
+          filename:
+              'account_statement_${customer.name.replaceAll(' ', '_')}.pdf');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _generating = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(tr('reports', ref)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            tooltip: tr('export_share', ref),
-            onPressed: () => _export(context),
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppBrand.onPrimary,
-          unselectedLabelColor: AppBrand.onPrimaryMuted,
-          indicatorColor: AppBrand.onPrimary,
-          tabs: [
-            Tab(text: tr('pnl_summary', ref)),
-            Tab(text: tr('workers', ref)),
-            Tab(text: tr('waste', ref)),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          _PnlSummaryTab(),
-          _WorkerReportTab(),
-          _WasteReportTab(),
-        ],
-      ),
-    );
-  }
-}
-
-class _PnlSummaryTab extends ConsumerWidget {
-  const _PnlSummaryTab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final year = DateTime.now().year;
-    final yearlyPnl = ref.watch(yearlyPnlProvider(year));
-
-    return yearlyPnl.when(
-      data: (list) {
-        if (list.isEmpty) {
-          return Center(child: Text(tr('no_pnl_data', ref)));
-        }
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Text('$year — ${tr('monthly_breakdown', ref)}',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            ...list.map((pnl) => _PnlMonthTile(pnl: pnl)),
-          ],
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorState(message: e.toString()),
-    );
-  }
-}
-
-class _PnlMonthTile extends ConsumerWidget {
-  final PnlSnapshotModel pnl;
-  const _PnlMonthTile({required this.pnl});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isProfit = pnl.netProfit >= 0;
+    final customersAsync = ref.watch(customersProvider);
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ExpansionTile(
-        title: Text(pnl.period),
-        trailing: Text(
-          AppFormatters.sar(pnl.netProfit),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isProfit ? Colors.green : Colors.red,
-          ),
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Column(
-              children: [
-                _DetailRow(tr('revenue', ref), pnl.revenue),
-                _DetailRow(tr('cogs', ref), pnl.cogs),
-                _DetailRow(tr('gross_profit', ref), pnl.grossProfit,
-                    bold: true),
-                _DetailRow(tr('expenses', ref), pnl.expenses),
-                _DetailRow(tr('worker_cost', ref), pnl.workerCost),
-                const Divider(),
-                _DetailRow(tr('net_profit', ref), pnl.netProfit,
-                    bold: true, color: isProfit ? Colors.green : Colors.red),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final double value;
-  final bool bold;
-  final Color? color;
-  const _DetailRow(this.label, this.value, {this.bold = false, this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final style = bold
-        ? Theme.of(context)
-            .textTheme
-            .bodySmall
-            ?.copyWith(fontWeight: FontWeight.bold, color: color)
-        : Theme.of(context).textTheme.bodySmall?.copyWith(color: color);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Expanded(child: Text(label, style: style)),
-          Text(AppFormatters.sar(value), style: style),
-        ],
-      ),
-    );
-  }
-}
-
-class _WorkerReportTab extends ConsumerWidget {
-  const _WorkerReportTab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final payments = ref.watch(allWorkerPaymentsProvider);
-
-    return payments.when(
-      data: (list) {
-        if (list.isEmpty) {
-          return Center(child: Text(tr('no_data', ref)));
-        }
-
-        // Group by worker
-        final Map<String, _WorkerStats> stats = {};
-        for (final p in list) {
-          final s = stats.putIfAbsent(p.workerId,
-              () => _WorkerStats(name: p.workerName, type: p.workerType));
-          s.totalPaid += p.amount;
-          s.totalPairs += p.pairsCount;
-        }
-
-        return ListView(
-          padding: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(tr('worker_cost_breakdown', ref),
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            ...stats.values.map((s) => Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    title: Text(s.name),
-                    subtitle:
-                        Text('${s.type.toUpperCase()} · ${s.totalPairs} pairs'),
-                    trailing: Text(AppFormatters.sar(s.totalPaid),
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                )),
-          ],
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorState(message: e.toString()),
-    );
-  }
-}
-
-class _WorkerStats {
-  final String name;
-  final String type;
-  double totalPaid = 0;
-  int totalPairs = 0;
-  _WorkerStats({required this.name, required this.type});
-}
-
-class _WasteReportTab extends ConsumerWidget {
-  const _WasteReportTab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final wasteAsync = ref.watch(wasteRecordsProvider);
-
-    return wasteAsync.when(
-      data: (list) {
-        final total = list.length;
-        final disposed = list.where((r) => r.disposed).length;
-        final undisposed = total - disposed;
-
-        // Group by reason
-        final Map<String, int> byReason = {};
-        for (final r in list) {
-          byReason[r.reason] = (byReason[r.reason] ?? 0) + 1;
-        }
-        final sorted = byReason.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value));
-
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Text(tr('waste_summary', ref),
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(
-                    child: _StatChip(
-                        label: tr('total', ref), value: total.toString())),
+                Icon(Icons.account_balance,
+                    color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
-                Expanded(
-                    child: _StatChip(
-                        label: tr('disposed', ref),
-                        value: disposed.toString())),
-                const SizedBox(width: 8),
-                Expanded(
-                    child: _StatChip(
-                        label: tr('pending', ref),
-                        value: undisposed.toString(),
-                        color: undisposed > 0 ? Colors.orange : null)),
+                Text(tr('account_statement', ref),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 15)),
               ],
             ),
-            const SizedBox(height: 16),
-            if (sorted.isNotEmpty) ...[
-              Text(tr('by_reason', ref),
-                  style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
-              ...sorted.map(
-                (e) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(e.key)),
-                      Text('${e.value} items',
-                          style: Theme.of(context).textTheme.bodySmall),
-                    ],
-                  ),
+            const SizedBox(height: 10),
+            customersAsync.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (e, _) => Text('$e'),
+              data: (customers) => DropdownButtonFormField<String>(
+                initialValue: _selectedCustomerId,
+                decoration: InputDecoration(
+                  labelText: tr('customer', ref),
+                  isDense: true,
+                  border: const OutlineInputBorder(),
                 ),
+                items: customers
+                    .map((c) =>
+                        DropdownMenuItem(value: c.id, child: Text(c.name)))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedCustomerId = v),
               ),
-            ],
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _selectedCustomerId == null || _generating
+                    ? null
+                    : _generate,
+                icon: _generating
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.picture_as_pdf),
+                label: Text(tr('export', ref)),
+              ),
+            ),
           ],
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorState(message: e.toString()),
+        ),
+      ),
     );
   }
 }
 
-class _StatChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color? color;
-  const _StatChip({required this.label, required this.value, this.color});
+// ─── Seller Report Card (admin only) ─────────────────────────────────────────
+class _SellerReportCard extends ConsumerStatefulWidget {
+  const _SellerReportCard();
+  @override
+  ConsumerState<_SellerReportCard> createState() => _SellerReportCardState();
+}
+
+class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
+  String? _selectedSellerId;
+  bool _generating = false;
+
+  Map<String, String> _labels(WidgetRef ref) {
+    final keys = [
+      'seller_report',
+      'seller',
+      'route',
+      'inventory',
+      'customers',
+      'customer',
+      'stock_sold',
+      'stock_received',
+      'stock_remaining',
+      'revenue',
+      'outstanding',
+      'total',
+      'pairs',
+      'report_date',
+      'page',
+    ];
+    return {for (final k in keys) k: tr(k, ref)};
+  }
+
+  Future<void> _generate() async {
+    if (_selectedSellerId == null) return;
+    setState(() => _generating = true);
+    try {
+      final locale = ref.read(appLocaleProvider);
+      final users = ref.read(allUsersProvider).valueOrNull ?? [];
+      final seller = users.firstWhere((u) => u.id == _selectedSellerId);
+      final allTxs = ref.read(allTransactionsProvider).valueOrNull ?? [];
+      final inventory =
+          ref.read(sellerInventoryProvider(_selectedSellerId!)).valueOrNull ??
+              [];
+      final allCustomers = ref.read(customersProvider).valueOrNull ?? [];
+
+      // Build per-customer summary
+      final txsBySeller =
+          allTxs.where((t) => t.createdBy == _selectedSellerId).toList();
+      final customerMap = <String, SellerReportCustomer>{};
+      for (final tx in txsBySeller) {
+        final cid = tx.customerId ?? tx.shopId;
+        if (cid.isEmpty) continue;
+        final cname = tx.customerName ??
+            allCustomers
+                .firstWhere((c) => c.id == cid,
+                    orElse: () => allCustomers.first)
+                .name;
+        final existing = customerMap[cid];
+        final pairsSold = tx.items.fold<int>(0, (sum, item) => sum + item.qty);
+        final revenue = tx.isCashOut ? tx.amount : 0.0;
+        customerMap[cid] = SellerReportCustomer(
+          name: cname,
+          totalPairsSold: (existing?.totalPairsSold ?? 0) + pairsSold,
+          totalRevenue: (existing?.totalRevenue ?? 0) + revenue,
+          outstandingBalance: 0,
+        );
+      }
+      // Add outstanding balance from customers collection
+      for (final entry in customerMap.entries) {
+        final match = allCustomers.where((c) => c.id == entry.key);
+        if (match.isNotEmpty) {
+          customerMap[entry.key] = SellerReportCustomer(
+            name: entry.value.name,
+            totalPairsSold: entry.value.totalPairsSold,
+            totalRevenue: entry.value.totalRevenue,
+            outstandingBalance: match.first.balance,
+          );
+        }
+      }
+
+      final stockReceived =
+          inventory.fold<int>(0, (s, i) => s + i.quantityAvailable);
+      final stockSold = txsBySeller
+          .expand((t) => t.items)
+          .fold<int>(0, (s, item) => s + item.qty);
+      final stockRemaining = (stockReceived - stockSold).clamp(0, 999999);
+
+      final bytes = await buildPdfSellerReport(
+        sellerName: seller.displayName,
+        sellerPhone: seller.phone ?? '',
+        routeName: seller.assignedRouteId ?? '',
+        customers: customerMap.values.toList(),
+        stockReceived: stockReceived,
+        stockSold: stockSold,
+        stockRemaining: stockRemaining,
+        labels: _labels(ref),
+        locale: locale,
+      );
+      await Printing.sharePdf(
+          bytes: bytes,
+          filename:
+              'seller_report_${seller.displayName.replaceAll(' ', '_')}.pdf');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _generating = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: (color ?? Theme.of(context).colorScheme.primary)
-            .withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        children: [
-          Text(value,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(color: color)),
-          Text(label, style: Theme.of(context).textTheme.labelSmall),
-        ],
+    final authAsync = ref.watch(authUserProvider);
+    final user = authAsync.valueOrNull;
+    if (user == null || !user.isAdmin) return const SizedBox.shrink();
+
+    final usersAsync = ref.watch(allUsersProvider);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.bar_chart,
+                    color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(tr('seller_report', ref),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 15)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            usersAsync.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (e, _) => Text('$e'),
+              data: (users) {
+                final sellers = users.where((u) => u.isSeller).toList();
+                return DropdownButtonFormField<String>(
+                  initialValue: _selectedSellerId,
+                  decoration: InputDecoration(
+                    labelText: tr('select_seller', ref),
+                    isDense: true,
+                    border: const OutlineInputBorder(),
+                  ),
+                  items: sellers
+                      .map((u) => DropdownMenuItem(
+                          value: u.id, child: Text(u.displayName)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedSellerId = v),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed:
+                    _selectedSellerId == null || _generating ? null : _generate,
+                icon: _generating
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.picture_as_pdf),
+                label: Text(tr('export', ref)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

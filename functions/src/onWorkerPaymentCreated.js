@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { sendToTopic } = require('./notificationHelper');
 
 /**
  * onWorkerPaymentCreated
@@ -96,6 +97,17 @@ exports.onWorkerPaymentCreated = functions.firestore
       });
 
       functions.logger.info(`onWorkerPaymentCreated: processed payment ${paymentId} for worker ${worker_id}`);
+
+      // Push notification to admins: worker payment created
+      const workerName = payment.worker_name || 'Worker';
+      const amount = payment.amount || 0;
+      await sendToTopic(
+        'admins',
+        'Worker Payment Created',
+        `${workerName} — ${amount} SAR`,
+        { route: '/workers', type: 'worker_payment' }
+      );
+
       return null;
     } catch (err) {
       functions.logger.error(`onWorkerPaymentCreated: failed for payment ${paymentId}`, err);
