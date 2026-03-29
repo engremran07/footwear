@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/shop_provider.dart';
@@ -128,16 +129,17 @@ class RouteDetailScreen extends ConsumerWidget {
                       itemBuilder: (_, i) {
                         final shop = shops[i];
                         final hasDebt = shop.balance > 0;
+                        final cs = Theme.of(context).colorScheme;
                         return Card(
                           child: ListTile(
                             leading: CircleAvatar(
                               backgroundColor: hasDebt
-                                  ? Colors.red.shade50
-                                  : Colors.green.shade50,
+                                  ? AppTheme.debtBg(cs)
+                                  : AppTheme.clearBg(cs),
                               child: Icon(Icons.store,
                                   color: hasDebt
-                                      ? Colors.red.shade700
-                                      : Colors.green.shade700),
+                                      ? AppTheme.debtFg(cs)
+                                      : AppTheme.clearFg(cs)),
                             ),
                             title: Text(shop.name,
                                 style: const TextStyle(
@@ -148,8 +150,8 @@ class RouteDetailScreen extends ConsumerWidget {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: hasDebt
-                                    ? Colors.red.shade700
-                                    : Colors.green.shade700,
+                                    ? AppTheme.debtFg(cs)
+                                    : AppTheme.clearFg(cs),
                               ),
                             ),
                             onTap: () => context.push('/shops/${shop.id}'),

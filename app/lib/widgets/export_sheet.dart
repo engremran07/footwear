@@ -36,18 +36,27 @@ class ExportSheet {
   }) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _ExportSheetContent(
-        ref: ref,
-        title: title,
-        headers: headers,
-        rows: rows,
-        fileName: fileName,
-        subtitle: subtitle,
-        pdfBytesBuilder: pdfBytesBuilder,
-      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            child: _ExportSheetContent(
+              ref: ref,
+              title: title,
+              headers: headers,
+              rows: rows,
+              fileName: fileName,
+              subtitle: subtitle,
+              pdfBytesBuilder: pdfBytesBuilder,
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -267,7 +276,9 @@ class _OptionTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
+                  color: theme.brightness == Brightness.dark
+                      ? color.withValues(alpha: 0.22)
+                      : color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: color, size: 22),
@@ -286,7 +297,9 @@ class _OptionTile extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
+                    color: theme.brightness == Brightness.dark
+                        ? color.withValues(alpha: 0.22)
+                        : color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(

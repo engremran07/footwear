@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,21 +9,30 @@ final networkStatusProvider = StreamProvider<bool>((ref) {
   return FirebaseFirestore.instance.snapshotsInSync().map((_) => true);
 });
 
-/// Alternative: Use a timer-based check on the settings doc (more reliable for UI feedback)
+/// Checks real device internet connectivity using a DNS lookup.
+/// Uses dart:io so it works without Firebase authentication — safe on the
+/// login screen (where the user is not yet signed in).
 final isOnlineProvider = StreamProvider<bool>((ref) {
-  final firestore = FirebaseFirestore.instance;
+  final controller = StreamController<bool>();
 
-  // Listen to real-time connection via `snapshotsInSync`
-  // When connection is active, Firestore will emit.
-  // When offline, it will timeout or get caught by error handling below.
+  Future<void> check() async {
+    try {
+      final result = await InternetAddress.lookup('8.8.8.8');
+      if (!controller.isClosed) {
+        controller.add(result.isNotEmpty && result[0].rawAddress.isNotEmpty);
+      }
+    } catch (_) {
+      if (!controller.isClosed) controller.add(false);
+    }
+  }
 
-  return firestore
-      .collection('settings')
-      .doc('global')
-      .snapshots()
-      .map((_) => true)
-      .handleError(
-        (_) => false, // If we can't connect, we're offline
-        test: (e) => e is Exception,
-      );
+  check(); // Immediate check — emits within ~100 ms
+  final timer = Timer.periodic(const Duration(seconds: 10), (_) => check());
+
+  ref.onDispose(() {
+    timer.cancel();
+    controller.close();
+  });
+
+  return controller.stream;
 });

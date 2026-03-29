@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
@@ -138,6 +139,7 @@ class ProductDetailScreen extends ConsumerWidget {
                       itemCount: variants.length,
                       itemBuilder: (_, i) {
                         final v = variants[i];
+                        final cs = Theme.of(context).colorScheme;
                         return Card(
                           child: ListTile(
                             title: Text(v.variantName,
@@ -150,19 +152,19 @@ class ProductDetailScreen extends ConsumerWidget {
                                   horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: v.quantityAvailable > 0
-                                    ? Colors.green.withAlpha(20)
-                                    : Colors.red.withAlpha(20),
+                                    ? AppTheme.clearBg(cs)
+                                    : AppTheme.debtBg(cs),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                _stockLabel(
-                                    v.quantityAvailable, settings?.pairsPerCarton ?? 12),
+                                _stockLabel(v.quantityAvailable,
+                                    settings?.pairsPerCarton ?? 12),
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
                                   color: v.quantityAvailable > 0
-                                      ? Colors.green.shade700
-                                      : Colors.red.shade700,
+                                      ? AppTheme.clearFg(cs)
+                                      : AppTheme.debtFg(cs),
                                 ),
                                 textAlign: TextAlign.center,
                               ),

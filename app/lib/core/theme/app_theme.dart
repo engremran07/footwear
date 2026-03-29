@@ -234,15 +234,24 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       fontFamily: fontFamily,
-      colorScheme: colorScheme,
+      colorScheme: colorScheme.copyWith(
+        primary: AppBrand.primaryColor,
+        onPrimary: AppBrand.onPrimary,
+      ),
       textTheme: textTheme,
       appBarTheme: const AppBarTheme(
         elevation: 0,
         centerTitle: false,
+        backgroundColor: AppBrand.primaryColor,
+        foregroundColor: AppBrand.onPrimary,
       ),
       tabBarTheme: const TabBarThemeData(
+        labelColor: AppBrand.onPrimary,
+        unselectedLabelColor: AppBrand.onPrimaryMuted,
+        indicatorColor: AppBrand.onPrimary,
         indicatorSize: TabBarIndicatorSize.tab,
         dividerColor: Colors.transparent,
+        overlayColor: WidgetStatePropertyAll(Colors.white10),
       ),
       cardTheme: CardThemeData(
         elevation: 2,
@@ -257,8 +266,46 @@ class AppTheme {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppBrand.primaryColor,
+          foregroundColor: AppBrand.onPrimary,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
     );
   }
+
+  // ─── Semantic colour helpers ──────────────────────────────────────────────
+  // Use these throughout the UI to avoid hardcoded light-only shade50/shade700
+  // pairs that break in dark mode.  They resolve to M3 container colours which
+  // Flutter generates correct dark-mode variants for automatically.
+
+  /// Red / debt / error container background.
+  static Color debtBg(ColorScheme cs) => cs.errorContainer;
+
+  /// Text / icon colour on top of [debtBg].
+  static Color debtFg(ColorScheme cs) => cs.onErrorContainer;
+
+  /// Green / clear / success container background.
+  static Color clearBg(ColorScheme cs) => cs.tertiaryContainer;
+
+  /// Text / icon colour on top of [clearBg].
+  static Color clearFg(ColorScheme cs) => cs.onTertiaryContainer;
+
+  /// Orange / warning container background.
+  static Color warningBg(ColorScheme cs) => cs.secondaryContainer;
+
+  /// Text / icon colour on top of [warningBg].
+  static Color warningFg(ColorScheme cs) => cs.onSecondaryContainer;
 
   // Legacy getters kept for backward compatibility
   static ThemeData get light => lightTheme(AppLocale.en);

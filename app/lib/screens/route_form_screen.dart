@@ -81,7 +81,9 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       ref.watch(routeDetailProvider(widget.routeId!));
       _loadExisting();
     }
-    final sellers = ref.watch(sellersProvider).valueOrNull ?? [];
+    final sellers = (ref.watch(allUsersProvider).valueOrNull ?? [])
+        .where((u) => u.active)
+        .toList();
     final user = ref.watch(authUserProvider).valueOrNull;
     final isAdmin = user?.isAdmin ?? false;
 

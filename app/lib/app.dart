@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'core/constants/app_brand.dart';
 import 'core/l10n/app_locale.dart';
 import 'core/services/session_guard.dart';
+import 'providers/theme_preference_provider.dart';
 
 class FootwearErpApp extends ConsumerWidget {
   const FootwearErpApp({super.key});
@@ -13,6 +14,7 @@ class FootwearErpApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
     final appLocale = ref.watch(appLocaleProvider);
+    final themeMode = ref.watch(themePreferenceProvider);
     return SessionGuard(
       child: Directionality(
         textDirection: appLocale.direction,
@@ -20,7 +22,7 @@ class FootwearErpApp extends ConsumerWidget {
           title: AppBrand.appName,
           theme: AppTheme.lightTheme(appLocale),
           darkTheme: AppTheme.darkTheme(appLocale),
-          themeMode: ThemeMode.system,
+          themeMode: themeMode,
           locale: appLocale.locale,
           routerConfig: router,
           debugShowCheckedModeBanner: false,

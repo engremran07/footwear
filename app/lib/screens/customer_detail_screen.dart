@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../providers/auth_provider.dart';
@@ -60,7 +61,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       selected: txType == 'cash_in',
                       onSelected: (_) =>
                           setModalState(() => txType = 'cash_in'),
-                      selectedColor: Colors.green.shade600,
+                      selectedColor:
+                          AppTheme.clearBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -70,7 +72,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       selected: txType == 'cash_out',
                       onSelected: (_) =>
                           setModalState(() => txType = 'cash_out'),
-                      selectedColor: Colors.red.shade600,
+                      selectedColor: AppTheme.debtBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                 ],
@@ -102,7 +104,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       label: Text(tr('sale_cash', ref)),
                       selected: saleType == 'cash',
                       onSelected: (_) => setModalState(() => saleType = 'cash'),
-                      selectedColor: Colors.green.shade600,
+                      selectedColor:
+                          AppTheme.clearBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -112,7 +115,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       selected: saleType == 'credit',
                       onSelected: (_) =>
                           setModalState(() => saleType = 'credit'),
-                      selectedColor: Colors.orange.shade600,
+                      selectedColor:
+                          AppTheme.warningBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                 ],
@@ -308,7 +312,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       label: Text(tr('sale_cash', ref)),
                       selected: saleType == 'cash',
                       onSelected: (_) => setModalState(() => saleType = 'cash'),
-                      selectedColor: Colors.green.shade600,
+                      selectedColor:
+                          AppTheme.clearBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -318,7 +323,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       selected: saleType == 'credit',
                       onSelected: (_) =>
                           setModalState(() => saleType = 'credit'),
-                      selectedColor: Colors.orange.shade600,
+                      selectedColor:
+                          AppTheme.warningBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                 ],
@@ -352,9 +358,10 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        type == 'cash_in' ? Colors.green : Colors.red.shade700,
-                    foregroundColor: Colors.white,
+                    backgroundColor: type == 'cash_in'
+                        ? AppBrand.successColor
+                        : AppBrand.errorColor,
+                    foregroundColor: AppBrand.onPrimary,
                   ),
                   onPressed: () async {
                     final amount = double.tryParse(amountC.text.trim());
@@ -420,8 +427,12 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
             body: Center(child: Text(tr('customer_not_found', ref))),
           );
         }
+        final isDebt = customer.balance > 0;
+        final cs = Theme.of(context).colorScheme;
         final balanceColor =
-            customer.balance > 0 ? Colors.red.shade700 : Colors.green.shade700;
+            isDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs);
+        final balanceBgColor =
+            isDebt ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs);
 
         return Scaffold(
           appBar: AppBar(
@@ -531,7 +542,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                         children: [
                           CircleAvatar(
                             radius: 28,
-                            backgroundColor: balanceColor.withAlpha(30),
+                            backgroundColor: balanceBgColor,
                             child: Text(
                               customer.name.isNotEmpty
                                   ? customer.name[0].toUpperCase()
@@ -574,9 +585,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                         padding: const EdgeInsets.symmetric(
                             vertical: 12, horizontal: 16),
                         decoration: BoxDecoration(
-                          color: balanceColor.withAlpha(15),
+                          color: balanceBgColor,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: balanceColor.withAlpha(40)),
+                          border: Border.all(color: balanceColor.withAlpha(80)),
                         ),
                         child: Column(
                           children: [
@@ -708,8 +719,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       itemBuilder: (_, i) {
                         final tx = txs[i];
                         final isCashIn = tx['type'] == 'cash_in';
-                        final color =
-                            isCashIn ? Colors.green : Colors.red.shade700;
+                        final color = isCashIn
+                            ? AppBrand.successColor
+                            : AppBrand.errorColor;
                         final sign = isCashIn ? '+' : '-';
                         final amount = (tx['amount'] as num).toDouble();
                         final desc = tx['description'] as String?;
@@ -789,12 +801,12 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                                 PopupMenuItem(
                                   value: 'delete',
                                   child: Row(children: [
-                                    Icon(Icons.delete,
-                                        size: 16, color: Colors.red.shade700),
+                                    const Icon(Icons.delete,
+                                        size: 16, color: AppBrand.errorColor),
                                     const SizedBox(width: 8),
                                     Text(tr('delete', ref),
-                                        style: TextStyle(
-                                            color: Colors.red.shade700)),
+                                        style: const TextStyle(
+                                            color: AppBrand.errorColor)),
                                   ]),
                                 ),
                               ],
@@ -1006,7 +1018,8 @@ class _SellStockSheetState extends ConsumerState<_SellStockSheet> {
                           label: Text(tr('sale_cash', ref)),
                           selected: _saleType == 'cash',
                           onSelected: (_) => setS(() => _saleType = 'cash'),
-                          selectedColor: Colors.green.shade600,
+                          selectedColor:
+                              AppTheme.clearBg(Theme.of(ctx).colorScheme),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1015,7 +1028,8 @@ class _SellStockSheetState extends ConsumerState<_SellStockSheet> {
                           label: Text(tr('sale_credit', ref)),
                           selected: _saleType == 'credit',
                           onSelected: (_) => setS(() => _saleType = 'credit'),
-                          selectedColor: Colors.orange.shade600,
+                          selectedColor:
+                              AppTheme.warningBg(Theme.of(ctx).colorScheme),
                         ),
                       ),
                     ],

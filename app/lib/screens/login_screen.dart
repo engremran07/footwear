@@ -103,7 +103,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   backgroundColor: (online ? Colors.green : Colors.grey)
                       .withValues(alpha: 0.1),
                 ),
-                loading: () => const SizedBox.shrink(),
+                loading: () => Chip(
+                  avatar: const Icon(
+                    Icons.cloud_queue,
+                    size: 18,
+                    color: Colors.grey,
+                  ),
+                  label: const Text(
+                    '...',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  backgroundColor: Colors.grey.withValues(alpha: 0.1),
+                ),
                 error: (_, __) => const Chip(
                   avatar: Icon(Icons.cloud_off, size: 18),
                   label: Text('Offline', style: TextStyle(fontSize: 12)),

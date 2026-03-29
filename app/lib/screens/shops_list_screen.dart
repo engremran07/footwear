@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
+import '../models/route_model.dart';
 import '../models/shop_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/route_provider.dart';
 import '../providers/shop_provider.dart';
 import '../widgets/empty_state.dart';
 
@@ -24,6 +27,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     final shopsAsync = user?.isSeller == true && user?.assignedRouteId != null
         ? ref.watch(shopsByRouteProvider(user!.assignedRouteId!))
         : ref.watch(shopsProvider);
+    final routesAsync =
+        user?.isAdmin == true ? ref.watch(routesProvider) : null;
     final canCreateShop =
         user != null && (user.isAdmin || user.assignedRouteId != null);
 
@@ -55,11 +60,13 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                 FilterChip(
                   label: Text(tr('outstanding', ref)),
                   selected: _outstandingOnly,
-                  selectedColor: Colors.red.shade100,
+                  selectedColor: AppTheme.debtBg(Theme.of(context).colorScheme),
                   avatar: _outstandingOnly
                       ? null
                       : Icon(Icons.warning_amber,
-                          size: 16, color: Colors.red.shade700),
+                          size: 16,
+                          color:
+                              AppTheme.debtFg(Theme.of(context).colorScheme)),
                   onSelected: (_) => setState(() => _outstandingOnly = true),
                 ),
               ],
@@ -91,6 +98,16 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   return EmptyState(
                       icon: Icons.store, message: tr('no_shops', ref));
                 }
+
+                // Admin: grouped by route
+                if (user?.isAdmin == true) {
+                  final routes = routesAsync?.valueOrNull ?? [];
+                  if (routes.isNotEmpty) {
+                    return _AdminGroupedShopsView(
+                        shops: filtered, routes: routes);
+                  }
+                }
+
                 return ListView.builder(
                   itemCount: filtered.length,
                   itemBuilder: (_, i) => _ShopTile(shop: filtered[i]),
@@ -145,7 +162,7 @@ class _ShopStatsStrip extends StatelessWidget {
             icon: Icons.warning_amber,
             label: 'Overdue',
             value: '${withDebt.length}',
-            color: Colors.orange.shade700,
+            color: AppTheme.warningFg(Theme.of(context).colorScheme),
           ),
           _Divider(),
           _Stat(
@@ -153,8 +170,8 @@ class _ShopStatsStrip extends StatelessWidget {
             label: 'Outstanding',
             value: AppFormatters.compact(totalOutstanding),
             color: totalOutstanding > 0
-                ? Colors.red.shade700
-                : Colors.green.shade700,
+                ? AppTheme.debtFg(Theme.of(context).colorScheme)
+                : AppTheme.clearFg(Theme.of(context).colorScheme),
           ),
         ],
       ),
@@ -192,10 +209,8 @@ class _Stat extends StatelessWidget {
               style: TextStyle(
                   fontWeight: FontWeight.bold, fontSize: 13, color: color)),
           Text(label,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: Colors.grey.shade600)),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ],
       );
 }
@@ -207,12 +222,13 @@ class _ShopTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hasDebt = shop.balance > 0;
+    final cs = Theme.of(context).colorScheme;
     return Card(
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: hasDebt ? Colors.red.shade50 : Colors.green.shade50,
+          backgroundColor: hasDebt ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs),
           child: Icon(Icons.store,
-              color: hasDebt ? Colors.red.shade700 : Colors.green.shade700),
+              color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs)),
         ),
         title: Text(shop.name,
             style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -228,7 +244,7 @@ class _ShopTile extends ConsumerWidget {
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: hasDebt ? Colors.red.shade50 : Colors.green.shade50,
+            color: hasDebt ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
@@ -236,12 +252,140 @@ class _ShopTile extends ConsumerWidget {
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 12,
-              color: hasDebt ? Colors.red.shade700 : Colors.green.shade700,
+              color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
             ),
           ),
         ),
         onTap: () => context.push('/shops/${shop.id}'),
       ),
+    );
+  }
+}
+
+// ── Admin grouped view ────────────────────────────────────────────────────────
+
+class _AdminGroupedShopsView extends StatefulWidget {
+  final List<ShopModel> shops;
+  final List<RouteModel> routes;
+  const _AdminGroupedShopsView({required this.shops, required this.routes});
+
+  @override
+  State<_AdminGroupedShopsView> createState() => _AdminGroupedShopsViewState();
+}
+
+class _AdminGroupedShopsViewState extends State<_AdminGroupedShopsView> {
+  final Set<String> _collapsed = {};
+
+  @override
+  Widget build(BuildContext context) {
+    // Build map routeId -> RouteModel, sorted by routeNumber
+    final routeMap = {for (final r in widget.routes) r.id: r};
+    final sorted = List.of(widget.routes)
+      ..sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
+
+    // Group shops by routeId
+    final Map<String, List<ShopModel>> grouped = {};
+    for (final shop in widget.shops) {
+      grouped.putIfAbsent(shop.routeId, () => []).add(shop);
+    }
+
+    // Build section list sorted by routeNumber + unassigned at end
+    final sections =
+        <({RouteModel? route, String key, List<ShopModel> items})>[];
+    for (final r in sorted) {
+      final items = grouped[r.id];
+      if (items != null && items.isNotEmpty) {
+        sections.add((route: r, key: r.id, items: items));
+      }
+    }
+    final knownIds = routeMap.keys.toSet();
+    final unassigned =
+        widget.shops.where((s) => !knownIds.contains(s.routeId)).toList();
+    if (unassigned.isNotEmpty) {
+      sections.add((route: null, key: '__unassigned', items: unassigned));
+    }
+
+    if (sections.isEmpty) {
+      return const EmptyState(icon: Icons.store, message: 'No shops found');
+    }
+
+    // Flat list of items: each entry is either a header key or a shop index
+    final flatItems = <({bool isHeader, String sectionKey, int itemIdx})>[];
+    for (final s in sections) {
+      flatItems.add((isHeader: true, sectionKey: s.key, itemIdx: -1));
+      if (!_collapsed.contains(s.key)) {
+        for (int i = 0; i < s.items.length; i++) {
+          flatItems.add((isHeader: false, sectionKey: s.key, itemIdx: i));
+        }
+      }
+    }
+
+    // Quick lookup: sectionKey -> section
+    final sectionMap = {for (final s in sections) s.key: s};
+
+    return ListView.builder(
+      itemCount: flatItems.length,
+      itemBuilder: (context, index) {
+        final entry = flatItems[index];
+        final section = sectionMap[entry.sectionKey]!;
+        if (entry.isHeader) {
+          final r = section.route;
+          final cs = Theme.of(context).colorScheme;
+          final isCollapsed = _collapsed.contains(entry.sectionKey);
+          return InkWell(
+            onTap: () => setState(() {
+              if (isCollapsed) {
+                _collapsed.remove(entry.sectionKey);
+              } else {
+                _collapsed.add(entry.sectionKey);
+              }
+            }),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: cs.surfaceContainerHighest,
+              child: Row(
+                children: [
+                  Icon(Icons.route, size: 16, color: cs.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      r != null
+                          ? 'R${r.routeNumber} · ${r.name}'
+                          : 'Unassigned',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: cs.primary, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  if (r?.assignedSellerName != null)
+                    Text(
+                      r!.assignedSellerName!,
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${section.items.length}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: isCollapsed ? -0.25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.expand_more,
+                        size: 18, color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return _ShopTile(shop: section.items[entry.itemIdx]);
+      },
     );
   }
 }

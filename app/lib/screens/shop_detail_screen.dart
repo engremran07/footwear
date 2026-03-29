@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../models/shop_model.dart';
@@ -56,7 +57,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('cash_in', ref)),
                       selected: txType == 'cash_in',
                       onSelected: (_) => setS(() => txType = 'cash_in'),
-                      selectedColor: Colors.green.shade600,
+                      selectedColor:
+                          AppTheme.clearBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -65,7 +67,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('cash_out', ref)),
                       selected: txType == 'cash_out',
                       onSelected: (_) => setS(() => txType = 'cash_out'),
-                      selectedColor: Colors.red.shade600,
+                      selectedColor: AppTheme.debtBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                 ],
@@ -97,7 +99,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('sale_cash', ref)),
                       selected: saleType == 'cash',
                       onSelected: (_) => setS(() => saleType = 'cash'),
-                      selectedColor: Colors.green.shade600,
+                      selectedColor:
+                          AppTheme.clearBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -106,7 +109,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('sale_credit', ref)),
                       selected: saleType == 'credit',
                       onSelected: (_) => setS(() => saleType = 'credit'),
-                      selectedColor: Colors.orange.shade600,
+                      selectedColor:
+                          AppTheme.warningBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                 ],
@@ -310,7 +314,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('sale_cash', ref)),
                       selected: saleType == 'cash',
                       onSelected: (_) => setModalState(() => saleType = 'cash'),
-                      selectedColor: Colors.green.shade600,
+                      selectedColor:
+                          AppTheme.clearBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -320,7 +325,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       selected: saleType == 'credit',
                       onSelected: (_) =>
                           setModalState(() => saleType = 'credit'),
-                      selectedColor: Colors.orange.shade600,
+                      selectedColor:
+                          AppTheme.warningBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                 ],
@@ -354,9 +360,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        type == 'cash_in' ? Colors.green : Colors.red.shade700,
-                    foregroundColor: Colors.white,
+                    backgroundColor: type == 'cash_in'
+                        ? AppBrand.successColor
+                        : AppBrand.errorColor,
+                    foregroundColor: AppBrand.onPrimary,
                   ),
                   onPressed: () async {
                     final amount = double.tryParse(amountC.text.trim());
@@ -418,8 +425,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
             body: Center(child: Text(tr('not_found', ref))),
           );
         }
+        final isDebt = shop.balance > 0;
+        final cs = Theme.of(context).colorScheme;
         final balanceColor =
-            shop.balance > 0 ? Colors.red.shade700 : Colors.green.shade700;
+            isDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs);
+        final balanceBgColor =
+            isDebt ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs);
         final canManageShop = user?.isAdmin == true ||
             (user?.isSeller == true && user?.assignedRouteId == shop.routeId);
 
@@ -510,7 +521,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         children: [
                           CircleAvatar(
                             radius: 28,
-                            backgroundColor: balanceColor.withAlpha(30),
+                            backgroundColor: balanceBgColor,
                             child: Text(
                               'R${shop.routeNumber}',
                               style: TextStyle(
@@ -554,9 +565,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         padding: const EdgeInsets.symmetric(
                             vertical: 12, horizontal: 16),
                         decoration: BoxDecoration(
-                          color: balanceColor.withAlpha(15),
+                          color: balanceBgColor,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: balanceColor.withAlpha(40)),
+                          border: Border.all(color: balanceColor.withAlpha(80)),
                         ),
                         child: Column(
                           children: [
@@ -636,8 +647,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.orange.shade700,
-                        side: BorderSide(color: Colors.orange.shade700),
+                        foregroundColor: AppBrand.warningColor,
+                        side: const BorderSide(color: AppBrand.warningColor),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                       onPressed: () => _showReturnDialog(shop),
@@ -720,7 +731,7 @@ class _TransactionTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isCashIn = tx.type == 'cash_in';
-    final color = isCashIn ? Colors.green : Colors.red.shade700;
+    final color = isCashIn ? AppBrand.successColor : AppBrand.errorColor;
     final sign = isCashIn ? '+' : '-';
     final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
     final totalQty = tx.items.fold<int>(0, (acc, item) => acc + item.qty);
@@ -777,10 +788,11 @@ class _TransactionTile extends ConsumerWidget {
                 PopupMenuItem(
                   value: 'delete',
                   child: Row(children: [
-                    Icon(Icons.delete, size: 16, color: Colors.red.shade700),
+                    const Icon(Icons.delete,
+                        size: 16, color: AppBrand.errorColor),
                     const SizedBox(width: 8),
                     Text(tr('delete', ref),
-                        style: TextStyle(color: Colors.red.shade700)),
+                        style: const TextStyle(color: AppBrand.errorColor)),
                   ]),
                 ),
               ],
@@ -912,8 +924,8 @@ class _ReturnSheetState extends ConsumerState<_ReturnSheet> {
               height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange.shade700,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppBrand.warningColor,
+                  foregroundColor: AppBrand.onPrimary,
                 ),
                 onPressed: () async {
                   final amount = double.tryParse(_amountC.text.trim());
