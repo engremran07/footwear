@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
+import '../core/constants/app_brand.dart';
 import '../core/utils/excel_export.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/share_helper.dart';
@@ -120,7 +121,7 @@ class _ExportSheetContent extends StatelessWidget {
           // Option tiles
           _OptionTile(
             icon: Icons.table_chart_outlined,
-            color: const Color(0xFF2E7D32),
+            color: AppBrand.successColor,
             label: tr('download_excel', ref),
             sublabel: 'XLSX',
             onTap: () {
@@ -137,7 +138,7 @@ class _ExportSheetContent extends StatelessWidget {
           const SizedBox(height: 8),
           _OptionTile(
             icon: Icons.picture_as_pdf_outlined,
-            color: const Color(0xFFD32F2F),
+            color: AppBrand.errorColor,
             label: tr('share_pdf', ref),
             sublabel: 'PDF',
             onTap: () async {
@@ -161,7 +162,7 @@ class _ExportSheetContent extends StatelessWidget {
           const SizedBox(height: 8),
           _OptionTile(
             icon: Icons.image_outlined,
-            color: const Color(0xFFE65100),
+            color: AppBrand.warningColor,
             label: tr('share_image', ref),
             sublabel: 'PNG',
             onTap: () async {
@@ -189,7 +190,7 @@ class _ExportSheetContent extends StatelessWidget {
           const SizedBox(height: 8),
           _OptionTile(
             icon: Icons.print_outlined,
-            color: const Color(0xFF1565C0),
+            color: AppBrand.primaryColor,
             label: tr('print_report', ref),
             sublabel: '',
             onTap: () async {
@@ -210,7 +211,7 @@ class _ExportSheetContent extends StatelessWidget {
           const SizedBox(height: 8),
           _OptionTile(
             icon: Icons.share_outlined,
-            color: const Color(0xFF6A1B9A),
+            color: AppBrand.adminRoleColor,
             label: tr('share_excel', ref),
             sublabel: 'XLSX',
             onTap: () async {

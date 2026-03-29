@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/route_model.dart';
@@ -143,6 +144,19 @@ class RouteNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> delete(String id) async {
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) {
+      throw StateError('Not authenticated');
+    }
+    final me = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(authUser.uid)
+        .get();
+    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
+    if (role != 'admin' && role != 'manager') {
+      throw StateError('Only admin can delete routes');
+    }
+
     await FirebaseFirestore.instance
         .collection(Collections.routes)
         .doc(id)

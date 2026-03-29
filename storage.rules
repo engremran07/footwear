@@ -17,18 +17,11 @@ service firebase.storage {
     }
 
     function isAdminRole(role) {
-      return role == 'admin' ||
-             role == 'manager' ||
-             role == 'Admin' ||
-             role == 'Manager' ||
-             role == 'ADMIN' ||
-             role == 'MANAGER';
+      return role.matches('(?i)^\\s*(admin|manager)\\s*$');
     }
 
     function isSellerRole(role) {
-      return role == 'seller' ||
-             role == 'Seller' ||
-             role == 'SELLER';
+      return role.matches('(?i)^\\s*seller\\s*$');
     }
 
     function isActiveUser() {

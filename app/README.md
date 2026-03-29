@@ -9,7 +9,7 @@ Mobile-first Android ERP for footwear distribution. Admins manage products, rout
 - Flutter 3.x
 - Android SDK (API 21+)
 - Java 17
-- Firebase project with Firestore, Auth, Storage, and Functions enabled
+- Firebase project with Firestore, Auth, and Functions enabled (no Storage needed)
 
 ---
 
@@ -74,6 +74,7 @@ lib/
 | --- | --- | --- |
 | `/login` | Login | Public |
 | `/` | Dashboard | All |
+| `/profile` | Profile | All |
 | `/routes` | Routes list | Admin |
 | `/routes/:id` | Route detail | Admin |
 | `/shops` | Shops list | All |
@@ -83,6 +84,8 @@ lib/
 | `/products` | Products list | Admin |
 | `/products/:id` | Product detail + variants | Admin |
 | `/inventory` | Inventory screen | Admin |
+| `/invoices` | Invoices list | All |
+| `/invoices/:id` | Invoice detail | All |
 | `/reports` | Reports (PDF / Excel) | Admin |
 | `/settings` | Settings | Admin |
 
@@ -95,6 +98,8 @@ lib/
 | `admin` | Full access |
 | `manager` | Admin-equivalent (legacy) |
 | `seller` | Assigned route only — read + create transactions |
+
+Seller accounts must be provisioned by admin with assigned route.
 
 ---
 

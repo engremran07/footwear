@@ -143,30 +143,37 @@ class ProductDetailScreen extends ConsumerWidget {
                         return Card(
                           child: ListTile(
                             title: Text(v.variantName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w600)),
                             subtitle: Text(
                                 'Quantity: ${AppFormatters.number(v.quantityAvailable)} pairs'),
-                            trailing: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: v.quantityAvailable > 0
-                                    ? AppTheme.clearBg(cs)
-                                    : AppTheme.debtBg(cs),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                _stockLabel(v.quantityAvailable,
-                                    settings?.pairsPerCarton ?? 12),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
+                            trailing: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 130),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
                                   color: v.quantityAvailable > 0
-                                      ? AppTheme.clearFg(cs)
-                                      : AppTheme.debtFg(cs),
+                                      ? AppTheme.clearBg(cs)
+                                      : AppTheme.debtBg(cs),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                textAlign: TextAlign.center,
+                                child: Text(
+                                  _stockLabel(v.quantityAvailable,
+                                      settings?.pairsPerCarton ?? 12),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: v.quantityAvailable > 0
+                                        ? AppTheme.clearFg(cs)
+                                        : AppTheme.debtFg(cs),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ),
                             onTap: user?.isAdmin == true

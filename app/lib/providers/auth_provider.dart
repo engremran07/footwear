@@ -3,10 +3,22 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/collections.dart';
 import '../models/user_model.dart';
+import 'customer_provider.dart';
+import 'dashboard_provider.dart';
+import 'invoice_provider.dart';
+import 'product_provider.dart';
+import 'route_provider.dart';
+import 'seller_inventory_provider.dart';
+import 'settings_provider.dart';
+import 'shop_provider.dart';
+import 'transaction_provider.dart';
+import 'user_provider.dart';
 
 final _logger = Logger();
+const rememberMePrefKey = 'auth.remember_me';
 
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
   return FirebaseAuth.instance;
@@ -38,6 +50,38 @@ final authUserProvider = StreamProvider<UserModel?>((ref) {
 class AuthNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
+
+  void _invalidateRoleScopedProviders() {
+    // Base providers
+    ref.invalidate(authUserProvider);
+    ref.invalidate(routesProvider);
+    ref.invalidate(routeDetailProvider);
+    ref.invalidate(routesBySellerProvider);
+    ref.invalidate(shopsProvider);
+    ref.invalidate(shopsByRouteProvider);
+    ref.invalidate(shopDetailProvider);
+    ref.invalidate(outstandingShopsProvider);
+    ref.invalidate(customersProvider);
+    ref.invalidate(customerDetailProvider);
+    ref.invalidate(customerTransactionsProvider);
+    ref.invalidate(outstandingCustomersProvider);
+    ref.invalidate(productsProvider);
+    ref.invalidate(productDetailProvider);
+    ref.invalidate(productVariantsProvider);
+    ref.invalidate(allVariantsProvider);
+    ref.invalidate(allTransactionsProvider);
+    ref.invalidate(shopTransactionsProvider);
+    ref.invalidate(sellerInventoryProvider);
+    ref.invalidate(sellerInventoryTotalPairsProvider);
+    ref.invalidate(adminAllSellerInventoryProvider);
+    ref.invalidate(sellersProvider);
+    ref.invalidate(allUsersProvider);
+    ref.invalidate(settingsProvider);
+    ref.invalidate(dashboardStatsProvider);
+    ref.invalidate(allInvoicesProvider);
+    ref.invalidate(sellerInvoicesProvider);
+    ref.invalidate(roleAwareInvoicesProvider);
+  }
 
   Future<void> signIn(String emailOrUsername, String password,
       {bool rememberMe = true}) async {
@@ -119,14 +163,24 @@ class AuthNotifier extends AsyncNotifier<void> {
               'created_at': data['created_at'] ?? Timestamp.now(),
             }, SetOptions(merge: true));
           } else {
+            final isBootstrapAdmin = email == 'admin@footwear.pk';
+            if (!isBootstrapAdmin) {
+              await FirebaseAuth.instance.signOut();
+              throw FirebaseAuthException(
+                code: 'permission-denied',
+                message:
+                    'User profile is not provisioned. Ask admin to create your account with route assignment.',
+              );
+            }
+
             final display = cred.user?.displayName?.trim();
             await usersRef.doc(uid).set({
               'email': email,
-              'display_name': (display != null && display.isNotEmpty)
-                  ? display
-                  : email.split('@').first,
-              'role': 'seller',
+              'display_name':
+                  (display != null && display.isNotEmpty) ? display : 'Admin',
+              'role': 'admin',
               'active': true,
+              'created_by': uid,
               'created_at': Timestamp.now(),
               'updated_at': Timestamp.now(),
             }, SetOptions(merge: true));
@@ -142,6 +196,11 @@ class AuthNotifier extends AsyncNotifier<void> {
             message: 'User account is inactive',
           );
         }
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(rememberMePrefKey, rememberMe);
+
+        _invalidateRoleScopedProviders();
       } on FirebaseAuthException catch (e) {
         _logger.e('Auth error [${e.code}]: ${e.message}');
         rethrow;
@@ -167,6 +226,7 @@ class AuthNotifier extends AsyncNotifier<void> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       await FirebaseAuth.instance.signOut();
+      _invalidateRoleScopedProviders();
     });
   }
 

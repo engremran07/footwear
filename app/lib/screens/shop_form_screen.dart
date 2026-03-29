@@ -107,7 +107,9 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       _loadExisting();
     }
     final user = ref.watch(authUserProvider).valueOrNull;
-    final allRoutes = ref.watch(routesProvider).valueOrNull ?? [];
+    final allRoutes = user?.isAdmin == true
+        ? ref.watch(routesProvider).valueOrNull ?? []
+        : ref.watch(routesBySellerProvider(user?.id ?? '')).valueOrNull ?? [];
     final routes = user?.isAdmin == true
         ? allRoutes
         : allRoutes.where((r) => r.id == user?.assignedRouteId).toList();
@@ -159,6 +161,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                 decoration:
                     InputDecoration(labelText: '${tr('shop_name', ref)} *'),
                 validator: (v) => Validators.notEmpty(v),
+                autofocus: !isEdit,
               ),
               const SizedBox(height: 16),
               TextFormField(

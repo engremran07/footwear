@@ -176,3 +176,12 @@ If issues persist after deployment:
 ---
 
 **All critical issues resolved. System is stable and ready for testing.**
+
+---
+
+## Post-Stabilization Update (2026-03-29)
+
+- `firebase_storage` dependency fully removed from pubspec.yaml
+- Storage config removed from firebase.json
+- Zero Firebase Storage usage across entire app — company logos stored as base64 in Firestore, product images use external HTTP URLs
+- Architecture runs on Firestore + Auth + Functions only (zero-cost Firebase tier)

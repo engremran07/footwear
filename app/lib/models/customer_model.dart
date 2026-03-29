@@ -7,6 +7,9 @@ class CustomerModel {
   final String? city;
   final double balance;
   final bool active;
+  final bool badDebt;
+  final double badDebtAmount;
+  final Timestamp? badDebtDate;
   final String createdBy;
   final Timestamp createdAt;
   final Timestamp updatedAt;
@@ -18,6 +21,9 @@ class CustomerModel {
     this.city,
     required this.balance,
     required this.active,
+    this.badDebt = false,
+    this.badDebtAmount = 0,
+    this.badDebtDate,
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
@@ -33,6 +39,9 @@ class CustomerModel {
       city: json['city'] as String?,
       balance: (json['balance'] as num?)?.toDouble() ?? 0,
       active: json['active'] as bool? ?? true,
+      badDebt: json['bad_debt'] as bool? ?? false,
+      badDebtAmount: (json['bad_debt_amount'] as num?)?.toDouble() ?? 0,
+      badDebtDate: json['bad_debt_date'] as Timestamp?,
       createdBy: json['created_by'] as String? ?? '',
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
@@ -45,6 +54,9 @@ class CustomerModel {
         'city': city,
         'balance': balance,
         'active': active,
+        'bad_debt': badDebt,
+        'bad_debt_amount': badDebtAmount,
+        if (badDebtDate != null) 'bad_debt_date': badDebtDate,
         'created_by': createdBy,
         'created_at': createdAt,
         'updated_at': updatedAt,

@@ -1,10 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/shop_model.dart';
 
 final shopsProvider = StreamProvider<List<ShopModel>>((ref) {
-  ref.keepAlive();
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('active', isEqualTo: true)
@@ -55,9 +55,12 @@ class ShopNotifier extends AsyncNotifier<void> {
 
   Future<void> create(Map<String, dynamic> data) async {
     final db = FirebaseFirestore.instance;
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) throw StateError('Not authenticated');
     // Create customer/shop first (sellers + admins have permission)
     await db.collection(Collections.customers).add({
       ...data,
+      if (!data.containsKey('created_by')) 'created_by': uid,
       'balance': 0.0,
       'active': true,
       'created_at': Timestamp.now(),
@@ -80,15 +83,30 @@ class ShopNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> deactivate(String id, String routeId) async {
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) {
+      throw StateError('Not authenticated');
+    }
+    final me = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(authUser.uid)
+        .get();
+    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
+    if (role != 'admin' && role != 'manager') {
+      throw StateError('Only admin can delete shops');
+    }
+
     final db = FirebaseFirestore.instance;
     final batch = db.batch();
     batch.update(db.collection(Collections.customers).doc(id), {
       'active': false,
       'updated_at': Timestamp.now(),
     });
-    batch.update(db.collection(Collections.routes).doc(routeId), {
-      'total_shops': FieldValue.increment(-1),
-    });
+    if (routeId.trim().isNotEmpty) {
+      batch.update(db.collection(Collections.routes).doc(routeId), {
+        'total_shops': FieldValue.increment(-1),
+      });
+    }
     await batch.commit();
   }
 }

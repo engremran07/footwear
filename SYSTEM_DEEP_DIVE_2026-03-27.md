@@ -133,3 +133,47 @@ Remaining operational tasks (environment/deploy):
 1. Deployment drift risk
 
 - If rules are changed but not deployed, runtime behavior will not match source code.
+
+## 2026-03-29 Stabilization Addendum
+
+Implemented in this pass:
+
+1. Seller-to-admin session switch resilience
+
+- Added provider invalidation on sign-in/sign-out to clear stale permission-denied stream state.
+
+1. User lifecycle hardening
+
+- Moved user creation/deletion to Cloud Function `manageUserAuth` (admin only).
+- Enforced seller route assignment requirement on create/update across UI, provider, and rules.
+- Prevented implicit auto-creation of route-less seller profiles during sign-in.
+
+1. Access model refinement
+
+- Added `/profile` route for all users (name, language, theme, security).
+- Retained `/settings` as admin-only and added in-screen admin guard.
+
+1. Admin-only destructive actions
+
+- Added route/shop/customer delete actions in detail screens for admin only.
+- Added provider-level admin guards for route/shop/customer delete methods.
+- Added seller-only user deletion in admin user management; admin users are protected.
+
+1. Report output consistency
+
+- Account Statement and Seller Report now route through shared export sheet for unified PDF/XLSX/PNG/Print entry points.
+
+1. Session and inventory stabilization (full-audit follow-up)
+
+- Fixed `InventoryScreen` null-user transition crash during auth switching (seller/admin swaps).
+- Centralized auth-session invalidation expanded to include family providers (route/shop/customer/product/transaction/seller inventory).
+- Hardened Firestore role checks with regex to tolerate role whitespace/case drift (`admin|manager|seller`).
+- Disabled Firestore disk persistence in app runtime to reduce stale cross-account cached state.
+
+1. Multi-device compatibility pass (Samsung A56, Android 16 API 36)
+
+- Added `last_active` to allowed seller self-update fields in Firestore rules (was causing PERMISSION_DENIED for session_guard heartbeat writes).
+- Added composite index for `seller_inventory: active + variant_name` (admin all-inventory query without seller_id filter).
+- Overflow hardening: stat_card, dashboard, reports, settings, inventory, customer_detail, shops_list, product_detail, route_detail, customers_list screens.
+- targetSdk updated 34→35.
+- Verified on Samsung Galaxy A56 (Android 16/API 36) and V2247 (Android 14/API 34): zero errors in logcat, zero overflows, zero crashes.

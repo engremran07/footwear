@@ -8,24 +8,24 @@ void main() {
 
   group('AppFormatters.sar', () {
     test('formats zero', () {
-      expect(AppFormatters.sar(0), contains('SAR'));
+      expect(AppFormatters.sar(0), contains('﷼'));
     });
 
     test('formats positive amount with 2 decimal places', () {
       final result = AppFormatters.sar(1234.5);
-      expect(result, contains('SAR'));
+      expect(result, contains('﷼'));
       expect(result, contains('1,234.50'));
     });
   });
 
   group('AppFormatters.currency', () {
     test('uses sar for SAR symbol', () {
-      expect(AppFormatters.currency(1000.0, 'SAR'), contains('SAR'));
+      expect(AppFormatters.currency(1000.0, 'SAR'), contains('﷼'));
     });
 
     test('uses sar for any symbol', () {
-      // All currencies now format as SAR
-      expect(AppFormatters.currency(1000.0, 'USD'), contains('SAR'));
+      // All currencies now format as ﷼
+      expect(AppFormatters.currency(1000.0, 'USD'), contains('﷼'));
     });
   });
 

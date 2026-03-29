@@ -17,7 +17,6 @@ final shopTransactionsProvider =
 });
 
 final allTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
-  ref.keepAlive();
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
       .orderBy('created_at', descending: true)

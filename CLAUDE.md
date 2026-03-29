@@ -1,13 +1,13 @@
 ﻿# ShoesERP AI Coding Rules (CLAUDE.md)
 
-Last updated: 2026-03-27
+Last updated: 2026-03-29
 
 ## Runtime Override (Always First)
 
 The live codebase is a route/seller distribution ERP.
 
 - Roles: admin, seller (manager must be admin-equivalent)
-- Collections: users, products, product_variants, routes, shops, customers, transactions, settings
+- Collections: users, products, product_variants, seller_inventory, inventory_transactions, routes, shops, customers, transactions, invoices, settings
 - Routing source: app/lib/core/router/app_router.dart
 
 If any legacy section conflicts with runtime truth, runtime truth wins.
@@ -30,6 +30,7 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 7. Keep role handling canonical and normalized (trim/lowercase in app writes).
 8. Keep admin-only write enforcement in submit methods (screen-level defense in depth).
 9. Validate required identity fields (for example created_by/route_id/shop_id) before provider writes.
+10. No Firebase Storage — company logos stored as base64 in Firestore, product images use external HTTP URLs. Do not add firebase_storage dependency.
 
 ## Failure Playbooks
 
@@ -76,10 +77,23 @@ Run before marking production ready:
 
 - Deny-by-default rules remain enabled
 - Admin-equivalent role behavior must be aligned in app and rules
+- No Firebase Storage — zero-cost Firebase tier (Firestore + Auth + Functions only)
 
 ## Done In This Baseline
 
+- Firebase Storage fully removed — zero cost architecture
 - Role normalization in app user parsing and writes
 - Firestore rules tolerate legacy role casing variants
 - Dashboard provider now uses timeout + cached fallback
 - Route/shop/variant/inventory forms map errors with AppErrorMapper
+- Added all-user profile route (/profile) for name/theme/language/security controls
+- Kept settings admin-only and added screen-level admin guard
+- Hardened user lifecycle: admin-only create/delete via Cloud Function, seller must have assigned route
+- Added admin-only delete actions for routes/shops/customers with provider guards
+- Full invoicing system (sale invoices, credit notes, void/paid lifecycle)
+- Stock transfer history with inventory_transactions provider
+- Bad debt tracking with customer write-off flow
+- L10n: 372 keys × 3 languages with full parity
+- Enterprise audit: all provider write guards, admin-only product creation, color consistency
+- Seller self-update rules: display_name, updated_at, last_active (session heartbeat)
+- Multi-device tested: Samsung A56 (Android 16/API 36), V2247 (Android 14/API 34) — zero errors

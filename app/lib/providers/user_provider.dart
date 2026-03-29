@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/user_model.dart';
@@ -33,7 +32,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
 
   String _normalizeRole(String role) {
     final normalized = role.trim().toLowerCase();
-    if (normalized == 'manager') return 'manager';
+    if (normalized == 'manager') return 'admin';
     if (normalized == 'admin') return 'admin';
     return 'seller';
   }
@@ -50,41 +49,24 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final normalizedRole = _normalizeRole(role);
-      // Use secondary app to avoid signing out current admin
-      final secondaryApp = await Firebase.initializeApp(
-        name: 'secondary_${DateTime.now().millisecondsSinceEpoch}',
-        options: Firebase.app().options,
-      );
-      try {
-        final cred = await FirebaseAuth.instanceFor(app: secondaryApp)
-            .createUserWithEmailAndPassword(
-          email: email.trim(),
-          password: password,
-        );
-        final uid = cred.user!.uid;
-        final db = FirebaseFirestore.instance;
-        await db.collection(Collections.users).doc(uid).set({
-          'email': email.trim(),
-          'display_name': displayName.trim(),
-          'role': normalizedRole,
-          'phone': phone,
-          'assigned_route_id': assignedRouteId,
-          'assigned_route_name': assignedRouteName,
-          'active': true,
-          'created_at': Timestamp.now(),
-          'updated_at': Timestamp.now(),
-        });
-        // If seller with route, update route's assigned seller
-        if (normalizedRole == 'seller' && assignedRouteId != null) {
-          await db.collection(Collections.routes).doc(assignedRouteId).update({
-            'assigned_seller_id': uid,
-            'assigned_seller_name': displayName.trim(),
-            'updated_at': Timestamp.now(),
-          });
-        }
-      } finally {
-        await secondaryApp.delete();
+      final routeId = assignedRouteId?.trim() ?? '';
+      if (normalizedRole == 'seller' && routeId.isEmpty) {
+        throw ArgumentError('Seller accounts require an assigned route.');
       }
+
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('manageUserAuth');
+      await callable.call({
+        'action': 'createUser',
+        'email': email.trim().toLowerCase(),
+        'password': password,
+        'displayName': displayName.trim(),
+        'role': normalizedRole,
+        'phone': phone,
+        'assignedRouteId': normalizedRole == 'seller' ? routeId : null,
+        'assignedRouteName':
+            normalizedRole == 'seller' ? assignedRouteName : null,
+      });
     });
   }
 
@@ -93,6 +75,12 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     final updateData = <String, dynamic>{...data};
     if (updateData['role'] is String) {
       updateData['role'] = _normalizeRole(updateData['role'] as String);
+    }
+    final updatedRole = updateData['role'] as String?;
+    final updatedRouteId = updateData['assigned_route_id'] as String?;
+    if (updatedRole == 'seller' &&
+        (updatedRouteId == null || updatedRouteId.trim().isEmpty)) {
+      throw ArgumentError('Seller accounts require an assigned route.');
     }
     await db
         .collection(Collections.users)
@@ -127,6 +115,18 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         .collection(Collections.users)
         .doc(uid)
         .update({'active': active, 'updated_at': Timestamp.now()});
+  }
+
+  Future<void> deleteUser(String uid) async {
+    final trimmedUid = uid.trim();
+    if (trimmedUid.isEmpty) {
+      throw ArgumentError('uid must not be empty');
+    }
+    final callable = FirebaseFunctions.instance.httpsCallable('manageUserAuth');
+    await callable.call({
+      'action': 'deleteUser',
+      'targetUid': trimmedUid,
+    });
   }
 
   Future<void> adminUpdateSellerAuth({
@@ -189,16 +189,6 @@ class UserManagementNotifier extends AsyncNotifier<void> {
 
     await currentUser.reauthenticateWithCredential(credential);
     await currentUser.updatePassword(trimmedNew);
-  }
-
-  /// Sends a password reset email to the given address via Firebase Auth.
-  /// Works on both Spark and Blaze plans — no backend function required.
-  Future<void> sendPasswordResetEmail(String email) async {
-    final trimmed = email.trim();
-    if (trimmed.isEmpty) {
-      throw ArgumentError('email must not be empty');
-    }
-    await FirebaseAuth.instance.sendPasswordResetEmail(email: trimmed);
   }
 }
 

@@ -17,6 +17,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 - **Reports** — account statement, seller summary report — exportable as PDF, Excel, or image
 - **User Management** — create/edit admin and seller accounts
 - **Settings** — company name, pairs-per-carton, business preferences
+- **Profile** — name, language, theme and password controls for all users
 
 ### Seller
 
@@ -37,7 +38,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 | Mobile app | Flutter 3.x — Android APK only |
 | State management | Riverpod |
 | Navigation | go_router |
-| Backend / Auth | Firebase (Firestore, Auth, Functions, Storage) |
+| Backend / Auth | Firebase (Firestore, Auth, Functions) — no Storage |
 | PDF export | `pdf` package — Noto Arabic + Noto Nastaliq Urdu fonts |
 | Excel export | `excel` package |
 | Print / Share | `printing` package |
@@ -121,13 +122,18 @@ firebase deploy --only functions
 | --- | --- | --- |
 | Manage products / variants | ✅ | ❌ |
 | Manage routes | ✅ | ❌ |
+| Delete routes / shops / customers | ✅ | ❌ |
 | Manage users | ✅ | ❌ |
+| Delete users | ✅ (seller only, admin protected) | ❌ |
 | View all customers | ✅ | Assigned route only |
 | Create / update customers | ✅ | Assigned route only |
 | Create transactions | ✅ | Assigned route only |
 | View reports | ✅ | ❌ |
 | Adjust inventory | ✅ | ❌ |
+| Profile (name/theme/language/password) | ✅ | ✅ |
 
+> Seller user creation requires assigned route allocation.
+>
 > `manager` role is treated as admin-equivalent for legacy data compatibility.
 
 ---
@@ -142,6 +148,9 @@ firebase deploy --only functions
 | `routes` | Delivery routes with assigned seller |
 | `customers` | Customers / shops with running balance |
 | `transactions` | Cash ledger entries per customer |
+| `invoices` | Sale invoices and credit notes |
+| `seller_inventory` | Seller-allocated stock per variant |
+| `inventory_transactions` | Stock movement audit trail |
 | `settings` | Global business settings |
 
 ---

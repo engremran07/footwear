@@ -79,7 +79,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   labelText: tr('amount', ref),
-                  prefixIcon: const Icon(Icons.attach_money),
+                  prefixIcon: const Icon(Icons.currency_exchange),
                 ),
                 autofocus: true,
               ),
@@ -293,7 +293,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   labelText: tr('amount', ref),
-                  prefixIcon: const Icon(Icons.attach_money),
+                  prefixIcon: const Icon(Icons.currency_exchange),
                 ),
                 autofocus: true,
               ),
@@ -442,6 +442,31 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 IconButton(
                   icon: const Icon(Icons.edit),
                   onPressed: () => context.push('/shops/${shop.id}/edit'),
+                ),
+              if (user?.isAdmin == true)
+                IconButton(
+                  icon: const Icon(Icons.delete, color: AppBrand.errorColor),
+                  onPressed: () async {
+                    final ok = await ConfirmDialog.show(
+                      context,
+                      title: tr('delete', ref),
+                      message: 'Delete this shop?',
+                    );
+                    if (ok != true) return;
+                    try {
+                      await ref
+                          .read(shopNotifierProvider.notifier)
+                          .deactivate(shop.id, shop.routeId);
+                      if (context.mounted) context.go('/shops');
+                    } catch (e) {
+                      if (context.mounted) {
+                        final key = AppErrorMapper.key(e);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(tr(key, ref))),
+                        );
+                      }
+                    }
+                  },
                 ),
               IconButton(
                 icon: const Icon(Icons.picture_as_pdf),
@@ -654,6 +679,26 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       onPressed: () => _showReturnDialog(shop),
                       icon: const Icon(Icons.undo, size: 18),
                       label: const Text('Return'),
+                    ),
+                  ),
+                ),
+              // Create Sale Invoice button (sellers only)
+              if (canManageShop && user?.isSeller == true)
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppBrand.primaryColor,
+                        foregroundColor: AppBrand.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      onPressed: () =>
+                          context.go('/invoices/new?shopId=${shop.id}'),
+                      icon: const Icon(Icons.receipt_long, size: 18),
+                      label: Text(tr('create_sale_invoice', ref)),
                     ),
                   ),
                 ),

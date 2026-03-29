@@ -7,11 +7,19 @@ import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../widgets/empty_state.dart';
 
-class RoutesListScreen extends ConsumerWidget {
+class RoutesListScreen extends ConsumerStatefulWidget {
   const RoutesListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RoutesListScreen> createState() => _RoutesListScreenState();
+}
+
+class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
+  String _search = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final user = ref.watch(authUserProvider).valueOrNull;
     final isAdmin = user?.isAdmin ?? false;
     final routesAsync = isAdmin
@@ -20,21 +28,52 @@ class RoutesListScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('routes', ref))),
-      body: routesAsync.when(
-        data: (routes) {
-          if (routes.isEmpty) {
-            return EmptyState(
-              icon: Icons.route,
-              message: tr('no_routes', ref),
-            );
-          }
-          return ListView.builder(
-            itemCount: routes.length,
-            itemBuilder: (_, i) => _RouteTile(route: routes[i]),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: tr('search', ref),
+                prefixIcon: const Icon(Icons.search),
+                isDense: true,
+              ),
+              onChanged: (v) =>
+                  setState(() => _search = v.trim().toLowerCase()),
+            ),
+          ),
+          Expanded(
+            child: routesAsync.when(
+              data: (routes) {
+                final filtered = _search.isEmpty
+                    ? routes
+                    : routes
+                        .where((r) =>
+                            r.name.toLowerCase().contains(_search) ||
+                            (r.area?.toLowerCase().contains(_search) ??
+                                false) ||
+                            (r.assignedSellerName
+                                    ?.toLowerCase()
+                                    .contains(_search) ??
+                                false) ||
+                            r.routeNumber.toString().contains(_search))
+                        .toList();
+                if (filtered.isEmpty) {
+                  return EmptyState(
+                    icon: Icons.route,
+                    message: tr('no_routes', ref),
+                  );
+                }
+                return ListView.builder(
+                  itemCount: filtered.length,
+                  itemBuilder: (_, i) => _RouteTile(route: filtered[i]),
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('$e')),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: isAdmin
           ? FloatingActionButton(

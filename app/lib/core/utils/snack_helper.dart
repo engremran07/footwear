@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/app_brand.dart';
 
 /// Convenience helpers for uniform snack bar messages across the app.
 
@@ -13,7 +14,7 @@ void showSuccess(BuildContext ctx, String msg) {
           Expanded(child: Text(msg)),
         ],
       ),
-      backgroundColor: const Color(0xFF2E7D32),
+      backgroundColor: AppBrand.successColor,
       behavior: SnackBarBehavior.floating,
       duration: const Duration(seconds: 3),
     ),
@@ -31,7 +32,7 @@ void showError(BuildContext ctx, String msg) {
           Expanded(child: Text(msg)),
         ],
       ),
-      backgroundColor: const Color(0xFFC62828),
+      backgroundColor: AppBrand.errorColor,
       behavior: SnackBarBehavior.floating,
       duration: const Duration(seconds: 4),
     ),
@@ -49,7 +50,7 @@ void showInfo(BuildContext ctx, String msg) {
           Expanded(child: Text(msg)),
         ],
       ),
-      backgroundColor: const Color(0xFF1565C0),
+      backgroundColor: AppBrand.primaryColor,
       behavior: SnackBarBehavior.floating,
       duration: const Duration(seconds: 3),
     ),

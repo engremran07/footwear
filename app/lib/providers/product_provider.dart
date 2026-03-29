@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
 
 final productsProvider = StreamProvider<List<ProductModel>>((ref) {
-  ref.keepAlive();
   return FirebaseFirestore.instance
       .collection(Collections.products)
       .where('active', isEqualTo: true)
@@ -56,7 +56,21 @@ class ProductNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
+  Future<void> _requireAdmin() async {
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) throw StateError('Not authenticated');
+    final me = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(authUser.uid)
+        .get();
+    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
+    if (role != 'admin' && role != 'manager') {
+      throw StateError('Only admin can manage products');
+    }
+  }
+
   Future<String> createProduct(Map<String, dynamic> data) async {
+    await _requireAdmin();
     final db = FirebaseFirestore.instance;
     final doc = await db.collection(Collections.products).add({
       ...data,
@@ -82,6 +96,7 @@ class ProductNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> createVariant(Map<String, dynamic> data) async {
+    await _requireAdmin();
     await FirebaseFirestore.instance
         .collection(Collections.productVariants)
         .add({

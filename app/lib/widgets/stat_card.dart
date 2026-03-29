@@ -76,7 +76,7 @@ class _StatCardState extends State<StatCard>
                   }
                 : null,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -89,35 +89,42 @@ class _StatCardState extends State<StatCard>
                           style: theme.textTheme.labelMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: cardColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(widget.icon, color: cardColor, size: 20),
+                        child: Icon(widget.icon, color: cardColor, size: 18),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const Spacer(),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
-                    child: Text(
-                      widget.value,
-                      key: ValueKey(widget.value),
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: cardColor,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        widget.value,
+                        key: ValueKey(widget.value),
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: cardColor,
+                        ),
                       ),
                     ),
                   ),
                   if (widget.subtitle != null) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       widget.subtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

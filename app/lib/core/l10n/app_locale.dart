@@ -185,6 +185,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Navigation ──
     'dashboard': 'Dashboard',
+    'profile': 'Profile',
     'products': 'Products',
     'inventory': 'Inventory',
     'orders': 'Orders',
@@ -201,6 +202,25 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'waste': 'Waste',
     'pnl': 'P&L',
     'reports': 'Reports',
+    'invoices': 'Invoices',
+    'invoice_detail': 'Invoice Detail',
+    'sale_invoice': 'Sale Invoice',
+    'credit_note': 'Credit Note',
+    'issued': 'Issued',
+    'paid': 'Paid',
+    'partial': 'Partial',
+    'void': 'Void',
+    'mark_paid': 'Mark as Paid',
+    'confirm_void_invoice':
+        'Are you sure you want to void this invoice? This will reverse the balance.',
+    'linked_invoice': 'Linked Invoice',
+    'bad_debt': 'Bad Debt',
+    'mark_bad_debt': 'Mark as Bad Debt',
+    'confirm_bad_debt':
+        'Mark this customer as bad debt? Their outstanding balance will be written off.',
+    'bad_debt_amount': 'Bad Debt Amount',
+    'bad_debts_report': 'Bad Debts Report',
+    'transfer_history': 'Transfer History',
     'settings': 'Settings',
 
     // ── Dashboard ──
@@ -842,6 +862,21 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'page': 'Page',
     'entry_by': 'Entry By',
     'mode': 'Mode',
+
+    // ── Sale Invoice Creation ──
+    'create_sale_invoice': 'Create Sale Invoice',
+    'invoice_created': 'Invoice created successfully',
+    'no_inventory_items': 'No inventory items available',
+    'select_shop': 'Select Shop',
+    'select_at_least_one_item': 'Select at least one item',
+    'sale_amount': 'Sale Amount',
+    'amount_received': 'Amount Received',
+    'previous_balance': 'Previous Balance',
+    'current_sale': 'Current Sale',
+    'total_outstanding': 'Total Outstanding',
+    'new_balance': 'New Balance',
+    'sale_amount_required': 'Enter sale amount',
+    'payment_summary': 'Payment Summary',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -995,6 +1030,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Navigation ──
     'dashboard': 'لوحة التحكم',
+    'profile': 'الملف الشخصي',
     'products': 'المنتجات',
     'inventory': 'المخزون',
     'orders': 'الطلبات',
@@ -1011,6 +1047,24 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'waste': 'الهدر',
     'pnl': 'الأرباح والخسائر',
     'reports': 'التقارير',
+    'invoices': 'الفواتير',
+    'invoice_detail': 'تفاصيل الفاتورة',
+    'sale_invoice': 'فاتورة بيع',
+    'credit_note': 'إشعار دائن',
+    'issued': 'صادرة',
+    'paid': 'مدفوعة',
+    'partial': 'جزئي',
+    'void': 'ملغاة',
+    'mark_paid': 'تعيين كمدفوعة',
+    'confirm_void_invoice':
+        'هل أنت متأكد من إلغاء هذه الفاتورة؟ سيتم عكس الرصيد.',
+    'linked_invoice': 'الفاتورة المرجعية',
+    'bad_debt': 'ديون معدومة',
+    'mark_bad_debt': 'تعيين كدين معدوم',
+    'confirm_bad_debt': 'تعيين هذا العميل كدين معدوم؟ سيتم شطب رصيده المستحق.',
+    'bad_debt_amount': 'مبلغ الدين المعدوم',
+    'bad_debts_report': 'تقرير الديون المعدومة',
+    'transfer_history': 'سجل التحويلات',
     'settings': 'الإعدادات',
 
     // ── Dashboard ──
@@ -1646,6 +1700,21 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'page': 'صفحة',
     'entry_by': 'أدخل بواسطة',
     'mode': 'النوع',
+
+    // ── Sale Invoice Creation ──
+    'create_sale_invoice': 'إنشاء فاتورة بيع',
+    'invoice_created': 'تم إنشاء الفاتورة بنجاح',
+    'no_inventory_items': 'لا توجد عناصر مخزون متاحة',
+    'select_shop': 'اختر المتجر',
+    'select_at_least_one_item': 'اختر عنصرًا واحدًا على الأقل',
+    'sale_amount': 'مبلغ البيع',
+    'amount_received': 'المبلغ المستلم',
+    'previous_balance': 'الرصيد السابق',
+    'current_sale': 'البيع الحالي',
+    'total_outstanding': 'إجمالي المستحق',
+    'new_balance': 'الرصيد الجديد',
+    'sale_amount_required': 'أدخل مبلغ البيع',
+    'payment_summary': 'ملخص الدفع',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1800,6 +1869,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Navigation ──
     'dashboard': 'ڈیش بورڈ',
+    'profile': 'پروفائل',
     'products': 'مصنوعات',
     'inventory': 'انوینٹری',
     'orders': 'آرڈرز',
@@ -1816,6 +1886,25 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'waste': 'فضلہ',
     'pnl': 'نفع و نقصان',
     'reports': 'رپورٹیں',
+    'invoices': 'رسیدیں',
+    'invoice_detail': 'رسید کی تفصیل',
+    'sale_invoice': 'فروخت کی رسید',
+    'credit_note': 'کریڈٹ نوٹ',
+    'issued': 'جاری',
+    'paid': 'ادا شدہ',
+    'partial': 'جزوی',
+    'void': 'منسوخ',
+    'mark_paid': 'ادا شدہ نشان زد کریں',
+    'confirm_void_invoice':
+        'کیا آپ واقعی یہ رسید منسوخ کرنا چاہتے ہیں؟ بیلنس واپس ہو جائے گا۔',
+    'linked_invoice': 'مرجع رسید',
+    'bad_debt': 'ناقابل وصول قرض',
+    'mark_bad_debt': 'ناقابل وصول قرض نشان زد کریں',
+    'confirm_bad_debt':
+        'اس گاہک کو ناقابل وصول قرض نشان زد کریں؟ بقایا رقم شطب ہو جائے گی۔',
+    'bad_debt_amount': 'ناقابل وصول قرض کی رقم',
+    'bad_debts_report': 'ناقابل وصول قرض رپورٹ',
+    'transfer_history': 'منتقلی تاریخ',
     'settings': 'ترتیبات',
 
     // ── Dashboard ──
@@ -2456,5 +2545,20 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'page': 'صفحہ',
     'entry_by': 'اندراج از',
     'mode': 'طریقہ',
+
+    // ── Sale Invoice Creation ──
+    'create_sale_invoice': 'فروخت کی رسید بنائیں',
+    'invoice_created': 'رسید کامیابی سے بنائی گئی',
+    'no_inventory_items': 'کوئی انوینٹری آئٹم دستیاب نہیں',
+    'select_shop': 'دکان منتخب کریں',
+    'select_at_least_one_item': 'کم از کم ایک آئٹم منتخب کریں',
+    'sale_amount': 'فروخت کی رقم',
+    'amount_received': 'وصول شدہ رقم',
+    'previous_balance': 'پچھلا بیلنس',
+    'current_sale': 'موجودہ فروخت',
+    'total_outstanding': 'کل واجب الادا',
+    'new_balance': 'نیا بیلنس',
+    'sale_amount_required': 'فروخت کی رقم درج کریں',
+    'payment_summary': 'ادائیگی کا خلاصہ',
   },
 };

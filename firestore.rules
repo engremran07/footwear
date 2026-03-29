@@ -22,18 +22,11 @@ service cloud.firestore {
     }
 
     function isAdminRole(role) {
-      return role == 'admin' ||
-        role == 'manager' ||
-        role == 'Admin' ||
-        role == 'Manager' ||
-        role == 'ADMIN' ||
-        role == 'MANAGER';
+      return role is string && role.matches('(?i)^\\s*(admin|manager)\\s*$');
     }
 
     function isSellerRole(role) {
-      return role == 'seller' ||
-        role == 'Seller' ||
-        role == 'SELLER';
+      return role is string && role.matches('(?i)^\\s*seller\\s*$');
     }
 
     function assignedRouteId() {
@@ -70,13 +63,23 @@ service cloud.firestore {
       allow get: if isOwnDoc(userId) || isAdmin();
       // list (collection query): admin only — avoids per-doc wildcard ambiguity
       allow list: if isAdmin();
-      allow create: if isAdmin() || isBootstrapAdminCreate(userId) ||
+      allow create: if isBootstrapAdminCreate(userId) ||
+        (
+          isAdmin() &&
+          (
+            request.resource.data.role != 'seller' ||
+            (
+              request.resource.data.assigned_route_id is string &&
+              request.resource.data.assigned_route_id != ''
+            )
+          )
+        );
+      allow update: if isAdmin() ||
         (
           isOwnDoc(userId) &&
-          request.resource.data.role == 'seller' &&
-          request.resource.data.active == true
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['display_name', 'updated_at', 'last_active'])
         );
-      allow update: if isAdmin() || isOwnDoc(userId);
       allow delete: if isAdmin();
     }
 
@@ -205,7 +208,35 @@ service cloud.firestore {
     // --- settings -----------------------------------------------------------
     match /settings/{docId} {
       allow read: if isActiveUser();
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      // Admin: full update; seller: only invoice counter bump
+      allow update: if isAdmin() ||
+        (isActiveUser() &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['last_invoice_number']));
+    }
+
+    // --- invoices -----------------------------------------------------------
+    match /invoices/{invoiceId} {
+      allow read: if isAdmin() ||
+        (
+          isSeller() && (
+            resource.data.seller_id == request.auth.uid ||
+            (resource.data.route_id != null &&
+             resource.data.route_id != '' &&
+             isSellerForRoute(resource.data.route_id))
+          )
+        );
+      allow create: if isAdmin() ||
+        (
+          isSeller() &&
+          request.resource.data.created_by == request.auth.uid &&
+          request.resource.data.route_id != null &&
+          request.resource.data.route_id != '' &&
+          isSellerForRoute(request.resource.data.route_id)
+        );
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // --- Deny all other paths -----------------------------------------------

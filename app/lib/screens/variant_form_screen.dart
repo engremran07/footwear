@@ -105,6 +105,7 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
                   hintText: 'e.g., Black • Size 40',
                 ),
                 validator: (v) => Validators.notEmpty(v),
+                autofocus: !isEdit,
               ),
               const SizedBox(height: 24),
               SizedBox(

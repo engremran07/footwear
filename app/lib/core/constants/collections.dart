@@ -9,4 +9,5 @@ class Collections {
   static const transactions = 'transactions';
   static const settings = 'settings';
   static const inventoryTransactions = 'inventory_transactions';
+  static const invoices = 'invoices';
 }

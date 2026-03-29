@@ -95,6 +95,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                 decoration:
                     InputDecoration(labelText: '${tr('product_name', ref)} *'),
                 validator: (v) => Validators.notEmpty(v),
+                autofocus: !isEdit,
               ),
               const SizedBox(height: 32),
               SizedBox(

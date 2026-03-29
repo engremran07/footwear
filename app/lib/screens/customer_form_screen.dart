@@ -101,6 +101,7 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
                 controller: _nameC,
                 decoration: InputDecoration(labelText: '${tr('name', ref)} *'),
                 validator: (v) => Validators.notEmpty(v),
+                autofocus: !isEdit,
               ),
               const SizedBox(height: 16),
               TextFormField(

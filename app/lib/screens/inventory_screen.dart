@@ -8,6 +8,7 @@ import '../models/product_variant_model.dart';
 import '../models/seller_inventory_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/inventory_transaction_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/seller_inventory_provider.dart';
 import '../providers/settings_provider.dart';
@@ -127,10 +128,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
     final currentUser = ref.watch(authUserProvider).valueOrNull;
-    final isAdmin = currentUser?.isAdmin == true;
+    if (currentUser == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(tr('inventory', ref))),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    final isAdmin = currentUser.isAdmin;
     final warehouseVariants = ref.watch(allVariantsProvider);
-    final sellerInventoryAsync = currentUser?.isSeller == true
-        ? ref.watch(sellerInventoryProvider(currentUser!.id))
+    final sellerInventoryAsync = currentUser.isSeller
+        ? ref.watch(sellerInventoryProvider(currentUser.id))
         : null;
     final ppc = settingsAsync.valueOrNull?.pairsPerCarton ?? 12;
 
@@ -138,6 +145,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       appBar: AppBar(
         title: Text(tr('inventory', ref)),
         actions: [
+          if (isAdmin)
+            IconButton(
+              icon: const Icon(Icons.history),
+              tooltip: tr('transfer_history', ref),
+              onPressed: () => _showTransferHistory(context),
+            ),
           settingsAsync.when(
             data: (settings) => IconButton(
               icon: const Icon(Icons.file_download),
@@ -226,9 +239,15 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                 vertical: 6,
                               ),
                               child: ListTile(
-                                title: Text(variant.variantName),
+                                title: Text(
+                                  variant.variantName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                                 subtitle: Text(
                                   'Stock: ${AppFormatters.stock(variant.quantityAvailable, ppc)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 trailing: ElevatedButton.icon(
                                   icon: const Icon(Icons.add),
@@ -252,96 +271,99 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, st) => Center(child: Text('Error: $e')),
             )
-          : sellerInventoryAsync!.when(
-              data: (data) {
-                if (data.isEmpty) {
-                  return const EmptyState(
-                    icon: Icons.inventory_2,
-                    message: 'No seller inventory yet',
-                  );
-                }
+          : sellerInventoryAsync?.when(
+                data: (data) {
+                  if (data.isEmpty) {
+                    return const EmptyState(
+                      icon: Icons.inventory_2,
+                      message: 'No seller inventory yet',
+                    );
+                  }
 
-                final filtered = data
-                    .where((v) => v.variantName
-                        .toLowerCase()
-                        .contains(_search.toLowerCase()))
-                    .toList();
+                  final filtered = data
+                      .where((v) => v.variantName
+                          .toLowerCase()
+                          .contains(_search.toLowerCase()))
+                      .toList();
 
-                if (filtered.isEmpty) {
-                  return EmptyState(
-                    icon: Icons.search,
-                    message: tr('no_results', ref),
-                  );
-                }
+                  if (filtered.isEmpty) {
+                    return EmptyState(
+                      icon: Icons.search,
+                      message: tr('no_results', ref),
+                    );
+                  }
 
-                return RefreshIndicator(
-                  onRefresh: () => ref
-                      .refresh(sellerInventoryProvider(currentUser!.id).future),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(12),
+                  return RefreshIndicator(
+                    onRefresh: () => ref.refresh(
+                        sellerInventoryProvider(currentUser.id).future),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color:
+                                Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'This tab shows your seller inventory only. Use Products to check warehouse stock before planning the next visit.',
+                          ),
                         ),
-                        child: const Text(
-                          'This tab shows your seller inventory only. Use Products to check warehouse stock before planning the next visit.',
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: TextField(
-                          onChanged: (v) => setState(() => _search = v),
-                          decoration: InputDecoration(
-                            hintText: tr('search_variants', ref),
-                            prefixIcon: const Icon(Icons.search),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: TextField(
+                            onChanged: (v) => setState(() => _search = v),
+                            decoration: InputDecoration(
+                              hintText: tr('search_variants', ref),
+                              prefixIcon: const Icon(Icons.search),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: filtered.length,
-                          itemBuilder: (ctx, i) {
-                            final variant = filtered[i];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              child: ListTile(
-                                title: Text(variant.variantName),
-                                subtitle: Text(
-                                  'Stock: ${AppFormatters.stock(variant.quantityAvailable, ppc)}',
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: filtered.length,
+                            itemBuilder: (ctx, i) {
+                              final variant = filtered[i];
+                              return Card(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
                                 ),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.undo,
-                                      color: Colors.orange),
-                                  tooltip: 'Return to Warehouse',
-                                  onPressed: () => _showReturnToWarehouseDialog(
-                                      variant, ppc),
+                                child: ListTile(
+                                  title: Text(variant.variantName),
+                                  subtitle: Text(
+                                    'Stock: ${AppFormatters.stock(variant.quantityAvailable, ppc)}',
+                                  ),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.undo,
+                                        color: Colors.orange),
+                                    tooltip: 'Return to Warehouse',
+                                    onPressed: () =>
+                                        _showReturnToWarehouseDialog(
+                                            variant, ppc),
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, st) => Center(child: Text('Error: $e')),
-            ),
+                      ],
+                    ),
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, st) => Center(child: Text('Error: $e')),
+              ) ??
+              const Center(child: CircularProgressIndicator()),
       floatingActionButton: isAdmin
           ? Column(
               mainAxisSize: MainAxisSize.min,
@@ -356,7 +378,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   onPressed: () => showDialog(
                     context: context,
                     builder: (_) => _TransferToSellerDialog(
-                      currentUserId: currentUser!.id,
+                      currentUserId: currentUser.id,
                     ),
                   ),
                 ),
@@ -452,6 +474,87 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showTransferHistory(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        maxChildSize: 0.95,
+        minChildSize: 0.4,
+        builder: (ctx, scrollController) {
+          final ppc =
+              ref.read(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
+          return Consumer(
+            builder: (ctx, cRef, _) {
+              final historyAsync = cRef.watch(allInventoryTransactionsProvider);
+              return Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(tr('transfer_history', ref),
+                        style: Theme.of(ctx)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: historyAsync.when(
+                      data: (items) {
+                        if (items.isEmpty) {
+                          return Center(
+                              child: Text(tr('no_transactions', ref)));
+                        }
+                        return ListView.builder(
+                          controller: scrollController,
+                          itemCount: items.length,
+                          itemBuilder: (_, i) {
+                            final item = items[i];
+                            final isReturn = item.type.contains('return');
+                            return ListTile(
+                              dense: true,
+                              leading: Icon(
+                                isReturn ? Icons.undo : Icons.swap_horiz,
+                                color: isReturn ? Colors.orange : Colors.blue,
+                              ),
+                              title: Text(item.variantName),
+                              subtitle: Text(
+                                '${item.sellerName} • ${AppFormatters.stock(item.quantity, ppc)}',
+                              ),
+                              trailing: Text(
+                                AppFormatters.dateTime(item.createdAt),
+                                style: Theme.of(ctx).textTheme.bodySmall,
+                              ),
+                            );
+                          },
+                        );
+                      },
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('$e')),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
       ),
     );
   }

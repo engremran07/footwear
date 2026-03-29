@@ -40,4 +40,16 @@ class SellerInventoryModel {
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'seller_id': sellerId,
+        'seller_name': sellerName,
+        'product_id': productId,
+        'variant_id': variantId,
+        'variant_name': variantName,
+        'quantity_available': quantityAvailable,
+        'active': active,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
 }

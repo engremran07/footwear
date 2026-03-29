@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../constants/app_brand.dart';
 import '../l10n/app_locale.dart';
 import 'error_mapper.dart';
 
@@ -61,21 +62,17 @@ class AppMessage {
 
     final (Color bg, Color fg, IconData icon) = switch (type) {
       _Type.success => (
-          const Color(0xFF2E7D32), // green-800
+          AppBrand.successColor,
           Colors.white,
           Icons.check_circle_outline
         ),
       _Type.error => (cs.error, cs.onError, Icons.error_outline),
       _Type.warning => (
-          const Color(0xFFF57F17), // amber-900
+          AppBrand.warningColor,
           Colors.white,
           Icons.warning_amber_rounded
         ),
-      _Type.info => (
-          const Color(0xFF1565C0), // blue-800
-          Colors.white,
-          Icons.info_outline
-        ),
+      _Type.info => (AppBrand.primaryColor, Colors.white, Icons.info_outline),
     };
 
     messenger.showSnackBar(

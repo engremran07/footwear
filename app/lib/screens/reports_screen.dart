@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:printing/printing.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
@@ -92,6 +91,11 @@ class ReportsScreen extends ConsumerWidget {
             icon: Icons.people,
             title: tr('customers_report', ref),
             onExport: () => _exportCustomers(context, ref),
+          ),
+          _ExportCard(
+            icon: Icons.money_off,
+            title: tr('bad_debts_report', ref),
+            onExport: () => _exportBadDebts(context, ref),
           ),
           const _AccountStatementCard(),
           const _SellerReportCard(),
@@ -221,6 +225,33 @@ class ReportsScreen extends ConsumerWidget {
       fileName: 'customers_report',
     );
   }
+
+  void _exportBadDebts(BuildContext context, WidgetRef ref) {
+    final customers = ref.read(customersProvider).valueOrNull ?? [];
+    final badDebtCustomers = customers.where((c) => c.badDebt).toList();
+    ExportSheet.show(
+      context,
+      ref,
+      title: tr('bad_debts_report', ref),
+      headers: [
+        tr('name', ref),
+        tr('phone', ref),
+        tr('bad_debt_amount', ref),
+        tr('date', ref),
+      ],
+      rows: badDebtCustomers
+          .map((c) => [
+                c.name,
+                c.phone ?? '',
+                AppFormatters.sar(c.badDebtAmount),
+                c.badDebtDate != null
+                    ? AppFormatters.dateTime(c.badDebtDate!)
+                    : '',
+              ])
+          .toList(),
+      fileName: 'bad_debts_report',
+    );
+  }
 }
 
 class _Row extends StatelessWidget {
@@ -232,10 +263,18 @@ class _Row extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.end,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -334,10 +373,30 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
         currency: settings.currency,
         logoBytes: settings.logoBytes,
       );
-      await Printing.sharePdf(
-          bytes: bytes,
-          filename:
-              'account_statement_${customer.name.replaceAll(' ', '_')}.pdf');
+      if (!mounted) return;
+      ExportSheet.show(
+        context,
+        ref,
+        title: '${customer.name} - ${tr('account_statement', ref)}',
+        headers: [
+          tr('date', ref),
+          tr('type', ref),
+          tr('amount', ref),
+          tr('description', ref),
+        ],
+        rows: txs
+            .map((t) => [
+                  AppFormatters.dateTime(t.createdAt),
+                  t.type == 'cash_in'
+                      ? tr('cash_in', ref)
+                      : tr('cash_out', ref),
+                  AppFormatters.sar(t.amount),
+                  t.description ?? '',
+                ])
+            .toList(),
+        fileName: 'account_statement_${customer.name.replaceAll(' ', '_')}',
+        pdfBytesBuilder: () async => bytes,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -509,10 +568,28 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
         locale: locale,
         logoBytes: settings.logoBytes,
       );
-      await Printing.sharePdf(
-          bytes: bytes,
-          filename:
-              'seller_report_${seller.displayName.replaceAll(' ', '_')}.pdf');
+      if (!mounted) return;
+      ExportSheet.show(
+        context,
+        ref,
+        title: '${seller.displayName} - ${tr('seller_report', ref)}',
+        headers: [
+          tr('customer', ref),
+          tr('stock_sold', ref),
+          tr('revenue', ref),
+          tr('outstanding', ref),
+        ],
+        rows: customerMap.values
+            .map((c) => [
+                  c.name,
+                  c.totalPairsSold,
+                  AppFormatters.sar(c.totalRevenue),
+                  AppFormatters.sar(c.outstandingBalance),
+                ])
+            .toList(),
+        fileName: 'seller_report_${seller.displayName.replaceAll(' ', '_')}',
+        pdfBytesBuilder: () async => bytes,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)

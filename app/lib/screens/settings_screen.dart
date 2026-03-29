@@ -12,7 +12,6 @@ import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/settings_provider.dart';
-import '../providers/theme_preference_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/confirm_dialog.dart';
 
@@ -26,7 +25,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _companyC = TextEditingController();
   final _currencyC = TextEditingController();
   final _ppcC = TextEditingController();
-  final _myNameC = TextEditingController();
   bool _settingsLoaded = false;
 
   @override
@@ -34,39 +32,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _companyC.dispose();
     _currencyC.dispose();
     _ppcC.dispose();
-    _myNameC.dispose();
     super.dispose();
-  }
-
-  Future<void> _renameMyself() async {
-    final me = ref.read(authUserProvider).valueOrNull;
-    if (me == null) return;
-    final name = _myNameC.text.trim();
-    if (name.isEmpty || name == me.displayName) return;
-    try {
-      await ref
-          .read(userManagementNotifierProvider.notifier)
-          .updateUser(me.id, {'display_name': name});
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(tr('saved_successfully', ref))));
-      }
-    } catch (e) {
-      if (mounted) {
-        final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(tr(key, ref))));
-      }
-    }
   }
 
   void _loadSettings() {
     if (_settingsLoaded) return;
     final s = ref.read(settingsProvider).valueOrNull;
     if (s != null) {
-      _companyC.text = s.companyName;
-      _currencyC.text = s.currency;
-      _ppcC.text = s.pairsPerCarton.toString();
+      _companyC.value = TextEditingValue(
+        text: s.companyName,
+        selection: TextSelection.collapsed(offset: s.companyName.length),
+      );
+      _currencyC.value = TextEditingValue(
+        text: s.currency,
+        selection: TextSelection.collapsed(offset: s.currency.length),
+      );
+      final ppcStr = s.pairsPerCarton.toString();
+      _ppcC.value = TextEditingValue(
+        text: ppcStr,
+        selection: TextSelection.collapsed(offset: ppcStr.length),
+      );
       _settingsLoaded = true;
     }
   }
@@ -94,94 +79,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
     final currentUser = ref.watch(authUserProvider).valueOrNull;
+    if (currentUser != null && !currentUser.isAdmin) {
+      return Scaffold(
+        appBar: AppBar(title: Text(tr('settings', ref))),
+        body: Center(child: Text(tr('permission_denied', ref))),
+      );
+    }
     // Only watch allUsersProvider when the current user is confirmed admin.
     // This prevents permission-denied errors from firing for seller accounts.
     final usersAsync = currentUser?.isAdmin == true
         ? ref.watch(allUsersProvider)
         : const AsyncValue<List<UserModel>>.loading();
-    final locale = ref.watch(appLocaleProvider);
-
     settingsAsync.whenData((_) => _loadSettings());
-
-    // Pre-fill my name field once (non-reactive to avoid cursor jumps).
-    if (currentUser != null && _myNameC.text.isEmpty) {
-      _myNameC.text = currentUser.displayName;
-    }
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('settings', ref))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ── My Profile ─────────────────────────────────────────────────────
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'My Profile',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Your name appears in the Entry By column of all PDF reports.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _myNameC,
-                    decoration:
-                        const InputDecoration(labelText: 'Display Name'),
-                    textCapitalization: TextCapitalization.words,
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _renameMyself,
-                      child: Text(tr('save', ref)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Language selector
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(tr('language', ref),
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  SegmentedButton<AppLocale>(
-                    segments: AppLocale.values
-                        .map((l) =>
-                            ButtonSegment(value: l, label: Text(l.label)))
-                        .toList(),
-                    selected: {locale},
-                    onSelectionChanged: (s) =>
-                        ref.read(appLocaleProvider.notifier).state = s.first,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Appearance (theme) selector — available to all users
-          _AppearanceCard(),
-          const SizedBox(height: 16),
           // Business settings
           Card(
             child: Padding(
@@ -285,7 +200,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       : AppBrand.sellerRoleColor,
                                 ),
                               ),
-                              title: Text(u.displayName),
+                              title: Text(
+                                u.displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
@@ -350,19 +269,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  if (!isSelf)
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, size: 18),
-                                      onPressed: () => _showEditUserDialog(u),
+                                  GestureDetector(
+                                    onTap: () => _showEditUserDialog(u),
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(4),
+                                      child: Icon(Icons.edit, size: 16),
                                     ),
-                                  Switch(
-                                    value: u.active,
-                                    onChanged: isSelf
-                                        ? null
-                                        : (v) => ref
-                                            .read(userManagementNotifierProvider
-                                                .notifier)
-                                            .toggleActive(u.id, v),
+                                  ),
+                                  if (!isSelf && !u.isAdmin)
+                                    GestureDetector(
+                                      onTap: () => _confirmDeleteUser(u),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(4),
+                                        child: Icon(Icons.delete,
+                                            size: 16,
+                                            color: AppBrand.errorColor),
+                                      ),
+                                    ),
+                                  SizedBox(
+                                    width: 40,
+                                    child: FittedBox(
+                                      child: Switch(
+                                        value: u.active,
+                                        onChanged: isSelf
+                                            ? null
+                                            : (v) => ref
+                                                .read(
+                                                    userManagementNotifierProvider
+                                                        .notifier)
+                                                .toggleActive(u.id, v),
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -376,37 +313,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Security',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.password),
-                    title: const Text('Change My Password'),
-                    subtitle: Text(
-                      currentUser?.isAdmin == true
-                          ? 'Change your own admin password'
-                          : 'Change your seller account password',
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: currentUser == null
-                        ? null
-                        : () => _showChangeOwnPasswordDialog(),
-                  ),
-                ],
-              ),
-            ),
-          ),
           const SizedBox(height: 16),
           // Sign out
           SizedBox(
@@ -429,83 +335,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: const Icon(Icons.logout),
               label: Text(tr('sign_out', ref)),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showChangeOwnPasswordDialog() {
-    final currentPassC = TextEditingController();
-    final newPassC = TextEditingController();
-    final confirmPassC = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Change Password'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: currentPassC,
-                decoration:
-                    const InputDecoration(labelText: 'Current Password'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: newPassC,
-                decoration: const InputDecoration(labelText: 'New Password'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: confirmPassC,
-                decoration:
-                    const InputDecoration(labelText: 'Confirm New Password'),
-                obscureText: true,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(tr('cancel', ref)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (newPassC.text.trim() != confirmPassC.text.trim()) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('New passwords do not match')),
-                );
-                return;
-              }
-              try {
-                await ref
-                    .read(userManagementNotifierProvider.notifier)
-                    .changeOwnPassword(
-                      currentPassword: currentPassC.text,
-                      newPassword: newPassC.text,
-                    );
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(tr('saved_successfully', ref))),
-                  );
-                }
-              } catch (e) {
-                if (ctx.mounted) {
-                  final key = AppErrorMapper.key(e);
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text(tr(key, ref))),
-                  );
-                }
-              }
-            },
-            child: Text(tr('save', ref)),
           ),
         ],
       ),
@@ -550,6 +379,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     controller: passC,
                     decoration: InputDecoration(labelText: tr('password', ref)),
                     obscureText: true,
+                    keyboardType: TextInputType.visiblePassword,
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
@@ -575,10 +405,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         labelText: tr('assigned_route', ref),
                       ),
                       items: [
-                        DropdownMenuItem<String>(
-                          value: null,
-                          child: Text(tr('none', ref)),
-                        ),
                         ...availableRoutes.map((r) => DropdownMenuItem(
                               value: r.id,
                               child: Text(r.name),
@@ -606,6 +432,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (nameC.text.trim().isEmpty ||
                       emailC.text.trim().isEmpty ||
                       passC.text.trim().isEmpty) {
+                    return;
+                  }
+                  if (role == 'seller' &&
+                      (selectedRouteId == null ||
+                          selectedRouteId!.trim().isEmpty)) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                            content:
+                                Text('Seller must be assigned to a route.')),
+                      );
+                    }
                     return;
                   }
                   try {
@@ -641,7 +479,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showEditUserDialog(UserModel user) {
     final nameC = TextEditingController(text: user.displayName);
     final emailC = TextEditingController(text: user.email);
+    final newPassC = TextEditingController();
+    final confirmPassC = TextEditingController();
     String role = user.isAdmin ? 'admin' : 'seller';
+    final currentUser = ref.read(authUserProvider).valueOrNull;
+    final isSelf = currentUser?.id == user.id;
     String? selectedRouteId = user.assignedRouteId;
     String? selectedRouteName = user.assignedRouteName;
     final oldRouteId = user.assignedRouteId;
@@ -682,50 +524,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   if (user.isSeller) ...[
                     const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.email, size: 16),
-                        label: Text(tr('send_reset_email', ref)),
-                        onPressed: () async {
-                          try {
-                            await ref
-                                .read(userManagementNotifierProvider.notifier)
-                                .sendPasswordResetEmail(user.email);
-                            if (ctx.mounted) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                SnackBar(
-                                    content: Text(tr('reset_email_sent', ref))),
-                              );
-                            }
-                          } catch (e) {
-                            if (ctx.mounted) {
-                              final key = AppErrorMapper.key(e);
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                SnackBar(content: Text(tr(key, ref))),
-                              );
-                            }
-                          }
-                        },
+                    TextField(
+                      controller: newPassC,
+                      decoration: const InputDecoration(
+                        labelText: 'Set New Password (Seller)',
+                        helperText:
+                            'Admin can directly set seller password. Min 6 chars.',
                       ),
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: confirmPassC,
+                      decoration: const InputDecoration(
+                        labelText: 'Confirm New Password',
+                      ),
+                      obscureText: true,
                     ),
                   ],
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    initialValue: role,
-                    decoration: InputDecoration(labelText: tr('role', ref)),
-                    items: const [
-                      DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                      DropdownMenuItem(value: 'seller', child: Text('Seller')),
-                    ],
-                    onChanged: (v) => setS(() {
-                      role = v ?? 'seller';
-                      if (role != 'seller') {
-                        selectedRouteId = null;
-                        selectedRouteName = null;
-                      }
-                    }),
-                  ),
+                  if (isSelf)
+                    TextField(
+                      enabled: false,
+                      decoration: InputDecoration(
+                        labelText: tr('role', ref),
+                        hintText: role,
+                      ),
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      initialValue: role,
+                      decoration: InputDecoration(labelText: tr('role', ref)),
+                      items: const [
+                        DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                        DropdownMenuItem(
+                            value: 'seller', child: Text('Seller')),
+                      ],
+                      onChanged: (v) => setS(() {
+                        role = v ?? 'seller';
+                        if (role != 'seller') {
+                          selectedRouteId = null;
+                          selectedRouteName = null;
+                        }
+                      }),
+                    ),
                   if (role == 'seller') ...[
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
@@ -734,10 +576,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         labelText: tr('assigned_route', ref),
                       ),
                       items: [
-                        DropdownMenuItem<String>(
-                          value: null,
-                          child: Text(tr('none', ref)),
-                        ),
                         ...availableRoutes.map((r) => DropdownMenuItem(
                               value: r.id,
                               child: Text(r.name),
@@ -775,6 +613,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (nameC.text.trim().isEmpty || emailC.text.trim().isEmpty) {
                     return;
                   }
+                  final newPass = newPassC.text.trim();
+                  final confirmPass = confirmPassC.text.trim();
+                  if (newPass.isNotEmpty || confirmPass.isNotEmpty) {
+                    if (newPass.length < 6) {
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(
+                              content: Text(
+                                  'New password must be at least 6 characters.')),
+                        );
+                      }
+                      return;
+                    }
+                    if (newPass != confirmPass) {
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(
+                              content: Text(
+                                  'New password and confirmation do not match.')),
+                        );
+                      }
+                      return;
+                    }
+                  }
+                  if (role == 'seller' &&
+                      (selectedRouteId == null ||
+                          selectedRouteId!.trim().isEmpty)) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                            content:
+                                Text('Seller must be assigned to a route.')),
+                      );
+                    }
+                    return;
+                  }
                   try {
                     final notifier =
                         ref.read(userManagementNotifierProvider.notifier);
@@ -786,15 +660,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       'display_name': nameC.text.trim(),
                       if (user.isSeller)
                         'email': emailC.text.trim().toLowerCase(),
-                      'role': role,
+                      'role': isSelf ? 'admin' : role,
                       'assigned_route_id': selectedRouteId,
                       'assigned_route_name': selectedRouteName,
                     });
                     if (user.isSeller &&
-                        emailC.text.trim().toLowerCase() != user.email) {
+                        (emailC.text.trim().toLowerCase() != user.email ||
+                            newPass.isNotEmpty)) {
                       await notifier.adminUpdateSellerAuth(
                         targetUid: user.id,
-                        newEmail: emailC.text.trim().toLowerCase(),
+                        newEmail: emailC.text.trim().toLowerCase() != user.email
+                            ? emailC.text.trim().toLowerCase()
+                            : null,
+                        newPassword: newPass.isNotEmpty ? newPass : null,
                       );
                     }
                     if (ctx.mounted) Navigator.pop(ctx);
@@ -815,60 +693,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-}
 
-// ─── Appearance Card ──────────────────────────────────────────────────────────
+  Future<void> _confirmDeleteUser(UserModel user) async {
+    final me = ref.read(authUserProvider).valueOrNull;
+    if (me?.isAdmin != true) return;
+    if (user.id == me?.id || user.isAdmin) return;
 
-class _AppearanceCard extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final current = ref.watch(themePreferenceProvider);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Appearance',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Auto follows your device setting.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            SegmentedButton<ThemeMode>(
-              segments: const [
-                ButtonSegment(
-                  value: ThemeMode.system,
-                  icon: Icon(Icons.brightness_auto, size: 18),
-                  label: Text('Auto'),
-                ),
-                ButtonSegment(
-                  value: ThemeMode.light,
-                  icon: Icon(Icons.light_mode, size: 18),
-                  label: Text('Light'),
-                ),
-                ButtonSegment(
-                  value: ThemeMode.dark,
-                  icon: Icon(Icons.dark_mode, size: 18),
-                  label: Text('Dark'),
-                ),
-              ],
-              selected: {current},
-              onSelectionChanged: (s) => ref
-                  .read(themePreferenceProvider.notifier)
-                  .setThemeMode(s.first),
-            ),
-          ],
-        ),
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: tr('delete', ref),
+      message: 'Delete user ${user.displayName}? This cannot be undone.',
     );
+    if (confirmed != true) return;
+
+    try {
+      await ref
+          .read(userManagementNotifierProvider.notifier)
+          .deleteUser(user.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${user.displayName} deleted')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+      }
+    }
   }
 }
 

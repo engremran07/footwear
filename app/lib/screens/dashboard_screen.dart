@@ -157,16 +157,19 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authUserProvider).valueOrNull;
-    final isAdmin = user?.isAdmin ?? false;
-    if (user != null && !isAdmin) {
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(tr('dashboard', ref))),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (!user.isAdmin) {
       return _SellerDashboard(user: user);
     }
 
     final stats = ref.watch(dashboardStatsProvider);
     final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
-    final routesAsync = isAdmin
-        ? ref.watch(routesProvider)
-        : ref.watch(routesBySellerProvider(user?.id ?? ''));
+    final routesAsync = ref.watch(routesProvider);
     final shopsAsync = ref.watch(shopsProvider);
     final transactionsAsync = ref.watch(allTransactionsProvider);
 
@@ -184,24 +187,23 @@ class DashboardScreen extends ConsumerWidget {
           data: (s) => ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              if (user != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(
-                    '${tr('welcome', ref)}, ${user.displayName}',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  '${tr('welcome', ref)}, ${user.displayName}',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
+              ),
               GridView.count(
                 crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 4,
-                crossAxisSpacing: 4,
-                childAspectRatio: 1.5,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1.2,
                 children: [
                   StatCard(
                     title: tr('total_routes', ref),

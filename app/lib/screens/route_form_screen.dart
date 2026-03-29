@@ -109,6 +109,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
                 decoration:
                     InputDecoration(labelText: '${tr('route_name', ref)} *'),
                 validator: (v) => Validators.notEmpty(v),
+                autofocus: !isEdit,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(

@@ -1,10 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/customer_model.dart';
 
 final customersProvider = StreamProvider<List<CustomerModel>>((ref) {
-  ref.keepAlive();
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('active', isEqualTo: true)
@@ -60,8 +60,11 @@ class CustomerNotifier extends AsyncNotifier<void> {
 
   Future<void> create(Map<String, dynamic> data) async {
     final db = FirebaseFirestore.instance;
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) throw StateError('Not authenticated');
     await db.collection(Collections.customers).add({
       ...data,
+      if (!data.containsKey('created_by')) 'created_by': uid,
       'balance': 0.0,
       'active': true,
       'created_at': Timestamp.now(),
@@ -77,7 +80,69 @@ class CustomerNotifier extends AsyncNotifier<void> {
     });
   }
 
+  /// Admin-only: marks a customer as bad debt, writes off outstanding balance.
+  Future<void> markAsBadDebt(String customerId) async {
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) throw StateError('Not authenticated');
+    final me = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(authUser.uid)
+        .get();
+    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
+    if (role != 'admin' && role != 'manager') {
+      throw StateError('Only admin can mark bad debt');
+    }
+
+    final db = FirebaseFirestore.instance;
+    final custDoc =
+        await db.collection(Collections.customers).doc(customerId).get();
+    final balance = (custDoc.data()?['balance'] as num?)?.toDouble() ?? 0;
+    if (balance <= 0) throw StateError('No outstanding balance to write off');
+
+    final batch = db.batch();
+
+    // Mark customer as bad debt
+    batch.update(db.collection(Collections.customers).doc(customerId), {
+      'bad_debt': true,
+      'bad_debt_amount': balance,
+      'bad_debt_date': Timestamp.now(),
+      'balance': 0.0,
+      'updated_at': Timestamp.now(),
+    });
+
+    // Create write_off transaction
+    final txRef = db.collection(Collections.transactions).doc();
+    batch.set(txRef, {
+      'type': 'write_off',
+      'shop_id': '',
+      'shop_name': '',
+      'route_id': '',
+      'customer_id': customerId,
+      'customer_name': custDoc.data()?['name'] ?? '',
+      'amount': balance,
+      'description': 'Bad debt write-off',
+      'items': <Map<String, dynamic>>[],
+      'created_by': authUser.uid,
+      'created_at': Timestamp.now(),
+    });
+
+    await batch.commit();
+  }
+
   Future<void> deactivate(String id) async {
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) {
+      throw StateError('Not authenticated');
+    }
+    final me = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(authUser.uid)
+        .get();
+    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
+    if (role != 'admin' && role != 'manager') {
+      throw StateError('Only admin can delete customers');
+    }
+
     final db = FirebaseFirestore.instance;
     await db.collection(Collections.customers).doc(id).update({
       'active': false,

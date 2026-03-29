@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class AppFormatters {
   AppFormatters._();
 
-  static final _sar = NumberFormat.currency(symbol: 'SAR ', decimalDigits: 2);
+  static final _sar = NumberFormat.currency(symbol: '﷼ ', decimalDigits: 2);
   static final _num = NumberFormat('#,##0.##');
   static final _date = DateFormat('dd MMM yyyy');
   static final _dateTime = DateFormat('dd MMM yyyy, HH:mm');

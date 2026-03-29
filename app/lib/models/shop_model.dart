@@ -82,4 +82,11 @@ class ShopModel {
         'created_at': createdAt,
         'updated_at': updatedAt,
       };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || (other is ShopModel && other.id == id);
+
+  @override
+  int get hashCode => id.hashCode;
 }

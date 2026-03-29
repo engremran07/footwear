@@ -12,6 +12,15 @@ ui-debug.log
 database-debug.log
 pubsub-debug.log
 
+# Device / debug log captures
+*_logs.txt
+*_logs_*.txt
+*_errors.txt
+app_logs.txt
+fresh_logs.txt
+fresh_errors.txt
+device_logs_*.txt
+
 # Firebase
 .firebase/
 

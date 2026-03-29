@@ -231,6 +231,8 @@ class _ShopTile extends ConsumerWidget {
               color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs)),
         ),
         title: Text(shop.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(
           [
@@ -241,18 +243,23 @@ class _ShopTile extends ConsumerWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: hasDebt ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            hasDebt ? AppFormatters.sar(shop.balance) : tr('clear', ref),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-              color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
+        trailing: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 120),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: hasDebt ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              hasDebt ? AppFormatters.sar(shop.balance) : tr('clear', ref),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ),

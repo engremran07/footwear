@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
+import '../core/utils/error_mapper.dart';
+import '../core/utils/formatters.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/shop_provider.dart';
+import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 
 class RouteDetailScreen extends ConsumerWidget {
@@ -34,6 +37,30 @@ class RouteDetailScreen extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.edit),
               onPressed: () => context.push('/routes/$routeId/edit'),
+            ),
+          if (isAdmin)
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () async {
+                final ok = await ConfirmDialog.show(
+                  context,
+                  title: tr('delete', ref),
+                  message: 'Delete this route?',
+                );
+                if (ok != true) return;
+                try {
+                  await ref
+                      .read(routeNotifierProvider.notifier)
+                      .delete(routeId);
+                  if (context.mounted) context.go('/routes');
+                } catch (e) {
+                  if (context.mounted) {
+                    final key = AppErrorMapper.key(e);
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+                  }
+                }
+              },
             ),
         ],
       ),
@@ -142,11 +169,14 @@ class RouteDetailScreen extends ConsumerWidget {
                                       : AppTheme.clearFg(cs)),
                             ),
                             title: Text(shop.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w600)),
-                            subtitle: Text(shop.phone ?? ''),
+                            subtitle: Text(shop.phone ?? '',
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
                             trailing: Text(
-                              'SAR ${shop.balance.toStringAsFixed(0)}',
+                              AppFormatters.sar(shop.balance),
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: hasDebt

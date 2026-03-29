@@ -3,12 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
-import '../providers/connectivity_provider.dart';
+import '../providers/network_provider.dart';
 import '../models/user_model.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/services/permissions_service.dart';
-import '../core/utils/error_mapper.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -21,6 +20,7 @@ class AppShell extends ConsumerStatefulWidget {
     (icon: Icons.people, key: 'customers', route: '/customers'),
     (icon: Icons.inventory_2, key: 'products', route: '/products'),
     (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
+    (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
     (icon: Icons.analytics, key: 'reports', route: '/reports'),
     (icon: Icons.settings, key: 'settings', route: '/settings'),
   ];
@@ -67,7 +67,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         .toList();
     final currentLocation = GoRouterState.of(context).uri.path;
 
-    final isOnline = ref.watch(connectivityProvider).valueOrNull ?? false;
+    final isOnline = ref.watch(isOnlineProvider).valueOrNull ?? false;
 
     void onPopInvoked(bool didPop, dynamic result) {
       if (didPop) return;
@@ -94,6 +94,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 onItem: (i) => context.go(navItems[i].route),
                 onLogout: () =>
                     ref.read(authNotifierProvider.notifier).signOut(),
+                onProfile: () => context.go('/profile'),
                 user: user,
                 signOutTooltip: tr('sign_out', ref),
                 isOnline: isOnline,
@@ -138,48 +139,57 @@ class _AppShellState extends ConsumerState<AppShell> {
             context.go(navItems[i].route);
           },
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 32, 16, 12),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Image.asset(AppBrand.logoAsset,
-                      height: 56, fit: BoxFit.contain),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      _UserAvatar(user: user, radius: 18),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: user != null
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(user.displayName,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14),
-                                      overflow: TextOverflow.ellipsis),
-                                  Text(user.email,
-                                      style: TextStyle(
-                                          fontSize: 11,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurfaceVariant),
-                                      overflow: TextOverflow.ellipsis),
-                                  const SizedBox(height: 4),
-                                  _RoleBadge(role: user.role),
-                                ],
-                              )
-                            : const Text(AppBrand.appName,
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                    ],
-                  ),
-                ],
+            InkWell(
+              onTap: user == null
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      context.go('/profile');
+                    },
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 32, 16, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Image.asset(AppBrand.logoAsset,
+                        height: 56, fit: BoxFit.contain),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _UserAvatar(user: user, radius: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: user != null
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(user.displayName,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14),
+                                        overflow: TextOverflow.ellipsis),
+                                    Text(user.email,
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant),
+                                        overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 4),
+                                    _RoleBadge(role: user.role),
+                                  ],
+                                )
+                              : const Text(AppBrand.appName,
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
             const Divider(height: 1),
@@ -188,14 +198,6 @@ class _AppShellState extends ConsumerState<AppShell> {
                   label: Text(e.label),
                 )),
             const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.lock_reset),
-              title: Text(tr('change_password', ref)),
-              onTap: () {
-                Navigator.pop(context);
-                _showChangePasswordDialog();
-              },
-            ),
           ],
         ),
         body: widget.child,
@@ -212,7 +214,8 @@ class _AppShellState extends ConsumerState<AppShell> {
               item.route == '/' ||
               item.route == '/shops' ||
               item.route == '/products' ||
-              item.route == '/inventory')
+              item.route == '/inventory' ||
+              item.route == '/invoices')
           .toList();
     }
     return AppShell._navItems.where((item) {
@@ -231,84 +234,6 @@ class _AppShellState extends ConsumerState<AppShell> {
         (e.route != '/' && location.startsWith(e.route)));
     return idx < 0 ? 0 : idx;
   }
-
-  void _showChangePasswordDialog() {
-    final currentC = TextEditingController();
-    final newC = TextEditingController();
-    final confirmC = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(tr('change_password', ref)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: currentC,
-              obscureText: true,
-              autofocus: true,
-              decoration:
-                  InputDecoration(labelText: tr('current_password', ref)),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: newC,
-              obscureText: true,
-              decoration: InputDecoration(labelText: tr('new_password', ref)),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: confirmC,
-              obscureText: true,
-              decoration:
-                  InputDecoration(labelText: tr('confirm_password', ref)),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(tr('cancel', ref)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final np = newC.text.trim();
-              if (np.length < 6) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(tr('err_weak_password', ref))),
-                );
-                return;
-              }
-              if (np != confirmC.text.trim()) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(tr('passwords_dont_match', ref))),
-                );
-                return;
-              }
-              Navigator.pop(ctx);
-              try {
-                await ref
-                    .read(authNotifierProvider.notifier)
-                    .changePassword(currentC.text.trim(), np);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(tr('password_changed', ref))),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  final key = AppErrorMapper.key(e);
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text(tr(key, ref))));
-                }
-              }
-            },
-            child: Text(tr('save', ref)),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ─── Scrollable side navigation rail ─────────────────────────────────────────
@@ -319,6 +244,7 @@ class _ScrollableNavRail extends StatelessWidget {
   final List<({IconData icon, String label, String route})> items;
   final ValueChanged<int> onItem;
   final VoidCallback onLogout;
+  final VoidCallback onProfile;
   final UserModel? user;
   final String signOutTooltip;
   final bool isOnline;
@@ -329,6 +255,7 @@ class _ScrollableNavRail extends StatelessWidget {
     required this.items,
     required this.onItem,
     required this.onLogout,
+    required this.onProfile,
     this.user,
     this.signOutTooltip = 'Sign out',
     this.isOnline = false,
@@ -375,30 +302,38 @@ class _ScrollableNavRail extends StatelessWidget {
             if (user != null)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: extended
-                    ? Row(
-                        children: [
-                          _UserAvatar(user: user, radius: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(user!.displayName,
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: cs.onSurface),
-                                    overflow: TextOverflow.ellipsis),
-                                _RoleBadge(role: user!.role, small: true),
-                              ],
-                            ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: onProfile,
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                    child: extended
+                        ? Row(
+                            children: [
+                              _UserAvatar(user: user, radius: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(user!.displayName,
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: cs.onSurface),
+                                        overflow: TextOverflow.ellipsis),
+                                    _RoleBadge(role: user!.role, small: true),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        : Center(
+                            child: _UserAvatar(user: user, radius: 14),
                           ),
-                        ],
-                      )
-                    : Center(
-                        child: _UserAvatar(user: user, radius: 14),
-                      ),
+                  ),
+                ),
               ),
             const Divider(height: 1),
             Expanded(

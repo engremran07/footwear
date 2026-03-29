@@ -22,6 +22,10 @@ import '../../screens/variant_form_screen.dart';
 import '../../screens/inventory_screen.dart';
 import '../../screens/reports_screen.dart';
 import '../../screens/settings_screen.dart';
+import '../../screens/profile_screen.dart';
+import '../../screens/invoices_list_screen.dart';
+import '../../screens/invoice_detail_screen.dart';
+import '../../screens/create_sale_invoice_screen.dart';
 import '../../screens/bootstrap_profile_screen.dart';
 import '../../widgets/app_shell.dart';
 
@@ -225,10 +229,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
               path: '/inventory',
               pageBuilder: (_, s) => _fadePage(const InventoryScreen(), s)),
+          // Invoices
+          GoRoute(
+              path: '/invoices',
+              pageBuilder: (_, s) => _fadePage(const InvoicesListScreen(), s)),
+          GoRoute(
+              path: '/invoices/new',
+              pageBuilder: (_, s) => _fadePage(
+                  CreateSaleInvoiceScreen(
+                      preselectedShopId: s.uri.queryParameters['shopId']),
+                  s)),
+          GoRoute(
+              path: '/invoices/:id',
+              pageBuilder: (_, s) => _fadePage(
+                  InvoiceDetailScreen(invoiceId: s.pathParameters['id']!), s)),
           // Reports
           GoRoute(
               path: '/reports',
               pageBuilder: (_, s) => _fadePage(const ReportsScreen(), s)),
+          // Profile
+          GoRoute(
+              path: '/profile',
+              pageBuilder: (_, s) => _fadePage(const ProfileScreen(), s)),
           // Settings
           GoRoute(
               path: '/settings',

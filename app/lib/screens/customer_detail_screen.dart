@@ -84,7 +84,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                     const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   labelText: tr('amount', ref),
-                  prefixIcon: const Icon(Icons.attach_money),
+                  prefixIcon: const Icon(Icons.currency_exchange),
                 ),
                 autofocus: true,
               ),
@@ -291,7 +291,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                     const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   labelText: tr('amount', ref),
-                  prefixIcon: const Icon(Icons.attach_money),
+                  prefixIcon: const Icon(Icons.currency_exchange),
                 ),
                 autofocus: true,
               ),
@@ -443,6 +443,59 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                   icon: const Icon(Icons.edit),
                   onPressed: () =>
                       context.push('/customers/${customer.id}/edit'),
+                ),
+              if (isAdmin)
+                IconButton(
+                  icon: const Icon(Icons.delete, color: AppBrand.errorColor),
+                  onPressed: () async {
+                    final ok = await ConfirmDialog.show(
+                      context,
+                      title: tr('delete', ref),
+                      message: 'Delete this customer?',
+                    );
+                    if (ok != true) return;
+                    try {
+                      await ref
+                          .read(customerNotifierProvider.notifier)
+                          .deactivate(customer.id);
+                      if (context.mounted) context.go('/customers');
+                    } catch (e) {
+                      if (context.mounted) {
+                        final key = AppErrorMapper.key(e);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(tr(key, ref))),
+                        );
+                      }
+                    }
+                  },
+                ),
+              if (isAdmin && customer.balance > 0 && !customer.badDebt)
+                IconButton(
+                  icon: const Icon(Icons.money_off, color: Colors.orange),
+                  tooltip: tr('mark_bad_debt', ref),
+                  onPressed: () async {
+                    final ok = await ConfirmDialog.show(
+                      context,
+                      title: tr('bad_debt', ref),
+                      message: tr('confirm_bad_debt', ref),
+                    );
+                    if (ok != true) return;
+                    try {
+                      await ref
+                          .read(customerNotifierProvider.notifier)
+                          .markAsBadDebt(customer.id);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(tr('success_updated', ref))),
+                      );
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      final key = AppErrorMapper.key(e);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(tr(key, ref))),
+                      );
+                    }
+                  },
                 ),
               IconButton(
                 icon: const Icon(Icons.ios_share),
@@ -617,6 +670,41 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                           ],
                         ),
                       ),
+                      if (customer.badDebt) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.orange.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.warning_amber,
+                                  color: Colors.orange),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(tr('bad_debt', ref),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.orange)),
+                                    Text(
+                                      '${tr('bad_debt_amount', ref)}: ${AppFormatters.sar(customer.badDebtAmount)}',
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -961,9 +1049,13 @@ class _SellStockSheetState extends ConsumerState<_SellStockSheet> {
                           onChanged: (v) =>
                               setS(() => _selected[item.id] = v ?? false),
                           title: Text(item.variantName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 13)),
                           subtitle: Text(
                             '${tr('available', ref)}: ${AppFormatters.stock(item.quantityAvailable, widget.ppc)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 11),
                           ),
                           secondary: isSelected

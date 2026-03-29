@@ -61,6 +61,8 @@ class TransactionModel {
   final double amount;
   final String? description;
   final List<TransactionItem> items;
+  final String? invoiceId;
+  final String? invoiceNumber;
   final String createdBy;
   final Timestamp createdAt;
 
@@ -76,6 +78,8 @@ class TransactionModel {
     required this.amount,
     this.description,
     this.items = const [],
+    this.invoiceId,
+    this.invoiceNumber,
     required this.createdBy,
     required this.createdAt,
   });
@@ -102,6 +106,8 @@ class TransactionModel {
               ?.map((e) => TransactionItem.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      invoiceId: json['invoice_id'] as String?,
+      invoiceNumber: json['invoice_number'] as String?,
       createdBy: json['created_by'] as String? ?? '',
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
     );
@@ -118,6 +124,8 @@ class TransactionModel {
         'amount': amount,
         'description': description,
         'items': items.map((e) => e.toJson()).toList(),
+        if (invoiceId != null) 'invoice_id': invoiceId,
+        if (invoiceNumber != null) 'invoice_number': invoiceNumber,
         'created_by': createdBy,
         'created_at': createdAt,
       };

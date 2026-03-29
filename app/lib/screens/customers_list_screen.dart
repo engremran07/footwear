@@ -112,11 +112,15 @@ class _CustomersListScreenState extends ConsumerState<CustomersListScreen> {
                         ),
                       ),
                       title: Text(c.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: Text(
                         [c.phone, c.city]
                             .where((e) => e != null && e.isNotEmpty)
                             .join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       trailing: Text(
                         AppFormatters.sar(c.balance.abs()),
@@ -340,12 +344,16 @@ class _AdminGroupedCustomersViewState
               c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
             ),
           ),
-          title:
-              Text(c.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+          title: Text(c.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600)),
           subtitle: Text(
             [c.phone, c.city]
                 .where((e) => e != null && e.isNotEmpty)
                 .join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           trailing: Text(
             AppFormatters.sar(c.balance.abs()),

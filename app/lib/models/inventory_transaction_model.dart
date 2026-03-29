@@ -1,8 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Audit-trail document written to `inventory_transactions` whenever stock moves.
-/// Types: 'transfer_out' | 'return_to_warehouse' | 'return_from_shop'
 class InventoryTransactionModel {
+  static const String typeTransferOut = 'transfer_out';
+  static const String typeReturnToWarehouse = 'return_to_warehouse';
+  static const String typeReturnFromShop = 'return_from_shop';
+  static const String typeStockAdjustment = 'stock_adjustment';
+
   final String id;
   final String type;
   final String sellerId;
