@@ -372,6 +372,34 @@ class _AdminGroupedShopsViewState extends State<_AdminGroupedShopsView> {
                           ?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   const SizedBox(width: 8),
+                  // Per-route outstanding balance
+                  Builder(builder: (_) {
+                    final routeOutstanding = section.items
+                        .where((s) => s.balance > 0)
+                        .fold(0.0, (sum, s) => sum + s.balance);
+                    if (routeOutstanding > 0) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.debtBg(cs),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            AppFormatters.compact(routeOutstanding),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.debtFg(cs),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  }),
                   Text(
                     '${section.items.length}',
                     style: Theme.of(context)

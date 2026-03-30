@@ -6,6 +6,7 @@ import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
+import '../core/utils/snack_helper.dart';
 import '../models/invoice_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/invoice_provider.dart';
@@ -91,7 +92,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
         if (context.mounted) {
           final key = AppErrorMapper.key(e);
           ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+              .showSnackBar(errorSnackBar(tr(key, ref)));
         }
       }
     } else if (action == 'paid') {
@@ -103,7 +104,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
         if (context.mounted) {
           final key = AppErrorMapper.key(e);
           ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+              .showSnackBar(errorSnackBar(tr(key, ref)));
         }
       }
     }
@@ -127,8 +128,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
       );
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
       }
     }
   }

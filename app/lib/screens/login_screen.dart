@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/utils/snack_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/network_provider.dart';
 
@@ -61,11 +62,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red.shade700,
-          duration: const Duration(seconds: 5),
-        ),
+        errorSnackBar(errorMessage),
       );
     }
   }

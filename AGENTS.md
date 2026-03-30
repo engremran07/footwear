@@ -176,18 +176,22 @@ Conflict resolution order for instructions:
 
 ## 10) Current Audit Status
 
-2026-03-29 enterprise audit:
+2026-03-30 enterprise audit:
 
-- Firebase Storage fully removed — zero cost architecture (Firestore + Auth + Functions only)
+- Firebase Storage fully removed — zero cost architecture (Firestore + Auth only, NO Cloud Functions)
+- Cloud Functions dependency removed — user CRUD uses secondary FirebaseApp approach
 - Company logo stored as base64 in Firestore settings doc (no CDN/Storage needed)
 - Product image_url field supports external HTTP URLs only (no upload to Storage)
 - Role normalization hardened in app + rules + storage.rules (regex matching)
 - Dashboard aggregate fallback cache enabled
 - Critical write screens map errors through AppErrorMapper
+- SnackBar system redesigned: Material 3 container-color card-style (light bg + dark text + accent bar)
+- All SnackBars across 19 screens converted to styled helpers (errorSnackBar/successSnackBar/warningSnackBar/infoSnackBar)
 - Variant stock shown as cartons/dozens/pairs in product detail
 - L10n: 372 keys × 3 languages — perfect parity
 - All 21 provider queries covered by 17 composite indexes + 1 new seller_inventory(active+variant_name)
 - Provider write guards: created_by validation, admin-only product/variant creation
 - Color consistency: all semantic colors use AppBrand constants
 - Seller self-update rules: display_name, updated_at, last_active (session heartbeat)
+- Edit user dialog: email read-only, password reset via email (no direct password setting)
 - Multi-device tested: Samsung A56 (Android 16/API 36), V2247 (Android 14/API 34)

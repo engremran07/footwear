@@ -4,6 +4,7 @@ import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
 import '../models/route_model.dart';
 import '../models/shop_model.dart';
+import 'auth_provider.dart';
 import 'product_provider.dart';
 import 'route_provider.dart';
 import 'shop_provider.dart';
@@ -27,11 +28,25 @@ class DashboardStats {
   });
 }
 
-/// Derives admin dashboard stats reactively from live stream providers.
-/// Updates automatically whenever any underlying Firestore collection changes.
+/// Derives dashboard stats reactively from live stream providers.
+/// Role-aware: admin sees all data, seller sees only their route's data.
 final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
-  final routes = ref.watch(routesProvider);
-  final shops = ref.watch(shopsProvider);
+  final userAsync = ref.watch(authUserProvider);
+  final user = userAsync.valueOrNull;
+  if (user == null) return const AsyncLoading();
+
+  final AsyncValue<List<RouteModel>> routes;
+  final AsyncValue<List<ShopModel>> shops;
+  if (user.isAdmin) {
+    routes = ref.watch(routesProvider);
+    shops = ref.watch(shopsProvider);
+  } else {
+    routes = ref.watch(routesBySellerProvider(user.id));
+    final routeId = user.assignedRouteId ?? '';
+    shops = routeId.isNotEmpty
+        ? ref.watch(shopsByRouteProvider(routeId))
+        : const AsyncData([]);
+  }
   final products = ref.watch(productsProvider);
   final variants = ref.watch(allVariantsProvider);
 

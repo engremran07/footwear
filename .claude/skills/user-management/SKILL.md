@@ -21,21 +21,23 @@ Firebase Auth + Firestore user profiles for admin/seller roles in ShoesERP.
 4. Never write non-canonical role values — write only 'admin' or 'seller'
 
 ## User CRUD Pattern
-- Create: Firebase Admin via Cloud Function `manageUserAuth` (NOT createUserWithEmailAndPassword)
-- Update: `UserNotifier.updateUser()` → batch write to Firestore only
-- Deactivate: set `active = false` (never hard delete)
-- Password reset: `UserNotifier.sendPasswordResetEmail(email)`
+- Create: Secondary `FirebaseApp` approach — admin signs in to a throwaway secondary app instance to call `createUserWithEmailAndPassword`, writes Firestore user doc, then deletes the secondary app. No Cloud Functions needed.
+- Update: `UserManagementNotifier.updateUser()` → batch write to Firestore only
+- Delete: `UserManagementNotifier.deleteUser()` → soft-delete: set `active = false`, clear route assignments. Auth account is orphaned but rules deny all access when `active != true`.
+- Password reset: `UserManagementNotifier.sendPasswordResetForSeller(email:)` → sends Firebase Auth password reset email. Admin cannot directly set passwords.
 
 ## Email Field Rules
 - Email is immutable after creation → `enabled: false` in edit dialog
+- Edit user dialog: name, role, route assignment, and "Send Password Reset Email" button
 - Only sellers have assignedRouteId; admins do not
 
 ## Firestore Security
 - Admin: full CRUD on `users` collection
-- Seller: read-only own document
+- Seller: read-only own document + limited self-update (display_name, updated_at, last_active)
 - Bootstrap admin allowed on empty collection
 
 ## Common Pitfalls
-- `FirebaseAuth.createUserWithEmailAndPassword` in app creates auth but NOT Firestore doc → use Cloud Function
+- Do NOT use Cloud Functions for user management — zero-cost Firebase tier (Firestore + Auth only)
+- Secondary FirebaseApp must be deleted after user creation to avoid resource leaks
 - Role mismatch between Firestore 'admin' and old 'manager' → rules and model both accept both
 - `active != true` users get permission-denied on all protected reads

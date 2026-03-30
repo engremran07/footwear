@@ -877,6 +877,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'new_balance': 'New Balance',
     'sale_amount_required': 'Enter sale amount',
     'payment_summary': 'Payment Summary',
+    'route_has_seller':
+        'Cannot delete: route has an assigned seller. Remove the seller assignment first.',
+    'route_has_shops':
+        'Cannot delete: route has active shops. Move or deactivate shops first.',
+    'invoice_ref': 'Invoice',
+    'warehouse_stock': 'Warehouse Stock',
+    'seller_stock': 'Seller Stock',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1715,6 +1722,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'new_balance': 'الرصيد الجديد',
     'sale_amount_required': 'أدخل مبلغ البيع',
     'payment_summary': 'ملخص الدفع',
+    'route_has_seller':
+        'لا يمكن الحذف: المسار لديه بائع معين. قم بإزالة تعيين البائع أولاً.',
+    'route_has_shops':
+        'لا يمكن الحذف: المسار يحتوي على محلات نشطة. انقل أو عطّل المحلات أولاً.',
+    'invoice_ref': 'فاتورة',
+    'warehouse_stock': 'مخزون المستودع',
+    'seller_stock': 'مخزون البائع',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2560,5 +2574,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'new_balance': 'نیا بیلنس',
     'sale_amount_required': 'فروخت کی رقم درج کریں',
     'payment_summary': 'ادائیگی کا خلاصہ',
+    'route_has_seller':
+        'حذف نہیں ہو سکتا: روٹ پر بائع مقرر ہے۔ پہلے بائع کی تفویض ہٹائیں۔',
+    'route_has_shops':
+        'حذف نہیں ہو سکتا: روٹ پر فعال دکانیں ہیں۔ پہلے دکانیں منتقل یا غیر فعال کریں۔',
+    'invoice_ref': 'رسید',
+    'warehouse_stock': 'گودام کا ذخیرہ',
+    'seller_stock': 'بائع کا ذخیرہ',
   },
 };

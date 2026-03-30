@@ -1,13 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../firebase_options.dart';
 import '../models/user_model.dart';
+import 'auth_provider.dart';
 
 final allUsersProvider = StreamProvider<List<UserModel>>((ref) {
+  // Admin-only list query: guard so non-admin credentials never subscribe,
+  // preventing PERMISSION_DENIED during auth transitions.
+  final user = ref.watch(authUserProvider).valueOrNull;
+  if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.users)
+      .where('active', isEqualTo: true)
       .orderBy('display_name')
       .limit(100)
       .snapshots()
@@ -16,6 +23,9 @@ final allUsersProvider = StreamProvider<List<UserModel>>((ref) {
 });
 
 final sellersProvider = StreamProvider<List<UserModel>>((ref) {
+  // Admin-only list query: guard to prevent PERMISSION_DENIED for seller creds.
+  final user = ref.watch(authUserProvider).valueOrNull;
+  if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.users)
       .where('role', isEqualTo: 'seller')
@@ -54,19 +64,61 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         throw ArgumentError('Seller accounts require an assigned route.');
       }
 
-      final callable =
-          FirebaseFunctions.instance.httpsCallable('manageUserAuth');
-      await callable.call({
-        'action': 'createUser',
-        'email': email.trim().toLowerCase(),
-        'password': password,
-        'displayName': displayName.trim(),
-        'role': normalizedRole,
-        'phone': phone,
-        'assignedRouteId': normalizedRole == 'seller' ? routeId : null,
-        'assignedRouteName':
-            normalizedRole == 'seller' ? assignedRouteName : null,
-      });
+      final trimmedEmail = email.trim().toLowerCase();
+      final trimmedName = displayName.trim();
+
+      // Use a secondary FirebaseApp so the admin stays signed in
+      FirebaseApp? tempApp;
+      try {
+        tempApp = Firebase.app('userCreation');
+      } catch (_) {
+        tempApp = await Firebase.initializeApp(
+          name: 'userCreation',
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      }
+      final tempAuth = FirebaseAuth.instanceFor(app: tempApp);
+
+      try {
+        // Create the Auth account via the disposable secondary app
+        final cred = await tempAuth.createUserWithEmailAndPassword(
+          email: trimmedEmail,
+          password: password,
+        );
+        final newUid = cred.user!.uid;
+
+        // Sign out immediately from the temp app (we only needed the UID)
+        await tempAuth.signOut();
+
+        // Write the Firestore profile + route assignment in a batch
+        final db = FirebaseFirestore.instance;
+        final batch = db.batch();
+        final now = Timestamp.now();
+
+        batch.set(db.collection(Collections.users).doc(newUid), {
+          'email': trimmedEmail,
+          'display_name': trimmedName,
+          'role': normalizedRole,
+          'assigned_route_id': normalizedRole == 'seller' ? routeId : null,
+          'assigned_route_name':
+              normalizedRole == 'seller' ? assignedRouteName : null,
+          'active': true,
+          'created_at': now,
+          'updated_at': now,
+        });
+
+        if (normalizedRole == 'seller' && routeId.isNotEmpty) {
+          batch.update(db.collection(Collections.routes).doc(routeId), {
+            'assigned_seller_id': newUid,
+            'assigned_seller_name': trimmedName,
+            'updated_at': now,
+          });
+        }
+
+        await batch.commit();
+      } on FirebaseAuthException {
+        rethrow; // Let AppErrorMapper handle auth errors (email-in-use, etc.)
+      }
     });
   }
 
@@ -117,43 +169,48 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         .update({'active': active, 'updated_at': Timestamp.now()});
   }
 
+  /// Soft-delete: deactivate user + clear route assignments.
+  /// Auth account is orphaned but cannot access anything (rules check active).
   Future<void> deleteUser(String uid) async {
     final trimmedUid = uid.trim();
     if (trimmedUid.isEmpty) {
       throw ArgumentError('uid must not be empty');
     }
-    final callable = FirebaseFunctions.instance.httpsCallable('manageUserAuth');
-    await callable.call({
-      'action': 'deleteUser',
-      'targetUid': trimmedUid,
+
+    final db = FirebaseFirestore.instance;
+    final now = Timestamp.now();
+
+    // Clear any route assignments for this seller
+    final routeSnap = await db
+        .collection(Collections.routes)
+        .where('assigned_seller_id', isEqualTo: trimmedUid)
+        .limit(20)
+        .get();
+
+    final batch = db.batch();
+    for (final routeDoc in routeSnap.docs) {
+      batch.update(routeDoc.reference, {
+        'assigned_seller_id': null,
+        'assigned_seller_name': null,
+        'updated_at': now,
+      });
+    }
+
+    // Deactivate the user (soft-delete)
+    batch.update(db.collection(Collections.users).doc(trimmedUid), {
+      'active': false,
+      'updated_at': now,
     });
+
+    await batch.commit();
   }
 
-  Future<void> adminUpdateSellerAuth({
-    required String targetUid,
-    String? newEmail,
-    String? newPassword,
-  }) async {
-    final trimmedUid = targetUid.trim();
-    final trimmedEmail = newEmail?.trim();
-    final trimmedPassword = newPassword?.trim();
-
-    if (trimmedUid.isEmpty) {
-      throw ArgumentError('targetUid must not be empty');
-    }
-    if ((trimmedEmail == null || trimmedEmail.isEmpty) &&
-        (trimmedPassword == null || trimmedPassword.isEmpty)) {
-      return;
-    }
-
-    final callable = FirebaseFunctions.instance.httpsCallable('manageUserAuth');
-    await callable.call({
-      'targetUid': trimmedUid,
-      if (trimmedEmail != null && trimmedEmail.isNotEmpty)
-        'newEmail': trimmedEmail,
-      if (trimmedPassword != null && trimmedPassword.isNotEmpty)
-        'newPassword': trimmedPassword,
-    });
+  /// Send a password-reset email to the seller.
+  /// Email is immutable after creation; password can only be reset via email.
+  Future<void> sendPasswordResetForSeller({required String email}) async {
+    final trimmedEmail = email.trim().toLowerCase();
+    if (trimmedEmail.isEmpty) return;
+    await FirebaseAuth.instance.sendPasswordResetEmail(email: trimmedEmail);
   }
 
   Future<void> changeOwnPassword({

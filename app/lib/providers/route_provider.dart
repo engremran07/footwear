@@ -3,8 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/route_model.dart';
+import 'auth_provider.dart';
 
 final routesProvider = StreamProvider<List<RouteModel>>((ref) {
+  // Admin-only unfiltered query: guard so non-admin credentials never
+  // subscribe, avoiding PERMISSION_DENIED during auth transitions.
+  final user = ref.watch(authUserProvider).valueOrNull;
+  if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.routes)
       .where('active', isEqualTo: true)
@@ -148,16 +153,32 @@ class RouteNotifier extends AsyncNotifier<void> {
     if (authUser == null) {
       throw StateError('Not authenticated');
     }
-    final me = await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(authUser.uid)
-        .get();
+    final db = FirebaseFirestore.instance;
+    final me = await db.collection(Collections.users).doc(authUser.uid).get();
     final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
     if (role != 'admin' && role != 'manager') {
       throw StateError('Only admin can delete routes');
     }
 
-    await FirebaseFirestore.instance
+    // Check for assigned seller
+    final routeDoc = await db.collection(Collections.routes).doc(id).get();
+    final assignedSellerId = routeDoc.data()?['assigned_seller_id'] as String?;
+    if (assignedSellerId != null && assignedSellerId.isNotEmpty) {
+      throw StateError('route_has_seller');
+    }
+
+    // Check for active shops/customers linked to this route
+    final shopsSnap = await db
+        .collection(Collections.customers)
+        .where('route_id', isEqualTo: id)
+        .where('active', isEqualTo: true)
+        .limit(1)
+        .get();
+    if (shopsSnap.docs.isNotEmpty) {
+      throw StateError('route_has_shops');
+    }
+
+    await db
         .collection(Collections.routes)
         .doc(id)
         .update({'active': false, 'updated_at': Timestamp.now()});

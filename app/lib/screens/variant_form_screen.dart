@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/snack_helper.dart';
 import '../core/utils/validators.dart';
 import '../models/product_variant_model.dart';
 import '../providers/auth_provider.dart';
@@ -48,7 +49,7 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
     if (user?.isAdmin != true) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr('permission_denied', ref))),
+          errorSnackBar(tr('permission_denied', ref)),
         );
       }
       return;
@@ -73,7 +74,7 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
       if (mounted) {
         final key = AppErrorMapper.key(e);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr(key, ref))),
+          errorSnackBar(tr(key, ref)),
         );
       }
     } finally {

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/snack_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_preference_provider.dart';
 import '../providers/user_provider.dart';
@@ -37,14 +38,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           .updateUser(me.id, {'display_name': name});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr('saved_successfully', ref))),
+          successSnackBar(tr('saved_successfully', ref)),
         );
       }
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
   }
@@ -97,13 +97,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               final newPass = newPassC.text.trim();
               if (newPass.length < 6) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text(tr('err_weak_password', ref))),
+                  warningSnackBar(tr('err_weak_password', ref)),
                 );
                 return;
               }
               if (newPass != confirmPassC.text.trim()) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text(tr('passwords_dont_match', ref))),
+                  warningSnackBar(tr('passwords_dont_match', ref)),
                 );
                 return;
               }
@@ -118,14 +118,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(tr('saved_successfully', ref))),
+                    successSnackBar(tr('saved_successfully', ref)),
                   );
                 }
               } catch (e) {
                 if (ctx.mounted) {
                   final key = AppErrorMapper.key(e);
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text(tr(key, ref))),
+                    errorSnackBar(tr(key, ref)),
                   );
                 }
               }

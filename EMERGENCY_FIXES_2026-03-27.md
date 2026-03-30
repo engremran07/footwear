@@ -184,4 +184,4 @@ If issues persist after deployment:
 - `firebase_storage` dependency fully removed from pubspec.yaml
 - Storage config removed from firebase.json
 - Zero Firebase Storage usage across entire app — company logos stored as base64 in Firestore, product images use external HTTP URLs
-- Architecture runs on Firestore + Auth + Functions only (zero-cost Firebase tier)
+- Architecture runs on Firestore + Auth only (zero-cost Firebase tier, no Cloud Functions)

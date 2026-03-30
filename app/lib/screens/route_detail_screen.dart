@@ -5,6 +5,7 @@ import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/snack_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/shop_provider.dart';
@@ -57,7 +58,7 @@ class RouteDetailScreen extends ConsumerWidget {
                   if (context.mounted) {
                     final key = AppErrorMapper.key(e);
                     ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+                        .showSnackBar(errorSnackBar(tr(key, ref)));
                   }
                 }
               },
@@ -120,8 +121,13 @@ class RouteDetailScreen extends ConsumerWidget {
                           children: [
                             const Icon(Icons.person, size: 18),
                             const SizedBox(width: 8),
-                            Text(
-                                '${tr('assigned_seller', ref)}: ${route.assignedSellerName}'),
+                            Flexible(
+                              child: Text(
+                                '${tr('assigned_seller', ref)}: ${route.assignedSellerName}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ],
                         ),
                       ],

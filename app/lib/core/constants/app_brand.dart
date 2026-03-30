@@ -41,6 +41,20 @@ class AppBrand {
   static const Color onPrimary = Colors.white;
   static const Color onPrimaryMuted = Colors.white70;
 
+  // ─── Snack bar container colours (light bg + dark text for max visibility)
+  static const Color errorBg = Color(0xFFFDECEC); // very light pink
+  static const Color errorFg = Color(0xFFC62828); // dark red
+  static const Color errorAccent = Color(0xFFE53935); // bright red border
+  static const Color successBg = Color(0xFFE8F5E9); // very light green
+  static const Color successFg = Color(0xFF2E7D32); // dark green
+  static const Color successAccent = Color(0xFF43A047); // bright green border
+  static const Color warningBg = Color(0xFFFFF8E1); // very light amber
+  static const Color warningFg = Color(0xFFE65100); // dark orange
+  static const Color warningAccent = Color(0xFFFFA000); // amber border
+  static const Color infoBg = Color(0xFFE3F2FD); // very light blue
+  static const Color infoFg = Color(0xFF1565C0); // dark blue
+  static const Color infoAccent = Color(0xFF1E88E5); // bright blue border
+
   // ─── Typography ──────────────────────────────────────────────────────────
   static const String fontFamilyUrdu = 'NotoNastaliqUrdu';
   static const String fontFamilyArabic = 'NotoSansArabic';

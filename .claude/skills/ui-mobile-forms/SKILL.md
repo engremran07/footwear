@@ -69,3 +69,42 @@ if (ctx.mounted) Navigator.pop(ctx);
 if (mounted) Navigator.of(context, rootNavigator: true).pop();
 ```
 The `rootNavigator: true` flag closes the topmost dialog regardless of nested Scaffolds.
+
+## SnackBar Styling — Card-Style Design Pattern
+
+**Problem:** Raw `SnackBar(content: Text(...))` or dark red backgrounds have poor visibility on mobile screens.
+
+**Solution:** Material 3 container-color card-style SnackBars with high-contrast scheme:
+
+| Type | Background | Text/Icon | Accent Bar |
+|---------|-----------|-----------|------------|
+| Error | `#FDECEC` | `#C62828` | `#E53935` |
+| Success | `#E8F5E9` | `#2E7D32` | `#43A047` |
+| Warning | `#FFF8E1` | `#E65100` | `#FFA000` |
+| Info | `#E3F2FD` | `#1565C0` | `#1E88E5` |
+
+**Usage — standalone (no WidgetRef needed):**
+```dart
+import '../core/utils/snack_helper.dart';
+
+// Build SnackBar for ScaffoldMessenger
+ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('Something failed'));
+ScaffoldMessenger.of(context).showSnackBar(successSnackBar('Saved!'));
+ScaffoldMessenger.of(context).showSnackBar(warningSnackBar('Check inputs'));
+
+// Or use show* shortcuts (require BuildContext)
+SnackHelper.showError(context, 'Error message');
+SnackHelper.showSuccess(context, 'Success message');
+```
+
+**Usage — with AppMessage (requires WidgetRef for i18n):**
+```dart
+AppMessage.error(context, ref, 'err_permission_denied');
+AppMessage.success(context, ref, 'success_saved');
+```
+
+**Rules:**
+- NEVER use raw `SnackBar(content: Text(...))` — always use `errorSnackBar()` / `successSnackBar()` / `warningSnackBar()` / `infoSnackBar()`
+- NEVER use `Colors.red` or hardcoded color in SnackBars
+- Container color constants are in `AppBrand` (errorBg, errorFg, errorAccent, etc.)
+- `SnackBarThemeData` in `AppTheme` provides baseline floating behavior for any unconverted SnackBars

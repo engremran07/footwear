@@ -3,8 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/shop_model.dart';
+import 'auth_provider.dart';
 
 final shopsProvider = StreamProvider<List<ShopModel>>((ref) {
+  // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED
+  // during auth transitions when seller credentials are active.
+  final user = ref.watch(authUserProvider).valueOrNull;
+  if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('active', isEqualTo: true)
@@ -38,8 +43,25 @@ final shopDetailProvider = StreamProvider.family<ShopModel?, String>((ref, id) {
 });
 
 final outstandingShopsProvider = StreamProvider<List<ShopModel>>((ref) {
+  // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
+  final user = ref.watch(authUserProvider).valueOrNull;
+  if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.customers)
+      .where('active', isEqualTo: true)
+      .where('balance', isGreaterThan: 0)
+      .orderBy('balance', descending: true)
+      .limit(200)
+      .snapshots()
+      .map((snap) =>
+          snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList());
+});
+
+final outstandingShopsByRouteProvider =
+    StreamProvider.family<List<ShopModel>, String>((ref, routeId) {
+  return FirebaseFirestore.instance
+      .collection(Collections.customers)
+      .where('route_id', isEqualTo: routeId)
       .where('active', isEqualTo: true)
       .where('balance', isGreaterThan: 0)
       .orderBy('balance', descending: true)

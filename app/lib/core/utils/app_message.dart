@@ -57,39 +57,71 @@ class AppMessage {
 
     messenger.clearSnackBars();
 
-    final cs = Theme.of(context).colorScheme;
     final text = tr(key, ref);
 
-    final (Color bg, Color fg, IconData icon) = switch (type) {
+    final (Color bg, Color fg, Color accent, IconData icon) = switch (type) {
       _Type.success => (
-          AppBrand.successColor,
-          Colors.white,
-          Icons.check_circle_outline
+          AppBrand.successBg,
+          AppBrand.successFg,
+          AppBrand.successAccent,
+          Icons.check_circle_rounded
         ),
-      _Type.error => (cs.error, cs.onError, Icons.error_outline),
+      _Type.error => (
+          AppBrand.errorBg,
+          AppBrand.errorFg,
+          AppBrand.errorAccent,
+          Icons.error_rounded
+        ),
       _Type.warning => (
-          AppBrand.warningColor,
-          Colors.white,
-          Icons.warning_amber_rounded
+          AppBrand.warningBg,
+          AppBrand.warningFg,
+          AppBrand.warningAccent,
+          Icons.warning_rounded
         ),
-      _Type.info => (AppBrand.primaryColor, Colors.white, Icons.info_outline),
+      _Type.info => (
+          AppBrand.infoBg,
+          AppBrand.infoFg,
+          AppBrand.infoAccent,
+          Icons.info_rounded
+        ),
     };
 
     messenger.showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            Icon(icon, color: fg, size: 20),
+            Container(
+              width: 4,
+              height: 36,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Icon(icon, color: fg, size: 22),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(text, style: TextStyle(color: fg, fontSize: 14)),
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         ),
         backgroundColor: bg,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: accent.withValues(alpha: 0.3)),
+        ),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         duration: duration ??
             (type == _Type.error ? _normalDuration : _shortDuration),
         dismissDirection: DismissDirection.horizontal,

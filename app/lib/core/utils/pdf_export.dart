@@ -223,9 +223,13 @@ Future<Uint8List> buildPdfLedger({
   final rows = <_LedgerRow>[];
   for (final tx in transactions) {
     final date = tx.createdAt.toDate();
-    final desc = tx.description?.isNotEmpty == true
+    final rawDesc = tx.description?.isNotEmpty == true
         ? tx.description!
         : (tx.hasItems ? tx.items.map((i) => i.productName).join(', ') : '');
+    // Prepend invoice number for cross-reference when available
+    final desc = tx.invoiceNumber != null && tx.invoiceNumber!.isNotEmpty
+        ? '[${tx.invoiceNumber}] $rawDesc'
+        : rawDesc;
     final mode = tx.saleType ?? '';
     final entryBy =
         showEntryBy ? (entryByMap[tx.createdBy] ?? tx.createdBy) : '';
@@ -997,7 +1001,7 @@ Future<Uint8List> generateInvoicePdf({
       ? 'ريال'
       : locale == AppLocale.ur
           ? 'ریال'
-          : currency;
+          : '﷼';
 
   final date = invoice.createdAt.toDate();
   final dateStr = _fmtDate(date);
@@ -1100,20 +1104,21 @@ Future<Uint8List> generateInvoicePdf({
                 // header row
                 pw.TableRow(
                   decoration: const pw.BoxDecoration(color: PdfColors.blue800),
-                  children: ['Item', 'Size', 'Color', 'Qty', 'Unit Price', 'Total']
-                      .map((h) => pw.Padding(
-                            padding: const pw.EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 5),
-                            child: pw.Text(h,
-                                style: pw.TextStyle(
-                                    fontSize: 8,
-                                    fontWeight: pw.FontWeight.bold,
-                                    color: PdfColors.white,
-                                    font: primaryFont,
-                                    fontFallback: ff),
-                                textDirection: dir),
-                          ))
-                      .toList(),
+                  children:
+                      ['Item', 'Size', 'Color', 'Qty', 'Unit Price', 'Total']
+                          .map((h) => pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 5),
+                                child: pw.Text(h,
+                                    style: pw.TextStyle(
+                                        fontSize: 8,
+                                        fontWeight: pw.FontWeight.bold,
+                                        color: PdfColors.white,
+                                        font: primaryFont,
+                                        fontFallback: ff),
+                                    textDirection: dir),
+                              ))
+                          .toList(),
                 ),
                 // data rows
                 ...invoice.items.asMap().entries.map((e) {

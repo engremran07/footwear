@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/snack_helper.dart';
 import '../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
@@ -67,7 +68,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       if (mounted) {
         final key = AppErrorMapper.key(e);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr(key, ref))),
+          errorSnackBar(tr(key, ref)),
         );
       }
     } finally {
@@ -81,9 +82,6 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       ref.watch(routeDetailProvider(widget.routeId!));
       _loadExisting();
     }
-    final sellers = (ref.watch(allUsersProvider).valueOrNull ?? [])
-        .where((u) => u.active)
-        .toList();
     final user = ref.watch(authUserProvider).valueOrNull;
     final isAdmin = user?.isAdmin ?? false;
 
@@ -93,6 +91,10 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
         body: Center(child: Text(tr('permission_denied', ref))),
       );
     }
+
+    final sellers = (ref.watch(allUsersProvider).valueOrNull ?? [])
+        .where((u) => u.active)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(

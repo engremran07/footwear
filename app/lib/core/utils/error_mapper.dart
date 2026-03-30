@@ -1,4 +1,3 @@
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 /// Maps Firebase and Dart exceptions to user-friendly i18n translation keys.
@@ -27,15 +26,6 @@ class AppErrorMapper {
         _ => 'err_auth_generic',
       };
     }
-    // ── Firebase Functions errors ───────────────────────────────────────────
-    if (error is FirebaseFunctionsException) {
-      return switch (error.code) {
-        'not-found' => 'err_function_not_deployed',
-        'permission-denied' => 'err_permission_denied',
-        'unauthenticated' => 'err_unauthenticated',
-        _ => 'err_unknown',
-      };
-    }
     // ── Firebase Storage + Firestore errors ───────────────────────────
     if (error is FirebaseException) {
       return switch (error.code) {
@@ -53,6 +43,8 @@ class AppErrorMapper {
 
     // ── Dart built-in errors ───────────────────────────────────────────
     final msg = error.toString().toLowerCase();
+    if (msg.contains('route_has_seller')) return 'route_has_seller';
+    if (msg.contains('route_has_shops')) return 'route_has_shops';
     if (msg.contains('no user found')) return 'err_user_not_found';
     if (msg.contains('socket') ||
         msg.contains('network') ||

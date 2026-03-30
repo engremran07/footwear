@@ -7,6 +7,7 @@ import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/snack_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/customer_provider.dart';
 import '../providers/seller_inventory_provider.dart';
@@ -14,6 +15,7 @@ import '../providers/settings_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/user_provider.dart';
 import '../models/transaction_model.dart';
+import '../models/user_model.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/export_sheet.dart';
@@ -171,8 +173,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                     } catch (e) {
                       if (ctx.mounted) {
                         final key = AppErrorMapper.key(e);
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(content: Text(tr(key, ref))));
+                        ScaffoldMessenger.of(ctx)
+                            .showSnackBar(errorSnackBar(tr(key, ref)));
                       }
                     }
                   },
@@ -203,8 +205,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
   }
@@ -248,14 +249,14 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
               if (ctx.mounted) Navigator.pop(ctx);
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(tr('success_created', ref))),
+                  successSnackBar(tr('success_created', ref)),
                 );
               }
             } catch (e) {
               if (ctx.mounted) {
                 final key = AppErrorMapper.key(e);
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text(tr(key, ref))),
+                  errorSnackBar(tr(key, ref)),
                 );
               }
             }
@@ -393,7 +394,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                     } catch (e) {
                       if (ctx.mounted) {
                         ScaffoldMessenger.of(ctx)
-                            .showSnackBar(SnackBar(content: Text('$e')));
+                            .showSnackBar(errorSnackBar('$e'));
                       }
                     }
                   },
@@ -463,7 +464,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       if (context.mounted) {
                         final key = AppErrorMapper.key(e);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(tr(key, ref))),
+                          errorSnackBar(tr(key, ref)),
                         );
                       }
                     }
@@ -486,13 +487,13 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                           .markAsBadDebt(customer.id);
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(tr('success_updated', ref))),
+                        successSnackBar(tr('success_updated', ref)),
                       );
                     } catch (e) {
                       if (!context.mounted) return;
                       final key = AppErrorMapper.key(e);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(tr(key, ref))),
+                        errorSnackBar(tr(key, ref)),
                       );
                     }
                   },
@@ -537,9 +538,11 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       final locale = ref.read(appLocaleProvider);
                       final settings = await ref.read(settingsProvider.future);
                       final authUser = ref.read(authUserProvider).valueOrNull;
-                      final allUsers =
-                          ref.read(allUsersProvider).valueOrNull ?? [];
-                      final entryByMap = {
+                      final allUsers = authUser?.isAdmin == true
+                          ? ref.read(allUsersProvider).valueOrNull ??
+                              <UserModel>[]
+                          : <UserModel>[];
+                      final entryByMap = <String, String>{
                         for (final u in allUsers) u.id: u.displayName
                       };
                       if (authUser != null) {
@@ -1205,9 +1208,8 @@ class _SellStockSheetState extends ConsumerState<_SellStockSheet> {
                               }
                               if (hasError || items.isEmpty) {
                                 ScaffoldMessenger.of(ctx).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'Please check quantities and prices')),
+                                  warningSnackBar(
+                                      'Please check quantities and prices'),
                                 );
                                 return;
                               }

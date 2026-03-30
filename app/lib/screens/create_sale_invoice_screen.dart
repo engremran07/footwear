@@ -6,6 +6,7 @@ import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/snack_helper.dart';
 import '../models/seller_inventory_model.dart';
 import '../models/shop_model.dart';
 import '../models/user_model.dart';
@@ -147,7 +148,9 @@ class _CreateSaleInvoiceScreenState
                     }
                     final matchedShop = _selectedShop == null
                         ? null
-                        : shops.where((s) => s.id == _selectedShop!.id).firstOrNull;
+                        : shops
+                            .where((s) => s.id == _selectedShop!.id)
+                            .firstOrNull;
                     return DropdownButtonFormField<ShopModel>(
                       initialValue: matchedShop,
                       isExpanded: true,
@@ -457,7 +460,7 @@ class _CreateSaleInvoiceScreenState
 
     if (_selectedShop == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('select_shop', ref))),
+        warningSnackBar(tr('select_shop', ref)),
       );
       return;
     }
@@ -468,7 +471,7 @@ class _CreateSaleInvoiceScreenState
     // Sellers must select inventory items; admins can create manual invoices
     if (user.isSeller && deductions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('select_at_least_one_item', ref))),
+        warningSnackBar(tr('select_at_least_one_item', ref)),
       );
       return;
     }
@@ -476,7 +479,7 @@ class _CreateSaleInvoiceScreenState
     final saleAmount = _saleAmount;
     if (saleAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('sale_amount_required', ref))),
+        warningSnackBar(tr('sale_amount_required', ref)),
       );
       return;
     }
@@ -534,14 +537,14 @@ class _CreateSaleInvoiceScreenState
 
       if (mounted) {
         messenger.showSnackBar(
-          SnackBar(content: Text(tr('invoice_created', ref))),
+          successSnackBar(tr('invoice_created', ref)),
         );
         router.go('/invoices/$invoiceId');
       }
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        messenger.showSnackBar(SnackBar(content: Text(tr(key, ref))));
+        messenger.showSnackBar(errorSnackBar(tr(key, ref)));
       }
     } finally {
       if (mounted) setState(() => _submitting = false);

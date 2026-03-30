@@ -149,6 +149,13 @@ class AppTheme {
           borderRadius: BorderRadius.circular(20),
         ),
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: const Color(0xFF323232),
+        contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
+        actionTextColor: AppBrand.primaryColor,
+      ),
     );
   }
 
@@ -280,6 +287,13 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: const Color(0xFF424242),
+        contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
+        actionTextColor: AppBrand.primaryColor,
       ),
     );
   }

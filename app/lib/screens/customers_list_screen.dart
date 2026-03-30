@@ -26,11 +26,20 @@ class _CustomersListScreenState extends ConsumerState<CustomersListScreen> {
   Widget build(BuildContext context) {
     // Always watch the full list so the stats strip reflects totals,
     // even when the filter is active.
-    final allCustomersAsync = ref.watch(customersProvider);
-    final asyncCustomers = _outstandingOnly
-        ? ref.watch(outstandingCustomersProvider)
-        : allCustomersAsync;
     final user = ref.watch(authUserProvider).valueOrNull;
+    final routeId = user?.assignedRouteId ?? '';
+    final allCustomersAsync = user?.isAdmin == true
+        ? ref.watch(customersProvider)
+        : (routeId.isNotEmpty
+            ? ref.watch(customersByRouteProvider(routeId))
+            : const AsyncData<List<CustomerModel>>([]));
+    final asyncCustomers = _outstandingOnly
+        ? (user?.isAdmin == true
+            ? ref.watch(outstandingCustomersProvider)
+            : (routeId.isNotEmpty
+                ? ref.watch(outstandingCustomersByRouteProvider(routeId))
+                : const AsyncData<List<CustomerModel>>([])))
+        : allCustomersAsync;
     final usersAsync =
         user?.isAdmin == true ? ref.watch(allUsersProvider) : null;
 
@@ -315,6 +324,34 @@ class _AdminGroupedCustomersViewState
                           color: cs.primary, fontWeight: FontWeight.bold),
                     ),
                   ),
+                  // Per-seller/route outstanding balance
+                  Builder(builder: (_) {
+                    final sectionOutstanding = section.value
+                        .where((c) => c.balance > 0)
+                        .fold(0.0, (sum, c) => sum + c.balance);
+                    if (sectionOutstanding > 0) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.debtBg(cs),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            AppFormatters.compact(sectionOutstanding),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.debtFg(cs),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  }),
                   Text(
                     '${section.value.length}',
                     style: Theme.of(context)

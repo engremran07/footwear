@@ -7,6 +7,7 @@ import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/snack_helper.dart';
 import '../models/shop_model.dart';
 import '../models/transaction_model.dart';
 import '../providers/auth_provider.dart';
@@ -163,8 +164,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     } catch (e) {
                       if (ctx.mounted) {
                         final key = AppErrorMapper.key(e);
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(content: Text(tr(key, ref))));
+                        ScaffoldMessenger.of(ctx)
+                            .showSnackBar(errorSnackBar(tr(key, ref)));
                       }
                     }
                   },
@@ -196,8 +197,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
   }
@@ -236,8 +236,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       final locale = ref.read(appLocaleProvider);
       final settings = await ref.read(settingsProvider.future);
       final user = ref.read(authUserProvider).valueOrNull;
-      final allUsers = ref.read(allUsersProvider).valueOrNull ?? [];
-      final entryByMap = {for (final u in allUsers) u.id: u.displayName};
+      final allUsers = user?.isAdmin == true
+          ? ref.read(allUsersProvider).valueOrNull ?? <UserModel>[]
+          : <UserModel>[];
+      final entryByMap = <String, String>{
+        for (final u in allUsers) u.id: u.displayName
+      };
       if (user != null) entryByMap[user.id] = user.displayName;
       final sorted = [...txs]
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
@@ -261,8 +265,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
       }
     }
   }
@@ -394,7 +397,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     } catch (e) {
                       if (ctx.mounted) {
                         ScaffoldMessenger.of(ctx)
-                            .showSnackBar(SnackBar(content: Text('$e')));
+                            .showSnackBar(errorSnackBar('$e'));
                       }
                     }
                   },
@@ -462,7 +465,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       if (context.mounted) {
                         final key = AppErrorMapper.key(e);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(tr(key, ref))),
+                          errorSnackBar(tr(key, ref)),
                         );
                       }
                     }
@@ -507,9 +510,11 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       final locale = ref.read(appLocaleProvider);
                       final settings = await ref.read(settingsProvider.future);
                       final user = ref.read(authUserProvider).valueOrNull;
-                      final allUsers =
-                          ref.read(allUsersProvider).valueOrNull ?? [];
-                      final entryByMap = {
+                      final allUsers = user?.isAdmin == true
+                          ? ref.read(allUsersProvider).valueOrNull ??
+                              <UserModel>[]
+                          : <UserModel>[];
+                      final entryByMap = <String, String>{
                         for (final u in allUsers) u.id: u.displayName
                       };
                       if (user != null) entryByMap[user.id] = user.displayName;
@@ -1000,8 +1005,7 @@ class _ReturnSheetState extends ConsumerState<_ReturnSheet> {
                   } catch (e) {
                     if (mounted) {
                       final key = AppErrorMapper.key(e);
-                      messenger
-                          .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+                      messenger.showSnackBar(errorSnackBar(tr(key, ref)));
                     }
                   }
                 },

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/transaction_model.dart';
+import 'auth_provider.dart';
 
 final shopTransactionsProvider =
     StreamProvider.family<List<TransactionModel>, String>((ref, shopId) {
@@ -17,8 +18,25 @@ final shopTransactionsProvider =
 });
 
 final allTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
+  // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
+  final user = ref.watch(authUserProvider).valueOrNull;
+  if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
+      .orderBy('created_at', descending: true)
+      .limit(200)
+      .snapshots()
+      .map((snap) => snap.docs
+          .map((d) => TransactionModel.fromJson(d.data(), d.id))
+          .toList());
+});
+
+/// Seller-scoped: transactions created by this seller.
+final sellerTransactionsProvider =
+    StreamProvider.family<List<TransactionModel>, String>((ref, sellerId) {
+  return FirebaseFirestore.instance
+      .collection(Collections.transactions)
+      .where('created_by', isEqualTo: sellerId)
       .orderBy('created_at', descending: true)
       .limit(200)
       .snapshots()

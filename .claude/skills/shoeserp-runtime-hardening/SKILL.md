@@ -35,6 +35,14 @@ Prevent regressions caused by architecture drift between code, rules, and agent 
 1. Error messaging
 
 - Map Firebase exceptions through AppErrorMapper
+- Use styled SnackBar helpers from `snack_helper.dart`:
+  - `errorSnackBar(msg)` — light pink bg + dark red text + red accent bar
+  - `successSnackBar(msg)` — light green bg + dark green text + green accent bar
+  - `warningSnackBar(msg)` — light amber bg + dark orange text + amber accent bar
+  - `infoSnackBar(msg)` — light blue bg + dark blue text + blue accent bar
+- NEVER use raw `SnackBar(content: Text(...))` or hardcoded `Colors.red`
+- For screens using `AppMessage` (requires WidgetRef): same card-style is applied automatically
+- Container color constants live in `AppBrand` (errorBg/errorFg/errorAccent etc.)
 
 1. Defense in depth on admin writes
 

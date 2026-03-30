@@ -102,15 +102,32 @@ class _RouteTile extends ConsumerWidget {
                   color: theme.colorScheme.onPrimaryContainer)),
         ),
         title: Text(route.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(
-          [
-            if (route.area != null) route.area,
-            '${route.totalShops} ${tr('shops', ref)}',
-            if (route.assignedSellerName != null) route.assignedSellerName,
-          ].join(' · '),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              [
+                if (route.area != null) route.area,
+                '${route.totalShops} ${tr('shops', ref)}',
+              ].join(' · '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (route.assignedSellerName != null)
+              Text(
+                route.assignedSellerName!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+          ],
         ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => context.push('/routes/${route.id}'),

@@ -144,7 +144,10 @@ Implemented in this pass:
 
 1. User lifecycle hardening
 
-- Moved user creation/deletion to Cloud Function `manageUserAuth` (admin only).
+- Moved user creation to secondary FirebaseApp approach (no Cloud Functions needed).
+- User deletion via soft-delete (set active=false, clear route assignments).
+- Password reset via Firebase Auth reset email (admin cannot directly set passwords).
+- Edit user dialog: email read-only, password reset button, role + route assignment.
 - Enforced seller route assignment requirement on create/update across UI, provider, and rules.
 - Prevented implicit auto-creation of route-less seller profiles during sign-in.
 
@@ -169,6 +172,9 @@ Implemented in this pass:
 - Centralized auth-session invalidation expanded to include family providers (route/shop/customer/product/transaction/seller inventory).
 - Hardened Firestore role checks with regex to tolerate role whitespace/case drift (`admin|manager|seller`).
 - Disabled Firestore disk persistence in app runtime to reduce stale cross-account cached state.
+- SnackBar system redesigned: Material 3 container-color card-style (light bg + dark text + accent bar).
+- All SnackBars across 19 screens converted to styled helpers (errorSnackBar/successSnackBar/warningSnackBar/infoSnackBar).
+- cloud_functions dependency removed from pubspec.yaml and error_mapper.dart.
 
 1. Multi-device compatibility pass (Samsung A56, Android 16 API 36)
 

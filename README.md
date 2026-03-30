@@ -38,7 +38,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 | Mobile app | Flutter 3.x — Android APK only |
 | State management | Riverpod |
 | Navigation | go_router |
-| Backend / Auth | Firebase (Firestore, Auth, Functions) — no Storage |
+| Backend / Auth | Firebase (Firestore, Auth) — no Storage, no Cloud Functions |
 | PDF export | `pdf` package — Noto Arabic + Noto Nastaliq Urdu fonts |
 | Excel export | `excel` package |
 | Print / Share | `printing` package |
@@ -107,12 +107,9 @@ flutter build apk --release --target-platform android-arm,android-arm64
 ```bash
 # Deploy Firestore rules and indexes
 firebase deploy --only firestore:rules,firestore:indexes
-
-# Deploy Cloud Functions
-cd functions
-npm install
-firebase deploy --only functions
 ```
+
+> Note: No Cloud Functions deployment needed — user management runs entirely client-side via secondary FirebaseApp.
 
 ---
 

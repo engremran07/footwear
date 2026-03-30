@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/snack_helper.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
@@ -64,13 +65,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         'pairs_per_carton': int.tryParse(_ppcC.text.trim()) ?? 12,
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(tr('saved_successfully', ref))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
       }
     }
   }
@@ -183,39 +183,60 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         return Column(
                           children: users.map((u) {
                             final isSelf = u.id == currentUser?.id;
-                            return ListTile(
-                              dense: true,
-                              leading: CircleAvatar(
-                                radius: 16,
-                                backgroundColor: u.isAdmin
-                                    ? AppBrand.adminRoleColor.withAlpha(30)
-                                    : AppBrand.sellerRoleColor.withAlpha(30),
-                                child: Icon(
-                                  u.isAdmin
-                                      ? Icons.admin_panel_settings
-                                      : Icons.person,
-                                  size: 16,
-                                  color: u.isAdmin
-                                      ? AppBrand.adminRoleColor
-                                      : AppBrand.sellerRoleColor,
-                                ),
-                              ),
-                              title: Text(
-                                u.displayName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Column(
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 4),
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    u.email,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall,
+                                  // ── Top row: avatar + name + email + role ──
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 16,
+                                        backgroundColor: u.isAdmin
+                                            ? AppBrand.adminRoleColor
+                                                .withAlpha(30)
+                                            : AppBrand.sellerRoleColor
+                                                .withAlpha(30),
+                                        child: Icon(
+                                          u.isAdmin
+                                              ? Icons.admin_panel_settings
+                                              : Icons.person,
+                                          size: 16,
+                                          color: u.isAdmin
+                                              ? AppBrand.adminRoleColor
+                                              : AppBrand.sellerRoleColor,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              u.displayName,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w500),
+                                            ),
+                                            Text(
+                                              u.email,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
+                                  const SizedBox(height: 4),
+                                  // ── Bottom row: role chip + route + actions ──
                                   Row(
                                     children: [
                                       Container(
@@ -253,54 +274,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                           ),
                                         ),
                                       ],
-                                      if (!u.active) ...[
-                                        const SizedBox(width: 4),
-                                        const Text(
-                                          '• inactive',
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              color: AppBrand.errorColor),
+                                      const Spacer(),
+                                      // ── Action buttons ──
+                                      GestureDetector(
+                                        onTap: () => _showEditUserDialog(u),
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(4),
+                                          child: Icon(Icons.edit, size: 16),
                                         ),
-                                      ],
+                                      ),
+                                      if (!isSelf && !u.isAdmin)
+                                        GestureDetector(
+                                          onTap: () => _confirmDeleteUser(u),
+                                          child: const Padding(
+                                            padding: EdgeInsets.all(4),
+                                            child: Icon(Icons.delete,
+                                                size: 16,
+                                                color: AppBrand.errorColor),
+                                          ),
+                                        ),
+                                      SizedBox(
+                                        width: 36,
+                                        height: 24,
+                                        child: FittedBox(
+                                          child: Switch(
+                                            value: u.active,
+                                            onChanged: isSelf
+                                                ? null
+                                                : (v) => ref
+                                                    .read(
+                                                        userManagementNotifierProvider
+                                                            .notifier)
+                                                    .toggleActive(u.id, v),
+                                          ),
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                ],
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  GestureDetector(
-                                    onTap: () => _showEditUserDialog(u),
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(4),
-                                      child: Icon(Icons.edit, size: 16),
-                                    ),
-                                  ),
-                                  if (!isSelf && !u.isAdmin)
-                                    GestureDetector(
-                                      onTap: () => _confirmDeleteUser(u),
-                                      child: const Padding(
-                                        padding: EdgeInsets.all(4),
-                                        child: Icon(Icons.delete,
-                                            size: 16,
-                                            color: AppBrand.errorColor),
-                                      ),
-                                    ),
-                                  SizedBox(
-                                    width: 40,
-                                    child: FittedBox(
-                                      child: Switch(
-                                        value: u.active,
-                                        onChanged: isSelf
-                                            ? null
-                                            : (v) => ref
-                                                .read(
-                                                    userManagementNotifierProvider
-                                                        .notifier)
-                                                .toggleActive(u.id, v),
-                                      ),
-                                    ),
-                                  ),
+                                  const Divider(height: 8),
                                 ],
                               ),
                             );
@@ -463,7 +474,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   } catch (e) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx)
-                          .showSnackBar(SnackBar(content: Text('$e')));
+                          .showSnackBar(errorSnackBar('$e'));
                     }
                   }
                 },
@@ -478,9 +489,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   void _showEditUserDialog(UserModel user) {
     final nameC = TextEditingController(text: user.displayName);
-    final emailC = TextEditingController(text: user.email);
-    final newPassC = TextEditingController();
-    final confirmPassC = TextEditingController();
     String role = user.isAdmin ? 'admin' : 'seller';
     final currentUser = ref.read(authUserProvider).valueOrNull;
     final isSelf = currentUser?.id == user.id;
@@ -512,36 +520,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 8),
                   TextField(
-                    controller: emailC,
-                    decoration: InputDecoration(
+                    controller: TextEditingController(text: user.email),
+                    decoration: const InputDecoration(
                       labelText: 'Email',
-                      helperText: user.isSeller
-                          ? 'Admin can change seller email'
-                          : 'Auth email editing is seller-only',
+                      helperText: 'Email cannot be changed after creation',
                     ),
-                    keyboardType: TextInputType.emailAddress,
-                    enabled: user.isSeller,
+                    enabled: false,
                   ),
-                  if (user.isSeller) ...[
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: newPassC,
-                      decoration: const InputDecoration(
-                        labelText: 'Set New Password (Seller)',
-                        helperText:
-                            'Admin can directly set seller password. Min 6 chars.',
-                      ),
-                      obscureText: true,
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.lock_reset),
+                      label: const Text('Send Password Reset Email'),
+                      onPressed: () async {
+                        try {
+                          await ref
+                              .read(userManagementNotifierProvider.notifier)
+                              .sendPasswordResetForSeller(email: user.email);
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              successSnackBar(
+                                  'Password reset email sent to ${user.email}'),
+                            );
+                          }
+                        } catch (e) {
+                          if (ctx.mounted) {
+                            final key = AppErrorMapper.key(e);
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              errorSnackBar(tr(key, ref)),
+                            );
+                          }
+                        }
+                      },
                     ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: confirmPassC,
-                      decoration: const InputDecoration(
-                        labelText: 'Confirm New Password',
-                      ),
-                      obscureText: true,
-                    ),
-                  ],
+                  ),
                   const SizedBox(height: 8),
                   if (isSelf)
                     TextField(
@@ -604,47 +617,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (currentUser?.isAdmin != true) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(
-                            content: Text(tr('err_permission_denied', ref))),
+                        errorSnackBar(tr('err_permission_denied', ref)),
                       );
                     }
                     return;
                   }
-                  if (nameC.text.trim().isEmpty || emailC.text.trim().isEmpty) {
-                    return;
-                  }
-                  final newPass = newPassC.text.trim();
-                  final confirmPass = confirmPassC.text.trim();
-                  if (newPass.isNotEmpty || confirmPass.isNotEmpty) {
-                    if (newPass.length < 6) {
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(
-                              content: Text(
-                                  'New password must be at least 6 characters.')),
-                        );
-                      }
-                      return;
-                    }
-                    if (newPass != confirmPass) {
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(
-                              content: Text(
-                                  'New password and confirmation do not match.')),
-                        );
-                      }
-                      return;
-                    }
-                  }
+                  if (nameC.text.trim().isEmpty) return;
                   if (role == 'seller' &&
                       (selectedRouteId == null ||
                           selectedRouteId!.trim().isEmpty)) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(
-                            content:
-                                Text('Seller must be assigned to a route.')),
+                        warningSnackBar('Seller must be assigned to a route.'),
                       );
                     }
                     return;
@@ -652,35 +636,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   try {
                     final notifier =
                         ref.read(userManagementNotifierProvider.notifier);
-                    // Clear old route assignment if route changed
                     if (oldRouteId != null && oldRouteId != selectedRouteId) {
                       await notifier.clearRouteAssignment(oldRouteId);
                     }
                     await notifier.updateUser(user.id, {
                       'display_name': nameC.text.trim(),
-                      if (user.isSeller)
-                        'email': emailC.text.trim().toLowerCase(),
                       'role': isSelf ? 'admin' : role,
                       'assigned_route_id': selectedRouteId,
                       'assigned_route_name': selectedRouteName,
                     });
-                    if (user.isSeller &&
-                        (emailC.text.trim().toLowerCase() != user.email ||
-                            newPass.isNotEmpty)) {
-                      await notifier.adminUpdateSellerAuth(
-                        targetUid: user.id,
-                        newEmail: emailC.text.trim().toLowerCase() != user.email
-                            ? emailC.text.trim().toLowerCase()
-                            : null,
-                        newPassword: newPass.isNotEmpty ? newPass : null,
-                      );
-                    }
                     if (ctx.mounted) Navigator.pop(ctx);
                   } catch (e) {
                     if (ctx.mounted) {
                       final key = AppErrorMapper.key(e);
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(content: Text(tr(key, ref))),
+                        errorSnackBar(tr(key, ref)),
                       );
                     }
                   }
@@ -712,14 +682,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           .deleteUser(user.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${user.displayName} deleted')),
+          successSnackBar('${user.displayName} deleted'),
         );
       }
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
   }
@@ -763,12 +732,9 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
     const maxBytes = 300 * 1024;
     if (bytes.lengthInBytes > maxBytes) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-            'Image is ${_fmtBytes(bytes.lengthInBytes)} — too large after optimisation. '
-            'Use a simpler image or reduce dimensions below 800×400 px.',
-          ),
-          duration: const Duration(seconds: 5),
+        ScaffoldMessenger.of(context).showSnackBar(warningSnackBar(
+          'Image is ${_fmtBytes(bytes.lengthInBytes)} — too large after optimisation. '
+          'Use a simpler image or reduce dimensions below 800×400 px.',
         ));
       }
       return;
@@ -803,17 +769,16 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
           _pendingSizeLabel = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Logo uploaded successfully')),
+          successSnackBar('Logo uploaded successfully'),
         );
       }
     } catch (e) {
       if (mounted) {
         final detail = e is FirebaseException ? ' [${e.plugin}/${e.code}]' : '';
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${tr(key, ref)}$detail'),
-          duration: const Duration(seconds: 8),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          errorSnackBar('${tr(key, ref)}$detail'),
+        );
       }
     } finally {
       if (mounted) {
@@ -837,14 +802,13 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
       await ref.read(settingsNotifierProvider.notifier).deleteLogo();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Logo removed')),
+          successSnackBar('Logo removed'),
         );
       }
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     } finally {
       if (mounted) setState(() => _uploading = false);

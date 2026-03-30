@@ -9,7 +9,7 @@ Mobile-first Android ERP for footwear distribution. Admins manage products, rout
 - Flutter 3.x
 - Android SDK (API 21+)
 - Java 17
-- Firebase project with Firestore, Auth, and Functions enabled (no Storage needed)
+- Firebase project with Firestore and Auth enabled (no Storage, no Cloud Functions needed)
 
 ---
 

@@ -77,18 +77,22 @@ Run before marking production ready:
 
 - Deny-by-default rules remain enabled
 - Admin-equivalent role behavior must be aligned in app and rules
-- No Firebase Storage — zero-cost Firebase tier (Firestore + Auth + Functions only)
+- No Firebase Storage, no Cloud Functions — zero-cost Firebase tier (Firestore + Auth only)
+- User creation via secondary FirebaseApp (no server-side admin SDK needed)
 
 ## Done In This Baseline
 
 - Firebase Storage fully removed — zero cost architecture
+- Cloud Functions dependency removed — user CRUD via secondary FirebaseApp (no server needed)
 - Role normalization in app user parsing and writes
 - Firestore rules tolerate legacy role casing variants
 - Dashboard provider now uses timeout + cached fallback
 - Route/shop/variant/inventory forms map errors with AppErrorMapper
+- SnackBar system redesigned: Material 3 container-color card-style across all 19 screens
 - Added all-user profile route (/profile) for name/theme/language/security controls
 - Kept settings admin-only and added screen-level admin guard
-- Hardened user lifecycle: admin-only create/delete via Cloud Function, seller must have assigned route
+- User lifecycle: create via secondary FirebaseApp, soft-delete, password reset via email
+- Edit user dialog: email read-only, password reset button (no direct password setting)
 - Added admin-only delete actions for routes/shops/customers with provider guards
 - Full invoicing system (sale invoices, credit notes, void/paid lifecycle)
 - Stock transfer history with inventory_transactions provider

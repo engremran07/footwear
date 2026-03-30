@@ -3,8 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/customer_model.dart';
+import 'auth_provider.dart';
 
 final customersProvider = StreamProvider<List<CustomerModel>>((ref) {
+  // Admin-only: guard so non-admin credentials never subscribe,
+  // avoiding PERMISSION_DENIED during auth transitions.
+  final user = ref.watch(authUserProvider).valueOrNull;
+  if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('active', isEqualTo: true)
@@ -26,7 +31,39 @@ final customerDetailProvider =
           doc.exists ? CustomerModel.fromJson(doc.data()!, doc.id) : null);
 });
 
+final customersByRouteProvider =
+    StreamProvider.family<List<CustomerModel>, String>((ref, routeId) {
+  return FirebaseFirestore.instance
+      .collection(Collections.customers)
+      .where('route_id', isEqualTo: routeId)
+      .where('active', isEqualTo: true)
+      .orderBy('name')
+      .limit(500)
+      .snapshots()
+      .map((snap) => snap.docs
+          .map((d) => CustomerModel.fromJson(d.data(), d.id))
+          .toList());
+});
+
+final outstandingCustomersByRouteProvider =
+    StreamProvider.family<List<CustomerModel>, String>((ref, routeId) {
+  return FirebaseFirestore.instance
+      .collection(Collections.customers)
+      .where('route_id', isEqualTo: routeId)
+      .where('active', isEqualTo: true)
+      .where('balance', isGreaterThan: 0)
+      .orderBy('balance', descending: true)
+      .limit(100)
+      .snapshots()
+      .map((snap) => snap.docs
+          .map((d) => CustomerModel.fromJson(d.data(), d.id))
+          .toList());
+});
+
 final outstandingCustomersProvider = StreamProvider<List<CustomerModel>>((ref) {
+  // Admin-only: guard so non-admin credentials never subscribe.
+  final user = ref.watch(authUserProvider).valueOrNull;
+  if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('active', isEqualTo: true)

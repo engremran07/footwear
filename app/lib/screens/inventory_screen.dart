@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/snack_helper.dart';
 import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
 import '../models/seller_inventory_model.dart';
@@ -24,6 +25,7 @@ class InventoryScreen extends ConsumerStatefulWidget {
 
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   String _search = '';
+  int _adminTab = 0; // 0 = warehouse, 1 = personal seller stock
 
   void _showAddStockDialog(ProductVariantModel variant, int ppc) {
     final cartonsC = TextEditingController(text: '0');
@@ -89,8 +91,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 if (totalPairs <= 0) {
                   if (ctx.mounted) {
                     ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                          content: Text('Enter stock greater than zero')),
+                      warningSnackBar('Enter stock greater than zero'),
                     );
                   }
                   return;
@@ -103,16 +104,15 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text(
-                              'Added ${AppFormatters.stock(totalPairs, ppc)} to stock')),
+                      successSnackBar(
+                          'Added ${AppFormatters.stock(totalPairs, ppc)} to stock'),
                     );
                   }
                 } catch (e) {
                   if (mounted) {
                     final key = AppErrorMapper.key(e);
                     ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+                        .showSnackBar(errorSnackBar(tr(key, ref)));
                   }
                 }
               },
@@ -136,9 +136,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     }
     final isAdmin = currentUser.isAdmin;
     final warehouseVariants = ref.watch(allVariantsProvider);
-    final sellerInventoryAsync = currentUser.isSeller
-        ? ref.watch(sellerInventoryProvider(currentUser.id))
-        : null;
+    final sellerInventoryAsync =
+        ref.watch(sellerInventoryProvider(currentUser.id));
     final ppc = settingsAsync.valueOrNull?.pairsPerCarton ?? 12;
 
     return Scaffold(
@@ -154,30 +153,33 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           settingsAsync.when(
             data: (settings) => IconButton(
               icon: const Icon(Icons.file_download),
-              onPressed: () => ExportSheet.show(
-                context,
-                ref,
-                title: tr('inventory_report', ref),
-                headers: ['Variant Name', 'Quantity Available'],
-                rows: isAdmin
-                    ? warehouseVariants.valueOrNull
-                            ?.map((v) => [
-                                  v.variantName,
-                                  AppFormatters.stock(v.quantityAvailable,
-                                      settings.pairsPerCarton),
-                                ])
-                            .toList() ??
-                        []
-                    : sellerInventoryAsync?.valueOrNull
-                            ?.map((v) => [
-                                  v.variantName,
-                                  AppFormatters.stock(v.quantityAvailable,
-                                      settings.pairsPerCarton),
-                                ])
-                            .toList() ??
-                        [],
-                fileName: 'inventory_report',
-              ),
+              onPressed: () {
+                final useWarehouse = isAdmin && _adminTab == 0;
+                ExportSheet.show(
+                  context,
+                  ref,
+                  title: tr('inventory_report', ref),
+                  headers: ['Variant Name', 'Quantity Available'],
+                  rows: useWarehouse
+                      ? warehouseVariants.valueOrNull
+                              ?.map((v) => [
+                                    v.variantName,
+                                    AppFormatters.stock(v.quantityAvailable,
+                                        settings.pairsPerCarton),
+                                  ])
+                              .toList() ??
+                          []
+                      : sellerInventoryAsync.valueOrNull
+                              ?.map((v) => [
+                                    v.variantName,
+                                    AppFormatters.stock(v.quantityAvailable,
+                                        settings.pairsPerCarton),
+                                  ])
+                              .toList() ??
+                          [],
+                  fileName: 'inventory_report',
+                );
+              },
             ),
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
@@ -185,185 +187,39 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         ],
       ),
       body: isAdmin
-          ? warehouseVariants.when(
-              data: (data) {
-                if (data.isEmpty) {
-                  return EmptyState(
-                    icon: Icons.inventory_2,
-                    message: tr('no_variants', ref),
-                  );
-                }
-
-                final filtered = data
-                    .where((v) => v.variantName
-                        .toLowerCase()
-                        .contains(_search.toLowerCase()))
-                    .toList();
-
-                if (filtered.isEmpty) {
-                  return EmptyState(
-                    icon: Icons.search,
-                    message: tr('no_results', ref),
-                  );
-                }
-
-                return RefreshIndicator(
-                  onRefresh: () => ref.refresh(allVariantsProvider.future),
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: TextField(
-                          onChanged: (v) => setState(() => _search = v),
-                          decoration: InputDecoration(
-                            hintText: tr('search_variants', ref),
-                            prefixIcon: const Icon(Icons.search),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                          ),
-                        ),
+          ? Column(
+              children: [
+                // Warehouse / Personal stock toggle
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: SegmentedButton<int>(
+                    segments: [
+                      ButtonSegment(
+                        value: 0,
+                        label: Text(tr('warehouse_stock', ref)),
+                        icon: const Icon(Icons.warehouse),
                       ),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: filtered.length,
-                          itemBuilder: (ctx, i) {
-                            final variant = filtered[i];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              child: ListTile(
-                                title: Text(
-                                  variant.variantName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                subtitle: Text(
-                                  'Stock: ${AppFormatters.stock(variant.quantityAvailable, ppc)}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: ElevatedButton.icon(
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('Add Stock'),
-                                  onPressed: () => settingsAsync.whenData(
-                                    (settings) => _showAddStockDialog(
-                                      variant,
-                                      settings.pairsPerCarton,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                      ButtonSegment(
+                        value: 1,
+                        label: Text(tr('seller_stock', ref)),
+                        icon: const Icon(Icons.person),
                       ),
                     ],
+                    selected: {_adminTab},
+                    onSelectionChanged: (v) =>
+                        setState(() => _adminTab = v.first),
                   ),
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, st) => Center(child: Text('Error: $e')),
+                ),
+                Expanded(
+                  child: _adminTab == 0
+                      ? _buildWarehouseList(
+                          warehouseVariants, ppc, settingsAsync)
+                      : _buildSellerList(
+                          sellerInventoryAsync, currentUser, ppc),
+                ),
+              ],
             )
-          : sellerInventoryAsync?.when(
-                data: (data) {
-                  if (data.isEmpty) {
-                    return const EmptyState(
-                      icon: Icons.inventory_2,
-                      message: 'No seller inventory yet',
-                    );
-                  }
-
-                  final filtered = data
-                      .where((v) => v.variantName
-                          .toLowerCase()
-                          .contains(_search.toLowerCase()))
-                      .toList();
-
-                  if (filtered.isEmpty) {
-                    return EmptyState(
-                      icon: Icons.search,
-                      message: tr('no_results', ref),
-                    );
-                  }
-
-                  return RefreshIndicator(
-                    onRefresh: () => ref.refresh(
-                        sellerInventoryProvider(currentUser.id).future),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            'This tab shows your seller inventory only. Use Products to check warehouse stock before planning the next visit.',
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: TextField(
-                            onChanged: (v) => setState(() => _search = v),
-                            decoration: InputDecoration(
-                              hintText: tr('search_variants', ref),
-                              prefixIcon: const Icon(Icons.search),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: filtered.length,
-                            itemBuilder: (ctx, i) {
-                              final variant = filtered[i];
-                              return Card(
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                child: ListTile(
-                                  title: Text(variant.variantName),
-                                  subtitle: Text(
-                                    'Stock: ${AppFormatters.stock(variant.quantityAvailable, ppc)}',
-                                  ),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.undo,
-                                        color: Colors.orange),
-                                    tooltip: 'Return to Warehouse',
-                                    onPressed: () =>
-                                        _showReturnToWarehouseDialog(
-                                            variant, ppc),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, st) => Center(child: Text('Error: $e')),
-              ) ??
-              const Center(child: CircularProgressIndicator()),
+          : _buildSellerList(sellerInventoryAsync, currentUser, ppc),
       floatingActionButton: isAdmin
           ? Column(
               mainAxisSize: MainAxisSize.min,
@@ -397,6 +253,176 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               label: const Text('Warehouse'),
               onPressed: _showWarehouseStockSheet,
             ),
+    );
+  }
+
+  Widget _buildWarehouseList(
+    AsyncValue<List<ProductVariantModel>> warehouseVariants,
+    int ppc,
+    AsyncValue<dynamic> settingsAsync,
+  ) {
+    return warehouseVariants.when(
+      data: (data) {
+        if (data.isEmpty) {
+          return EmptyState(
+            icon: Icons.inventory_2,
+            message: tr('no_variants', ref),
+          );
+        }
+        final filtered = data
+            .where((v) =>
+                v.variantName.toLowerCase().contains(_search.toLowerCase()))
+            .toList();
+        if (filtered.isEmpty) {
+          return EmptyState(
+            icon: Icons.search,
+            message: tr('no_results', ref),
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () => ref.refresh(allVariantsProvider.future),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: TextField(
+                  onChanged: (v) => setState(() => _search = v),
+                  decoration: InputDecoration(
+                    hintText: tr('search_variants', ref),
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: filtered.length,
+                  itemBuilder: (ctx, i) {
+                    final variant = filtered[i];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      child: ListTile(
+                        title: Text(
+                          variant.variantName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          'Stock: ${AppFormatters.stock(variant.quantityAvailable, ppc)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: ElevatedButton.icon(
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Stock'),
+                          onPressed: () => _showAddStockDialog(variant, ppc),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, st) => Center(child: Text('Error: $e')),
+    );
+  }
+
+  Widget _buildSellerList(
+    AsyncValue<List<SellerInventoryModel>> sellerInventoryAsync,
+    UserModel currentUser,
+    int ppc,
+  ) {
+    return sellerInventoryAsync.when(
+      data: (data) {
+        if (data.isEmpty) {
+          return EmptyState(
+            icon: Icons.inventory_2,
+            message: tr('no_variants', ref),
+          );
+        }
+        final filtered = data
+            .where((v) =>
+                v.variantName.toLowerCase().contains(_search.toLowerCase()))
+            .toList();
+        if (filtered.isEmpty) {
+          return EmptyState(
+            icon: Icons.search,
+            message: tr('no_results', ref),
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () =>
+              ref.refresh(sellerInventoryProvider(currentUser.id).future),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: TextField(
+                  onChanged: (v) => setState(() => _search = v),
+                  decoration: InputDecoration(
+                    hintText: tr('search_variants', ref),
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: filtered.length,
+                  itemBuilder: (ctx, i) {
+                    final variant = filtered[i];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      child: ListTile(
+                        title: Text(
+                          variant.variantName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          'Stock: ${AppFormatters.stock(variant.quantityAvailable, ppc)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.undo, color: Colors.orange),
+                          tooltip: 'Return to Warehouse',
+                          onPressed: () =>
+                              _showReturnToWarehouseDialog(variant, ppc),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, st) => Center(child: Text('Error: $e')),
     );
   }
 
@@ -438,7 +464,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 final qty = int.tryParse(qtyC.text.trim()) ?? 0;
                 if (qty <= 0 || qty > item.quantityAvailable) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Invalid quantity')),
+                    warningSnackBar('Invalid quantity'),
                   );
                   return;
                 }
@@ -458,15 +484,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       );
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text(
-                            'Returned ${AppFormatters.stock(qty, ppc)} to warehouse')));
+                    ScaffoldMessenger.of(context).showSnackBar(successSnackBar(
+                        'Returned ${AppFormatters.stock(qty, ppc)} to warehouse'));
                   }
                 } catch (e) {
                   if (ctx.mounted) {
                     final key = AppErrorMapper.key(e);
                     ScaffoldMessenger.of(ctx)
-                        .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+                        .showSnackBar(errorSnackBar(tr(key, ref)));
                   }
                 }
               },
@@ -492,7 +517,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               ref.read(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
           return Consumer(
             builder: (ctx, cRef, _) {
-              final historyAsync = cRef.watch(allInventoryTransactionsProvider);
+              final user = cRef.watch(authUserProvider).valueOrNull;
+              final historyAsync = user?.isAdmin == true
+                  ? cRef.watch(allInventoryTransactionsProvider)
+                  : cRef.watch(
+                      sellerInventoryTransactionsProvider(user?.id ?? ''));
               return Column(
                 children: [
                   const SizedBox(height: 12),
@@ -670,7 +699,7 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
     final total = _total;
     if (total <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter stock greater than zero')),
+        warningSnackBar('Enter stock greater than zero'),
       );
       return;
     }
@@ -682,16 +711,13 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
       if (mounted) Navigator.pop(context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text('Added ${AppFormatters.stock(total, _ppc)} to stock')),
+          successSnackBar('Added ${AppFormatters.stock(total, _ppc)} to stock'),
         );
       }
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -853,17 +879,14 @@ class _TransferToSellerDialogState
     final total = _total;
     if (total <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter quantity greater than zero')),
+        warningSnackBar('Enter quantity greater than zero'),
       );
       return;
     }
     if (total > _selectedVariant!.quantityAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Not enough stock. Available: ${AppFormatters.stock(_selectedVariant!.quantityAvailable, _ppc)}',
-          ),
-          backgroundColor: Colors.red,
+        errorSnackBar(
+          'Not enough stock. Available: ${AppFormatters.stock(_selectedVariant!.quantityAvailable, _ppc)}',
         ),
       );
       return;
@@ -882,18 +905,15 @@ class _TransferToSellerDialogState
       if (mounted) Navigator.pop(context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Transferred ${AppFormatters.stock(total, _ppc)} to ${_selectedSeller!.displayName}',
-            ),
+          successSnackBar(
+            'Transferred ${AppFormatters.stock(total, _ppc)} to ${_selectedSeller!.displayName}',
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(tr(key, ref))));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     } finally {
       if (mounted) setState(() => _saving = false);

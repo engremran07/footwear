@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/utils/snack_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/bootstrap_provider.dart';
 
@@ -90,17 +91,17 @@ class BootstrapProfileScreen extends ConsumerWidget {
           .createCurrentAdminProfile();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Admin profile created successfully.')),
+        successSnackBar('Admin profile created successfully.'),
       );
     } on FirebaseAuthException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? e.code)),
+        errorSnackBar(e.message ?? e.code),
       );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
+        errorSnackBar('$e'),
       );
     }
   }

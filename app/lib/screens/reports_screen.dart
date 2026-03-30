@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
+import '../core/utils/snack_helper.dart';
+import '../models/customer_model.dart';
+import '../models/shop_model.dart';
+import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/customer_provider.dart';
 import '../providers/dashboard_provider.dart';
@@ -19,6 +23,7 @@ class ReportsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(authUserProvider);
     final stats = ref.watch(dashboardStatsProvider);
     final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
     return Scaffold(
@@ -105,7 +110,14 @@ class ReportsScreen extends ConsumerWidget {
   }
 
   void _exportShops(BuildContext context, WidgetRef ref) {
-    final shops = ref.read(shopsProvider).valueOrNull ?? [];
+    final user = ref.read(authUserProvider).valueOrNull;
+    final routeId = user?.assignedRouteId ?? '';
+    final shops = user?.isAdmin == true
+        ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
+        : (routeId.isNotEmpty
+            ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
+                <ShopModel>[]
+            : <ShopModel>[]);
     ExportSheet.show(
       context,
       ref,
@@ -153,7 +165,11 @@ class ReportsScreen extends ConsumerWidget {
   }
 
   void _exportTransactions(BuildContext context, WidgetRef ref) {
-    final txs = ref.read(allTransactionsProvider).valueOrNull ?? [];
+    final user = ref.read(authUserProvider).valueOrNull;
+    final txs = user?.isAdmin == true
+        ? ref.read(allTransactionsProvider).valueOrNull ?? []
+        : ref.read(sellerTransactionsProvider(user?.id ?? '')).valueOrNull ??
+            [];
     ExportSheet.show(
       context,
       ref,
@@ -179,7 +195,14 @@ class ReportsScreen extends ConsumerWidget {
   }
 
   void _exportOutstanding(BuildContext context, WidgetRef ref) {
-    final shops = ref.read(outstandingShopsProvider).valueOrNull ?? [];
+    final user = ref.read(authUserProvider).valueOrNull;
+    final routeId = user?.assignedRouteId ?? '';
+    final shops = user?.isAdmin == true
+        ? ref.read(outstandingShopsProvider).valueOrNull ?? <ShopModel>[]
+        : (routeId.isNotEmpty
+            ? ref.read(outstandingShopsByRouteProvider(routeId)).valueOrNull ??
+                <ShopModel>[]
+            : <ShopModel>[]);
     ExportSheet.show(
       context,
       ref,
@@ -203,7 +226,14 @@ class ReportsScreen extends ConsumerWidget {
   }
 
   void _exportCustomers(BuildContext context, WidgetRef ref) {
-    final customers = ref.read(customersProvider).valueOrNull ?? [];
+    final user = ref.read(authUserProvider).valueOrNull;
+    final routeId = user?.assignedRouteId ?? '';
+    final customers = user?.isAdmin == true
+        ? ref.read(customersProvider).valueOrNull ?? <CustomerModel>[]
+        : (routeId.isNotEmpty
+            ? ref.read(customersByRouteProvider(routeId)).valueOrNull ??
+                <CustomerModel>[]
+            : <CustomerModel>[]);
     ExportSheet.show(
       context,
       ref,
@@ -227,7 +257,14 @@ class ReportsScreen extends ConsumerWidget {
   }
 
   void _exportBadDebts(BuildContext context, WidgetRef ref) {
-    final customers = ref.read(customersProvider).valueOrNull ?? [];
+    final user = ref.read(authUserProvider).valueOrNull;
+    final routeId = user?.assignedRouteId ?? '';
+    final customers = user?.isAdmin == true
+        ? ref.read(customersProvider).valueOrNull ?? <CustomerModel>[]
+        : (routeId.isNotEmpty
+            ? ref.read(customersByRouteProvider(routeId)).valueOrNull ??
+                <CustomerModel>[]
+            : <CustomerModel>[]);
     final badDebtCustomers = customers.where((c) => c.badDebt).toList();
     ExportSheet.show(
       context,
@@ -345,19 +382,31 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
     setState(() => _generating = true);
     try {
       final locale = ref.read(appLocaleProvider);
-      final customers = ref.read(customersProvider).valueOrNull ?? [];
+      final user = ref.read(authUserProvider).valueOrNull;
+      final routeId = user?.assignedRouteId ?? '';
+      final customers = user?.isAdmin == true
+          ? ref.read(customersProvider).valueOrNull ?? <CustomerModel>[]
+          : (routeId.isNotEmpty
+              ? ref.read(customersByRouteProvider(routeId)).valueOrNull ??
+                  <CustomerModel>[]
+              : <CustomerModel>[]);
       final customer = customers.firstWhere((c) => c.id == _selectedCustomerId);
-      final allTxs = ref.read(allTransactionsProvider).valueOrNull ?? [];
+      final allTxs = user?.isAdmin == true
+          ? ref.read(allTransactionsProvider).valueOrNull ?? []
+          : ref.read(sellerTransactionsProvider(user!.id)).valueOrNull ?? [];
       final txs = allTxs
           .where((t) =>
               t.customerId == _selectedCustomerId ||
               t.shopId == _selectedCustomerId)
           .toList()
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-      final user = ref.read(authUserProvider).valueOrNull;
       final settings = await ref.read(settingsProvider.future);
-      final allUsers = ref.read(allUsersProvider).valueOrNull ?? [];
-      final entryByMap = {for (final u in allUsers) u.id: u.displayName};
+      final allUsers = user?.isAdmin == true
+          ? ref.read(allUsersProvider).valueOrNull ?? <UserModel>[]
+          : <UserModel>[];
+      final entryByMap = <String, String>{
+        for (final u in allUsers) u.id: u.displayName
+      };
       if (user != null) entryByMap[user.id] = user.displayName;
 
       final bytes = await buildPdfLedger(
@@ -399,8 +448,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
       }
     } finally {
       if (mounted) setState(() => _generating = false);
@@ -409,7 +457,13 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
 
   @override
   Widget build(BuildContext context) {
-    final customersAsync = ref.watch(customersProvider);
+    final user = ref.watch(authUserProvider).valueOrNull;
+    final routeId = user?.assignedRouteId ?? '';
+    final AsyncValue<List<CustomerModel>> customersAsync = user?.isAdmin == true
+        ? ref.watch(customersProvider)
+        : (routeId.isNotEmpty
+            ? ref.watch(customersByRouteProvider(routeId))
+            : const AsyncData(<CustomerModel>[]));
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -592,8 +646,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
       }
     } finally {
       if (mounted) setState(() => _generating = false);

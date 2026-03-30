@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/utils/snack_helper.dart';
 import '../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
 import '../providers/customer_provider.dart';
@@ -71,8 +72,7 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
       if (mounted) context.pop();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
