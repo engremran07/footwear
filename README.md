@@ -1,6 +1,8 @@
-﻿# FootWear ERP
+﻿# FootWear ERP — v3.0.0
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android APK) and Firebase as the backend. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
+
+> **v3.0.0** — Enterprise upgrade: design system, animations, hardened security, PDF isolate export, session guard, dark mode + RTL QA, 3 split-per-abi release APKs.
 
 ---
 
@@ -8,15 +10,16 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 
 ### Admin
 
-- **Dashboard** — live stats: revenue, outstanding balances, inventory levels
-- **Products & Variants** — manage SKUs with size/color variants, carton/dozen/pair stock tracking
-- **Routes** — define delivery routes and assign sellers
-- **Customers & Shops** — full CRUD with balance ledger per customer
-- **Inventory** — warehouse stock allocation and adjustment
+- **Dashboard** — live stats with shimmer loading, cash flow BarChart, alerts banner, admin speed-dial FAB
+- **Products & Variants** — manage SKUs with size/color variants, carton/dozen/pair stock tracking, share button
+- **Routes** — define delivery routes and assign sellers, performance strip, shops sorted by debt
+- **Customers & Shops** — full CRUD with balance ledger, balance trend LineChart, days-overdue indicator
+- **Inventory** — warehouse stock allocation with low-stock warning badges, drag-to-reorder
 - **Transactions** — cash-in / cash-out ledger with running balance
-- **Reports** — account statement, seller summary report — exportable as PDF, Excel, or image
-- **User Management** — create/edit admin and seller accounts
-- **Settings** — company name, pairs-per-carton, business preferences
+- **Invoices** — sale invoices, credit notes, void/paid lifecycle, 3-step payment progression bar
+- **Reports** — monthly cash flow BarChart, outstanding PieChart, PDF/Excel/image export
+- **User Management** — create/edit admin and seller accounts, soft-delete, password reset via email
+- **Settings** — company name, logo (base64 ≤50KB), pairs-per-carton, business preferences
 - **Profile** — name, language, theme and password controls for all users
 
 ### Seller
@@ -27,7 +30,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 
 ### Multilingual
 
-- English, Arabic (RTL), Urdu (RTL) — fully synced across all screens and PDF exports
+- English, Arabic (RTL), Urdu (RTL) — 372+ translation keys fully synced across all screens and PDF exports
 
 ---
 
@@ -35,13 +38,17 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 
 | Layer | Technology |
 | --- | --- |
-| Mobile app | Flutter 3.x — Android APK only |
-| State management | Riverpod |
-| Navigation | go_router |
+| Mobile app | Flutter 3.5+ — Android APK only |
+| State management | Riverpod (AsyncNotifier, StreamProvider) |
+| Navigation | go_router with role-based redirect guards |
 | Backend / Auth | Firebase (Firestore, Auth) — no Storage, no Cloud Functions |
-| PDF export | `pdf` package — Noto Arabic + Noto Nastaliq Urdu fonts |
+| Design system | AppTokens, AppAnimations, AppSanitizer, AppInputFormatters |
+| Charts | fl_chart (BarChart, LineChart, PieChart) |
+| PDF export | `pdf` package + Isolate.run() — Arabic + Urdu fonts |
 | Excel export | `excel` package |
-| Print / Share | `printing` package |
+| Print / Share | `printing` + `share_plus` |
+| Image compression | `flutter_image_compress` (base64 logo) |
+| Animations | `flutter_animate` + `shimmer` |
 
 ---
 
@@ -51,15 +58,14 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 shoeserp/
 ├── app/                    # Flutter Android app
 │   ├── lib/
-│   │   ├── core/           # constants, l10n, router, theme, utils
+│   │   ├── core/           # constants, l10n, router, theme, utils, design tokens
 │   │   ├── models/         # Firestore data models
-│   │   ├── providers/      # Riverpod state notifiers
+│   │   ├── providers/      # Riverpod state notifiers — all Firestore writes
 │   │   ├── screens/        # all UI screens
-│   │   └── widgets/        # shared UI components
+│   │   └── widgets/        # 14 shared UI components (6 upgraded + 8 new)
 │   └── android/            # Android-specific config
-├── functions/              # Firebase Cloud Functions
-├── firestore.rules         # Firestore security rules
-├── firestore.indexes.json  # Composite indexes
+├── firestore.rules         # Security rules (docSizeOk, withinWriteRate)
+├── firestore.indexes.json  # 17 composite indexes
 └── firebase.json           # Firebase project config
 ```
 
@@ -69,8 +75,8 @@ shoeserp/
 
 ### Prerequisites
 
-- Flutter SDK 3.x
-- Android Studio / Android SDK
+- Flutter SDK >=3.5.0 <4.0.0
+- Android Studio / Android SDK (API 21+)
 - Firebase project (`firebase login`)
 - Java 17+
 
@@ -96,8 +102,11 @@ flutter run
 
 ```bash
 cd app
-flutter build apk --release --target-platform android-arm,android-arm64
-# Output: app/build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --release --split-per-abi
+# Output: 3 APKs in app/build/app/outputs/flutter-apk/
+#   app-armeabi-v7a-release.apk  (~27MB)
+#   app-arm64-v8a-release.apk   (~29MB)
+#   app-x86_64-release.apk      (~31MB)
 ```
 
 ---
@@ -184,6 +193,24 @@ flutter test -r expanded
 3. Build release APK
 4. Deploy firestore rules and indexes
 5. Validate admin and seller write-path behavior on live project users
+
+## v3.0.0 Enterprise Upgrade Highlights
+
+- **Design system**: AppTokens (spacing, radii, elevation), AppAnimations (screenEntry, listEntry, pressable, successFlash, errorShake)
+- **14 widgets**: 6 upgraded + 8 new — StatusBadge, AppSearchBar, FilterChipBar, ShimmerList, StatStripCard, ConfirmDialog, EmptyState, AppDateRangePicker — all with accessibility tooltips
+- **5 list screens**: search, filter chips, shimmer loading, pull-to-refresh, staggered list animations, stat strips
+- **7 forms**: PopScope dirty-check, AppSanitizer, haptic feedback on submit/error, unified validation
+- **5 detail screens**: enriched with fl_chart charts, badges, grouped sections
+- **PDF export**: all 4 functions run in `Isolate.run()` with sanitized string interpolation (S-08)
+- **Session guard**: `AppLifecycleListener`, 8-hour admin hard session limit (S-10)
+- **Base64 logo**: 256×256 + flutter_image_compress + ≤50KB cap (S-07)
+- **Firestore rules**: `docSizeOk()` <50KB, `withinWriteRate()` 1s cooldown on all writes
+- **Dark mode QA**: theme-aware colors throughout — no hardcoded Colors.white/grey
+- **RTL QA**: EdgeInsetsDirectional throughout — no hardcoded left/right padding
+- **Zero-cost Firebase**: Firestore + Auth only — no Storage, no Cloud Functions
+- **Release**: v3.0.0+7, 3 split-per-abi APKs, tested on Samsung A56 + V2247
+
+---
 
 ## Canonical Docs
 

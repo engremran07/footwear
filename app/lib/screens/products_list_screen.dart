@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
+import '../widgets/app_pull_refresh.dart';
+import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/shimmer_loading.dart';
 
 class ProductsListScreen extends ConsumerStatefulWidget {
   const ProductsListScreen({super.key});
@@ -25,20 +29,13 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
       appBar: AppBar(title: Text(tr('products', ref))),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: tr('search_products', ref),
-                prefixIcon: const Icon(Icons.search),
-                isDense: true,
-              ),
-              onChanged: (v) => setState(() => _search = v.toLowerCase()),
-            ),
+          AppSearchBar(
+            hintText: tr('search_products', ref),
+            onChanged: (v) => setState(() => _search = v.toLowerCase()),
           ),
           Expanded(
             child: productsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const ShimmerLoading(),
               error: (e, _) => Center(child: Text('$e')),
               data: (products) {
                 final filtered = _search.isEmpty
@@ -54,35 +51,42 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                     message: tr('no_products', ref),
                   );
                 }
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  itemCount: filtered.length,
-                  itemBuilder: (_, i) {
-                    final p = filtered[i];
-                    return Card(
-                      child: ListTile(
-                        leading: p.imageUrl != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  p.imageUrl!,
-                                  width: 48,
-                                  height: 48,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      _productIcon(cs),
-                                ),
-                              )
-                            : _productIcon(cs),
-                        title: Text(p.name,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: Text(p.category),
-                        trailing: const Icon(Icons.chevron_right, size: 20),
-                        onTap: () => context.push('/products/${p.id}'),
-                      ),
-                    );
+                return AppPullRefresh(
+                  onRefresh: () async {
+                    ref.invalidate(productsProvider);
+                    await Future.delayed(const Duration(milliseconds: 300));
                   },
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final p = filtered[i];
+                      return Card(
+                        child: ListTile(
+                          leading: p.imageUrl != null
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    p.imageUrl!,
+                                    width: 48,
+                                    height: 48,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        _productIcon(cs),
+                                  ),
+                                )
+                              : _productIcon(cs),
+                          title: Text(p.name,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: Text(p.category),
+                          trailing: const Icon(Icons.chevron_right, size: 20),
+                          onTap: () => context.push('/products/${p.id}'),
+                        ),
+                      ).listEntry(i);
+                    },
+                  ),
                 );
               },
             ),

@@ -118,6 +118,11 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         await batch.commit();
       } on FirebaseAuthException {
         rethrow; // Let AppErrorMapper handle auth errors (email-in-use, etc.)
+      } finally {
+        // S-04: Dispose the secondary app to prevent resource leaks
+        try {
+          await tempApp.delete();
+        } catch (_) {}
       }
     });
   }

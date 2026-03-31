@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,9 +16,24 @@ void main() async {
   try {
     await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform);
-    // Keep auth sessions clean across account switches by disabling disk cache.
+
+    // S-01: Crashlytics — collect in release only
+    await FirebaseCrashlytics.instance
+        .setCrashlyticsCollectionEnabled(!kDebugMode);
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+
+    // S-06: Firebase App Check — play integrity for Android
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: AndroidProvider.playIntegrity,
+    );
+
+    // Enable Firestore offline persistence for faster loads
     FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: false,
+      persistenceEnabled: true,
     );
 
     final prefs = await SharedPreferences.getInstance();
@@ -23,11 +41,11 @@ void main() async {
     if (!rememberMe && FirebaseAuth.instance.currentUser != null) {
       await FirebaseAuth.instance.signOut();
     } else if (rememberMe && FirebaseAuth.instance.currentUser != null) {
-      // Force token refresh so Firestore queries don't fail with stale token
       try {
         await FirebaseAuth.instance.currentUser!.getIdToken(true);
-      } catch (_) {
-        // Token refresh failed (offline/expired) — force re-login
+      } catch (e, stack) {
+        // S-01: Log token refresh failure to Crashlytics before sign-out
+        FirebaseCrashlytics.instance.recordError(e, stack);
         await FirebaseAuth.instance.signOut();
       }
     }

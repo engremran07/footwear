@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/app_brand.dart';
+import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/snack_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/network_provider.dart';
+import '../widgets/app_online_indicator.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -17,17 +22,57 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailC = TextEditingController();
   final _passC = TextEditingController();
+  final _emailFocus = FocusNode();
   bool _obscure = true;
   bool _remember = true;
+
+  // S-02: Brute-force protection
+  int _failCount = 0;
+  int _lockoutSeconds = 0;
+  Timer? _lockoutTimer;
+
+  bool get _isLockedOut => _lockoutSeconds > 0;
+
+  void _startLockout() {
+    final duration = switch (_failCount) {
+      >= 7 => 120,
+      >= 5 => 60,
+      _ => 30,
+    };
+    _lockoutSeconds = duration;
+    _lockoutTimer?.cancel();
+    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() {
+        _lockoutSeconds--;
+        if (_lockoutSeconds <= 0) t.cancel();
+      });
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-focus email on mount
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _emailFocus.requestFocus();
+    });
+  }
 
   @override
   void dispose() {
     _emailC.dispose();
     _passC.dispose();
+    _emailFocus.dispose();
+    _lockoutTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _submit() async {
+    if (_isLockedOut) return;
     if (!_formKey.currentState!.validate()) return;
 
     try {
@@ -36,13 +81,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             _passC.text,
             rememberMe: _remember,
           );
-      // After successful sign-in, the router will navigate automatically
+      _failCount = 0;
     } catch (e) {
       if (!mounted) return;
 
+      _failCount++;
+      if (_failCount >= 3) _startLockout();
+
       String errorMessage = tr('err_auth_generic', ref);
 
-      // Interpret Firebase errors
       if (e is FirebaseAuthException) {
         errorMessage = switch (e.code) {
           'user-not-found' => tr('err_user_not_found', ref),
@@ -71,162 +118,301 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final isLoading = ref.watch(authNotifierProvider).isLoading;
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final currentLocale = ref.watch(appLocaleProvider);
     final isOnline = ref.watch(isOnlineProvider);
+    final isWide = MediaQuery.sizeOf(context).width > 720;
 
     return Scaffold(
       body: SafeArea(
-        child: Stack(
+        child: isWide
+            ? _wideLayout(theme, cs, currentLocale, isOnline, isLoading)
+            : _narrowLayout(theme, cs, currentLocale, isOnline, isLoading),
+      ),
+    );
+  }
+
+  /// Wide layout: brand panel (40%) + form panel (60%)
+  Widget _wideLayout(ThemeData theme, ColorScheme cs, AppLocale currentLocale,
+      AsyncValue<bool> isOnline, bool isLoading) {
+    return Row(
+      children: [
+        // Brand panel
+        Expanded(
+          flex: 4,
+          child: _BrandPanel(theme: theme, cs: cs),
+        ),
+        // Form panel
+        Expanded(
+          flex: 6,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppTokens.s48),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _languagePicker(currentLocale),
+                    const SizedBox(height: AppTokens.s24),
+                    _loginForm(theme, cs, isLoading),
+                    const SizedBox(height: AppTokens.s16),
+                    _onlineIndicator(isOnline),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Narrow (mobile) layout: single column
+  Widget _narrowLayout(ThemeData theme, ColorScheme cs, AppLocale currentLocale,
+      AsyncValue<bool> isOnline, bool isLoading) {
+    return Stack(
+      children: [
+        Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppTokens.s32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    AppBrand.logoAsset,
+                    height: 90,
+                    fit: BoxFit.contain,
+                  ).animate().fadeIn(duration: AppTokens.durNormal).scale(
+                        begin: const Offset(0.8, 0.8),
+                        end: const Offset(1, 1),
+                        curve: AppTokens.curveStd,
+                      ),
+                  const SizedBox(height: AppTokens.s12),
+                  Text(tr('app_name', ref),
+                      style: theme.textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: AppTokens.s4),
+                  Text(tr('sign_in_continue', ref),
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: cs.onSurfaceVariant)),
+                  const SizedBox(height: AppTokens.s24),
+                  _languagePicker(currentLocale),
+                  const SizedBox(height: AppTokens.s24),
+                  _loginForm(theme, cs, isLoading),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Online indicator bottom-right
+        Positioned(
+          bottom: AppTokens.s12,
+          right: AppTokens.s12,
+          child: _onlineIndicator(isOnline),
+        ),
+      ],
+    );
+  }
+
+  Widget _languagePicker(AppLocale currentLocale) {
+    return SegmentedButton<AppLocale>(
+      segments: AppLocale.values
+          .map((l) => ButtonSegment<AppLocale>(
+                value: l,
+                label: Text(l.label),
+              ))
+          .toList(),
+      selected: {currentLocale},
+      onSelectionChanged: (set) {
+        ref.read(appLocaleProvider.notifier).state = set.first;
+      },
+      showSelectedIcon: false,
+      style: ButtonStyle(
+        visualDensity: VisualDensity.compact,
+        textStyle:
+            WidgetStatePropertyAll(Theme.of(context).textTheme.labelMedium),
+      ),
+    );
+  }
+
+  Widget _onlineIndicator(AsyncValue<bool> isOnline) {
+    return isOnline.when(
+      data: (online) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppOnlineIndicator(isOnline: online),
+          const SizedBox(width: AppTokens.s4),
+          Text(
+            online ? tr('login_online', ref) : tr('login_offline', ref),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: online ? Colors.green : Colors.grey,
+                ),
+          ),
+        ],
+      ),
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const AppOnlineIndicator(isOnline: false),
+          const SizedBox(width: AppTokens.s4),
+          Text(tr('login_offline', ref),
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _loginForm(ThemeData theme, ColorScheme cs, bool isLoading) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppTokens.brLG,
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.s24),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(tr('sign_in', ref),
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: AppTokens.s24),
+              TextFormField(
+                controller: _emailC,
+                focusNode: _emailFocus,
+                decoration: InputDecoration(
+                  labelText: tr('email', ref),
+                  prefixIcon: const Icon(Icons.person_outline),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? tr('required', ref) : null,
+              )
+                  .animate()
+                  .fadeIn(delay: 100.ms, duration: AppTokens.durNormal)
+                  .slideX(begin: 0.05, end: 0, curve: AppTokens.curveStd),
+              const SizedBox(height: AppTokens.s16),
+              TextFormField(
+                controller: _passC,
+                obscureText: _obscure,
+                decoration: InputDecoration(
+                  labelText: tr('password', ref),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: AnimatedSwitcher(
+                      duration: AppTokens.durFast,
+                      child: Icon(
+                        _obscure ? Icons.visibility_off : Icons.visibility,
+                        key: ValueKey(_obscure),
+                      ),
+                    ),
+                    tooltip: _obscure
+                        ? tr('tooltip_show_password', ref)
+                        : tr('tooltip_hide_password', ref),
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                  ),
+                ),
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _submit(),
+                validator: (v) =>
+                    v == null || v.isEmpty ? tr('required', ref) : null,
+              )
+                  .animate()
+                  .fadeIn(delay: 200.ms, duration: AppTokens.durNormal)
+                  .slideX(begin: 0.05, end: 0, curve: AppTokens.curveStd),
+              const SizedBox(height: AppTokens.s8),
+              Row(
+                children: [
+                  Checkbox(
+                    value: _remember,
+                    onChanged: (v) => setState(() => _remember = v!),
+                  ),
+                  Text(tr('remember_me', ref)),
+                ],
+              ),
+              const SizedBox(height: AppTokens.s24),
+              SizedBox(
+                height: AppTokens.buttonMinHeight,
+                child: FilledButton(
+                  onPressed: (isLoading || _isLockedOut) ? null : _submit,
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : _isLockedOut
+                          ? Text('${tr('sign_in', ref)} ($_lockoutSeconds s)')
+                          : Text(tr('sign_in', ref)),
+                ),
+              ).animate().fadeIn(delay: 300.ms, duration: AppTokens.durNormal),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Brand panel for wide layout — gradient + logo + tagline
+class _BrandPanel extends ConsumerWidget {
+  final ThemeData theme;
+  final ColorScheme cs;
+
+  const _BrandPanel({required this.theme, required this.cs});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppBrand.primaryColor,
+            AppBrand.primaryColor.withValues(alpha: 0.8),
+            cs.primaryContainer,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Online status indicator (top-left)
-            Positioned(
-              top: 8,
-              left: 8,
-              child: isOnline.when(
-                data: (online) => Chip(
-                  avatar: Icon(
-                    online ? Icons.cloud_done : Icons.cloud_off,
-                    size: 18,
-                    color: online ? Colors.green : Colors.grey,
-                  ),
-                  label: Text(
-                    online ? 'Online' : 'Offline',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: online ? Colors.green : Colors.grey,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  backgroundColor: (online ? Colors.green : Colors.grey)
-                      .withValues(alpha: 0.1),
+            Image.asset(
+              AppBrand.logoAsset,
+              height: 120,
+              fit: BoxFit.contain,
+            ).animate().fadeIn(duration: AppTokens.durSlow).scale(
+                  begin: const Offset(0.85, 0.85),
+                  end: const Offset(1, 1),
+                  curve: AppTokens.curveSpring,
                 ),
-                loading: () => Chip(
-                  avatar: const Icon(
-                    Icons.cloud_queue,
-                    size: 18,
-                    color: Colors.grey,
-                  ),
-                  label: const Text(
-                    '...',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  backgroundColor: Colors.grey.withValues(alpha: 0.1),
-                ),
-                error: (_, __) => const Chip(
-                  avatar: Icon(Icons.cloud_off, size: 18),
-                  label: Text('Offline', style: TextStyle(fontSize: 12)),
-                ),
+            const SizedBox(height: AppTokens.s16),
+            Text(
+              AppBrand.appName,
+              style: theme.textTheme.headlineLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
-            ),
-            // Language selector top-right
-            Positioned(
-              top: 8,
-              right: 8,
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<AppLocale>(
-                  value: currentLocale,
-                  icon: const Icon(Icons.language, size: 20),
-                  borderRadius: BorderRadius.circular(12),
-                  items: AppLocale.values
-                      .map((l) => DropdownMenuItem(
-                            value: l,
-                            child: Text(l.label,
-                                style: const TextStyle(fontSize: 14)),
-                          ))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) {
-                      ref.read(appLocaleProvider.notifier).state = v;
-                    }
-                  },
-                ),
-              ),
-            ),
-            // Main login form
-            Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(32),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 400),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset(
-                          AppBrand.logoAsset,
-                          height: 110,
-                          fit: BoxFit.contain,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(tr('app_name', ref),
-                            style: theme.textTheme.headlineMedium
-                                ?.copyWith(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Text(tr('sign_in_continue', ref),
-                            style: theme.textTheme.bodyMedium),
-                        const SizedBox(height: 32),
-                        TextFormField(
-                          controller: _emailC,
-                          decoration: InputDecoration(
-                            labelText: tr('email', ref),
-                            prefixIcon: const Icon(Icons.person_outline),
-                          ),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (v) => v == null || v.trim().isEmpty
-                              ? tr('required', ref)
-                              : null,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passC,
-                          obscureText: _obscure,
-                          decoration: InputDecoration(
-                            labelText: tr('password', ref),
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(_obscure
-                                  ? Icons.visibility_off
-                                  : Icons.visibility),
-                              onPressed: () =>
-                                  setState(() => _obscure = !_obscure),
-                            ),
-                          ),
-                          validator: (v) => v == null || v.isEmpty
-                              ? tr('required', ref)
-                              : null,
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Checkbox(
-                              value: _remember,
-                              onChanged: (v) => setState(() => _remember = v!),
-                            ),
-                            Text(tr('remember_me', ref)),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: ElevatedButton(
-                            onPressed: isLoading ? null : _submit,
-                            child: isLoading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2))
-                                : Text(tr('sign_in', ref)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            ).animate().fadeIn(delay: 200.ms, duration: AppTokens.durNormal),
+            const SizedBox(height: AppTokens.s8),
+            Text(
+              tr('login_tagline', ref),
+              style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
+            ).animate().fadeIn(delay: 400.ms, duration: AppTokens.durNormal),
           ],
         ),
       ),

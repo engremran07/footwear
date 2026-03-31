@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/l10n/app_locale.dart';
 import '../core/utils/snack_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/bootstrap_provider.dart';
@@ -18,12 +19,12 @@ class BootstrapProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bootstrap Admin Profile'),
+        title: Text(tr('bootstrap_title', ref)),
         actions: [
           TextButton.icon(
             onPressed: () => ref.read(authNotifierProvider.notifier).signOut(),
             icon: const Icon(Icons.logout),
-            label: const Text('Sign out'),
+            label: Text(tr('bootstrap_sign_out', ref)),
           ),
         ],
       ),
@@ -39,22 +40,23 @@ class BootstrapProfileScreen extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Account signed in, but user profile is missing.',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    Text(
+                      tr('bootstrap_missing_profile', ref),
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 12),
-                    Text('Signed in as: ${authUser?.email ?? '-'}'),
+                    Text(tr('bootstrap_signed_in_as', ref)
+                        .replaceAll('%s', authUser?.email ?? '-')),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Use this one-time action to create users/{uid} with admin role. This is restricted to admin@footwear.pk only.',
+                    Text(
+                      tr('bootstrap_instructions', ref),
                     ),
                     const SizedBox(height: 20),
                     if (!canBootstrap)
-                      const Text(
-                        'This account is not eligible for bootstrap. Sign out and log in with admin@footwear.pk.',
-                        style: TextStyle(color: Colors.red),
+                      Text(
+                        tr('bootstrap_not_eligible', ref),
+                        style: const TextStyle(color: Colors.red),
                       ),
                     const SizedBox(height: 12),
                     SizedBox(
@@ -71,7 +73,7 @@ class BootstrapProfileScreen extends ConsumerWidget {
                                     strokeWidth: 2, color: Colors.white),
                               )
                             : const Icon(Icons.build_circle_outlined),
-                        label: const Text('Create Admin Profile'),
+                        label: Text(tr('bootstrap_create_btn', ref)),
                       ),
                     ),
                   ],
@@ -91,7 +93,7 @@ class BootstrapProfileScreen extends ConsumerWidget {
           .createCurrentAdminProfile();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        successSnackBar('Admin profile created successfully.'),
+        successSnackBar(tr('msg_admin_profile_created', ref)),
       );
     } on FirebaseAuthException catch (e) {
       if (!context.mounted) return;

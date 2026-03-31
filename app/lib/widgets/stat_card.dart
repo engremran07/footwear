@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import '../core/design/app_tokens.dart';
 
-class StatCard extends StatefulWidget {
+class StatCard extends StatelessWidget {
   final String title;
   final String value;
   final IconData icon;
@@ -9,6 +11,8 @@ class StatCard extends StatefulWidget {
   final String? subtitle;
   final VoidCallback? onTap;
   final int staggerIndex;
+  final double? trend; // positive = up, negative = down, null = no trend
+  final bool isLoading;
 
   const StatCard({
     super.key,
@@ -19,123 +23,146 @@ class StatCard extends StatefulWidget {
     this.subtitle,
     this.onTap,
     this.staggerIndex = 0,
+    this.trend,
+    this.isLoading = false,
   });
-
-  @override
-  State<StatCard> createState() => _StatCardState();
-}
-
-class _StatCardState extends State<StatCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _fadeAnim;
-  late final Animation<Offset> _slideAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    final curved = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
-    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(curved);
-    _slideAnim = Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero)
-        .animate(curved);
-
-    Future.delayed(
-      Duration(milliseconds: 80 * widget.staggerIndex),
-      () {
-        if (mounted) _controller.forward();
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cardColor = widget.color ?? theme.colorScheme.primary;
+    final cardColor = color ?? theme.colorScheme.primary;
 
-    return FadeTransition(
-      opacity: _fadeAnim,
-      child: SlideTransition(
-        position: _slideAnim,
-        child: Card(
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: widget.onTap != null
-                ? () {
-                    HapticFeedback.lightImpact();
-                    widget.onTap!();
-                  }
-                : null,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          widget.title,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: cardColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(widget.icon, color: cardColor, size: 18),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: AlignmentDirectional.centerStart,
+    if (isLoading) {
+      return Card(
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.all(AppTokens.s12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 12,
+                width: 80,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: AppTokens.brXS,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                height: 24,
+                width: 60,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: AppTokens.brXS,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Semantics(
+      label: '$title: $value',
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap != null
+              ? () {
+                  HapticFeedback.lightImpact();
+                  onTap!();
+                }
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.all(AppTokens.s12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
                       child: Text(
-                        widget.value,
-                        key: ValueKey(widget.value),
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: cardColor,
+                        title,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ),
-                  if (widget.subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      widget.subtitle!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: cardColor.withValues(alpha: 0.12),
+                        borderRadius: AppTokens.brSM,
                       ),
+                      child: Icon(icon,
+                          color: cardColor, size: AppTokens.iconSizeSM),
                     ),
                   ],
+                ),
+                const Spacer(),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: AnimatedSwitcher(
+                        duration: AppTokens.durNormal,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(
+                            value,
+                            key: ValueKey(value),
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: cardColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (trend != null) ...[
+                      const SizedBox(width: AppTokens.s4),
+                      Icon(
+                        trend! > 0 ? Icons.trending_up : Icons.trending_down,
+                        size: 16,
+                        color: trend! > 0 ? Colors.green : Colors.red,
+                      ),
+                    ],
+                  ],
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ),
       ),
-    );
+    )
+        .animate()
+        .fadeIn(
+          duration: AppTokens.durNormal,
+          delay: Duration(milliseconds: 60 * staggerIndex),
+          curve: AppTokens.curveEnter,
+        )
+        .slideY(
+          begin: 0.1,
+          end: 0,
+          duration: AppTokens.durNormal,
+          delay: Duration(milliseconds: 60 * staggerIndex),
+          curve: AppTokens.curveEnter,
+        );
   }
 }

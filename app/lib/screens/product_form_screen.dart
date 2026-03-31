@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/utils/app_sanitizer.dart';
+import '../core/utils/error_mapper.dart';
+import '../core/utils/input_formatters.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
+import '../widgets/confirm_dialog.dart';
 
 class ProductFormScreen extends ConsumerStatefulWidget {
   final String? productId;
@@ -19,6 +24,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   final _nameC = TextEditingController();
   bool _saving = false;
   bool _loaded = false;
+  bool _isDirty = false;
 
   bool get isEdit => widget.productId != null;
 
@@ -40,7 +46,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      HapticFeedback.vibrate();
+      return;
+    }
 
     final user = ref.read(authUserProvider).valueOrNull;
     if (user?.isAdmin != true) {
@@ -55,7 +64,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     setState(() => _saving = true);
     try {
       final data = {
-        'name': _nameC.text.trim(),
+        'name': AppSanitizer.name(_nameC.text),
       };
       final notifier = ref.read(productNotifierProvider.notifier);
       if (isEdit) {
@@ -63,10 +72,15 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       } else {
         await notifier.createProduct(data);
       }
-      if (mounted) context.pop();
+      if (mounted) {
+        HapticFeedback.mediumImpact();
+        _isDirty = false;
+        context.pop();
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -80,38 +94,64 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       _loadExisting();
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isEdit ? tr('edit_product', ref) : tr('new_product', ref)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _nameC,
-                decoration:
-                    InputDecoration(labelText: '${tr('product_name', ref)} *'),
-                validator: (v) => Validators.notEmpty(v),
-                autofocus: !isEdit,
+    return PopScope(
+      canPop: !_isDirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final discard = await ConfirmDialog.show(
+          context,
+          title: tr('unsaved_changes', ref),
+          message: tr('discard_changes_prompt', ref),
+          confirmLabel: tr('discard', ref),
+          isDestructive: true,
+        );
+        if (discard && context.mounted) context.pop();
+      },
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          appBar: AppBar(
+            title:
+                Text(isEdit ? tr('edit_product', ref) : tr('new_product', ref)),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: _formKey,
+              onChanged: () {
+                if (!_isDirty) setState(() => _isDirty = true);
+              },
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _nameC,
+                    decoration: InputDecoration(
+                        labelText: '${tr('product_name', ref)} *'),
+                    validator: (v) => Validators.notEmpty(v),
+                    autofocus: !isEdit,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _save(),
+                    inputFormatters: [
+                      AppInputFormatters.maxLength(200),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: FilledButton(
+                      onPressed: _saving ? null : _save,
+                      child: _saving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : Text(tr('save', ref)),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _saving ? null : _save,
-                  child: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(tr('save', ref)),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

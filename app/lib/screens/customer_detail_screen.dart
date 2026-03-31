@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -442,17 +443,19 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
               if (user != null)
                 IconButton(
                   icon: const Icon(Icons.edit),
+                  tooltip: tr('tooltip_edit_customer', ref),
                   onPressed: () =>
                       context.push('/customers/${customer.id}/edit'),
                 ),
               if (isAdmin)
                 IconButton(
                   icon: const Icon(Icons.delete, color: AppBrand.errorColor),
+                  tooltip: tr('tooltip_delete_customer', ref),
                   onPressed: () async {
                     final ok = await ConfirmDialog.show(
                       context,
                       title: tr('delete', ref),
-                      message: 'Delete this customer?',
+                      message: tr('confirm_delete_customer', ref),
                     );
                     if (ok != true) return;
                     try {
@@ -500,6 +503,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                 ),
               IconButton(
                 icon: const Icon(Icons.ios_share),
+                tooltip: tr('tooltip_export_statement', ref),
                 onPressed: () {
                   final txs = txAsync.valueOrNull ?? [];
                   final sorted = [...txs]..sort((a, b) {
@@ -673,6 +677,58 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                           ],
                         ),
                       ),
+                      // Days overdue indicator
+                      if (customer.balance > 0) ...[
+                        const SizedBox(height: 8),
+                        txAsync.whenOrNull(
+                              data: (txs) {
+                                if (txs.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+                                final oldest = txs.last;
+                                final oldestDate =
+                                    (oldest['created_at'] as Timestamp)
+                                        .toDate();
+                                final days = DateTime.now()
+                                    .difference(oldestDate)
+                                    .inDays;
+                                final severity = days > 60
+                                    ? AppBrand.errorColor
+                                    : days > 30
+                                        ? Colors.orange
+                                        : cs.onSurfaceVariant;
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.schedule,
+                                        size: 14, color: severity),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '$days ${tr('days_overdue', ref)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: severity,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ) ??
+                            const SizedBox.shrink(),
+                      ],
+                      // Balance trend mini chart
+                      txAsync.whenOrNull(
+                            data: (txs) {
+                              if (txs.length < 2) {
+                                return const SizedBox.shrink();
+                              }
+                              return _BalanceTrendChart(
+                                transactions: txs.cast<Map<String, dynamic>>(),
+                              );
+                            },
+                          ) ??
+                          const SizedBox.shrink(),
                       if (customer.badDebt) ...[
                         const SizedBox(height: 12),
                         Container(
@@ -803,12 +859,44 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                         message: tr('no_transactions', ref),
                       );
                     }
-                    return ListView.separated(
+                    // Build grouped items with month headers
+                    final items = <_TxListItem>[];
+                    String? lastMonth;
+                    for (final tx in txs) {
+                      final ts = tx['created_at'] as Timestamp;
+                      final dt = ts.toDate();
+                      final monthKey =
+                          '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+                      if (monthKey != lastMonth) {
+                        items.add(_TxListItem(
+                            monthHeader: AppFormatters.period(monthKey)));
+                        lastMonth = monthKey;
+                      }
+                      items.add(_TxListItem(tx: tx as Map<String, dynamic>));
+                    }
+                    return ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
-                      itemCount: txs.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemCount: items.length,
                       itemBuilder: (_, i) {
-                        final tx = txs[i];
+                        final item = items[i];
+                        if (item.monthHeader != null) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 6),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            child: Text(item.monthHeader!,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                )),
+                          );
+                        }
+                        final tx = item.tx!;
                         final isCashIn = tx['type'] == 'cash_in';
                         final color = isCashIn
                             ? AppBrand.successColor
@@ -851,7 +939,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                                     overflow: TextOverflow.ellipsis),
                               if (totalQty > 0)
                                 Text(
-                                  'Items: ${AppFormatters.stock(totalQty, ppc)}',
+                                  tr('lbl_items_stock', ref).replaceAll(
+                                      '%s', AppFormatters.stock(totalQty, ppc)),
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: Theme.of(context)
@@ -873,11 +962,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                               icon: const Icon(Icons.more_vert, size: 20),
                               onSelected: (v) {
                                 if (v == 'edit') {
-                                  _showEditTransactionDialog(
-                                      tx as Map<String, dynamic>);
+                                  _showEditTransactionDialog(tx);
                                 } else if (v == 'delete') {
-                                  _confirmDeleteTransaction(
-                                      tx as Map<String, dynamic>);
+                                  _confirmDeleteTransaction(tx);
                                 }
                               },
                               itemBuilder: (ctx) => [
@@ -1070,12 +1157,13 @@ class _SellStockSheetState extends ConsumerState<_SellStockSheet> {
                                       child: TextField(
                                         controller: _qtyControllers[item.id],
                                         keyboardType: TextInputType.number,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Qty',
+                                        decoration: InputDecoration(
+                                          labelText: tr('lbl_qty', ref),
                                           isDense: true,
-                                          contentPadding: EdgeInsets.symmetric(
-                                              horizontal: 4, vertical: 4),
-                                          border: OutlineInputBorder(),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 4, vertical: 4),
+                                          border: const OutlineInputBorder(),
                                         ),
                                         onChanged: (_) => setS(() {}),
                                       ),
@@ -1087,12 +1175,13 @@ class _SellStockSheetState extends ConsumerState<_SellStockSheet> {
                                         controller: _priceControllers[item.id],
                                         keyboardType: const TextInputType
                                             .numberWithOptions(decimal: true),
-                                        decoration: const InputDecoration(
-                                          labelText: 'Price',
+                                        decoration: InputDecoration(
+                                          labelText: tr('lbl_price', ref),
                                           isDense: true,
-                                          contentPadding: EdgeInsets.symmetric(
-                                              horizontal: 4, vertical: 4),
-                                          border: OutlineInputBorder(),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 4, vertical: 4),
+                                          border: const OutlineInputBorder(),
                                         ),
                                         onChanged: (_) => setS(() {}),
                                       ),
@@ -1209,7 +1298,7 @@ class _SellStockSheetState extends ConsumerState<_SellStockSheet> {
                               if (hasError || items.isEmpty) {
                                 ScaffoldMessenger.of(ctx).showSnackBar(
                                   warningSnackBar(
-                                      'Please check quantities and prices'),
+                                      tr('msg_check_qty_prices', ref)),
                                 );
                                 return;
                               }
@@ -1235,5 +1324,147 @@ class _SellStockSheetState extends ConsumerState<_SellStockSheet> {
         },
       ),
     );
+  }
+}
+
+// ─── Transaction list item (header or data) ─────────────────────────────────
+
+class _TxListItem {
+  final String? monthHeader;
+  final Map<String, dynamic>? tx;
+  const _TxListItem({this.monthHeader, this.tx});
+}
+
+// ─── Balance Trend Mini Chart ────────────────────────────────────────────────
+
+class _BalanceTrendChart extends StatelessWidget {
+  final List<Map<String, dynamic>> transactions;
+  const _BalanceTrendChart({required this.transactions});
+
+  @override
+  Widget build(BuildContext context) {
+    // Compute running balance from oldest → newest
+    final sorted = [...transactions]..sort((a, b) {
+        final aTs = a['created_at'] as Timestamp;
+        final bTs = b['created_at'] as Timestamp;
+        return aTs.compareTo(bTs);
+      });
+
+    if (sorted.length < 2) return const SizedBox.shrink();
+
+    // Aggregate monthly balances
+    final monthlyBalance = <String, double>{};
+    double running = 0;
+    for (final tx in sorted) {
+      final isCashIn = tx['type'] == 'cash_in';
+      final amount = (tx['amount'] as num).toDouble();
+      running += isCashIn ? -amount : amount; // cash_in reduces balance
+      final dt = (tx['created_at'] as Timestamp).toDate();
+      final key = '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+      monthlyBalance[key] = running;
+    }
+
+    final entries = monthlyBalance.entries.toList();
+    // Take last 6 months max
+    final display =
+        entries.length > 6 ? entries.sublist(entries.length - 6) : entries;
+
+    if (display.length < 2) return const SizedBox.shrink();
+
+    final cs = Theme.of(context).colorScheme;
+    final spots = <FlSpot>[];
+    for (var i = 0; i < display.length; i++) {
+      spots.add(FlSpot(i.toDouble(), display[i].value));
+    }
+
+    final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+    final minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Balance Trend',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurfaceVariant,
+              )),
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 80,
+            child: LineChart(
+              LineChartData(
+                gridData: const FlGridData(show: false),
+                titlesData: FlTitlesData(
+                  leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 16,
+                      getTitlesWidget: (value, _) {
+                        final idx = value.toInt();
+                        if (idx < 0 || idx >= display.length) {
+                          return const SizedBox.shrink();
+                        }
+                        final parts = display[idx].key.split('-');
+                        return Text(
+                          _shortMonth(int.tryParse(parts[1]) ?? 1),
+                          style: TextStyle(
+                              fontSize: 9, color: cs.onSurfaceVariant),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                minX: 0,
+                maxX: (display.length - 1).toDouble(),
+                minY: minY < 0 ? minY : 0,
+                maxY: maxY > 0 ? maxY * 1.1 : 100,
+                lineTouchData: const LineTouchData(enabled: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: cs.primary,
+                    barWidth: 2,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: cs.primary.withAlpha(30),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _shortMonth(int m) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    return months[(m - 1).clamp(0, 11)];
   }
 }

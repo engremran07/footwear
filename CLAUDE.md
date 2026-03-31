@@ -97,7 +97,21 @@ Run before marking production ready:
 - Full invoicing system (sale invoices, credit notes, void/paid lifecycle)
 - Stock transfer history with inventory_transactions provider
 - Bad debt tracking with customer write-off flow
-- L10n: 372 keys × 3 languages with full parity
+- L10n: 372+ keys × 3 languages with full parity
 - Enterprise audit: all provider write guards, admin-only product creation, color consistency
 - Seller self-update rules: display_name, updated_at, last_active (session heartbeat)
 - Multi-device tested: Samsung A56 (Android 16/API 36), V2247 (Android 14/API 34) — zero errors
+- Enterprise v3.0.0 upgrade (22 sections, 6 phases):
+  - Design system: app_tokens, app_animations, app_sanitizer, input_formatters
+  - 14 widgets (6 upgraded + 8 new), all with accessibility tooltips
+  - 5 list screens with search/filter/shimmer/pull-to-refresh/listEntry animations
+  - 7 forms standardized with PopScope/dirty-check/sanitizer/haptic
+  - 5 detail screens enriched with charts/badges/grouping
+  - Reports: monthly cash flow BarChart, outstanding PieChart
+  - PDF export: Isolate.run() for all 4 functions, sanitized string interpolation (S-08)
+  - Session guard: AppLifecycleListener, 8h admin hard session limit (S-10)
+  - Base64 logo: 256×256 + flutter_image_compress + ≤50KB cap (S-07)
+  - Firestore rules: docSizeOk() <50KB, withinWriteRate() 1s cooldown
+  - Dark mode QA: theme-aware colors, no hardcoded Colors.white/grey
+  - RTL QA: EdgeInsetsDirectional, no hardcoded left/right padding
+  - Release: v3.0.0+7, 3 split-per-abi APKs built

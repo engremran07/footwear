@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-class ConfirmDialog extends StatelessWidget {
+class ConfirmDialog extends StatefulWidget {
   final String title;
   final String message;
   final String confirmLabel;
   final String cancelLabel;
   final Color? confirmColor;
+  final bool isDestructive;
+  final Future<bool> Function()? onConfirmAsync;
 
   const ConfirmDialog({
     super.key,
@@ -15,6 +17,8 @@ class ConfirmDialog extends StatelessWidget {
     this.confirmLabel = 'Confirm',
     this.cancelLabel = 'Cancel',
     this.confirmColor,
+    this.isDestructive = false,
+    this.onConfirmAsync,
   });
 
   static Future<bool> show(
@@ -24,6 +28,8 @@ class ConfirmDialog extends StatelessWidget {
     String confirmLabel = 'Confirm',
     String cancelLabel = 'Cancel',
     Color? confirmColor,
+    bool isDestructive = false,
+    Future<bool> Function()? onConfirmAsync,
   }) async {
     final result = await showDialog<bool>(
       context: context,
@@ -33,30 +39,61 @@ class ConfirmDialog extends StatelessWidget {
         confirmLabel: confirmLabel,
         cancelLabel: cancelLabel,
         confirmColor: confirmColor,
+        isDestructive: isDestructive,
+        onConfirmAsync: onConfirmAsync,
       ),
     );
     return result ?? false;
   }
 
   @override
+  State<ConfirmDialog> createState() => _ConfirmDialogState();
+}
+
+class _ConfirmDialogState extends State<ConfirmDialog> {
+  bool _isLoading = false;
+
+  Future<void> _handleConfirm() async {
+    HapticFeedback.mediumImpact();
+    if (widget.onConfirmAsync != null) {
+      setState(() => _isLoading = true);
+      try {
+        final success = await widget.onConfirmAsync!();
+        if (mounted) Navigator.pop(context, success);
+      } catch (_) {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } else {
+      Navigator.pop(context, true);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final effectiveColor = widget.confirmColor ??
+        (widget.isDestructive ? theme.colorScheme.error : null);
+
     return AlertDialog(
-      title: Text(title),
-      content: Text(message),
+      title: Text(widget.title),
+      content: Text(widget.message),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: Text(cancelLabel),
+          onPressed: _isLoading ? null : () => Navigator.pop(context, false),
+          child: Text(widget.cancelLabel),
         ),
         FilledButton(
-          style: confirmColor != null
-              ? FilledButton.styleFrom(backgroundColor: confirmColor)
+          style: effectiveColor != null
+              ? FilledButton.styleFrom(backgroundColor: effectiveColor)
               : null,
-          onPressed: () {
-            HapticFeedback.mediumImpact();
-            Navigator.pop(context, true);
-          },
-          child: Text(confirmLabel),
+          onPressed: _isLoading ? null : _handleConfirm,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(widget.confirmLabel),
         ),
       ],
     );

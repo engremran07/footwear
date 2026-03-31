@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
@@ -27,6 +28,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _currencyC = TextEditingController();
   final _ppcC = TextEditingController();
   bool _settingsLoaded = false;
+  bool _isDirty = false;
 
   @override
   void dispose() {
@@ -65,6 +67,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         'pairs_per_carton': int.tryParse(_ppcC.text.trim()) ?? 12,
       });
       if (mounted) {
+        setState(() => _isDirty = false);
         ScaffoldMessenger.of(context)
             .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       }
@@ -92,262 +95,285 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         : const AsyncValue<List<UserModel>>.loading();
     settingsAsync.whenData((_) => _loadSettings());
 
-    return Scaffold(
-      appBar: AppBar(title: Text(tr('settings', ref))),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Business settings
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(tr('business_settings', ref),
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _companyC,
-                    decoration:
-                        InputDecoration(labelText: tr('company_name', ref)),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _currencyC,
-                    decoration: InputDecoration(labelText: tr('currency', ref)),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _ppcC,
-                    decoration:
-                        InputDecoration(labelText: tr('pairs_per_carton', ref)),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _saveSettings,
-                      child: Text(tr('save', ref)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Company Logo (admin only)
-          if (currentUser?.isAdmin == true) ...[
-            const _LogoCard(),
-            const SizedBox(height: 16),
-          ],
-          // User Management (admin only)
-          if (currentUser?.isAdmin == true) ...[
+    return PopScope(
+      canPop: !_isDirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final leave = await ConfirmDialog.show(
+          context,
+          title: tr('unsaved_changes', ref),
+          message: tr('discard_changes_message', ref),
+        );
+        if (leave == true && context.mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
+        appBar: AppBar(title: Text(tr('settings', ref))),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // Business settings
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(tr('users', ref),
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(fontWeight: FontWeight.bold)),
-                        const Spacer(),
-                        TextButton.icon(
-                          onPressed: () => _showCreateUserDialog(),
-                          icon: const Icon(Icons.person_add, size: 18),
-                          label: Text(tr('new_user', ref)),
-                        ),
-                      ],
-                    ),
-                    const Divider(),
-                    usersAsync.when(
-                      loading: () =>
-                          const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => Text('$e'),
-                      data: (users) {
-                        if (users.isEmpty) {
-                          return Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Text(tr('no_data', ref)),
-                          );
-                        }
-                        return Column(
-                          children: users.map((u) {
-                            final isSelf = u.id == currentUser?.id;
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 4),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // ── Top row: avatar + name + email + role ──
-                                  Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 16,
-                                        backgroundColor: u.isAdmin
-                                            ? AppBrand.adminRoleColor
-                                                .withAlpha(30)
-                                            : AppBrand.sellerRoleColor
-                                                .withAlpha(30),
-                                        child: Icon(
-                                          u.isAdmin
-                                              ? Icons.admin_panel_settings
-                                              : Icons.person,
-                                          size: 16,
-                                          color: u.isAdmin
-                                              ? AppBrand.adminRoleColor
-                                              : AppBrand.sellerRoleColor,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              u.displayName,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.w500),
-                                            ),
-                                            Text(
-                                              u.email,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  // ── Bottom row: role chip + route + actions ──
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 6, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: (u.isAdmin
-                                                  ? AppBrand.adminRoleColor
-                                                  : AppBrand.sellerRoleColor)
-                                              .withAlpha(25),
-                                          borderRadius:
-                                              BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          u.role.name,
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: u.isAdmin
-                                                ? AppBrand.adminRoleColor
-                                                : AppBrand.sellerRoleColor,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                      if (u.isSeller &&
-                                          u.assignedRouteName != null) ...[
-                                        const SizedBox(width: 4),
-                                        Flexible(
-                                          child: Text(
-                                            '• ${u.assignedRouteName}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style:
-                                                const TextStyle(fontSize: 11),
-                                          ),
-                                        ),
-                                      ],
-                                      const Spacer(),
-                                      // ── Action buttons ──
-                                      GestureDetector(
-                                        onTap: () => _showEditUserDialog(u),
-                                        child: const Padding(
-                                          padding: EdgeInsets.all(4),
-                                          child: Icon(Icons.edit, size: 16),
-                                        ),
-                                      ),
-                                      if (!isSelf && !u.isAdmin)
-                                        GestureDetector(
-                                          onTap: () => _confirmDeleteUser(u),
-                                          child: const Padding(
-                                            padding: EdgeInsets.all(4),
-                                            child: Icon(Icons.delete,
-                                                size: 16,
-                                                color: AppBrand.errorColor),
-                                          ),
-                                        ),
-                                      SizedBox(
-                                        width: 36,
-                                        height: 24,
-                                        child: FittedBox(
-                                          child: Switch(
-                                            value: u.active,
-                                            onChanged: isSelf
-                                                ? null
-                                                : (v) => ref
-                                                    .read(
-                                                        userManagementNotifierProvider
-                                                            .notifier)
-                                                    .toggleActive(u.id, v),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const Divider(height: 8),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        );
+                    Text(tr('business_settings', ref),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _companyC,
+                      decoration:
+                          InputDecoration(labelText: tr('company_name', ref)),
+                      onChanged: (_) {
+                        if (!_isDirty) setState(() => _isDirty = true);
                       },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _currencyC,
+                      decoration:
+                          InputDecoration(labelText: tr('currency', ref)),
+                      onChanged: (_) {
+                        if (!_isDirty) setState(() => _isDirty = true);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _ppcC,
+                      decoration: InputDecoration(
+                          labelText: tr('pairs_per_carton', ref)),
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) {
+                        if (!_isDirty) setState(() => _isDirty = true);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _saveSettings,
+                        child: Text(tr('save', ref)),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-          ],
-          const SizedBox(height: 16),
-          // Sign out
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppBrand.errorColor,
-                side: const BorderSide(color: AppBrand.errorColor),
+            const SizedBox(height: 16),
+            // Company Logo (admin only)
+            if (currentUser?.isAdmin == true) ...[
+              const _LogoCard(),
+              const SizedBox(height: 16),
+            ],
+            // User Management (admin only)
+            if (currentUser?.isAdmin == true) ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(tr('users', ref),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold)),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: () => _showCreateUserDialog(),
+                            icon: const Icon(Icons.person_add, size: 18),
+                            label: Text(tr('new_user', ref)),
+                          ),
+                        ],
+                      ),
+                      const Divider(),
+                      usersAsync.when(
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator()),
+                        error: (e, _) => Text('$e'),
+                        data: (users) {
+                          if (users.isEmpty) {
+                            return Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Text(tr('no_data', ref)),
+                            );
+                          }
+                          return Column(
+                            children: users.map((u) {
+                              final isSelf = u.id == currentUser?.id;
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // ── Top row: avatar + name + email + role ──
+                                    Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 16,
+                                          backgroundColor: u.isAdmin
+                                              ? AppBrand.adminRoleColor
+                                                  .withAlpha(30)
+                                              : AppBrand.sellerRoleColor
+                                                  .withAlpha(30),
+                                          child: Icon(
+                                            u.isAdmin
+                                                ? Icons.admin_panel_settings
+                                                : Icons.person,
+                                            size: 16,
+                                            color: u.isAdmin
+                                                ? AppBrand.adminRoleColor
+                                                : AppBrand.sellerRoleColor,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                u.displayName,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.w500),
+                                              ),
+                                              Text(
+                                                u.email,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    // ── Bottom row: role chip + route + actions ──
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: (u.isAdmin
+                                                    ? AppBrand.adminRoleColor
+                                                    : AppBrand.sellerRoleColor)
+                                                .withAlpha(25),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            u.role.name,
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: u.isAdmin
+                                                  ? AppBrand.adminRoleColor
+                                                  : AppBrand.sellerRoleColor,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        if (u.isSeller &&
+                                            u.assignedRouteName != null) ...[
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              '• ${u.assignedRouteName}',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style:
+                                                  const TextStyle(fontSize: 11),
+                                            ),
+                                          ),
+                                        ],
+                                        const Spacer(),
+                                        // ── Action buttons ──
+                                        GestureDetector(
+                                          onTap: () => _showEditUserDialog(u),
+                                          child: const Padding(
+                                            padding: EdgeInsets.all(4),
+                                            child: Icon(Icons.edit, size: 16),
+                                          ),
+                                        ),
+                                        if (!isSelf && !u.isAdmin)
+                                          GestureDetector(
+                                            onTap: () => _confirmDeleteUser(u),
+                                            child: const Padding(
+                                              padding: EdgeInsets.all(4),
+                                              child: Icon(Icons.delete,
+                                                  size: 16,
+                                                  color: AppBrand.errorColor),
+                                            ),
+                                          ),
+                                        SizedBox(
+                                          width: 36,
+                                          height: 24,
+                                          child: FittedBox(
+                                            child: Switch(
+                                              value: u.active,
+                                              onChanged: isSelf
+                                                  ? null
+                                                  : (v) => ref
+                                                      .read(
+                                                          userManagementNotifierProvider
+                                                              .notifier)
+                                                      .toggleActive(u.id, v),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const Divider(height: 8),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              onPressed: () async {
-                final confirmed = await ConfirmDialog.show(
-                  context,
-                  title: tr('sign_out', ref),
-                  message: tr('confirm_sign_out', ref),
-                );
-                if (confirmed == true) {
-                  ref.read(authNotifierProvider.notifier).signOut();
-                }
-              },
-              icon: const Icon(Icons.logout),
-              label: Text(tr('sign_out', ref)),
+            ],
+            const SizedBox(height: 16),
+            // Sign out
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppBrand.errorColor,
+                  side: const BorderSide(color: AppBrand.errorColor),
+                ),
+                onPressed: () async {
+                  final confirmed = await ConfirmDialog.show(
+                    context,
+                    title: tr('sign_out', ref),
+                    message: tr('confirm_sign_out', ref),
+                  );
+                  if (confirmed == true) {
+                    ref.read(authNotifierProvider.notifier).signOut();
+                  }
+                },
+                icon: const Icon(Icons.logout),
+                label: Text(tr('sign_out', ref)),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -396,9 +422,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   DropdownButtonFormField<String>(
                     initialValue: role,
                     decoration: InputDecoration(labelText: tr('role', ref)),
-                    items: const [
-                      DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                      DropdownMenuItem(value: 'seller', child: Text('Seller')),
+                    items: [
+                      DropdownMenuItem(
+                          value: 'admin', child: Text(tr('lbl_admin', ref))),
+                      DropdownMenuItem(
+                          value: 'seller', child: Text(tr('lbl_seller', ref))),
                     ],
                     onChanged: (v) => setS(() {
                       role = v ?? 'seller';
@@ -450,9 +478,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           selectedRouteId!.trim().isEmpty)) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(
-                            content:
-                                Text('Seller must be assigned to a route.')),
+                        SnackBar(
+                            content: Text(tr('msg_seller_needs_route', ref))),
                       );
                     }
                     return;
@@ -521,9 +548,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: TextEditingController(text: user.email),
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      helperText: 'Email cannot be changed after creation',
+                    decoration: InputDecoration(
+                      labelText: tr('lbl_email', ref),
+                      helperText: tr('lbl_email_no_change', ref),
                     ),
                     enabled: false,
                   ),
@@ -532,7 +559,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.lock_reset),
-                      label: const Text('Send Password Reset Email'),
+                      label: Text(tr('settings_send_reset_email', ref)),
                       onPressed: () async {
                         try {
                           await ref
@@ -540,8 +567,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               .sendPasswordResetForSeller(email: user.email);
                           if (ctx.mounted) {
                             ScaffoldMessenger.of(ctx).showSnackBar(
-                              successSnackBar(
-                                  'Password reset email sent to ${user.email}'),
+                              successSnackBar(tr('msg_reset_email_sent', ref)
+                                  .replaceAll('%s', user.email)),
                             );
                           }
                         } catch (e) {
@@ -568,10 +595,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     DropdownButtonFormField<String>(
                       initialValue: role,
                       decoration: InputDecoration(labelText: tr('role', ref)),
-                      items: const [
-                        DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                      items: [
                         DropdownMenuItem(
-                            value: 'seller', child: Text('Seller')),
+                            value: 'admin', child: Text(tr('lbl_admin', ref))),
+                        DropdownMenuItem(
+                            value: 'seller',
+                            child: Text(tr('lbl_seller', ref))),
                       ],
                       onChanged: (v) => setS(() {
                         role = v ?? 'seller';
@@ -628,7 +657,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           selectedRouteId!.trim().isEmpty)) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                        warningSnackBar('Seller must be assigned to a route.'),
+                        warningSnackBar(tr('msg_seller_needs_route', ref)),
                       );
                     }
                     return;
@@ -672,7 +701,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final confirmed = await ConfirmDialog.show(
       context,
       title: tr('delete', ref),
-      message: 'Delete user ${user.displayName}? This cannot be undone.',
+      message:
+          tr('confirm_delete_user', ref).replaceAll('%s', user.displayName),
     );
     if (confirmed != true) return;
 
@@ -682,7 +712,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           .deleteUser(user.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          successSnackBar('${user.displayName} deleted'),
+          successSnackBar(
+              tr('msg_user_deleted', ref).replaceAll('%s', user.displayName)),
         );
       }
     } catch (e) {
@@ -720,21 +751,35 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
       // Auto-optimise: image_picker resizes + JPEG-compresses before returning bytes.
-      // 800×400 @ quality 75 typically yields 40–120 KB for a logo.
-      maxWidth: 800,
-      maxHeight: 400,
-      imageQuality: 75,
+      // 256×256 for a logo icon is sufficient; keeps Firestore doc size small.
+      maxWidth: 256,
+      maxHeight: 256,
+      imageQuality: 70,
     );
     if (picked == null) return;
-    final bytes = await picked.readAsBytes();
+    var bytes = await picked.readAsBytes();
 
-    // Hard guard: reject if still above 300 KB after resize+compress
-    const maxBytes = 300 * 1024;
-    if (bytes.lengthInBytes > maxBytes) {
+    // Secondary compression via flutter_image_compress (S-07 hardening).
+    try {
+      final compressed = await FlutterImageCompress.compressWithList(
+        bytes,
+        minWidth: 256,
+        minHeight: 256,
+        quality: 65,
+        format: CompressFormat.jpeg,
+      );
+      bytes = compressed;
+    } catch (_) {
+      // Fall through with original bytes if compress fails.
+    }
+
+    // Hard guard: base64 encoding adds ~33%, so cap raw at 37 KB → ~50 KB base64
+    const maxRawBytes = 37 * 1024;
+    if (bytes.lengthInBytes > maxRawBytes) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(warningSnackBar(
-          'Image is ${_fmtBytes(bytes.lengthInBytes)} — too large after optimisation. '
-          'Use a simpler image or reduce dimensions below 800×400 px.',
+          'Image is ${_fmtBytes(bytes.lengthInBytes)} — too large. '
+          'Use a simpler image or reduce dimensions to 256×256 px.',
         ));
       }
       return;
@@ -759,6 +804,18 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
       // The settingsProvider real-time stream propagates the new logo to every
       // connected device instantly — no Firebase Storage or CDN involved.
       final encoded = base64Encode(bytes);
+
+      // S-07: Final base64 size cap — 50 KB max to keep Firestore reads cheap.
+      if (encoded.length > 50 * 1024) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(warningSnackBar(
+            'Encoded logo is ${_fmtBytes(encoded.length)} — exceeds 50 KB limit.',
+          ));
+        }
+        setState(() => _uploading = false);
+        return;
+      }
+
       await ref
           .read(settingsNotifierProvider.notifier)
           .save({'logo_base64': encoded, 'logo_url': null});
@@ -769,7 +826,7 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
           _pendingSizeLabel = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          successSnackBar('Logo uploaded successfully'),
+          successSnackBar(tr('msg_logo_uploaded', ref)),
         );
       }
     } catch (e) {
@@ -793,8 +850,8 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
   Future<void> _deleteLogo() async {
     final confirmed = await ConfirmDialog.show(
       context,
-      title: 'Remove Logo',
-      message: 'Remove the company logo from all reports?',
+      title: tr('confirm_remove_logo', ref),
+      message: tr('confirm_remove_logo_msg', ref),
     );
     if (confirmed != true) return;
     setState(() => _uploading = true);
@@ -802,7 +859,7 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
       await ref.read(settingsNotifierProvider.notifier).deleteLogo();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          successSnackBar('Logo removed'),
+          successSnackBar(tr('msg_logo_removed', ref)),
         );
       }
     } catch (e) {
@@ -829,7 +886,7 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Company Logo',
+              tr('settings_company_logo', ref),
               style: Theme.of(context)
                   .textTheme
                   .titleSmall
@@ -837,7 +894,7 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
             ),
             const SizedBox(height: 4),
             Text(
-              'PDF reports · PNG/JPG · max 800×400 px · max 300 KB',
+              tr('settings_logo_specs', ref),
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -854,7 +911,8 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Preview · $_pendingSizeLabel',
+                tr('lbl_preview', ref)
+                    .replaceAll('%s', _pendingSizeLabel ?? ''),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
@@ -894,8 +952,9 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
               const SizedBox(height: 6),
               Text(
                 _uploadProgress != null
-                    ? 'Uploading… ${(_uploadProgress! * 100).round()}%'
-                    : 'Uploading…',
+                    ? tr('settings_uploading_pct', ref)
+                        .replaceAll('%s', '${(_uploadProgress! * 100).round()}')
+                    : tr('settings_uploading', ref),
                 style: Theme.of(context).textTheme.labelSmall,
               ),
               const SizedBox(height: 4),
@@ -912,7 +971,7 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
                     ElevatedButton.icon(
                       onPressed: _confirmUpload,
                       icon: const Icon(Icons.cloud_upload, size: 18),
-                      label: const Text('Upload'),
+                      label: Text(tr('lbl_upload', ref)),
                     ),
                     OutlinedButton(
                       onPressed: () => setState(() {
@@ -932,8 +991,8 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
                       onPressed: _pickImage,
                       icon: const Icon(Icons.upload, size: 18),
                       label: Text(savedLogoBytes != null
-                          ? 'Replace Logo'
-                          : 'Upload Logo'),
+                          ? tr('settings_replace_logo', ref)
+                          : tr('settings_upload_logo', ref)),
                     ),
                     if (savedLogoBytes != null)
                       OutlinedButton.icon(
@@ -943,7 +1002,7 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
                           side: const BorderSide(color: AppBrand.errorColor),
                         ),
                         icon: const Icon(Icons.delete_outline, size: 18),
-                        label: const Text('Remove'),
+                        label: Text(tr('lbl_remove', ref)),
                       ),
                   ],
                 ),

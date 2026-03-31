@@ -37,16 +37,18 @@ class RouteDetailScreen extends ConsumerWidget {
           if (isAdmin)
             IconButton(
               icon: const Icon(Icons.edit),
+              tooltip: tr('tooltip_edit_route', ref),
               onPressed: () => context.push('/routes/$routeId/edit'),
             ),
           if (isAdmin)
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
+              tooltip: tr('tooltip_delete_route', ref),
               onPressed: () async {
                 final ok = await ConfirmDialog.show(
                   context,
                   title: tr('delete', ref),
-                  message: 'Delete this route?',
+                  message: tr('confirm_delete_route', ref),
                 );
                 if (ok != true) return;
                 try {
@@ -141,6 +143,56 @@ class RouteDetailScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              // Route performance strip
+              shopsAsync.whenOrNull(
+                    data: (shops) {
+                      if (shops.isEmpty) return const SizedBox.shrink();
+                      final totalOutstanding = shops.fold<double>(
+                          0,
+                          (s, shop) =>
+                              s + (shop.balance > 0 ? shop.balance : 0));
+                      final shopsWithDebt =
+                          shops.where((s) => s.balance > 0).length;
+                      final cs = Theme.of(context).colorScheme;
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _RStat(
+                              icon: Icons.store,
+                              label: tr('shops', ref),
+                              value: '${shops.length}',
+                              color: cs.primary,
+                            ),
+                            _RStat(
+                              icon: Icons.warning_amber,
+                              label: tr('outstanding', ref),
+                              value: AppFormatters.compact(totalOutstanding),
+                              color: totalOutstanding > 0
+                                  ? AppTheme.debtFg(cs)
+                                  : AppTheme.clearFg(cs),
+                            ),
+                            _RStat(
+                              icon: Icons.account_balance_wallet,
+                              label: tr('route_with_debt', ref),
+                              value: '$shopsWithDebt',
+                              color: shopsWithDebt > 0
+                                  ? Colors.orange
+                                  : AppTheme.clearFg(cs),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ) ??
+                  const SizedBox.shrink(),
+              const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(tr('shops', ref),
@@ -156,11 +208,14 @@ class RouteDetailScreen extends ConsumerWidget {
                       return EmptyState(
                           icon: Icons.store, message: tr('no_shops', ref));
                     }
+                    // Sort by outstanding balance (highest first)
+                    final sorted = [...shops]
+                      ..sort((a, b) => b.balance.compareTo(a.balance));
                     return ListView.builder(
-                      itemCount: shops.length,
+                      itemCount: sorted.length,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       itemBuilder: (_, i) {
-                        final shop = shops[i];
+                        final shop = sorted[i];
                         final hasDebt = shop.balance > 0;
                         final cs = Theme.of(context).colorScheme;
                         return Card(
@@ -213,6 +268,35 @@ class RouteDetailScreen extends ConsumerWidget {
               child: const Icon(Icons.add),
             )
           : null,
+    );
+  }
+}
+
+class _RStat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  const _RStat(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      required this.color});
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(height: 2),
+        Text(value,
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 13, color: color)),
+        Text(label,
+            style: TextStyle(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      ],
     );
   }
 }

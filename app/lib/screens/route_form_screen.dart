@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/utils/app_sanitizer.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/input_formatters.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/user_provider.dart';
+import '../widgets/confirm_dialog.dart';
 
 class RouteFormScreen extends ConsumerStatefulWidget {
   final String? routeId;
@@ -23,6 +27,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
   String? _sellerName;
   bool _loaded = false;
   bool _saving = false;
+  bool _isDirty = false;
 
   bool get isEdit => widget.routeId != null;
 
@@ -46,12 +51,15 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      HapticFeedback.vibrate();
+      return;
+    }
     setState(() => _saving = true);
     try {
       final user = ref.read(authUserProvider).valueOrNull;
       final Map<String, dynamic> data = {
-        'name': _nameC.text.trim(),
+        'name': AppSanitizer.name(_nameC.text),
         'assigned_seller_id': _sellerId,
         'assigned_seller_name': _sellerName,
       };
@@ -63,7 +71,11 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
         data['created_by'] = user?.id ?? '';
         await ref.read(routeNotifierProvider.notifier).create(data);
       }
-      if (mounted) context.pop();
+      if (mounted) {
+        HapticFeedback.mediumImpact();
+        _isDirty = false;
+        context.pop();
+      }
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
@@ -96,63 +108,88 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
         .where((u) => u.active)
         .toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isEdit ? tr('edit_route', ref) : tr('new_route', ref)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _nameC,
-                decoration:
-                    InputDecoration(labelText: '${tr('route_name', ref)} *'),
-                validator: (v) => Validators.notEmpty(v),
-                autofocus: !isEdit,
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                initialValue: _sellerId,
-                decoration:
-                    InputDecoration(labelText: tr('assigned_seller', ref)),
-                items: [
-                  DropdownMenuItem<String>(
-                    value: null,
-                    child: Text(tr('none', ref)),
+    return PopScope(
+      canPop: !_isDirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final discard = await ConfirmDialog.show(
+          context,
+          title: tr('unsaved_changes', ref),
+          message: tr('discard_changes_prompt', ref),
+          confirmLabel: tr('discard', ref),
+          isDestructive: true,
+        );
+        if (discard && context.mounted) context.pop();
+      },
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(isEdit ? tr('edit_route', ref) : tr('new_route', ref)),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: _formKey,
+              onChanged: () {
+                if (!_isDirty) setState(() => _isDirty = true);
+              },
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _nameC,
+                    decoration: InputDecoration(
+                        labelText: '${tr('route_name', ref)} *'),
+                    validator: (v) => Validators.notEmpty(v),
+                    autofocus: !isEdit,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _save(),
+                    inputFormatters: [
+                      AppInputFormatters.maxLength(200),
+                    ],
                   ),
-                  ...sellers.map((s) => DropdownMenuItem(
-                        value: s.id,
-                        child: Text(s.displayName),
-                      )),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    initialValue: _sellerId,
+                    decoration:
+                        InputDecoration(labelText: tr('assigned_seller', ref)),
+                    items: [
+                      DropdownMenuItem<String>(
+                        value: null,
+                        child: Text(tr('none', ref)),
+                      ),
+                      ...sellers.map((s) => DropdownMenuItem(
+                            value: s.id,
+                            child: Text(s.displayName),
+                          )),
+                    ],
+                    onChanged: (v) {
+                      setState(() {
+                        _sellerId = v;
+                        _sellerName = sellers
+                            .where((s) => s.id == v)
+                            .map((s) => s.displayName)
+                            .firstOrNull;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: FilledButton(
+                      onPressed: _saving ? null : _save,
+                      child: _saving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : Text(tr('save', ref)),
+                    ),
+                  ),
                 ],
-                onChanged: (v) {
-                  setState(() {
-                    _sellerId = v;
-                    _sellerName = sellers
-                        .where((s) => s.id == v)
-                        .map((s) => s.displayName)
-                        .firstOrNull;
-                  });
-                },
               ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _saving ? null : _save,
-                  child: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(tr('save', ref)),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

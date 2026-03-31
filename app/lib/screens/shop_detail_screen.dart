@@ -444,16 +444,18 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
               if (canManageShop)
                 IconButton(
                   icon: const Icon(Icons.edit),
+                  tooltip: tr('tooltip_edit_shop', ref),
                   onPressed: () => context.push('/shops/${shop.id}/edit'),
                 ),
               if (user?.isAdmin == true)
                 IconButton(
                   icon: const Icon(Icons.delete, color: AppBrand.errorColor),
+                  tooltip: tr('tooltip_delete_shop', ref),
                   onPressed: () async {
                     final ok = await ConfirmDialog.show(
                       context,
                       title: tr('delete', ref),
-                      message: 'Delete this shop?',
+                      message: tr('confirm_delete_shop', ref),
                     );
                     if (ok != true) return;
                     try {
@@ -473,7 +475,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 ),
               IconButton(
                 icon: const Icon(Icons.picture_as_pdf),
-                tooltip: 'Export PDF',
+                tooltip: tr('tooltip_export_pdf', ref),
                 onPressed: () {
                   final txs = txAsync.valueOrNull ?? [];
                   _generatePdf(shop, txs);
@@ -481,6 +483,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.ios_share),
+                tooltip: tr('tooltip_export_statement', ref),
                 onPressed: () {
                   final txs = txAsync.valueOrNull ?? [];
                   final sorted = [...txs]
@@ -627,6 +630,42 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           ],
                         ),
                       ),
+                      // Days overdue indicator
+                      if (shop.balance > 0)
+                        txAsync.whenOrNull(
+                              data: (txs) {
+                                if (txs.isEmpty) return const SizedBox.shrink();
+                                final oldest = txs.last;
+                                final days = DateTime.now()
+                                    .difference(oldest.createdAt.toDate())
+                                    .inDays;
+                                final sev = days > 60
+                                    ? AppBrand.errorColor
+                                    : days > 30
+                                        ? Colors.orange
+                                        : cs.onSurfaceVariant;
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.schedule,
+                                          size: 14, color: sev),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '$days ${tr('days_overdue', ref)}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: sev,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ) ??
+                            const SizedBox.shrink(),
                     ],
                   ),
                 ),
@@ -683,7 +722,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       ),
                       onPressed: () => _showReturnDialog(shop),
                       icon: const Icon(Icons.undo, size: 18),
-                      label: const Text('Return'),
+                      label: Text(tr('shop_return_btn', ref)),
                     ),
                   ),
                 ),
@@ -940,6 +979,7 @@ class _ReturnSheetState extends ConsumerState<_ReturnSheet> {
                           children: [
                             IconButton(
                               icon: const Icon(Icons.remove, size: 18),
+                              tooltip: 'Decrease quantity',
                               onPressed: qty <= 0
                                   ? null
                                   : () => setState(
@@ -955,6 +995,7 @@ class _ReturnSheetState extends ConsumerState<_ReturnSheet> {
                             ),
                             IconButton(
                               icon: const Icon(Icons.add, size: 18),
+                              tooltip: 'Increase quantity',
                               onPressed: qty >= item.quantityAvailable
                                   ? null
                                   : () => setState(

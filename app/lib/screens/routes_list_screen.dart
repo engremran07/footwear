@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../models/route_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
+import '../widgets/app_pull_refresh.dart';
+import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/shimmer_loading.dart';
 
 class RoutesListScreen extends ConsumerStatefulWidget {
   const RoutesListScreen({super.key});
@@ -30,17 +34,9 @@ class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
       appBar: AppBar(title: Text(tr('routes', ref))),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: tr('search', ref),
-                prefixIcon: const Icon(Icons.search),
-                isDense: true,
-              ),
-              onChanged: (v) =>
-                  setState(() => _search = v.trim().toLowerCase()),
-            ),
+          AppSearchBar(
+            hintText: tr('search', ref),
+            onChanged: (v) => setState(() => _search = v.toLowerCase()),
           ),
           Expanded(
             child: routesAsync.when(
@@ -64,12 +60,24 @@ class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
                     message: tr('no_routes', ref),
                   );
                 }
-                return ListView.builder(
-                  itemCount: filtered.length,
-                  itemBuilder: (_, i) => _RouteTile(route: filtered[i]),
+                return AppPullRefresh(
+                  onRefresh: () async {
+                    if (isAdmin) {
+                      ref.invalidate(routesProvider);
+                    } else {
+                      ref.invalidate(routesBySellerProvider(user?.id ?? ''));
+                    }
+                    await Future.delayed(const Duration(milliseconds: 300));
+                  },
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) =>
+                        _RouteTile(route: filtered[i]).listEntry(i),
+                  ),
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const ShimmerLoading(),
               error: (e, _) => Center(child: Text('$e')),
             ),
           ),
@@ -92,14 +100,22 @@ class _RouteTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Card(
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: theme.colorScheme.primaryContainer,
-          child: Text('${route.routeNumber}',
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: cs.primaryContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.center,
+          child: Text('R${route.routeNumber}',
               style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onPrimaryContainer)),
+                  fontSize: 14,
+                  color: cs.onPrimaryContainer)),
         ),
         title: Text(route.name,
             maxLines: 1,
@@ -118,18 +134,45 @@ class _RouteTile extends ConsumerWidget {
               overflow: TextOverflow.ellipsis,
             ),
             if (route.assignedSellerName != null)
-              Text(
-                route.assignedSellerName!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.primary,
-                ),
+              Row(
+                children: [
+                  Icon(Icons.person, size: 12, color: cs.primary),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      route.assignedSellerName!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
           ],
         ),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.store, size: 14, color: cs.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text('${route.totalShops}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: cs.onSurfaceVariant,
+                  )),
+            ],
+          ),
+        ),
         onTap: () => context.push('/routes/${route.id}'),
       ),
     );

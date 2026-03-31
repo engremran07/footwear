@@ -183,3 +183,57 @@ Implemented in this pass:
 - Overflow hardening: stat_card, dashboard, reports, settings, inventory, customer_detail, shops_list, product_detail, route_detail, customers_list screens.
 - targetSdk updated 34→35.
 - Verified on Samsung Galaxy A56 (Android 16/API 36) and V2247 (Android 14/API 34): zero errors in logcat, zero overflows, zero crashes.
+
+## 2026-03-30 Enterprise v3.0.0 Upgrade
+
+Full 6-phase implementation of the enterprise master plan (22 sections).
+
+### Phase 1 — Foundation (complete)
+- Upgraded all dependencies to latest stable (15 packages)
+- Added 6 new dependencies: flutter_animate, shimmer, fl_chart, firebase_crashlytics, firebase_app_check, flutter_image_compress
+- Crashlytics + App Check initialized in main.dart
+- Version bumped to 3.0.0+7
+
+### Phase 2 — Design System (complete)
+- `app_tokens.dart`: Unified spacing (s2-s48), radius (brSM/brMD/brLG), shadows, motion, breakpoints
+- `app_animations.dart`: Extension methods — screenEntry(), listEntry(i), pressable(), successFlash(), errorShake()
+- `app_sanitizer.dart`: Input sanitization (text, name, sku, phone, amount, clamp)
+- `input_formatters.dart`: AppInputFormatters (sku, phone, amount, int, maxLength)
+- 6 upgraded widgets: stat_card, shimmer_loading, status_chip, empty_state, error_state, confirm_dialog
+- 8 new widgets: app_search_bar, app_pull_refresh, app_filter_chip_bar, app_amount_field, app_section_header, app_balance_badge, app_online_indicator, app_chart_card
+- All 22 IconButtons have tooltips (accessibility)
+
+### Phase 3 — Core Screens (complete)
+- Login: split layout, SegmentedButton locale, AnimatedSwitcher password, staggered animations
+- App shell: role-color avatar border, haptic nav, AnimatedSwitcher breadcrumb
+- Router: `_normalizePath()` security, shared-axis Z page transitions
+- Dashboard: _RouteAnalyticsSection, _CashFlowChart (fl_chart), alerts banner, _AdminSpeedDial FAB, shimmer loading
+- New providers: search_provider, alert_provider
+
+### Phase 4 — List & Form Screens (complete)
+- 5 list screens upgraded: search bars, filter chips, shimmer loading, pull-to-refresh, listEntry animations, stats strips
+- 7 forms standardized: PopScope dirty-check, GestureDetector dismiss, AppSanitizer, HapticFeedback, textInputAction, FilledButton submit
+
+### Phase 5 — Detail Screens & Charts (complete)
+- Customer detail: balance trend LineChart (6 months), days-overdue indicator, transaction month grouping
+- Product detail: stock summary strip, share button (share_plus)
+- Invoice detail: 3-step payment progression bar (draft→issued→paid)
+- Route detail: performance strip (shops/outstanding/debt), shops sorted by debt
+- Shop detail: days-overdue indicator
+- Inventory: low-stock warning badges (orange warning / red out-of-stock)
+- Reports: monthly cash flow BarChart, outstanding PieChart (top 5 shops)
+- PDF export: all 4 functions wrapped in Isolate.run() for UI-thread safety, font bytes pre-loaded, _s() sanitizer on all interpolated strings (S-08)
+
+### Phase 6 — Polish + Harden + Ship (complete)
+- Session guard: upgraded to AppLifecycleListener, added 8-hour admin hard session limit (S-10)
+- Base64 logo: 256×256 resize + flutter_image_compress secondary compression, base64 ≤50KB cap (S-07)
+- Firestore rules: docSizeOk() <50KB on all writes, withinWriteRate() 1s cooldown
+- Haptic protocol: drawer nav selectionClick(), all forms/buttons/pull-to-refresh covered
+- Dark mode QA: fixed drag handle colors, pie chart label contrast, removed hardcoded Colors.white/grey
+- RTL QA: fixed EdgeInsets.only(right) → EdgeInsetsDirectional.only(end)
+- Release build: 3 APKs (arm7: 27.3MB, arm64: 29.0MB, x64: 30.5MB)
+
+### Verification
+- `flutter analyze lib --no-pub` → No issues found
+- `flutter test -r expanded` → All 123 tests passed
+- `flutter build apk --release --split-per-abi` → 3 APKs built successfully

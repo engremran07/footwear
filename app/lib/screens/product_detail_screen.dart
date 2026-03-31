@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
@@ -50,9 +52,33 @@ class ProductDetailScreen extends ConsumerWidget {
           appBar: AppBar(
             title: Text(product.name),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.share),
+                tooltip: 'Share product info',
+                onPressed: () {
+                  final variants = variantsAsync.valueOrNull ?? [];
+                  final ppc = settings?.pairsPerCarton ?? 12;
+                  final totalStock =
+                      variants.fold<int>(0, (s, v) => s + v.quantityAvailable);
+                  final buf = StringBuffer()
+                    ..writeln(product.name)
+                    ..writeln('${tr('category', ref)}: ${product.category}')
+                    ..writeln(
+                        '${tr('total_variants', ref)}: ${variants.length}')
+                    ..writeln(
+                        '${tr('stock_pairs', ref)}: ${_stockLabel(totalStock, ppc)}');
+                  for (final v in variants) {
+                    buf.writeln(
+                        '  ${v.variantName}: ${_stockLabel(v.quantityAvailable, ppc)}');
+                  }
+                  Share.share(buf.toString());
+                  HapticFeedback.lightImpact();
+                },
+              ),
               if (user?.isAdmin == true)
                 IconButton(
                   icon: const Icon(Icons.edit),
+                  tooltip: 'Edit product',
                   onPressed: () => context.push('/products/$productId/edit'),
                 ),
             ],
@@ -101,6 +127,52 @@ class ProductDetailScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              // Stock summary strip
+              variantsAsync.whenOrNull(
+                    data: (variants) {
+                      if (variants.isEmpty) return const SizedBox.shrink();
+                      final ppc = settings?.pairsPerCarton ?? 12;
+                      final totalStock = variants.fold<int>(
+                          0, (s, v) => s + v.quantityAvailable);
+                      final inStock =
+                          variants.where((v) => v.quantityAvailable > 0).length;
+                      final outOfStock = variants.length - inStock;
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _PStatChip(
+                              icon: Icons.inventory,
+                              label: tr('stock_pairs', ref),
+                              value: _stockLabel(totalStock, ppc),
+                              color: cs.primary,
+                            ),
+                            _PStatChip(
+                              icon: Icons.check_circle,
+                              label: 'In Stock',
+                              value: '$inStock',
+                              color: AppTheme.clearFg(cs),
+                            ),
+                            if (outOfStock > 0)
+                              _PStatChip(
+                                icon: Icons.cancel,
+                                label: 'Out',
+                                value: '$outOfStock',
+                                color: AppTheme.debtFg(cs),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ) ??
+                  const SizedBox.shrink(),
+              const SizedBox(height: 8),
               // Variants header
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -206,4 +278,33 @@ class ProductDetailScreen extends ConsumerWidget {
         backgroundColor: cs.primaryContainer,
         child: Icon(Icons.inventory_2, size: 32, color: cs.primary),
       );
+}
+
+class _PStatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  const _PStatChip(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      required this.color});
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(height: 2),
+        Text(value,
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 13, color: color)),
+        Text(label,
+            style: TextStyle(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      ],
+    );
+  }
 }

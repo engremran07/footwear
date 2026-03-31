@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
@@ -9,7 +10,10 @@ import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/customer_provider.dart';
 import '../providers/user_provider.dart';
+import '../widgets/app_pull_refresh.dart';
+import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/shimmer_loading.dart';
 
 class CustomersListScreen extends ConsumerStatefulWidget {
   const CustomersListScreen({super.key});
@@ -49,27 +53,16 @@ class _CustomersListScreenState extends ConsumerState<CustomersListScreen> {
       ),
       body: Column(
         children: [
+          AppSearchBar(
+            hintText: tr('search_by_name', ref),
+            onChanged: (v) => setState(() => _search = v.toLowerCase()),
+          ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: tr('search_by_name', ref),
-                      prefixIcon: const Icon(Icons.search),
-                      isDense: true,
-                    ),
-                    onChanged: (v) => setState(() => _search = v.toLowerCase()),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilterChip(
-                  label: Text(tr('outstanding', ref)),
-                  selected: _outstandingOnly,
-                  onSelected: (v) => setState(() => _outstandingOnly = v),
-                ),
-              ],
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: FilterChip(
+              label: Text(tr('outstanding', ref)),
+              selected: _outstandingOnly,
+              onSelected: (v) => setState(() => _outstandingOnly = v),
             ),
           ),
           const SizedBox(height: 4),
@@ -80,7 +73,7 @@ class _CustomersListScreenState extends ConsumerState<CustomersListScreen> {
               const SizedBox.shrink(),
           Expanded(
             child: asyncCustomers.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const ShimmerLoading(),
               error: (e, _) => Center(child: Text('$e')),
               data: (customers) {
                 final filtered = _search.isEmpty
@@ -104,41 +97,53 @@ class _CustomersListScreenState extends ConsumerState<CustomersListScreen> {
                       customers: filtered, users: users);
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, i) {
-                    final c = filtered[i];
-                    final cs = Theme.of(context).colorScheme;
-                    final balColor = c.balance > 0
-                        ? AppTheme.debtFg(cs)
-                        : AppTheme.clearFg(cs);
-                    return ListTile(
-                      leading: CircleAvatar(
-                        child: Text(
-                          c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
+                return AppPullRefresh(
+                  onRefresh: () async {
+                    if (user?.isAdmin == true) {
+                      ref.invalidate(customersProvider);
+                    } else {
+                      ref.invalidate(customersByRouteProvider(routeId));
+                    }
+                    await Future.delayed(const Duration(milliseconds: 300));
+                  },
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final c = filtered[i];
+                      final cs = Theme.of(context).colorScheme;
+                      final balColor = c.balance > 0
+                          ? AppTheme.debtFg(cs)
+                          : AppTheme.clearFg(cs);
+                      return ListTile(
+                        leading: CircleAvatar(
+                          child: Text(
+                            c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
+                          ),
                         ),
-                      ),
-                      title: Text(c.name,
+                        title: Text(c.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text(
+                          [c.phone, c.city]
+                              .where((e) => e != null && e.isNotEmpty)
+                              .join(' · '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Text(
-                        [c.phone, c.city]
-                            .where((e) => e != null && e.isNotEmpty)
-                            .join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: Text(
-                        AppFormatters.sar(c.balance.abs()),
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, color: balColor),
-                      ),
-                      onTap: () => context.push('/customers/${c.id}'),
-                    );
-                  },
+                        ),
+                        trailing: Text(
+                          AppFormatters.sar(c.balance.abs()),
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, color: balColor),
+                        ),
+                        onTap: () => context.push('/customers/${c.id}'),
+                      ).listEntry(i);
+                    },
+                  ),
                 );
               },
             ),
@@ -158,12 +163,12 @@ class _CustomersListScreenState extends ConsumerState<CustomersListScreen> {
 
 // ── Stats strip ───────────────────────────────────────────────────────────────
 
-class _CustomerStatsStrip extends StatelessWidget {
+class _CustomerStatsStrip extends ConsumerWidget {
   final List<CustomerModel> customers;
   const _CustomerStatsStrip({required this.customers});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final total = customers.length;
     final withDebt = customers.where((c) => c.balance > 0).toList();
     final totalOutstanding = withDebt.fold(0.0, (sum, c) => sum + c.balance);
@@ -180,21 +185,21 @@ class _CustomerStatsStrip extends StatelessWidget {
         children: [
           _CStat(
             icon: Icons.people,
-            label: 'Total',
+            label: tr('stats_total', ref),
             value: '$total',
             color: Theme.of(context).colorScheme.primary,
           ),
           _CDivider(),
           _CStat(
             icon: Icons.warning_amber,
-            label: 'Overdue',
+            label: tr('stats_overdue', ref),
             value: '${withDebt.length}',
             color: AppTheme.warningFg(Theme.of(context).colorScheme),
           ),
           _CDivider(),
           _CStat(
             icon: Icons.account_balance_wallet,
-            label: 'Outstanding',
+            label: tr('stats_outstanding', ref),
             value: AppFormatters.compact(totalOutstanding),
             color: totalOutstanding > 0
                 ? AppTheme.debtFg(Theme.of(context).colorScheme)
@@ -244,19 +249,19 @@ class _CStat extends StatelessWidget {
 
 // ── Admin grouped view ────────────────────────────────────────────────────────
 
-class _AdminGroupedCustomersView extends StatefulWidget {
+class _AdminGroupedCustomersView extends ConsumerStatefulWidget {
   final List<CustomerModel> customers;
   final List<UserModel> users;
   const _AdminGroupedCustomersView(
       {required this.customers, required this.users});
 
   @override
-  State<_AdminGroupedCustomersView> createState() =>
+  ConsumerState<_AdminGroupedCustomersView> createState() =>
       _AdminGroupedCustomersViewState();
 }
 
 class _AdminGroupedCustomersViewState
-    extends State<_AdminGroupedCustomersView> {
+    extends ConsumerState<_AdminGroupedCustomersView> {
   final Set<String> _collapsed = {};
 
   @override
@@ -276,8 +281,9 @@ class _AdminGroupedCustomersViewState
       });
 
     if (sections.isEmpty) {
-      return const EmptyState(
-          icon: Icons.people_outline, message: 'No customers found');
+      return EmptyState(
+          icon: Icons.people_outline,
+          message: tr('msg_no_customers_found', ref));
     }
 
     // Flat item list respecting collapsed state
@@ -331,7 +337,7 @@ class _AdminGroupedCustomersViewState
                         .fold(0.0, (sum, c) => sum + c.balance);
                     if (sectionOutstanding > 0) {
                       return Padding(
-                        padding: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsetsDirectional.only(end: 8),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),

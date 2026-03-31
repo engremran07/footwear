@@ -176,11 +176,12 @@ Conflict resolution order for instructions:
 
 ## 10) Current Audit Status
 
-2026-03-30 enterprise audit:
+2026-03-30 enterprise v3.0.0 upgrade:
 
+- Full 6-phase enterprise master plan (22 sections) implemented
 - Firebase Storage fully removed — zero cost architecture (Firestore + Auth only, NO Cloud Functions)
 - Cloud Functions dependency removed — user CRUD uses secondary FirebaseApp approach
-- Company logo stored as base64 in Firestore settings doc (no CDN/Storage needed)
+- Company logo stored as base64 in Firestore settings doc (≤50KB cap, 256×256 compressed)
 - Product image_url field supports external HTTP URLs only (no upload to Storage)
 - Role normalization hardened in app + rules + storage.rules (regex matching)
 - Dashboard aggregate fallback cache enabled
@@ -188,10 +189,22 @@ Conflict resolution order for instructions:
 - SnackBar system redesigned: Material 3 container-color card-style (light bg + dark text + accent bar)
 - All SnackBars across 19 screens converted to styled helpers (errorSnackBar/successSnackBar/warningSnackBar/infoSnackBar)
 - Variant stock shown as cartons/dozens/pairs in product detail
-- L10n: 372 keys × 3 languages — perfect parity
+- L10n: 372+ keys × 3 languages — perfect parity
 - All 21 provider queries covered by 17 composite indexes + 1 new seller_inventory(active+variant_name)
 - Provider write guards: created_by validation, admin-only product/variant creation
 - Color consistency: all semantic colors use AppBrand constants
 - Seller self-update rules: display_name, updated_at, last_active (session heartbeat)
 - Edit user dialog: email read-only, password reset via email (no direct password setting)
 - Multi-device tested: Samsung A56 (Android 16/API 36), V2247 (Android 14/API 34)
+- Design system: app_tokens, app_animations, app_sanitizer, input_formatters
+- 14 widgets (6 upgraded + 8 new), all with accessibility tooltips
+- 5 list screens with search/filter/shimmer/pull-to-refresh/animations
+- 7 forms standardized with PopScope/dirty-check/sanitizer/haptic
+- 5 detail screens enriched with charts/badges/grouping
+- Reports: monthly cash flow BarChart, outstanding PieChart
+- PDF export: Isolate.run() for all 4 functions, sanitized interpolation (S-08)
+- Session guard: AppLifecycleListener, 8h admin hard session limit (S-10)
+- Firestore rules: docSizeOk() <50KB, withinWriteRate() 1s cooldown
+- Dark mode QA: theme-aware colors throughout
+- RTL QA: EdgeInsetsDirectional throughout
+- Release: v3.0.0+7, 3 split-per-abi APKs built

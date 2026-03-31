@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
@@ -9,7 +10,10 @@ import '../models/shop_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/shop_provider.dart';
+import '../widgets/app_pull_refresh.dart';
+import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/shimmer_loading.dart';
 
 class ShopsListScreen extends ConsumerStatefulWidget {
   const ShopsListScreen({super.key});
@@ -36,16 +40,9 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       appBar: AppBar(title: Text(tr('shops', ref))),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: tr('search', ref),
-                prefixIcon: const Icon(Icons.search),
-                isDense: true,
-              ),
-              onChanged: (v) => setState(() => _search = v.toLowerCase()),
-            ),
+          AppSearchBar(
+            hintText: tr('search', ref),
+            onChanged: (v) => setState(() => _search = v.toLowerCase()),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -108,12 +105,26 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   }
                 }
 
-                return ListView.builder(
-                  itemCount: filtered.length,
-                  itemBuilder: (_, i) => _ShopTile(shop: filtered[i]),
+                return AppPullRefresh(
+                  onRefresh: () async {
+                    if (user?.isSeller == true &&
+                        user?.assignedRouteId != null) {
+                      ref.invalidate(
+                          shopsByRouteProvider(user!.assignedRouteId!));
+                    } else {
+                      ref.invalidate(shopsProvider);
+                    }
+                    await Future.delayed(const Duration(milliseconds: 300));
+                  },
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) =>
+                        _ShopTile(shop: filtered[i]).listEntry(i),
+                  ),
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const ShimmerLoading(),
               error: (e, _) => Center(child: Text('$e')),
             ),
           ),
@@ -131,12 +142,12 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
 // ── Stats strip ───────────────────────────────────────────────────────────────
 
-class _ShopStatsStrip extends StatelessWidget {
+class _ShopStatsStrip extends ConsumerWidget {
   final List<ShopModel> shops;
   const _ShopStatsStrip({required this.shops});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final total = shops.length;
     final withDebt = shops.where((s) => s.balance > 0).toList();
     final totalOutstanding = withDebt.fold(0.0, (sum, s) => sum + s.balance);
@@ -153,21 +164,21 @@ class _ShopStatsStrip extends StatelessWidget {
         children: [
           _Stat(
             icon: Icons.store,
-            label: 'Total',
+            label: tr('stats_total', ref),
             value: '$total',
             color: Theme.of(context).colorScheme.primary,
           ),
           _Divider(),
           _Stat(
             icon: Icons.warning_amber,
-            label: 'Overdue',
+            label: tr('stats_overdue', ref),
             value: '${withDebt.length}',
             color: AppTheme.warningFg(Theme.of(context).colorScheme),
           ),
           _Divider(),
           _Stat(
             icon: Icons.account_balance_wallet,
-            label: 'Outstanding',
+            label: tr('stats_outstanding', ref),
             value: AppFormatters.compact(totalOutstanding),
             color: totalOutstanding > 0
                 ? AppTheme.debtFg(Theme.of(context).colorScheme)
@@ -271,16 +282,18 @@ class _ShopTile extends ConsumerWidget {
 
 // ── Admin grouped view ────────────────────────────────────────────────────────
 
-class _AdminGroupedShopsView extends StatefulWidget {
+class _AdminGroupedShopsView extends ConsumerStatefulWidget {
   final List<ShopModel> shops;
   final List<RouteModel> routes;
   const _AdminGroupedShopsView({required this.shops, required this.routes});
 
   @override
-  State<_AdminGroupedShopsView> createState() => _AdminGroupedShopsViewState();
+  ConsumerState<_AdminGroupedShopsView> createState() =>
+      _AdminGroupedShopsViewState();
 }
 
-class _AdminGroupedShopsViewState extends State<_AdminGroupedShopsView> {
+class _AdminGroupedShopsViewState
+    extends ConsumerState<_AdminGroupedShopsView> {
   final Set<String> _collapsed = {};
 
   @override
@@ -313,7 +326,8 @@ class _AdminGroupedShopsViewState extends State<_AdminGroupedShopsView> {
     }
 
     if (sections.isEmpty) {
-      return const EmptyState(icon: Icons.store, message: 'No shops found');
+      return EmptyState(
+          icon: Icons.store, message: tr('msg_no_shops_found', ref));
     }
 
     // Flat list of items: each entry is either a header key or a shop index
@@ -358,7 +372,7 @@ class _AdminGroupedShopsViewState extends State<_AdminGroupedShopsView> {
                     child: Text(
                       r != null
                           ? 'R${r.routeNumber} · ${r.name}'
-                          : 'Unassigned',
+                          : tr('shops_unassigned', ref),
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: cs.primary, fontWeight: FontWeight.bold),
                     ),
@@ -379,7 +393,7 @@ class _AdminGroupedShopsViewState extends State<_AdminGroupedShopsView> {
                         .fold(0.0, (sum, s) => sum + s.balance);
                     if (routeOutstanding > 0) {
                       return Padding(
-                        padding: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsetsDirectional.only(end: 8),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),

@@ -135,6 +135,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         drawer: NavigationDrawer(
           selectedIndex: _selectedIndex(navItems, currentLocation),
           onDestinationSelected: (i) {
+            HapticFeedback.selectionClick();
             Navigator.pop(context);
             context.go(navItems[i].route);
           },
@@ -353,7 +354,10 @@ class _ScrollableNavRail extends StatelessWidget {
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
                         child: InkWell(
-                          onTap: () => onItem(i),
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            onItem(i);
+                          },
                           borderRadius: BorderRadius.circular(28),
                           child: Ink(
                             padding: const EdgeInsets.symmetric(
@@ -385,7 +389,10 @@ class _ScrollableNavRail extends StatelessWidget {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
                         child: InkWell(
-                          onTap: () => onItem(i),
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            onItem(i);
+                          },
                           borderRadius: BorderRadius.circular(24),
                           child: Ink(
                             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -434,15 +441,24 @@ class _UserAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final initials = _initials(user?.displayName ?? '');
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: cs.primaryContainer,
-      child: Text(
-        initials,
-        style: TextStyle(
-          fontSize: radius * 0.7,
-          fontWeight: FontWeight.w600,
-          color: cs.onPrimaryContainer,
+    final borderColor = user?.isAdmin == true
+        ? AppBrand.adminRoleColor
+        : AppBrand.sellerRoleColor;
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: borderColor, width: 2),
+      ),
+      child: CircleAvatar(
+        radius: radius,
+        backgroundColor: cs.primaryContainer,
+        child: Text(
+          initials,
+          style: TextStyle(
+            fontSize: radius * 0.7,
+            fontWeight: FontWeight.w600,
+            color: cs.onPrimaryContainer,
+          ),
         ),
       ),
     );
@@ -532,9 +548,13 @@ class _BreadcrumbTitle extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Flexible(
-          child: Text(
-            _buildCrumb(),
-            overflow: TextOverflow.ellipsis,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: Text(
+              _buildCrumb(),
+              key: ValueKey(location),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ),
         const SizedBox(width: 8),

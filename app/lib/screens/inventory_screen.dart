@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
@@ -14,8 +15,10 @@ import '../providers/product_provider.dart';
 import '../providers/seller_inventory_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/user_provider.dart';
+import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/export_sheet.dart';
+import '../widgets/shimmer_loading.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -30,13 +33,15 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   void _showAddStockDialog(ProductVariantModel variant, int ppc) {
     final cartonsC = TextEditingController(text: '0');
     final pairsC = TextEditingController(text: '0');
+    final pairsFn = FocusNode();
     int previewTotal = 0;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlgState) => AlertDialog(
-          title: Text('Add Stock: ${variant.variantName}'),
+          title: Text(tr('inventory_add_stock_title', ref)
+              .replaceAll('%s', variant.variantName)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -44,9 +49,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 TextField(
                   controller: cartonsC,
                   keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => pairsFn.requestFocus(),
                   decoration: InputDecoration(
-                    labelText: 'Cartons',
-                    helperText: '1 carton = $ppc pairs',
+                    labelText: tr('lbl_cartons', ref),
+                    helperText:
+                        tr('lbl_carton_helper', ref).replaceAll('%s', '$ppc'),
                   ),
                   onChanged: (_) => setDlgState(() {
                     final c = int.tryParse(cartonsC.text) ?? 0;
@@ -57,9 +65,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: pairsC,
+                  focusNode: pairsFn,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Extra pairs',
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: tr('lbl_extra_pairs', ref),
                   ),
                   onChanged: (_) => setDlgState(() {
                     final c = int.tryParse(cartonsC.text) ?? 0;
@@ -70,7 +80,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 if (previewTotal > 0) ...[
                   const SizedBox(height: 12),
                   Text(
-                    'Adding: ${AppFormatters.stock(previewTotal, ppc)}',
+                    tr('lbl_adding_stock', ref).replaceAll(
+                        '%s', AppFormatters.stock(previewTotal, ppc)),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -91,7 +102,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 if (totalPairs <= 0) {
                   if (ctx.mounted) {
                     ScaffoldMessenger.of(ctx).showSnackBar(
-                      warningSnackBar('Enter stock greater than zero'),
+                      warningSnackBar(tr('msg_enter_stock_gt_zero', ref)),
                     );
                   }
                   return;
@@ -104,8 +115,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      successSnackBar(
-                          'Added ${AppFormatters.stock(totalPairs, ppc)} to stock'),
+                      successSnackBar(tr('msg_added_stock', ref).replaceAll(
+                          '%s', AppFormatters.stock(totalPairs, ppc))),
                     );
                   }
                 } catch (e) {
@@ -153,13 +164,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           settingsAsync.when(
             data: (settings) => IconButton(
               icon: const Icon(Icons.file_download),
+              tooltip: tr('inventory_export_tooltip', ref),
               onPressed: () {
                 final useWarehouse = isAdmin && _adminTab == 0;
                 ExportSheet.show(
                   context,
                   ref,
                   title: tr('inventory_report', ref),
-                  headers: ['Variant Name', 'Quantity Available'],
+                  headers: [
+                    tr('lbl_variant_name', ref),
+                    tr('lbl_quantity_available', ref)
+                  ],
                   rows: useWarehouse
                       ? warehouseVariants.valueOrNull
                               ?.map((v) => [
@@ -230,7 +245,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   backgroundColor: Theme.of(context).colorScheme.secondary,
                   foregroundColor: Theme.of(context).colorScheme.onSecondary,
                   icon: const Icon(Icons.swap_horiz),
-                  label: const Text('Transfer to Seller'),
+                  label: Text(tr('inventory_transfer_to_seller', ref)),
                   onPressed: () => showDialog(
                     context: context,
                     builder: (_) => _TransferToSellerDialog(
@@ -242,7 +257,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 FloatingActionButton.extended(
                   heroTag: 'add_inventory',
                   icon: const Icon(Icons.add),
-                  label: const Text('Add Inventory'),
+                  label: Text(tr('inventory_add_inventory', ref)),
                   onPressed: _showAddInventoryDialog,
                 ),
               ],
@@ -250,7 +265,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           : FloatingActionButton.extended(
               heroTag: 'view_warehouse',
               icon: const Icon(Icons.warehouse),
-              label: const Text('Warehouse'),
+              label: Text(tr('lbl_warehouse', ref)),
               onPressed: _showWarehouseStockSheet,
             ),
     );
@@ -283,51 +298,61 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           onRefresh: () => ref.refresh(allVariantsProvider.future),
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: TextField(
-                  onChanged: (v) => setState(() => _search = v),
-                  decoration: InputDecoration(
-                    hintText: tr('search_variants', ref),
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
+              AppSearchBar(
+                hintText: tr('search_variants', ref),
+                onChanged: (v) => setState(() => _search = v),
               ),
               Expanded(
                 child: ListView.builder(
                   itemCount: filtered.length,
                   itemBuilder: (ctx, i) {
                     final variant = filtered[i];
+                    final isLowStock = variant.quantityAvailable > 0 &&
+                        variant.quantityAvailable < ppc;
+                    final isOutOfStock = variant.quantityAvailable <= 0;
+                    final cs = Theme.of(ctx).colorScheme;
                     return Card(
                       margin: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 6,
                       ),
                       child: ListTile(
+                        leading: isOutOfStock
+                            ? Icon(Icons.cancel, color: cs.error, size: 20)
+                            : isLowStock
+                                ? const Icon(Icons.warning_amber,
+                                    color: Colors.orange, size: 20)
+                                : null,
                         title: Text(
                           variant.variantName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          'Stock: ${AppFormatters.stock(variant.quantityAvailable, ppc)}',
+                          tr('lbl_stock_value', ref).replaceAll(
+                              '%s',
+                              AppFormatters.stock(
+                                  variant.quantityAvailable, ppc)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isOutOfStock
+                                ? cs.error
+                                : isLowStock
+                                    ? Colors.orange
+                                    : null,
+                            fontWeight: isOutOfStock || isLowStock
+                                ? FontWeight.w600
+                                : null,
+                          ),
                         ),
                         trailing: ElevatedButton.icon(
                           icon: const Icon(Icons.add),
-                          label: const Text('Add Stock'),
+                          label: Text(tr('inventory_add_stock', ref)),
                           onPressed: () => _showAddStockDialog(variant, ppc),
                         ),
                       ),
-                    );
+                    ).listEntry(i);
                   },
                 ),
               ),
@@ -335,7 +360,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const ShimmerLoading(),
       error: (e, st) => Center(child: Text('Error: $e')),
     );
   }
@@ -368,22 +393,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               ref.refresh(sellerInventoryProvider(currentUser.id).future),
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: TextField(
-                  onChanged: (v) => setState(() => _search = v),
-                  decoration: InputDecoration(
-                    hintText: tr('search_variants', ref),
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
+              AppSearchBar(
+                hintText: tr('search_variants', ref),
+                onChanged: (v) => setState(() => _search = v),
               ),
               Expanded(
                 child: ListView.builder(
@@ -402,18 +414,21 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          'Stock: ${AppFormatters.stock(variant.quantityAvailable, ppc)}',
+                          tr('lbl_stock_value', ref).replaceAll(
+                              '%s',
+                              AppFormatters.stock(
+                                  variant.quantityAvailable, ppc)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         trailing: IconButton(
                           icon: const Icon(Icons.undo, color: Colors.orange),
-                          tooltip: 'Return to Warehouse',
+                          tooltip: tr('inventory_return_to_warehouse', ref),
                           onPressed: () =>
                               _showReturnToWarehouseDialog(variant, ppc),
                         ),
                       ),
-                    );
+                    ).listEntry(i);
                   },
                 ),
               ),
@@ -421,7 +436,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const ShimmerLoading(),
       error: (e, st) => Center(child: Text('Error: $e')),
     );
   }
@@ -432,20 +447,22 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: Text('Return: ${item.variantName}'),
+          title: Text(tr('inventory_return_title', ref)
+              .replaceAll('%s', item.variantName)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                  'Available: ${AppFormatters.stock(item.quantityAvailable, ppc)}'),
+              Text(tr('lbl_available_stock', ref).replaceAll(
+                  '%s', AppFormatters.stock(item.quantityAvailable, ppc))),
               const SizedBox(height: 12),
               TextField(
                 controller: qtyC,
                 keyboardType: TextInputType.number,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Pairs to return to warehouse',
-                  prefixIcon: Icon(Icons.undo),
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: tr('lbl_pairs_to_return', ref),
+                  prefixIcon: const Icon(Icons.undo),
                 ),
               ),
             ],
@@ -464,7 +481,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 final qty = int.tryParse(qtyC.text.trim()) ?? 0;
                 if (qty <= 0 || qty > item.quantityAvailable) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    warningSnackBar('Invalid quantity'),
+                    warningSnackBar(tr('msg_invalid_quantity', ref)),
                   );
                   return;
                 }
@@ -485,7 +502,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(successSnackBar(
-                        'Returned ${AppFormatters.stock(qty, ppc)} to warehouse'));
+                        tr('msg_returned_stock', ref)
+                            .replaceAll('%s', AppFormatters.stock(qty, ppc))));
                   }
                 } catch (e) {
                   if (ctx.mounted) {
@@ -495,7 +513,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   }
                 }
               },
-              child: const Text('Return'),
+              child: Text(tr('lbl_return', ref)),
             ),
           ],
         ),
@@ -529,7 +547,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: Theme.of(ctx)
+                          .colorScheme
+                          .onSurfaceVariant
+                          .withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -610,14 +631,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: Theme.of(ctx)
+                          .colorScheme
+                          .onSurfaceVariant
+                          .withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('Warehouse Stock',
+                    child: Text(tr('inventory_warehouse_stock', ref),
                         style: Theme.of(ctx)
                             .textTheme
                             .titleMedium
@@ -677,12 +701,14 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
   ProductVariantModel? _selectedVariant;
   final _cartonsC = TextEditingController();
   final _pairsC = TextEditingController();
+  final _pairsFn = FocusNode();
   bool _saving = false;
 
   @override
   void dispose() {
     _cartonsC.dispose();
     _pairsC.dispose();
+    _pairsFn.dispose();
     super.dispose();
   }
 
@@ -699,7 +725,7 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
     final total = _total;
     if (total <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        warningSnackBar('Enter stock greater than zero'),
+        warningSnackBar(tr('msg_enter_stock_gt_zero', ref)),
       );
       return;
     }
@@ -711,7 +737,8 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
       if (mounted) Navigator.pop(context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          successSnackBar('Added ${AppFormatters.stock(total, _ppc)} to stock'),
+          successSnackBar(tr('msg_added_stock', ref)
+              .replaceAll('%s', AppFormatters.stock(total, _ppc))),
         );
       }
     } catch (e) {
@@ -736,17 +763,18 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
     final ppc = _ppc;
 
     return AlertDialog(
-      title: const Text('Add Inventory'),
+      title: Text(tr('inventory_add_inventory', ref)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             InputDecorator(
-              decoration: const InputDecoration(labelText: 'Product *'),
+              decoration:
+                  InputDecoration(labelText: tr('lbl_product_required', ref)),
               child: DropdownButton<ProductModel>(
                 value: _selectedProduct,
-                hint: const Text('Select product'),
+                hint: Text(tr('hint_select_product', ref)),
                 isExpanded: true,
                 underline: const SizedBox.shrink(),
                 items: products
@@ -762,13 +790,14 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
               const SizedBox(height: 12),
               InputDecorator(
                 decoration: InputDecoration(
-                  labelText: 'Variant *',
-                  helperText:
-                      variants.isEmpty ? 'No variants for this product' : null,
+                  labelText: tr('lbl_variant_required', ref),
+                  helperText: variants.isEmpty
+                      ? tr('msg_no_variants_for_product', ref)
+                      : null,
                 ),
                 child: DropdownButton<ProductVariantModel>(
                   value: _selectedVariant,
-                  hint: const Text('Select variant'),
+                  hint: Text(tr('hint_select_variant', ref)),
                   isExpanded: true,
                   underline: const SizedBox.shrink(),
                   items: variants
@@ -788,24 +817,31 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
             TextField(
               controller: _cartonsC,
               keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              onSubmitted: (_) => _pairsFn.requestFocus(),
               decoration: InputDecoration(
-                labelText: 'Cartons',
-                helperText: '1 carton = $ppc pairs',
+                labelText: tr('lbl_cartons', ref),
+                helperText:
+                    tr('lbl_carton_helper', ref).replaceAll('%s', '$ppc'),
               ),
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 8),
             TextField(
               controller: _pairsC,
+              focusNode: _pairsFn,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Extra pairs (optional)',
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _submit(),
+              decoration: InputDecoration(
+                labelText: tr('lbl_extra_pairs_optional', ref),
               ),
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
             Text(
-              'Adding: ${AppFormatters.stock(_total, ppc)}',
+              tr('lbl_adding_stock', ref)
+                  .replaceAll('%s', AppFormatters.stock(_total, ppc)),
               style: Theme.of(context)
                   .textTheme
                   .titleMedium
@@ -854,12 +890,14 @@ class _TransferToSellerDialogState
   UserModel? _selectedSeller;
   final _cartonsC = TextEditingController();
   final _pairsC = TextEditingController();
+  final _pairsFn = FocusNode();
   bool _saving = false;
 
   @override
   void dispose() {
     _cartonsC.dispose();
     _pairsC.dispose();
+    _pairsFn.dispose();
     super.dispose();
   }
 
@@ -879,14 +917,15 @@ class _TransferToSellerDialogState
     final total = _total;
     if (total <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        warningSnackBar('Enter quantity greater than zero'),
+        warningSnackBar(tr('msg_enter_qty_gt_zero', ref)),
       );
       return;
     }
     if (total > _selectedVariant!.quantityAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
         errorSnackBar(
-          'Not enough stock. Available: ${AppFormatters.stock(_selectedVariant!.quantityAvailable, _ppc)}',
+          tr('msg_not_enough_stock', ref).replaceAll('%s',
+              AppFormatters.stock(_selectedVariant!.quantityAvailable, _ppc)),
         ),
       );
       return;
@@ -906,7 +945,9 @@ class _TransferToSellerDialogState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           successSnackBar(
-            'Transferred ${AppFormatters.stock(total, _ppc)} to ${_selectedSeller!.displayName}',
+            tr('msg_transferred_stock', ref)
+                .replaceFirst('%s', AppFormatters.stock(total, _ppc))
+                .replaceFirst('%s', _selectedSeller!.displayName),
           ),
         );
       }
@@ -933,7 +974,7 @@ class _TransferToSellerDialogState
     final ppc = _ppc;
 
     return AlertDialog(
-      title: const Text('Transfer Inventory to Seller'),
+      title: Text(tr('inventory_transfer_title', ref)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -942,12 +983,13 @@ class _TransferToSellerDialogState
             // Seller dropdown
             InputDecorator(
               decoration: InputDecoration(
-                labelText: 'Seller *',
-                helperText: sellers.isEmpty ? 'No active sellers found' : null,
+                labelText: tr('lbl_seller_required', ref),
+                helperText:
+                    sellers.isEmpty ? tr('msg_no_active_sellers', ref) : null,
               ),
               child: DropdownButton<UserModel>(
                 value: _selectedSeller,
-                hint: const Text('Select seller'),
+                hint: Text(tr('hint_select_seller', ref)),
                 isExpanded: true,
                 underline: const SizedBox.shrink(),
                 items: sellers
@@ -964,10 +1006,11 @@ class _TransferToSellerDialogState
             const SizedBox(height: 12),
             // Product dropdown
             InputDecorator(
-              decoration: const InputDecoration(labelText: 'Product *'),
+              decoration:
+                  InputDecoration(labelText: tr('lbl_product_required', ref)),
               child: DropdownButton<ProductModel>(
                 value: _selectedProduct,
-                hint: const Text('Select product'),
+                hint: Text(tr('hint_select_product', ref)),
                 isExpanded: true,
                 underline: const SizedBox.shrink(),
                 items: products
@@ -983,20 +1026,21 @@ class _TransferToSellerDialogState
               const SizedBox(height: 12),
               InputDecorator(
                 decoration: InputDecoration(
-                  labelText: 'Variant *',
-                  helperText:
-                      variants.isEmpty ? 'No variants for this product' : null,
+                  labelText: tr('lbl_variant_required', ref),
+                  helperText: variants.isEmpty
+                      ? tr('msg_no_variants_for_product', ref)
+                      : null,
                 ),
                 child: DropdownButton<ProductVariantModel>(
                   value: _selectedVariant,
-                  hint: const Text('Select variant'),
+                  hint: Text(tr('hint_select_variant', ref)),
                   isExpanded: true,
                   underline: const SizedBox.shrink(),
                   items: variants
                       .map((v) => DropdownMenuItem(
                             value: v,
                             child: Text(
-                              '${v.variantName}  •  ${AppFormatters.stock(v.quantityAvailable, ppc)} in stock',
+                              '${v.variantName}  •  ${AppFormatters.stock(v.quantityAvailable, ppc)} ${tr('lbl_in_stock', ref)}',
                             ),
                           ))
                       .toList(),
@@ -1010,25 +1054,32 @@ class _TransferToSellerDialogState
             TextField(
               controller: _cartonsC,
               keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              onSubmitted: (_) => _pairsFn.requestFocus(),
               decoration: InputDecoration(
-                labelText: 'Cartons',
-                helperText: '1 carton = $ppc pairs',
+                labelText: tr('lbl_cartons', ref),
+                helperText:
+                    tr('lbl_carton_helper', ref).replaceAll('%s', '$ppc'),
               ),
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 8),
             TextField(
               controller: _pairsC,
+              focusNode: _pairsFn,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Extra pairs (optional)',
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _submit(),
+              decoration: InputDecoration(
+                labelText: tr('lbl_extra_pairs_optional', ref),
               ),
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
             if (_total > 0) ...[
               Text(
-                'Transferring: ${AppFormatters.stock(_total, ppc)}',
+                tr('lbl_transferring', ref)
+                    .replaceAll('%s', AppFormatters.stock(_total, ppc)),
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium
@@ -1038,7 +1089,10 @@ class _TransferToSellerDialogState
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    'Exceeds available stock (${AppFormatters.stock(_selectedVariant!.quantityAvailable, ppc)})',
+                    tr('msg_exceeds_stock', ref).replaceAll(
+                        '%s',
+                        AppFormatters.stock(
+                            _selectedVariant!.quantityAvailable, ppc)),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
                       fontWeight: FontWeight.w600,
@@ -1068,7 +1122,7 @@ class _TransferToSellerDialogState
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Transfer'),
+              : Text(tr('lbl_transfer', ref)),
         ),
       ],
     );

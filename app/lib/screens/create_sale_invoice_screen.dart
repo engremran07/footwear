@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
+import '../core/utils/app_sanitizer.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/input_formatters.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/seller_inventory_model.dart';
 import '../models/shop_model.dart';
@@ -15,6 +18,7 @@ import '../providers/invoice_provider.dart';
 import '../providers/seller_inventory_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/shop_provider.dart';
+import '../widgets/confirm_dialog.dart';
 
 class CreateSaleInvoiceScreen extends ConsumerStatefulWidget {
   final String? preselectedShopId;
@@ -32,8 +36,12 @@ class _CreateSaleInvoiceScreenState
   final _amountReceivedC = TextEditingController();
   final _discountC = TextEditingController();
   final _notesC = TextEditingController();
+  final _discountFn = FocusNode();
+  final _amountReceivedFn = FocusNode();
+  final _notesFn = FocusNode();
   final Map<String, int> _selectedQtys = {};
   bool _submitting = false;
+  bool _isDirty = false;
 
   @override
   void dispose() {
@@ -41,6 +49,9 @@ class _CreateSaleInvoiceScreenState
     _amountReceivedC.dispose();
     _discountC.dispose();
     _notesC.dispose();
+    _discountFn.dispose();
+    _amountReceivedFn.dispose();
+    _notesFn.dispose();
     super.dispose();
   }
 
@@ -95,18 +106,33 @@ class _CreateSaleInvoiceScreenState
       });
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(tr('create_sale_invoice', ref)),
-      ),
-      body: inventoryAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
-        data: (inventory) {
-          final available =
-              inventory.where((i) => i.quantityAvailable > 0).toList();
-          return _buildBody(context, user, shopsAsync, available);
-        },
+    return PopScope(
+      canPop: !_isDirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final leave = await ConfirmDialog.show(
+          context,
+          title: tr('unsaved_changes', ref),
+          message: tr('discard_changes_message', ref),
+        );
+        if (leave == true && context.mounted) context.pop();
+      },
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(tr('create_sale_invoice', ref)),
+          ),
+          body: inventoryAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('$e')),
+            data: (inventory) {
+              final available =
+                  inventory.where((i) => i.quantityAvailable > 0).toList();
+              return _buildBody(context, user, shopsAsync, available);
+            },
+          ),
+        ),
       ),
     );
   }
@@ -213,6 +239,7 @@ class _CreateSaleInvoiceScreenState
                             IconButton(
                               icon: const Icon(Icons.remove_circle_outline,
                                   size: 22),
+                              tooltip: tr('tooltip_decrease_qty', ref),
                               onPressed: qty <= 0
                                   ? null
                                   : () => setState(
@@ -229,6 +256,7 @@ class _CreateSaleInvoiceScreenState
                             IconButton(
                               icon: const Icon(Icons.add_circle_outline,
                                   size: 22),
+                              tooltip: tr('tooltip_increase_qty', ref),
                               onPressed: qty >= item.quantityAvailable
                                   ? null
                                   : () => setState(
@@ -252,7 +280,15 @@ class _CreateSaleInvoiceScreenState
                     prefixIcon: const Icon(Icons.currency_exchange),
                     hintText: '0.00',
                   ),
-                  onChanged: (_) => setState(() {}),
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _discountFn.requestFocus(),
+                  inputFormatters: [
+                    AppInputFormatters.amountFormatter,
+                  ],
+                  onChanged: (_) {
+                    if (!_isDirty) _isDirty = true;
+                    setState(() {});
+                  },
                 ),
 
                 const SizedBox(height: 12),
@@ -266,7 +302,16 @@ class _CreateSaleInvoiceScreenState
                     labelText: tr('discount', ref),
                     prefixIcon: const Icon(Icons.percent),
                   ),
-                  onChanged: (_) => setState(() {}),
+                  focusNode: _discountFn,
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _amountReceivedFn.requestFocus(),
+                  inputFormatters: [
+                    AppInputFormatters.amountFormatter,
+                  ],
+                  onChanged: (_) {
+                    if (!_isDirty) _isDirty = true;
+                    setState(() {});
+                  },
                 ),
 
                 const SizedBox(height: 12),
@@ -281,7 +326,16 @@ class _CreateSaleInvoiceScreenState
                     prefixIcon: const Icon(Icons.payments),
                     hintText: '0.00',
                   ),
-                  onChanged: (_) => setState(() {}),
+                  focusNode: _amountReceivedFn,
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _notesFn.requestFocus(),
+                  inputFormatters: [
+                    AppInputFormatters.amountFormatter,
+                  ],
+                  onChanged: (_) {
+                    if (!_isDirty) _isDirty = true;
+                    setState(() {});
+                  },
                 ),
 
                 const SizedBox(height: 16),
@@ -294,10 +348,16 @@ class _CreateSaleInvoiceScreenState
                 // ── Notes ──
                 TextField(
                   controller: _notesC,
+                  focusNode: _notesFn,
                   decoration: InputDecoration(
                     labelText: tr('notes', ref),
                     prefixIcon: const Icon(Icons.notes),
                   ),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(context),
+                  inputFormatters: [
+                    AppInputFormatters.maxLength(300),
+                  ],
                 ),
               ],
             ),
@@ -334,8 +394,8 @@ class _CreateSaleInvoiceScreenState
                 SizedBox(
                   width: double.infinity,
                   height: 48,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
                       backgroundColor: AppBrand.primaryColor,
                       foregroundColor: AppBrand.onPrimary,
                     ),
@@ -459,6 +519,7 @@ class _CreateSaleInvoiceScreenState
     if (user == null) return;
 
     if (_selectedShop == null) {
+      HapticFeedback.vibrate();
       ScaffoldMessenger.of(context).showSnackBar(
         warningSnackBar(tr('select_shop', ref)),
       );
@@ -470,6 +531,7 @@ class _CreateSaleInvoiceScreenState
     );
     // Sellers must select inventory items; admins can create manual invoices
     if (user.isSeller && deductions.isEmpty) {
+      HapticFeedback.vibrate();
       ScaffoldMessenger.of(context).showSnackBar(
         warningSnackBar(tr('select_at_least_one_item', ref)),
       );
@@ -478,6 +540,7 @@ class _CreateSaleInvoiceScreenState
 
     final saleAmount = _saleAmount;
     if (saleAmount <= 0) {
+      HapticFeedback.vibrate();
       ScaffoldMessenger.of(context).showSnackBar(
         warningSnackBar(tr('sale_amount_required', ref)),
       );
@@ -530,12 +593,16 @@ class _CreateSaleInvoiceScreenState
                 discount: discount,
                 total: total,
                 amountReceived: amountReceived,
-                notes: _notesC.text.trim().isEmpty ? null : _notesC.text.trim(),
+                notes: _notesC.text.trim().isEmpty
+                    ? null
+                    : AppSanitizer.text(_notesC.text, maxLength: 300),
                 createdBy: user.id,
                 sellerInventoryDeductions: deductions,
               );
 
       if (mounted) {
+        HapticFeedback.mediumImpact();
+        _isDirty = false;
         messenger.showSnackBar(
           successSnackBar(tr('invoice_created', ref)),
         );

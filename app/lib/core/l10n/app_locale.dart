@@ -350,6 +350,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'all_categories': 'All Categories',
 
     // ── Cash ──
+    'cash_flow': 'Cash Flow',
     'cash_in': 'Cash In',
     'cash_out_type': 'Cash Out',
     'reference': 'Reference',
@@ -797,6 +798,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'credit_ledger': 'Credit Ledger',
     'send_payment_reminder': 'Send Payment Reminder',
     'outstanding': 'Outstanding',
+    'days_overdue': 'days overdue',
     'clear': 'Clear',
     'quick_cash_in': 'Quick Cash In',
     'quick_cash_out': 'Quick Cash Out',
@@ -884,6 +886,171 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'invoice_ref': 'Invoice',
     'warehouse_stock': 'Warehouse Stock',
     'seller_stock': 'Seller Stock',
+
+    // ── Inventory Screen ──
+    'inventory_add_stock_title': 'Add Stock: %s',
+    'lbl_cartons': 'Cartons',
+    'lbl_carton_helper': '1 carton = %s pairs',
+    'lbl_extra_pairs': 'Extra pairs',
+    'lbl_adding_stock': 'Adding: %s',
+    'msg_enter_stock_gt_zero': 'Enter stock greater than zero',
+    'msg_added_stock': 'Added %s to stock',
+    'inventory_export_tooltip': 'Export inventory',
+    'lbl_variant_name': 'Variant Name',
+    'lbl_quantity_available': 'Quantity Available',
+    'inventory_transfer_to_seller': 'Transfer to Seller',
+    'inventory_add_inventory': 'Add Inventory',
+    'lbl_warehouse': 'Warehouse',
+    'lbl_stock_value': 'Stock: %s',
+    'inventory_add_stock': 'Add Stock',
+    'inventory_return_to_warehouse': 'Return to Warehouse',
+    'inventory_return_title': 'Return: %s',
+    'lbl_available_stock': 'Available: %s',
+    'lbl_pairs_to_return': 'Pairs to return to warehouse',
+    'msg_invalid_quantity': 'Invalid quantity',
+    'msg_returned_stock': 'Returned %s to warehouse',
+    'lbl_return': 'Return',
+    'inventory_warehouse_stock': 'Warehouse Stock',
+    'lbl_product_required': 'Product *',
+    'hint_select_product': 'Select product',
+    'lbl_variant_required': 'Variant *',
+    'msg_no_variants_for_product': 'No variants for this product',
+    'hint_select_variant': 'Select variant',
+    'lbl_extra_pairs_optional': 'Extra pairs (optional)',
+    'inventory_transfer_title': 'Transfer Inventory to Seller',
+    'lbl_seller_required': 'Seller *',
+    'msg_no_active_sellers': 'No active sellers found',
+    'hint_select_seller': 'Select seller',
+    'msg_enter_qty_gt_zero': 'Enter quantity greater than zero',
+    'msg_not_enough_stock': 'Not enough stock. Available: %s',
+    'msg_transferred_stock': 'Transferred %s to %s',
+    'lbl_transferring': 'Transferring: %s',
+    'msg_exceeds_stock': 'Exceeds available stock (%s)',
+    'lbl_in_stock': 'in stock',
+    'lbl_transfer': 'Transfer',
+
+    // ── Settings Screen ──
+    'lbl_admin': 'Admin',
+    'lbl_seller': 'Seller',
+    'msg_seller_needs_route': 'Seller must be assigned to a route.',
+    'lbl_email': 'Email',
+    'lbl_email_no_change': 'Email cannot be changed after creation',
+    'settings_send_reset_email': 'Send Password Reset Email',
+    'msg_reset_email_sent': 'Password reset email sent to %s',
+    'confirm_delete_user': 'Delete user %s? This cannot be undone.',
+    'msg_user_deleted': '%s deleted',
+    'settings_company_logo': 'Company Logo',
+    'settings_logo_specs':
+        'PDF reports · PNG/JPG · max 800×400 px · max 300 KB',
+    'lbl_preview': 'Preview · %s',
+    'settings_uploading_pct': 'Uploading… %s%%',
+    'settings_uploading': 'Uploading…',
+    'lbl_upload': 'Upload',
+    'settings_replace_logo': 'Replace Logo',
+    'settings_upload_logo': 'Upload Logo',
+    'lbl_remove': 'Remove',
+    'confirm_remove_logo': 'Remove Logo',
+    'confirm_remove_logo_msg': 'Remove the company logo from all reports?',
+    'msg_logo_uploaded': 'Logo uploaded successfully',
+    'msg_logo_removed': 'Logo removed',
+
+    // ── Dashboard Screen ──
+    'dashboard_outstanding_alert': 'Outstanding balance: %s',
+    'dashboard_pending_dues': 'Customers have pending dues',
+    'lbl_view': 'View',
+    'dashboard_stock_cartons': 'Stock Cartons',
+    'dashboard_pairs_remainder': '%s pairs remainder',
+    'dashboard_no_route_assigned': 'No route assigned to this seller account.',
+    'dashboard_route_number': 'Route %s',
+    'dashboard_my_shops': 'My Shops',
+    'dashboard_outstanding': 'Outstanding',
+    'dashboard_my_inventory': 'My Inventory',
+    'dashboard_net': 'Net %s',
+    'dashboard_due': 'Due %s',
+    'dashboard_cash_flow': 'Cash Flow',
+    'dashboard_last_6_months': 'Last 6 months',
+    'dashboard_cash_in_legend': 'Cash In',
+    'dashboard_cash_out_legend': 'Cash Out',
+    'dashboard_new_customer': 'New Customer',
+    'dashboard_new_invoice': 'New Invoice',
+    'dashboard_quick_actions': 'Quick Actions',
+
+    // ── Profile Screen ──
+    'profile_title': 'Profile',
+    'profile_my_profile': 'My Profile',
+    'lbl_display_name': 'Display Name',
+    'profile_appearance': 'Appearance',
+    'profile_theme_auto': 'Auto',
+    'profile_theme_light': 'Light',
+    'profile_theme_dark': 'Dark',
+    'profile_security': 'Security',
+
+    // ── Bootstrap Profile Screen ──
+    'bootstrap_title': 'Bootstrap Admin Profile',
+    'bootstrap_sign_out': 'Sign out',
+    'bootstrap_missing_profile':
+        'Account signed in, but user profile is missing.',
+    'bootstrap_signed_in_as': 'Signed in as: %s',
+    'bootstrap_instructions':
+        'Use this one-time action to create users/{uid} with admin role. This is restricted to admin@footwear.pk only.',
+    'bootstrap_not_eligible':
+        'This account is not eligible for bootstrap. Sign out and log in with admin@footwear.pk.',
+    'bootstrap_create_btn': 'Create Admin Profile',
+    'msg_admin_profile_created': 'Admin profile created successfully.',
+
+    // ── Customer Detail Screen ──
+    'tooltip_edit_customer': 'Edit customer',
+    'tooltip_delete_customer': 'Delete customer',
+    'confirm_delete_customer': 'Delete this customer?',
+    'tooltip_export_statement': 'Export statement',
+    'lbl_items_stock': 'Items: %s',
+    'msg_check_qty_prices': 'Please check quantities and prices',
+    'lbl_qty': 'Qty',
+    'lbl_price': 'Price',
+
+    // ── Shop Detail Screen ──
+    'tooltip_edit_shop': 'Edit shop',
+    'tooltip_delete_shop': 'Delete shop',
+    'confirm_delete_shop': 'Delete this shop?',
+    'tooltip_export_pdf': 'Export PDF',
+    'shop_return_btn': 'Return',
+
+    // ── Route Detail Screen ──
+    'tooltip_edit_route': 'Edit route',
+    'tooltip_delete_route': 'Delete route',
+    'confirm_delete_route': 'Delete this route?',
+    'route_with_debt': 'With Debt',
+
+    // ── Invoice Detail Screen ──
+    'invoice_voided': 'VOIDED',
+    'invoice_step_draft': 'DRAFT',
+    'invoice_step_issued': 'ISSUED',
+    'invoice_step_paid': 'PAID',
+
+    // ── Variant Form Screen ──
+    'hint_variant_example': 'e.g., Black · Size 40',
+
+    // ── List Screens ──
+    'stats_total': 'Total',
+    'stats_overdue': 'Overdue',
+    'stats_outstanding': 'Outstanding',
+    'shops_unassigned': 'Unassigned',
+    'msg_no_shops_found': 'No shops found',
+    'msg_no_customers_found': 'No customers found',
+
+    // ── Invoice / Sale ──
+    'tooltip_decrease_qty': 'Decrease quantity',
+    'tooltip_increase_qty': 'Increase quantity',
+
+    // ── Login Screen ──
+    'login_online': 'Online',
+    'login_offline': 'Offline',
+    'tooltip_show_password': 'Show password',
+    'tooltip_hide_password': 'Hide password',
+    'login_tagline': 'Route & Distribution ERP',
+
+    // ── Widgets ──
+    'filter_all': 'All',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1201,6 +1368,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'all_categories': 'جميع الفئات',
 
     // ── Cash ──
+    'cash_flow': 'التدفق النقدي',
     'cash_in': 'نقد وارد',
     'cash_out_type': 'نقد صادر',
     'reference': 'المرجع',
@@ -1644,6 +1812,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'credit_ledger': 'دفتر الائتمان',
     'send_payment_reminder': 'إرسال تذكير بالدفع',
     'outstanding': 'مستحق',
+    'days_overdue': 'أيام متأخرة',
     'clear': 'مسدد',
     'quick_cash_in': 'إيداع سريع',
     'quick_cash_out': 'سحب سريع',
@@ -1651,18 +1820,18 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'optional': 'اختياري',
 
     // ── مفاتيح التطبيق الجديدة ──
-    'route': 'مسار',
-    'route_number': 'رقم المسار',
-    'route_name': 'اسم المسار',
-    'new_route': 'مسار جديد',
-    'edit_route': 'تعديل المسار',
-    'no_routes': 'لا توجد مسارات بعد',
+    'route': 'منطقة',
+    'route_number': 'رقم المنطقة',
+    'route_name': 'اسم المنطقة',
+    'new_route': 'منطقة جديدة',
+    'edit_route': 'تعديل المنطقة',
+    'no_routes': 'لا توجد مناطق بعد',
     'no_shops': 'لا توجد محلات بعد',
     'none': 'لا شيء',
-    'select_route': 'الرجاء اختيار مسار',
+    'select_route': 'الرجاء اختيار منطقة',
     'seller': 'بائع',
     'welcome': 'مرحباً',
-    'total_routes': 'إجمالي المسارات',
+    'total_routes': 'إجمالي المناطق',
     'total_shops': 'إجمالي المحلات',
     'outstanding_balance': 'الرصيد المستحق',
     'total_products': 'إجمالي المنتجات',
@@ -1723,12 +1892,176 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'sale_amount_required': 'أدخل مبلغ البيع',
     'payment_summary': 'ملخص الدفع',
     'route_has_seller':
-        'لا يمكن الحذف: المسار لديه بائع معين. قم بإزالة تعيين البائع أولاً.',
+        'لا يمكن الحذف: المنطقة لديها بائع معين. قم بإزالة تعيين البائع أولاً.',
     'route_has_shops':
-        'لا يمكن الحذف: المسار يحتوي على محلات نشطة. انقل أو عطّل المحلات أولاً.',
+        'لا يمكن الحذف: المنطقة تحتوي على محلات نشطة. انقل أو عطّل المحلات أولاً.',
     'invoice_ref': 'فاتورة',
     'warehouse_stock': 'مخزون المستودع',
     'seller_stock': 'مخزون البائع',
+
+    // ── Inventory Screen ──
+    'inventory_add_stock_title': 'إضافة مخزون: %s',
+    'lbl_cartons': 'كراتين',
+    'lbl_carton_helper': '١ كرتونة = %s زوج',
+    'lbl_extra_pairs': 'أزواج إضافية',
+    'lbl_adding_stock': 'إضافة: %s',
+    'msg_enter_stock_gt_zero': 'أدخل كمية أكبر من صفر',
+    'msg_added_stock': 'تمت إضافة %s إلى المخزون',
+    'inventory_export_tooltip': 'تصدير المخزون',
+    'lbl_variant_name': 'اسم الصنف',
+    'lbl_quantity_available': 'الكمية المتاحة',
+    'inventory_transfer_to_seller': 'تحويل إلى البائع',
+    'inventory_add_inventory': 'إضافة مخزون',
+    'lbl_warehouse': 'المستودع',
+    'lbl_stock_value': 'المخزون: %s',
+    'inventory_add_stock': 'إضافة مخزون',
+    'inventory_return_to_warehouse': 'إرجاع إلى المستودع',
+    'inventory_return_title': 'إرجاع: %s',
+    'lbl_available_stock': 'المتاح: %s',
+    'lbl_pairs_to_return': 'عدد الأزواج للإرجاع إلى المستودع',
+    'msg_invalid_quantity': 'كمية غير صالحة',
+    'msg_returned_stock': 'تم إرجاع %s إلى المستودع',
+    'lbl_return': 'إرجاع',
+    'inventory_warehouse_stock': 'مخزون المستودع',
+    'lbl_product_required': 'المنتج *',
+    'hint_select_product': 'اختر المنتج',
+    'lbl_variant_required': 'الصنف *',
+    'msg_no_variants_for_product': 'لا توجد أصناف لهذا المنتج',
+    'hint_select_variant': 'اختر الصنف',
+    'lbl_extra_pairs_optional': 'أزواج إضافية (اختياري)',
+    'inventory_transfer_title': 'تحويل المخزون إلى البائع',
+    'lbl_seller_required': 'البائع *',
+    'msg_no_active_sellers': 'لا يوجد بائعون نشطون',
+    'hint_select_seller': 'اختر البائع',
+    'msg_enter_qty_gt_zero': 'أدخل كمية أكبر من صفر',
+    'msg_not_enough_stock': 'المخزون غير كافٍ. المتاح: %s',
+    'msg_transferred_stock': 'تم تحويل %s إلى %s',
+    'lbl_transferring': 'جارٍ التحويل: %s',
+    'msg_exceeds_stock': 'يتجاوز المخزون المتاح (%s)',
+    'lbl_in_stock': 'في المخزون',
+    'lbl_transfer': 'تحويل',
+
+    // ── Settings Screen ──
+    'lbl_admin': 'مدير',
+    'lbl_seller': 'البائع',
+    'msg_seller_needs_route': 'يجب تعيين البائع إلى منطقة.',
+    'lbl_email': 'البريد الإلكتروني',
+    'lbl_email_no_change': 'لا يمكن تغيير البريد الإلكتروني بعد الإنشاء',
+    'settings_send_reset_email': 'إرسال بريد إعادة تعيين كلمة المرور',
+    'msg_reset_email_sent': 'تم إرسال بريد إعادة تعيين كلمة المرور إلى %s',
+    'confirm_delete_user': 'هل تريد حذف المستخدم %s؟ لا يمكن التراجع عن ذلك.',
+    'msg_user_deleted': 'تم حذف %s',
+    'settings_company_logo': 'شعار الشركة',
+    'settings_logo_specs':
+        'تقارير PDF · PNG/JPG · بحد أقصى 800×400 بكسل · 300 كيلوبايت',
+    'lbl_preview': 'معاينة · %s',
+    'settings_uploading_pct': 'جارٍ الرفع… %s%%',
+    'settings_uploading': 'جارٍ الرفع…',
+    'lbl_upload': 'رفع',
+    'settings_replace_logo': 'استبدال الشعار',
+    'settings_upload_logo': 'رفع الشعار',
+    'lbl_remove': 'إزالة',
+    'confirm_remove_logo': 'إزالة الشعار',
+    'confirm_remove_logo_msg': 'هل تريد إزالة شعار الشركة من جميع التقارير؟',
+    'msg_logo_uploaded': 'تم رفع الشعار بنجاح',
+    'msg_logo_removed': 'تم إزالة الشعار',
+
+    // ── Dashboard Screen ──
+    'dashboard_outstanding_alert': 'الرصيد المستحق: %s',
+    'dashboard_pending_dues': 'لدى العملاء مستحقات معلقة',
+    'lbl_view': 'عرض',
+    'dashboard_stock_cartons': 'كراتين المخزون',
+    'dashboard_pairs_remainder': '%s زوج متبقٍ',
+    'dashboard_no_route_assigned': 'لم يتم تعيين منطقة لحساب البائع هذا.',
+    'dashboard_route_number': 'منطقة %s',
+    'dashboard_my_shops': 'متاجري',
+    'dashboard_outstanding': 'المستحقات',
+    'dashboard_my_inventory': 'مخزوني',
+    'dashboard_net': 'صافي %s',
+    'dashboard_due': 'مستحق %s',
+    'dashboard_cash_flow': 'التدفق النقدي',
+    'dashboard_last_6_months': 'آخر ٦ أشهر',
+    'dashboard_cash_in_legend': 'نقد وارد',
+    'dashboard_cash_out_legend': 'نقد صادر',
+    'dashboard_new_customer': 'عميل جديد',
+    'dashboard_new_invoice': 'فاتورة جديدة',
+    'dashboard_quick_actions': 'إجراءات سريعة',
+
+    // ── Profile Screen ──
+    'profile_title': 'الملف الشخصي',
+    'profile_my_profile': 'ملفي الشخصي',
+    'lbl_display_name': 'الاسم المعروض',
+    'profile_appearance': 'المظهر',
+    'profile_theme_auto': 'تلقائي',
+    'profile_theme_light': 'فاتح',
+    'profile_theme_dark': 'داكن',
+    'profile_security': 'الأمان',
+
+    // ── Bootstrap Profile Screen ──
+    'bootstrap_title': 'تهيئة ملف المدير',
+    'bootstrap_sign_out': 'تسجيل الخروج',
+    'bootstrap_missing_profile': 'تم تسجيل الدخول ولكن ملف المستخدم مفقود.',
+    'bootstrap_signed_in_as': 'مسجّل الدخول كـ: %s',
+    'bootstrap_instructions':
+        'استخدم هذا الإجراء لمرة واحدة لإنشاء users/{uid} بدور المدير. مقيد بـ admin@footwear.pk فقط.',
+    'bootstrap_not_eligible':
+        'هذا الحساب غير مؤهل للتهيئة. سجّل الخروج وادخل بـ admin@footwear.pk.',
+    'bootstrap_create_btn': 'إنشاء ملف المدير',
+    'msg_admin_profile_created': 'تم إنشاء ملف المدير بنجاح.',
+
+    // ── Customer Detail Screen ──
+    'tooltip_edit_customer': 'تعديل العميل',
+    'tooltip_delete_customer': 'حذف العميل',
+    'confirm_delete_customer': 'هل تريد حذف هذا العميل؟',
+    'tooltip_export_statement': 'تصدير كشف الحساب',
+    'lbl_items_stock': 'الأصناف: %s',
+    'msg_check_qty_prices': 'يرجى التحقق من الكميات والأسعار',
+    'lbl_qty': 'الكمية',
+    'lbl_price': 'السعر',
+
+    // ── Shop Detail Screen ──
+    'tooltip_edit_shop': 'تعديل المتجر',
+    'tooltip_delete_shop': 'حذف المتجر',
+    'confirm_delete_shop': 'هل تريد حذف هذا المتجر؟',
+    'tooltip_export_pdf': 'تصدير PDF',
+    'shop_return_btn': 'إرجاع',
+
+    // ── Route Detail Screen ──
+    'tooltip_edit_route': 'تعديل المنطقة',
+    'tooltip_delete_route': 'حذف المنطقة',
+    'confirm_delete_route': 'هل تريد حذف هذه المنطقة؟',
+    'route_with_debt': 'بديون',
+
+    // ── Invoice Detail Screen ──
+    'invoice_voided': 'ملغاة',
+    'invoice_step_draft': 'مسودة',
+    'invoice_step_issued': 'صادرة',
+    'invoice_step_paid': 'مدفوعة',
+
+    // ── Variant Form Screen ──
+    'hint_variant_example': 'مثلاً، أسود · مقاس 40',
+
+    // ── List Screens ──
+    'stats_total': 'الإجمالي',
+    'stats_overdue': 'متأخر',
+    'stats_outstanding': 'المستحقات',
+    'shops_unassigned': 'غير مُعيّن',
+    'msg_no_shops_found': 'لا توجد متاجر',
+    'msg_no_customers_found': 'لا يوجد عملاء',
+
+    // ── Invoice / Sale ──
+    'tooltip_decrease_qty': 'تقليل الكمية',
+    'tooltip_increase_qty': 'زيادة الكمية',
+
+    // ── Login Screen ──
+    'login_online': 'متصل',
+    'login_offline': 'غير متصل',
+    'tooltip_show_password': 'إظهار كلمة المرور',
+    'tooltip_hide_password': 'إخفاء كلمة المرور',
+    'login_tagline': 'نظام إدارة المناطق والتوزيع',
+
+    // ── Widgets ──
+    'filter_all': 'الكل',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2048,6 +2381,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'all_categories': 'تمام زمرے',
 
     // ── Cash ──
+    'cash_flow': 'نقدی بہاؤ',
     'cash_in': 'نقد آمد',
     'cash_out_type': 'نقد اخراج',
     'reference': 'حوالہ',
@@ -2496,6 +2830,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'credit_ledger': 'کریڈٹ لیجر',
     'send_payment_reminder': 'ادائیگی کی یاددہانی بھیجیں',
     'outstanding': 'واجب الادا',
+    'days_overdue': 'دن بقایا',
     'clear': 'صاف',
     'quick_cash_in': 'فوری نقد جمع',
     'quick_cash_out': 'فوری نقد نکاسی',
@@ -2503,18 +2838,18 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'optional': 'اختیاری',
 
     // ── نئی ایپ کیز ──
-    'route': 'روٹ',
-    'route_number': 'روٹ نمبر',
-    'route_name': 'روٹ کا نام',
-    'new_route': 'نیا روٹ',
-    'edit_route': 'روٹ میں ترمیم',
-    'no_routes': 'ابھی کوئی روٹ نہیں',
+    'route': 'علاقہ',
+    'route_number': 'علاقہ نمبر',
+    'route_name': 'علاقے کا نام',
+    'new_route': 'نیا علاقہ',
+    'edit_route': 'علاقے میں ترمیم',
+    'no_routes': 'ابھی کوئی علاقہ نہیں',
     'no_shops': 'ابھی کوئی دکان نہیں',
     'none': 'کوئی نہیں',
-    'select_route': 'براہ کرم روٹ منتخب کریں',
+    'select_route': 'براہ کرم علاقہ منتخب کریں',
     'seller': 'سیلر',
     'welcome': 'خوش آمدید',
-    'total_routes': 'کل روٹس',
+    'total_routes': 'کل علاقے',
     'total_shops': 'کل دکانیں',
     'outstanding_balance': 'واجب الادا بقایا',
     'total_products': 'کل مصنوعات',
@@ -2575,11 +2910,177 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'sale_amount_required': 'فروخت کی رقم درج کریں',
     'payment_summary': 'ادائیگی کا خلاصہ',
     'route_has_seller':
-        'حذف نہیں ہو سکتا: روٹ پر بائع مقرر ہے۔ پہلے بائع کی تفویض ہٹائیں۔',
+        'حذف نہیں ہو سکتا: علاقے پر بائع مقرر ہے۔ پہلے بائع کی تفویض ہٹائیں۔',
     'route_has_shops':
-        'حذف نہیں ہو سکتا: روٹ پر فعال دکانیں ہیں۔ پہلے دکانیں منتقل یا غیر فعال کریں۔',
+        'حذف نہیں ہو سکتا: علاقے پر فعال دکانیں ہیں۔ پہلے دکانیں منتقل یا غیر فعال کریں۔',
     'invoice_ref': 'رسید',
     'warehouse_stock': 'گودام کا ذخیرہ',
     'seller_stock': 'بائع کا ذخیرہ',
+
+    // ── Inventory Screen ──
+    'inventory_add_stock_title': 'اسٹاک شامل کریں: %s',
+    'lbl_cartons': 'کارٹن',
+    'lbl_carton_helper': '1 کارٹن = %s جوڑے',
+    'lbl_extra_pairs': 'اضافی جوڑے',
+    'lbl_adding_stock': 'شامل ہو رہا ہے: %s',
+    'msg_enter_stock_gt_zero': 'صفر سے زیادہ اسٹاک درج کریں',
+    'msg_added_stock': '%s اسٹاک میں شامل ہو گیا',
+    'inventory_export_tooltip': 'انوینٹری ایکسپورٹ کریں',
+    'lbl_variant_name': 'ویرینٹ کا نام',
+    'lbl_quantity_available': 'دستیاب مقدار',
+    'inventory_transfer_to_seller': 'سیلر کو منتقل کریں',
+    'inventory_add_inventory': 'انوینٹری شامل کریں',
+    'lbl_warehouse': 'گودام',
+    'lbl_stock_value': 'اسٹاک: %s',
+    'inventory_add_stock': 'اسٹاک شامل کریں',
+    'inventory_return_to_warehouse': 'گودام واپس کریں',
+    'inventory_return_title': 'واپسی: %s',
+    'lbl_available_stock': 'دستیاب: %s',
+    'lbl_pairs_to_return': 'گودام واپسی کے جوڑوں کی تعداد',
+    'msg_invalid_quantity': 'غلط مقدار',
+    'msg_returned_stock': '%s گودام واپس ہو گیا',
+    'lbl_return': 'واپسی',
+    'inventory_warehouse_stock': 'گودام اسٹاک',
+    'lbl_product_required': 'پروڈکٹ *',
+    'hint_select_product': 'پروڈکٹ منتخب کریں',
+    'lbl_variant_required': 'ویرینٹ *',
+    'msg_no_variants_for_product': 'اس پروڈکٹ کے لیے کوئی ویرینٹ نہیں',
+    'hint_select_variant': 'ویرینٹ منتخب کریں',
+    'lbl_extra_pairs_optional': 'اضافی جوڑے (اختیاری)',
+    'inventory_transfer_title': 'سیلر کو انوینٹری منتقل کریں',
+    'lbl_seller_required': 'سیلر *',
+    'msg_no_active_sellers': 'کوئی فعال سیلر نہیں ملا',
+    'hint_select_seller': 'سیلر منتخب کریں',
+    'msg_enter_qty_gt_zero': 'صفر سے زیادہ مقدار درج کریں',
+    'msg_not_enough_stock': 'اسٹاک کافی نہیں۔ دستیاب: %s',
+    'msg_transferred_stock': '%s کو %s منتقل ہو گیا',
+    'lbl_transferring': 'منتقل ہو رہا ہے: %s',
+    'msg_exceeds_stock': 'دستیاب اسٹاک سے زیادہ (%s)',
+    'lbl_in_stock': 'اسٹاک میں',
+    'lbl_transfer': 'منتقل کریں',
+
+    // ── Settings Screen ──
+    'lbl_admin': 'ایڈمن',
+    'lbl_seller': 'سیلر',
+    'msg_seller_needs_route': 'سیلر کو ایک علاقے میں تعینات ہونا ضروری ہے۔',
+    'lbl_email': 'ای میل',
+    'lbl_email_no_change': 'تخلیق کے بعد ای میل تبدیل نہیں ہو سکتی',
+    'settings_send_reset_email': 'پاس ورڈ ری سیٹ ای میل بھیجیں',
+    'msg_reset_email_sent': '%s کو پاس ورڈ ری سیٹ ای میل بھیج دی گئی',
+    'confirm_delete_user': 'صارف %s کو حذف کریں؟ یہ واپس نہیں ہو سکتا۔',
+    'msg_user_deleted': '%s حذف ہو گیا',
+    'settings_company_logo': 'کمپنی لوگو',
+    'settings_logo_specs':
+        'PDF رپورٹس · PNG/JPG · زیادہ سے زیادہ 800×400 px · 300 KB',
+    'lbl_preview': 'پیش نظارہ · %s',
+    'settings_uploading_pct': 'اپلوڈ ہو رہا ہے… %s%%',
+    'settings_uploading': 'اپلوڈ ہو رہا ہے…',
+    'lbl_upload': 'اپلوڈ',
+    'settings_replace_logo': 'لوگو تبدیل کریں',
+    'settings_upload_logo': 'لوگو اپلوڈ کریں',
+    'lbl_remove': 'ہٹائیں',
+    'confirm_remove_logo': 'لوگو ہٹائیں',
+    'confirm_remove_logo_msg':
+        'کیا آپ تمام رپورٹس سے کمپنی لوگو ہٹانا چاہتے ہیں؟',
+    'msg_logo_uploaded': 'لوگو کامیابی سے اپلوڈ ہو گیا',
+    'msg_logo_removed': 'لوگو ہٹا دیا گیا',
+
+    // ── Dashboard Screen ──
+    'dashboard_outstanding_alert': 'واجب الادا بیلنس: %s',
+    'dashboard_pending_dues': 'صارفین کے واجبات باقی ہیں',
+    'lbl_view': 'دیکھیں',
+    'dashboard_stock_cartons': 'اسٹاک کارٹن',
+    'dashboard_pairs_remainder': '%s جوڑے باقی',
+    'dashboard_no_route_assigned': 'اس سیلر اکاؤنٹ کو کوئی علاقہ تعینات نہیں۔',
+    'dashboard_route_number': 'علاقہ %s',
+    'dashboard_my_shops': 'میری دکانیں',
+    'dashboard_outstanding': 'واجب الادا',
+    'dashboard_my_inventory': 'میری انوینٹری',
+    'dashboard_net': 'نیٹ %s',
+    'dashboard_due': 'واجب %s',
+    'dashboard_cash_flow': 'کیش فلو',
+    'dashboard_last_6_months': 'گزشتہ 6 ماہ',
+    'dashboard_cash_in_legend': 'کیش ان',
+    'dashboard_cash_out_legend': 'کیش آؤٹ',
+    'dashboard_new_customer': 'نیا گاہک',
+    'dashboard_new_invoice': 'نیا انوائس',
+    'dashboard_quick_actions': 'فوری اقدامات',
+
+    // ── Profile Screen ──
+    'profile_title': 'پروفائل',
+    'profile_my_profile': 'میرا پروفائل',
+    'lbl_display_name': 'ظاہری نام',
+    'profile_appearance': 'ظاہری شکل',
+    'profile_theme_auto': 'خودکار',
+    'profile_theme_light': 'لائٹ',
+    'profile_theme_dark': 'ڈارک',
+    'profile_security': 'سیکیورٹی',
+
+    // ── Bootstrap Profile Screen ──
+    'bootstrap_title': 'ایڈمن پروفائل بوٹسٹریپ',
+    'bootstrap_sign_out': 'سائن آؤٹ',
+    'bootstrap_missing_profile':
+        'اکاؤنٹ سائن ان ہے لیکن صارف پروفائل موجود نہیں۔',
+    'bootstrap_signed_in_as': 'بطور سائن ان: %s',
+    'bootstrap_instructions':
+        'یہ ایک بار کی کارروائی ہے users/{uid} ایڈمن رول سے بنانے کے لیے۔ صرف admin@footwear.pk کے لیے۔',
+    'bootstrap_not_eligible':
+        'یہ اکاؤنٹ بوٹسٹریپ کے اہل نہیں۔ سائن آؤٹ کر کے admin@footwear.pk سے لاگ ان کریں۔',
+    'bootstrap_create_btn': 'ایڈمن پروفائل بنائیں',
+    'msg_admin_profile_created': 'ایڈمن پروفائل کامیابی سے بن گیا۔',
+
+    // ── Customer Detail Screen ──
+    'tooltip_edit_customer': 'گاہک میں ترمیم',
+    'tooltip_delete_customer': 'گاہک حذف کریں',
+    'confirm_delete_customer': 'کیا آپ اس گاہک کو حذف کرنا چاہتے ہیں؟',
+    'tooltip_export_statement': 'اسٹیٹمنٹ ایکسپورٹ',
+    'lbl_items_stock': 'آئٹمز: %s',
+    'msg_check_qty_prices': 'برائے مہربانی مقدار اور قیمتیں چیک کریں',
+    'lbl_qty': 'مقدار',
+    'lbl_price': 'قیمت',
+
+    // ── Shop Detail Screen ──
+    'tooltip_edit_shop': 'دکان میں ترمیم',
+    'tooltip_delete_shop': 'دکان حذف کریں',
+    'confirm_delete_shop': 'کیا آپ اس دکان کو حذف کرنا چاہتے ہیں؟',
+    'tooltip_export_pdf': 'PDF ایکسپورٹ',
+    'shop_return_btn': 'واپسی',
+
+    // ── Route Detail Screen ──
+    'tooltip_edit_route': 'علاقے میں ترمیم',
+    'tooltip_delete_route': 'علاقہ حذف کریں',
+    'confirm_delete_route': 'کیا آپ اس علاقے کو حذف کرنا چاہتے ہیں؟',
+    'route_with_debt': 'قرض دار',
+
+    // ── Invoice Detail Screen ──
+    'invoice_voided': 'کالعدم',
+    'invoice_step_draft': 'ڈرافٹ',
+    'invoice_step_issued': 'جاری شدہ',
+    'invoice_step_paid': 'ادا شدہ',
+
+    // ── Variant Form Screen ──
+    'hint_variant_example': 'مثلاً، سیاہ · سائز 40',
+
+    // ── List Screens ──
+    'stats_total': 'کل',
+    'stats_overdue': 'زائد المیعاد',
+    'stats_outstanding': 'واجب الادا',
+    'shops_unassigned': 'غیر تعینات',
+    'msg_no_shops_found': 'کوئی دکان نہیں ملی',
+    'msg_no_customers_found': 'کوئی گاہک نہیں ملا',
+
+    // ── Invoice / Sale ──
+    'tooltip_decrease_qty': 'مقدار کم کریں',
+    'tooltip_increase_qty': 'مقدار بڑھائیں',
+
+    // ── Login Screen ──
+    'login_online': 'آن لائن',
+    'login_offline': 'آف لائن',
+    'tooltip_show_password': 'پاس ورڈ دکھائیں',
+    'tooltip_hide_password': 'پاس ورڈ چھپائیں',
+    'login_tagline': 'علاقے اور ڈسٹری بیوشن ERP',
+
+    // ── Widgets ──
+    'filter_all': 'سب',
   },
 };

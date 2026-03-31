@@ -1,6 +1,8 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/snack_helper.dart';
@@ -70,6 +72,12 @@ class ReportsScreen extends ConsumerWidget {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Text('$e'),
           ),
+          const SizedBox(height: 16),
+          // Monthly Cash Flow Chart
+          _MonthlyCashFlowChart(),
+          const SizedBox(height: 16),
+          // Outstanding Distribution Chart
+          _OutstandingPieChart(),
           const SizedBox(height: 16),
           // Export sections
           _ExportCard(
@@ -334,6 +342,293 @@ class _ExportCard extends StatelessWidget {
         trailing: const Icon(Icons.download),
         onTap: onExport,
       ),
+    );
+  }
+}
+
+// ─── Monthly Cash Flow Chart ─────────────────────────────────────────────────
+
+class _MonthlyCashFlowChart extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authUserProvider).valueOrNull;
+    final txsAsync = user?.isAdmin == true
+        ? ref.watch(allTransactionsProvider)
+        : ref.watch(sellerTransactionsProvider(user?.id ?? ''));
+    final cs = Theme.of(context).colorScheme;
+
+    return txsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (txs) {
+        if (txs.isEmpty) return const SizedBox.shrink();
+
+        // Aggregate by month
+        final cashIn = <String, double>{};
+        final cashOut = <String, double>{};
+        for (final tx in txs) {
+          final dt = tx.createdAt.toDate();
+          final key = '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+          if (tx.type == 'cash_in') {
+            cashIn[key] = (cashIn[key] ?? 0) + tx.amount;
+          } else {
+            cashOut[key] = (cashOut[key] ?? 0) + tx.amount;
+          }
+        }
+
+        // Take last 6 months
+        final periods = AppFormatters.last12Periods()
+            .reversed
+            .take(6)
+            .toList()
+            .reversed
+            .toList();
+        final displayPeriods = periods
+            .where((p) => (cashIn[p] ?? 0) > 0 || (cashOut[p] ?? 0) > 0)
+            .toList();
+        if (displayPeriods.isEmpty) return const SizedBox.shrink();
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tr('cash_flow', ref),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    _LegendDot(
+                        color: AppTheme.clearFg(cs), label: tr('cash_in', ref)),
+                    const SizedBox(width: 12),
+                    _LegendDot(
+                        color: AppTheme.debtFg(cs), label: tr('cash_out', ref)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 180,
+                  child: BarChart(
+                    BarChartData(
+                      barGroups: List.generate(displayPeriods.length, (i) {
+                        final p = displayPeriods[i];
+                        return BarChartGroupData(
+                          x: i,
+                          barRods: [
+                            BarChartRodData(
+                              toY: cashIn[p] ?? 0,
+                              color: AppTheme.clearFg(cs),
+                              width: 10,
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(4)),
+                            ),
+                            BarChartRodData(
+                              toY: cashOut[p] ?? 0,
+                              color: AppTheme.debtFg(cs),
+                              width: 10,
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(4)),
+                            ),
+                          ],
+                        );
+                      }),
+                      gridData: const FlGridData(show: false),
+                      borderData: FlBorderData(show: false),
+                      titlesData: FlTitlesData(
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 48,
+                            getTitlesWidget: (v, _) => Text(
+                              AppFormatters.compact(v),
+                              style: TextStyle(
+                                  fontSize: 9, color: cs.onSurfaceVariant),
+                            ),
+                          ),
+                        ),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 20,
+                            getTitlesWidget: (v, _) {
+                              final idx = v.toInt();
+                              if (idx < 0 || idx >= displayPeriods.length) {
+                                return const SizedBox.shrink();
+                              }
+                              return Text(
+                                AppFormatters.period(displayPeriods[idx])
+                                    .substring(0, 3),
+                                style: TextStyle(
+                                    fontSize: 9, color: cs.onSurfaceVariant),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      barTouchData: BarTouchData(enabled: false),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _LegendDot({required this.color, required this.label});
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
+        const SizedBox(width: 4),
+        Text(label,
+            style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      ],
+    );
+  }
+}
+
+// ─── Outstanding Distribution Pie Chart ──────────────────────────────────────
+
+class _OutstandingPieChart extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authUserProvider).valueOrNull;
+    final shopsAsync = user?.isAdmin == true
+        ? ref.watch(shopsProvider)
+        : ref.watch(shopsByRouteProvider(user?.assignedRouteId ?? ''));
+    final cs = Theme.of(context).colorScheme;
+
+    return shopsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (shops) {
+        final withDebt = shops.where((s) => s.balance > 0).toList()
+          ..sort((a, b) => b.balance.compareTo(a.balance));
+        if (withDebt.isEmpty) return const SizedBox.shrink();
+
+        // Group: top 5 + "others"
+        final top = withDebt.take(5).toList();
+        final othersTotal =
+            withDebt.skip(5).fold<double>(0, (s, sh) => s + sh.balance);
+
+        final colors = [
+          cs.primary,
+          cs.secondary,
+          cs.tertiary,
+          Colors.orange,
+          Colors.teal,
+          cs.onSurfaceVariant,
+        ];
+
+        final sections = <PieChartSectionData>[];
+        for (var i = 0; i < top.length; i++) {
+          sections.add(PieChartSectionData(
+            value: top[i].balance,
+            title: AppFormatters.compact(top[i].balance),
+            color: colors[i % colors.length],
+            radius: 50,
+            titleStyle: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: ThemeData.estimateBrightnessForColor(
+                            colors[i % colors.length]) ==
+                        Brightness.dark
+                    ? Colors.white
+                    : Colors.black),
+          ));
+        }
+        if (othersTotal > 0) {
+          sections.add(PieChartSectionData(
+            value: othersTotal,
+            title: AppFormatters.compact(othersTotal),
+            color: colors.last,
+            radius: 50,
+            titleStyle: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: ThemeData.estimateBrightnessForColor(colors.last) ==
+                        Brightness.dark
+                    ? Colors.white
+                    : Colors.black),
+          ));
+        }
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tr('outstanding_report', ref),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 160,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: PieChart(
+                          PieChartData(
+                            sections: sections,
+                            sectionsSpace: 2,
+                            centerSpaceRadius: 24,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var i = 0; i < top.length; i++)
+                            _LegendDot(
+                              color: colors[i % colors.length],
+                              label: top[i].name.length > 12
+                                  ? '${top[i].name.substring(0, 12)}…'
+                                  : top[i].name,
+                            ),
+                          if (othersTotal > 0)
+                            _LegendDot(
+                              color: colors.last,
+                              label: 'Others',
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

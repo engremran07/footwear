@@ -1,12 +1,14 @@
-﻿# FootWear ERP — Flutter App
+﻿# FootWear ERP — Flutter App (v3.0.0)
 
 Mobile-first Android ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record customer transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
+
+> **v3.0.0** — Enterprise upgrade with design system, animations, hardened security, Isolate PDF export, session guard, dark mode + RTL QA.
 
 ---
 
 ## Requirements
 
-- Flutter 3.x
+- Flutter >=3.5.0 <4.0.0
 - Android SDK (API 21+)
 - Java 17
 - Firebase project with Firestore and Auth enabled (no Storage, no Cloud Functions needed)
@@ -28,12 +30,15 @@ Place `google-services.json` in `android/app/` before running (obtain from Fireb
 ## Build
 
 ```bash
-# Release APK (arm + arm64)
-flutter build apk --release --target-platform android-arm,android-arm64
-# Output: build/app/outputs/flutter-apk/app-release.apk
+# Release APKs (split per ABI)
+flutter build apk --release --split-per-abi
+# Output: build/app/outputs/flutter-apk/
+#   app-armeabi-v7a-release.apk  (~27MB)
+#   app-arm64-v8a-release.apk   (~29MB)
+#   app-x86_64-release.apk      (~31MB)
 
 # Install to connected device
-adb install -r build/app/outputs/flutter-apk/app-release.apk
+adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
 
 ---
@@ -46,9 +51,13 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk
 | Navigation | go_router with role-based redirect guards |
 | Backend | Cloud Firestore (realtime streams) |
 | Auth | Firebase Auth (email/password) |
-| Exports (PDF) | `pdf` package — Arabic + Urdu fonts embedded |
+| Design system | AppTokens, AppAnimations, AppSanitizer, AppInputFormatters |
+| Charts | fl_chart (BarChart, LineChart, PieChart) |
+| Exports (PDF) | `pdf` package + `Isolate.run()` — Arabic + Urdu fonts |
 | Exports (Excel) | `excel` package |
-| Print / Share | `printing` package |
+| Print / Share | `printing` + `share_plus` |
+| Image compression | `flutter_image_compress` (base64 logo ≤50KB) |
+| Animations | `flutter_animate` + `shimmer` |
 
 ### Key directories
 
@@ -56,14 +65,14 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk
 lib/
 ├── core/
 │   ├── constants/   # AppBrand, AppCollections
-│   ├── l10n/        # app_locale.dart — EN / AR / UR translations
+│   ├── l10n/        # app_locale.dart — EN / AR / UR (372+ keys)
 │   ├── router/      # app_router.dart — all routes + auth guards
-│   ├── theme/       # AppTheme
-│   └── utils/       # pdf_export, excel_export, error_mapper, formatters
+│   ├── theme/       # AppTheme, AppTokens, AppAnimations
+│   └── utils/       # pdf_export (Isolate), excel_export, error_mapper, formatters, sanitizer
 ├── models/          # Firestore data models (fromJson / toJson)
 ├── providers/       # Riverpod notifiers — all Firestore writes happen here
-├── screens/         # Full-page UI screens
-└── widgets/         # Reusable UI components
+├── screens/         # Full-page UI screens (login, dashboard, 5 lists, 7 forms, 5 details, reports)
+└── widgets/         # 14 shared components (6 upgraded + 8 new) with accessibility tooltips
 ```
 
 ---
@@ -133,3 +142,21 @@ flutter analyze lib --no-pub        # No issues found
 flutter test -r expanded            # All tests pass
 flutter build apk --release         # APK builds cleanly
 ```
+
+---
+
+## v3.0.0 Enterprise Features
+
+- **Design tokens**: `AppTokens` (spacing s2–s48, radii brSM/brMD/brLG, elevation), `AppAnimations` extension with screenEntry(), listEntry(i), pressable(), successFlash(), errorShake()
+- **14 widgets**: StatusBadge, AppSearchBar, FilterChipBar, ShimmerList, StatStripCard, ConfirmDialog, EmptyState, AppDateRangePicker — all with Semantics/Tooltip
+- **5 enriched list screens**: search bar, filter chips, shimmer placeholders, pull-to-refresh, staggered entry animations, stat summary strips
+- **7 standardized forms**: PopScope dirty-check, AppSanitizer input cleaning, haptic feedback (vibrate on error, mediumImpact on save)
+- **5 enriched detail screens**: fl_chart charts, status badges, grouped card sections
+- **PDF isolate export**: all 4 PDF functions use `Isolate.run()`, font bytes pre-loaded on main isolate, `_s()` sanitizer for all interpolated strings (S-08)
+- **Session guard**: `AppLifecycleListener` replaces deprecated observer, 8h admin hard timeout (S-10)
+- **Base64 logo**: 256×256 + flutter_image_compress + ≤50KB Firestore cap (S-07)
+- **Firestore rules**: `docSizeOk()` <50KB on all creates/updates, `withinWriteRate()` 1s cooldown
+- **Dark mode**: theme-aware colors, no hardcoded Colors.white/grey
+- **RTL**: EdgeInsetsDirectional throughout, no hardcoded left/right
+- **Security**: deny-by-default rules, admin defense-in-depth, provider write guards, `_normalizePath()` in router
+- **Release**: v3.0.0+7, 3 split-per-abi APKs, tested Samsung A56 (API 36) + V2247 (API 34)

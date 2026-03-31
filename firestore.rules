@@ -45,6 +45,18 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // S-07: cap document size at 50 KB to prevent abuse
+    function docSizeOk() {
+      return request.resource.data.size() < 50000;
+    }
+
+    // Write-rate guard: at least 1 second between writes (prevent rapid-fire)
+    function withinWriteRate() {
+      return resource == null
+        || !('updated_at' in resource.data)
+        || request.time > resource.data.updated_at + duration.value(1, 's');
+    }
+
     function isBootstrapAdminCreate(userId) {
       return isOwnDoc(userId)
         && !exists(/databases/$(database)/documents/users/$(userId))
@@ -63,7 +75,7 @@ service cloud.firestore {
       allow get: if isOwnDoc(userId) || isAdmin();
       // list (collection query): admin only — avoids per-doc wildcard ambiguity
       allow list: if isAdmin();
-      allow create: if isBootstrapAdminCreate(userId) ||
+      allow create: if (isBootstrapAdminCreate(userId) ||
         (
           isAdmin() &&
           (
@@ -73,41 +85,41 @@ service cloud.firestore {
               request.resource.data.assigned_route_id != ''
             )
           )
-        );
-      allow update: if isAdmin() ||
+        )) && docSizeOk();
+      allow update: if (isAdmin() ||
         (
           isOwnDoc(userId) &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['display_name', 'updated_at', 'last_active'])
-        );
+        )) && docSizeOk() && withinWriteRate();
       allow delete: if isAdmin();
     }
 
     // --- products -----------------------------------------------------------
     match /products/{productId} {
       allow read: if isActiveUser();
-      allow create, update: if isAdmin();
+      allow create, update: if isAdmin() && docSizeOk();
       allow delete: if isAdmin();
     }
 
     // --- product_variants ---------------------------------------------------
     match /product_variants/{variantId} {
       allow read: if isActiveUser();
-      allow create: if isAdmin();
+      allow create: if isAdmin() && docSizeOk();
       // Seller can only increment quantity_available (warehouse returns) — prevents depletion
-      allow update: if isAdmin() ||
+      allow update: if (isAdmin() ||
         (
           isSeller() &&
           request.resource.data.quantity_available > resource.data.quantity_available &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity_available', 'updated_at'])
-        );
+        )) && docSizeOk();
       allow delete: if isAdmin();
     }
 
     // --- routes -------------------------------------------------------------
     match /routes/{routeId} {
       allow read: if isAdmin() || isSellerForRoute(routeId);
-      allow create, update: if isAdmin();
+      allow create, update: if isAdmin() && docSizeOk();
       allow delete: if isAdmin();
     }
 
@@ -119,29 +131,25 @@ service cloud.firestore {
           resource.data.route_id != null &&
           isSellerForRoute(resource.data.route_id)
         );
-      allow create: if isAdmin() ||
+      allow create: if (isAdmin() ||
         (
           isSeller() &&
           request.resource.data.route_id != null &&
           isSellerForRoute(request.resource.data.route_id)
         ) ||
-        (isSeller() && request.resource.data.route_id == null);
-      allow update: if isAdmin() || 
+        (isSeller() && request.resource.data.route_id == null)) && docSizeOk();
+      allow update: if (isAdmin() || 
         (
           isSeller() &&
           isSellerForRoute(resource.data.route_id)
         ) ||
         (
-          // Allow sellers to update ONLY balance+updated_at on customers that
-          // have no route assigned (route_id == '' / null).  This covers atomic
-          // batch writes from createReturn / updateTransaction / deleteTransaction
-          // where the shop was created without a route ("R0" badge).
           isSeller() &&
           (resource.data.route_id == null || resource.data.route_id == '') &&
           assignedRouteId() != null && assignedRouteId() != '' &&
           request.resource.data.diff(resource.data)
             .affectedKeys().hasOnly(['balance', 'updated_at'])
-        );
+        )) && docSizeOk();
       allow delete: if isAdmin();
     }
 
@@ -161,7 +169,7 @@ service cloud.firestore {
              ))
           )
         );
-      allow create: if isAdmin() ||
+      allow create: if (isAdmin() ||
         (
           isSeller() &&
           request.resource.data.created_by == request.auth.uid &&
@@ -175,7 +183,7 @@ service cloud.firestore {
                get(/databases/$(database)/documents/customers/$(request.resource.data.shop_id)).data.route_id
              ))
           )
-        );
+        )) && docSizeOk();
       allow update: if isAdmin() ||
         (isSeller() && resource.data.created_by == request.auth.uid);
       allow delete: if isAdmin() ||
@@ -210,10 +218,10 @@ service cloud.firestore {
       allow read: if isActiveUser();
       allow create, delete: if isAdmin();
       // Admin: full update; seller: only invoice counter bump
-      allow update: if isAdmin() ||
+      allow update: if (isAdmin() ||
         (isActiveUser() &&
          request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['last_invoice_number']));
+           .hasOnly(['last_invoice_number']))) && docSizeOk();
     }
 
     // --- invoices -----------------------------------------------------------

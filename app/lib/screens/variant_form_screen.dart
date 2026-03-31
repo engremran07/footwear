@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/utils/app_sanitizer.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/input_formatters.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/utils/validators.dart';
 import '../models/product_variant_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
+import '../widgets/confirm_dialog.dart';
 
 class VariantFormScreen extends ConsumerStatefulWidget {
   final String productId;
@@ -22,6 +26,7 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
   final _variantNameC = TextEditingController();
   bool _saving = false;
   bool _loaded = false;
+  bool _isDirty = false;
 
   bool get isEdit => widget.variantId != null;
 
@@ -43,7 +48,10 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      HapticFeedback.vibrate();
+      return;
+    }
 
     final user = ref.read(authUserProvider).valueOrNull;
     if (user?.isAdmin != true) {
@@ -59,7 +67,7 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
     try {
       final data = {
         'product_id': widget.productId,
-        'variant_name': _variantNameC.text.trim(),
+        'variant_name': AppSanitizer.name(_variantNameC.text),
         'quantity_available':
             0, // New variants start with 0; admin adds stock later
       };
@@ -69,7 +77,11 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
       } else {
         await notifier.createVariant(data);
       }
-      if (mounted) context.pop();
+      if (mounted) {
+        HapticFeedback.mediumImpact();
+        _isDirty = false;
+        context.pop();
+      }
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
@@ -89,47 +101,74 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
       variantsAsync.whenData((vars) => _loadExisting(vars));
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isEdit ? tr('edit_variant', ref) : tr('new_variant', ref)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _variantNameC,
-                decoration: InputDecoration(
-                  labelText: '${tr('variant_name', ref)} *',
-                  hintText: 'e.g., Black • Size 40',
-                ),
-                validator: (v) => Validators.notEmpty(v),
-                autofocus: !isEdit,
+    return PopScope(
+      canPop: !_isDirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final discard = await ConfirmDialog.show(
+          context,
+          title: tr('unsaved_changes', ref),
+          message: tr('discard_changes_prompt', ref),
+          confirmLabel: tr('discard', ref),
+          isDestructive: true,
+        );
+        if (discard && context.mounted) context.pop();
+      },
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          appBar: AppBar(
+            title:
+                Text(isEdit ? tr('edit_variant', ref) : tr('new_variant', ref)),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: _formKey,
+              onChanged: () {
+                if (!_isDirty) setState(() => _isDirty = true);
+              },
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _variantNameC,
+                    decoration: InputDecoration(
+                      labelText: '${tr('variant_name', ref)} *',
+                      hintText: tr('hint_variant_example', ref),
+                    ),
+                    validator: (v) => Validators.notEmpty(v),
+                    autofocus: !isEdit,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _save(),
+                    inputFormatters: [
+                      AppInputFormatters.maxLength(200),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _saving ? null : _save,
+                      child: _saving
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(tr('saving', ref)),
+                              ],
+                            )
+                          : Text(tr('save', ref)),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saving ? null : _save,
-                  child: _saving
-                      ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(tr('saving', ref)),
-                          ],
-                        )
-                      : Text(tr('save', ref)),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

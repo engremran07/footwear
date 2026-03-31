@@ -78,6 +78,14 @@ class AppValidators {
         }
         return null;
       };
+
+  static String? Function(String?) maxLength(int max, [AppLocale? locale]) =>
+      (String? value) {
+        if (value != null && value.trim().length > max) {
+          return 'Maximum $max characters';
+        }
+        return null;
+      };
 }
 
 /// Convenience alias so screens can use `Validators.notEmpty` etc.

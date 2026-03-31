@@ -29,7 +29,16 @@ import '../../screens/create_sale_invoice_screen.dart';
 import '../../screens/bootstrap_profile_screen.dart';
 import '../../widgets/app_shell.dart';
 
-bool _isAdminOnlyPath(String path) {
+/// Normalize path: strip query params, trailing slashes, collapse double slashes.
+String _normalizePath(String raw) {
+  var p = Uri.parse(raw).path;
+  p = p.replaceAll(RegExp(r'/+'), '/'); // collapse double slashes
+  if (p.length > 1 && p.endsWith('/')) p = p.substring(0, p.length - 1);
+  return p;
+}
+
+bool _isAdminOnlyPath(String rawPath) {
+  final path = _normalizePath(rawPath);
   if (path == '/settings' || path == '/routes/new' || path == '/products/new') {
     return true;
   }
@@ -39,7 +48,8 @@ bool _isAdminOnlyPath(String path) {
       RegExp(r'^/products/[^/]+/variants/[^/]+/edit$').hasMatch(path);
 }
 
-bool _isSellerBlockedPath(String path) {
+bool _isSellerBlockedPath(String rawPath) {
+  final path = _normalizePath(rawPath);
   return path == '/routes' ||
       path == '/customers' ||
       path == '/reports' ||
@@ -52,22 +62,21 @@ bool _isSellerBlockedPath(String path) {
       RegExp(r'^/customers/[^/]+/edit$').hasMatch(path);
 }
 
-/// Smooth fade+slide transition for all routes.
+/// Material shared-axis Z transition (scale+fade) for all routes.
 CustomTransitionPage<void> _fadePage(Widget child, GoRouterState state) {
   return CustomTransitionPage<void>(
     key: state.pageKey,
     child: child,
-    transitionDuration: const Duration(milliseconds: 250),
-    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 250),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+      final fadeIn = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+      final scaleIn =
+          CurvedAnimation(parent: animation, curve: Curves.fastOutSlowIn);
       return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0.03, 0),
-            end: Offset.zero,
-          ).animate(curved),
+        opacity: fadeIn,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.92, end: 1.0).animate(scaleIn),
           child: child,
         ),
       );

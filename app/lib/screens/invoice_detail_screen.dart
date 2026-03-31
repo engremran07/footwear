@@ -202,6 +202,9 @@ class _InvoiceBody extends ConsumerWidget {
                       : tr('credit_note', ref),
                   style: TextStyle(color: cs.onSurfaceVariant),
                 ),
+                // Payment status progression
+                const SizedBox(height: 12),
+                _PaymentProgressBar(invoice: invoice),
                 const Divider(height: 24),
                 _InfoRow(
                     label: tr('customer', ref), value: invoice.customerName),
@@ -373,6 +376,95 @@ class _TotalRow extends StatelessWidget {
               )),
         ],
       ),
+    );
+  }
+}
+
+// ─── Payment Progress Bar ────────────────────────────────────────────────────
+
+class _PaymentProgressBar extends ConsumerWidget {
+  final InvoiceModel invoice;
+  const _PaymentProgressBar({required this.invoice});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final steps = ['draft', 'issued', 'paid'];
+    final stepLabels = [
+      tr('invoice_step_draft', ref),
+      tr('invoice_step_issued', ref),
+      tr('invoice_step_paid', ref),
+    ];
+    final currentIdx = steps.indexOf(invoice.status);
+    final isVoid = invoice.status == 'void';
+
+    if (isVoid) {
+      return Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: cs.errorContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cancel, size: 16, color: cs.onErrorContainer),
+            const SizedBox(width: 6),
+            Text(tr('invoice_voided', ref),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: cs.onErrorContainer,
+                  fontSize: 12,
+                )),
+          ],
+        ),
+      );
+    }
+
+    return Row(
+      children: List.generate(steps.length, (i) {
+        final isActive = i <= currentIdx;
+        final isLast = i == steps.length - 1;
+        return Expanded(
+          child: Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isActive ? cs.primary : cs.surfaceContainerHighest,
+                ),
+                alignment: Alignment.center,
+                child: isActive
+                    ? Icon(Icons.check, size: 14, color: cs.onPrimary)
+                    : Text('${i + 1}',
+                        style: TextStyle(
+                            fontSize: 11, color: cs.onSurfaceVariant)),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                stepLabels[i],
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                  color: isActive ? cs.primary : cs.onSurfaceVariant,
+                ),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    height: 2,
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    color: i < currentIdx
+                        ? cs.primary
+                        : cs.surfaceContainerHighest,
+                  ),
+                ),
+            ],
+          ),
+        );
+      }),
     );
   }
 }

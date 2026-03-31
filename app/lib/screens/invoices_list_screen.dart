@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/constants/app_brand.dart';
+import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
 import '../models/invoice_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/invoice_provider.dart';
+import '../widgets/app_pull_refresh.dart';
+import '../widgets/app_search_bar.dart';
+import '../widgets/shimmer_loading.dart';
 
 class InvoicesListScreen extends ConsumerStatefulWidget {
   const InvoicesListScreen({super.key});
@@ -40,18 +44,15 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
           : null,
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: tr('search', ref),
-                prefixIcon: const Icon(Icons.search),
-                isDense: true,
-              ),
-              onChanged: (v) =>
-                  setState(() => _search = v.trim().toLowerCase()),
-            ),
+          AppSearchBar(
+            hintText: tr('search', ref),
+            onChanged: (v) => setState(() => _search = v.toLowerCase()),
           ),
+          // Invoice summary strip
+          invoicesAsync
+                  .whenData((inv) => _InvoiceStatsStrip(invoices: inv))
+                  .valueOrNull ??
+              const SizedBox.shrink(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: SingleChildScrollView(
@@ -91,16 +92,23 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
                 if (filtered.isEmpty) {
                   return Center(child: Text(tr('no_data', ref)));
                 }
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, i) {
-                    final inv = filtered[i];
-                    return _InvoiceTile(invoice: inv);
+                return AppPullRefresh(
+                  onRefresh: () async {
+                    ref.invalidate(roleAwareInvoicesProvider);
+                    await Future.delayed(const Duration(milliseconds: 300));
                   },
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, i) {
+                      final inv = filtered[i];
+                      return _InvoiceTile(invoice: inv).listEntry(i);
+                    },
+                  ),
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const ShimmerLoading(),
               error: (e, _) => Center(child: Text('$e')),
             ),
           ),
@@ -192,4 +200,84 @@ class _InvoiceTile extends ConsumerWidget {
       ),
     );
   }
+}
+
+// ── Invoice Stats Strip ───────────────────────────────────────────────────────
+
+class _InvoiceStatsStrip extends StatelessWidget {
+  final List<InvoiceModel> invoices;
+  const _InvoiceStatsStrip({required this.invoices});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final sales = invoices.where((i) => i.isSale).toList();
+    final totalSales = sales.fold(0.0, (sum, i) => sum + i.total);
+    final paid = sales.where((i) => i.status == InvoiceModel.statusPaid);
+    final paidAmount = paid.fold(0.0, (sum, i) => sum + i.total);
+    final outstanding = totalSales - paidAmount;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _IStat(
+            icon: Icons.receipt_long,
+            label: 'Total',
+            value: AppFormatters.compact(totalSales),
+            color: cs.primary,
+          ),
+          Container(
+              height: 28, width: 1, color: Theme.of(context).dividerColor),
+          _IStat(
+            icon: Icons.check_circle,
+            label: 'Paid',
+            value: AppFormatters.compact(paidAmount),
+            color: AppTheme.clearFg(cs),
+          ),
+          Container(
+              height: 28, width: 1, color: Theme.of(context).dividerColor),
+          _IStat(
+            icon: Icons.pending,
+            label: 'Pending',
+            value: AppFormatters.compact(outstanding),
+            color: outstanding > 0 ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IStat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  const _IStat(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(height: 2),
+          Text(value,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 13, color: color)),
+          Text(label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        ],
+      );
 }

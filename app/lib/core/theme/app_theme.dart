@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/app_brand.dart';
+import '../design/app_tokens.dart';
 import '../l10n/app_locale.dart';
 import '../utils/text_scaler.dart' as urdu_text;
 
@@ -22,96 +23,71 @@ class AppTheme {
     }
   }
 
-  /// Creates a light theme with the given locale's font.
-  static ThemeData lightTheme(AppLocale locale) {
+  // ─── Safe font-size scaler (avoids assert when fontSize is null) ────────
+  static TextTheme _safeScaleTextTheme(
+      TextTheme base, double factor, String? family) {
+    // When factor is 1.0 and no family override, return as-is
+    if (factor == 1.0 && family == null) return base;
+
+    TextStyle scale(TextStyle? style) {
+      if (style == null) return const TextStyle();
+      final scaled = style.copyWith(
+        fontSize: (style.fontSize ?? 14.0) * factor,
+      );
+      return family != null ? scaled.copyWith(fontFamily: family) : scaled;
+    }
+
+    return TextTheme(
+      displayLarge: scale(base.displayLarge),
+      displayMedium: scale(base.displayMedium),
+      displaySmall: scale(base.displaySmall),
+      headlineLarge: scale(base.headlineLarge),
+      headlineMedium: scale(base.headlineMedium),
+      headlineSmall: scale(base.headlineSmall),
+      titleLarge: scale(base.titleLarge),
+      titleMedium: scale(base.titleMedium),
+      titleSmall: scale(base.titleSmall),
+      bodyLarge: scale(base.bodyLarge),
+      bodyMedium: scale(base.bodyMedium),
+      bodySmall: scale(base.bodySmall),
+      labelLarge: scale(base.labelLarge),
+      labelMedium: scale(base.labelMedium),
+      labelSmall: scale(base.labelSmall),
+    );
+  }
+
+  // ─── DRY theme builder ────────────────────────────────────────────────────
+  static ThemeData _buildTheme(Brightness brightness, AppLocale locale) {
     final fontFamily = fontFamilyFor(locale);
     final scaleFactor = urdu_text.UrduTextScaler.getScaleFactor(locale);
+    final isDark = brightness == Brightness.dark;
 
     final colorScheme = ColorScheme.fromSeed(
       seedColor: AppBrand.primaryColor,
       secondary: AppBrand.secondaryColor,
       error: AppBrand.errorColor,
-      brightness: Brightness.light,
+      brightness: brightness,
+    ).copyWith(
+      primary: AppBrand.primaryColor,
+      onPrimary: AppBrand.onPrimary,
     );
 
-    // Build scaled text theme for RTL languages
-    final baseTextTheme = ThemeData(fontFamily: fontFamily).textTheme;
-    final textTheme = TextTheme(
-      displayLarge: baseTextTheme.displayLarge?.copyWith(
-        fontSize: (baseTextTheme.displayLarge?.fontSize ?? 57) * scaleFactor,
-        height: 1.2,
-      ),
-      displayMedium: baseTextTheme.displayMedium?.copyWith(
-        fontSize: (baseTextTheme.displayMedium?.fontSize ?? 45) * scaleFactor,
-        height: 1.2,
-      ),
-      displaySmall: baseTextTheme.displaySmall?.copyWith(
-        fontSize: (baseTextTheme.displaySmall?.fontSize ?? 36) * scaleFactor,
-        height: 1.3,
-      ),
-      headlineLarge: baseTextTheme.headlineLarge?.copyWith(
-        fontSize: (baseTextTheme.headlineLarge?.fontSize ?? 32) * scaleFactor,
-        height: 1.3,
-      ),
-      headlineMedium: baseTextTheme.headlineMedium?.copyWith(
-        fontSize: (baseTextTheme.headlineMedium?.fontSize ?? 28) * scaleFactor,
-        height: 1.3,
-      ),
-      headlineSmall: baseTextTheme.headlineSmall?.copyWith(
-        fontSize: (baseTextTheme.headlineSmall?.fontSize ?? 24) * scaleFactor,
-        height: 1.3,
-      ),
-      titleLarge: baseTextTheme.titleLarge?.copyWith(
-        fontSize: (baseTextTheme.titleLarge?.fontSize ?? 22) * scaleFactor,
-        height: 1.3,
-      ),
-      titleMedium: baseTextTheme.titleMedium?.copyWith(
-        fontSize: (baseTextTheme.titleMedium?.fontSize ?? 16) * scaleFactor,
-        height: 1.3,
-      ),
-      titleSmall: baseTextTheme.titleSmall?.copyWith(
-        fontSize: (baseTextTheme.titleSmall?.fontSize ?? 14) * scaleFactor,
-        height: 1.3,
-      ),
-      bodyLarge: baseTextTheme.bodyLarge?.copyWith(
-        fontSize: (baseTextTheme.bodyLarge?.fontSize ?? 16) * scaleFactor,
-        height: 1.4,
-      ),
-      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
-        fontSize: (baseTextTheme.bodyMedium?.fontSize ?? 14) * scaleFactor,
-        height: 1.4,
-      ),
-      bodySmall: baseTextTheme.bodySmall?.copyWith(
-        fontSize: (baseTextTheme.bodySmall?.fontSize ?? 12) * scaleFactor,
-        height: 1.4,
-      ),
-      labelLarge: baseTextTheme.labelLarge?.copyWith(
-        fontSize: (baseTextTheme.labelLarge?.fontSize ?? 14) * scaleFactor,
-        height: 1.3,
-      ),
-      labelMedium: baseTextTheme.labelMedium?.copyWith(
-        fontSize: (baseTextTheme.labelMedium?.fontSize ?? 12) * scaleFactor,
-        height: 1.3,
-      ),
-      labelSmall: baseTextTheme.labelSmall?.copyWith(
-        fontSize: (baseTextTheme.labelSmall?.fontSize ?? 11) * scaleFactor,
-        height: 1.3,
-      ),
-    );
+    // Scaled text theme — safe against null fontSize in any style
+    final baseTextTheme = ThemeData(brightness: brightness).textTheme;
+    final textTheme =
+        _safeScaleTextTheme(baseTextTheme, scaleFactor, fontFamily);
 
     return ThemeData(
       useMaterial3: true,
       fontFamily: fontFamily,
-      colorScheme: colorScheme.copyWith(
-        primary: AppBrand.primaryColor,
-        onPrimary: AppBrand.onPrimary,
-      ),
+      colorScheme: colorScheme,
       textTheme: textTheme,
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: false,
-        backgroundColor: AppBrand.primaryColor,
-        foregroundColor: AppBrand.onPrimary,
+        backgroundColor: isDark ? colorScheme.surface : AppBrand.primaryColor,
+        foregroundColor: isDark ? colorScheme.onSurface : AppBrand.onPrimary,
+        surfaceTintColor: isDark ? colorScheme.surfaceTint : null,
       ),
       tabBarTheme: const TabBarThemeData(
         labelColor: AppBrand.onPrimary,
@@ -121,27 +97,62 @@ class AppTheme {
         dividerColor: Colors.transparent,
         overlayColor: WidgetStatePropertyAll(Colors.white10),
       ),
-      cardTheme: CardThemeData(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+      navigationRailTheme: NavigationRailThemeData(
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: AppTokens.brMD,
         ),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        selectedIconTheme: IconThemeData(color: colorScheme.onPrimaryContainer),
+        unselectedIconTheme: IconThemeData(color: colorScheme.onSurfaceVariant),
+        labelType: NavigationRailLabelType.all,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: AppTokens.brMD,
+        ),
+        height: 64,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      ),
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTokens.rXL),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        showDragHandle: true,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppTokens.rXL),
+          ),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        elevation: AppTokens.cardElevation,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppTokens.brMD,
+        ),
+        margin:
+            const EdgeInsets.symmetric(horizontal: AppTokens.s16, vertical: 6),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        border: OutlineInputBorder(borderRadius: AppTokens.brSM),
         filled: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.s16, vertical: AppTokens.s12),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppBrand.primaryColor,
           foregroundColor: AppBrand.onPrimary,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.s24, vertical: 14),
+          minimumSize: const Size(0, AppTokens.buttonMinHeight),
+          shape: RoundedRectangleBorder(borderRadius: AppTokens.brSM),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, AppTokens.buttonMinHeight),
+          shape: RoundedRectangleBorder(borderRadius: AppTokens.brSM),
         ),
       ),
       chipTheme: ChipThemeData(
@@ -151,152 +162,22 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: const Color(0xFF323232),
+        shape: RoundedRectangleBorder(borderRadius: AppTokens.brMD),
+        backgroundColor:
+            isDark ? const Color(0xFF424242) : const Color(0xFF323232),
         contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
         actionTextColor: AppBrand.primaryColor,
       ),
     );
   }
+
+  /// Creates a light theme with the given locale's font.
+  static ThemeData lightTheme(AppLocale locale) =>
+      _buildTheme(Brightness.light, locale);
 
   /// Creates a dark theme with the given locale's font.
-  static ThemeData darkTheme(AppLocale locale) {
-    final fontFamily = fontFamilyFor(locale);
-    final scaleFactor = urdu_text.UrduTextScaler.getScaleFactor(locale);
-
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppBrand.primaryColor,
-      secondary: AppBrand.secondaryColor,
-      error: AppBrand.errorColor,
-      brightness: Brightness.dark,
-    );
-
-    // Build scaled text theme for RTL languages
-    final baseTextTheme =
-        ThemeData(fontFamily: fontFamily, brightness: Brightness.dark)
-            .textTheme;
-    final textTheme = TextTheme(
-      displayLarge: baseTextTheme.displayLarge?.copyWith(
-        fontSize: (baseTextTheme.displayLarge?.fontSize ?? 57) * scaleFactor,
-        height: 1.2,
-      ),
-      displayMedium: baseTextTheme.displayMedium?.copyWith(
-        fontSize: (baseTextTheme.displayMedium?.fontSize ?? 45) * scaleFactor,
-        height: 1.2,
-      ),
-      displaySmall: baseTextTheme.displaySmall?.copyWith(
-        fontSize: (baseTextTheme.displaySmall?.fontSize ?? 36) * scaleFactor,
-        height: 1.3,
-      ),
-      headlineLarge: baseTextTheme.headlineLarge?.copyWith(
-        fontSize: (baseTextTheme.headlineLarge?.fontSize ?? 32) * scaleFactor,
-        height: 1.3,
-      ),
-      headlineMedium: baseTextTheme.headlineMedium?.copyWith(
-        fontSize: (baseTextTheme.headlineMedium?.fontSize ?? 28) * scaleFactor,
-        height: 1.3,
-      ),
-      headlineSmall: baseTextTheme.headlineSmall?.copyWith(
-        fontSize: (baseTextTheme.headlineSmall?.fontSize ?? 24) * scaleFactor,
-        height: 1.3,
-      ),
-      titleLarge: baseTextTheme.titleLarge?.copyWith(
-        fontSize: (baseTextTheme.titleLarge?.fontSize ?? 22) * scaleFactor,
-        height: 1.3,
-      ),
-      titleMedium: baseTextTheme.titleMedium?.copyWith(
-        fontSize: (baseTextTheme.titleMedium?.fontSize ?? 16) * scaleFactor,
-        height: 1.3,
-      ),
-      titleSmall: baseTextTheme.titleSmall?.copyWith(
-        fontSize: (baseTextTheme.titleSmall?.fontSize ?? 14) * scaleFactor,
-        height: 1.3,
-      ),
-      bodyLarge: baseTextTheme.bodyLarge?.copyWith(
-        fontSize: (baseTextTheme.bodyLarge?.fontSize ?? 16) * scaleFactor,
-        height: 1.4,
-      ),
-      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
-        fontSize: (baseTextTheme.bodyMedium?.fontSize ?? 14) * scaleFactor,
-        height: 1.4,
-      ),
-      bodySmall: baseTextTheme.bodySmall?.copyWith(
-        fontSize: (baseTextTheme.bodySmall?.fontSize ?? 12) * scaleFactor,
-        height: 1.4,
-      ),
-      labelLarge: baseTextTheme.labelLarge?.copyWith(
-        fontSize: (baseTextTheme.labelLarge?.fontSize ?? 14) * scaleFactor,
-        height: 1.3,
-      ),
-      labelMedium: baseTextTheme.labelMedium?.copyWith(
-        fontSize: (baseTextTheme.labelMedium?.fontSize ?? 12) * scaleFactor,
-        height: 1.3,
-      ),
-      labelSmall: baseTextTheme.labelSmall?.copyWith(
-        fontSize: (baseTextTheme.labelSmall?.fontSize ?? 11) * scaleFactor,
-        height: 1.3,
-      ),
-    );
-
-    return ThemeData(
-      useMaterial3: true,
-      fontFamily: fontFamily,
-      colorScheme: colorScheme.copyWith(
-        primary: AppBrand.primaryColor,
-        onPrimary: AppBrand.onPrimary,
-      ),
-      textTheme: textTheme,
-      appBarTheme: const AppBarTheme(
-        elevation: 0,
-        centerTitle: false,
-        backgroundColor: AppBrand.primaryColor,
-        foregroundColor: AppBrand.onPrimary,
-      ),
-      tabBarTheme: const TabBarThemeData(
-        labelColor: AppBrand.onPrimary,
-        unselectedLabelColor: AppBrand.onPrimaryMuted,
-        indicatorColor: AppBrand.onPrimary,
-        indicatorSize: TabBarIndicatorSize.tab,
-        dividerColor: Colors.transparent,
-        overlayColor: WidgetStatePropertyAll(Colors.white10),
-      ),
-      cardTheme: CardThemeData(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        filled: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppBrand.primaryColor,
-          foregroundColor: AppBrand.onPrimary,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-      ),
-      chipTheme: ChipThemeData(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
-      snackBarTheme: SnackBarThemeData(
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: const Color(0xFF424242),
-        contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
-        actionTextColor: AppBrand.primaryColor,
-      ),
-    );
-  }
+  static ThemeData darkTheme(AppLocale locale) =>
+      _buildTheme(Brightness.dark, locale);
 
   // ─── Semantic colour helpers ──────────────────────────────────────────────
   // Use these throughout the UI to avoid hardcoded light-only shade50/shade700
