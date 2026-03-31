@@ -77,4 +77,40 @@ void main() {
       expect(restored.badDebt, original.badDebt);
     });
   });
+
+  group('CustomerModel balance edge cases', () {
+    test('hasOutstanding is false for negative balance', () {
+      final m = CustomerModel.fromJson({...baseJson, 'balance': -100.0}, 'c6');
+      expect(m.hasOutstanding, isFalse);
+    });
+
+    test('balance can be negative (overpayment scenario)', () {
+      final m = CustomerModel.fromJson({...baseJson, 'balance': -50.0}, 'c7');
+      expect(m.balance, -50.0);
+    });
+
+    test('active defaults to true when missing', () {
+      final m = CustomerModel.fromJson({'name': 'Test'}, 'c8');
+      expect(m.active, isTrue);
+    });
+
+    test('active can be false', () {
+      final m = CustomerModel.fromJson({...baseJson, 'active': false}, 'c9');
+      expect(m.active, isFalse);
+    });
+
+    test('bad_debt amount round-trips for non-zero value', () {
+      final m = CustomerModel.fromJson({
+        ...baseJson,
+        'bad_debt': true,
+        'bad_debt_amount': 3500.75,
+        'bad_debt_date': ts,
+      }, 'c10');
+      final json = m.toJson();
+      final restored = CustomerModel.fromJson(json, 'c10');
+      expect(restored.badDebt, isTrue);
+      expect(restored.badDebtAmount, 3500.75);
+      expect(restored.badDebtDate, ts);
+    });
+  });
 }

@@ -21,11 +21,12 @@ class InvoiceModel {
   final double total;
   final String saleType; // cash | credit
   final double amountReceived; // cash collected at time of invoice
-  final String status; // draft | issued | paid | partial
+  final String status; // draft | issued | paid | partial | void
   static const String statusDraft = 'draft';
   static const String statusIssued = 'issued';
   static const String statusPaid = 'paid';
   static const String statusPartial = 'partial';
+  static const String statusVoid = 'void';
   final String? notes;
   final String? linkedInvoiceId; // for credit notes referencing original
   final String createdBy;
@@ -63,6 +64,8 @@ class InvoiceModel {
   bool get isDraft => status == statusDraft;
   bool get isIssued => status == statusIssued;
   bool get isPaid => status == statusPaid;
+  bool get isPartial => status == statusPartial;
+  bool get isVoid => status == statusVoid;
 
   factory InvoiceModel.fromJson(Map<String, dynamic> json, String docId) {
     final rawItems = json['items'] as List<dynamic>?;

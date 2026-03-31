@@ -89,15 +89,20 @@ class InvoiceNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
-  /// Generates the next invoice number: INV-YYYY-NNNN using a Firestore
-  /// counter stored in settings/global.lastInvoiceNumber.
+  /// Generates the next invoice number: INV-YYYY-NNNN.
+  ///
+  /// Uses a Firestore transaction on settings/global.last_invoice_number so
+  /// that concurrent invoice creation never produces duplicate numbers.
   Future<String> _nextInvoiceNumber() async {
     final db = FirebaseFirestore.instance;
     final settingsRef = db.collection(Collections.settings).doc('global');
-    final doc = await settingsRef.get();
-    final currentNum = (doc.data()?['last_invoice_number'] as int?) ?? 0;
-    final next = currentNum + 1;
-    await settingsRef.update({'last_invoice_number': next});
+    final next = await db.runTransaction<int>((txn) async {
+      final doc = await txn.get(settingsRef);
+      final currentNum = (doc.data()?['last_invoice_number'] as int?) ?? 0;
+      final nextNum = currentNum + 1;
+      txn.update(settingsRef, {'last_invoice_number': nextNum});
+      return nextNum;
+    });
     return 'INV-${DateTime.now().year}-${next.toString().padLeft(4, '0')}';
   }
 
@@ -358,7 +363,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final now = Timestamp.now();
 
     batch.update(db.collection(Collections.invoices).doc(invoiceId), {
-      'status': 'void',
+      'status': InvoiceModel.statusVoid,
       'updated_at': now,
     });
 
