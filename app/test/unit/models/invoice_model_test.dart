@@ -123,6 +123,31 @@ void main() {
       final m = InvoiceModel.fromJson({...baseJson, 'status': 'paid'}, 'i3');
       expect(m.isPaid, isTrue);
     });
+
+    test('isPartial is true for partial status', () {
+      final m =
+          InvoiceModel.fromJson({...baseJson, 'status': 'partial'}, 'i4');
+      expect(m.isPartial, isTrue);
+      expect(m.isPaid, isFalse);
+      expect(m.isIssued, isFalse);
+    });
+
+    test('isVoid is true for void status', () {
+      final m = InvoiceModel.fromJson({...baseJson, 'status': 'void'}, 'i5');
+      expect(m.isVoid, isTrue);
+      expect(m.isPaid, isFalse);
+    });
+
+    test('status helpers are mutually exclusive for known statuses', () {
+      for (final statusVal in ['draft', 'issued', 'paid', 'partial', 'void']) {
+        final m =
+            InvoiceModel.fromJson({...baseJson, 'status': statusVal}, 'sx');
+        final flags = [m.isDraft, m.isIssued, m.isPaid, m.isPartial, m.isVoid];
+        expect(flags.where((f) => f).length, 1,
+            reason:
+                'Exactly one status flag should be true for "$statusVal"');
+      }
+    });
   });
 
   group('InvoiceModel.toJson', () {
@@ -150,6 +175,27 @@ void main() {
       expect(InvoiceModel.statusIssued, 'issued');
       expect(InvoiceModel.statusPaid, 'paid');
       expect(InvoiceModel.statusPartial, 'partial');
+      expect(InvoiceModel.statusVoid, 'void');
+    });
+  });
+
+  group('InvoiceModel linked_invoice_id', () {
+    test('null linked_invoice_id round-trips correctly', () {
+      final m = InvoiceModel.fromJson(baseJson, 'inv-link-1');
+      expect(m.linkedInvoiceId, isNull);
+      final json = m.toJson();
+      expect(json['linked_invoice_id'], isNull);
+    });
+
+    test('non-null linked_invoice_id round-trips correctly', () {
+      final m = InvoiceModel.fromJson(
+        {...baseJson, 'linked_invoice_id': 'orig-inv-42'},
+        'inv-link-2',
+      );
+      expect(m.linkedInvoiceId, 'orig-inv-42');
+      final json = m.toJson();
+      final restored = InvoiceModel.fromJson(json, 'inv-link-2');
+      expect(restored.linkedInvoiceId, 'orig-inv-42');
     });
   });
 }
