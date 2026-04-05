@@ -1,50 +1,11 @@
-#!/usr/bin/env pwsh
-<#
-.SYNOPSIS
-  ShoesERP Autonomous Release Script
-  Unified version bump + build (web + APK splits) + Firebase deploy + Git tag.
-
-.USAGE
-  From D:\Footwear\app\ :
-    ..\tool\release.ps1 -Mode minor
-    ..\tool\release.ps1 -Mode patch
-    ..\tool\release.ps1 -Mode major
-    ..\tool\release.ps1 -Mode build   # increment build number only
-
-.MODES
-  major  : x+1.0.0   (breaking change)
-  minor  : x.y+1.0   (new features, backward-compat)  -- DEFAULT
-  patch  : x.y.z+1   (bug fixes)
-  build  : x.y.z+b+1 (internal / hot fix; no semver increment)
-
-.FLAGS
-  -SkipTests    : skip flutter test (emergency patch only)
-  -SkipBuild    : skip APK / web build (deploy rules only)
-  -SkipGit      : skip git commit + tag + push
-  -SkipDeploy   : skip firebase deploy
-  -WebOnly      : build and deploy web only (skip APKs)
-  -DryRun       : print plan without executing
-
-.EXAMPLE
-  # Standard minor release — full pipeline:
-  cd D:\Footwear\app
-  ..\tool\release.ps1 -Mode minor
-
-  # Emergency rules-only deploy (no rebuild):
-  cd D:\Footwear\app
-  ..\tool\release.ps1 -Mode build -SkipBuild
-
-  # Dry run to see what would happen:
-  ..\tool\release.ps1 -Mode minor -DryRun
-#>
-
 param(
   [ValidateSet('major','minor','patch','build')]
-  [string]$Mode = 'minor',
+  [string]$Mode = 'patch',
   [switch]$SkipTests,
   [switch]$SkipBuild,
   [switch]$SkipGit,
   [switch]$SkipDeploy,
+  [switch]$SkipInstall,
   [switch]$WebOnly,
   [switch]$DryRun
 )
@@ -52,114 +13,176 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# ── helpers ────────────────────────────────────────────────────────────────────
-function Step([string]$msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
+function Step([string]$msg) { Write-Host "" ; Write-Host "==> $msg" -ForegroundColor Cyan }
 function OK([string]$msg)   { Write-Host "    [OK] $msg" -ForegroundColor Green }
-function DIE([string]$msg)  { Write-Host "`n[FATAL] $msg" -ForegroundColor Red ; exit 1 }
+function WARN([string]$msg) { Write-Host "    [WARN] $msg" -ForegroundColor Yellow }
+function DIE([string]$msg)  { Write-Host "" ; Write-Host "[FATAL] $msg" -ForegroundColor Red ; exit 1 }
 function DRY([string]$cmd)  {
   if ($DryRun) { Write-Host "    [DRY] $cmd" -ForegroundColor Yellow }
   else { Invoke-Expression $cmd }
 }
 
-# ── resolve paths ──────────────────────────────────────────────────────────────
-$appDir   = Split-Path -Parent $PSScriptRoot   # D:\Footwear\app
-$rootDir  = Split-Path -Parent $appDir          # D:\Footwear
-$pubspec  = Join-Path $appDir "pubspec.yaml"
+# Resolve paths relative to this script
+$scriptDir   = $PSScriptRoot
+$rootDir     = Split-Path -Parent $scriptDir
+$appDir      = Join-Path $rootDir "app"
+$pubspec     = Join-Path $appDir "pubspec.yaml"
+$releasesDir = Join-Path $rootDir "releases"
 
 if (-not (Test-Path $pubspec)) {
-  DIE "Run this script from D:\Footwear\app\ or ensure pubspec.yaml exists at $pubspec"
+  DIE "pubspec.yaml not found at $pubspec -- check repo layout."
+}
+
+if (-not (Test-Path $releasesDir)) {
+  New-Item -ItemType Directory -Path $releasesDir | Out-Null
+  OK "Created releases\ folder at $releasesDir"
 }
 
 Push-Location $appDir
+$arm64Apk = $null
 
 try {
-  # ── 1. Version bump ──────────────────────────────────────────────────────────
+  # 1. Version bump
   Step "Bumping version ($Mode)"
   DRY "dart run tool/bump_version.dart $Mode"
   if (-not $DryRun) {
-    # Re-read bumped version for tagging
     $vLine = (Get-Content $pubspec | Select-String '^version:').Line
-    $script:version = ($vLine -split '\s+')[1].Trim()   # e.g. 3.1.0+8
-    $script:semver  = ($script:version -split '\+')[0]   # e.g. 3.1.0
+    $script:version = ($vLine -split '\s+')[1].Trim()
+    $script:semver  = ($script:version -split '\+')[0]
     OK "New version: $script:version"
   } else {
     $script:version = 'X.Y.Z+N'
     $script:semver  = 'X.Y.Z'
   }
 
-  # ── 2. Analyze ───────────────────────────────────────────────────────────────
-  Step "flutter analyze"
+  # 2. Analyze
+  Step "flutter analyze lib --no-pub"
   DRY "flutter analyze lib --no-pub"
-  if (-not $DryRun) { OK "Analyze clean" }
+  if (-not $DryRun) { OK "Analyzer clean" }
 
-  # ── 3. Tests ─────────────────────────────────────────────────────────────────
+  # 3. Tests
   if (-not $SkipTests) {
     Step "flutter test"
     DRY "flutter test test/unit --reporter=expanded"
     if (-not $DryRun) { OK "All unit tests passed" }
   } else {
-    Write-Host "    [SKIP] Tests (SkipTests flag set)" -ForegroundColor Yellow
+    WARN "Tests skipped (-SkipTests)"
   }
 
-  # ── 4. Build ─────────────────────────────────────────────────────────────────
+  # 4. Build
   if (-not $SkipBuild) {
-    # 4a. Web
-    Step "Building Flutter web (release)"
-    DRY "flutter build web --release --dart-define=FLUTTER_WEB_USE_SKIA=false"
-    if (-not $DryRun) { OK "Web build → app/build/web/" }
-
-    # 4b. APK splits (skip if -WebOnly)
     if (-not $WebOnly) {
-      Step "Building split-per-ABI APKs (release)"
+      # 4a. Split-per-ABI APKs
+      Step "Building split-per-ABI release APKs"
       DRY "flutter build apk --release --split-per-abi"
+
       if (-not $DryRun) {
-        $apkDir = "build\app\outputs\flutter-apk"
-        Get-ChildItem $apkDir -Filter "*-release.apk" |
-          ForEach-Object { OK "APK: $($_.Name)  ($([math]::Round($_.Length/1MB, 1)) MB)" }
+        $apkDir = Join-Path $appDir "build\app\outputs\flutter-apk"
+        $abiMap = @{
+          'arm64-v8a'   = 'arm64'
+          'armeabi-v7a' = 'arm'
+          'x86_64'      = 'x86_64'
+        }
+        foreach ($abi in $abiMap.Keys) {
+          $src = Join-Path $apkDir "app-$abi-release.apk"
+          if (-not (Test-Path $src)) { WARN "APK not found: $src" ; continue }
+          $destName = "FootWear-V$($script:semver)-$($abiMap[$abi]).apk"
+          $dest = Join-Path $releasesDir $destName
+          Copy-Item $src $dest -Force
+          $sizeMB = [math]::Round((Get-Item $dest).Length / 1MB, 1)
+          OK "$destName ($sizeMB MB) -> releases\"
+          if ($abi -eq 'arm64-v8a') { $arm64Apk = $dest }
+        }
+      } else {
+        WARN "[DRY] Would rename APKs to FootWear-V{semver}-{abi}.apk -> releases\"
       }
     }
+
+    # 4b. Web build
+    Step "Building Flutter web (release)"
+    DRY "flutter build web --release --dart-define=FLUTTER_WEB_USE_SKIA=false"
+    if (-not $DryRun) { OK "Web build -> app/build/web/" }
+
   } else {
-    Write-Host "    [SKIP] Build (SkipBuild flag set)" -ForegroundColor Yellow
+    WARN "Build skipped (-SkipBuild)"
   }
 
-  # ── 5. Firebase deploy ────────────────────────────────────────────────────────
+  # 5. adb install
+  if (-not $SkipInstall -and -not $WebOnly) {
+    Step "Installing arm64 APK to connected Android device"
+    # Resolve adb: prefer PATH, fall back to Android SDK default locations
+    $adbExe = (Get-Command adb -ErrorAction SilentlyContinue)?.Source
+    if (-not $adbExe) {
+      $candidates = @(
+        "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe",
+        "C:\Android\platform-tools\adb.exe",
+        "$env:ProgramFiles\Android\android-sdk\platform-tools\adb.exe"
+      )
+      $adbExe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    }
+    if ($DryRun) {
+      WARN "[DRY] adb install FootWear-V{semver}-arm64.apk"
+    } elseif (-not $adbExe) {
+      WARN "adb not found -- skipping install (add platform-tools to PATH)"
+    } elseif ($arm64Apk -and (Test-Path $arm64Apk)) {
+      $devices = (& $adbExe devices 2>$null) | Select-String '^\w' | Where-Object { $_ -notmatch '^List' }
+      if ($devices) {
+        & $adbExe install -r $arm64Apk
+        if ($LASTEXITCODE -eq 0) {
+          OK "Installed $(Split-Path -Leaf $arm64Apk) to device"
+        } else {
+          WARN "adb install returned exit code $LASTEXITCODE -- check device connection"
+        }
+      } else {
+        WARN "No Android device connected -- skipping adb install"
+      }
+    } else {
+      WARN "arm64 APK not found -- skipping adb install"
+    }
+  } else {
+    WARN "Install skipped (-SkipInstall or -WebOnly)"
+  }
+
+  # 6. Firebase deploy
   if (-not $SkipDeploy) {
     Push-Location $rootDir
-    if (-not $SkipBuild -and -not $WebOnly) {
-      Step "Deploying: Firestore rules + indexes + hosting"
-      DRY "firebase deploy --only firestore:rules,firestore:indexes,hosting"
+    $targets = if (-not $SkipBuild -and -not $WebOnly) {
+      "firestore:rules,firestore:indexes,hosting"
     } elseif ($WebOnly -and -not $SkipBuild) {
-      Step "Deploying: hosting only"
-      DRY "firebase deploy --only hosting"
+      "hosting"
     } else {
-      Step "Deploying: Firestore rules + indexes only (no hosting — build skipped)"
-      DRY "firebase deploy --only firestore:rules,firestore:indexes"
+      "firestore:rules,firestore:indexes"
     }
+    Step "firebase deploy --only $targets"
+    DRY "firebase deploy --only $targets"
     Pop-Location
     if (-not $DryRun) { OK "Firebase deploy complete" }
   } else {
-    Write-Host "    [SKIP] Firebase deploy (SkipDeploy flag set)" -ForegroundColor Yellow
+    WARN "Firebase deploy skipped (-SkipDeploy)"
   }
 
-  # ── 6. Git commit + tag + push ────────────────────────────────────────────────
+  # 7. Git commit + tag + push
   if (-not $SkipGit) {
-    Step "Git: stage + commit + tag v$script:version"
+    Step "Git: commit + tag v$($script:version) + push"
     Push-Location $rootDir
     DRY "git add -A"
-    DRY "git commit -m `"release: v$script:version`""
-    DRY "git tag -a `"v$script:version`" -m `"ShoesERP v$script:version`""
+    DRY "git commit -m `"release: v$($script:version)`""
+    DRY "git tag -a `"v$($script:version)`" -m `"ShoesERP v$($script:version)`""
     DRY "git push origin HEAD --tags"
     Pop-Location
-    if (-not $DryRun) { OK "Git tag v$script:version pushed" }
+    if (-not $DryRun) { OK "Pushed tag v$($script:version)" }
   } else {
-    Write-Host "    [SKIP] Git (SkipGit flag set)" -ForegroundColor Yellow
+    WARN "Git skipped (-SkipGit)"
   }
 
-  # ── Done ─────────────────────────────────────────────────────────────────────
-  Write-Host "`n╔══════════════════════════════════════════╗" -ForegroundColor Green
-  Write-Host "║  ShoesERP v$($script:version.PadRight(28))  ║" -ForegroundColor Green
-  Write-Host "║  Release pipeline complete $(' ' * 14)  ║" -ForegroundColor Green
-  Write-Host "╚══════════════════════════════════════════╝`n" -ForegroundColor Green
+  # Done
+  $v = $script:version
+  Write-Host ""
+  Write-Host "  +-------------------------------------------+" -ForegroundColor Green
+  Write-Host "  |  FootWear ERP  v$($v.PadRight(25))|" -ForegroundColor Green
+  Write-Host "  |  Release pipeline complete                |" -ForegroundColor Green
+  Write-Host "  +-------------------------------------------+" -ForegroundColor Green
+  Write-Host ""
 
 } finally {
   Pop-Location

@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_brand.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
@@ -56,9 +58,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    // Auto-focus email on mount
+    _loadRememberedCredentials();
+  }
+
+  /// Restore remembered email from SharedPreferences and populate the field.
+  Future<void> _loadRememberedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final remembered = prefs.getBool(rememberMePrefKey) ?? true;
+    final savedEmail = prefs.getString('auth.saved_email') ?? '';
+    if (!mounted) return;
+    setState(() {
+      _remember = remembered;
+      if (remembered && savedEmail.isNotEmpty) {
+        _emailC.text = savedEmail;
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _emailFocus.requestFocus();
+      if (!mounted) return;
+      // If email already pre-filled jump straight to password, otherwise focus email
+      if (_emailC.text.isNotEmpty) {
+        FocusScope.of(context).nextFocus();
+      } else {
+        _emailFocus.requestFocus();
+      }
     });
   }
 
@@ -82,6 +104,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             rememberMe: _remember,
           );
       _failCount = 0;
+      // Persist or clear remembered email for next cold launch
+      final prefs = await SharedPreferences.getInstance();
+      if (_remember) {
+        await prefs.setBool(rememberMePrefKey, true);
+        await prefs.setString('auth.saved_email', _emailC.text.trim());
+      } else {
+        await prefs.setBool(rememberMePrefKey, false);
+        await prefs.remove('auth.saved_email');
+      }
+      // Signal Android autofill framework to offer credential save
+      if (mounted) TextInput.finishAutofillContext();
     } catch (e) {
       if (!mounted) return;
 
@@ -368,10 +401,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         padding: const EdgeInsets.all(AppTokens.s24),
         child: Form(
           key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+          child: AutofillGroup(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Text(tr('sign_in', ref),
                   style: theme.textTheme.titleLarge
                       ?.copyWith(fontWeight: FontWeight.w600)),
@@ -379,6 +413,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               TextFormField(
                 controller: _emailC,
                 focusNode: _emailFocus,
+                autofillHints: const [AutofillHints.email, AutofillHints.username],
                 decoration: InputDecoration(
                   labelText: tr('email', ref),
                   prefixIcon: const Icon(Icons.person_outline),
@@ -395,6 +430,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               TextFormField(
                 controller: _passC,
                 obscureText: _obscure,
+                autofillHints: const [AutofillHints.password],
                 decoration: InputDecoration(
                   labelText: tr('password', ref),
                   prefixIcon: const Icon(Icons.lock_outline),
@@ -455,6 +491,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
             ],
+            ),
           ),
         ),
       ),
