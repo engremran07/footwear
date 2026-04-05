@@ -69,54 +69,51 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
             child: SegmentedButton<bool>(
               segments: [
                 ButtonSegment(
-                    value: false,
-                    label: Text(tr('tab_active_users', ref))),
+                    value: false, label: Text(tr('tab_active_users', ref))),
                 ButtonSegment(
-                    value: true,
-                    label: Text(tr('tab_inactive_users', ref))),
+                    value: true, label: Text(tr('tab_inactive_users', ref))),
               ],
               selected: {_showInactive},
               onSelectionChanged: (s) =>
                   setState(() => _showInactive = s.first),
-              style: const ButtonStyle(
-                  visualDensity: VisualDensity.compact),
+              style: const ButtonStyle(visualDensity: VisualDensity.compact),
             ),
           ),
           // Role filter chips (active tab only)
           if (!_showInactive)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Row(
-              children: [
-                _RoleChip(
-                  label: tr('all', ref),
-                  selected: _roleFilter == null,
-                  onTap: () => setState(() => _roleFilter = null),
-                ),
-                const SizedBox(width: 8),
-                _RoleChip(
-                  label: tr('lbl_admin', ref),
-                  selected: _roleFilter == 'admin',
-                  color: AppBrand.adminRoleColor,
-                  onTap: () => setState(
-                    () => _roleFilter = _roleFilter == 'admin' ? null : 'admin',
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Row(
+                children: [
+                  _RoleChip(
+                    label: tr('all', ref),
+                    selected: _roleFilter == null,
+                    onTap: () => setState(() => _roleFilter = null),
                   ),
-                ),
-                const SizedBox(width: 8),
-                _RoleChip(
-                  label: tr('lbl_seller', ref),
-                  selected: _roleFilter == 'seller',
-                  color: AppBrand.sellerRoleColor,
-                  onTap: () => setState(
-                    () =>
-                        _roleFilter = _roleFilter == 'seller' ? null : 'seller',
+                  const SizedBox(width: 8),
+                  _RoleChip(
+                    label: tr('lbl_admin', ref),
+                    selected: _roleFilter == 'admin',
+                    color: AppBrand.adminRoleColor,
+                    onTap: () => setState(
+                      () =>
+                          _roleFilter = _roleFilter == 'admin' ? null : 'admin',
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  _RoleChip(
+                    label: tr('lbl_seller', ref),
+                    selected: _roleFilter == 'seller',
+                    color: AppBrand.sellerRoleColor,
+                    onTap: () => setState(
+                      () => _roleFilter =
+                          _roleFilter == 'seller' ? null : 'seller',
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
           const Divider(height: 1),
           Expanded(
             child: usersAsync.when(
@@ -127,9 +124,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                   final matchesSearch = _search.isEmpty ||
                       u.displayName.toLowerCase().contains(_search) ||
                       u.email.toLowerCase().contains(_search) ||
-                      (u.assignedRouteName
-                              ?.toLowerCase()
-                              .contains(_search) ??
+                      (u.assignedRouteName?.toLowerCase().contains(_search) ??
                           false);
                   final matchesRole = _roleFilter == null ||
                       (_roleFilter == 'admin' ? u.isAdmin : u.isSeller);
@@ -164,14 +159,14 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                                 _confirmHardDeleteUser(filtered[i]),
                           ).listEntry(i)
                         : _UserTile(
-                          user: filtered[i],
-                          currentUser: currentUser,
-                          onEdit: () => _showEditUserDialog(filtered[i]),
-                          onDelete: () => _confirmDeleteUser(filtered[i]),
-                          onToggle: (v) => ref
-                              .read(userManagementNotifierProvider.notifier)
-                              .toggleActive(filtered[i].id, v),
-                        ).listEntry(i),
+                            user: filtered[i],
+                            currentUser: currentUser,
+                            onEdit: () => _showEditUserDialog(filtered[i]),
+                            onDelete: () => _confirmDeleteUser(filtered[i]),
+                            onToggle: (v) => ref
+                                .read(userManagementNotifierProvider.notifier)
+                                .toggleActive(filtered[i].id, v),
+                          ).listEntry(i),
                   ),
                 );
               },
@@ -215,30 +210,25 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: emailC,
-                    decoration:
-                        InputDecoration(labelText: tr('email', ref)),
+                    decoration: InputDecoration(labelText: tr('email', ref)),
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: passC,
-                    decoration:
-                        InputDecoration(labelText: tr('password', ref)),
+                    decoration: InputDecoration(labelText: tr('password', ref)),
                     obscureText: true,
                     keyboardType: TextInputType.visiblePassword,
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     initialValue: role,
-                    decoration:
-                        InputDecoration(labelText: tr('role', ref)),
+                    decoration: InputDecoration(labelText: tr('role', ref)),
                     items: [
                       DropdownMenuItem(
-                          value: 'admin',
-                          child: Text(tr('lbl_admin', ref))),
+                          value: 'admin', child: Text(tr('lbl_admin', ref))),
                       DropdownMenuItem(
-                          value: 'seller',
-                          child: Text(tr('lbl_seller', ref))),
+                          value: 'seller', child: Text(tr('lbl_seller', ref))),
                     ],
                     onChanged: (v) => setS(() {
                       role = v ?? 'seller';
@@ -252,8 +242,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       initialValue: selectedRouteId,
-                      decoration: InputDecoration(
-                          labelText: tr('assigned_route', ref)),
+                      decoration:
+                          InputDecoration(labelText: tr('assigned_route', ref)),
                       items: availableRoutes
                           .map((r) => DropdownMenuItem(
                                 value: r.id,
@@ -281,15 +271,16 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                 onPressed: () async {
                   if (nameC.text.trim().isEmpty ||
                       emailC.text.trim().isEmpty ||
-                      passC.text.trim().isEmpty) { return; }
+                      passC.text.trim().isEmpty) {
+                    return;
+                  }
                   if (role == 'seller' &&
                       (selectedRouteId == null ||
                           selectedRouteId!.trim().isEmpty)) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         SnackBar(
-                          content:
-                              Text(tr('msg_seller_needs_route', ref)),
+                          content: Text(tr('msg_seller_needs_route', ref)),
                         ),
                       );
                     }
@@ -381,13 +372,11 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         try {
                           await ref
                               .read(userManagementNotifierProvider.notifier)
-                              .sendPasswordResetForSeller(
-                                  email: user.email);
+                              .sendPasswordResetForSeller(email: user.email);
                           if (ctx.mounted) {
                             ScaffoldMessenger.of(ctx).showSnackBar(
-                              successSnackBar(
-                                  tr('msg_reset_email_sent', ref)
-                                      .replaceAll('%s', user.email)),
+                              successSnackBar(tr('msg_reset_email_sent', ref)
+                                  .replaceAll('%s', user.email)),
                             );
                           }
                         } catch (e) {
@@ -413,12 +402,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                   else
                     DropdownButtonFormField<String>(
                       initialValue: role,
-                      decoration:
-                          InputDecoration(labelText: tr('role', ref)),
+                      decoration: InputDecoration(labelText: tr('role', ref)),
                       items: [
                         DropdownMenuItem(
-                            value: 'admin',
-                            child: Text(tr('lbl_admin', ref))),
+                            value: 'admin', child: Text(tr('lbl_admin', ref))),
                         DropdownMenuItem(
                             value: 'seller',
                             child: Text(tr('lbl_seller', ref))),
@@ -435,8 +422,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       initialValue: selectedRouteId,
-                      decoration: InputDecoration(
-                          labelText: tr('assigned_route', ref)),
+                      decoration:
+                          InputDecoration(labelText: tr('assigned_route', ref)),
                       items: availableRoutes
                           .map((r) => DropdownMenuItem(
                                 value: r.id,
@@ -483,10 +470,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     return;
                   }
                   try {
-                    final notifier = ref
-                        .read(userManagementNotifierProvider.notifier);
-                    if (oldRouteId != null &&
-                        oldRouteId != selectedRouteId) {
+                    final notifier =
+                        ref.read(userManagementNotifierProvider.notifier);
+                    if (oldRouteId != null && oldRouteId != selectedRouteId) {
                       await notifier.clearRouteAssignment(oldRouteId);
                     }
                     await notifier.updateUser(user.id, {
@@ -527,8 +513,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
         builder: (ctx, setS) {
           final freeRoutes = routes
               .where((r) =>
-                  r.assignedSellerId == null ||
-                  r.assignedSellerId!.isEmpty)
+                  r.assignedSellerId == null || r.assignedSellerId!.isEmpty)
               .toList();
           return AlertDialog(
             title: Text(tr('reactivate', ref)),
@@ -540,11 +525,11 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                 const SizedBox(height: 12),
                 if (user.isSeller)
                   DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                        labelText: tr('assigned_route', ref)),
+                    decoration:
+                        InputDecoration(labelText: tr('assigned_route', ref)),
                     items: freeRoutes
-                        .map((r) => DropdownMenuItem(
-                            value: r.id, child: Text(r.name)))
+                        .map((r) =>
+                            DropdownMenuItem(value: r.id, child: Text(r.name)))
                         .toList(),
                     onChanged: (v) => setS(() {
                       selectedRouteId = v;
@@ -572,9 +557,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     if (confirmed != true) return;
 
     try {
-      await ref
-          .read(userManagementNotifierProvider.notifier)
-          .reactivateUser(
+      await ref.read(userManagementNotifierProvider.notifier).reactivateUser(
             uid: user.id,
             routeId: selectedRouteId ?? '',
             routeName: selectedRouteName ?? '',
@@ -587,8 +570,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(errorSnackBar('$e'));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
       }
     }
   }
@@ -620,8 +602,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(errorSnackBar('$e'));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
       }
     }
   }
@@ -637,8 +618,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     final confirmed = await ConfirmDialog.show(
       context,
       title: tr('delete', ref),
-      message: tr('confirm_delete_user', ref)
-          .replaceAll('%s', user.displayName),
+      message:
+          tr('confirm_delete_user', ref).replaceAll('%s', user.displayName),
     );
     if (confirmed != true) return;
 
@@ -648,15 +629,14 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
           .deleteUser(user.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          successSnackBar(tr('msg_user_deleted', ref)
-              .replaceAll('%s', user.displayName)),
+          successSnackBar(
+              tr('msg_user_deleted', ref).replaceAll('%s', user.displayName)),
         );
       }
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(errorSnackBar(tr(key, ref)));
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
   }
@@ -730,9 +710,7 @@ class _UserTile extends StatelessWidget {
                   radius: 18,
                   backgroundColor: roleColor.withAlpha(30),
                   child: Icon(
-                    user.isAdmin
-                        ? Icons.admin_panel_settings
-                        : Icons.person,
+                    user.isAdmin ? Icons.admin_panel_settings : Icons.person,
                     size: 18,
                     color: roleColor,
                   ),
@@ -749,8 +727,8 @@ class _UserTile extends StatelessWidget {
                               user.displayName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
                           if (!user.active)
@@ -788,8 +766,8 @@ class _UserTile extends StatelessWidget {
               children: [
                 // Role chip
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 7, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
                     color: roleColor.withAlpha(25),
                     borderRadius: BorderRadius.circular(4),
@@ -886,9 +864,7 @@ class _InactiveUserTile extends StatelessWidget {
               radius: 18,
               backgroundColor: Colors.grey.withAlpha(40),
               child: Icon(
-                user.isAdmin
-                    ? Icons.admin_panel_settings
-                    : Icons.person_off,
+                user.isAdmin ? Icons.admin_panel_settings : Icons.person_off,
                 size: 18,
                 color: Colors.grey,
               ),
@@ -921,8 +897,8 @@ class _InactiveUserTile extends StatelessWidget {
                   ),
                   Container(
                     margin: const EdgeInsetsDirectional.only(top: 2),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 1),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                     decoration: BoxDecoration(
                       color: roleColor.withAlpha(25),
                       borderRadius: BorderRadius.circular(4),
@@ -943,8 +919,8 @@ class _InactiveUserTile extends StatelessWidget {
             Tooltip(
               message: 'Reactivate',
               child: IconButton(
-                icon: const Icon(Icons.person_add_alt_1, size: 20,
-                    color: AppBrand.successColor),
+                icon: const Icon(Icons.person_add_alt_1,
+                    size: 20, color: AppBrand.successColor),
                 onPressed: onReactivate,
                 visualDensity: VisualDensity.compact,
               ),

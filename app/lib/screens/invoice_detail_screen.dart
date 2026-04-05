@@ -97,9 +97,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
       }
     } else if (action == 'paid') {
       try {
-        await ref
-            .read(invoiceNotifierProvider.notifier)
-            .markAsPaid(
+        await ref.read(invoiceNotifierProvider.notifier).markAsPaid(
               invoiceId: inv.id,
               customerId: inv.customerId,
               routeId: inv.routeId,

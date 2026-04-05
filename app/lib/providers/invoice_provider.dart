@@ -463,8 +463,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       final amountReceived =
           (data['amount_received'] as num?)?.toDouble() ?? 0.0;
       final outstandingBalance = total - amountReceived;
-      final reversalDelta =
-          type == InvoiceModel.typeSale ? -outstandingBalance : outstandingBalance;
+      final reversalDelta = type == InvoiceModel.typeSale
+          ? -outstandingBalance
+          : outstandingBalance;
       batch.update(db.collection(Collections.customers).doc(customerId), {
         'balance': FieldValue.increment(reversalDelta),
         'updated_at': now,

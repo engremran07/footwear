@@ -83,7 +83,8 @@ void main() {
       expect(InventoryTransactionModel.typeTransferOut, 'transfer_out');
     });
     test('typeReturnToWarehouse has correct value', () {
-      expect(InventoryTransactionModel.typeReturnToWarehouse, 'return_to_warehouse');
+      expect(InventoryTransactionModel.typeReturnToWarehouse,
+          'return_to_warehouse');
     });
     test('typeReturnFromShop has correct value', () {
       expect(InventoryTransactionModel.typeReturnFromShop, 'return_from_shop');

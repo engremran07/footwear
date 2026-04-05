@@ -958,8 +958,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'hard_delete_user': 'Permanently Delete',
     'confirm_hard_delete_user':
         'Permanently delete %s? Their Firestore profile will be removed. '
-        'On the free tier their Firebase Auth entry persists until '
-        'manually removed via the Firebase console.',
+            'On the free tier their Firebase Auth entry persists until '
+            'manually removed via the Firebase console.',
     'msg_user_hard_deleted': '%s permanently deleted',
     'reactivate': 'Reactivate',
     'confirm_reactivate_user': 'Reactivate %s and restore their access?',
@@ -1989,14 +1989,15 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ISSUE-018/019: مفاتيح مفقودة
     'permission_denied': 'تم رفض الوصول',
     'unsaved_changes': 'تغييرات غير محفوظة',
-    'discard_changes_message': 'لديك تغييرات غير محفوظة. هل تريد تجاهلها والمغادرة؟',
+    'discard_changes_message':
+        'لديك تغييرات غير محفوظة. هل تريد تجاهلها والمغادرة؟',
     // ISSUE-012: إدارة المستخدمين غير النشطين
     'tab_active_users': 'نشط',
     'tab_inactive_users': 'غير نشط',
     'hard_delete_user': 'حذف نهائي',
     'confirm_hard_delete_user':
         'حذف %s نهائيًا؟ سيتم إزالة ملفه الشخصي من قاعدة البيانات. '
-        'في الإصدار المجاني تبقى بيانات المصادقة حتى يتم حذفها يدويًا.',
+            'في الإصدار المجاني تبقى بيانات المصادقة حتى يتم حذفها يدويًا.',
     'msg_user_hard_deleted': 'تم حذف %s نهائيًا',
     'reactivate': 'إعادة تفعيل',
     'confirm_reactivate_user': 'هل تريد إعادة تفعيل %s واستعادة صلاحياتهم؟',
@@ -3032,17 +3033,19 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ISSUE-018/019: لاپتہ کلیدیں
     'permission_denied': 'رسائی سے انکار',
     'unsaved_changes': 'غیر محفوظ تبدیلیاں',
-    'discard_changes_message': 'آپ کے غیر محفوظ تبدیلیاں ہیں۔ کیا آپ انہیں ضائع کر کے جانا چاہتے ہیں؟',
+    'discard_changes_message':
+        'آپ کے غیر محفوظ تبدیلیاں ہیں۔ کیا آپ انہیں ضائع کر کے جانا چاہتے ہیں؟',
     // ISSUE-012: غیر فعال صارف انتظامیہ
     'tab_active_users': 'فعال',
     'tab_inactive_users': 'غیر فعال',
     'hard_delete_user': 'مستقل حذف',
     'confirm_hard_delete_user':
         '%s کو مستقل طور پر حذف کریں؟ ان کا Firestore پروفائل ہٹا دیا جائے گا۔ '
-        'مفت پلان میں Firebase Auth انٹری Firebase کنسول سے دستی طور پر ہٹانی ہوگی۔',
+            'مفت پلان میں Firebase Auth انٹری Firebase کنسول سے دستی طور پر ہٹانی ہوگی۔',
     'msg_user_hard_deleted': '%s مستقل طور پر حذف ہو گیا',
     'reactivate': 'دوبارہ فعال کریں',
-    'confirm_reactivate_user': '%s کو دوبارہ فعال کریں اور ان کی رسائی بحال کریں؟',
+    'confirm_reactivate_user':
+        '%s کو دوبارہ فعال کریں اور ان کی رسائی بحال کریں؟',
     'settings_company_logo': 'کمپنی لوگو',
     'settings_logo_specs':
         'PDF رپورٹس · PNG/JPG · زیادہ سے زیادہ 800×400 px · 300 KB',

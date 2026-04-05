@@ -266,8 +266,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     });
 
     if (routeId.trim().isNotEmpty) {
-      batch.update(
-          db.collection(Collections.routes).doc(routeId.trim()), {
+      batch.update(db.collection(Collections.routes).doc(routeId.trim()), {
         'assigned_seller_id': trimmedUid,
         'assigned_seller_name': displayName.trim(),
         'updated_at': now,

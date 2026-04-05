@@ -82,11 +82,19 @@ void main() {
     test('toJson preserves all 9 expected keys', () {
       final m = SellerInventoryModel.fromJson(baseJson, 'si1');
       final keys = m.toJson().keys.toSet();
-      expect(keys, containsAll([
-        'seller_id', 'seller_name', 'product_id',
-        'variant_id', 'variant_name', 'quantity_available',
-        'active', 'created_at', 'updated_at',
-      ]));
+      expect(
+          keys,
+          containsAll([
+            'seller_id',
+            'seller_name',
+            'product_id',
+            'variant_id',
+            'variant_name',
+            'quantity_available',
+            'active',
+            'created_at',
+            'updated_at',
+          ]));
     });
 
     test('quantity_available reflects updated value', () {

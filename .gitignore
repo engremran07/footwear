@@ -67,6 +67,11 @@ app/android/key.properties
 # Auth export (contains hashed credentials)
 auth-users.json
 
+# Release APKs (binary artifacts, distribute separately)
+releases/
+*.apk
+*.aab
+
 # Dev utility scripts (local only)
 check_locale.ps1
 check_locale.py

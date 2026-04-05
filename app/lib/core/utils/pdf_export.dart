@@ -746,7 +746,8 @@ Future<Uint8List> buildPdfSellerReport({
   required Map<String, String> labels,
   AppLocale locale = AppLocale.en,
   Uint8List? logoBytes,
-  String companyName = 'FOOTWEAR', // ISSUE-015: was hardcoded; now parameterised
+  String companyName =
+      'FOOTWEAR', // ISSUE-015: was hardcoded; now parameterised
 }) async {
   await _ensureFontBytes();
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;

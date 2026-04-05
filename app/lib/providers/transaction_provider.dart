@@ -92,7 +92,8 @@ class TransactionNotifier extends AsyncNotifier<void> {
       'items': items.map((e) => e.toJson()).toList(),
       'created_by': normalizedCreatedBy,
       'created_at': transactionDate ?? Timestamp.now(),
-      'deleted': false, // DI-01: required for isNotEqualTo filter in allTransactionsProvider
+      'deleted':
+          false, // DI-01: required for isNotEqualTo filter in allTransactionsProvider
     });
 
     // Update shop balance: cash_out adds, cash_in subtracts
