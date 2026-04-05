@@ -5,7 +5,8 @@ import '../core/constants/collections.dart';
 import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
 
-final productsProvider = StreamProvider<List<ProductModel>>((ref) {
+final productsProvider =
+    StreamProvider.autoDispose<List<ProductModel>>((ref) {
   return FirebaseFirestore.instance
       .collection(Collections.products)
       .where('active', isEqualTo: true)
@@ -17,7 +18,7 @@ final productsProvider = StreamProvider<List<ProductModel>>((ref) {
 });
 
 final productDetailProvider =
-    StreamProvider.family<ProductModel?, String>((ref, id) {
+    StreamProvider.autoDispose.family<ProductModel?, String>((ref, id) {
   return FirebaseFirestore.instance
       .collection(Collections.products)
       .doc(id)
@@ -26,8 +27,8 @@ final productDetailProvider =
           doc.exists ? ProductModel.fromJson(doc.data()!, doc.id) : null);
 });
 
-final productVariantsProvider =
-    StreamProvider.family<List<ProductVariantModel>, String>((ref, productId) {
+final productVariantsProvider = StreamProvider.autoDispose
+    .family<List<ProductVariantModel>, String>((ref, productId) {
   return FirebaseFirestore.instance
       .collection(Collections.productVariants)
       .where('product_id', isEqualTo: productId)
@@ -40,7 +41,8 @@ final productVariantsProvider =
           .toList());
 });
 
-final allVariantsProvider = StreamProvider<List<ProductVariantModel>>((ref) {
+final allVariantsProvider =
+    StreamProvider.autoDispose<List<ProductVariantModel>>((ref) {
   return FirebaseFirestore.instance
       .collection(Collections.productVariants)
       .where('active', isEqualTo: true)
@@ -71,6 +73,11 @@ class ProductNotifier extends AsyncNotifier<void> {
 
   Future<String> createProduct(Map<String, dynamic> data) async {
     await _requireAdmin();
+    // enforce HTTPS for product image URLs
+    final imageUrl = data['image_url'] as String? ?? '';
+    if (imageUrl.isNotEmpty && !imageUrl.startsWith('https://')) {
+      throw ArgumentError('Product image_url must use HTTPS (got: $imageUrl)');
+    }
     final db = FirebaseFirestore.instance;
     final doc = await db.collection(Collections.products).add({
       ...data,
@@ -82,6 +89,11 @@ class ProductNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> updateProduct(String id, Map<String, dynamic> data) async {
+    // enforce HTTPS for product image URLs on update
+    final imageUrl = data['image_url'] as String? ?? '';
+    if (imageUrl.isNotEmpty && !imageUrl.startsWith('https://')) {
+      throw ArgumentError('Product image_url must use HTTPS (got: $imageUrl)');
+    }
     await FirebaseFirestore.instance
         .collection(Collections.products)
         .doc(id)

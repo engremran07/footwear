@@ -65,6 +65,9 @@ class TransactionModel {
   final String? invoiceNumber;
   final String createdBy;
   final Timestamp createdAt;
+  final bool deleted;
+  final Timestamp? deletedAt;
+  final String? deletedBy;
 
   const TransactionModel({
     required this.id,
@@ -82,6 +85,9 @@ class TransactionModel {
     this.invoiceNumber,
     required this.createdBy,
     required this.createdAt,
+    this.deleted = false,
+    this.deletedAt,
+    this.deletedBy,
   });
 
   bool get isCashIn => type == 'cash_in';
@@ -110,6 +116,9 @@ class TransactionModel {
       invoiceNumber: json['invoice_number'] as String?,
       createdBy: json['created_by'] as String? ?? '',
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
+      deleted: json['deleted'] as bool? ?? false,
+      deletedAt: json['deleted_at'] as Timestamp?,
+      deletedBy: json['deleted_by'] as String?,
     );
   }
 

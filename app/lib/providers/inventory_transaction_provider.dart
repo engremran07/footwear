@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/inventory_transaction_model.dart';
 
-/// All inventory transactions (admin — transfer history).
+/// All inventory transactions (admin â€” transfer history).
 final allInventoryTransactionsProvider =
     StreamProvider<List<InventoryTransactionModel>>((ref) {
   return FirebaseFirestore.instance
@@ -18,7 +18,7 @@ final allInventoryTransactionsProvider =
 
 /// Inventory transactions for a single seller.
 final sellerInventoryTransactionsProvider =
-    StreamProvider.family<List<InventoryTransactionModel>, String>(
+    StreamProvider.autoDispose.family<List<InventoryTransactionModel>, String>(
         (ref, sellerId) {
   return FirebaseFirestore.instance
       .collection(Collections.inventoryTransactions)

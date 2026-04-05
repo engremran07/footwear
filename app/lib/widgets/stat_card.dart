@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../core/constants/app_brand.dart';
 import '../core/design/app_tokens.dart';
 
 class StatCard extends StatelessWidget {
@@ -129,7 +130,7 @@ class StatCard extends StatelessWidget {
                       Icon(
                         trend! > 0 ? Icons.trending_up : Icons.trending_down,
                         size: 16,
-                        color: trend! > 0 ? Colors.green : Colors.red,
+                        color: trend! > 0 ? AppBrand.successColor : AppBrand.errorColor,
                       ),
                     ],
                   ],

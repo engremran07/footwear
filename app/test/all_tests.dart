@@ -12,6 +12,7 @@ import 'unit/models/invoice_model_test.dart' as invoice_model;
 import 'unit/models/transaction_model_test.dart' as transaction_model;
 import 'unit/core/validators_test.dart' as validators;
 import 'unit/core/formatters_test.dart' as formatters;
+import 'unit/core/l10n_test.dart' as l10n;
 
 void main() {
   user_model.main();
@@ -24,4 +25,5 @@ void main() {
   transaction_model.main();
   validators.main();
   formatters.main();
+  l10n.main();
 }

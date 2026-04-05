@@ -1,15 +1,25 @@
 // Bumps the app version in pubspec.yaml and syncs it to app_brand.dart.
 //
-// Usage:
+// Usage (from app/ directory):
 //   dart run tool/bump_version.dart patch   # 1.0.0 → 1.0.1
 //   dart run tool/bump_version.dart minor   # 1.0.0 → 1.1.0
 //   dart run tool/bump_version.dart major   # 1.0.0 → 2.0.0
 //   dart run tool/bump_version.dart build   # only increment +N
 //   dart run tool/bump_version.dart         # (no arg) = build
+//
+// Flags:
+//   --tag   : also create a local git tag v<version> (does NOT push)
+//   --print : only print current version and exit (no changes)
 import 'dart:io';
 
 void main(List<String> args) {
-  final mode = args.isEmpty ? 'build' : args.first.toLowerCase();
+  final flags = args.where((a) => a.startsWith('--')).toSet();
+  final positional = args.where((a) => !a.startsWith('--')).toList();
+
+  final mode = positional.isEmpty ? 'build' : positional.first.toLowerCase();
+  final createTag = flags.contains('--tag');
+  final printOnly = flags.contains('--print');
+
   final pubspecFile = File('pubspec.yaml');
   if (!pubspecFile.existsSync()) {
     stderr.writeln('Error: pubspec.yaml not found. Run from app/ directory.');
@@ -29,6 +39,11 @@ void main(List<String> args) {
   var minor = int.parse(match.group(2)!);
   var patch = int.parse(match.group(3)!);
   var build = int.parse(match.group(4)!);
+
+  if (printOnly) {
+    stdout.writeln('$major.$minor.$patch+$build');
+    return;
+  }
 
   final oldVersion = '$major.$minor.$patch+$build';
 
@@ -65,6 +80,19 @@ void main(List<String> args) {
   _syncAppBrand('$major.$minor.$patch', build.toString());
 
   stdout.writeln('✓ Version bumped: $oldVersion → $newVersion ($mode)');
+
+  // 3. Optionally create a local git tag (use release.ps1 for full pipeline)
+  if (createTag) {
+    final tag = 'v$newVersion';
+    final result =
+        Process.runSync('git', ['tag', '-a', tag, '-m', 'ShoesERP $tag']);
+    if (result.exitCode == 0) {
+      stdout
+          .writeln('✓ Git tag created: $tag (push with: git push origin $tag)');
+    } else {
+      stderr.writeln('Warning: git tag failed — ${result.stderr}');
+    }
+  }
 }
 
 void _syncAppBrand(String version, String buildNumber) {

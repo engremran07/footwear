@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +8,8 @@ import '../models/user_model.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/services/permissions_service.dart';
+
+// ─── App Shell ───────────────────────────────────────────────────────────────
 
 class AppShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -22,6 +24,7 @@ class AppShell extends ConsumerStatefulWidget {
     (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
     (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
     (icon: Icons.analytics, key: 'reports', route: '/reports'),
+    (icon: Icons.manage_accounts, key: 'users', route: '/users'),
     (icon: Icons.settings, key: 'settings', route: '/settings'),
   ];
 
@@ -29,48 +32,129 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> {
+class _AppShellState extends ConsumerState<AppShell>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _drawerCtrl;
+  late final Animation<double> _drawerAnim;
+  bool _isDrawerOpen = false;
+
   @override
   void initState() {
     super.initState();
+    _drawerCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _drawerAnim = CurvedAnimation(
+      parent: _drawerCtrl,
+      curve: Curves.fastOutSlowIn,
+      reverseCurve: Curves.easeIn,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PermissionsService.requestOnFirstRun();
     });
   }
 
-  /// Returns the logical parent route for [path], or null when already at root.
+  @override
+  void dispose() {
+    _drawerCtrl.dispose();
+    super.dispose();
+  }
+
+  void _openDrawer() {
+    setState(() => _isDrawerOpen = true);
+    _drawerCtrl.forward();
+  }
+
+  void _closeDrawer() {
+    _drawerCtrl.reverse().then((_) {
+      if (mounted) setState(() => _isDrawerOpen = false);
+    });
+  }
+
+  void _toggleDrawer() => _isDrawerOpen ? _closeDrawer() : _openDrawer();
+
   String? _parentRoute(String path) {
     final segs = path.split('/').where((s) => s.isNotEmpty).toList();
-    if (segs.isEmpty) return null; // at /
-    if (segs.length == 1) return '/'; // /routes → /
-    // /products/:id/variants/new  or  /products/:id/variants/:vid/edit → /products/:id
+    if (segs.isEmpty) return null;
+    if (segs.length == 1) return '/';
     if (segs.length >= 3 && segs[2] == 'variants') {
       return '/${segs[0]}/${segs[1]}';
     }
-    // /routes/:id/edit → /routes/:id
     if (segs.length == 3 && segs[2] == 'edit') {
       return '/${segs[0]}/${segs[1]}';
     }
-    // /routes/:id → /routes
     if (segs.length == 2) return '/${segs[0]}';
     return '/';
+  }
+
+  List<({IconData icon, String key, String route})> _filteredItems(
+      UserModel? user) {
+    if (user == null) return [];
+    if (user.isSeller) {
+      return AppShell._navItems
+          .where((e) =>
+              e.route == '/' ||
+              e.route == '/shops' ||
+              e.route == '/products' ||
+              e.route == '/inventory' ||
+              e.route == '/invoices')
+          .toList();
+    }
+    return AppShell._navItems.where((e) {
+      if (e.route == '/settings' || e.route == '/users') return user.isAdmin;
+      return true;
+    }).toList();
+  }
+
+  List<({IconData icon, String key, String route})> _primaryNavItems(
+      UserModel? user) {
+    if (user == null) return [];
+    if (user.isSeller) {
+      return const [
+        (icon: Icons.dashboard, key: 'dashboard', route: '/'),
+        (icon: Icons.storefront, key: 'shops', route: '/shops'),
+        (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
+        (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
+        (icon: Icons.person, key: 'profile', route: '/profile'),
+      ];
+    }
+    return const [
+      (icon: Icons.dashboard, key: 'dashboard', route: '/'),
+      (icon: Icons.route, key: 'routes', route: '/routes'),
+      (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
+      (icon: Icons.analytics, key: 'reports', route: '/reports'),
+      (icon: Icons.settings, key: 'settings', route: '/settings'),
+    ];
+  }
+
+  int _selectedIndex(List<({IconData icon, String label, String route})> items,
+      String location) {
+    if (items.isEmpty) return 0;
+    final idx = items.indexWhere((e) =>
+        e.route == location ||
+        (e.route != '/' && location.startsWith(e.route)));
+    return idx < 0 ? 0 : idx;
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).valueOrNull;
     final isWide = MediaQuery.of(context).size.width >= 720;
+    final isOnline = ref.watch(isOnlineProvider).valueOrNull ?? false;
+    final currentLocation = GoRouterState.of(context).uri.path;
 
     final rawItems = _filteredItems(user);
     final navItems = rawItems
         .map((e) => (icon: e.icon, label: tr(e.key, ref), route: e.route))
         .toList();
-    final currentLocation = GoRouterState.of(context).uri.path;
-
-    final isOnline = ref.watch(isOnlineProvider).valueOrNull ?? false;
 
     void onPopInvoked(bool didPop, dynamic result) {
       if (didPop) return;
+      if (_isDrawerOpen) {
+        _closeDrawer();
+        return;
+      }
       final parent = _parentRoute(currentLocation);
       if (parent != null) {
         context.go(parent);
@@ -79,6 +163,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       }
     }
 
+    // ── Tablet/Desktop: NavigationRail (unchanged) ────────────────────────
     if (isWide) {
       return PopScope(
         canPop: false,
@@ -107,137 +192,446 @@ class _AppShellState extends ConsumerState<AppShell> {
       );
     }
 
+    // ── Mobile: Zoom Drawer + WhatsApp AppBar + Bottom Nav ────────────────
+    final rawPrimary = _primaryNavItems(user);
+    final primaryItems = rawPrimary
+        .map((e) => (icon: e.icon, label: tr(e.key, ref), route: e.route))
+        .toList();
+
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final slideWidth = MediaQuery.of(context).size.width * 0.74;
+    final profileLabel = tr('profile', ref);
+    final signOutLabel = tr('sign_out', ref);
+    final menuLabel = tr('menu', ref);
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: onPopInvoked,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
+      child: AnimatedBuilder(
+        animation: _drawerAnim,
+        builder: (context, _) {
+          final progress = _drawerAnim.value;
+          final dx = isRtl ? -(progress * slideWidth) : progress * slideWidth;
+          final scale = 1.0 - 0.08 * progress;
+          final radius = 22.0 * progress;
+          final shadowAlpha = (64 * progress).round().clamp(0, 64);
+
+          return Stack(
             children: [
-              Image.asset(AppBrand.logoAsset, height: 32, fit: BoxFit.contain),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _BreadcrumbTitle(
-                    location: currentLocation, isOnline: isOnline, ref: ref),
+              // Drawer background
+              Positioned.fill(
+                child: _DrawerMenuScreen(
+                  user: user,
+                  navItems: navItems,
+                  currentLocation: currentLocation,
+                  isOnline: isOnline,
+                  isRtl: isRtl,
+                  profileLabel: profileLabel,
+                  signOutLabel: signOutLabel,
+                  onNavigate: (route) {
+                    _closeDrawer();
+                    context.go(route);
+                  },
+                  onProfile: () {
+                    _closeDrawer();
+                    context.go('/profile');
+                  },
+                  onSignOut: () =>
+                      ref.read(authNotifierProvider.notifier).signOut(),
+                ),
               ),
-            ],
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout),
-              tooltip: tr('sign_out', ref),
-              onPressed: () =>
-                  ref.read(authNotifierProvider.notifier).signOut(),
-            ),
-          ],
-        ),
-        drawer: NavigationDrawer(
-          selectedIndex: _selectedIndex(navItems, currentLocation),
-          onDestinationSelected: (i) {
-            HapticFeedback.selectionClick();
-            Navigator.pop(context);
-            context.go(navItems[i].route);
-          },
-          children: [
-            InkWell(
-              onTap: user == null
-                  ? null
-                  : () {
-                      Navigator.pop(context);
-                      context.go('/profile');
-                    },
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 32, 16, 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Image.asset(AppBrand.logoAsset,
-                        height: 56, fit: BoxFit.contain),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _UserAvatar(user: user, radius: 18),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: user != null
-                              ? Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(user.displayName,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14),
-                                        overflow: TextOverflow.ellipsis),
-                                    Text(user.email,
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurfaceVariant),
-                                        overflow: TextOverflow.ellipsis),
-                                    const SizedBox(height: 4),
-                                    _RoleBadge(role: user.role),
-                                  ],
-                                )
-                              : const Text(AppBrand.appName,
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16)),
+
+              // Main content with zoom transform (scale from edge, then slide)
+              Transform.translate(
+                offset: Offset(dx, 0),
+                child: Transform.scale(
+                  scale: scale,
+                  alignment:
+                      isRtl ? Alignment.centerRight : Alignment.centerLeft,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(radius),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(shadowAlpha),
+                          blurRadius: 28,
+                          spreadRadius: 4,
                         ),
                       ],
                     ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(radius),
+                      child: Scaffold(
+                        appBar: _WhatsAppBar(
+                          user: user,
+                          currentLocation: currentLocation,
+                          isOnline: isOnline,
+                          menuLabel: menuLabel,
+                          drawerAnim: _drawerAnim,
+                          onMenuTap: _toggleDrawer,
+                          onProfileTap: () {
+                            if (_isDrawerOpen) _closeDrawer();
+                            context.go('/profile');
+                          },
+                        ),
+                        body: GestureDetector(
+                          onTap: _isDrawerOpen ? _closeDrawer : null,
+                          onHorizontalDragEnd: (d) {
+                            final vel = d.primaryVelocity ?? 0;
+                            if (!isRtl && vel > 200) _openDrawer();
+                            if (!isRtl && vel < -200) _closeDrawer();
+                            if (isRtl && vel < -200) _openDrawer();
+                            if (isRtl && vel > 200) _closeDrawer();
+                          },
+                          behavior: HitTestBehavior.translucent,
+                          child: AbsorbPointer(
+                            absorbing: _isDrawerOpen,
+                            child: widget.child,
+                          ),
+                        ),
+                        bottomNavigationBar: primaryItems.isEmpty
+                            ? null
+                            : _WhatsAppBottomNav(
+                                items: primaryItems,
+                                currentLocation: currentLocation,
+                                onTap: (route) {
+                                  HapticFeedback.selectionClick();
+                                  if (_isDrawerOpen) _closeDrawer();
+                                  context.go(route);
+                                },
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─── WhatsApp-style App Bar ───────────────────────────────────────────────────
+
+class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final UserModel? user;
+  final String currentLocation;
+  final bool isOnline;
+  final String menuLabel;
+  final Animation<double> drawerAnim;
+  final VoidCallback onMenuTap;
+  final VoidCallback onProfileTap;
+
+  const _WhatsAppBar({
+    required this.user,
+    required this.currentLocation,
+    required this.isOnline,
+    required this.menuLabel,
+    required this.drawerAnim,
+    required this.onMenuTap,
+    required this.onProfileTap,
+  });
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return AppBar(
+      elevation: 0,
+      scrolledUnderElevation: 2,
+      leading: Tooltip(
+        message: menuLabel,
+        child: IconButton(
+          icon: AnimatedIcon(
+            icon: AnimatedIcons.menu_close,
+            progress: drawerAnim,
+            semanticLabel: menuLabel,
+          ),
+          onPressed: onMenuTap,
+        ),
+      ),
+      title: Row(
+        children: [
+          Image.asset(AppBrand.logoAsset, height: 30, fit: BoxFit.contain),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _BreadcrumbTitle(
+              location: currentLocation,
+              isOnline: isOnline,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        if (user != null)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 10),
+            child: GestureDetector(
+              onTap: onProfileTap,
+              child: Semantics(
+                label: 'Profile',
+                button: true,
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    _UserAvatar(user: user, radius: 17),
+                    if (isOnline)
+                      Positioned(
+                        bottom: 1,
+                        right: 1,
+                        child: Container(
+                          width: 9,
+                          height: 9,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppBrand.successColor,
+                            border: Border.all(color: cs.surface, width: 1.5),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
             ),
-            const Divider(height: 1),
-            ...navItems.map((e) => NavigationDrawerDestination(
-                  icon: Icon(e.icon),
-                  label: Text(e.label),
-                )),
-            const Divider(height: 1),
-          ],
-        ),
-        body: widget.child,
-      ),
+          ),
+      ],
     );
-  }
-
-  List<({IconData icon, String key, String route})> _filteredItems(
-      UserModel? user) {
-    if (user == null) return [];
-    if (user.isSeller) {
-      return AppShell._navItems
-          .where((item) =>
-              item.route == '/' ||
-              item.route == '/shops' ||
-              item.route == '/products' ||
-              item.route == '/inventory' ||
-              item.route == '/invoices')
-          .toList();
-    }
-    return AppShell._navItems.where((item) {
-      if (item.route == '/settings') {
-        return user.isAdmin;
-      }
-      return true;
-    }).toList();
-  }
-
-  int? _selectedIndex(List<({IconData icon, String label, String route})> items,
-      String location) {
-    if (items.isEmpty) return null;
-    final idx = items.indexWhere((e) =>
-        e.route == location ||
-        (e.route != '/' && location.startsWith(e.route)));
-    return idx < 0 ? 0 : idx;
   }
 }
 
-// ─── Scrollable side navigation rail ─────────────────────────────────────────
+// ─── WhatsApp-style Bottom Navigation ────────────────────────────────────────
+
+class _WhatsAppBottomNav extends StatelessWidget {
+  final List<({IconData icon, String label, String route})> items;
+  final String currentLocation;
+  final ValueChanged<String> onTap;
+
+  const _WhatsAppBottomNav({
+    required this.items,
+    required this.currentLocation,
+    required this.onTap,
+  });
+
+  int get _selectedIndex {
+    final idx = items.indexWhere((e) =>
+        e.route == currentLocation ||
+        (e.route != '/' && currentLocation.startsWith(e.route)));
+    return idx < 0 ? 0 : idx;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NavigationBar(
+      selectedIndex: _selectedIndex,
+      onDestinationSelected: (i) => onTap(items[i].route),
+      labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+      animationDuration: const Duration(milliseconds: 300),
+      destinations: items
+          .map(
+            (item) => NavigationDestination(
+              icon: Icon(item.icon),
+              selectedIcon: Icon(item.icon, color: AppBrand.primaryColor),
+              label: item.label,
+              tooltip: item.label,
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+// ─── Zoom Drawer Menu Screen ──────────────────────────────────────────────────
+
+class _DrawerMenuScreen extends StatelessWidget {
+  final UserModel? user;
+  final List<({IconData icon, String label, String route})> navItems;
+  final String currentLocation;
+  final bool isOnline;
+  final bool isRtl;
+  final String profileLabel;
+  final String signOutLabel;
+  final ValueChanged<String> onNavigate;
+  final VoidCallback onProfile;
+  final VoidCallback onSignOut;
+
+  const _DrawerMenuScreen({
+    required this.user,
+    required this.navItems,
+    required this.currentLocation,
+    required this.isOnline,
+    required this.isRtl,
+    required this.profileLabel,
+    required this.signOutLabel,
+    required this.onNavigate,
+    required this.onProfile,
+    required this.onSignOut,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final drawerWidth = MediaQuery.of(context).size.width * 0.74;
+
+    return Align(
+      alignment: isRtl ? Alignment.centerRight : Alignment.centerLeft,
+      child: SizedBox(
+        width: drawerWidth,
+        child: Material(
+          color: cs.surface,
+          child: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // User header
+                InkWell(
+                  onTap: onProfile,
+                  child: Padding(
+                    padding:
+                        const EdgeInsetsDirectional.fromSTEB(20, 28, 20, 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Image.asset(AppBrand.logoAsset,
+                            height: 46, fit: BoxFit.contain),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                _UserAvatar(user: user, radius: 23),
+                                if (isOnline)
+                                  Positioned(
+                                    bottom: 1,
+                                    right: 1,
+                                    child: Container(
+                                      width: 11,
+                                      height: 11,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: AppBrand.successColor,
+                                        border: Border.all(
+                                            color: cs.surface, width: 2),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(width: 12),
+                            if (user != null)
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      user!.displayName,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: cs.onSurface,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      user!.email,
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: cs.onSurfaceVariant),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 5),
+                                    _RoleBadge(role: user!.role, small: true),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+
+                // Nav items
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    itemCount: navItems.length,
+                    itemBuilder: (ctx, i) {
+                      final item = navItems[i];
+                      final isSel = item.route == currentLocation ||
+                          (item.route != '/' &&
+                              currentLocation.startsWith(item.route));
+                      return ListTile(
+                        leading: Icon(
+                          item.icon,
+                          size: 22,
+                          color: isSel
+                              ? AppBrand.primaryColor
+                              : cs.onSurfaceVariant,
+                        ),
+                        title: Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight:
+                                isSel ? FontWeight.w600 : FontWeight.normal,
+                            color: isSel ? AppBrand.primaryColor : cs.onSurface,
+                          ),
+                        ),
+                        selected: isSel,
+                        selectedTileColor: AppBrand.primaryColor.withAlpha(20),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        horizontalTitleGap: 8,
+                        contentPadding:
+                            const EdgeInsetsDirectional.fromSTEB(18, 0, 14, 0),
+                        onTap: () => onNavigate(item.route),
+                      );
+                    },
+                  ),
+                ),
+
+                const Divider(height: 1),
+
+                // Footer
+                ListTile(
+                  leading: Icon(Icons.person_outline,
+                      color: cs.onSurfaceVariant, size: 22),
+                  title: Text(profileLabel,
+                      style: TextStyle(fontSize: 14, color: cs.onSurface)),
+                  contentPadding:
+                      const EdgeInsetsDirectional.fromSTEB(18, 0, 14, 0),
+                  horizontalTitleGap: 8,
+                  onTap: onProfile,
+                ),
+                ListTile(
+                  leading: Icon(Icons.logout, color: cs.error, size: 22),
+                  title: Text(signOutLabel,
+                      style: TextStyle(fontSize: 14, color: cs.error)),
+                  contentPadding:
+                      const EdgeInsetsDirectional.fromSTEB(18, 0, 14, 0),
+                  horizontalTitleGap: 8,
+                  onTap: onSignOut,
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Scrollable NavigationRail (tablet/desktop) ───────────────────────────────
 
 class _ScrollableNavRail extends StatelessWidget {
   final bool extended;
@@ -300,6 +694,7 @@ class _ScrollableNavRail extends StatelessWidget {
                       ),
               ),
             ),
+            const Divider(height: 1),
             if (user != null)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -318,12 +713,14 @@ class _ScrollableNavRail extends StatelessWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(user!.displayName,
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: cs.onSurface),
-                                        overflow: TextOverflow.ellipsis),
+                                    Text(
+                                      user!.displayName,
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: cs.onSurface),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                     _RoleBadge(role: user!.role, small: true),
                                   ],
                                 ),
@@ -370,13 +767,15 @@ class _ScrollableNavRail extends StatelessWidget {
                               Icon(item.icon, size: 20, color: fg),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: Text(item.label,
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        color: fg,
-                                        fontWeight: sel
-                                            ? FontWeight.w600
-                                            : FontWeight.normal)),
+                                child: Text(
+                                  item.label,
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: fg,
+                                      fontWeight: sel
+                                          ? FontWeight.w600
+                                          : FontWeight.normal),
+                                ),
                               ),
                             ]),
                           ),
@@ -401,7 +800,8 @@ class _ScrollableNavRail extends StatelessWidget {
                               borderRadius: BorderRadius.circular(24),
                             ),
                             child: Center(
-                                child: Icon(item.icon, size: 20, color: fg)),
+                              child: Icon(item.icon, size: 20, color: fg),
+                            ),
                           ),
                         ),
                       ),
@@ -472,7 +872,7 @@ class _UserAvatar extends StatelessWidget {
   }
 }
 
-// ─── Role Badge ──────────────────────────────────────────────────────────────
+// ─── Role Badge ───────────────────────────────────────────────────────────────
 
 class _RoleBadge extends StatelessWidget {
   final UserRole role;
@@ -510,12 +910,10 @@ class _RoleBadge extends StatelessWidget {
 class _BreadcrumbTitle extends StatelessWidget {
   final String location;
   final bool isOnline;
-  final WidgetRef ref;
 
   const _BreadcrumbTitle({
     required this.location,
     required this.isOnline,
-    required this.ref,
   });
 
   static const _segmentLabels = <String, String>{
@@ -524,8 +922,10 @@ class _BreadcrumbTitle extends StatelessWidget {
     'routes': 'Routes',
     'shops': 'Shops',
     'inventory': 'Inventory',
+    'invoices': 'Invoices',
     'reports': 'Reports',
     'settings': 'Settings',
+    'profile': 'Profile',
     'variants': 'Variants',
     'edit': 'Edit',
     'new': 'New',
@@ -537,7 +937,6 @@ class _BreadcrumbTitle extends StatelessWidget {
     for (final seg in segments) {
       final label = _segmentLabels[seg];
       if (label != null) labels.add(label);
-      // Skip IDs (long alphanumeric strings without spaces)
     }
     return labels.isEmpty ? AppBrand.appName : labels.join(' \u203a ');
   }
@@ -564,7 +963,7 @@ class _BreadcrumbTitle extends StatelessWidget {
   }
 }
 
-// ─── Connectivity Dot ────────────────────────────────────────────────────────
+// ─── Connectivity Dot ─────────────────────────────────────────────────────────
 
 class _ConnectivityDot extends StatelessWidget {
   final bool isOnline;

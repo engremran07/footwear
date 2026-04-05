@@ -21,6 +21,7 @@ class InvoiceModel {
   final double total;
   final String saleType; // cash | credit
   final double amountReceived; // cash collected at time of invoice
+  final double outstandingAmount; // amount still owed = total - amountReceived
   final String status; // draft | issued | paid | partial | void
   static const String statusDraft = 'draft';
   static const String statusIssued = 'issued';
@@ -50,6 +51,7 @@ class InvoiceModel {
     required this.total,
     this.saleType = 'credit',
     this.amountReceived = 0,
+    this.outstandingAmount = 0,
     required this.status,
     this.notes,
     this.linkedInvoiceId,
@@ -89,6 +91,7 @@ class InvoiceModel {
       total: (json['total'] as num?)?.toDouble() ?? 0,
       saleType: json['sale_type'] as String? ?? 'credit',
       amountReceived: (json['amount_received'] as num?)?.toDouble() ?? 0,
+      outstandingAmount: (json['outstanding_amount'] as num?)?.toDouble() ?? 0,
       status: json['status'] as String? ?? statusDraft,
       notes: json['notes'] as String?,
       linkedInvoiceId: json['linked_invoice_id'] as String?,

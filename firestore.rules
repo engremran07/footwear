@@ -69,6 +69,13 @@ service cloud.firestore {
       return isSeller() && assignedRouteId() != null && assignedRouteId() == routeId;
     }
 
+    // Validates an allowed transaction type value
+    function isValidTransactionType(type) {
+      return type is string &&
+        (type == 'cash_out' || type == 'cash_in' || type == 'return' ||
+         type == 'payment' || type == 'write_off');
+    }
+
     // --- users --------------------------------------------------------------
     match /users/{userId} {
       // get (single doc): own doc or admin
@@ -78,6 +85,7 @@ service cloud.firestore {
       allow create: if (isBootstrapAdminCreate(userId) ||
         (
           isAdmin() &&
+          request.resource.data.created_by == request.auth.uid &&
           (
             request.resource.data.role != 'seller' ||
             (
@@ -123,7 +131,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // --- customers (consolidates shops and customers) ----
+    // --- customers (consolidates shops and customers) -----------------------
     match /customers/{customerId} {
       allow read: if isAdmin() ||
         (
@@ -131,16 +139,21 @@ service cloud.firestore {
           resource.data.route_id != null &&
           isSellerForRoute(resource.data.route_id)
         );
+      // Sellers must include a non-empty route_id when creating customers
       allow create: if (isAdmin() ||
         (
           isSeller() &&
-          request.resource.data.route_id != null &&
+          request.resource.data.route_id is string &&
+          request.resource.data.route_id != '' &&
           isSellerForRoute(request.resource.data.route_id)
-        ) ||
-        (isSeller() && request.resource.data.route_id == null)) && docSizeOk();
-      allow update: if (isAdmin() || 
+        )) && docSizeOk();
+      // Sellers can update customers in their route, OR update balance on un-routed
+      // customers that fall within their newly assigned route (route_id may differ)
+      allow update: if (isAdmin() ||
         (
           isSeller() &&
+          resource.data.route_id is string &&
+          resource.data.route_id != '' &&
           isSellerForRoute(resource.data.route_id)
         ) ||
         (
@@ -169,10 +182,14 @@ service cloud.firestore {
              ))
           )
         );
+      // Field validation: type must be in allowed set, amount must be positive
       allow create: if (isAdmin() ||
         (
           isSeller() &&
           request.resource.data.created_by == request.auth.uid &&
+          isValidTransactionType(request.resource.data.type) &&
+          request.resource.data.amount is number &&
+          request.resource.data.amount > 0 &&
           (
             (request.resource.data.route_id != null &&
              request.resource.data.route_id != '' &&
@@ -185,9 +202,13 @@ service cloud.firestore {
           )
         )) && docSizeOk();
       allow update: if isAdmin() ||
-        (isSeller() && resource.data.created_by == request.auth.uid);
-      allow delete: if isAdmin() ||
-        (isSeller() && resource.data.created_by == request.auth.uid);
+        (
+          isSeller() &&
+          resource.data.created_by == request.auth.uid &&
+          request.resource.data.diff(resource.data)
+            .affectedKeys().hasOnly(['deleted', 'deleted_at', 'deleted_by', 'updated_at'])
+        );
+      allow delete: if isAdmin();
     }
 
     // --- seller inventory ---------------------------------------------------
@@ -195,9 +216,15 @@ service cloud.firestore {
       allow read: if isAdmin() ||
         (isSeller() && resource.data.seller_id == request.auth.uid);
       allow create, delete: if isAdmin();
-      // Seller can update quantity_available when executing a sale (stock deduction)
+      // Seller can update quantity_available (stock deduction on sale).
+      // Post-state quantity_available must stay >= 0 to prevent negative stock.
       allow update: if isAdmin() ||
-        (isSeller() && resource.data.seller_id == request.auth.uid);
+        (
+          isSeller() &&
+          resource.data.seller_id == request.auth.uid &&
+          request.resource.data.quantity_available >= 0 &&
+          docSizeOk()
+        );
     }
 
     // --- inventory transactions (audit log for all stock movements) ---------
@@ -217,11 +244,15 @@ service cloud.firestore {
     match /settings/{docId} {
       allow read: if isActiveUser();
       allow create, delete: if isAdmin();
-      // Admin: full update; seller: only invoice counter bump
+      // Admin: full update.
+      // Sellers: only invoice counter — and only increment by exactly 1 to
+      // prevent fraudulent bulk increments of the invoice sequence.
       allow update: if (isAdmin() ||
         (isActiveUser() &&
          request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['last_invoice_number']))) && docSizeOk();
+           .hasOnly(['last_invoice_number']) &&
+         request.resource.data.last_invoice_number ==
+           resource.data.last_invoice_number + 1)) && docSizeOk();
     }
 
     // --- invoices -----------------------------------------------------------

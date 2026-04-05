@@ -21,9 +21,15 @@ class SettingsModel {
   });
 
   /// Decoded logo bytes ready for Image.memory() and PDF generation.
-  /// Returns null when no logo has been uploaded.
-  Uint8List? get logoBytes =>
-      logoBase64 != null ? base64Decode(logoBase64!) : null;
+  /// Returns null when no logo has been uploaded or if the base64 is corrupt.
+  Uint8List? get logoBytes {
+    if (logoBase64 == null) return null;
+    try {
+      return base64Decode(logoBase64!);
+    } catch (_) {
+      return null; // I-23: corrupt base64 must not crash the app
+    }
+  }
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) {
     return SettingsModel(

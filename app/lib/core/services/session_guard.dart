@@ -119,6 +119,9 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
 
   @override
   Widget build(BuildContext context) {
+    // Activate the idToken guard — detects Firebase Console account disabling
+    ref.watch(authTokenGuardProvider);
+
     // Reset session clock on fresh login
     ref.listen<AsyncValue<UserModel?>>(authUserProvider, (prev, next) {
       final prevUser = prev?.valueOrNull;

@@ -187,12 +187,14 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     );
     if (confirmed != true) return;
     try {
+      final authUser = ref.read(authUserProvider).valueOrNull;
       await ref.read(transactionNotifierProvider.notifier).deleteTransaction(
             txId: tx.id,
             customerId:
                 tx.customerId ?? (tx.shopId.isNotEmpty ? tx.shopId : null),
             amount: tx.amount,
             type: tx.type,
+            deletedBy: authUser?.id ?? '',
           );
     } catch (e) {
       if (mounted) {

@@ -27,6 +27,8 @@ import '../../screens/invoices_list_screen.dart';
 import '../../screens/invoice_detail_screen.dart';
 import '../../screens/create_sale_invoice_screen.dart';
 import '../../screens/bootstrap_profile_screen.dart';
+import '../../screens/about_screen.dart';
+import '../../screens/users_list_screen.dart';
 import '../../widgets/app_shell.dart';
 
 /// Normalize path: strip query params, trailing slashes, collapse double slashes.
@@ -39,7 +41,7 @@ String _normalizePath(String raw) {
 
 bool _isAdminOnlyPath(String rawPath) {
   final path = _normalizePath(rawPath);
-  if (path == '/settings' || path == '/routes/new' || path == '/products/new') {
+  if (path == '/settings' || path == '/users' || path == '/routes/new' || path == '/products/new') {
     return true;
   }
   return RegExp(r'^/routes/[^/]+/edit$').hasMatch(path) ||
@@ -252,6 +254,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               path: '/invoices/:id',
               pageBuilder: (_, s) => _fadePage(
                   InvoiceDetailScreen(invoiceId: s.pathParameters['id']!), s)),
+          // Users (admin-only)
+          GoRoute(
+              path: '/users',
+              pageBuilder: (_, s) =>
+                  _fadePage(const UsersListScreen(), s)),
           // Reports
           GoRoute(
               path: '/reports',
@@ -260,6 +267,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
               path: '/profile',
               pageBuilder: (_, s) => _fadePage(const ProfileScreen(), s)),
+          // About
+          GoRoute(
+              path: '/about',
+              pageBuilder: (_, s) => _fadePage(const AboutScreen(), s)),
           // Settings
           GoRoute(
               path: '/settings',

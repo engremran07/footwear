@@ -7,7 +7,7 @@ import '../firebase_options.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
 
-final allUsersProvider = StreamProvider<List<UserModel>>((ref) {
+final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
   // Admin-only list query: guard so non-admin credentials never subscribe,
   // preventing PERMISSION_DENIED during auth transitions.
   final user = ref.watch(authUserProvider).valueOrNull;
@@ -22,7 +22,7 @@ final allUsersProvider = StreamProvider<List<UserModel>>((ref) {
           snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList());
 });
 
-final sellersProvider = StreamProvider<List<UserModel>>((ref) {
+final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
   // Admin-only list query: guard to prevent PERMISSION_DENIED for seller creds.
   final user = ref.watch(authUserProvider).valueOrNull;
   if (user == null || !user.isAdmin) return const Stream.empty();

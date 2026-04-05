@@ -1,23 +1,17 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Tracks online/offline status by listening to Firestore connection state.
+/// Bidirectional online/offline detection via DNS probe.
+/// Emits [true] when reachable, [false] when not.
+/// Probes every 10 seconds; first result within ~100 ms.
 final networkStatusProvider = StreamProvider<bool>((ref) {
-  // This stream emits true when Firestore detects internet connectivity
-  return FirebaseFirestore.instance.snapshotsInSync().map((_) => true);
-});
-
-/// Checks real device internet connectivity using a DNS lookup.
-/// Uses dart:io so it works without Firebase authentication — safe on the
-/// login screen (where the user is not yet signed in).
-final isOnlineProvider = StreamProvider<bool>((ref) {
   final controller = StreamController<bool>();
 
   Future<void> check() async {
     try {
-      final result = await InternetAddress.lookup('8.8.8.8');
+      final result = await InternetAddress.lookup('8.8.8.8')
+          .timeout(const Duration(seconds: 5));
       if (!controller.isClosed) {
         controller.add(result.isNotEmpty && result[0].rawAddress.isNotEmpty);
       }
@@ -26,7 +20,7 @@ final isOnlineProvider = StreamProvider<bool>((ref) {
     }
   }
 
-  check(); // Immediate check — emits within ~100 ms
+  check();
   final timer = Timer.periodic(const Duration(seconds: 10), (_) => check());
 
   ref.onDispose(() {
@@ -36,3 +30,6 @@ final isOnlineProvider = StreamProvider<bool>((ref) {
 
   return controller.stream;
 });
+
+/// Alias kept for backward compatibility — prefer [networkStatusProvider].
+final isOnlineProvider = networkStatusProvider;

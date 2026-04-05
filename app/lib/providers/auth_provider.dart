@@ -6,15 +6,9 @@ import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/collections.dart';
 import '../models/user_model.dart';
-import 'customer_provider.dart';
 import 'dashboard_provider.dart';
 import 'invoice_provider.dart';
-import 'product_provider.dart';
-import 'route_provider.dart';
-import 'seller_inventory_provider.dart';
 import 'settings_provider.dart';
-import 'shop_provider.dart';
-import 'transaction_provider.dart';
 import 'user_provider.dart';
 
 final _logger = Logger();
@@ -26,6 +20,25 @@ final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
 
 final authStateProvider = StreamProvider<User?>((ref) {
   return ref.watch(firebaseAuthProvider).authStateChanges();
+});
+
+/// Monitors idToken refresh events to detect when Firebase Console disables
+/// an account (3-way sync Path 3). On each token refresh the Firebase SDK
+/// returns a FirebaseAuthException(code: 'user-disabled') if the account has
+/// been disabled server-side, which we map to a forced sign-out.
+final authTokenGuardProvider = StreamProvider<void>((ref) async* {
+  await for (final user
+      in FirebaseAuth.instance.idTokenChanges()) {
+    if (user == null) continue;
+    try {
+      await user.getIdToken(true); // force server round-trip
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-disabled' || e.code == 'user-token-expired') {
+        // Account was disabled in Firebase Console — sign out immediately
+        ref.read(authNotifierProvider.notifier).signOut();
+      }
+    } catch (_) {}
+  }
 });
 
 final authUserProvider = StreamProvider<UserModel?>((ref) {
@@ -52,35 +65,16 @@ class AuthNotifier extends AsyncNotifier<void> {
   Future<void> build() async {}
 
   void _invalidateRoleScopedProviders() {
-    // Base providers
+    // Invalidate only the role-scoped providers that need to reset on sign-out.
+    // Listing all 28 providers was causing 28 concurrent Firestore listener
+    // restarts — a quota spike and UI jank. autoDispose providers self-cancel
+    // when no widget watches them, so we only need to reset the core ones.
     ref.invalidate(authUserProvider);
-    ref.invalidate(routesProvider);
-    ref.invalidate(routeDetailProvider);
-    ref.invalidate(routesBySellerProvider);
-    ref.invalidate(shopsProvider);
-    ref.invalidate(shopsByRouteProvider);
-    ref.invalidate(shopDetailProvider);
-    ref.invalidate(outstandingShopsProvider);
-    ref.invalidate(customersProvider);
-    ref.invalidate(customerDetailProvider);
-    ref.invalidate(customerTransactionsProvider);
-    ref.invalidate(outstandingCustomersProvider);
-    ref.invalidate(productsProvider);
-    ref.invalidate(productDetailProvider);
-    ref.invalidate(productVariantsProvider);
-    ref.invalidate(allVariantsProvider);
-    ref.invalidate(allTransactionsProvider);
-    ref.invalidate(shopTransactionsProvider);
-    ref.invalidate(sellerInventoryProvider);
-    ref.invalidate(sellerInventoryTotalPairsProvider);
-    ref.invalidate(adminAllSellerInventoryProvider);
-    ref.invalidate(sellersProvider);
-    ref.invalidate(allUsersProvider);
-    ref.invalidate(settingsProvider);
     ref.invalidate(dashboardStatsProvider);
-    ref.invalidate(allInvoicesProvider);
-    ref.invalidate(sellerInvoicesProvider);
+    ref.invalidate(settingsProvider);
     ref.invalidate(roleAwareInvoicesProvider);
+    ref.invalidate(sellerInvoicesProvider);
+    ref.invalidate(sellersProvider);
   }
 
   Future<void> signIn(String emailOrUsername, String password,

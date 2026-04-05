@@ -10,7 +10,6 @@ import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
-import '../providers/product_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/seller_inventory_provider.dart';
 import '../providers/settings_provider.dart';
@@ -52,11 +51,10 @@ class DashboardScreen extends ConsumerWidget {
       floatingActionButton: _AdminSpeedDial(),
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(routesProvider);
-          ref.invalidate(shopsProvider);
-          ref.invalidate(productsProvider);
-          ref.invalidate(allVariantsProvider);
-          ref.invalidate(allTransactionsProvider);
+          // Refresh only the dashboard stats aggregation — derived stream
+          // providers will re-query automatically. This avoids triggering
+          // 5 concurrent Firestore re-subscriptions (48K reads/day on Spark tier).
+          ref.invalidate(dashboardStatsProvider);
         },
         child: stats.when(
           data: (s) {

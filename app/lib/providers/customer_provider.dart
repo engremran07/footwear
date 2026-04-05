@@ -5,7 +5,8 @@ import '../core/constants/collections.dart';
 import '../models/customer_model.dart';
 import 'auth_provider.dart';
 
-final customersProvider = StreamProvider<List<CustomerModel>>((ref) {
+final customersProvider =
+    StreamProvider.autoDispose<List<CustomerModel>>((ref) {
   // Admin-only: guard so non-admin credentials never subscribe,
   // avoiding PERMISSION_DENIED during auth transitions.
   final user = ref.watch(authUserProvider).valueOrNull;
@@ -22,7 +23,7 @@ final customersProvider = StreamProvider<List<CustomerModel>>((ref) {
 });
 
 final customerDetailProvider =
-    StreamProvider.family<CustomerModel?, String>((ref, id) {
+    StreamProvider.autoDispose.family<CustomerModel?, String>((ref, id) {
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .doc(id)
@@ -32,7 +33,7 @@ final customerDetailProvider =
 });
 
 final customersByRouteProvider =
-    StreamProvider.family<List<CustomerModel>, String>((ref, routeId) {
+    StreamProvider.autoDispose.family<List<CustomerModel>, String>((ref, routeId) {
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('route_id', isEqualTo: routeId)
@@ -46,7 +47,7 @@ final customersByRouteProvider =
 });
 
 final outstandingCustomersByRouteProvider =
-    StreamProvider.family<List<CustomerModel>, String>((ref, routeId) {
+    StreamProvider.autoDispose.family<List<CustomerModel>, String>((ref, routeId) {
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('route_id', isEqualTo: routeId)
@@ -60,7 +61,8 @@ final outstandingCustomersByRouteProvider =
           .toList());
 });
 
-final outstandingCustomersProvider = StreamProvider<List<CustomerModel>>((ref) {
+final outstandingCustomersProvider =
+    StreamProvider.autoDispose<List<CustomerModel>>((ref) {
   // Admin-only: guard so non-admin credentials never subscribe.
   final user = ref.watch(authUserProvider).valueOrNull;
   if (user == null || !user.isAdmin) return const Stream.empty();
@@ -77,7 +79,7 @@ final outstandingCustomersProvider = StreamProvider<List<CustomerModel>>((ref) {
 });
 
 final customerTransactionsProvider =
-    StreamProvider.family<List<dynamic>, String>((ref, customerId) {
+    StreamProvider.autoDispose.family<List<dynamic>, String>((ref, customerId) {
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
       .where('customer_id', isEqualTo: customerId)

@@ -197,11 +197,13 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     );
     if (confirmed != true) return;
     try {
+      final authUser = ref.read(authUserProvider).valueOrNull;
       await ref.read(transactionNotifierProvider.notifier).deleteTransaction(
             txId: tx['id'] as String,
             customerId: tx['customer_id'] as String?,
             amount: (tx['amount'] as num).toDouble(),
             type: tx['type'] as String,
+            deletedBy: authUser?.id ?? '',
           );
     } catch (e) {
       if (mounted) {

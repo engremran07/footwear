@@ -114,6 +114,94 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _showForgotPassword() async {
+    final emailController = TextEditingController(text: _emailC.text.trim());
+    final formKey = GlobalKey<FormState>();
+    bool sent = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: Text(tr('forgot_password', ref)),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(tr('enter_email_to_reset', ref)),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: emailController,
+                  decoration: InputDecoration(
+                    labelText: tr('email', ref),
+                    prefixIcon: const Icon(Icons.email_outlined),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.done,
+                  autofocus: emailController.text.isEmpty,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? tr('required', ref)
+                      : null,
+                  onFieldSubmitted: (_) async {
+                    if (!formKey.currentState!.validate()) return;
+                    try {
+                      await FirebaseAuth.instance.sendPasswordResetEmail(
+                        email: emailController.text.trim(),
+                      );
+                      setDlgState(() => sent = true);
+                    } catch (_) {}
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: sent
+              ? [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: Text(tr('ok', ref)),
+                  ),
+                ]
+              : [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: Text(tr('cancel', ref)),
+                  ),
+                  FilledButton(
+                    onPressed: () async {
+                      if (!formKey.currentState!.validate()) return;
+                      try {
+                        await FirebaseAuth.instance.sendPasswordResetEmail(
+                          email: emailController.text.trim(),
+                        );
+                        setDlgState(() => sent = true);
+                      } on FirebaseAuthException catch (e) {
+                        if (!ctx.mounted) return;
+                        Navigator.of(ctx).pop();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            errorSnackBar(
+                                e.message ?? tr('err_auth_generic', ref)),
+                          );
+                        }
+                      }
+                    },
+                    child: Text(tr('send_reset_email', ref)),
+                  ),
+                ],
+        ),
+      ),
+    );
+
+    if (sent && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        successSnackBar(tr('reset_email_sent', ref)),
+      );
+    }
+    emailController.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLoading = ref.watch(authNotifierProvider).isLoading;
@@ -358,6 +446,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           : Text(tr('sign_in', ref)),
                 ),
               ).animate().fadeIn(delay: 300.ms, duration: AppTokens.durNormal),
+              const SizedBox(height: AppTokens.s8),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: TextButton(
+                  onPressed: _showForgotPassword,
+                  child: Text(tr('forgot_password', ref)),
+                ),
+              ),
             ],
           ),
         ),

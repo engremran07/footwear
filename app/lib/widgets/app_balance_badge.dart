@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../core/constants/app_brand.dart';
 import '../core/design/app_tokens.dart';
 
 /// Red/green pill that shows a formatted currency balance.
@@ -22,11 +23,11 @@ class AppBalanceBadge extends StatelessWidget {
     final Color fg;
 
     if (invertColors) {
-      bg = isNegative ? Colors.green.shade50 : Colors.red.shade50;
-      fg = isNegative ? Colors.green.shade700 : Colors.red.shade700;
+      bg = isNegative ? AppBrand.successBg : AppBrand.errorBg;
+      fg = isNegative ? AppBrand.successFg : AppBrand.errorFg;
     } else {
-      bg = isNegative ? Colors.red.shade50 : Colors.green.shade50;
-      fg = isNegative ? Colors.red.shade700 : Colors.green.shade700;
+      bg = isNegative ? AppBrand.errorBg : AppBrand.successBg;
+      fg = isNegative ? AppBrand.errorFg : AppBrand.successFg;
     }
 
     final formatted = NumberFormat.currency(

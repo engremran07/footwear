@@ -45,6 +45,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'about_us': 'About Us',
     'contact_us': 'Contact Us',
     'app_version': 'App Version',
+    'version_info': 'Version Info',
+    'build_number': 'Build Number',
+    'release_date': 'Release Date',
+    'platform': 'Platform',
+    'legal': 'Legal',
+    'open_source_licenses': 'Open Source Licenses',
+    'copied': 'Copied to clipboard',
     'sign_out': 'Sign out',
     'save': 'Save',
     'saving': 'Saving',
@@ -126,6 +133,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'Feature requires server setup — contact admin.',
     'reset_email_sent': 'Password reset email sent.',
     'send_reset_email': 'Send Password Reset Email',
+    'forgot_password': 'Forgot Password?',
+    'enter_email_to_reset': 'Enter your email to receive a reset link.',
     'confirm_delete_transaction':
         'Delete this transaction and reverse the balance change?',
     // ── Seller Sell-Stock ──
@@ -1051,6 +1060,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Widgets ──
     'filter_all': 'All',
+    'routes': 'Routes',
+    'menu': 'Menu',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1066,6 +1077,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'about_us': 'من نحن',
     'contact_us': 'اتصل بنا',
     'app_version': 'إصدار التطبيق',
+    'version_info': 'معلومات الإصدار',
+    'build_number': 'رقم البناء',
+    'release_date': 'تاريخ الإصدار',
+    'platform': 'المنصة',
+    'legal': 'قانوني',
+    'open_source_licenses': 'تراخيص المصدر المفتوح',
+    'copied': 'تم النسخ إلى الحافظة',
     'sign_out': 'تسجيل الخروج',
     'save': 'حفظ',
     'saving': 'جارٍ الحفظ',
@@ -1145,6 +1163,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'هذه الميزة تتطلب إعداد الخادم — تواصل مع المسؤول.',
     'reset_email_sent': 'تم إرسال رسالة إعادة تعيين كلمة المرور.',
     'send_reset_email': 'إرسال رابط إعادة تعيين كلمة المرور',
+    'forgot_password': 'نسيت كلمة المرور؟',
+    'enter_email_to_reset': 'أدخل بريدك الإلكتروني لاستلام رابط إعادة التعيين.',
     'confirm_delete_transaction':
         'هل تريد حذف هذه المعاملة وعكس التغيير في الرصيد؟',
     // ── بيع المخزون ──
@@ -2062,6 +2082,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Widgets ──
     'filter_all': 'الكل',
+    'routes': 'المسارات',
+    'menu': 'القائمة',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2077,6 +2099,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'about_us': 'ہمارے بارے میں',
     'contact_us': 'ہم سے رابطہ کریں',
     'app_version': 'ایپ ورژن',
+    'version_info': 'ورژن کی معلومات',
+    'build_number': 'بلڈ نمبر',
+    'release_date': 'ریلیز کی تاریخ',
+    'platform': 'پلیٹ فارم',
+    'legal': 'قانونی',
+    'open_source_licenses': 'اوپن سورس لائسنسز',
+    'copied': 'کلپ بورڈ پر کاپی کی گئی',
     'sign_out': 'سائن آؤٹ',
     'save': 'محفوظ کریں',
     'saving': 'محفوظ ہو رہا ہے',
@@ -2157,6 +2186,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'اس فیچر کے لیے سرور سیٹ اپ درکار ہے — ایڈمن سے رابطہ کریں۔',
     'reset_email_sent': 'پاسورڈ ری سیٹ ای میل بھیج دی گئی۔',
     'send_reset_email': 'پاسورڈ ری سیٹ ای میل بھیجیں',
+    'forgot_password': 'پاسورڈ بھول گئے؟',
+    'enter_email_to_reset': 'ری سیٹ لنک کے لیے اپنی ای میل درج کریں۔',
     'confirm_delete_transaction':
         'یہ ٹرانزیکشن حذف کریں اور بیلنس تبدیلی واپس کریں؟',
     // ── اسٹاک فروخت ──
@@ -3082,5 +3113,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Widgets ──
     'filter_all': 'سب',
+    'routes': 'راستے',
+    'menu': 'مینو',
   },
 };

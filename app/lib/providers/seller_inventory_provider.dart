@@ -4,7 +4,7 @@ import '../core/constants/collections.dart';
 import '../models/seller_inventory_model.dart';
 
 final sellerInventoryProvider =
-    StreamProvider.family<List<SellerInventoryModel>, String>((ref, sellerId) {
+    StreamProvider.autoDispose.family<List<SellerInventoryModel>, String>((ref, sellerId) {
   return FirebaseFirestore.instance
       .collection(Collections.sellerInventory)
       .where('seller_id', isEqualTo: sellerId)
@@ -26,13 +26,14 @@ final sellerInventoryTotalPairsProvider =
 });
 
 /// Streams ALL active seller-inventory items (admin use for reports).
+/// Limit is 100 to keep free-tier Firestore reads within budget.
 final adminAllSellerInventoryProvider =
-    StreamProvider<List<SellerInventoryModel>>((ref) {
+    StreamProvider.autoDispose<List<SellerInventoryModel>>((ref) {
   return FirebaseFirestore.instance
       .collection(Collections.sellerInventory)
       .where('active', isEqualTo: true)
       .orderBy('variant_name')
-      .limit(2000)
+      .limit(100)
       .snapshots()
       .map((snap) => snap.docs
           .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))

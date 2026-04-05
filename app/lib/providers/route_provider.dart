@@ -5,7 +5,7 @@ import '../core/constants/collections.dart';
 import '../models/route_model.dart';
 import 'auth_provider.dart';
 
-final routesProvider = StreamProvider<List<RouteModel>>((ref) {
+final routesProvider = StreamProvider.autoDispose<List<RouteModel>>((ref) {
   // Admin-only unfiltered query: guard so non-admin credentials never
   // subscribe, avoiding PERMISSION_DENIED during auth transitions.
   final user = ref.watch(authUserProvider).valueOrNull;
@@ -21,7 +21,7 @@ final routesProvider = StreamProvider<List<RouteModel>>((ref) {
 });
 
 final routeDetailProvider =
-    StreamProvider.family<RouteModel?, String>((ref, id) {
+    StreamProvider.autoDispose.family<RouteModel?, String>((ref, id) {
   return FirebaseFirestore.instance
       .collection(Collections.routes)
       .doc(id)
@@ -31,7 +31,7 @@ final routeDetailProvider =
 });
 
 final routesBySellerProvider =
-    StreamProvider.family<List<RouteModel>, String>((ref, sellerId) {
+    StreamProvider.autoDispose.family<List<RouteModel>, String>((ref, sellerId) {
   return FirebaseFirestore.instance
       .collection(Collections.routes)
       .where('assigned_seller_id', isEqualTo: sellerId)

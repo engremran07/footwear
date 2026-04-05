@@ -1,11 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../core/constants/collections.dart';
 import '../models/invoice_model.dart';
 import 'auth_provider.dart';
 
-final invoicesByCustomerProvider =
-    StreamProvider.family<List<InvoiceModel>, String>((ref, customerId) {
+final invoicesByCustomerProvider = StreamProvider.autoDispose
+    .family<List<InvoiceModel>, String>((ref, customerId) {
   return FirebaseFirestore.instance
       .collection(Collections.invoices)
       .where('customer_id', isEqualTo: customerId)
@@ -16,8 +17,8 @@ final invoicesByCustomerProvider =
           snap.docs.map((d) => InvoiceModel.fromJson(d.data(), d.id)).toList());
 });
 
-final invoicesByShopProvider =
-    StreamProvider.family<List<InvoiceModel>, String>((ref, shopId) {
+final invoicesByShopProvider = StreamProvider.autoDispose
+    .family<List<InvoiceModel>, String>((ref, shopId) {
   return FirebaseFirestore.instance
       .collection(Collections.invoices)
       .where('shop_id', isEqualTo: shopId)
@@ -28,7 +29,9 @@ final invoicesByShopProvider =
           snap.docs.map((d) => InvoiceModel.fromJson(d.data(), d.id)).toList());
 });
 
-final allInvoicesProvider = StreamProvider<List<InvoiceModel>>((ref) {
+final allInvoicesProvider = StreamProvider.autoDispose<List<InvoiceModel>>((ref) {
+  // Prefer roleAwareInvoicesProvider in screens; use this only for admin-only
+  // bulk operations where you need ALL invoices regardless of role.
   return FirebaseFirestore.instance
       .collection(Collections.invoices)
       .orderBy('created_at', descending: true)
@@ -39,8 +42,8 @@ final allInvoicesProvider = StreamProvider<List<InvoiceModel>>((ref) {
 });
 
 /// Seller-scoped: only invoices created by this seller.
-final sellerInvoicesProvider =
-    StreamProvider.family<List<InvoiceModel>, String>((ref, sellerId) {
+final sellerInvoicesProvider = StreamProvider.autoDispose
+    .family<List<InvoiceModel>, String>((ref, sellerId) {
   return FirebaseFirestore.instance
       .collection(Collections.invoices)
       .where('seller_id', isEqualTo: sellerId)
@@ -52,7 +55,8 @@ final sellerInvoicesProvider =
 });
 
 /// Role-aware: admins see all, sellers see only their own.
-final roleAwareInvoicesProvider = StreamProvider<List<InvoiceModel>>((ref) {
+final roleAwareInvoicesProvider =
+    StreamProvider.autoDispose<List<InvoiceModel>>((ref) {
   final user = ref.watch(authUserProvider).valueOrNull;
   if (user == null) return Stream.value([]);
   if (user.isAdmin) {
@@ -76,7 +80,7 @@ final roleAwareInvoicesProvider = StreamProvider<List<InvoiceModel>>((ref) {
 });
 
 final invoiceByIdProvider =
-    StreamProvider.family<InvoiceModel?, String>((ref, invoiceId) {
+    StreamProvider.autoDispose.family<InvoiceModel?, String>((ref, invoiceId) {
   return FirebaseFirestore.instance
       .collection(Collections.invoices)
       .doc(invoiceId)
@@ -109,9 +113,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
   /// Creates a sale invoice with atomic customer balance update and stock deduction.
   ///
   /// Payment scenarios handled via [amountReceived]:
-  /// - 0 → full credit (status: issued)
-  /// - > 0 and < total → partial payment (status: partial)
-  /// - >= total → full payment (status: paid); excess reduces old balance
+  /// - 0 â†’ full credit (status: issued)
+  /// - > 0 and < total â†’ partial payment (status: partial)
+  /// - >= total â†’ full payment (status: paid); excess reduces old balance
   Future<String> createSaleInvoice({
     required String customerId,
     required String customerName,
@@ -128,6 +132,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     String? notes,
     required String createdBy,
     Map<String, int> sellerInventoryDeductions = const {},
+    String? idempotencyKey, // optional: pass a stable UUID to prevent duplicates on retry
   }) async {
     final normalizedCreatedBy = createdBy.trim();
     if (normalizedCreatedBy.isEmpty) {
@@ -135,6 +140,45 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
     if (customerId.trim().isEmpty) {
       throw ArgumentError('customerId must not be empty');
+    }
+    // Max-amount cap prevents fraudulent invoices
+    const double maxInvoiceAmount = 999999.99;
+    if (total > maxInvoiceAmount) {
+      throw ArgumentError(
+        'Invoice total exceeds maximum allowed amount '
+        '(${maxInvoiceAmount.toStringAsFixed(2)})',
+      );
+    }
+    // Item subtotal integrity check: sum of (qty * unit_price) must equal subtotal
+    if (items.isNotEmpty) {
+      final computedSubtotal = items.fold<double>(
+        0,
+        (acc, item) =>
+            acc +
+            ((item['qty'] as num?)?.toDouble() ?? 0) *
+                ((item['unit_price'] as num?)?.toDouble() ?? 0),
+      );
+      // Allow 0.01 floating-point tolerance
+      if ((computedSubtotal - subtotal).abs() > 0.01) {
+        throw ArgumentError(
+          'Item subtotals (${computedSubtotal.toStringAsFixed(2)}) '
+          'do not match invoice subtotal (${subtotal.toStringAsFixed(2)})',
+        );
+      }
+    }
+
+    // Idempotency guard: if caller passes a key, check for existing invoice
+    final db = FirebaseFirestore.instance;
+    final resolvedKey = idempotencyKey ?? const Uuid().v4();
+    if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
+      final existing = await db
+          .collection(Collections.invoices)
+          .where('idempotency_key', isEqualTo: idempotencyKey)
+          .limit(1)
+          .get();
+      if (existing.docs.isNotEmpty) {
+        return existing.docs.first.id; // return existing instead of creating duplicate
+      }
     }
 
     // Derive sale type and invoice status from payment
@@ -152,7 +196,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
 
     final invoiceNumber = await _nextInvoiceNumber();
-    final db = FirebaseFirestore.instance;
     final batch = db.batch();
     final now = Timestamp.now();
 
@@ -160,6 +203,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final invRef = db.collection(Collections.invoices).doc();
     batch.set(invRef, {
       'invoice_number': invoiceNumber,
+      'idempotency_key': resolvedKey,
       'type': InvoiceModel.typeSale,
       'customer_id': customerId,
       'customer_name': customerName,
@@ -172,8 +216,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'subtotal': subtotal,
       'discount': discount,
       'total': total,
-      'sale_type': saleType,
       'amount_received': amountReceived,
+      'outstanding_amount': total - amountReceived,
+      'sale_type': saleType,
       'status': invoiceStatus,
       'notes': notes,
       'linked_invoice_id': null,
@@ -222,9 +267,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       });
     }
 
-    // Customer balance: net change = sale total − amount received
-    // e.g. sale 5000, received 2000 → balance +3000
-    // e.g. sale 5000, received 8000 → balance −3000 (pays off old debt)
+    // Customer balance: net change = sale total âˆ’ amount received
+    // e.g. sale 5000, received 2000 â†’ balance +3000
+    // e.g. sale 5000, received 8000 â†’ balance âˆ’3000 (pays off old debt)
     if (customerId.isNotEmpty) {
       final balanceDelta = total - amountReceived;
       batch.update(db.collection(Collections.customers).doc(customerId), {
@@ -275,14 +320,33 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       throw ArgumentError('customerId must not be empty');
     }
 
-    final invoiceNumber = await _nextInvoiceNumber();
     final db = FirebaseFirestore.instance;
+    // I-12: 30-day time-lock on credit note creation
+    if (linkedInvoiceId != null && linkedInvoiceId.isNotEmpty) {
+      final origSnap =
+          await db.collection(Collections.invoices).doc(linkedInvoiceId).get();
+      if (origSnap.exists) {
+        final origCreatedAt = origSnap.data()?['created_at'] as Timestamp?;
+        if (origCreatedAt != null) {
+          final ageInDays =
+              DateTime.now().difference(origCreatedAt.toDate()).inDays;
+          if (ageInDays > 30) {
+            throw ArgumentError(
+              'Credit notes must be created within 30 days of the original invoice',
+            );
+          }
+        }
+      }
+    }
+
+    final invoiceNumber = await _nextInvoiceNumber();
     final batch = db.batch();
     final now = Timestamp.now();
 
     final invRef = db.collection(Collections.invoices).doc();
     batch.set(invRef, {
       'invoice_number': invoiceNumber,
+      'idempotency_key': const Uuid().v4(), // dedup guard
       'type': InvoiceModel.typeCreditNote,
       'customer_id': customerId,
       'customer_name': customerName,
@@ -347,7 +411,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     return invRef.id;
   }
 
-  /// Voids an invoice — admin only, reverses balance impact.
+  /// Voids an invoice â€” admin only, reverses balance impact.
   Future<void> voidInvoice({
     required String invoiceId,
     required String customerId,
@@ -359,6 +423,17 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
 
     final db = FirebaseFirestore.instance;
+    // double-void guard — read current status before reversing
+    final invSnap =
+        await db.collection(Collections.invoices).doc(invoiceId).get();
+    if (!invSnap.exists) {
+      throw ArgumentError('Invoice not found: $invoiceId');
+    }
+    final currentStatus = invSnap.data()?['status'] as String? ?? '';
+    if (currentStatus == 'void') {
+      throw StateError('Invoice $invoiceId is already voided');
+    }
+
     final batch = db.batch();
     final now = Timestamp.now();
 
@@ -379,15 +454,22 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     await batch.commit();
   }
 
-  /// Marks an invoice as paid.
+  /// Marks an invoice as paid. Rejects void invoices (state machine guard).
   Future<void> markAsPaid({required String invoiceId}) async {
     if (invoiceId.trim().isEmpty) {
       throw ArgumentError('invoiceId must not be empty');
     }
-    await FirebaseFirestore.instance
-        .collection(Collections.invoices)
-        .doc(invoiceId)
-        .update({
+    final db = FirebaseFirestore.instance;
+    final invSnap =
+        await db.collection(Collections.invoices).doc(invoiceId).get();
+    if (!invSnap.exists) {
+      throw ArgumentError('Invoice not found: $invoiceId');
+    }
+    final currentStatus = invSnap.data()?['status'] as String? ?? '';
+    if (currentStatus == InvoiceModel.statusVoid) {
+      throw StateError('Cannot mark a voided invoice as paid');
+    }
+    await db.collection(Collections.invoices).doc(invoiceId).update({
       'status': InvoiceModel.statusPaid,
       'updated_at': Timestamp.now(),
     });

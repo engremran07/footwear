@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
@@ -349,6 +350,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 16),
+            // About
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.info_outlined),
+              title: Text(tr('about_us', ref)),
+              subtitle: const Text(
+                AppBrand.versionDisplay,
+                style: TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/about'),
+            ),
             const SizedBox(height: 16),
             // Sign out
             SizedBox(

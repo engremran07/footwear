@@ -5,7 +5,7 @@ import '../models/transaction_model.dart';
 import 'auth_provider.dart';
 
 final shopTransactionsProvider =
-    StreamProvider.family<List<TransactionModel>, String>((ref, shopId) {
+    StreamProvider.autoDispose.family<List<TransactionModel>, String>((ref, shopId) {
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
       .where('shop_id', isEqualTo: shopId)
@@ -17,12 +17,14 @@ final shopTransactionsProvider =
           .toList());
 });
 
-final allTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
+final allTransactionsProvider =
+    StreamProvider.autoDispose<List<TransactionModel>>((ref) {
   // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
   final user = ref.watch(authUserProvider).valueOrNull;
   if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
+      .where('deleted', isNotEqualTo: true)
       .orderBy('created_at', descending: true)
       .limit(200)
       .snapshots()
@@ -33,7 +35,7 @@ final allTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
 
 /// Seller-scoped: transactions created by this seller.
 final sellerTransactionsProvider =
-    StreamProvider.family<List<TransactionModel>, String>((ref, sellerId) {
+    StreamProvider.autoDispose.family<List<TransactionModel>, String>((ref, sellerId) {
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
       .where('created_by', isEqualTo: sellerId)
@@ -101,8 +103,11 @@ class TransactionNotifier extends AsyncNotifier<void> {
       });
     }
 
-    // Update customer balance if customer transaction
-    if (customerId != null && customerId.isNotEmpty) {
+    // Update customer balance — only when customerId differs from shopId
+    // (prevents duplicate batch writes to the same document).
+    if (customerId != null &&
+        customerId.isNotEmpty &&
+        customerId != shopId) {
       final balanceDelta = type == 'cash_out' ? amount : -amount;
       batch.update(db.collection(Collections.customers).doc(customerId), {
         'balance': FieldValue.increment(balanceDelta),
@@ -124,7 +129,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
   }
 
   /// Creates a seller-side sale transaction.
-  /// Deducts stock from [sellerInventoryDeductions] (map of sellerInventoryDocId→qty)
+  /// Deducts stock from [sellerInventoryDeductions] (map of sellerInventoryDocIdâ†’qty)
   /// in the same atomic batch as the transaction + customer balance update.
   Future<void> createSellerSale({
     required String routeId,
@@ -187,12 +192,14 @@ class TransactionNotifier extends AsyncNotifier<void> {
     await batch.commit();
   }
 
-  /// Deletes a transaction and reverses its balance impact on the customer.
+  /// Soft-deletes a transaction (sets deleted=true) and reverses its balance
+  /// impact on the customer. Preserves audit trail.
   Future<void> deleteTransaction({
     required String txId,
     required String? customerId,
     required double amount,
     required String type,
+    required String deletedBy,
   }) async {
     if (txId.trim().isEmpty) {
       throw ArgumentError('txId must not be empty');
@@ -200,15 +207,22 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
     final db = FirebaseFirestore.instance;
     final batch = db.batch();
+    final now = Timestamp.now();
 
-    batch.delete(db.collection(Collections.transactions).doc(txId));
+    // Soft-delete: preserve audit trail, never hard-delete
+    batch.update(db.collection(Collections.transactions).doc(txId), {
+      'deleted': true,
+      'deleted_at': now,
+      'deleted_by': deletedBy.trim(),
+      'updated_at': now,
+    });
 
     if (customerId != null && customerId.isNotEmpty) {
       // Reverse: cash_out added to balance, so subtract; cash_in subtracted, so add
       final reversalDelta = type == 'cash_out' ? -amount : amount;
       batch.update(db.collection(Collections.customers).doc(customerId), {
         'balance': FieldValue.increment(reversalDelta),
-        'updated_at': Timestamp.now(),
+        'updated_at': now,
       });
     }
 

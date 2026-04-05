@@ -5,7 +5,7 @@ import '../core/constants/collections.dart';
 import '../models/shop_model.dart';
 import 'auth_provider.dart';
 
-final shopsProvider = StreamProvider<List<ShopModel>>((ref) {
+final shopsProvider = StreamProvider.autoDispose<List<ShopModel>>((ref) {
   // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED
   // during auth transitions when seller credentials are active.
   final user = ref.watch(authUserProvider).valueOrNull;
@@ -21,7 +21,7 @@ final shopsProvider = StreamProvider<List<ShopModel>>((ref) {
 });
 
 final shopsByRouteProvider =
-    StreamProvider.family<List<ShopModel>, String>((ref, routeId) {
+    StreamProvider.autoDispose.family<List<ShopModel>, String>((ref, routeId) {
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('route_id', isEqualTo: routeId)
@@ -33,7 +33,7 @@ final shopsByRouteProvider =
           snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList());
 });
 
-final shopDetailProvider = StreamProvider.family<ShopModel?, String>((ref, id) {
+final shopDetailProvider = StreamProvider.autoDispose.family<ShopModel?, String>((ref, id) {
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .doc(id)
@@ -42,7 +42,8 @@ final shopDetailProvider = StreamProvider.family<ShopModel?, String>((ref, id) {
           (doc) => doc.exists ? ShopModel.fromJson(doc.data()!, doc.id) : null);
 });
 
-final outstandingShopsProvider = StreamProvider<List<ShopModel>>((ref) {
+final outstandingShopsProvider =
+    StreamProvider.autoDispose<List<ShopModel>>((ref) {
   // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
   final user = ref.watch(authUserProvider).valueOrNull;
   if (user == null || !user.isAdmin) return const Stream.empty();
@@ -58,7 +59,7 @@ final outstandingShopsProvider = StreamProvider<List<ShopModel>>((ref) {
 });
 
 final outstandingShopsByRouteProvider =
-    StreamProvider.family<List<ShopModel>, String>((ref, routeId) {
+    StreamProvider.autoDispose.family<List<ShopModel>, String>((ref, routeId) {
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('route_id', isEqualTo: routeId)
@@ -88,7 +89,7 @@ class ShopNotifier extends AsyncNotifier<void> {
       'created_at': Timestamp.now(),
       'updated_at': Timestamp.now(),
     });
-    // Try to increment route total_shops (may fail for sellers — non-critical)
+    // Try to increment route total_shops (may fail for sellers â€” non-critical)
     try {
       final routeId = data['route_id'] as String;
       await db.collection(Collections.routes).doc(routeId).update({
