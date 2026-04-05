@@ -41,7 +41,10 @@ String _normalizePath(String raw) {
 
 bool _isAdminOnlyPath(String rawPath) {
   final path = _normalizePath(rawPath);
-  if (path == '/settings' || path == '/users' || path == '/routes/new' || path == '/products/new') {
+  if (path == '/settings' ||
+      path == '/users' ||
+      path == '/routes/new' ||
+      path == '/products/new') {
     return true;
   }
   return RegExp(r'^/routes/[^/]+/edit$').hasMatch(path) ||
@@ -99,8 +102,7 @@ CustomTransitionPage<void> _slidePage(Widget child, GoRouterState state) {
         end: Offset.zero,
       ).animate(
           CurvedAnimation(parent: animation, curve: Curves.fastOutSlowIn));
-      final fadeIn =
-          CurvedAnimation(parent: animation, curve: Curves.easeOut);
+      final fadeIn = CurvedAnimation(parent: animation, curve: Curves.easeOut);
       return FadeTransition(
         opacity: fadeIn,
         child: SlideTransition(position: slideIn, child: child),
@@ -280,8 +282,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Users (admin-only)
           GoRoute(
               path: '/users',
-              pageBuilder: (_, s) =>
-                  _fadePage(const UsersListScreen(), s)),
+              pageBuilder: (_, s) => _fadePage(const UsersListScreen(), s)),
           // Reports
           GoRoute(
               path: '/reports',

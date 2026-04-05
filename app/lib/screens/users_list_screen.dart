@@ -29,6 +29,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   String _search = '';
   // null means 'all'
   String? _roleFilter;
+  // Active/Inactive tab toggle
+  bool _showInactive = false;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +44,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       );
     }
 
-    final usersAsync = ref.watch(allUsersProvider);
+    final usersAsync = _showInactive
+        ? ref.watch(inactiveUsersProvider)
+        : ref.watch(allUsersProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('users', ref))),
@@ -58,7 +62,28 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
             hintText: tr('search', ref),
             onChanged: (v) => setState(() => _search = v.toLowerCase()),
           ),
-          // Role filter chips
+          // Active / Inactive segmented tab
+          Padding(
+            padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: 12, vertical: 4),
+            child: SegmentedButton<bool>(
+              segments: [
+                ButtonSegment(
+                    value: false,
+                    label: Text(tr('tab_active_users', ref))),
+                ButtonSegment(
+                    value: true,
+                    label: Text(tr('tab_inactive_users', ref))),
+              ],
+              selected: {_showInactive},
+              onSelectionChanged: (s) =>
+                  setState(() => _showInactive = s.first),
+              style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact),
+            ),
+          ),
+          // Role filter chips (active tab only)
+          if (!_showInactive)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding:
@@ -120,14 +145,25 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
                 return AppPullRefresh(
                   onRefresh: () async {
-                    ref.invalidate(allUsersProvider);
+                    if (_showInactive) {
+                      ref.invalidate(inactiveUsersProvider);
+                    } else {
+                      ref.invalidate(allUsersProvider);
+                    }
                     await Future.delayed(const Duration(milliseconds: 300));
                   },
                   child: ListView.builder(
                     itemCount: filtered.length,
                     physics: const AlwaysScrollableScrollPhysics(),
-                    itemBuilder: (_, i) =>
-                        _UserTile(
+                    itemBuilder: (_, i) => _showInactive
+                        ? _InactiveUserTile(
+                            user: filtered[i],
+                            onReactivate: () =>
+                                _confirmReactivateUser(filtered[i]),
+                            onHardDelete: () =>
+                                _confirmHardDeleteUser(filtered[i]),
+                          ).listEntry(i)
+                        : _UserTile(
                           user: filtered[i],
                           currentUser: currentUser,
                           onEdit: () => _showEditUserDialog(filtered[i]),
@@ -478,6 +514,118 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     );
   }
 
+  // ── Reactivate user dialog ────────────────────────────────────────────────
+
+  Future<void> _confirmReactivateUser(UserModel user) async {
+    final routes = ref.read(routesProvider).valueOrNull ?? [];
+    String? selectedRouteId;
+    String? selectedRouteName;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final freeRoutes = routes
+              .where((r) =>
+                  r.assignedSellerId == null ||
+                  r.assignedSellerId!.isEmpty)
+              .toList();
+          return AlertDialog(
+            title: Text(tr('reactivate', ref)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(tr('confirm_reactivate_user', ref)
+                    .replaceAll('%s', user.displayName)),
+                const SizedBox(height: 12),
+                if (user.isSeller)
+                  DropdownButtonFormField<String>(
+                    decoration: InputDecoration(
+                        labelText: tr('assigned_route', ref)),
+                    items: freeRoutes
+                        .map((r) => DropdownMenuItem(
+                            value: r.id, child: Text(r.name)))
+                        .toList(),
+                    onChanged: (v) => setS(() {
+                      selectedRouteId = v;
+                      selectedRouteName = routes
+                          .where((r) => r.id == v)
+                          .map((r) => r.name)
+                          .firstOrNull;
+                    }),
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(tr('cancel', ref))),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(tr('reactivate', ref)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await ref
+          .read(userManagementNotifierProvider.notifier)
+          .reactivateUser(
+            uid: user.id,
+            routeId: selectedRouteId ?? '',
+            routeName: selectedRouteName ?? '',
+            displayName: user.displayName,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          successSnackBar(tr('saved_successfully', ref)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar('$e'));
+      }
+    }
+  }
+
+  // ── Hard-delete user confirmation ─────────────────────────────────────────
+
+  Future<void> _confirmHardDeleteUser(UserModel user) async {
+    final me = ref.read(authUserProvider).valueOrNull;
+    if (me?.isAdmin != true) return;
+
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: tr('hard_delete_user', ref),
+      message: tr('confirm_hard_delete_user', ref)
+          .replaceAll('%s', user.displayName),
+      isDestructive: true,
+    );
+    if (confirmed != true) return;
+
+    try {
+      await ref
+          .read(userManagementNotifierProvider.notifier)
+          .hardDeleteUser(user.id, me!.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          successSnackBar(tr('msg_user_hard_deleted', ref)
+              .replaceAll('%s', user.displayName)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar('$e'));
+      }
+    }
+  }
+
   // ── Delete user confirmation ──────────────────────────────────────────────
 
   Future<void> _confirmDeleteUser(UserModel user) async {
@@ -701,6 +849,115 @@ class _UserTile extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Inactive user tile ────────────────────────────────────────────────────────────────────
+
+class _InactiveUserTile extends StatelessWidget {
+  final UserModel user;
+  final VoidCallback onReactivate;
+  final VoidCallback onHardDelete;
+
+  const _InactiveUserTile({
+    required this.user,
+    required this.onReactivate,
+    required this.onHardDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final roleColor =
+        user.isAdmin ? AppBrand.adminRoleColor : AppBrand.sellerRoleColor;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.grey.withAlpha(40),
+              child: Icon(
+                user.isAdmin
+                    ? Icons.admin_panel_settings
+                    : Icons.person_off,
+                size: 18,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withAlpha(140)),
+                  ),
+                  Text(
+                    user.email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withAlpha(100)),
+                  ),
+                  Container(
+                    margin: const EdgeInsetsDirectional.only(top: 2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: roleColor.withAlpha(25),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      user.role.name,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: roleColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Reactivate
+            Tooltip(
+              message: 'Reactivate',
+              child: IconButton(
+                icon: const Icon(Icons.person_add_alt_1, size: 20,
+                    color: AppBrand.successColor),
+                onPressed: onReactivate,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            // Hard delete
+            Tooltip(
+              message: 'Permanently Delete',
+              child: IconButton(
+                icon: const Icon(Icons.delete_forever,
+                    size: 20, color: AppBrand.errorColor),
+                onPressed: onHardDelete,
+                visualDensity: VisualDensity.compact,
+              ),
             ),
           ],
         ),

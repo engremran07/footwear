@@ -29,7 +29,8 @@ final invoicesByShopProvider = StreamProvider.autoDispose
           snap.docs.map((d) => InvoiceModel.fromJson(d.data(), d.id)).toList());
 });
 
-final allInvoicesProvider = StreamProvider.autoDispose<List<InvoiceModel>>((ref) {
+final allInvoicesProvider =
+    StreamProvider.autoDispose<List<InvoiceModel>>((ref) {
   // Prefer roleAwareInvoicesProvider in screens; use this only for admin-only
   // bulk operations where you need ALL invoices regardless of role.
   return FirebaseFirestore.instance
@@ -132,7 +133,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     String? notes,
     required String createdBy,
     Map<String, int> sellerInventoryDeductions = const {},
-    String? idempotencyKey, // optional: pass a stable UUID to prevent duplicates on retry
+    String?
+        idempotencyKey, // optional: pass a stable UUID to prevent duplicates on retry
   }) async {
     final normalizedCreatedBy = createdBy.trim();
     if (normalizedCreatedBy.isEmpty) {
@@ -166,6 +168,13 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         );
       }
     }
+    // FI-07: total must equal subtotal minus discount
+    if ((total - (subtotal - discount)).abs() > 0.01) {
+      throw ArgumentError(
+        'Invoice total (${total.toStringAsFixed(2)}) must equal '
+        'subtotal minus discount (${(subtotal - discount).toStringAsFixed(2)})',
+      );
+    }
 
     // Idempotency guard: if caller passes a key, check for existing invoice
     final db = FirebaseFirestore.instance;
@@ -177,7 +186,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           .limit(1)
           .get();
       if (existing.docs.isNotEmpty) {
-        return existing.docs.first.id; // return existing instead of creating duplicate
+        return existing
+            .docs.first.id; // return existing instead of creating duplicate
       }
     }
 
@@ -244,6 +254,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'invoice_number': invoiceNumber,
       'created_by': normalizedCreatedBy,
       'created_at': now,
+      'deleted': false, // DI-01: required for isNotEqualTo filter
     });
 
     // If payment received, create a separate cash_in transaction
@@ -264,6 +275,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'invoice_number': invoiceNumber,
         'created_by': normalizedCreatedBy,
         'created_at': now,
+        'deleted': false, // DI-01: required for isNotEqualTo filter
       });
     }
 
@@ -384,6 +396,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'invoice_number': invoiceNumber,
       'created_by': normalizedCreatedBy,
       'created_at': now,
+      'deleted': false, // DI-01: required for isNotEqualTo filter
     });
 
     // Return reduces customer balance
@@ -442,9 +455,16 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'updated_at': now,
     });
 
-    // Reverse balance: sale added, so subtract; return subtracted, so add
+    // FI-05: Reverse only the outstanding_amount (not the full total).
+    // At creation: balance += (total - amountReceived).
+    // Voiding must reverse exactly that amount, not the full total.
     if (customerId.isNotEmpty) {
-      final reversalDelta = type == InvoiceModel.typeSale ? -total : total;
+      final data = invSnap.data()!;
+      final amountReceived =
+          (data['amount_received'] as num?)?.toDouble() ?? 0.0;
+      final outstandingBalance = total - amountReceived;
+      final reversalDelta =
+          type == InvoiceModel.typeSale ? -outstandingBalance : outstandingBalance;
       batch.update(db.collection(Collections.customers).doc(customerId), {
         'balance': FieldValue.increment(reversalDelta),
         'updated_at': now,
@@ -454,10 +474,22 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     await batch.commit();
   }
 
-  /// Marks an invoice as paid. Rejects void invoices (state machine guard).
-  Future<void> markAsPaid({required String invoiceId}) async {
+  /// Marks an invoice as paid.
+  ///
+  /// FI-06: Creates a cash_in transaction and decrements customer.balance
+  /// by the outstanding_amount in the same atomic batch. Without this,
+  /// the customer ledger would be permanently wrong.
+  Future<void> markAsPaid({
+    required String invoiceId,
+    required String customerId,
+    required String routeId,
+    required String createdBy,
+  }) async {
     if (invoiceId.trim().isEmpty) {
       throw ArgumentError('invoiceId must not be empty');
+    }
+    if (createdBy.trim().isEmpty) {
+      throw ArgumentError('createdBy must not be empty');
     }
     final db = FirebaseFirestore.instance;
     final invSnap =
@@ -465,14 +497,64 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (!invSnap.exists) {
       throw ArgumentError('Invoice not found: $invoiceId');
     }
-    final currentStatus = invSnap.data()?['status'] as String? ?? '';
+    final invData = invSnap.data()!;
+    final currentStatus = invData['status'] as String? ?? '';
     if (currentStatus == InvoiceModel.statusVoid) {
       throw StateError('Cannot mark a voided invoice as paid');
     }
-    await db.collection(Collections.invoices).doc(invoiceId).update({
+    if (currentStatus == InvoiceModel.statusPaid) {
+      return; // already paid, idempotent
+    }
+
+    final outstanding =
+        (invData['outstanding_amount'] as num?)?.toDouble() ?? 0.0;
+    final invoiceNumber = invData['invoice_number'] as String? ?? '';
+    final shopId = invData['shop_id'] as String? ?? '';
+    final shopName = invData['shop_name'] as String? ?? '';
+    final customerName = invData['customer_name'] as String? ?? '';
+    final now = Timestamp.now();
+    final batch = db.batch();
+
+    // Update invoice: mark paid, zero outstanding
+    batch.update(db.collection(Collections.invoices).doc(invoiceId), {
       'status': InvoiceModel.statusPaid,
-      'updated_at': Timestamp.now(),
+      'amount_received':
+          FieldValue.increment(outstanding > 0 ? outstanding : 0),
+      'outstanding_amount': 0,
+      'updated_at': now,
     });
+
+    // Create cash_in transaction for the settled amount
+    if (outstanding > 0) {
+      final payRef = db.collection(Collections.transactions).doc();
+      batch.set(payRef, {
+        'shop_id': shopId,
+        'shop_name': shopName,
+        'route_id': routeId,
+        'customer_id': customerId,
+        'customer_name': customerName,
+        'type': 'cash_in',
+        'sale_type': 'cash',
+        'amount': outstanding,
+        'description': 'Settled invoice $invoiceNumber',
+        'items': <Map<String, dynamic>>[],
+        'invoice_id': invoiceId,
+        'invoice_number': invoiceNumber,
+        'created_by': createdBy.trim(),
+        'created_at': now,
+        'deleted': false,
+      });
+
+      // Decrement customer balance
+      if (customerId.isNotEmpty) {
+        batch.update(db.collection(Collections.customers).doc(customerId), {
+          'balance': FieldValue.increment(-outstanding),
+          'updated_at': now,
+        });
+      }
+    }
+
+    await batch.commit();
   }
 }
 

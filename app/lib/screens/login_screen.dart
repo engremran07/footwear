@@ -406,91 +406,97 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-              Text(tr('sign_in', ref),
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w600)),
-              const SizedBox(height: AppTokens.s24),
-              TextFormField(
-                controller: _emailC,
-                focusNode: _emailFocus,
-                autofillHints: const [AutofillHints.email, AutofillHints.username],
-                decoration: InputDecoration(
-                  labelText: tr('email', ref),
-                  prefixIcon: const Icon(Icons.person_outline),
-                ),
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? tr('required', ref) : null,
-              )
-                  .animate()
-                  .fadeIn(delay: 100.ms, duration: AppTokens.durNormal)
-                  .slideX(begin: 0.05, end: 0, curve: AppTokens.curveStd),
-              const SizedBox(height: AppTokens.s16),
-              TextFormField(
-                controller: _passC,
-                obscureText: _obscure,
-                autofillHints: const [AutofillHints.password],
-                decoration: InputDecoration(
-                  labelText: tr('password', ref),
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    icon: AnimatedSwitcher(
-                      duration: AppTokens.durFast,
-                      child: Icon(
-                        _obscure ? Icons.visibility_off : Icons.visibility,
-                        key: ValueKey(_obscure),
+                Text(tr('sign_in', ref),
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: AppTokens.s24),
+                TextFormField(
+                  controller: _emailC,
+                  focusNode: _emailFocus,
+                  autofillHints: const [
+                    AutofillHints.email,
+                    AutofillHints.username
+                  ],
+                  decoration: InputDecoration(
+                    labelText: tr('email', ref),
+                    prefixIcon: const Icon(Icons.person_outline),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? tr('required', ref)
+                      : null,
+                )
+                    .animate()
+                    .fadeIn(delay: 100.ms, duration: AppTokens.durNormal)
+                    .slideX(begin: 0.05, end: 0, curve: AppTokens.curveStd),
+                const SizedBox(height: AppTokens.s16),
+                TextFormField(
+                  controller: _passC,
+                  obscureText: _obscure,
+                  autofillHints: const [AutofillHints.password],
+                  decoration: InputDecoration(
+                    labelText: tr('password', ref),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: AnimatedSwitcher(
+                        duration: AppTokens.durFast,
+                        child: Icon(
+                          _obscure ? Icons.visibility_off : Icons.visibility,
+                          key: ValueKey(_obscure),
+                        ),
                       ),
+                      tooltip: _obscure
+                          ? tr('tooltip_show_password', ref)
+                          : tr('tooltip_hide_password', ref),
+                      onPressed: () => setState(() => _obscure = !_obscure),
                     ),
-                    tooltip: _obscure
-                        ? tr('tooltip_show_password', ref)
-                        : tr('tooltip_hide_password', ref),
-                    onPressed: () => setState(() => _obscure = !_obscure),
+                  ),
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _submit(),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? tr('required', ref) : null,
+                )
+                    .animate()
+                    .fadeIn(delay: 200.ms, duration: AppTokens.durNormal)
+                    .slideX(begin: 0.05, end: 0, curve: AppTokens.curveStd),
+                const SizedBox(height: AppTokens.s8),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _remember,
+                      onChanged: (v) => setState(() => _remember = v!),
+                    ),
+                    Text(tr('remember_me', ref)),
+                  ],
+                ),
+                const SizedBox(height: AppTokens.s24),
+                SizedBox(
+                  height: AppTokens.buttonMinHeight,
+                  child: FilledButton(
+                    onPressed: (isLoading || _isLockedOut) ? null : _submit,
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : _isLockedOut
+                            ? Text('${tr('sign_in', ref)} ($_lockoutSeconds s)')
+                            : Text(tr('sign_in', ref)),
+                  ),
+                )
+                    .animate()
+                    .fadeIn(delay: 300.ms, duration: AppTokens.durNormal),
+                const SizedBox(height: AppTokens.s8),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: TextButton(
+                    onPressed: _showForgotPassword,
+                    child: Text(tr('forgot_password', ref)),
                   ),
                 ),
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => _submit(),
-                validator: (v) =>
-                    v == null || v.isEmpty ? tr('required', ref) : null,
-              )
-                  .animate()
-                  .fadeIn(delay: 200.ms, duration: AppTokens.durNormal)
-                  .slideX(begin: 0.05, end: 0, curve: AppTokens.curveStd),
-              const SizedBox(height: AppTokens.s8),
-              Row(
-                children: [
-                  Checkbox(
-                    value: _remember,
-                    onChanged: (v) => setState(() => _remember = v!),
-                  ),
-                  Text(tr('remember_me', ref)),
-                ],
-              ),
-              const SizedBox(height: AppTokens.s24),
-              SizedBox(
-                height: AppTokens.buttonMinHeight,
-                child: FilledButton(
-                  onPressed: (isLoading || _isLockedOut) ? null : _submit,
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : _isLockedOut
-                          ? Text('${tr('sign_in', ref)} ($_lockoutSeconds s)')
-                          : Text(tr('sign_in', ref)),
-                ),
-              ).animate().fadeIn(delay: 300.ms, duration: AppTokens.durNormal),
-              const SizedBox(height: AppTokens.s8),
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: TextButton(
-                  onPressed: _showForgotPassword,
-                  child: Text(tr('forgot_password', ref)),
-                ),
-              ),
-            ],
+              ],
             ),
           ),
         ),

@@ -49,8 +49,10 @@ class AppTokens {
   static const Duration durNormal = Duration(milliseconds: 250);
   static const Duration durSlow = Duration(milliseconds: 400);
   static const Duration durPage = Duration(milliseconds: 300);
+
   /// Arctic-slow — for glacial fade and premium entrances
   static const Duration durGlacial = Duration(milliseconds: 600);
+
   /// Used for staggered list items in large screens (80ms per step)
   static const Duration durStaggerStep = Duration(milliseconds: 80);
 

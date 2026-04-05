@@ -20,3 +20,17 @@
 # Keep play core (for deferred components)
 -keep class com.google.android.play.core.** { *; }
 -dontwarn com.google.android.play.core.**
+
+# cloud_firestore gRPC native bridge
+-keep class io.grpc.** { *; }
+-keep class io.opencensus.** { *; }
+-dontwarn io.grpc.**
+-dontwarn io.opencensus.**
+
+# flutter_local_notifications
+-keep class com.dexterous.** { *; }
+-dontwarn com.dexterous.**
+
+# share_plus
+-keep class dev.fluttercommunity.plus.share.** { *; }
+-dontwarn dev.fluttercommunity.plus.share.**

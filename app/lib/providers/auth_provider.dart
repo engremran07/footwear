@@ -27,8 +27,7 @@ final authStateProvider = StreamProvider<User?>((ref) {
 /// returns a FirebaseAuthException(code: 'user-disabled') if the account has
 /// been disabled server-side, which we map to a forced sign-out.
 final authTokenGuardProvider = StreamProvider<void>((ref) async* {
-  await for (final user
-      in FirebaseAuth.instance.idTokenChanges()) {
+  await for (final user in FirebaseAuth.instance.idTokenChanges()) {
     if (user == null) continue;
     try {
       await user.getIdToken(true); // force server round-trip

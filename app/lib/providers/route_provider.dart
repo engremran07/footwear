@@ -30,8 +30,8 @@ final routeDetailProvider =
           doc.exists ? RouteModel.fromJson(doc.data()!, doc.id) : null);
 });
 
-final routesBySellerProvider =
-    StreamProvider.autoDispose.family<List<RouteModel>, String>((ref, sellerId) {
+final routesBySellerProvider = StreamProvider.autoDispose
+    .family<List<RouteModel>, String>((ref, sellerId) {
   return FirebaseFirestore.instance
       .collection(Collections.routes)
       .where('assigned_seller_id', isEqualTo: sellerId)

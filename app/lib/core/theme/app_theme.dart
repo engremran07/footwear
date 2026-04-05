@@ -101,7 +101,8 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        backgroundColor: isDark ? const Color(0xFF001825) : AppBrand.primaryColor,
+        backgroundColor:
+            isDark ? const Color(0xFF001825) : AppBrand.primaryColor,
         foregroundColor: AppBrand.onPrimary,
         surfaceTintColor: Colors.transparent,
         iconTheme: const IconThemeData(color: AppBrand.onPrimary, size: 24),
@@ -118,7 +119,9 @@ class AppTheme {
             : AppBrand.primaryColor.withAlpha(30),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return IconThemeData(color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor);
+            return IconThemeData(
+                color:
+                    isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor);
           }
           return IconThemeData(color: colorScheme.onSurfaceVariant);
         }),
@@ -134,8 +137,8 @@ class AppTheme {
             color: baseColor,
           );
         }),
-        overlayColor: WidgetStatePropertyAll(
-            AppBrand.primaryColor.withAlpha(15)),
+        overlayColor:
+            WidgetStatePropertyAll(AppBrand.primaryColor.withAlpha(15)),
         height: 64,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         indicatorShape: RoundedRectangleBorder(
@@ -181,16 +184,14 @@ class AppTheme {
 
       // ── Dialog / Sheet ────────────────────────────────────────────────────
       dialogTheme: DialogThemeData(
-        backgroundColor:
-            isDark ? const Color(0xFF0D2030) : colorScheme.surface,
+        backgroundColor: isDark ? const Color(0xFF0D2030) : colorScheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTokens.rXL),
         ),
         elevation: 6,
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor:
-            isDark ? const Color(0xFF0D2030) : colorScheme.surface,
+        backgroundColor: isDark ? const Color(0xFF0D2030) : colorScheme.surface,
         showDragHandle: true,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
@@ -208,14 +209,12 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: AppTokens.brMD,
           side: BorderSide(
-            color: isDark
-                ? const Color(0xFF1E3340)
-                : const Color(0xFFB6DFF0),
+            color: isDark ? const Color(0xFF1E3340) : const Color(0xFFB6DFF0),
             width: 1,
           ),
         ),
-        margin: const EdgeInsets.symmetric(
-            horizontal: AppTokens.s16, vertical: 6),
+        margin:
+            const EdgeInsets.symmetric(horizontal: AppTokens.s16, vertical: 6),
         shadowColor: AppBrand.primaryColor.withAlpha(20),
       ),
 
@@ -227,15 +226,13 @@ class AppTheme {
             : const Color(0xFFE3F2FD).withAlpha(200),
         border: OutlineInputBorder(
           borderRadius: AppTokens.brSM,
-          borderSide:
-              BorderSide(color: colorScheme.outline.withAlpha(100)),
+          borderSide: BorderSide(color: colorScheme.outline.withAlpha(100)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: AppTokens.brSM,
           borderSide: BorderSide(
-              color: isDark
-                  ? const Color(0xFF1E3A50)
-                  : const Color(0xFFB0D8F0)),
+              color:
+                  isDark ? const Color(0xFF1E3A50) : const Color(0xFFB0D8F0)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: AppTokens.brSM,
@@ -268,7 +265,8 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+          foregroundColor:
+              isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
           side: BorderSide(
               color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor),
           minimumSize: const Size(0, AppTokens.buttonMinHeight),
@@ -286,9 +284,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: isDark
-                ? const Color(0xFF1E3A50)
-                : const Color(0xFFB0D8F0),
+            color: isDark ? const Color(0xFF1E3A50) : const Color(0xFFB0D8F0),
           ),
         ),
       ),
@@ -299,8 +295,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: AppTokens.brMD),
         backgroundColor:
             isDark ? const Color(0xFF1A3040) : const Color(0xFF00344A),
-        contentTextStyle:
-            const TextStyle(color: Colors.white, fontSize: 14),
+        contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
         actionTextColor: const Color(0xFF81D4FA),
       ),
 
@@ -309,22 +304,20 @@ class AppTheme {
         selectedTileColor: isDark
             ? AppBrand.primaryColor.withAlpha(32)
             : AppBrand.primaryColor.withAlpha(18),
-        selectedColor:
-            isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+        selectedColor: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
         iconColor: colorScheme.onSurfaceVariant,
       ),
 
       // ── Divider ───────────────────────────────────────────────────────────
       dividerTheme: DividerThemeData(
-        color: isDark
-            ? const Color(0xFF1E3340)
-            : const Color(0xFFB6DFF0),
+        color: isDark ? const Color(0xFF1E3340) : const Color(0xFFB6DFF0),
         thickness: 0.8,
       ),
 
       // ── FloatingActionButton ───────────────────────────────────────────────
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: isDark ? const Color(0xFF003D56) : AppBrand.primaryColor,
+        backgroundColor:
+            isDark ? const Color(0xFF003D56) : AppBrand.primaryColor,
         foregroundColor: AppBrand.onPrimary,
         elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: AppTokens.brLG),

@@ -204,12 +204,12 @@ class _InvoiceTile extends ConsumerWidget {
 
 // ── Invoice Stats Strip ───────────────────────────────────────────────────────
 
-class _InvoiceStatsStrip extends StatelessWidget {
+class _InvoiceStatsStrip extends ConsumerWidget {
   final List<InvoiceModel> invoices;
   const _InvoiceStatsStrip({required this.invoices});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final sales = invoices.where((i) => i.isSale).toList();
     final totalSales = sales.fold(0.0, (sum, i) => sum + i.total);
@@ -229,7 +229,7 @@ class _InvoiceStatsStrip extends StatelessWidget {
         children: [
           _IStat(
             icon: Icons.receipt_long,
-            label: 'Total',
+            label: tr('stats_total', ref),
             value: AppFormatters.compact(totalSales),
             color: cs.primary,
           ),
@@ -237,7 +237,7 @@ class _InvoiceStatsStrip extends StatelessWidget {
               height: 28, width: 1, color: Theme.of(context).dividerColor),
           _IStat(
             icon: Icons.check_circle,
-            label: 'Paid',
+            label: tr('paid', ref),
             value: AppFormatters.compact(paidAmount),
             color: AppTheme.clearFg(cs),
           ),
@@ -245,7 +245,7 @@ class _InvoiceStatsStrip extends StatelessWidget {
               height: 28, width: 1, color: Theme.of(context).dividerColor),
           _IStat(
             icon: Icons.pending,
-            label: 'Pending',
+            label: tr('pending', ref),
             value: AppFormatters.compact(outstanding),
             color: outstanding > 0 ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
           ),

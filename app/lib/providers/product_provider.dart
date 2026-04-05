@@ -5,8 +5,7 @@ import '../core/constants/collections.dart';
 import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
 
-final productsProvider =
-    StreamProvider.autoDispose<List<ProductModel>>((ref) {
+final productsProvider = StreamProvider.autoDispose<List<ProductModel>>((ref) {
   return FirebaseFirestore.instance
       .collection(Collections.products)
       .where('active', isEqualTo: true)
@@ -89,6 +88,7 @@ class ProductNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> updateProduct(String id, Map<String, dynamic> data) async {
+    await _requireAdmin();
     // enforce HTTPS for product image URLs on update
     final imageUrl = data['image_url'] as String? ?? '';
     if (imageUrl.isNotEmpty && !imageUrl.startsWith('https://')) {
@@ -101,6 +101,7 @@ class ProductNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> deleteProduct(String id) async {
+    await _requireAdmin();
     await FirebaseFirestore.instance
         .collection(Collections.products)
         .doc(id)
@@ -120,6 +121,7 @@ class ProductNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> updateVariant(String id, Map<String, dynamic> data) async {
+    await _requireAdmin();
     await FirebaseFirestore.instance
         .collection(Collections.productVariants)
         .doc(id)
@@ -127,6 +129,7 @@ class ProductNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> deleteVariant(String id) async {
+    await _requireAdmin();
     await FirebaseFirestore.instance
         .collection(Collections.productVariants)
         .doc(id)

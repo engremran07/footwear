@@ -33,7 +33,8 @@ final shopsByRouteProvider =
           snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList());
 });
 
-final shopDetailProvider = StreamProvider.autoDispose.family<ShopModel?, String>((ref, id) {
+final shopDetailProvider =
+    StreamProvider.autoDispose.family<ShopModel?, String>((ref, id) {
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .doc(id)

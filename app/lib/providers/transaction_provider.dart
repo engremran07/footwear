@@ -4,8 +4,8 @@ import '../core/constants/collections.dart';
 import '../models/transaction_model.dart';
 import 'auth_provider.dart';
 
-final shopTransactionsProvider =
-    StreamProvider.autoDispose.family<List<TransactionModel>, String>((ref, shopId) {
+final shopTransactionsProvider = StreamProvider.autoDispose
+    .family<List<TransactionModel>, String>((ref, shopId) {
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
       .where('shop_id', isEqualTo: shopId)
@@ -34,8 +34,8 @@ final allTransactionsProvider =
 });
 
 /// Seller-scoped: transactions created by this seller.
-final sellerTransactionsProvider =
-    StreamProvider.autoDispose.family<List<TransactionModel>, String>((ref, sellerId) {
+final sellerTransactionsProvider = StreamProvider.autoDispose
+    .family<List<TransactionModel>, String>((ref, sellerId) {
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
       .where('created_by', isEqualTo: sellerId)
@@ -92,6 +92,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       'items': items.map((e) => e.toJson()).toList(),
       'created_by': normalizedCreatedBy,
       'created_at': transactionDate ?? Timestamp.now(),
+      'deleted': false, // DI-01: required for isNotEqualTo filter in allTransactionsProvider
     });
 
     // Update shop balance: cash_out adds, cash_in subtracts
@@ -105,9 +106,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
     // Update customer balance — only when customerId differs from shopId
     // (prevents duplicate batch writes to the same document).
-    if (customerId != null &&
-        customerId.isNotEmpty &&
-        customerId != shopId) {
+    if (customerId != null && customerId.isNotEmpty && customerId != shopId) {
       final balanceDelta = type == 'cash_out' ? amount : -amount;
       batch.update(db.collection(Collections.customers).doc(customerId), {
         'balance': FieldValue.increment(balanceDelta),
@@ -168,6 +167,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       'items': items.map((e) => e.toJson()).toList(),
       'created_by': normalizedCreatedBy,
       'created_at': transactionDate ?? Timestamp.now(),
+      'deleted': false, // DI-01: required for isNotEqualTo filter
     });
 
     // Customer owes more
@@ -263,6 +263,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       'items': items.map((e) => e.toJson()).toList(),
       'created_by': normalizedCreatedBy,
       'created_at': Timestamp.now(),
+      'deleted': false, // DI-01: required for isNotEqualTo filter
     });
 
     // Return reduces balance (customer owes less)

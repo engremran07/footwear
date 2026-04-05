@@ -75,32 +75,53 @@ class _AppShellState extends ConsumerState<AppShell>
   void _toggleDrawer() => _isDrawerOpen ? _closeDrawer() : _openDrawer();
 
   // ─── Quick-action map for long-press on bottom nav ──────────────────────
-  static const _navQuickActions =
-      <String, List<({IconData icon, String label, String route})>>{
-    '/shops': [
-      (icon: Icons.add_business, label: 'New Shop', route: '/shops/new'),
-    ],
-    '/routes': [
-      (icon: Icons.add_road, label: 'New Route', route: '/routes/new'),
-    ],
-    '/customers': [
-      (
-        icon: Icons.person_add,
-        label: 'New Customer',
-        route: '/customers/new'
-      ),
-    ],
-    '/products': [
-      (icon: Icons.add_box, label: 'New Product', route: '/products/new'),
-    ],
-  };
+  // Returns localized quick-action entries for the given route.
+  List<({IconData icon, String label, String route})> _quickActionsFor(
+      String route) {
+    switch (route) {
+      case '/shops':
+        return [
+          (
+            icon: Icons.add_business,
+            label: tr('new_shop', ref),
+            route: '/shops/new'
+          )
+        ];
+      case '/routes':
+        return [
+          (
+            icon: Icons.add_road,
+            label: tr('new_route', ref),
+            route: '/routes/new'
+          )
+        ];
+      case '/customers':
+        return [
+          (
+            icon: Icons.person_add,
+            label: tr('new_customer', ref),
+            route: '/customers/new'
+          )
+        ];
+      case '/products':
+        return [
+          (
+            icon: Icons.add_box,
+            label: tr('new_product', ref),
+            route: '/products/new'
+          )
+        ];
+      default:
+        return [];
+    }
+  }
 
   void _onNavLongPress(
     BuildContext ctx,
     ({IconData icon, String label, String route}) item,
   ) {
     HapticFeedback.mediumImpact();
-    final actions = _navQuickActions[item.route] ?? [];
+    final actions = _quickActionsFor(item.route);
     if (actions.isEmpty) return;
     showModalBottomSheet<void>(
       context: ctx,
@@ -112,15 +133,13 @@ class _AppShellState extends ConsumerState<AppShell>
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: Text(
               item.label,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 16),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ),
           const Divider(height: 1),
           for (final action in actions)
             ListTile(
-              leading:
-                  Icon(action.icon, color: AppBrand.primaryColor),
+              leading: Icon(action.icon, color: AppBrand.primaryColor),
               title: Text(action.label),
               onTap: () {
                 Navigator.pop(ctx);
@@ -352,30 +371,23 @@ class _AppShellState extends ConsumerState<AppShell>
                                 final idx = primaryItems.indexWhere((e) =>
                                     e.route == currentLocation ||
                                     (e.route != '/' &&
-                                        currentLocation
-                                            .startsWith(e.route)));
-                                if (idx >= 0 &&
-                                    idx < primaryItems.length - 1) {
+                                        currentLocation.startsWith(e.route)));
+                                if (idx >= 0 && idx < primaryItems.length - 1) {
                                   HapticFeedback.selectionClick();
-                                  context
-                                      .go(primaryItems[idx + 1].route);
+                                  context.go(primaryItems[idx + 1].route);
                                 }
                               }
                             } else {
                               if (vel < -200) {
                                 _openDrawer();
-                              } else if (vel > 600 &&
-                                  primaryItems.length > 1) {
+                              } else if (vel > 600 && primaryItems.length > 1) {
                                 final idx = primaryItems.indexWhere((e) =>
                                     e.route == currentLocation ||
                                     (e.route != '/' &&
-                                        currentLocation
-                                            .startsWith(e.route)));
-                                if (idx >= 0 &&
-                                    idx < primaryItems.length - 1) {
+                                        currentLocation.startsWith(e.route)));
+                                if (idx >= 0 && idx < primaryItems.length - 1) {
                                   HapticFeedback.selectionClick();
-                                  context
-                                      .go(primaryItems[idx + 1].route);
+                                  context.go(primaryItems[idx + 1].route);
                                 }
                               }
                             }
@@ -529,7 +541,8 @@ class _ArcticBottomNav extends StatelessWidget {
   final List<({IconData icon, String label, String route})> items;
   final String currentLocation;
   final ValueChanged<String> onTap;
-  final void Function(({IconData icon, String label, String route})) onLongPress;
+  final void Function(({IconData icon, String label, String route}))
+      onLongPress;
 
   const _ArcticBottomNav({
     required this.items,
@@ -546,9 +559,7 @@ class _ArcticBottomNav extends StatelessWidget {
         color: isDark ? const Color(0xFF0D1618) : Colors.white,
         border: Border(
           top: BorderSide(
-            color: isDark
-                ? const Color(0xFF1E3340)
-                : const Color(0xFFB6DFF0),
+            color: isDark ? const Color(0xFF1E3340) : const Color(0xFFB6DFF0),
             width: 1,
           ),
         ),
@@ -567,8 +578,7 @@ class _ArcticBottomNav extends StatelessWidget {
           child: Row(
             children: items.map((item) {
               final isSelected = item.route == currentLocation ||
-                  (item.route != '/' &&
-                      currentLocation.startsWith(item.route));
+                  (item.route != '/' && currentLocation.startsWith(item.route));
               return Expanded(
                 child: _ArcticNavItem(
                   item: item,
@@ -666,9 +676,8 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
                   width: widget.isSelected ? 24 : 0,
                   margin: const EdgeInsets.only(bottom: 4),
                   decoration: BoxDecoration(
-                    color: widget.isSelected
-                        ? selectedColor
-                        : Colors.transparent,
+                    color:
+                        widget.isSelected ? selectedColor : Colors.transparent,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -686,9 +695,8 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
                   duration: const Duration(milliseconds: 200),
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight: widget.isSelected
-                        ? FontWeight.w700
-                        : FontWeight.normal,
+                    fontWeight:
+                        widget.isSelected ? FontWeight.w700 : FontWeight.normal,
                     color: color,
                     letterSpacing: widget.isSelected ? 0.2 : 0,
                   ),
@@ -759,8 +767,8 @@ class _DrawerMenuScreen extends StatelessWidget {
                     splashColor: Colors.white12,
                     highlightColor: Colors.white10,
                     child: Padding(
-                      padding: const EdgeInsetsDirectional.fromSTEB(
-                          20, 28, 20, 18),
+                      padding:
+                          const EdgeInsetsDirectional.fromSTEB(20, 28, 20, 18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -784,8 +792,7 @@ class _DrawerMenuScreen extends StatelessWidget {
                                           shape: BoxShape.circle,
                                           color: AppBrand.successColor,
                                           border: Border.all(
-                                              color: Colors.white,
-                                              width: 2),
+                                              color: Colors.white, width: 2),
                                         ),
                                       ),
                                     ),
@@ -817,8 +824,7 @@ class _DrawerMenuScreen extends StatelessWidget {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 5),
-                                      _RoleBadge(
-                                          role: user!.role, small: true),
+                                      _RoleBadge(role: user!.role, small: true),
                                     ],
                                   ),
                                 ),

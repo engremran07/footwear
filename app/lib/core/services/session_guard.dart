@@ -62,6 +62,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
 
   void _resetInactivityTimer() {
     _inactivityTimer?.cancel();
+    _checkAdminSessionExpiry(); // ISSUE-010: also check in foreground on every interaction
     _inactivityTimer = Timer(widget.timeoutDuration, _onInactivityTimeout);
   }
 

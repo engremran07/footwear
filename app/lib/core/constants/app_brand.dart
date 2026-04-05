@@ -30,14 +30,15 @@ class AppBrand {
   // Seed drives Material 3 tone generation; override specific roles below.
   static const Color arcticSeedColor = Color(0xFF0288D1); // Arctic Sky Blue
 
-  static const Color primaryColor    = Color(0xFF01579B); // Glacier Deep Blue
-  static const Color secondaryColor  = Color(0xFF37474F); // Arctic Slate Rock
-  static const Color tertiaryColor   = Color(0xFF5C5FBE); // Northern Lights Indigo
-  static const Color errorColor      = Color(0xFFBA1A1A); // Ice Alert Red
-  static const Color warningColor    = Color(0xFFE07C00); // Arctic Flame
-  static const Color successColor    = Color(0xFF2E7D32); // Glacier Pine
-  static const Color stockColor      = Color(0xFF455A64); // Arctic Steel
-  static const Color adminRoleColor  = Color(0xFF5C5FBE); // Aurora Indigo
+  static const Color primaryColor = Color(0xFF01579B); // Glacier Deep Blue
+  static const Color secondaryColor = Color(0xFF37474F); // Arctic Slate Rock
+  static const Color tertiaryColor =
+      Color(0xFF5C5FBE); // Northern Lights Indigo
+  static const Color errorColor = Color(0xFFBA1A1A); // Ice Alert Red
+  static const Color warningColor = Color(0xFFE07C00); // Arctic Flame
+  static const Color successColor = Color(0xFF2E7D32); // Glacier Pine
+  static const Color stockColor = Color(0xFF455A64); // Arctic Steel
+  static const Color adminRoleColor = Color(0xFF5C5FBE); // Aurora Indigo
   static const Color sellerRoleColor = Color(0xFF01579B); // Glacier Blue
 
   // ─── Arctic Gradients ─────────────────────────────────────────────────────
@@ -73,17 +74,17 @@ class AppBrand {
   static const Color onPrimaryMuted = Colors.white70;
 
   // ─── Snack bar container colours (Arctic-tinted) ─────────────────────────
-  static const Color errorBg     = Color(0xFFFCEEEB); // ice rose
-  static const Color errorFg     = Color(0xFF8C1D18); // deep crimson
+  static const Color errorBg = Color(0xFFFCEEEB); // ice rose
+  static const Color errorFg = Color(0xFF8C1D18); // deep crimson
   static const Color errorAccent = Color(0xFFBA1A1A);
-  static const Color successBg     = Color(0xFFEBF5EE); // frost mint
-  static const Color successFg     = Color(0xFF1B5E20); // glacier pine
+  static const Color successBg = Color(0xFFEBF5EE); // frost mint
+  static const Color successFg = Color(0xFF1B5E20); // glacier pine
   static const Color successAccent = Color(0xFF2E7D32);
-  static const Color warningBg     = Color(0xFFFFF3E0); // arctic amber
-  static const Color warningFg     = Color(0xFF7D3E00);
+  static const Color warningBg = Color(0xFFFFF3E0); // arctic amber
+  static const Color warningFg = Color(0xFF7D3E00);
   static const Color warningAccent = Color(0xFFE07C00);
-  static const Color infoBg     = Color(0xFFE1F5FE); // ice blue
-  static const Color infoFg     = Color(0xFF01579B); // glacier deep
+  static const Color infoBg = Color(0xFFE1F5FE); // ice blue
+  static const Color infoFg = Color(0xFF01579B); // glacier deep
   static const Color infoAccent = Color(0xFF0288D1);
 
   // ─── Typography ──────────────────────────────────────────────────────────

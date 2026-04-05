@@ -32,8 +32,8 @@ final customerDetailProvider =
           doc.exists ? CustomerModel.fromJson(doc.data()!, doc.id) : null);
 });
 
-final customersByRouteProvider =
-    StreamProvider.autoDispose.family<List<CustomerModel>, String>((ref, routeId) {
+final customersByRouteProvider = StreamProvider.autoDispose
+    .family<List<CustomerModel>, String>((ref, routeId) {
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('route_id', isEqualTo: routeId)
@@ -46,8 +46,8 @@ final customersByRouteProvider =
           .toList());
 });
 
-final outstandingCustomersByRouteProvider =
-    StreamProvider.autoDispose.family<List<CustomerModel>, String>((ref, routeId) {
+final outstandingCustomersByRouteProvider = StreamProvider.autoDispose
+    .family<List<CustomerModel>, String>((ref, routeId) {
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('route_id', isEqualTo: routeId)

@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/seller_inventory_model.dart';
 
-final sellerInventoryProvider =
-    StreamProvider.autoDispose.family<List<SellerInventoryModel>, String>((ref, sellerId) {
+final sellerInventoryProvider = StreamProvider.autoDispose
+    .family<List<SellerInventoryModel>, String>((ref, sellerId) {
   return FirebaseFirestore.instance
       .collection(Collections.sellerInventory)
       .where('seller_id', isEqualTo: sellerId)

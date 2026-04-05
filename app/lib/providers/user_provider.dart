@@ -36,6 +36,21 @@ final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
           snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList());
 });
 
+/// Admin-only: inactive (deactivated) users ordered by most recently updated.
+final inactiveUsersProvider =
+    StreamProvider.autoDispose<List<UserModel>>((ref) {
+  final user = ref.watch(authUserProvider).valueOrNull;
+  if (user == null || !user.isAdmin) return const Stream.empty();
+  return FirebaseFirestore.instance
+      .collection(Collections.users)
+      .where('active', isEqualTo: false)
+      .orderBy('updated_at', descending: true)
+      .limit(200)
+      .snapshots()
+      .map((snap) =>
+          snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList());
+});
+
 class UserManagementNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
@@ -103,6 +118,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'assigned_route_name':
               normalizedRole == 'seller' ? assignedRouteName : null,
           'active': true,
+          'created_by': FirebaseAuth.instance.currentUser!.uid, // RU-04
           'created_at': now,
           'updated_at': now,
         });
@@ -139,20 +155,28 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         (updatedRouteId == null || updatedRouteId.trim().isEmpty)) {
       throw ArgumentError('Seller accounts require an assigned route.');
     }
-    await db
-        .collection(Collections.users)
-        .doc(uid)
-        .update({...updateData, 'updated_at': Timestamp.now()});
-    // If route assignment changed, update route doc
+
+    // DI-02: use a single WriteBatch for atomicity — user doc + route doc
+    final batch = db.batch();
+    final now = Timestamp.now();
+
+    batch.update(db.collection(Collections.users).doc(uid),
+        {...updateData, 'updated_at': now});
+
+    // If route assignment changed, update route doc in same batch
     final newRouteId = data['assigned_route_id'] as String?;
     final displayName = data['display_name'] as String?;
-    if (newRouteId != null && displayName != null) {
-      await db.collection(Collections.routes).doc(newRouteId).update({
+    if (newRouteId != null &&
+        newRouteId.trim().isNotEmpty &&
+        displayName != null) {
+      batch.update(db.collection(Collections.routes).doc(newRouteId.trim()), {
         'assigned_seller_id': uid,
         'assigned_seller_name': displayName,
-        'updated_at': Timestamp.now(),
+        'updated_at': now,
       });
     }
+
+    await batch.commit();
   }
 
   /// Clear route assignment from a route doc when seller is unassigned
@@ -216,6 +240,70 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     final trimmedEmail = email.trim().toLowerCase();
     if (trimmedEmail.isEmpty) return;
     await FirebaseAuth.instance.sendPasswordResetEmail(email: trimmedEmail);
+  }
+
+  /// Reactivates a soft-deleted user and re-assigns them to a route atomically.
+  /// DI-06: deleteUser() clears route; must re-assign on reactivation.
+  Future<void> reactivateUser({
+    required String uid,
+    required String routeId,
+    required String routeName,
+    required String displayName,
+  }) async {
+    final trimmedUid = uid.trim();
+    if (trimmedUid.isEmpty) throw ArgumentError('uid must not be empty');
+
+    final db = FirebaseFirestore.instance;
+    final batch = db.batch();
+    final now = Timestamp.now();
+
+    batch.update(db.collection(Collections.users).doc(trimmedUid), {
+      'active': true,
+      'assigned_route_id': routeId.trim().isNotEmpty ? routeId.trim() : null,
+      'assigned_route_name':
+          routeId.trim().isNotEmpty ? routeName.trim() : null,
+      'updated_at': now,
+    });
+
+    if (routeId.trim().isNotEmpty) {
+      batch.update(
+          db.collection(Collections.routes).doc(routeId.trim()), {
+        'assigned_seller_id': trimmedUid,
+        'assigned_seller_name': displayName.trim(),
+        'updated_at': now,
+      });
+    }
+
+    await batch.commit();
+  }
+
+  /// Hard-deletes the Firestore profile of a deactivated user.
+  ///
+  /// IMPORTANT: On the free Firebase tier (Spark), the Firebase Auth entry
+  /// cannot be removed programmatically without the Admin SDK / Cloud Functions.
+  /// This method only removes the Firestore document. The Auth entry persists
+  /// until manually deleted via the Firebase console.
+  ///
+  /// Guard: only inactive users can be hard-deleted; admin cannot delete self.
+  Future<void> hardDeleteUser(String uid, String currentAdminUid) async {
+    final trimmedUid = uid.trim();
+    if (trimmedUid.isEmpty) throw ArgumentError('uid must not be empty');
+    if (trimmedUid == currentAdminUid.trim()) {
+      throw ArgumentError('Admin cannot delete their own account.');
+    }
+
+    final db = FirebaseFirestore.instance;
+    final userSnap =
+        await db.collection(Collections.users).doc(trimmedUid).get();
+    if (!userSnap.exists) throw ArgumentError('User not found: $trimmedUid');
+
+    final isActive = userSnap.data()?['active'] as bool? ?? true;
+    if (isActive) {
+      throw StateError(
+          'Only deactivated users can be permanently deleted. Deactivate first.');
+    }
+
+    await db.collection(Collections.users).doc(trimmedUid).delete();
   }
 
   Future<void> changeOwnPassword({

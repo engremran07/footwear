@@ -948,6 +948,21 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'msg_reset_email_sent': 'Password reset email sent to %s',
     'confirm_delete_user': 'Delete user %s? This cannot be undone.',
     'msg_user_deleted': '%s deleted',
+    // ISSUE-018/019: missing keys that caused raw key text on screen
+    'permission_denied': 'Access Denied',
+    'unsaved_changes': 'Unsaved Changes',
+    'discard_changes_message': 'You have unsaved changes. Discard and leave?',
+    // ISSUE-012: inactive user management
+    'tab_active_users': 'Active',
+    'tab_inactive_users': 'Inactive',
+    'hard_delete_user': 'Permanently Delete',
+    'confirm_hard_delete_user':
+        'Permanently delete %s? Their Firestore profile will be removed. '
+        'On the free tier their Firebase Auth entry persists until '
+        'manually removed via the Firebase console.',
+    'msg_user_hard_deleted': '%s permanently deleted',
+    'reactivate': 'Reactivate',
+    'confirm_reactivate_user': 'Reactivate %s and restore their access?',
     'settings_company_logo': 'Company Logo',
     'settings_logo_specs':
         'PDF reports · PNG/JPG · max 800×400 px · max 300 KB',
@@ -1971,6 +1986,20 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'msg_reset_email_sent': 'تم إرسال بريد إعادة تعيين كلمة المرور إلى %s',
     'confirm_delete_user': 'هل تريد حذف المستخدم %s؟ لا يمكن التراجع عن ذلك.',
     'msg_user_deleted': 'تم حذف %s',
+    // ISSUE-018/019: مفاتيح مفقودة
+    'permission_denied': 'تم رفض الوصول',
+    'unsaved_changes': 'تغييرات غير محفوظة',
+    'discard_changes_message': 'لديك تغييرات غير محفوظة. هل تريد تجاهلها والمغادرة؟',
+    // ISSUE-012: إدارة المستخدمين غير النشطين
+    'tab_active_users': 'نشط',
+    'tab_inactive_users': 'غير نشط',
+    'hard_delete_user': 'حذف نهائي',
+    'confirm_hard_delete_user':
+        'حذف %s نهائيًا؟ سيتم إزالة ملفه الشخصي من قاعدة البيانات. '
+        'في الإصدار المجاني تبقى بيانات المصادقة حتى يتم حذفها يدويًا.',
+    'msg_user_hard_deleted': 'تم حذف %s نهائيًا',
+    'reactivate': 'إعادة تفعيل',
+    'confirm_reactivate_user': 'هل تريد إعادة تفعيل %s واستعادة صلاحياتهم؟',
     'settings_company_logo': 'شعار الشركة',
     'settings_logo_specs':
         'تقارير PDF · PNG/JPG · بحد أقصى 800×400 بكسل · 300 كيلوبايت',
@@ -3000,6 +3029,20 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'msg_reset_email_sent': '%s کو پاس ورڈ ری سیٹ ای میل بھیج دی گئی',
     'confirm_delete_user': 'صارف %s کو حذف کریں؟ یہ واپس نہیں ہو سکتا۔',
     'msg_user_deleted': '%s حذف ہو گیا',
+    // ISSUE-018/019: لاپتہ کلیدیں
+    'permission_denied': 'رسائی سے انکار',
+    'unsaved_changes': 'غیر محفوظ تبدیلیاں',
+    'discard_changes_message': 'آپ کے غیر محفوظ تبدیلیاں ہیں۔ کیا آپ انہیں ضائع کر کے جانا چاہتے ہیں؟',
+    // ISSUE-012: غیر فعال صارف انتظامیہ
+    'tab_active_users': 'فعال',
+    'tab_inactive_users': 'غیر فعال',
+    'hard_delete_user': 'مستقل حذف',
+    'confirm_hard_delete_user':
+        '%s کو مستقل طور پر حذف کریں؟ ان کا Firestore پروفائل ہٹا دیا جائے گا۔ '
+        'مفت پلان میں Firebase Auth انٹری Firebase کنسول سے دستی طور پر ہٹانی ہوگی۔',
+    'msg_user_hard_deleted': '%s مستقل طور پر حذف ہو گیا',
+    'reactivate': 'دوبارہ فعال کریں',
+    'confirm_reactivate_user': '%s کو دوبارہ فعال کریں اور ان کی رسائی بحال کریں؟',
     'settings_company_logo': 'کمپنی لوگو',
     'settings_logo_specs':
         'PDF رپورٹس · PNG/JPG · زیادہ سے زیادہ 800×400 px · 300 KB',

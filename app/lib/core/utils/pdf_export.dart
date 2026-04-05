@@ -746,6 +746,7 @@ Future<Uint8List> buildPdfSellerReport({
   required Map<String, String> labels,
   AppLocale locale = AppLocale.en,
   Uint8List? logoBytes,
+  String companyName = 'FOOTWEAR', // ISSUE-015: was hardcoded; now parameterised
 }) async {
   await _ensureFontBytes();
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
@@ -806,7 +807,7 @@ Future<Uint8List> buildPdfSellerReport({
                           : pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text(
-                          'FOOTWEAR',
+                          _s(companyName), // ISSUE-015: was hardcoded 'FOOTWEAR'
                           style: ts(size: 18, fw: pw.FontWeight.bold),
                           textDirection: dir,
                         ),
@@ -1184,9 +1185,9 @@ Future<Uint8List> generateInvoicePdf({
                     final item = e.value;
                     final bg = i % 2 == 0 ? PdfColors.white : PdfColors.grey50;
                     final cells = [
-                      item.productName,
-                      item.size,
-                      item.color,
+                      _s(item.productName), // ISSUE-014: sanitize user input
+                      _s(item.size),
+                      _s(item.color),
                       item.qty.toString(),
                       _fmtAmt(item.unitPrice),
                       _fmtAmt(item.subtotal),
@@ -1256,7 +1257,7 @@ Future<Uint8List> generateInvoicePdf({
 
             if (invoice.linkedInvoiceId != null &&
                 invoice.linkedInvoiceId!.isNotEmpty) ...[
-              pw.Text('Reference: ${invoice.linkedInvoiceId}',
+              pw.Text('Reference: ${_s(invoice.linkedInvoiceId!)}', // ISSUE-036
                   style: ts(size: 8, color: PdfColors.grey600)),
             ],
 

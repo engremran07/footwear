@@ -99,7 +99,12 @@ class InvoiceDetailScreen extends ConsumerWidget {
       try {
         await ref
             .read(invoiceNotifierProvider.notifier)
-            .markAsPaid(invoiceId: inv.id);
+            .markAsPaid(
+              invoiceId: inv.id,
+              customerId: inv.customerId,
+              routeId: inv.routeId,
+              createdBy: ref.read(authStateProvider).valueOrNull?.uid ?? '',
+            );
       } catch (e) {
         if (context.mounted) {
           final key = AppErrorMapper.key(e);

@@ -162,7 +162,7 @@ service cloud.firestore {
           assignedRouteId() != null && assignedRouteId() != '' &&
           request.resource.data.diff(resource.data)
             .affectedKeys().hasOnly(['balance', 'updated_at'])
-        )) && docSizeOk();
+        )) && docSizeOk() && withinWriteRate();
       allow delete: if isAdmin();
     }
 
@@ -218,25 +218,26 @@ service cloud.firestore {
       allow create, delete: if isAdmin();
       // Seller can update quantity_available (stock deduction on sale).
       // Post-state quantity_available must stay >= 0 to prevent negative stock.
-      allow update: if isAdmin() ||
+      allow update: if (isAdmin() ||
         (
           isSeller() &&
           resource.data.seller_id == request.auth.uid &&
           request.resource.data.quantity_available >= 0 &&
-          docSizeOk()
-        );
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['quantity_available', 'updated_at'])
+        )) && docSizeOk() && withinWriteRate();
     }
 
     // --- inventory transactions (audit log for all stock movements) ---------
     match /inventory_transactions/{docId} {
       allow read: if isAdmin() ||
         (isSeller() && resource.data.seller_id == request.auth.uid);
-      allow create: if isAdmin() ||
+      allow create: if (isAdmin() ||
         (
           isSeller() &&
           request.resource.data.seller_id == request.auth.uid &&
           request.resource.data.created_by == request.auth.uid
-        );
+        )) && docSizeOk();
       allow update, delete: if isAdmin();
     }
 
@@ -266,15 +267,15 @@ service cloud.firestore {
              isSellerForRoute(resource.data.route_id))
           )
         );
-      allow create: if isAdmin() ||
+      allow create: if (isAdmin() ||
         (
           isSeller() &&
           request.resource.data.created_by == request.auth.uid &&
           request.resource.data.route_id != null &&
           request.resource.data.route_id != '' &&
           isSellerForRoute(request.resource.data.route_id)
-        );
-      allow update: if isAdmin();
+        )) && docSizeOk();
+      allow update: if isAdmin() && docSizeOk();
       allow delete: if isAdmin();
     }
 
