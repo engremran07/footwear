@@ -49,4 +49,94 @@ extension AppAnimations on Widget {
         amount: 6,
         duration: AppTokens.durSlow,
       );
+
+  // ─── Arctic / Glacial Animations ─────────────────────────────────────────
+
+  /// Smooth slide-up entrance from bottom — used for sheets, cards, FABs.
+  Widget frostedSlideUp({
+    double beginY = 0.08,
+    Duration? duration,
+    Duration? delay,
+  }) =>
+      animate()
+          .slideY(
+            begin: beginY,
+            end: 0,
+            duration: duration ?? AppTokens.durGlacial,
+            delay: delay,
+            curve: Curves.fastOutSlowIn,
+          )
+          .fadeIn(
+            duration: duration ?? AppTokens.durGlacial,
+            delay: delay,
+            curve: Curves.easeOut,
+          );
+
+  /// Glacial slow fade-in — for hero images and splash overlays.
+  Widget arcticFade({Duration? duration, Duration? delay}) =>
+      animate().fadeIn(
+        duration: duration ?? AppTokens.durGlacial,
+        delay: delay,
+        curve: Curves.easeInOutCubic,
+      );
+
+  /// Elastic pop entrance — scale from 0 with bounce.
+  Widget impactBounce({Duration? delay}) => animate()
+      .scaleXY(
+        begin: 0.6,
+        end: 1.0,
+        duration: AppTokens.durSlow,
+        delay: delay,
+        curve: Curves.elasticOut,
+      )
+      .fadeIn(
+        duration: AppTokens.durNormal,
+        delay: delay,
+        curve: Curves.easeOut,
+      );
+
+  /// Spacious stagger — 80 ms per index. Ideal for dashboard tiles.
+  Widget glacialStagger(int index, {double beginY = 0.04}) => animate()
+      .fadeIn(
+        duration: AppTokens.durSlow,
+        delay: AppTokens.durStaggerStep * index,
+        curve: AppTokens.curveEnter,
+      )
+      .slideY(
+        begin: beginY,
+        end: 0,
+        duration: AppTokens.durSlow,
+        delay: AppTokens.durStaggerStep * index,
+        curve: AppTokens.curveEnter,
+      );
+
+  /// Quick pop-in: scale 0.85 → 1.0 with fade (dialog buttons, chips, badges).
+  Widget popIn({Duration? delay}) => animate()
+      .scaleXY(
+        begin: 0.85,
+        end: 1.0,
+        duration: AppTokens.durNormal,
+        delay: delay,
+        curve: AppTokens.curveSpring,
+      )
+      .fadeIn(
+        duration: AppTokens.durNormal,
+        delay: delay,
+        curve: Curves.easeOut,
+      );
+
+  /// Quick horizontal slide used when switching bottom nav tabs via swipe.
+  Widget tabEntry({bool fromRight = true, Duration? delay}) => animate()
+      .slideX(
+        begin: fromRight ? 0.04 : -0.04,
+        end: 0,
+        duration: AppTokens.durNormal,
+        delay: delay,
+        curve: Curves.easeOutCubic,
+      )
+      .fadeIn(
+        duration: AppTokens.durNormal,
+        delay: delay,
+        curve: Curves.easeOut,
+      );
 }

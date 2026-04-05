@@ -62,17 +62,25 @@ class AppTheme {
     final scaleFactor = urdu_text.UrduTextScaler.getScaleFactor(locale);
     final isDark = brightness == Brightness.dark;
 
+    // ── Arctic M3 Color Scheme ─────────────────────────────────────────────
+    // ColorScheme.fromSeed with Arctic Sky Blue seed generates the full tonal
+    // palette; we then override specific roles for Arctic-brand alignment.
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppBrand.primaryColor,
-      secondary: AppBrand.secondaryColor,
-      error: AppBrand.errorColor,
+      seedColor: AppBrand.arcticSeedColor,
       brightness: brightness,
     ).copyWith(
-      primary: AppBrand.primaryColor,
-      onPrimary: AppBrand.onPrimary,
+      // Override primary to the deeper glacier blue (avoids M3 auto-brightening)
+      primary: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+      onPrimary: isDark ? const Color(0xFF003549) : AppBrand.onPrimary,
+      // Arctic surface tones: slightly icy white (light), polar night (dark)
+      surface: isDark ? const Color(0xFF0D1618) : const Color(0xFFF2FAFD),
+      onSurface: isDark ? const Color(0xFFDCF0F8) : const Color(0xFF001F2A),
+      surfaceContainerHighest:
+          isDark ? const Color(0xFF1A2D35) : const Color(0xFFD6EEF8),
+      surfaceContainer:
+          isDark ? const Color(0xFF121F25) : const Color(0xFFE4F3FA),
     );
 
-    // Scaled text theme — safe against null fontSize in any style
     final baseTextTheme = ThemeData(brightness: brightness).textTheme;
     final textTheme =
         _safeScaleTextTheme(baseTextTheme, scaleFactor, fontFamily);
@@ -81,14 +89,87 @@ class AppTheme {
       useMaterial3: true,
       fontFamily: fontFamily,
       colorScheme: colorScheme,
+      // Scaffold background matches the surface tint exactly
+      scaffoldBackgroundColor: colorScheme.surface,
       textTheme: textTheme,
+
+      // ── AppBar ────────────────────────────────────────────────────────────
+      // backgroundColor intentionally solid (not transparent) so screen-level
+      // AppBars get the Arctic primary colour by default.
+      // The shell AppBar overrides this per-widget with a gradient flexibleSpace.
       appBarTheme: AppBarTheme(
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: false,
-        backgroundColor: isDark ? colorScheme.surface : AppBrand.primaryColor,
-        foregroundColor: isDark ? colorScheme.onSurface : AppBrand.onPrimary,
-        surfaceTintColor: isDark ? colorScheme.surfaceTint : null,
+        backgroundColor: isDark ? const Color(0xFF001825) : AppBrand.primaryColor,
+        foregroundColor: AppBrand.onPrimary,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: AppBrand.onPrimary, size: 24),
+        actionsIconTheme: const IconThemeData(color: AppBrand.onPrimary),
       ),
+
+      // ── Bottom Navigation Bar ─────────────────────────────────────────────
+      // The custom _ArcticBottomNav in app_shell.dart draws its own surface.
+      // These tokens are used by screen-level NavigationBars if any.
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: isDark ? const Color(0xFF0D1618) : colorScheme.surface,
+        indicatorColor: isDark
+            ? const Color(0xFF003D56)
+            : AppBrand.primaryColor.withAlpha(30),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return IconThemeData(color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor);
+          }
+          return IconThemeData(color: colorScheme.onSurfaceVariant);
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final baseColor = states.contains(WidgetState.selected)
+              ? (isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor)
+              : colorScheme.onSurfaceVariant;
+          return TextStyle(
+            fontSize: 10,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w700
+                : FontWeight.normal,
+            color: baseColor,
+          );
+        }),
+        overlayColor: WidgetStatePropertyAll(
+            AppBrand.primaryColor.withAlpha(15)),
+        height: 64,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+
+      // ── Navigation Rail ────────────────────────────────────────────────────
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor:
+            isDark ? const Color(0xFF0D1618) : const Color(0xFFE8F5FD),
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: AppTokens.brMD,
+        ),
+        indicatorColor: isDark
+            ? const Color(0xFF003D56)
+            : AppBrand.primaryColor.withAlpha(22),
+        selectedIconTheme: IconThemeData(
+          color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+        ),
+        unselectedIconTheme: IconThemeData(color: colorScheme.onSurfaceVariant),
+        selectedLabelTextStyle: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+          color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+        ),
+        unselectedLabelTextStyle: TextStyle(
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+        ),
+        labelType: NavigationRailLabelType.all,
+      ),
+
+      // ── Tab Bar ────────────────────────────────────────────────────────────
       tabBarTheme: const TabBarThemeData(
         labelColor: AppBrand.onPrimary,
         unselectedLabelColor: AppBrand.onPrimaryMuted,
@@ -97,52 +178,82 @@ class AppTheme {
         dividerColor: Colors.transparent,
         overlayColor: WidgetStatePropertyAll(Colors.white10),
       ),
-      navigationRailTheme: NavigationRailThemeData(
-        indicatorShape: RoundedRectangleBorder(
-          borderRadius: AppTokens.brMD,
-        ),
-        selectedIconTheme: IconThemeData(color: colorScheme.onPrimaryContainer),
-        unselectedIconTheme: IconThemeData(color: colorScheme.onSurfaceVariant),
-        labelType: NavigationRailLabelType.all,
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        indicatorShape: RoundedRectangleBorder(
-          borderRadius: AppTokens.brMD,
-        ),
-        height: 64,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      ),
+
+      // ── Dialog / Sheet ────────────────────────────────────────────────────
       dialogTheme: DialogThemeData(
+        backgroundColor:
+            isDark ? const Color(0xFF0D2030) : colorScheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTokens.rXL),
         ),
+        elevation: 6,
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor:
+            isDark ? const Color(0xFF0D2030) : colorScheme.surface,
         showDragHandle: true,
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(AppTokens.rXL),
           ),
         ),
       ),
+
+      // ── Card ──────────────────────────────────────────────────────────────
       cardTheme: CardThemeData(
-        elevation: AppTokens.cardElevation,
+        // Arctic cards: barely-tinted surface with subtle icy shadow
+        color: isDark ? const Color(0xFF121F25) : const Color(0xFFEAF5FB),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: AppTokens.brMD,
+          side: BorderSide(
+            color: isDark
+                ? const Color(0xFF1E3340)
+                : const Color(0xFFB6DFF0),
+            width: 1,
+          ),
         ),
-        margin:
-            const EdgeInsets.symmetric(horizontal: AppTokens.s16, vertical: 6),
+        margin: const EdgeInsets.symmetric(
+            horizontal: AppTokens.s16, vertical: 6),
+        shadowColor: AppBrand.primaryColor.withAlpha(20),
       ),
+
+      // ── Input ─────────────────────────────────────────────────────────────
       inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(borderRadius: AppTokens.brSM),
         filled: true,
+        fillColor: isDark
+            ? const Color(0xFF172530)
+            : const Color(0xFFE3F2FD).withAlpha(200),
+        border: OutlineInputBorder(
+          borderRadius: AppTokens.brSM,
+          borderSide:
+              BorderSide(color: colorScheme.outline.withAlpha(100)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: AppTokens.brSM,
+          borderSide: BorderSide(
+              color: isDark
+                  ? const Color(0xFF1E3A50)
+                  : const Color(0xFFB0D8F0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: AppTokens.brSM,
+          borderSide: BorderSide(
+              color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+              width: 2),
+        ),
         contentPadding: const EdgeInsets.symmetric(
             horizontal: AppTokens.s16, vertical: AppTokens.s12),
       ),
+
+      // ── Buttons ───────────────────────────────────────────────────────────
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppBrand.primaryColor,
           foregroundColor: AppBrand.onPrimary,
+          elevation: 2,
+          shadowColor: AppBrand.primaryColor.withAlpha(80),
           padding: const EdgeInsets.symmetric(
               horizontal: AppTokens.s24, vertical: 14),
           minimumSize: const Size(0, AppTokens.buttonMinHeight),
@@ -155,18 +266,68 @@ class AppTheme {
           shape: RoundedRectangleBorder(borderRadius: AppTokens.brSM),
         ),
       ),
-      chipTheme: ChipThemeData(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+          side: BorderSide(
+              color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor),
+          minimumSize: const Size(0, AppTokens.buttonMinHeight),
+          shape: RoundedRectangleBorder(borderRadius: AppTokens.brSM),
         ),
       ),
+
+      // ── Chip ─────────────────────────────────────────────────────────────
+      chipTheme: ChipThemeData(
+        backgroundColor:
+            isDark ? const Color(0xFF172530) : const Color(0xFFE1F5FE),
+        selectedColor: isDark
+            ? const Color(0xFF003D56)
+            : AppBrand.primaryColor.withAlpha(30),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: isDark
+                ? const Color(0xFF1E3A50)
+                : const Color(0xFFB0D8F0),
+          ),
+        ),
+      ),
+
+      // ── Snack Bar ─────────────────────────────────────────────────────────
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: AppTokens.brMD),
         backgroundColor:
-            isDark ? const Color(0xFF424242) : const Color(0xFF323232),
-        contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
-        actionTextColor: AppBrand.primaryColor,
+            isDark ? const Color(0xFF1A3040) : const Color(0xFF00344A),
+        contentTextStyle:
+            const TextStyle(color: Colors.white, fontSize: 14),
+        actionTextColor: const Color(0xFF81D4FA),
+      ),
+
+      // ── List Tile ─────────────────────────────────────────────────────────
+      listTileTheme: ListTileThemeData(
+        selectedTileColor: isDark
+            ? AppBrand.primaryColor.withAlpha(32)
+            : AppBrand.primaryColor.withAlpha(18),
+        selectedColor:
+            isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+        iconColor: colorScheme.onSurfaceVariant,
+      ),
+
+      // ── Divider ───────────────────────────────────────────────────────────
+      dividerTheme: DividerThemeData(
+        color: isDark
+            ? const Color(0xFF1E3340)
+            : const Color(0xFFB6DFF0),
+        thickness: 0.8,
+      ),
+
+      // ── FloatingActionButton ───────────────────────────────────────────────
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: isDark ? const Color(0xFF003D56) : AppBrand.primaryColor,
+        foregroundColor: AppBrand.onPrimary,
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: AppTokens.brLG),
       ),
     );
   }

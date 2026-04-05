@@ -31,15 +31,17 @@ class AppTokens {
   static final BorderRadius brXL = BorderRadius.circular(rXL);
   static final BorderRadius brFull = BorderRadius.circular(rFull);
 
-  // ─── Elevation / Shadows ───
+  // ─── Elevation / Shadows (Arctic blue-tinted depth) ───
   static const List<BoxShadow> shadowSM = [
-    BoxShadow(color: Color(0x0D000000), blurRadius: 4, offset: Offset(0, 1)),
+    BoxShadow(color: Color(0x0C0277BD), blurRadius: 4, offset: Offset(0, 1)),
   ];
   static const List<BoxShadow> shadowMD = [
-    BoxShadow(color: Color(0x1A000000), blurRadius: 8, offset: Offset(0, 2)),
+    BoxShadow(color: Color(0x180277BD), blurRadius: 8, offset: Offset(0, 2)),
+    BoxShadow(color: Color(0x080277BD), blurRadius: 2, offset: Offset(0, 1)),
   ];
   static const List<BoxShadow> shadowLG = [
-    BoxShadow(color: Color(0x26000000), blurRadius: 16, offset: Offset(0, 4)),
+    BoxShadow(color: Color(0x220277BD), blurRadius: 16, offset: Offset(0, 4)),
+    BoxShadow(color: Color(0x0C0277BD), blurRadius: 6, offset: Offset(0, 2)),
   ];
 
   // ─── Motion Durations ───
@@ -47,6 +49,10 @@ class AppTokens {
   static const Duration durNormal = Duration(milliseconds: 250);
   static const Duration durSlow = Duration(milliseconds: 400);
   static const Duration durPage = Duration(milliseconds: 300);
+  /// Arctic-slow — for glacial fade and premium entrances
+  static const Duration durGlacial = Duration(milliseconds: 600);
+  /// Used for staggered list items in large screens (80ms per step)
+  static const Duration durStaggerStep = Duration(milliseconds: 80);
 
   // ─── Motion Curves ───
   static const Curve curveStd = Curves.easeInOut;

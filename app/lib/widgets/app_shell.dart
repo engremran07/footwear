@@ -74,6 +74,65 @@ class _AppShellState extends ConsumerState<AppShell>
 
   void _toggleDrawer() => _isDrawerOpen ? _closeDrawer() : _openDrawer();
 
+  // ─── Quick-action map for long-press on bottom nav ──────────────────────
+  static const _navQuickActions =
+      <String, List<({IconData icon, String label, String route})>>{
+    '/shops': [
+      (icon: Icons.add_business, label: 'New Shop', route: '/shops/new'),
+    ],
+    '/routes': [
+      (icon: Icons.add_road, label: 'New Route', route: '/routes/new'),
+    ],
+    '/customers': [
+      (
+        icon: Icons.person_add,
+        label: 'New Customer',
+        route: '/customers/new'
+      ),
+    ],
+    '/products': [
+      (icon: Icons.add_box, label: 'New Product', route: '/products/new'),
+    ],
+  };
+
+  void _onNavLongPress(
+    BuildContext ctx,
+    ({IconData icon, String label, String route}) item,
+  ) {
+    HapticFeedback.mediumImpact();
+    final actions = _navQuickActions[item.route] ?? [];
+    if (actions.isEmpty) return;
+    showModalBottomSheet<void>(
+      context: ctx,
+      builder: (_) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Text(
+              item.label,
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+          const Divider(height: 1),
+          for (final action in actions)
+            ListTile(
+              leading:
+                  Icon(action.icon, color: AppBrand.primaryColor),
+              title: Text(action.label),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.go(action.route);
+              },
+            ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
   String? _parentRoute(String path) {
     final segs = path.split('/').where((s) => s.isNotEmpty).toList();
     if (segs.isEmpty) return null;
@@ -278,10 +337,48 @@ class _AppShellState extends ConsumerState<AppShell>
                           onTap: _isDrawerOpen ? _closeDrawer : null,
                           onHorizontalDragEnd: (d) {
                             final vel = d.primaryVelocity ?? 0;
-                            if (!isRtl && vel > 200) _openDrawer();
-                            if (!isRtl && vel < -200) _closeDrawer();
-                            if (isRtl && vel < -200) _openDrawer();
-                            if (isRtl && vel > 200) _closeDrawer();
+                            if (_isDrawerOpen) {
+                              // Only close when drawer already open
+                              if (!isRtl && vel < -200) _closeDrawer();
+                              if (isRtl && vel > 200) _closeDrawer();
+                              return;
+                            }
+                            // Drawer closed: open OR tab-swipe
+                            if (!isRtl) {
+                              if (vel > 200) {
+                                _openDrawer();
+                              } else if (vel < -600 &&
+                                  primaryItems.length > 1) {
+                                final idx = primaryItems.indexWhere((e) =>
+                                    e.route == currentLocation ||
+                                    (e.route != '/' &&
+                                        currentLocation
+                                            .startsWith(e.route)));
+                                if (idx >= 0 &&
+                                    idx < primaryItems.length - 1) {
+                                  HapticFeedback.selectionClick();
+                                  context
+                                      .go(primaryItems[idx + 1].route);
+                                }
+                              }
+                            } else {
+                              if (vel < -200) {
+                                _openDrawer();
+                              } else if (vel > 600 &&
+                                  primaryItems.length > 1) {
+                                final idx = primaryItems.indexWhere((e) =>
+                                    e.route == currentLocation ||
+                                    (e.route != '/' &&
+                                        currentLocation
+                                            .startsWith(e.route)));
+                                if (idx >= 0 &&
+                                    idx < primaryItems.length - 1) {
+                                  HapticFeedback.selectionClick();
+                                  context
+                                      .go(primaryItems[idx + 1].route);
+                                }
+                              }
+                            }
                           },
                           behavior: HitTestBehavior.translucent,
                           child: AbsorbPointer(
@@ -291,7 +388,7 @@ class _AppShellState extends ConsumerState<AppShell>
                         ),
                         bottomNavigationBar: primaryItems.isEmpty
                             ? null
-                            : _WhatsAppBottomNav(
+                            : _ArcticBottomNav(
                                 items: primaryItems,
                                 currentLocation: currentLocation,
                                 onTap: (route) {
@@ -299,6 +396,8 @@ class _AppShellState extends ConsumerState<AppShell>
                                   if (_isDrawerOpen) _closeDrawer();
                                   context.go(route);
                                 },
+                                onLongPress: (item) =>
+                                    _onNavLongPress(context, item),
                               ),
                       ),
                     ),
@@ -335,14 +434,34 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  // +2 px for aurora accent stripe at the bottom edge
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 2);
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     return AppBar(
       elevation: 0,
-      scrolledUnderElevation: 2,
+      scrolledUnderElevation: 0,
+      backgroundColor: Colors.transparent,
+      // Arctic glacier gradient fills the full AppBar area
+      flexibleSpace: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: isDark
+              ? AppBrand.appBarGradientDark
+              : AppBrand.appBarGradientLight,
+        ),
+        child: const SizedBox.expand(),
+      ),
+      // Aurora accent 2 px stripe at the bottom
+      bottom: const PreferredSize(
+        preferredSize: Size.fromHeight(2),
+        child: DecoratedBox(
+          decoration: BoxDecoration(gradient: AppBrand.auroraAccent),
+          child: SizedBox(height: 2, width: double.infinity),
+        ),
+      ),
       leading: Tooltip(
         message: menuLabel,
         child: IconButton(
@@ -404,43 +523,186 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-// ─── WhatsApp-style Bottom Navigation ────────────────────────────────────────
+// ─── Arctic Bottom Navigation ───────────────────────────────────────────────
 
-class _WhatsAppBottomNav extends StatelessWidget {
+class _ArcticBottomNav extends StatelessWidget {
   final List<({IconData icon, String label, String route})> items;
   final String currentLocation;
   final ValueChanged<String> onTap;
+  final void Function(({IconData icon, String label, String route})) onLongPress;
 
-  const _WhatsAppBottomNav({
+  const _ArcticBottomNav({
     required this.items,
     required this.currentLocation,
     required this.onTap,
+    required this.onLongPress,
   });
-
-  int get _selectedIndex {
-    final idx = items.indexWhere((e) =>
-        e.route == currentLocation ||
-        (e.route != '/' && currentLocation.startsWith(e.route)));
-    return idx < 0 ? 0 : idx;
-  }
 
   @override
   Widget build(BuildContext context) {
-    return NavigationBar(
-      selectedIndex: _selectedIndex,
-      onDestinationSelected: (i) => onTap(items[i].route),
-      labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-      animationDuration: const Duration(milliseconds: 300),
-      destinations: items
-          .map(
-            (item) => NavigationDestination(
-              icon: Icon(item.icon),
-              selectedIcon: Icon(item.icon, color: AppBrand.primaryColor),
-              label: item.label,
-              tooltip: item.label,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0D1618) : Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: isDark
+                ? const Color(0xFF1E3340)
+                : const Color(0xFFB6DFF0),
+            width: 1,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppBrand.primaryColor.withAlpha(28),
+            blurRadius: 14,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 62,
+          child: Row(
+            children: items.map((item) {
+              final isSelected = item.route == currentLocation ||
+                  (item.route != '/' &&
+                      currentLocation.startsWith(item.route));
+              return Expanded(
+                child: _ArcticNavItem(
+                  item: item,
+                  isSelected: isSelected,
+                  onTap: () => onTap(item.route),
+                  onLongPress: () => onLongPress(item),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ArcticNavItem extends StatefulWidget {
+  final ({IconData icon, String label, String route}) item;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  const _ArcticNavItem({
+    required this.item,
+    required this.isSelected,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  @override
+  State<_ArcticNavItem> createState() => _ArcticNavItemState();
+}
+
+class _ArcticNavItemState extends State<_ArcticNavItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pressCtrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+      value: 0,
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.87).animate(
+      CurvedAnimation(parent: _pressCtrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pressCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails _) => _pressCtrl.forward();
+  void _onTapUp(TapUpDetails _) => _pressCtrl.reverse();
+  void _onTapCancel() => _pressCtrl.reverse();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selectedColor =
+        isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor;
+    final color = widget.isSelected ? selectedColor : cs.onSurfaceVariant;
+
+    return Semantics(
+      label: widget.item.label,
+      selected: widget.isSelected,
+      button: true,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
+        onTapCancel: _onTapCancel,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedBuilder(
+          animation: _scale,
+          builder: (context, child) =>
+              Transform.scale(scale: _scale.value, child: child),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Animated pill indicator
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.fastOutSlowIn,
+                  height: 3,
+                  width: widget.isSelected ? 24 : 0,
+                  margin: const EdgeInsets.only(bottom: 4),
+                  decoration: BoxDecoration(
+                    color: widget.isSelected
+                        ? selectedColor
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    widget.item.icon,
+                    key: ValueKey(widget.isSelected),
+                    size: 22,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: widget.isSelected
+                        ? FontWeight.w700
+                        : FontWeight.normal,
+                    color: color,
+                    letterSpacing: widget.isSelected ? 0.2 : 0,
+                  ),
+                  child: Text(
+                    widget.item.label,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
             ),
-          )
-          .toList(),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -487,73 +749,83 @@ class _DrawerMenuScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // User header
-                InkWell(
-                  onTap: onProfile,
-                  child: Padding(
-                    padding:
-                        const EdgeInsetsDirectional.fromSTEB(20, 28, 20, 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Image.asset(AppBrand.logoAsset,
-                            height: 46, fit: BoxFit.contain),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                _UserAvatar(user: user, radius: 23),
-                                if (isOnline)
-                                  Positioned(
-                                    bottom: 1,
-                                    right: 1,
-                                    child: Container(
-                                      width: 11,
-                                      height: 11,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: AppBrand.successColor,
-                                        border: Border.all(
-                                            color: cs.surface, width: 2),
+                // Arctic gradient drawer header
+                DecoratedBox(
+                  decoration: const BoxDecoration(
+                    gradient: AppBrand.drawerHeaderGradient,
+                  ),
+                  child: InkWell(
+                    onTap: onProfile,
+                    splashColor: Colors.white12,
+                    highlightColor: Colors.white10,
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                          20, 28, 20, 18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Image.asset(AppBrand.logoAsset,
+                              height: 46, fit: BoxFit.contain),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  _UserAvatar(user: user, radius: 23),
+                                  if (isOnline)
+                                    Positioned(
+                                      bottom: 1,
+                                      right: 1,
+                                      child: Container(
+                                        width: 11,
+                                        height: 11,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: AppBrand.successColor,
+                                          border: Border.all(
+                                              color: Colors.white,
+                                              width: 2),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(width: 12),
-                            if (user != null)
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      user!.displayName,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: cs.onSurface,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      user!.email,
-                                      style: TextStyle(
-                                          fontSize: 11,
-                                          color: cs.onSurfaceVariant),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 5),
-                                    _RoleBadge(role: user!.role, small: true),
-                                  ],
-                                ),
+                                ],
                               ),
-                          ],
-                        ),
-                      ],
+                              const SizedBox(width: 12),
+                              if (user != null)
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        user!.displayName,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        user!.email,
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.white70),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 5),
+                                      _RoleBadge(
+                                          role: user!.role, small: true),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

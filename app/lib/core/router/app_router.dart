@@ -86,6 +86,29 @@ CustomTransitionPage<void> _fadePage(Widget child, GoRouterState state) {
   );
 }
 
+/// Slide-up + fade for form / create / edit screens.
+CustomTransitionPage<void> _slidePage(Widget child, GoRouterState state) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 320),
+    reverseTransitionDuration: const Duration(milliseconds: 250),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final slideIn = Tween<Offset>(
+        begin: const Offset(0, 0.06),
+        end: Offset.zero,
+      ).animate(
+          CurvedAnimation(parent: animation, curve: Curves.fastOutSlowIn));
+      final fadeIn =
+          CurvedAnimation(parent: animation, curve: Curves.easeOut);
+      return FadeTransition(
+        opacity: fadeIn,
+        child: SlideTransition(position: slideIn, child: child),
+      );
+    },
+  );
+}
+
 /// Drives GoRouter redirects in response to auth-state changes.
 ///
 /// Uses [ref.listen] (not ref.watch) so this notifier — and the GoRouter
@@ -167,10 +190,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               pageBuilder: (_, s) => _fadePage(const RoutesListScreen(), s)),
           GoRoute(
               path: '/routes/new',
-              pageBuilder: (_, s) => _fadePage(const RouteFormScreen(), s)),
+              pageBuilder: (_, s) => _slidePage(const RouteFormScreen(), s)),
           GoRoute(
               path: '/routes/:id/edit',
-              pageBuilder: (_, s) => _fadePage(
+              pageBuilder: (_, s) => _slidePage(
                   RouteFormScreen(routeId: s.pathParameters['id']!), s)),
           GoRoute(
               path: '/routes/:id',
@@ -182,13 +205,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               pageBuilder: (_, s) => _fadePage(const ShopsListScreen(), s)),
           GoRoute(
               path: '/shops/new',
-              pageBuilder: (_, s) => _fadePage(
+              pageBuilder: (_, s) => _slidePage(
                   ShopFormScreen(
                       preselectedRouteId: s.uri.queryParameters['routeId']),
                   s)),
           GoRoute(
               path: '/shops/:id/edit',
-              pageBuilder: (_, s) => _fadePage(
+              pageBuilder: (_, s) => _slidePage(
                   ShopFormScreen(shopId: s.pathParameters['id']!), s)),
           GoRoute(
               path: '/shops/:id',
@@ -200,10 +223,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               pageBuilder: (_, s) => _fadePage(const CustomersListScreen(), s)),
           GoRoute(
               path: '/customers/new',
-              pageBuilder: (_, s) => _fadePage(const CustomerFormScreen(), s)),
+              pageBuilder: (_, s) => _slidePage(const CustomerFormScreen(), s)),
           GoRoute(
               path: '/customers/:id/edit',
-              pageBuilder: (_, s) => _fadePage(
+              pageBuilder: (_, s) => _slidePage(
                   CustomerFormScreen(customerId: s.pathParameters['id']!), s)),
           GoRoute(
               path: '/customers/:id',
@@ -216,10 +239,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               pageBuilder: (_, s) => _fadePage(const ProductsListScreen(), s)),
           GoRoute(
               path: '/products/new',
-              pageBuilder: (_, s) => _fadePage(const ProductFormScreen(), s)),
+              pageBuilder: (_, s) => _slidePage(const ProductFormScreen(), s)),
           GoRoute(
               path: '/products/:id/edit',
-              pageBuilder: (_, s) => _fadePage(
+              pageBuilder: (_, s) => _slidePage(
                   ProductFormScreen(productId: s.pathParameters['id']!), s)),
           GoRoute(
               path: '/products/:id',
@@ -227,11 +250,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   ProductDetailScreen(productId: s.pathParameters['id']!), s)),
           GoRoute(
               path: '/products/:id/variants/new',
-              pageBuilder: (_, s) => _fadePage(
+              pageBuilder: (_, s) => _slidePage(
                   VariantFormScreen(productId: s.pathParameters['id']!), s)),
           GoRoute(
               path: '/products/:id/variants/:vid/edit',
-              pageBuilder: (_, s) => _fadePage(
+              pageBuilder: (_, s) => _slidePage(
                   VariantFormScreen(
                       productId: s.pathParameters['id']!,
                       variantId: s.pathParameters['vid']!),
@@ -246,7 +269,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               pageBuilder: (_, s) => _fadePage(const InvoicesListScreen(), s)),
           GoRoute(
               path: '/invoices/new',
-              pageBuilder: (_, s) => _fadePage(
+              pageBuilder: (_, s) => _slidePage(
                   CreateSaleInvoiceScreen(
                       preselectedShopId: s.uri.queryParameters['shopId']),
                   s)),
