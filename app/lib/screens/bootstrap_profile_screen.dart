@@ -15,7 +15,7 @@ class BootstrapProfileScreen extends ConsumerWidget {
     final authUser = ref.watch(authStateProvider).valueOrNull;
     final isLoading = ref.watch(bootstrapNotifierProvider).isLoading;
     final email = (authUser?.email ?? '').trim().toLowerCase();
-    final canBootstrap = authUser != null && email == 'admin@footwear.pk';
+    final canBootstrap = authUser != null && email.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(

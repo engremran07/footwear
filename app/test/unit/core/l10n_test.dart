@@ -66,6 +66,12 @@ void main() {
       expect(missing, isEmpty, reason: 'UR missing keys: $missing');
     });
 
+    test('login reset hint exists in all locales', () {
+      expect(enKeys, contains('login_reset_email_hint'));
+      expect(arKeys, contains('login_reset_email_hint'));
+      expect(urKeys, contains('login_reset_email_hint'));
+    });
+
     test('No duplicate keys in EN locale', () {
       final seen = <String>{};
       final dups = <String>[];

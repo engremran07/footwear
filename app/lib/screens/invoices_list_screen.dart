@@ -230,7 +230,7 @@ class _InvoiceStatsStrip extends ConsumerWidget {
           _IStat(
             icon: Icons.receipt_long,
             label: tr('stats_total', ref),
-            value: AppFormatters.compact(totalSales),
+            value: AppFormatters.sar(totalSales),
             color: cs.primary,
           ),
           Container(
@@ -238,7 +238,7 @@ class _InvoiceStatsStrip extends ConsumerWidget {
           _IStat(
             icon: Icons.check_circle,
             label: tr('paid', ref),
-            value: AppFormatters.compact(paidAmount),
+            value: AppFormatters.sar(paidAmount),
             color: AppTheme.clearFg(cs),
           ),
           Container(
@@ -246,7 +246,7 @@ class _InvoiceStatsStrip extends ConsumerWidget {
           _IStat(
             icon: Icons.pending,
             label: tr('pending', ref),
-            value: AppFormatters.compact(outstanding),
+            value: AppFormatters.sar(outstanding),
             color: outstanding > 0 ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
           ),
         ],

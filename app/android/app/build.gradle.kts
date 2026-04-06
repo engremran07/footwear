@@ -14,6 +14,14 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
+fun computeAndroidVersionCode(versionName: String, buildNumber: Int): Int {
+    val parts = versionName.split(".")
+    val major = parts.getOrNull(0)?.toIntOrNull() ?: 0
+    val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    val patch = parts.getOrNull(2)?.toIntOrNull() ?: 0
+    return (major * 1_000_000) + (minor * 10_000) + (patch * 100) + buildNumber
+}
+
 android {
     namespace = "footwear.pk.com"
     compileSdk = flutter.compileSdkVersion
@@ -33,7 +41,7 @@ android {
         applicationId = "footwear.pk.com"
         minSdk = 29
         targetSdk = 35
-        versionCode = flutter.versionCode
+        versionCode = computeAndroidVersionCode(flutter.versionName, flutter.versionCode)
         versionName = flutter.versionName
     }
 

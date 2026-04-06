@@ -71,6 +71,7 @@ class AuthNotifier extends AsyncNotifier<void> {
     ref.invalidate(authUserProvider);
     ref.invalidate(dashboardStatsProvider);
     ref.invalidate(settingsProvider);
+    ref.invalidate(allInvoicesProvider);
     ref.invalidate(roleAwareInvoicesProvider);
     ref.invalidate(sellerInvoicesProvider);
     ref.invalidate(sellersProvider);
@@ -218,7 +219,15 @@ class AuthNotifier extends AsyncNotifier<void> {
   Future<void> signOut() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
+      if (kIsWeb) {
+        try {
+          await FirebaseAuth.instance.setPersistence(Persistence.NONE);
+        } catch (_) {}
+      }
       await FirebaseAuth.instance.signOut();
+      try {
+        await FirebaseFirestore.instance.clearPersistence();
+      } catch (_) {}
       _invalidateRoleScopedProviders();
     });
   }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/utils/share_helper.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/snack_helper.dart';
@@ -77,7 +79,7 @@ class AboutScreen extends ConsumerWidget {
           _InfoTile(
             icon: Icons.calendar_today_outlined,
             label: tr('release_date', ref),
-            value: 'April 5, 2026',
+            value: 'April 6, 2026',
           ),
           _InfoTile(
             icon: Icons.cloud_outlined,
@@ -91,18 +93,55 @@ class AboutScreen extends ConsumerWidget {
 
           // ── Contact ──────────────────────────────────────────────────────
           _SectionHeader(label: tr('contact', ref), cs: cs),
-          _InfoTile(
+          _ContactActionTile(
             icon: Icons.email_outlined,
             label: tr('email', ref),
             value: AppBrand.contactEmail,
-            onTap: () => _launchUrl('mailto:${AppBrand.contactEmail}', context),
+            actions: [
+              _ActionButton(
+                tooltip: tr('email', ref),
+                icon: const Icon(Icons.email_outlined, size: 18),
+                onTap: () => _launchUrl('mailto:${AppBrand.contactEmail}', context),
+              ),
+            ],
           ),
-          _InfoTile(
+          _ContactActionTile(
             icon: Icons.phone_outlined,
             label: tr('phone', ref),
-            value: AppBrand.contactPhone,
-            onTap: () => _launchUrl(
-                'tel:${AppBrand.contactPhone.replaceAll(' ', '')}', context),
+            value: AppBrand.contactPhonePrimary,
+            actions: [
+              _ActionButton(
+                tooltip: tr('phone', ref),
+                icon: const Icon(Icons.call_outlined, size: 18),
+                onTap: () => _launchUrl('tel:${AppBrand.contactPhonePrimary.replaceAll('+', '')}', context),
+              ),
+              _ActionButton(
+                tooltip: 'WhatsApp',
+                icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
+                backgroundColor: const Color(0xFFE9F9EF),
+                foregroundColor: const Color(0xFF128C7E),
+                onTap: () => _openWhatsApp(AppBrand.contactPhonePrimary, context),
+              ),
+            ],
+          ),
+          _ContactActionTile(
+            icon: Icons.phone_android_outlined,
+            label: tr('phone', ref),
+            value: AppBrand.contactPhoneSecondary,
+            actions: [
+              _ActionButton(
+                tooltip: tr('phone', ref),
+                icon: const Icon(Icons.call_outlined, size: 18),
+                onTap: () => _launchUrl('tel:${AppBrand.contactPhoneSecondary.replaceAll('+', '')}', context),
+              ),
+              _ActionButton(
+                tooltip: 'WhatsApp',
+                icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
+                backgroundColor: const Color(0xFFE9F9EF),
+                foregroundColor: const Color(0xFF128C7E),
+                onTap: () => _openWhatsApp(AppBrand.contactPhoneSecondary, context),
+              ),
+            ],
           ),
           _InfoTile(
             icon: Icons.language_outlined,
@@ -121,7 +160,6 @@ class AboutScreen extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.article_outlined),
             title: Text(tr('open_source_licenses', ref)),
-            trailing: const Icon(Icons.chevron_right),
             onTap: () => showLicensePage(
               context: context,
               applicationName: AppBrand.appName,
@@ -162,6 +200,17 @@ class AboutScreen extends ConsumerWidget {
         ScaffoldMessenger.of(context)
             .showSnackBar(errorSnackBar('Could not open $url'));
       }
+    }
+  }
+
+  Future<void> _openWhatsApp(String phone, BuildContext context) async {
+    final ok = await openWhatsApp(
+      phone: phone.replaceAll('+', ''),
+      message: 'Hello ${AppBrand.companyName}',
+    );
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar('Could not open WhatsApp'));
     }
   }
 }
@@ -254,6 +303,101 @@ class _InfoTile extends StatelessWidget {
           : null,
       onTap: onTap,
       mouseCursor: onTap != null ? SystemMouseCursors.click : null,
+    );
+  }
+}
+
+class _ContactActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final List<Widget> actions;
+
+  const _ContactActionTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.actions,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 16),
+            child: Icon(icon, color: cs.onSurfaceVariant, size: 20),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: cs.onSurface,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Wrap(spacing: 8, children: actions),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String tooltip;
+  final Widget icon;
+  final VoidCallback onTap;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+
+  const _ActionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onTap,
+    this.backgroundColor,
+    this.foregroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: backgroundColor ?? cs.surfaceContainerHighest,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: IconTheme(
+            data: IconThemeData(
+              color: foregroundColor ?? cs.primary,
+              size: 18,
+            ),
+            child: icon,
+          ),
+        ),
+      ),
     );
   }
 }

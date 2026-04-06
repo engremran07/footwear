@@ -40,6 +40,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   DateTime? _backgroundedAt;
   DateTime? _sessionStartedAt;
   DateTime? _lastActivityAt;
+  DateTime? _lastActiveWriteAt;
   late final AppLifecycleListener _lifecycleListener;
 
   @override
@@ -122,6 +123,12 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   void _updateLastActive() {
     final user = ref.read(authUserProvider).valueOrNull;
     if (user != null) {
+      final now = DateTime.now();
+      if (_lastActiveWriteAt != null &&
+          now.difference(_lastActiveWriteAt!) < const Duration(minutes: 5)) {
+        return;
+      }
+      _lastActiveWriteAt = now;
       FirebaseFirestore.instance
           .collection(Collections.users)
           .doc(user.id)
@@ -138,9 +145,9 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     ref.listen<AsyncValue<UserModel?>>(authUserProvider, (prev, next) {
       final prevUser = prev?.valueOrNull;
       final nextUser = next.valueOrNull;
-      // New login: reset session start
-      if (prevUser == null && nextUser != null) {
+      if (prevUser?.id != nextUser?.id && nextUser != null) {
         _sessionStartedAt = DateTime.now();
+        _lastActiveWriteAt = null;
       }
       // Force logout if user's active flag cleared remotely
       if (nextUser != null && !nextUser.active) {

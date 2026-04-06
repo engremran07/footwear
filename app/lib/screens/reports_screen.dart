@@ -547,7 +547,7 @@ class _OutstandingPieChart extends ConsumerWidget {
         for (var i = 0; i < top.length; i++) {
           sections.add(PieChartSectionData(
             value: top[i].balance,
-            title: AppFormatters.compact(top[i].balance),
+            title: AppFormatters.sar(top[i].balance),
             color: colors[i % colors.length],
             radius: 50,
             titleStyle: TextStyle(
@@ -563,7 +563,7 @@ class _OutstandingPieChart extends ConsumerWidget {
         if (othersTotal > 0) {
           sections.add(PieChartSectionData(
             value: othersTotal,
-            title: AppFormatters.compact(othersTotal),
+            title: AppFormatters.sar(othersTotal),
             color: colors.last,
             radius: 50,
             titleStyle: TextStyle(

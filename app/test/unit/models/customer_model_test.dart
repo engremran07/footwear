@@ -6,6 +6,7 @@ void main() {
   final ts = Timestamp.fromMillisecondsSinceEpoch(0);
   final baseJson = <String, dynamic>{
     'name': 'Hassan Traders',
+    'route_id': 'route-7',
     'phone': '+966509876543',
     'city': 'Dammam',
     'balance': 2500.0,
@@ -22,6 +23,7 @@ void main() {
       final m = CustomerModel.fromJson(baseJson, 'c1');
       expect(m.id, 'c1');
       expect(m.name, 'Hassan Traders');
+      expect(m.routeId, 'route-7');
       expect(m.phone, '+966509876543');
       expect(m.city, 'Dammam');
       expect(m.balance, 2500.0);
@@ -35,6 +37,7 @@ void main() {
     test('missing fields use defaults', () {
       final m = CustomerModel.fromJson({}, 'c2');
       expect(m.name, '');
+      expect(m.routeId, isNull);
       expect(m.phone, isNull);
       expect(m.city, isNull);
       expect(m.balance, 0);
@@ -72,9 +75,16 @@ void main() {
       final json = original.toJson();
       final restored = CustomerModel.fromJson(json, 'c1');
       expect(restored.name, original.name);
+      expect(restored.routeId, original.routeId);
       expect(restored.phone, original.phone);
       expect(restored.balance, original.balance);
       expect(restored.badDebt, original.badDebt);
+    });
+
+    test('omits route_id when null', () {
+      final json = CustomerModel.fromJson({...baseJson, 'route_id': null}, 'c11')
+          .toJson();
+      expect(json.containsKey('route_id'), isFalse);
     });
   });
 

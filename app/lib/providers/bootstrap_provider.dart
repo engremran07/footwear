@@ -17,9 +17,9 @@ class BootstrapNotifier extends AsyncNotifier<void> {
       }
 
       final email = (authUser.email ?? '').trim().toLowerCase();
-      if (email != 'admin@footwear.pk') {
+      if (email.isEmpty) {
         throw StateError(
-          'Bootstrap is restricted to admin@footwear.pk for one-time setup.',
+          'Bootstrap requires a signed-in account with an email address.',
         );
       }
 

@@ -75,18 +75,52 @@ class InvoiceDetailScreen extends ConsumerWidget {
   Future<void> _handleAction(BuildContext context, WidgetRef ref, String action,
       InvoiceModel inv) async {
     if (action == 'void') {
-      final confirmed = await ConfirmDialog.show(
-        context,
-        title: tr('void', ref),
-        message: tr('confirm_void_invoice', ref),
-      );
-      if (confirmed != true) return;
+      VoidRefundMode refundMode = VoidRefundMode.creditBalance;
+      if (inv.amountReceived > 0 && inv.isSale) {
+        final selectedMode = await showDialog<VoidRefundMode>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(tr('void', ref)),
+            content: Text(
+              '${tr('confirm_void_invoice', ref)}\n\n'
+              '${tr('amount_received', ref)}: ${AppFormatters.sar(inv.amountReceived)}\n'
+              '${tr('outstanding_amount', ref)}: ${AppFormatters.sar(inv.outstandingAmount)}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(tr('cancel', ref)),
+              ),
+              OutlinedButton(
+                onPressed: () => Navigator.of(ctx).pop(VoidRefundMode.cashRefund),
+                child: Text(tr('cash_in', ref)),
+              ),
+              FilledButton(
+                onPressed: () =>
+                    Navigator.of(ctx).pop(VoidRefundMode.creditBalance),
+                child: Text(tr('outstanding_balance', ref)),
+              ),
+            ],
+          ),
+        );
+        if (selectedMode == null) return;
+        refundMode = selectedMode;
+      } else {
+        final confirmed = await ConfirmDialog.show(
+          context,
+          title: tr('void', ref),
+          message: tr('confirm_void_invoice', ref),
+        );
+        if (confirmed != true) return;
+      }
       try {
         await ref.read(invoiceNotifierProvider.notifier).voidInvoice(
               invoiceId: inv.id,
               customerId: inv.customerId,
               total: inv.total,
               type: inv.type,
+              createdBy: ref.read(authStateProvider).valueOrNull?.uid ?? '',
+              refundMode: refundMode,
             );
       } catch (e) {
         if (context.mounted) {
@@ -299,6 +333,19 @@ class _InvoiceBody extends ConsumerWidget {
                   bold: true,
                   color: invoice.isSale ? cs.error : cs.primary,
                 ),
+                if (invoice.amountReceived > 0)
+                  _TotalRow(
+                    label: tr('amount_received', ref),
+                    value: AppFormatters.sar(invoice.amountReceived),
+                    color: cs.primary,
+                  ),
+                if (invoice.outstandingAmount > 0)
+                  _TotalRow(
+                    label: tr('outstanding_amount', ref),
+                    value: AppFormatters.sar(invoice.outstandingAmount),
+                    bold: true,
+                    color: cs.error,
+                  ),
               ],
             ),
           ),
@@ -392,13 +439,16 @@ class _PaymentProgressBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
-    final steps = ['draft', 'issued', 'paid'];
+    final steps = ['draft', 'issued', 'partial', 'paid'];
     final stepLabels = [
       tr('invoice_step_draft', ref),
       tr('invoice_step_issued', ref),
+      tr('partial', ref),
       tr('invoice_step_paid', ref),
     ];
-    final currentIdx = steps.indexOf(invoice.status);
+    final currentIdx = invoice.status == InvoiceModel.statusVoid
+        ? -1
+        : steps.indexOf(invoice.status);
     final isVoid = invoice.status == 'void';
 
     if (isVoid) {

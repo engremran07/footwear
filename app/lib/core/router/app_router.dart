@@ -148,6 +148,8 @@ class RouterNotifier extends ChangeNotifier {
       return null;
     }
 
+    if (!appUser.active) return '/login';
+
     if (isLoginRoute || isBootstrapRoute) return '/';
 
     if (_isAdminOnlyPath(state.matchedLocation) && !appUser.isAdmin) {

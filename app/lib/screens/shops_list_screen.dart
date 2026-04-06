@@ -179,7 +179,7 @@ class _ShopStatsStrip extends ConsumerWidget {
           _Stat(
             icon: Icons.account_balance_wallet,
             label: tr('stats_outstanding', ref),
-            value: AppFormatters.compact(totalOutstanding),
+            value: AppFormatters.sar(totalOutstanding),
             color: totalOutstanding > 0
                 ? AppTheme.debtFg(Theme.of(context).colorScheme)
                 : AppTheme.clearFg(Theme.of(context).colorScheme),
@@ -402,7 +402,7 @@ class _AdminGroupedShopsViewState
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            AppFormatters.compact(routeOutstanding),
+                            AppFormatters.sar(routeOutstanding),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,

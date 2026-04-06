@@ -5,6 +5,8 @@ import '../core/constants/collections.dart';
 import '../models/invoice_model.dart';
 import 'auth_provider.dart';
 
+enum VoidRefundMode { cashRefund, creditBalance }
+
 final invoicesByCustomerProvider = StreamProvider.autoDispose
     .family<List<InvoiceModel>, String>((ref, customerId) {
   return FirebaseFirestore.instance
@@ -93,6 +95,23 @@ final invoiceByIdProvider =
 class InvoiceNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
+
+  void _restoreWarehouseStock(
+    WriteBatch batch,
+    FirebaseFirestore db,
+    List<dynamic> rawItems,
+    Timestamp now,
+  ) {
+    for (final item in rawItems.whereType<Map<String, dynamic>>()) {
+      final variantId = (item['variant_id'] as String?)?.trim() ?? '';
+      final qty = (item['qty'] as num?)?.toInt() ?? 0;
+      if (variantId.isEmpty || qty <= 0) continue;
+      batch.update(db.collection(Collections.productVariants).doc(variantId), {
+        'quantity_available': FieldValue.increment(qty),
+        'updated_at': now,
+      });
+    }
+  }
 
   /// Generates the next invoice number: INV-YYYY-NNNN.
   ///
@@ -436,6 +455,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       }
     }
 
+    if (sellerInventoryRestores.isEmpty) {
+      _restoreWarehouseStock(batch, db, items, now);
+    }
+
     await batch.commit();
     return invRef.id;
   }
@@ -446,9 +469,14 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     required String customerId,
     required double total,
     required String type,
+    required String createdBy,
+    VoidRefundMode refundMode = VoidRefundMode.creditBalance,
   }) async {
     if (invoiceId.trim().isEmpty) {
       throw ArgumentError('invoiceId must not be empty');
+    }
+    if (createdBy.trim().isEmpty) {
+      throw ArgumentError('createdBy must not be empty');
     }
 
     final db = FirebaseFirestore.instance;
@@ -463,25 +491,78 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       throw StateError('Invoice $invoiceId is already voided');
     }
 
+    final data = invSnap.data()!;
+    final amountReceived = (data['amount_received'] as num?)?.toDouble() ?? 0.0;
+    final outstandingAmount =
+        (data['outstanding_amount'] as num?)?.toDouble() ??
+            (total - amountReceived);
+    final invoiceNumber = data['invoice_number'] as String? ?? '';
+    final routeId = data['route_id'] as String? ?? '';
+    final shopId = data['shop_id'] as String? ?? '';
+    final shopName = data['shop_name'] as String? ?? '';
+    final customerName = data['customer_name'] as String? ?? '';
+    final rawItems = (data['items'] as List<dynamic>?) ?? const [];
+    final linkedTransactions = await db
+        .collection(Collections.transactions)
+        .where('invoice_id', isEqualTo: invoiceId)
+        .where('deleted', isEqualTo: false)
+        .get();
+
     final batch = db.batch();
     final now = Timestamp.now();
+
+    Map<String, dynamic> transactionData({
+      required String txType,
+      required double amount,
+      required String description,
+      List<Map<String, dynamic>> items = const <Map<String, dynamic>>[],
+      String txCustomerId = '',
+      String txCustomerName = '',
+      String txShopId = '',
+      String txShopName = '',
+    }) {
+      return {
+        'shop_id': txShopId,
+        'shop_name': txShopName,
+        'route_id': routeId,
+        'customer_id': txCustomerId,
+        'customer_name': txCustomerName,
+        'type': txType,
+        'sale_type': type == InvoiceModel.typeSale ? 'credit' : 'return',
+        'amount': amount,
+        'description': description,
+        'items': items,
+        'invoice_id': invoiceId,
+        'invoice_number': invoiceNumber,
+        'created_by': createdBy.trim(),
+        'created_at': now,
+        'deleted': false,
+      };
+    }
 
     batch.update(db.collection(Collections.invoices).doc(invoiceId), {
       'status': InvoiceModel.statusVoid,
       'updated_at': now,
     });
 
-    // FI-05: Reverse only the outstanding_amount (not the full total).
-    // At creation: balance += (total - amountReceived).
-    // Voiding must reverse exactly that amount, not the full total.
+    for (final tx in linkedTransactions.docs) {
+      batch.update(tx.reference, {
+        'deleted': true,
+        'deleted_at': now,
+        'deleted_by': createdBy.trim(),
+        'deleted_reason': 'invoice_voided',
+        'updated_at': now,
+      });
+    }
+
     if (customerId.isNotEmpty) {
-      final data = invSnap.data()!;
-      final amountReceived =
-          (data['amount_received'] as num?)?.toDouble() ?? 0.0;
-      final outstandingBalance = total - amountReceived;
-      final reversalDelta = type == InvoiceModel.typeSale
-          ? -outstandingBalance
-          : outstandingBalance;
+      final reversalDelta = switch (type) {
+        InvoiceModel.typeSale => refundMode == VoidRefundMode.creditBalance
+            ? -total
+            : -outstandingAmount,
+        _ => total,
+      };
+
       batch.update(db.collection(Collections.customers).doc(customerId), {
         'balance': FieldValue.increment(reversalDelta),
         'updated_at': now,
@@ -499,6 +580,98 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             'quantity_available': FieldValue.increment(qty),
             'updated_at': now,
           },
+        );
+      }
+
+      if (rawDeductions.isEmpty) {
+        _restoreWarehouseStock(batch, db, rawItems, now);
+      }
+
+      if (type == InvoiceModel.typeSale) {
+        batch.set(
+          db.collection(Collections.transactions).doc(),
+          transactionData(
+            txType: 'cash_out',
+            amount: total,
+            description: 'Voided invoice snapshot $invoiceNumber',
+            items: rawItems.whereType<Map<String, dynamic>>().toList(),
+            txCustomerId: customerId,
+            txCustomerName: customerName,
+            txShopId: shopId,
+            txShopName: shopName,
+          ),
+        );
+
+        if (amountReceived > 0) {
+          batch.set(
+            db.collection(Collections.transactions).doc(),
+            transactionData(
+              txType: 'cash_in',
+              amount: amountReceived,
+              description: 'Voided payment snapshot $invoiceNumber',
+              txCustomerId: customerId,
+              txCustomerName: customerName,
+              txShopId: shopId,
+              txShopName: shopName,
+            ),
+          );
+        }
+
+        final reversalAmount = refundMode == VoidRefundMode.creditBalance
+            ? total
+            : outstandingAmount;
+        if (reversalAmount > 0) {
+          batch.set(
+            db.collection(Collections.transactions).doc(),
+            transactionData(
+              txType: 'return',
+              amount: reversalAmount,
+              description: refundMode == VoidRefundMode.creditBalance
+                  ? 'Credit for voided invoice $invoiceNumber'
+                  : 'Outstanding reversal for voided invoice $invoiceNumber',
+              txCustomerId: customerId,
+              txCustomerName: customerName,
+              txShopId: shopId,
+              txShopName: shopName,
+            ),
+          );
+        }
+
+        if (refundMode == VoidRefundMode.cashRefund && amountReceived > 0) {
+          batch.set(
+            db.collection(Collections.transactions).doc(),
+            transactionData(
+              txType: 'cash_out',
+              amount: amountReceived,
+              description: 'Cash refund for voided invoice $invoiceNumber',
+            ),
+          );
+        }
+      } else {
+        batch.set(
+          db.collection(Collections.transactions).doc(),
+          transactionData(
+            txType: 'return',
+            amount: total,
+            description: 'Voided credit note snapshot $invoiceNumber',
+            items: rawItems.whereType<Map<String, dynamic>>().toList(),
+            txCustomerId: customerId,
+            txCustomerName: customerName,
+            txShopId: shopId,
+            txShopName: shopName,
+          ),
+        );
+        batch.set(
+          db.collection(Collections.transactions).doc(),
+          transactionData(
+            txType: 'cash_out',
+            amount: total,
+            description: 'Reversal for voided credit note $invoiceNumber',
+            txCustomerId: customerId,
+            txCustomerName: customerName,
+            txShopId: shopId,
+            txShopName: shopName,
+          ),
         );
       }
     }

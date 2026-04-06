@@ -173,7 +173,7 @@ class RouteDetailScreen extends ConsumerWidget {
                             _RStat(
                               icon: Icons.warning_amber,
                               label: tr('outstanding', ref),
-                              value: AppFormatters.compact(totalOutstanding),
+                              value: AppFormatters.sar(totalOutstanding),
                               color: totalOutstanding > 0
                                   ? AppTheme.debtFg(cs)
                                   : AppTheme.clearFg(cs),

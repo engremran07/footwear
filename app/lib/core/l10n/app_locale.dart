@@ -50,7 +50,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'release_date': 'Release Date',
     'platform': 'Platform',
     'legal': 'Legal',
-    'open_source_licenses': 'Open Source Licenses',
+    'open_source_licenses': 'Open Source License',
     'copied': 'Copied to clipboard',
     'sign_out': 'Sign out',
     'save': 'Save',
@@ -135,6 +135,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'send_reset_email': 'Send Password Reset Email',
     'forgot_password': 'Forgot Password?',
     'enter_email_to_reset': 'Enter your email to receive a reset link.',
+    'login_reset_email_hint':
+        'You can enter either your username or your email address.',
     'confirm_delete_transaction':
         'Delete this transaction and reverse the balance change?',
     // ── Seller Sell-Stock ──
@@ -1016,9 +1018,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'Account signed in, but user profile is missing.',
     'bootstrap_signed_in_as': 'Signed in as: %s',
     'bootstrap_instructions':
-        'Use this one-time action to create users/{uid} with admin role. This is restricted to admin@footwear.pk only.',
+        'Use this one-time action to create users/{uid} with admin role when no admin profile exists yet.',
     'bootstrap_not_eligible':
-        'This account is not eligible for bootstrap. Sign out and log in with admin@footwear.pk.',
+        'This account is not eligible for bootstrap. Sign in with an email-based account to continue.',
     'bootstrap_create_btn': 'Create Admin Profile',
     'msg_admin_profile_created': 'Admin profile created successfully.',
 
@@ -1097,7 +1099,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'release_date': 'تاريخ الإصدار',
     'platform': 'المنصة',
     'legal': 'قانوني',
-    'open_source_licenses': 'تراخيص المصدر المفتوح',
+    'open_source_licenses': 'ترخيص المصدر المفتوح',
     'copied': 'تم النسخ إلى الحافظة',
     'sign_out': 'تسجيل الخروج',
     'save': 'حفظ',
@@ -1180,6 +1182,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'send_reset_email': 'إرسال رابط إعادة تعيين كلمة المرور',
     'forgot_password': 'نسيت كلمة المرور؟',
     'enter_email_to_reset': 'أدخل بريدك الإلكتروني لاستلام رابط إعادة التعيين.',
+    'login_reset_email_hint':
+        'يمكنك إدخال اسم المستخدم أو البريد الإلكتروني.',
     'confirm_delete_transaction':
         'هل تريد حذف هذه المعاملة وعكس التغيير في الرصيد؟',
     // ── بيع المخزون ──
@@ -2053,9 +2057,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'bootstrap_missing_profile': 'تم تسجيل الدخول ولكن ملف المستخدم مفقود.',
     'bootstrap_signed_in_as': 'مسجّل الدخول كـ: %s',
     'bootstrap_instructions':
-        'استخدم هذا الإجراء لمرة واحدة لإنشاء users/{uid} بدور المدير. مقيد بـ admin@footwear.pk فقط.',
+        'استخدم هذا الإجراء لمرة واحدة لإنشاء users/{uid} بدور المدير عندما لا يوجد ملف مدير بعد.',
     'bootstrap_not_eligible':
-        'هذا الحساب غير مؤهل للتهيئة. سجّل الخروج وادخل بـ admin@footwear.pk.',
+        'هذا الحساب غير مؤهل للتهيئة. سجّل الدخول بحساب يعتمد على البريد الإلكتروني للمتابعة.',
     'bootstrap_create_btn': 'إنشاء ملف المدير',
     'msg_admin_profile_created': 'تم إنشاء ملف المدير بنجاح.',
 
@@ -2134,7 +2138,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'release_date': 'ریلیز کی تاریخ',
     'platform': 'پلیٹ فارم',
     'legal': 'قانونی',
-    'open_source_licenses': 'اوپن سورس لائسنسز',
+    'open_source_licenses': 'اوپن سورس لائسنس',
     'copied': 'کلپ بورڈ پر کاپی کی گئی',
     'sign_out': 'سائن آؤٹ',
     'save': 'محفوظ کریں',
@@ -2218,6 +2222,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'send_reset_email': 'پاسورڈ ری سیٹ ای میل بھیجیں',
     'forgot_password': 'پاسورڈ بھول گئے؟',
     'enter_email_to_reset': 'ری سیٹ لنک کے لیے اپنی ای میل درج کریں۔',
+    'login_reset_email_hint':
+        'آپ اپنا یوزرنیم یا ای میل ایڈریس درج کر سکتے ہیں۔',
     'confirm_delete_transaction':
         'یہ ٹرانزیکشن حذف کریں اور بیلنس تبدیلی واپس کریں؟',
     // ── اسٹاک فروخت ──
@@ -3100,9 +3106,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'اکاؤنٹ سائن ان ہے لیکن صارف پروفائل موجود نہیں۔',
     'bootstrap_signed_in_as': 'بطور سائن ان: %s',
     'bootstrap_instructions':
-        'یہ ایک بار کی کارروائی ہے users/{uid} ایڈمن رول سے بنانے کے لیے۔ صرف admin@footwear.pk کے لیے۔',
+        'یہ ایک بار کی کارروائی ہے users/{uid} کو ایڈمن رول کے ساتھ بنانے کے لیے جب ابھی تک کوئی ایڈمن پروفائل موجود نہ ہو۔',
     'bootstrap_not_eligible':
-        'یہ اکاؤنٹ بوٹسٹریپ کے اہل نہیں۔ سائن آؤٹ کر کے admin@footwear.pk سے لاگ ان کریں۔',
+        'یہ اکاؤنٹ بوٹسٹریپ کے اہل نہیں۔ جاری رکھنے کے لیے ای میل والے اکاؤنٹ سے سائن ان کریں۔',
     'bootstrap_create_btn': 'ایڈمن پروفائل بنائیں',
     'msg_admin_profile_created': 'ایڈمن پروفائل کامیابی سے بن گیا۔',
 

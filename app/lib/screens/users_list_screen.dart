@@ -155,6 +155,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                             user: filtered[i],
                             onReactivate: () =>
                                 _confirmReactivateUser(filtered[i]),
+                          onSendReset: () =>
+                            _sendResetEmailForUser(filtered[i]),
                             onHardDelete: () =>
                                 _confirmHardDeleteUser(filtered[i]),
                           ).listEntry(i)
@@ -640,6 +642,28 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       }
     }
   }
+
+  Future<void> _sendResetEmailForUser(UserModel user) async {
+    try {
+      await ref
+          .read(userManagementNotifierProvider.notifier)
+          .sendPasswordResetForSeller(email: user.email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          successSnackBar(
+            tr('msg_reset_email_sent', ref).replaceAll('%s', user.email),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context).showSnackBar(
+          errorSnackBar(tr(key, ref)),
+        );
+      }
+    }
+  }
 }
 
 // ─── Role filter chip ─────────────────────────────────────────────────────────
@@ -840,11 +864,13 @@ class _UserTile extends StatelessWidget {
 class _InactiveUserTile extends StatelessWidget {
   final UserModel user;
   final VoidCallback onReactivate;
+  final VoidCallback onSendReset;
   final VoidCallback onHardDelete;
 
   const _InactiveUserTile({
     required this.user,
     required this.onReactivate,
+    required this.onSendReset,
     required this.onHardDelete,
   });
 
@@ -926,6 +952,15 @@ class _InactiveUserTile extends StatelessWidget {
               ),
             ),
             // Hard delete
+            Tooltip(
+              message: 'Send Reset Email',
+              child: IconButton(
+                icon: const Icon(Icons.lock_reset,
+                    size: 20, color: AppBrand.primaryColor),
+                onPressed: onSendReset,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
             Tooltip(
               message: 'Permanently Delete',
               child: IconButton(

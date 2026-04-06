@@ -91,7 +91,7 @@ class DashboardScreen extends ConsumerWidget {
                           color: AppBrand.warningColor),
                       title: Text(
                         tr('dashboard_outstanding_alert', ref).replaceAll(
-                            '%s', AppFormatters.compact(s.totalOutstanding)),
+                            '%s', AppFormatters.sar(s.totalOutstanding)),
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(tr('dashboard_pending_dues', ref)),
@@ -135,7 +135,7 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     StatCard(
                       title: tr('outstanding_balance', ref),
-                      value: AppFormatters.compact(s.totalOutstanding),
+                      value: AppFormatters.sar(s.totalOutstanding),
                       icon: Icons.account_balance_wallet,
                       color: s.totalOutstanding > 0
                           ? AppBrand.errorColor
@@ -278,7 +278,7 @@ class _SellerDashboard extends ConsumerWidget {
                       ),
                       StatCard(
                         title: tr('dashboard_outstanding', ref),
-                        value: AppFormatters.compact(outstanding),
+                        value: AppFormatters.sar(outstanding),
                         icon: Icons.account_balance_wallet,
                         color: outstanding > 0
                             ? AppBrand.errorColor
@@ -420,7 +420,7 @@ class _RouteAnalyticsSection extends ConsumerWidget {
                   children: [
                     Text(
                       tr('dashboard_net', ref)
-                          .replaceAll('%s', AppFormatters.compact(row.netFlow)),
+                          .replaceAll('%s', AppFormatters.sar(row.netFlow)),
                       style: TextStyle(
                         color: row.netFlow >= 0
                             ? AppBrand.successColor
@@ -429,7 +429,7 @@ class _RouteAnalyticsSection extends ConsumerWidget {
                       ),
                     ),
                     Text(tr('dashboard_due', ref).replaceAll(
-                        '%s', AppFormatters.compact(row.outstanding))),
+                        '%s', AppFormatters.sar(row.outstanding))),
                   ],
                 ),
                 onTap: () => context.push('/routes/${row.route.id}'),

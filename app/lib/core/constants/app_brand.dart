@@ -13,12 +13,13 @@ class AppBrand {
 
   // ─── Version ─────────────────────────────────────────────────────────────
   static const String appVersion = '3.2.3';
-  static const String buildNumber = '13';
+  static const String buildNumber = '15';
   static const String versionDisplay = 'v$appVersion+$buildNumber';
 
   // ─── Contact / About ─────────────────────────────────────────────────────
-  static const String contactEmail = 'support@footwear-erp.com';
-  static const String contactPhone = '+966 50 000 0000';
+  static const String contactEmail = 'engremran@gmail.com';
+  static const String contactPhonePrimary = '+923067863310';
+  static const String contactPhoneSecondary = '+966530421571';
   static const String websiteUrl = 'https://footwear-erp.com';
   static const String aboutDescription =
       'FootWear is a comprehensive enterprise resource planning system '

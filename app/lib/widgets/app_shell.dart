@@ -199,9 +199,9 @@ class _AppShellState extends ConsumerState<AppShell>
     }
     return const [
       (icon: Icons.dashboard, key: 'dashboard', route: '/'),
-      (icon: Icons.route, key: 'routes', route: '/routes'),
+      (icon: Icons.people, key: 'customers', route: '/customers'),
       (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
-      (icon: Icons.analytics, key: 'reports', route: '/reports'),
+      (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
       (icon: Icons.settings, key: 'settings', route: '/settings'),
     ];
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
@@ -11,15 +12,33 @@ import '../../models/invoice_model.dart';
 /// then sent into compute isolates as raw [Uint8List].
 Uint8List? _arabicFontBytes;
 Uint8List? _urduFontBytes;
+Completer<void>? _fontBytesLoader;
 
 /// Loads font byte data from assets (main-isolate only).
 /// Must be called before any PDF export function.
 Future<void> _ensureFontBytes() async {
-  if (_arabicFontBytes != null) return;
-  final ad = await rootBundle.load('assets/fonts/NotoSansArabic.ttf');
-  _arabicFontBytes = ad.buffer.asUint8List(ad.offsetInBytes, ad.lengthInBytes);
-  final ud = await rootBundle.load('assets/fonts/NotoNastaliqUrdu.ttf');
-  _urduFontBytes = ud.buffer.asUint8List(ud.offsetInBytes, ud.lengthInBytes);
+  if (_arabicFontBytes != null && _urduFontBytes != null) return;
+  if (_fontBytesLoader != null) {
+    await _fontBytesLoader!.future;
+    return;
+  }
+
+  final loader = Completer<void>();
+  _fontBytesLoader = loader;
+  try {
+    final ad = await rootBundle.load('assets/fonts/NotoSansArabic.ttf');
+    _arabicFontBytes =
+        ad.buffer.asUint8List(ad.offsetInBytes, ad.lengthInBytes);
+    final ud = await rootBundle.load('assets/fonts/NotoNastaliqUrdu.ttf');
+    _urduFontBytes =
+        ud.buffer.asUint8List(ud.offsetInBytes, ud.lengthInBytes);
+    loader.complete();
+  } catch (error, stackTrace) {
+    loader.completeError(error, stackTrace);
+    rethrow;
+  } finally {
+    _fontBytesLoader = null;
+  }
 }
 
 /// Recreates [pw.Font] objects from raw byte data (isolate-safe).
@@ -28,6 +47,18 @@ Future<void> _ensureFontBytes() async {
   return (
     arabic: pw.Font.ttf(ByteData.view(arabicBytes.buffer)),
     urdu: pw.Font.ttf(ByteData.view(urduBytes.buffer)),
+  );
+}
+
+pw.Document _buildDocument(pw.Font primaryFont, List<pw.Font> fontFallback) {
+  return pw.Document(
+    theme: pw.ThemeData.withFont(
+      base: primaryFont,
+      bold: primaryFont,
+      italic: primaryFont,
+      boldItalic: primaryFont,
+      fontFallback: fontFallback,
+    ),
   );
 }
 
@@ -69,7 +100,7 @@ Future<Uint8List> buildPdfTable({
         ? <pw.Font>[fonts.arabic]
         : <pw.Font>[fonts.urdu];
 
-    final pdf = pw.Document();
+    final pdf = _buildDocument(primaryFont, fontFallback);
     final dir = isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr;
 
     final headerStyle = pw.TextStyle(
@@ -320,7 +351,7 @@ Future<Uint8List> buildPdfLedger({
           ];
     final colCount = colWidths.length;
 
-    final pdf = pw.Document();
+    final pdf = _buildDocument(primaryFont, ff);
     const rowsPerPage = 28;
     final pageCount = ((rows.length + 1) / rowsPerPage).ceil().clamp(1, 999);
 
@@ -779,7 +810,10 @@ Future<Uint8List> buildPdfSellerReport({
       totalPairs += c.totalPairsSold;
     }
 
-    final pdf = pw.Document();
+    final pdf = _buildDocument(
+      locale == AppLocale.ur ? fonts.urdu : fonts.arabic,
+      locale == AppLocale.ur ? <pw.Font>[fonts.arabic] : <pw.Font>[fonts.urdu],
+    );
 
     pdf.addPage(
       pw.MultiPage(
@@ -1066,7 +1100,7 @@ Future<Uint8List> generateInvoicePdf({
     final isCreditNote = invoice.type != InvoiceModel.typeSale;
     final docTitle = isCreditNote ? 'CREDIT NOTE' : 'INVOICE';
 
-    final pdf = pw.Document();
+    final pdf = _buildDocument(primaryFont, ff);
 
     pdf.addPage(
       pw.Page(

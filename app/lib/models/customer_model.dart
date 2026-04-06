@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class CustomerModel {
   final String id;
   final String name;
+  final String? routeId;
   final String? phone;
   final String? city;
   final double balance;
@@ -17,6 +18,7 @@ class CustomerModel {
   const CustomerModel({
     required this.id,
     required this.name,
+    this.routeId,
     this.phone,
     this.city,
     required this.balance,
@@ -35,6 +37,7 @@ class CustomerModel {
     return CustomerModel(
       id: docId,
       name: json['name'] as String? ?? '',
+      routeId: json['route_id'] as String?,
       phone: json['phone'] as String?,
       city: json['city'] as String?,
       balance: (json['balance'] as num?)?.toDouble() ?? 0,
@@ -50,6 +53,7 @@ class CustomerModel {
 
   Map<String, dynamic> toJson() => {
         'name': name,
+      if (routeId != null) 'route_id': routeId,
         'phone': phone,
         'city': city,
         'balance': balance,
