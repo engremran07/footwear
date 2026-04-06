@@ -191,9 +191,12 @@ flutter test -r expanded
 
 1. Run flutter analyze lib --no-pub
 2. Run flutter test -r expanded
-3. Build release APK
-4. Deploy firestore rules and indexes
-5. Validate admin and seller write-path behavior on live project users
+3. If web and APK are both being shipped, bump the release version/build first and keep `app/pubspec.yaml` plus `AppBrand.versionDisplay` aligned
+4. Build web and deploy Hosting from that release candidate
+5. Build release APK from the same release candidate
+6. Deploy firestore rules and indexes when backend behavior changed
+7. Validate admin and seller write-path behavior on live project users
+8. Verify About/version/contact content is the same on web and APK for user-facing release changes
 
 ## v3.0.0 Enterprise Upgrade Highlights
 

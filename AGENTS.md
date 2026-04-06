@@ -82,6 +82,14 @@ Seller:
   during auth/profile loading; role-scoped providers must stay in loading,
   empty, or cached fallback state until access is confirmed.
 
+1. Web and APK release surfaces must stay version-synced. If user-visible
+  changes are shipped to both, bump version/build when needed and rebuild both
+  surfaces from the same source tree before calling them aligned.
+
+1. Firebase Hosting must not cache Flutter web shell files (`index.html`,
+  `flutter.js`, `flutter_bootstrap.js`, `main.dart.js`,
+  `flutter_service_worker.js`, `version.json`, `manifest.json`) as immutable.
+
 1. Every where(A)+orderBy(B) (A != B) must have composite index in firestore.indexes.json.
 
 1. If runtime behavior changes, update these docs in same change set:
@@ -168,6 +176,9 @@ Before finishing:
 - Run flutter test -r expanded
 - Manually or logically verify admin and seller access for `/` and `/inventory`
   after auth/router/provider/rules edits; no transient permission-denied UI is acceptable
+- When release/deploy work is requested, verify `app/pubspec.yaml` and
+  `app/lib/core/constants/app_brand.dart` carry the same release version, then
+  rebuild/deploy/install from that version before commit/push
 - Update deep-dive and READMEs if runtime assumptions changed
 - If rules changed, deploy firestore:rules and firestore:indexes
 

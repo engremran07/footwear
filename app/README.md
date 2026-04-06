@@ -145,6 +145,13 @@ flutter test -r expanded            # All tests pass
 flutter build apk --release         # APK builds cleanly
 ```
 
+If the release includes both web and APK:
+
+- keep `pubspec.yaml` version and `AppBrand.versionDisplay` aligned first
+- rebuild web and APK from that same versioned source tree
+- avoid immutable Hosting cache for Flutter web shell files
+- verify user-facing About/version/contact data matches on both surfaces
+
 ---
 
 ## v3.0.0 Enterprise Features

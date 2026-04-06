@@ -32,6 +32,8 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 9. Keep admin-only write enforcement in submit methods (screen-level defense in depth).
 10. Validate required identity fields (for example created_by/route_id/shop_id) before provider writes.
 11. No Firebase Storage — company logos stored as base64 in Firestore, product images use external HTTP URLs. Do not add firebase_storage dependency.
+12. When shipping both web and APK, keep `app/pubspec.yaml` and `app/lib/core/constants/app_brand.dart` on the same release version/build and rebuild both surfaces from that version before calling them synced.
+13. Do not cache Flutter web shell files immutably in Firebase Hosting; stale `main.dart.js` and bootstrap files are a release regression.
 
 ## Failure Playbooks
 
@@ -72,6 +74,8 @@ Run before marking production ready:
 - flutter analyze lib --no-pub
 - flutter test -r expanded
 - flutter build apk --release
+- If web is part of the request: flutter build web and deploy hosting from the same versioned source tree
+- Verify current About/version/contact content on both APK and web if those surfaces were part of the release request
 - Verify admin and seller startup for `/` and `/inventory`; transient permission-denied UI during stream warm-up is a regression.
 - firebase deploy --only firestore:rules,firestore:indexes
 

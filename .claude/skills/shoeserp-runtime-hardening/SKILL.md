@@ -43,6 +43,17 @@ Prevent regressions caused by architecture drift between code, rules, and agent 
 - Prefer loading, empty, or cached fallback states over raw permission text
   while role-scoped providers settle
 
+1. Release-surface sync
+
+- If the user asks for web deploy + APK build/install in the same task, treat
+  them as one release candidate and verify both are built from the same current
+  version in `app/pubspec.yaml` and `app/lib/core/constants/app_brand.dart`
+- If user-visible content still appears old on web after deploy, inspect
+  `firebase.json` cache headers and Flutter web shell caching before assuming
+  code changes were missed
+- Do not mark web and APK as aligned until build, deploy, install, and git push
+  all reflect the same release candidate
+
 1. Error messaging
 
 - Map Firebase exceptions through AppErrorMapper
