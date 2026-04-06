@@ -56,36 +56,52 @@ class _CreateSaleInvoiceScreenState
   final _discountFn = FocusNode();
   final _amountReceivedFn = FocusNode();
   final _notesFn = FocusNode();
+  // _selectedQtys stores DOZENS per inventory item (primary UI unit)
   final Map<String, int> _selectedQtys = {};
+  // _selectedExtraPairs stores extra pairs (0–11) per inventory item beyond full dozens
+  final Map<String, int> _selectedExtraPairs = {};
   bool _submitting = false;
   bool _isDirty = false;
 
+  /// Builds invoice line items.
+  /// [ppc] = pairs per dozen (always 12 from settings).
+  /// qty in each item = dozens (user-visible unit); extra_pairs records optional overage.
+  /// Prices are distributed proportionally by pair count so that
+  /// subtotal is always exactly preserved in the last item.
   List<Map<String, dynamic>> _buildInvoiceItems(
     List<SellerInventoryModel> inventoryList,
     double subtotal,
+    int ppc,
   ) {
-    final deductions =
+    final dozenEntries =
         _selectedQtys.entries.where((entry) => entry.value > 0).toList();
-    if (deductions.isEmpty || subtotal <= 0) return const [];
+    if (dozenEntries.isEmpty || subtotal <= 0) return const [];
 
     final inventoryMap = {for (final item in inventoryList) item.id: item};
-    final totalPairs = deductions.fold<int>(0, (sum, entry) => sum + entry.value);
+    // Distribute price proportionally by total pairs (dozens * ppc + extra)
+    final totalPairs = dozenEntries.fold<int>(
+      0,
+      (sum, entry) =>
+          sum + entry.value * ppc + (_selectedExtraPairs[entry.key] ?? 0),
+    );
     if (totalPairs <= 0) return const [];
 
-    final averageUnitPrice = subtotal / totalPairs;
+    final pricePerPair = subtotal / totalPairs;
     final items = <Map<String, dynamic>>[];
     double allocatedSubtotal = 0;
 
-    for (var index = 0; index < deductions.length; index++) {
-      final entry = deductions[index];
+    for (var index = 0; index < dozenEntries.length; index++) {
+      final entry = dozenEntries[index];
       final inventory = inventoryMap[entry.key];
       if (inventory == null) continue;
 
-      final qty = entry.value;
-      final isLast = index == deductions.length - 1;
+      final dozens = entry.value;
+      final extraPairs = _selectedExtraPairs[entry.key] ?? 0;
+      final linePairs = dozens * ppc + extraPairs;
+      final isLast = index == dozenEntries.length - 1;
       final lineSubtotal = isLast
           ? subtotal - allocatedSubtotal
-          : averageUnitPrice * qty;
+          : pricePerPair * linePairs;
       allocatedSubtotal += lineSubtotal;
 
       items.add({
@@ -94,8 +110,9 @@ class _CreateSaleInvoiceScreenState
         'product_name': inventory.variantName,
         'size': '',
         'color': '',
-        'qty': qty,
-        'unit_price': qty > 0 ? (lineSubtotal / qty) : 0.0,
+        'qty': dozens, // invoice line qty = dozens (selling unit)
+        'extra_pairs': extraPairs,
+        'unit_price': dozens > 0 ? (lineSubtotal / dozens) : 0.0, // price per dozen
         'subtotal': lineSubtotal,
       });
     }
@@ -207,10 +224,14 @@ class _CreateSaleInvoiceScreenState
     final ts = Theme.of(context).textTheme;
     final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
 
-    // Calculate totals from selected items
+    // Calculate totals from selected items (_selectedQtys = dozens, quantity_available = pairs)
     final selectedEntries =
         _selectedQtys.entries.where((e) => e.value > 0).toList();
-    final totalPairs = selectedEntries.fold<int>(0, (acc, e) => acc + e.value);
+    final totalDozens = selectedEntries.fold<int>(0, (acc, e) => acc + e.value);
+    final totalExtraPairs = selectedEntries.fold<int>(
+      0,
+      (acc, e) => acc + (_selectedExtraPairs[e.key] ?? 0),
+    );
 
     return Column(
       children: [
@@ -284,44 +305,115 @@ class _CreateSaleInvoiceScreenState
                   )
                 else
                   ...inventory.map((item) {
-                    final qty = _selectedQtys[item.id] ?? 0;
+                    final maxDozens = item.quantityAvailable ~/ ppc;
+                    final dozens = _selectedQtys[item.id] ?? 0;
+                    final extraPairs = _selectedExtraPairs[item.id] ?? 0;
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        dense: true,
-                        title: Text(item.variantName,
-                            overflow: TextOverflow.ellipsis),
-                        subtitle: Text(
-                            '${tr("available", ref)}: ${AppFormatters.stock(item.quantityAvailable, ppc)}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle_outline,
-                                  size: 22),
-                              tooltip: tr('tooltip_decrease_qty', ref),
-                              onPressed: qty <= 0
-                                  ? null
-                                  : () => setState(
-                                      () => _selectedQtys[item.id] = qty - 1),
+                            Text(item.variantName,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w500)),
+                            Text(
+                              '${tr("available", ref)}: ${AppFormatters.stock(item.quantityAvailable, ppc)}',
+                              style:
+                                  Theme.of(context).textTheme.bodySmall,
                             ),
-                            SizedBox(
-                              width: 32,
-                              child: Text('$qty',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16)),
+                            const SizedBox(height: 4),
+                            // ── Dozens stepper ──
+                            Row(
+                              children: [
+                                Text(tr('lbl_cartons', ref),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall),
+                                const Spacer(),
+                                IconButton(
+                                  icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                      size: 22),
+                                  tooltip: tr('tooltip_decrease_qty', ref),
+                                  onPressed: dozens <= 0
+                                      ? null
+                                      : () => setState(() {
+                                            _selectedQtys[item.id] =
+                                                dozens - 1;
+                                            if (dozens - 1 == 0) {
+                                              _selectedExtraPairs
+                                                  .remove(item.id);
+                                            }
+                                          }),
+                                ),
+                                SizedBox(
+                                  width: 32,
+                                  child: Text('$dozens',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16)),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                      Icons.add_circle_outline,
+                                      size: 22),
+                                  tooltip: tr('tooltip_increase_qty', ref),
+                                  onPressed: dozens >= maxDozens
+                                      ? null
+                                      : () => setState(() =>
+                                          _selectedQtys[item.id] =
+                                              dozens + 1),
+                                ),
+                              ],
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.add_circle_outline,
-                                  size: 22),
-                              tooltip: tr('tooltip_increase_qty', ref),
-                              onPressed: qty >= item.quantityAvailable
-                                  ? null
-                                  : () => setState(
-                                      () => _selectedQtys[item.id] = qty + 1),
-                            ),
+                            // ── Extra pairs stepper (optional, shown when dozens > 0) ──
+                            if (dozens > 0)
+                              Row(
+                                children: [
+                                  Text(tr('lbl_extra_pairs', ref),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall),
+                                  const Spacer(),
+                                  IconButton(
+                                    icon: const Icon(
+                                        Icons.remove_circle_outline,
+                                        size: 20),
+                                    tooltip:
+                                        tr('tooltip_decrease_qty', ref),
+                                    onPressed: extraPairs <= 0
+                                        ? null
+                                        : () => setState(() =>
+                                            _selectedExtraPairs[item.id] =
+                                                extraPairs - 1),
+                                  ),
+                                  SizedBox(
+                                    width: 32,
+                                    child: Text('$extraPairs',
+                                        textAlign: TextAlign.center,
+                                        style:
+                                            const TextStyle(fontSize: 14)),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                        Icons.add_circle_outline,
+                                        size: 20),
+                                    tooltip:
+                                        tr('tooltip_increase_qty', ref),
+                                    // max extra pairs = ppc - 1 (a full dozen would be a new dozen)
+                                    onPressed: extraPairs >= ppc - 1
+                                        ? null
+                                        : () => setState(() =>
+                                            _selectedExtraPairs[item.id] =
+                                                extraPairs + 1),
+                                  ),
+                                ],
+                              ),
                           ],
                         ),
                       ),
@@ -445,8 +537,15 @@ class _CreateSaleInvoiceScreenState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('${tr("items", ref)}: $totalPairs ${tr("pairs", ref)}',
-                        style: ts.bodyMedium),
+                    Builder(builder: (context) {
+                      final extraLabel = totalExtraPairs > 0
+                          ? ' $totalExtraPairs ${tr("pairs", ref)}'
+                          : '';
+                      return Text(
+                        '${tr("items", ref)}: $totalDozens ${tr("lbl_cartons", ref)}$extraLabel',
+                        style: ts.bodyMedium,
+                      );
+                    }),
                     _buildSaleTypeChip(ts),
                   ],
                 ),
@@ -577,6 +676,7 @@ class _CreateSaleInvoiceScreenState
   Future<void> _submit(BuildContext context) async {
     final user = ref.read(authUserProvider).valueOrNull;
     if (user == null) return;
+    final ppc = ref.read(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
 
     if (_selectedShop == null) {
       HapticFeedback.vibrate();
@@ -586,8 +686,14 @@ class _CreateSaleInvoiceScreenState
       return;
     }
 
+    // Convert dozens → pairs for inventory deduction (quantity_available stores pairs)
     final deductions = Map<String, int>.fromEntries(
-      _selectedQtys.entries.where((e) => e.value > 0),
+      _selectedQtys.entries
+          .where((e) => e.value > 0)
+          .map((e) => MapEntry(
+                e.key,
+                e.value * ppc + (_selectedExtraPairs[e.key] ?? 0),
+              )),
     );
     // Invoices are exclusively for stock sales — at least one item is required for all roles
     if (deductions.isEmpty) {
@@ -620,7 +726,7 @@ class _CreateSaleInvoiceScreenState
     final inventoryList =
         ref.read(sellerInventoryProvider(user.id)).valueOrNull ?? [];
     final total = _invoiceTotal;
-    final items = _buildInvoiceItems(inventoryList, saleAmount);
+    final items = _buildInvoiceItems(inventoryList, saleAmount, ppc);
     final amountReceived = _amountReceived;
 
     setState(() => _submitting = true);

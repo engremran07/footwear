@@ -43,18 +43,27 @@ class AppFormatters {
     return value.toStringAsFixed(0);
   }
 
-  /// Formats stock as:
-  /// "X cartons Y pairs (X dozens Y pairs)"
-  /// Example: "12 cartons 3 pairs (12 dozens 3 pairs)"
+  /// Formats stock as dozens (primary) + optional extra pairs.
+  ///
+  /// quantity_available in Firestore stores PAIRS for legacy compat.
+  /// The UI always shows and accepts DOZENS as primary (1 dozen = 12 pairs).
+  /// ppc = pairs per dozen (always 12; kept as parameter for settings compat).
+  ///
+  /// Examples:
+  ///   stock(0, 12)   → "0 dozens"
+  ///   stock(12, 12)  → "1 dozen"
+  ///   stock(15, 12)  → "1 dozen 3 pairs"
+  ///   stock(24, 12)  → "2 dozens"
+  ///   stock(5, 12)   → "0 dozens 5 pairs"
   static String stock(int pairs, int ppc) {
     if (ppc <= 0) return '$pairs pairs';
-    final cartons = pairs ~/ ppc;
+    final dozens = pairs ~/ ppc;
     final remaining = pairs % ppc;
-    if (cartons == 0) return '$remaining pairs';
-    if (remaining == 0) {
-      return '$cartons cartons ($cartons dozens)';
-    }
-    return '$cartons cartons $remaining pairs ($cartons dozens $remaining pairs)';
+    if (dozens == 0 && remaining == 0) return '0 dozens';
+    if (dozens == 0) return '$remaining pairs';
+    final dozenLabel = dozens == 1 ? '1 dozen' : '$dozens dozens';
+    if (remaining == 0) return dozenLabel;
+    return '$dozenLabel $remaining pairs';
   }
 
   static List<String> last12Periods() {

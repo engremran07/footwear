@@ -72,35 +72,32 @@ try {
   # 4. Build
   if (-not $SkipBuild) {
     if (-not $WebOnly) {
-      # 4a. Split-per-ABI APKs
-      Step "Building split-per-ABI release APKs"
-      DRY "flutter build apk --release --split-per-abi"
+      # 4a. Fat APK (single file: arm32 + arm64 + x86_64)
+      # NEVER --split-per-abi — always fat APK per project rules.
+      Step "Building fat release APK"
+      DRY "flutter build apk --release"
 
       if (-not $DryRun) {
         $apkDir = Join-Path $appDir "build\app\outputs\flutter-apk"
-        $abiMap = @{
-          'arm64-v8a'   = 'arm64'
-          'armeabi-v7a' = 'arm'
-          'x86_64'      = 'x86_64'
-        }
-        foreach ($abi in $abiMap.Keys) {
-          $src = Join-Path $apkDir "app-$abi-release.apk"
-          if (-not (Test-Path $src)) { WARN "APK not found: $src" ; continue }
-          $destName = "FootWear-V$($script:semver)-$($abiMap[$abi]).apk"
+        $src = Join-Path $apkDir "app-release.apk"
+        if (-not (Test-Path $src)) { WARN "APK not found: $src" }
+        else {
+          $destName = "FootWear-V$($script:semver).apk"
           $dest = Join-Path $releasesDir $destName
           Copy-Item $src $dest -Force
           $sizeMB = [math]::Round((Get-Item $dest).Length / 1MB, 1)
           OK "$destName ($sizeMB MB) -> releases\"
-          if ($abi -eq 'arm64-v8a') { $arm64Apk = $dest }
+          $arm64Apk = $dest
         }
       } else {
-        WARN "[DRY] Would rename APKs to FootWear-V{semver}-{abi}.apk -> releases\"
+        WARN "[DRY] Would copy app-release.apk to releases\FootWear-V{semver}.apk"
       }
     }
 
     # 4b. Web build
     Step "Building Flutter web (release)"
-    DRY "flutter build web --release --dart-define=FLUTTER_WEB_USE_SKIA=false"
+    # FLUTTER_WEB_USE_SKIA was removed in Flutter 3.10+ — do NOT pass it.
+    DRY "flutter build web --release"
     if (-not $DryRun) { OK "Web build -> app/build/web/" }
 
   } else {

@@ -32,8 +32,11 @@ class DashboardStats {
 /// Holds the last successfully computed dashboard stats so we can serve a
 /// cached result during loading states or when sub-providers temporarily error
 /// (e.g. resource-exhausted). This prevents blank-screen regressions.
-final _lastGoodDashboardStatsProvider =
+/// Exposed (not private) so auth_provider can invalidate it on sign-out
+/// to prevent stale stats from flashing when a new user signs in (SM-01).
+final lastGoodDashboardStatsProvider =
     StateProvider<DashboardStats?>((ref) => null);
+final _lastGoodDashboardStatsProvider = lastGoodDashboardStatsProvider;
 
 /// Derives dashboard stats reactively from live stream providers.
 /// Role-aware: admin sees all data, seller sees only their route's data.

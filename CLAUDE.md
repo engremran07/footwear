@@ -1,13 +1,17 @@
 ﻿# ShoesERP AI Coding Rules (CLAUDE.md)
 
-Last updated: 2026-03-29
+Last updated: 2026-04-07
 
 ## Runtime Override (Always First)
 
 The live codebase is a route/seller distribution ERP.
 
 - Roles: admin, seller (manager must be admin-equivalent)
-- Collections: users, products, product_variants, seller_inventory, inventory_transactions, routes, shops, customers, transactions, invoices, settings
+- Collections: users, products, product_variants, seller_inventory, inventory_transactions,
+  routes, shops [Firestore name: 'customers' — legacy, use Collections.shops],
+  transactions, invoices, settings
+- Stock unit: DOZENS primary (1 dozen = 12 pairs). quantity_available stores
+  pairs; UI inputs/displays in dozens. Extra pairs (0–11) are optional per entry.
 - Routing source: app/lib/core/router/app_router.dart
 
 If any legacy section conflicts with runtime truth, runtime truth wins.
@@ -34,6 +38,38 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 11. No Firebase Storage — company logos stored as base64 in Firestore, product images use external HTTP URLs. Do not add firebase_storage dependency.
 12. When shipping both web and APK, keep `app/pubspec.yaml` and `app/lib/core/constants/app_brand.dart` on the same release version/build and rebuild both surfaces from that version before calling them synced.
 13. Do not cache Flutter web shell files immutably in Firebase Hosting; stale `main.dart.js` and bootstrap files are a release regression.
+14. Shops ARE the customers. One entity: shops (Firestore collection: 'customers' — legacy).
+    Never create a separate Customer model, collection, or route. No /customers routes exist.
+    All invoices and transactions reference shop.id as both shop_id AND customer_id
+    (dual-write for backward compatibility with pre-unification documents).
+15. Stock tracking and selling unit is DOZENS (1 dozen = 12 pairs). quantity_available
+    in Firestore stores PAIRS for legacy compat. UI always shows and accepts dozens as
+    primary, with optional extra pairs (0–11). Always fat APK: flutter build apk --release.
+16. Admin has no assigned_route_id — admin is the warehouse AND a field seller.
+    Admin can own seller_inventory docs (seller_id = adminUid). isAdmin() in Firestore
+    rules covers all admin operations including self-stock-allocation.
+
+## Financial Pathways (never mix these)
+
+    Pathway 1: SALE WITH STOCK
+      → CreateSaleInvoiceScreen → InvoiceNotifier.createSaleInvoice()
+      → Invoice + cash_out tx + optional cash_in tx + seller_inventory deduction
+         (all in one atomic batch)
+      → USE WHEN: new goods delivered to shop, stock deduction required
+
+    Pathway 2: CASH COLLECTION (old debt, no new goods)
+      → ShopDetailScreen → TransactionNotifier.create(type: 'cash_in')
+      → Cash_in ledger entry ONLY. No invoice. No stock movement.
+      → USE WHEN: collecting outstanding balance, no new delivery
+
+    VOID / RETURN:
+      → InvoiceNotifier.voidInvoice() — admin only
+      → Returns stock to inventory (seller_inventory or warehouse)
+      → Two refund modes: cashRefund (cheque/cash paid back) or creditBalance (deduct from balance)
+      → Issues ONE reversal transaction (return tx). Cash refund adds a second cash_out tx.
+
+    NEVER create an invoice for cash-only collection.
+    NEVER create a standalone transaction for a new stock sale (always through invoice).
 
 ## Failure Playbooks
 

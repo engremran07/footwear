@@ -12,8 +12,8 @@ class AppBrand {
   static const String logoAsset = 'assets/images/app_icon.png';
 
   // ─── Version ─────────────────────────────────────────────────────────────
-  static const String appVersion = '3.3.1';
-  static const String buildNumber = '22';
+  static const String appVersion = '3.3.2';
+  static const String buildNumber = '23';
   static const String versionDisplay = 'v$appVersion+$buildNumber';
 
   // ─── Contact / About ─────────────────────────────────────────────────────

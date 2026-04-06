@@ -15,8 +15,7 @@ This repository is a route/seller distribution ERP.
   - seller_inventory
   - inventory_transactions
   - routes
-  - shops
-  - customers
+  - shops [Firestore collection: 'customers' — legacy name, use Collections.shops]
   - transactions
   - invoices
   - settings
@@ -37,10 +36,6 @@ Defined in app/lib/core/router/app_router.dart:
 - /shops/new
 - /shops/:id
 - /shops/:id/edit
-- /customers
-- /customers/new
-- /customers/:id
-- /customers/:id/edit
 - /products
 - /products/new
 - /products/:id

@@ -70,6 +70,9 @@ class AuthNotifier extends AsyncNotifier<void> {
     // when no widget watches them, so we only need to reset the core ones.
     ref.invalidate(authUserProvider);
     ref.invalidate(dashboardStatsProvider);
+    // SM-01: Also invalidate the last-good cache so stale stats from the
+    // previous session do not flash briefly when a new user signs in.
+    ref.invalidate(lastGoodDashboardStatsProvider);
     ref.invalidate(settingsProvider);
     ref.invalidate(allInvoicesProvider);
     ref.invalidate(roleAwareInvoicesProvider);

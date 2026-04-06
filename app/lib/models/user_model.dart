@@ -50,7 +50,10 @@ class UserModel {
   bool get isAdmin => role == UserRole.admin;
   bool get isSeller => role == UserRole.seller;
   /// True for any user who can carry vehicle (seller) inventory.
-  /// Admin is god — warehouse owner, seller, and manager in one.
+  /// Admin is warehouse owner + field seller simultaneously — no assigned_route_id,
+  /// services all routes. Admin owns seller_inventory docs (seller_id = adminUid)
+  /// loaded via the Inventory Transfer screen. isAdmin() in Firestore rules covers
+  /// all admin writes including self-allocation without a route constraint.
   bool get canHaveSellerInventory => true;
 
   factory UserModel.fromJson(Map<String, dynamic> json, String docId) {

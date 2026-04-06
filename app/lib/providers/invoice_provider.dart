@@ -35,6 +35,11 @@ import 'auth_provider.dart';
 
 enum VoidRefundMode { cashRefund, creditBalance }
 
+// DEPRECATED: Use invoicesByShopProvider instead.
+// Kept for backward compatibility with legacy invoice docs that only have
+// customer_id set (written before the shops-customer unification).
+// In the unified model, customerId == shopId — both refer to the same entity.
+// New code must use invoicesByShopProvider.
 final invoicesByCustomerProvider = StreamProvider.autoDispose
     .family<List<InvoiceModel>, String>((ref, customerId) {
   return FirebaseFirestore.instance
@@ -680,25 +685,19 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           );
         }
       } else {
-        batch.set(
-          db.collection(Collections.transactions).doc(),
-          transactionData(
-            txType: 'return',
-            amount: docTotal,
-            description: 'Voided credit note snapshot $invoiceNumber',
-            items: rawItems.whereType<Map<String, dynamic>>().toList(),
-            txCustomerId: customerId,
-            txCustomerName: customerName,
-            txShopId: shopId,
-            txShopName: shopName,
-          ),
-        );
+        // FC-04: credit_note void — write ONE reversal tx only.
+        // A credit note void cancels a previously issued credit; it increases
+        // the shop's balance back by docTotal (reversalDelta = +docTotal above).
+        // We write 1 'cash_out' tx to record the reversal in the ledger.
+        // (The previous double-tx approach wrote both 'return' + 'cash_out'
+        // which created a confusing duplicate entry with no clear accounting story.)
         batch.set(
           db.collection(Collections.transactions).doc(),
           transactionData(
             txType: 'cash_out',
             amount: docTotal,
-            description: 'Reversal for voided credit note $invoiceNumber',
+            description: 'Reversed credit note $invoiceNumber',
+            items: rawItems.whereType<Map<String, dynamic>>().toList(),
             txCustomerId: customerId,
             txCustomerName: customerName,
             txShopId: shopId,

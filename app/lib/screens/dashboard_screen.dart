@@ -108,7 +108,8 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                       subtitle: Text(tr('dashboard_pending_dues', ref)),
                       trailing: TextButton(
-                        onPressed: () => context.go('/customers'),
+                        // NOTE: no /customers route — shops are the customers
+                        onPressed: () => context.go('/shops'),
                         child: Text(tr('lbl_view', ref)),
                       ),
                     ),
@@ -582,10 +583,11 @@ class _AdminSpeedDial extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         FloatingActionButton.small(
-          heroTag: 'fab_customer',
+          heroTag: 'fab_shop',
           tooltip: tr('dashboard_new_customer', ref),
-          onPressed: () => context.push('/customers/new'),
-          child: const Icon(Icons.person_add),
+          // NOTE: shops are the customers; /customers/new route was removed
+          onPressed: () => context.push('/shops/new'),
+          child: const Icon(Icons.store),
         ),
         const SizedBox(height: AppTokens.s8),
         FloatingActionButton.small(
