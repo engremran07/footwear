@@ -5,6 +5,34 @@ import '../core/constants/collections.dart';
 import '../models/invoice_model.dart';
 import 'auth_provider.dart';
 
+// =============================================================================
+// InvoiceProvider — all invoice lifecycle operations.
+//
+// WHEN TO USE:
+//   Call createSaleInvoice() ONLY when making a new sale with stock deduction.
+//   For cash collection from existing debt: use TransactionNotifier.create()
+//   with type='cash_in' — no invoice needed.
+//
+// INVOICE vs LEDGER PATHWAYS:
+//   Sale + stock available  → createSaleInvoice()
+//       └ atomic batch: invoice doc + cash_out tx + optional cash_in tx
+//                        + seller_inventory deductions + balance update
+//   Return of goods         → createReturnInvoice()
+//       └ atomic batch: credit_note invoice + return tx + balance decrease
+//                        + optional seller_inventory restore
+//   Void invoice            → voidInvoice() [admin only]
+//       └ atomic: marks invoice void, soft-deletes linked txs, reverses balance
+//
+// PARAMETER NOTE:
+//   createSaleInvoice / createReturnInvoice each accept both customerId AND
+//   shopId. In this app they MUST be the same value (shopId == customerId).
+//   Both fields are written for backward index compatibility only.
+//
+// INVOICE STATE MACHINE:
+//   draft → issued → partial → paid
+//                  → void (terminal state, never re-opened)
+// =============================================================================
+
 enum VoidRefundMode { cashRefund, creditBalance }
 
 final invoicesByCustomerProvider = StreamProvider.autoDispose
@@ -487,7 +515,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
     if (createdBy.trim().isEmpty) {
       throw ArgumentError('createdBy must not be empty');
-    }    // Defense-in-depth: enforce admin-only at app level (rules enforce at DB level)
+    } // Defense-in-depth: enforce admin-only at app level (rules enforce at DB level)
     final currentUser = ref.read(authUserProvider).valueOrNull;
     if (currentUser == null || !currentUser.isAdmin) {
       throw StateError('voidInvoice requires admin privileges');
@@ -532,8 +560,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final linkedTransactions = await db
         .collection(Collections.transactions)
         .where('invoice_id', isEqualTo: invoiceId)
-        .where('deleted', isEqualTo: false)
         .get();
+    // Filter client-side: old docs may not have deleted field
+    final activeTxDocs = linkedTransactions.docs
+        .where((d) => d.data()['deleted'] != true)
+        .toList();
 
     final batch = db.batch();
 
@@ -567,7 +598,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
 
     // Invoice status already set to void atomically in the transaction above.
-    for (final tx in linkedTransactions.docs) {
+    for (final tx in activeTxDocs) {
       batch.update(tx.reference, {
         'deleted': true,
         'deleted_at': now,

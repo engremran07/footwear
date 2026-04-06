@@ -116,7 +116,8 @@ class AboutScreen extends ConsumerWidget {
                 icon: const Icon(Icons.call_outlined, size: 18),
                 onTap: () => _launchUrl(
                     'tel:${AppBrand.contactPhonePrimary.replaceAll('+', '')}',
-                    context, ref),
+                    context,
+                    ref),
               ),
               _ActionButton(
                 tooltip: 'WhatsApp',
@@ -138,7 +139,8 @@ class AboutScreen extends ConsumerWidget {
                 icon: const Icon(Icons.call_outlined, size: 18),
                 onTap: () => _launchUrl(
                     'tel:${AppBrand.contactPhoneSecondary.replaceAll('+', '')}',
-                    context, ref),
+                    context,
+                    ref),
               ),
               _ActionButton(
                 tooltip: 'WhatsApp',
@@ -197,7 +199,8 @@ class AboutScreen extends ConsumerWidget {
         .showSnackBar(successSnackBar(tr('copied', ref)));
   }
 
-  Future<void> _launchUrl(String url, BuildContext context, WidgetRef ref) async {
+  Future<void> _launchUrl(
+      String url, BuildContext context, WidgetRef ref) async {
     final uri = Uri.tryParse(url);
     if (uri == null) return;
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
@@ -208,7 +211,8 @@ class AboutScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _openWhatsApp(String phone, BuildContext context, WidgetRef ref) async {
+  Future<void> _openWhatsApp(
+      String phone, BuildContext context, WidgetRef ref) async {
     final ok = await openWhatsApp(
       phone: phone,
       message: '${tr('whatsapp_greeting', ref)} ${AppBrand.companyName}',

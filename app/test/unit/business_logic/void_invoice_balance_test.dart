@@ -22,9 +22,8 @@ double _computeReversalDelta({
 }) {
   const typeSale = 'sale';
   return switch (type) {
-    typeSale => refundMode == VoidRefundMode.creditBalance
-        ? -total
-        : -outstandingAmount,
+    typeSale =>
+      refundMode == VoidRefundMode.creditBalance ? -total : -outstandingAmount,
     _ => total,
   };
 }
@@ -65,7 +64,7 @@ void main() {
     // (return tx). Verified by transaction count = reversalAmount > 0 → 1 tx.
     test('reversalAmount for creditBalance equals total', () {
       const total = 5000.0;
-      final reversalAmount =
+      const reversalAmount =
           VoidRefundMode.creditBalance == VoidRefundMode.creditBalance
               ? total
               : 3000.0;
@@ -111,7 +110,7 @@ void main() {
     test('cashRefund reversalAmount equals outstandingAmount', () {
       const outstandingAmount = 3000.0;
       // reversalAmount in provider: refundMode != creditBalance → outstandingAmount
-      final reversalAmount = outstandingAmount;
+      const reversalAmount = outstandingAmount;
       expect(reversalAmount, equals(3000.0));
     });
   });
@@ -128,7 +127,8 @@ void main() {
       expect(delta, equals(2000.0));
     });
 
-    test('reversalDelta is +total for credit note regardless of refundMode', () {
+    test('reversalDelta is +total for credit note regardless of refundMode',
+        () {
       final delta = _computeReversalDelta(
         type: 'credit_note',
         total: 1500,

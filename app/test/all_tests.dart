@@ -7,9 +7,14 @@ import 'unit/models/product_model_test.dart' as product_model;
 import 'unit/models/settings_model_test.dart' as settings_model;
 import 'unit/models/shop_model_test.dart' as shop_model;
 import 'unit/models/route_model_test.dart' as route_model;
-import 'unit/models/customer_model_test.dart' as customer_model;
+import 'unit/models/shop_model_bad_debt_test.dart' as shop_model_bad_debt;
+import 'unit/core/collections_test.dart' as collections;
+import 'unit/business_logic/financial_pathways_test.dart' as financial_pathways;
+import 'unit/business_logic/bad_debt_writeoff_test.dart' as bad_debt_writeoff;
+import 'unit/business_logic/transaction_type_validation_test.dart'
+    as transaction_type_validation;
 import 'unit/models/inventory_transaction_model_test.dart'
-  as inventory_transaction_model;
+    as inventory_transaction_model;
 import 'unit/models/invoice_model_test.dart' as invoice_model;
 import 'unit/models/transaction_model_test.dart' as transaction_model;
 import 'unit/models/product_variant_model_test.dart' as product_variant_model;
@@ -33,7 +38,11 @@ void main() {
   settings_model.main();
   shop_model.main();
   route_model.main();
-  customer_model.main();
+  shop_model_bad_debt.main();
+  collections.main();
+  financial_pathways.main();
+  bad_debt_writeoff.main();
+  transaction_type_validation.main();
   inventory_transaction_model.main();
   invoice_model.main();
   transaction_model.main();

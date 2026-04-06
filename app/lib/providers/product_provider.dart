@@ -214,22 +214,17 @@ class ProductNotifier extends AsyncNotifier<void> {
       SetOptions(merge: true),
     );
 
-    // Log transfer in transactions collection
-    final txRef = db.collection(Collections.transactions).doc();
-    batch.set(txRef, {
-      'type': 'stock_transfer',
-      'shop_id': '',
-      'shop_name': '',
-      'route_id': '',
+    // Audit log — write to inventory_transactions (matches allInventoryTransactionsProvider query)
+    final auditRef = db.collection(Collections.inventoryTransactions).doc();
+    batch.set(auditRef, {
+      'type': 'transfer_out',
       'seller_id': sellerId,
       'seller_name': sellerName,
       'product_id': productId,
       'variant_id': variantId,
       'variant_name': variantName,
       'quantity': quantity,
-      'amount': 0.0,
-      'description': 'Stock transfer to $sellerName',
-      'items': <Map<String, dynamic>>[],
+      'notes': null,
       'created_by': normalizedAdminId,
       'created_at': Timestamp.now(),
     });

@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/core/utils/error_mapper.dart';
 
@@ -58,7 +57,8 @@ void main() {
 
   group('AppErrorMapper.key — FirebaseException (Firestore)', () {
     test('permission-denied → err_permission_denied', () {
-      final e = FirebaseException(plugin: 'firestore', code: 'permission-denied');
+      final e =
+          FirebaseException(plugin: 'firestore', code: 'permission-denied');
       expect(AppErrorMapper.key(e), equals('err_permission_denied'));
     });
 
@@ -73,7 +73,8 @@ void main() {
     });
 
     test('resource-exhausted → err_resource_exhausted', () {
-      final e = FirebaseException(plugin: 'firestore', code: 'resource-exhausted');
+      final e =
+          FirebaseException(plugin: 'firestore', code: 'resource-exhausted');
       expect(AppErrorMapper.key(e), equals('err_resource_exhausted'));
     });
 
@@ -137,7 +138,8 @@ void main() {
 
   group('AppErrorMapper.isPermissionOrAuthError', () {
     test('permission-denied error returns true', () {
-      final e = FirebaseException(plugin: 'firestore', code: 'permission-denied');
+      final e =
+          FirebaseException(plugin: 'firestore', code: 'permission-denied');
       expect(AppErrorMapper.isPermissionOrAuthError(e), isTrue);
     });
 

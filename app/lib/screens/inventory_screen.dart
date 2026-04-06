@@ -989,7 +989,9 @@ class _TransferToSellerDialogState
   @override
   Widget build(BuildContext context) {
     final products = ref.watch(productsProvider).valueOrNull ?? [];
-    final sellers = ref.watch(sellersProvider).valueOrNull ?? [];
+    // Use allUsersProvider so admin can also select themselves as a recipient
+    // (admin loads stock into their own vehicle, same as a seller).
+    final sellers = ref.watch(allUsersProvider).valueOrNull ?? [];
     final variants = _selectedProduct != null
         ? ref
                 .watch(productVariantsProvider(_selectedProduct!.id))

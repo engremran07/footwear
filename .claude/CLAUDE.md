@@ -13,7 +13,12 @@ If this file and root CLAUDE.md ever differ, follow runtime blocks in CLAUDE.md 
 3. .claude/CLAUDE.md
 4. .claude/skills/*/SKILL.md
 
-## Fast Triage Order
+## Inline Audit (Mandatory)
+
+Every fix is also an audit pass. Load `.claude/skills/inline-audit/SKILL.md`
+whenever fixing any issue. Catch and fix culprits found while reading touched files.
+
+## Build Standard
 
 1. Role + permission alignment
 
@@ -45,3 +50,4 @@ See SYSTEM_DEEP_DIVE_2026-03-27.md for latest findings and remediation map.
 - flutter analyze lib --no-pub
 - flutter test -r expanded
 - flutter build apk --release
+- flutter build web --release ; firebase deploy --only hosting

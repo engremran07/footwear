@@ -20,6 +20,23 @@ import '../providers/settings_provider.dart';
 import '../providers/shop_provider.dart';
 import '../widgets/confirm_dialog.dart';
 
+// =============================================================================
+// CreateSaleInvoiceScreen — used ONLY for sales where stock is being deducted.
+//
+// PREREQUISITES:
+//   - Seller must have items in seller_inventory (loaded via sellerInventoryProvider)
+//   - At least 1 item must be selected with qty > 0
+//   - Sale amount > 0
+//
+// ON SUBMIT → InvoiceNotifier.createSaleInvoice():
+//   - Atomically creates: invoice doc + cash_out transaction
+//   - If amountReceived > 0: also creates a cash_in transaction
+//   - Deducts seller_inventory quantities for selected items
+//   - Updates shop.balance (balance += total - amountReceived)
+//
+// DO NOT use this screen for collecting cash from old debt — that is done via
+// ShopDetailScreen quick cash_in (no invoice, no stock movement).
+// =============================================================================
 class CreateSaleInvoiceScreen extends ConsumerStatefulWidget {
   final String? preselectedShopId;
   const CreateSaleInvoiceScreen({super.key, this.preselectedShopId});
@@ -132,10 +149,10 @@ class _CreateSaleInvoiceScreenState
         : (routeId.isNotEmpty
             ? ref.watch(shopsByRouteProvider(routeId))
             : const AsyncData<List<ShopModel>>([]));
-    // Admin has no seller inventory — list will be empty and items optional
-    final inventoryAsync = user.isSeller
-        ? ref.watch(sellerInventoryProvider(user.id))
-        : const AsyncData<List<SellerInventoryModel>>([]);
+    // Both admin and seller use their own seller_inventory (vehicle stock).
+    // Admin loads stock from warehouse to their own seller_inventory via the
+    // Inventory screen transfer, then selects items here to create an invoice.
+    final inventoryAsync = ref.watch(sellerInventoryProvider(user.id));
 
     // Auto-select shop if preselected
     if (widget.preselectedShopId != null && _selectedShop == null) {
@@ -572,8 +589,8 @@ class _CreateSaleInvoiceScreenState
     final deductions = Map<String, int>.fromEntries(
       _selectedQtys.entries.where((e) => e.value > 0),
     );
-    // Sellers must select inventory items; admins can create manual invoices
-    if (user.isSeller && deductions.isEmpty) {
+    // Invoices are exclusively for stock sales — at least one item is required for all roles
+    if (deductions.isEmpty) {
       HapticFeedback.vibrate();
       ScaffoldMessenger.of(context).showSnackBar(
         warningSnackBar(tr('select_at_least_one_item', ref)),
@@ -620,8 +637,8 @@ class _CreateSaleInvoiceScreenState
                 routeId: _selectedShop!.routeId.isNotEmpty
                     ? _selectedShop!.routeId
                     : (user.assignedRouteId ?? ''),
-                sellerId: user.isSeller ? user.id : '',
-                sellerName: user.isSeller ? user.displayName : '',
+                sellerId: user.id,
+                sellerName: user.displayName,
                 items: items,
                 subtotal: saleAmount,
                 discount: discount,

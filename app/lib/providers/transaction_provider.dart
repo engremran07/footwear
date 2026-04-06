@@ -4,16 +4,43 @@ import '../core/constants/collections.dart';
 import '../models/transaction_model.dart';
 import 'auth_provider.dart';
 
+// =============================================================================
+// TransactionProvider — all shop ledger writes go through this notifier.
+//
+// ARCHITECTURE:
+//   Shops are stored in the 'customers' Firestore collection (legacy name).
+//   All balance updates reference Collections.customers / Collections.shops.
+//
+// TWO FINANCIAL PATHWAYS:
+//   1. SALE WITH STOCK → InvoiceNotifier.createSaleInvoice() (in invoice_provider.dart)
+//      - Atomically creates invoice + cash_out tx + optional cash_in tx + stock deduction
+//      - cash_out tx has invoice_id field linking it back to the invoice
+//   2. CASH COLLECTION (debt only, no new sale) → TransactionNotifier.create()
+//      - type: 'cash_in', no items, no invoice created
+//      - Reduces shop.balance atomically
+//      - Called from ShopDetailScreen quick-cash panel
+//
+// BALANCE DELTA CONVENTION:
+//   cash_out  → balance += amount  (shop owes more)
+//   cash_in   → balance -= amount  (shop owes less)
+//   return    → balance -= amount  (goods returned, owes less)
+//   write_off → balance zeroed by ShopNotifier.markAsBadDebt() directly
+//
+// SOFT DELETE (DI-01): never hard-delete transactions; set deleted=true + reverse balance.
+// =============================================================================
+
 final shopTransactionsProvider = StreamProvider.autoDispose
     .family<List<TransactionModel>, String>((ref, shopId) {
+  // Remove server-side deleted==false: old docs predate the field.
+  // Filter client-side with !=true to include legacy docs.
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
       .where('shop_id', isEqualTo: shopId)
-      .where('deleted', isEqualTo: false)
       .orderBy('created_at', descending: true)
-      .limit(100)
+      .limit(200)
       .snapshots()
       .map((snap) => snap.docs
+          .where((d) => d.data()['deleted'] != true)
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList());
 });
@@ -25,11 +52,11 @@ final allTransactionsProvider =
   if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
-      .where('deleted', isEqualTo: false)
       .orderBy('created_at', descending: true)
       .limit(200)
       .snapshots()
       .map((snap) => snap.docs
+          .where((d) => d.data()['deleted'] != true)
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList());
 });
@@ -40,11 +67,11 @@ final sellerTransactionsProvider = StreamProvider.autoDispose
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
       .where('created_by', isEqualTo: sellerId)
-      .where('deleted', isEqualTo: false)
       .orderBy('created_at', descending: true)
       .limit(200)
       .snapshots()
       .map((snap) => snap.docs
+          .where((d) => d.data()['deleted'] != true)
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList());
 });
@@ -75,7 +102,11 @@ class TransactionNotifier extends AsyncNotifier<void> {
     }
     // Validate type is in allowed set to prevent arbitrary transaction types
     const allowedTypes = {
-      'cash_out', 'cash_in', 'return', 'payment', 'write_off'
+      'cash_out',
+      'cash_in',
+      'return',
+      'payment',
+      'write_off'
     };
     if (!allowedTypes.contains(type)) {
       throw ArgumentError(
@@ -142,9 +173,14 @@ class TransactionNotifier extends AsyncNotifier<void> {
     await batch.commit();
   }
 
-  /// Creates a seller-side sale transaction.
-  /// Deducts stock from [sellerInventoryDeductions] (map of sellerInventoryDocIdâ†’qty)
-  /// in the same atomic batch as the transaction + customer balance update.
+  /// Creates a seller-side sale transaction WITHOUT going through invoicing.
+  /// Used for legacy simple sales where no formal invoice is required.
+  ///
+  /// NOTE: Prefer InvoiceNotifier.createSaleInvoice() for all new sales that
+  /// involve stock deduction from seller_inventory. This method exists for
+  /// edge-case manual entries only.
+  ///
+  /// IMPORTANT: customerId here IS the shopId (shops = customers in Firestore).
   Future<void> createSellerSale({
     required String routeId,
     required String customerId,
@@ -170,10 +206,10 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
     final txRef = db.collection(Collections.transactions).doc();
     batch.set(txRef, {
-      'shop_id': '',
-      'shop_name': '',
+      'shop_id': customerId, // customerId == shopId in our unified architecture
+      'shop_name': customerName,
       'route_id': routeId,
-      'customer_id': customerId,
+      'customer_id': customerId, // legacy alias retained for index compatibility
       'customer_name': customerName,
       'type': 'cash_out',
       'sale_type': saleType ?? 'cash',

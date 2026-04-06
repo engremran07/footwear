@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,6 +25,26 @@ import '../widgets/export_sheet.dart';
 import 'package:printing/printing.dart';
 import '../core/utils/pdf_export.dart';
 
+// =============================================================================
+// ShopDetailScreen — live ledger view for a single retail shop.
+//
+// TWO FINANCIAL INTERACTION PATHWAYS:
+//   1. CASH COLLECTION (existing debt only, no invoice):
+//      └ Tap the quick cash_in button → _showQuickCash('cash_in')
+//        → TransactionNotifier.create(type: 'cash_in')
+//        → Reduces shop.balance atomically. No stock movement.
+//
+//   2. NEW SALE WITH STOCK → /invoices/new (CreateSaleInvoiceScreen):
+//      └ Seller selects items from seller_inventory
+//        → InvoiceNotifier.createSaleInvoice()
+//        → Creates invoice + cash_out tx + stock deduction atomically.
+//
+// Additionally: return of goods uses _showReturnDialog → _ReturnSheet
+//               → TransactionNotifier.createReturn()
+//
+// BAD DEBT: admin-only button in AppBar when balance > 0 && !shop.badDebt.
+//           → ShopNotifier.markAsBadDebt() → zeros balance, flags shop.
+// =============================================================================
 class ShopDetailScreen extends ConsumerStatefulWidget {
   final String shopId;
   const ShopDetailScreen({super.key, required this.shopId});
@@ -221,6 +242,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
         'credit': tr('credit', ref),
         'running_balance': tr('running_balance', ref),
         'account_statement': tr('account_statement', ref),
+        'opening_balance': tr('opening_balance', ref),
         'net_payable': tr('net_payable', ref),
         'page': tr('page', ref),
         'report_date': tr('report_date', ref),
@@ -248,16 +270,24 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       final sorted = [...txs]
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
       final logoBytes = settings.logoBytes;
+      // Reconcile opening balance: stored balance minus the net of the
+      // displayed transactions, so the final running balance equals shop.balance.
+      final netTx = sorted.fold<double>(
+        0.0,
+        (s, t) => t.isCashOut ? s + t.amount : s - t.amount,
+      );
       final bytes = await buildPdfLedger(
         customerName: shop.name,
         companyName: settings.companyName,
         generatedBy: user?.displayName ?? '',
-        openingBalance: 0,
+        openingBalance: shop.balance - netTx,
         transactions: sorted,
         labels: _labels(),
         locale: locale,
         showEntryBy: true,
         entryByMap: entryByMap,
+        dateFrom: sorted.isNotEmpty ? sorted.first.createdAt.toDate() : null,
+        dateTo: sorted.isNotEmpty ? sorted.last.createdAt.toDate() : null,
         currency: settings.currency,
         logoBytes: logoBytes,
       );
@@ -475,6 +505,34 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     }
                   },
                 ),
+              if (user?.isAdmin == true && shop.balance > 0 && !shop.badDebt)
+                IconButton(
+                  icon: const Icon(Icons.money_off, color: Colors.orange),
+                  tooltip: tr('mark_bad_debt', ref),
+                  onPressed: () async {
+                    final ok = await ConfirmDialog.show(
+                      context,
+                      title: tr('bad_debt', ref),
+                      message: tr('confirm_bad_debt', ref),
+                    );
+                    if (ok != true) return;
+                    try {
+                      await ref
+                          .read(shopNotifierProvider.notifier)
+                          .markAsBadDebt(shop.id);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        successSnackBar(tr('success_updated', ref)),
+                      );
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      final key = AppErrorMapper.key(e);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        errorSnackBar(tr(key, ref)),
+                      );
+                    }
+                  },
+                ),
               IconButton(
                 icon: const Icon(Icons.picture_as_pdf),
                 tooltip: tr('tooltip_export_pdf', ref),
@@ -524,16 +582,27 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       };
                       if (user != null) entryByMap[user.id] = user.displayName;
                       final logoBytes = settings.logoBytes;
+                      // Reconcile opening balance
+                      final netTx = sorted.fold<double>(
+                        0.0,
+                        (s, t) => t.isCashOut ? s + t.amount : s - t.amount,
+                      );
                       return buildPdfLedger(
                         customerName: shop.name,
                         companyName: settings.companyName,
                         generatedBy: user?.displayName ?? '',
-                        openingBalance: 0,
+                        openingBalance: shop.balance - netTx,
                         transactions: sorted,
                         labels: _labels(),
                         locale: locale,
                         showEntryBy: true,
                         entryByMap: entryByMap,
+                        dateFrom: sorted.isNotEmpty
+                            ? sorted.first.createdAt.toDate()
+                            : null,
+                        dateTo: sorted.isNotEmpty
+                            ? sorted.last.createdAt.toDate()
+                            : null,
                         currency: settings.currency,
                         logoBytes: logoBytes,
                       );
@@ -668,6 +737,51 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               },
                             ) ??
                             const SizedBox.shrink(),
+                      // Balance trend mini chart
+                      txAsync.whenOrNull(
+                            data: (txs) {
+                              if (txs.length < 2) return const SizedBox.shrink();
+                              return _BalanceTrendChart(transactions: txs);
+                            },
+                          ) ??
+                          const SizedBox.shrink(),
+                      // Bad debt banner
+                      if (shop.badDebt) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.orange.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.warning_amber,
+                                  color: Colors.orange),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(tr('bad_debt', ref),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.orange)),
+                                    Text(
+                                      '${tr('bad_debt_amount', ref)}: ${AppFormatters.sar(shop.badDebtAmount)}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -782,18 +896,54 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         message: tr('no_transactions', ref),
                       );
                     }
-                    return ListView.separated(
+                    // Build grouped items with month headers
+                    final items = <_TxListItem>[];
+                    String? lastMonth;
+                    for (final tx in txs) {
+                      final dt = tx.createdAt.toDate();
+                      final monthKey =
+                          '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+                      if (monthKey != lastMonth) {
+                        items.add(_TxListItem(
+                            monthHeader: AppFormatters.period(monthKey)));
+                        lastMonth = monthKey;
+                      }
+                      items.add(_TxListItem(tx: tx));
+                    }
+                    return ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
-                      itemCount: txs.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (_, i) => _TransactionTile(
-                        tx: txs[i],
-                        canEdit: user?.isAdmin == true ||
-                            (user?.isSeller == true &&
-                                user?.id == txs[i].createdBy),
-                        onEdit: () => _showEditTransactionDialog(txs[i]),
-                        onDelete: () => _confirmDeleteTransaction(txs[i]),
-                      ),
+                      itemCount: items.length,
+                      itemBuilder: (_, i) {
+                        final item = items[i];
+                        if (item.monthHeader != null) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 6),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            child: Text(
+                              item.monthHeader!,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                            ),
+                          );
+                        }
+                        final tx = item.tx!;
+                        return _TransactionTile(
+                          tx: tx,
+                          canEdit: user?.isAdmin == true ||
+                              (user?.isSeller == true &&
+                                  user?.id == tx.createdBy),
+                          onEdit: () => _showEditTransactionDialog(tx),
+                          onDelete: () => _confirmDeleteTransaction(tx),
+                        );
+                      },
                     );
                   },
                 ),
@@ -890,6 +1040,133 @@ class _TransactionTile extends ConsumerWidget {
             )
           : null,
       dense: true,
+    );
+  }
+}
+
+// ─── Tx List Item ────────────────────────────────────────────────────────────
+
+class _TxListItem {
+  final String? monthHeader;
+  final TransactionModel? tx;
+  const _TxListItem({this.monthHeader, this.tx});
+}
+
+// ─── Balance Trend Mini Chart ─────────────────────────────────────────────────
+
+class _BalanceTrendChart extends StatelessWidget {
+  final List<TransactionModel> transactions;
+  const _BalanceTrendChart({required this.transactions});
+
+  String _shortMonth(int m) {
+    const names = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return m >= 1 && m <= 12 ? names[m - 1] : '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = [...transactions]
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    if (sorted.length < 2) return const SizedBox.shrink();
+
+    // Aggregate monthly balances
+    final monthlyBalance = <String, double>{};
+    double running = 0;
+    for (final tx in sorted) {
+      running += tx.isCashOut ? tx.amount : -tx.amount;
+      final dt = tx.createdAt.toDate();
+      final key = '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+      monthlyBalance[key] = running;
+    }
+
+    final entries = monthlyBalance.entries.toList();
+    final display =
+        entries.length > 6 ? entries.sublist(entries.length - 6) : entries;
+
+    if (display.length < 2) return const SizedBox.shrink();
+
+    final cs = Theme.of(context).colorScheme;
+    final spots = <FlSpot>[];
+    for (var i = 0; i < display.length; i++) {
+      spots.add(FlSpot(i.toDouble(), display[i].value));
+    }
+
+    final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+    final minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Balance Trend',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 80,
+            child: LineChart(
+              LineChartData(
+                gridData: const FlGridData(show: false),
+                titlesData: FlTitlesData(
+                  leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 16,
+                      getTitlesWidget: (value, _) {
+                        final idx = value.toInt();
+                        if (idx < 0 || idx >= display.length) {
+                          return const SizedBox.shrink();
+                        }
+                        final parts = display[idx].key.split('-');
+                        return Text(
+                          _shortMonth(int.tryParse(parts[1]) ?? 1),
+                          style: TextStyle(
+                              fontSize: 9, color: cs.onSurfaceVariant),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                minX: 0,
+                maxX: (display.length - 1).toDouble(),
+                minY: minY < 0 ? minY : 0,
+                maxY: maxY > 0 ? maxY * 1.1 : 100,
+                lineTouchData: const LineTouchData(enabled: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: cs.primary,
+                    barWidth: 2,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: cs.primary.withAlpha(30),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -150,6 +150,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                   child: ListView.builder(
                     itemCount: filtered.length,
                     physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: 88),
                     itemBuilder: (_, i) => _showInactive
                         ? _InactiveUserTile(
                             user: filtered[i],

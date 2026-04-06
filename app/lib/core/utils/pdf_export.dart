@@ -275,6 +275,19 @@ Future<Uint8List> buildPdfLedger({
     final int entryCount = transactions.length;
 
     final rows = <_LedgerRow>[];
+    // Insert an opening-balance row so the final running balance is
+    // always reconcilable to the stored account balance.
+    if (openingBalance != 0) {
+      rows.add(_LedgerRow(
+        date: '',
+        desc: labels['opening_balance'] ?? 'Opening Balance',
+        entryBy: '',
+        mode: '',
+        cashIn: 0,
+        cashOut: 0,
+        balance: openingBalance,
+      ));
+    }
     for (final tx in transactions) {
       final date = tx.createdAt.toDate();
       final rawDesc = tx.description?.isNotEmpty == true

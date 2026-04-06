@@ -12,9 +12,6 @@ import '../../screens/route_detail_screen.dart';
 import '../../screens/shops_list_screen.dart';
 import '../../screens/shop_form_screen.dart';
 import '../../screens/shop_detail_screen.dart';
-import '../../screens/customers_list_screen.dart';
-import '../../screens/customer_form_screen.dart';
-import '../../screens/customer_detail_screen.dart';
 import '../../screens/products_list_screen.dart';
 import '../../screens/product_form_screen.dart';
 import '../../screens/product_detail_screen.dart';
@@ -56,15 +53,11 @@ bool _isAdminOnlyPath(String rawPath) {
 bool _isSellerBlockedPath(String rawPath) {
   final path = _normalizePath(rawPath);
   return path == '/routes' ||
-      path == '/customers' ||
       path == '/reports' ||
       path == '/settings' ||
       path == '/routes/new' ||
-      path == '/customers/new' ||
       RegExp(r'^/routes/[^/]+$').hasMatch(path) ||
-      RegExp(r'^/routes/[^/]+/edit$').hasMatch(path) ||
-      RegExp(r'^/customers/[^/]+$').hasMatch(path) ||
-      RegExp(r'^/customers/[^/]+/edit$').hasMatch(path);
+      RegExp(r'^/routes/[^/]+/edit$').hasMatch(path);
 }
 
 /// Material shared-axis Z transition (scale+fade) for all routes.
@@ -221,22 +214,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               path: '/shops/:id',
               pageBuilder: (_, s) => _fadePage(
                   ShopDetailScreen(shopId: s.pathParameters['id']!), s)),
-          // Customers
-          GoRoute(
-              path: '/customers',
-              pageBuilder: (_, s) => _fadePage(const CustomersListScreen(), s)),
-          GoRoute(
-              path: '/customers/new',
-              pageBuilder: (_, s) => _slidePage(const CustomerFormScreen(), s)),
-          GoRoute(
-              path: '/customers/:id/edit',
-              pageBuilder: (_, s) => _slidePage(
-                  CustomerFormScreen(customerId: s.pathParameters['id']!), s)),
-          GoRoute(
-              path: '/customers/:id',
-              pageBuilder: (_, s) => _fadePage(
-                  CustomerDetailScreen(customerId: s.pathParameters['id']!),
-                  s)),
           // Products
           GoRoute(
               path: '/products',

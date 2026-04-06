@@ -74,7 +74,7 @@ Run before marking production ready:
 - flutter analyze lib --no-pub
 - flutter test -r expanded
 - flutter build apk --release
-- If web is part of the request: flutter build web and deploy hosting from the same versioned source tree
+- If web is part of the request: flutter build web --release and deploy hosting from the same versioned source tree
 - Verify current About/version/contact content on both APK and web if those surfaces were part of the release request
 - Verify admin and seller startup for `/` and `/inventory`; transient permission-denied UI during stream warm-up is a regression.
 - firebase deploy --only firestore:rules,firestore:indexes

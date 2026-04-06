@@ -33,11 +33,11 @@ void main() async {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       if (kDebugMode) {
         await FirebaseAppCheck.instance.activate(
-          androidProvider: AndroidProvider.debug,
+          providerAndroid: const AndroidDebugProvider(),
         );
       } else if (usePlayIntegrity) {
         await FirebaseAppCheck.instance.activate(
-          androidProvider: AndroidProvider.playIntegrity,
+          providerAndroid: const AndroidPlayIntegrityProvider(),
         );
       }
     }

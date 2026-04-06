@@ -80,3 +80,5 @@ check_locale.py
 .idea/
 .vscode/settings.json
 *.iml
+
+*.jks.bak

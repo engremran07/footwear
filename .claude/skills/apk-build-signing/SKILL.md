@@ -20,20 +20,23 @@ version: MAJOR.MINOR.PATCH+BUILD
 
 ## Release Build Command
 ```bash
-# Split-per-ABI (3 APKs: armeabi-v7a, arm64-v8a, x86_64)
+# ── CANONICAL BUILD (always use fat APK) ──────────────────────────────────
+# Fat APK — single universal file, direct sideload to any device.
 cd app
-flutter build apk --release --split-per-abi
-
-# Output locations:
-# build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-# build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-# build/app/outputs/flutter-apk/app-x86_64-release.apk
-
-# Universal APK (for testing only — larger size)
 flutter build apk --release
 
-# App Bundle (for Play Store)
-flutter build appbundle --release
+# Output location:
+# build/app/outputs/flutter-apk/app-release.apk
+
+# ── Web ───────────────────────────────────────────────────────────────────
+flutter build web --release
+firebase deploy --only hosting
+
+# ── NEVER use --split-per-abi — project standard is fat APK only ──────────
+# (split-per-abi is for Play Store; this app is sideloaded)
+
+# App Bundle (Play Store only — NOT the standard for this project)
+# flutter build appbundle --release
 ```
 
 ## Signing Configuration

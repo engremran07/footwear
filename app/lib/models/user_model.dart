@@ -49,6 +49,9 @@ class UserModel {
 
   bool get isAdmin => role == UserRole.admin;
   bool get isSeller => role == UserRole.seller;
+  /// True for any user who can carry vehicle (seller) inventory.
+  /// Admin is god — warehouse owner, seller, and manager in one.
+  bool get canHaveSellerInventory => true;
 
   factory UserModel.fromJson(Map<String, dynamic> json, String docId) {
     return UserModel(

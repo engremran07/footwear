@@ -8,7 +8,7 @@ import 'package:footwear_erp/models/invoice_model.dart';
 void main() {
   final ts = Timestamp.fromMillisecondsSinceEpoch(0);
 
-  InvoiceModel _base({
+  InvoiceModel base({
     String status = InvoiceModel.statusIssued,
     Map<String, int> deductions = const {},
   }) =>
@@ -30,7 +30,7 @@ void main() {
   group('sellerInventoryDeductions — round-trip (TEST-023)', () {
     test('non-empty deductions survive fromJson/toJson round-trip', () {
       final deductions = {'doc-A': 12, 'doc-B': 6};
-      final original = _base(deductions: deductions);
+      final original = base(deductions: deductions);
       final json = original.toJson()
         ..['status'] = original.status
         ..['created_at'] = original.createdAt
@@ -40,15 +40,16 @@ void main() {
     });
   });
 
-  group('sellerInventoryDeductions — empty map excluded from toJson (TEST-024)', () {
+  group('sellerInventoryDeductions — empty map excluded from toJson (TEST-024)',
+      () {
     test('empty deductions map is not written to toJson output', () {
-      final model = _base(deductions: const {});
+      final model = base(deductions: const {});
       final json = model.toJson();
       expect(json.containsKey('seller_inventory_deductions'), isFalse);
     });
 
     test('non-empty deductions map IS written to toJson output', () {
-      final model = _base(deductions: {'doc-A': 3});
+      final model = base(deductions: {'doc-A': 3});
       final json = model.toJson();
       expect(json.containsKey('seller_inventory_deductions'), isTrue);
       expect((json['seller_inventory_deductions'] as Map)['doc-A'], equals(3));
@@ -57,7 +58,7 @@ void main() {
 
   group('partial status flags — mutual exclusion (TEST-025)', () {
     test('partial status → isPartial=true, all others false', () {
-      final m = _base(status: InvoiceModel.statusPartial);
+      final m = base(status: InvoiceModel.statusPartial);
       expect(m.isPartial, isTrue);
       expect(m.isIssued, isFalse);
       expect(m.isPaid, isFalse);
@@ -66,7 +67,7 @@ void main() {
     });
 
     test('partial status fromJson round-trip preserves status', () {
-      final json = _base(status: 'partial').toJson()
+      final json = base(status: 'partial').toJson()
         ..['status'] = 'partial'
         ..['created_at'] = ts
         ..['updated_at'] = ts;
@@ -77,7 +78,7 @@ void main() {
 
   group('void status flags — mutual exclusion (TEST-026)', () {
     test('void status → isVoid=true, all others false', () {
-      final m = _base(status: InvoiceModel.statusVoid);
+      final m = base(status: InvoiceModel.statusVoid);
       expect(m.isVoid, isTrue);
       expect(m.isPartial, isFalse);
       expect(m.isIssued, isFalse);
@@ -86,7 +87,7 @@ void main() {
     });
 
     test('void status fromJson round-trip preserves status', () {
-      final json = _base(status: 'void').toJson()
+      final json = base(status: 'void').toJson()
         ..['status'] = 'void'
         ..['created_at'] = ts
         ..['updated_at'] = ts;
@@ -97,7 +98,7 @@ void main() {
 
   group('invoice type helpers round-trip', () {
     test('isSale true for type=sale', () {
-      expect(_base().isSale, isTrue);
+      expect(base().isSale, isTrue);
     });
 
     test('isReturn true for type=return', () {

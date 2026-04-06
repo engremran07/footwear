@@ -160,7 +160,11 @@ Flutter:
 cd app
 flutter pub get
 flutter analyze lib --no-pub
+# Fat APK (canonical — always fat, never --split-per-abi)
 flutter build apk --release
+# Web
+flutter build web --release
+firebase deploy --only hosting
 ```
 
 ## 8) Autonomous Agent Checklist
@@ -192,6 +196,16 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-04-06 audit v7 — v3.3.0+21:
+
+- Admin is now a full seller: loads vehicle stock via Inventory → Transfer, sees own seller_inventory in invoice creation, creates invoices from own stock
+- Invoice item restriction: all roles (admin + seller) must select ≥1 item; empty-item invoices blocked
+- Transfer dialog: `sellersProvider` → `allUsersProvider` so admin appears as a recipient for self-transfer
+- product_provider.transferToSeller: fixed audit log to write to `inventory_transactions` (not `transactions`); type corrected to `transfer_out` matching InventoryTransactionModel constants — was violating Firestore rules AND not appearing in transfer history
+- customer transaction visibility fixed (v3.2.7+19): client-side `deleted != true` filter on all providers
+- Build standard: fat APK only (`flutter build apk --release`), never --split-per-abi
+- user_model: added `canHaveSellerInventory` getter (always true; admin = god tier)
 
 2026-04-06 audit v6 — v3.2.6+18:
 

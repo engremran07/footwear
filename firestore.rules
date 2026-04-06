@@ -132,7 +132,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // --- customers (consolidates shops and customers) -----------------------
+    // --- customers (= shops) ------------------------------------------------
+    // This collection stores RETAIL SHOPS only. The collection name 'customers'
+    // is legacy and kept to avoid a data migration. App code uses ShopModel
+    // and Collections.shops alias. No separate Customer entity exists.
+    //
+    // BALANCE FIELD: balance > 0 means shop owes us money (accounts receivable).
+    // Updated atomically with every transaction/invoice write.
     match /customers/{customerId} {
       allow read: if isAdmin() ||
         (
@@ -168,6 +174,12 @@ service cloud.firestore {
     }
 
     // --- transactions -------------------------------------------------------
+    // Ledger entries for shop accounts. Two creation pathways:
+    //   1. Via InvoiceNotifier.createSaleInvoice() \u2014 sale with stock deduction
+    //      (type: cash_out, linked via invoice_id + invoice_number)
+    //   2. Via TransactionNotifier.create() \u2014 cash collection from existing debt
+    //      (type: cash_in, no invoice_id, no items)
+    // Allowed types: cash_in | cash_out | return | payment | write_off
     match /transactions/{txId} {
       allow read: if isAdmin() ||
         (

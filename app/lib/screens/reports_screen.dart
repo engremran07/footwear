@@ -1,16 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/constants/collections.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/snack_helper.dart';
-import '../models/customer_model.dart';
 import '../models/shop_model.dart';
+import '../models/transaction_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
-import '../providers/customer_provider.dart';
 import '../providers/dashboard_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/seller_inventory_provider.dart';
@@ -236,12 +237,12 @@ class ReportsScreen extends ConsumerWidget {
   void _exportCustomers(BuildContext context, WidgetRef ref) {
     final user = ref.read(authUserProvider).valueOrNull;
     final routeId = user?.assignedRouteId ?? '';
-    final customers = user?.isAdmin == true
-        ? ref.read(customersProvider).valueOrNull ?? <CustomerModel>[]
+    final shops = user?.isAdmin == true
+        ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
         : (routeId.isNotEmpty
-            ? ref.read(customersByRouteProvider(routeId)).valueOrNull ??
-                <CustomerModel>[]
-            : <CustomerModel>[]);
+            ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
+                <ShopModel>[]
+            : <ShopModel>[]);
     ExportSheet.show(
       context,
       ref,
@@ -252,12 +253,12 @@ class ReportsScreen extends ConsumerWidget {
         tr('city', ref),
         tr('balance', ref),
       ],
-      rows: customers
-          .map((c) => [
-                c.name,
-                c.phone ?? '',
-                c.city ?? '',
-                AppFormatters.sar(c.balance),
+      rows: shops
+          .map((s) => [
+                s.name,
+                s.phone ?? '',
+                s.city ?? '',
+                AppFormatters.sar(s.balance),
               ])
           .toList(),
       fileName: 'customers_report',
@@ -267,13 +268,13 @@ class ReportsScreen extends ConsumerWidget {
   void _exportBadDebts(BuildContext context, WidgetRef ref) {
     final user = ref.read(authUserProvider).valueOrNull;
     final routeId = user?.assignedRouteId ?? '';
-    final customers = user?.isAdmin == true
-        ? ref.read(customersProvider).valueOrNull ?? <CustomerModel>[]
+    final shops = user?.isAdmin == true
+        ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
         : (routeId.isNotEmpty
-            ? ref.read(customersByRouteProvider(routeId)).valueOrNull ??
-                <CustomerModel>[]
-            : <CustomerModel>[]);
-    final badDebtCustomers = customers.where((c) => c.badDebt).toList();
+            ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
+                <ShopModel>[]
+            : <ShopModel>[]);
+    final badDebtShops = shops.where((s) => s.badDebt).toList();
     ExportSheet.show(
       context,
       ref,
@@ -284,13 +285,13 @@ class ReportsScreen extends ConsumerWidget {
         tr('bad_debt_amount', ref),
         tr('date', ref),
       ],
-      rows: badDebtCustomers
-          .map((c) => [
-                c.name,
-                c.phone ?? '',
-                AppFormatters.sar(c.badDebtAmount),
-                c.badDebtDate != null
-                    ? AppFormatters.dateTime(c.badDebtDate!)
+      rows: badDebtShops
+          .map((s) => [
+                s.name,
+                s.phone ?? '',
+                AppFormatters.sar(s.badDebtAmount),
+                s.badDebtDate != null
+                    ? AppFormatters.dateTime(s.badDebtDate!)
                     : '',
               ])
           .toList(),
@@ -679,22 +680,27 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       final locale = ref.read(appLocaleProvider);
       final user = ref.read(authUserProvider).valueOrNull;
       final routeId = user?.assignedRouteId ?? '';
-      final customers = user?.isAdmin == true
-          ? ref.read(customersProvider).valueOrNull ?? <CustomerModel>[]
+      final shops = user?.isAdmin == true
+          ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
           : (routeId.isNotEmpty
-              ? ref.read(customersByRouteProvider(routeId)).valueOrNull ??
-                  <CustomerModel>[]
-              : <CustomerModel>[]);
-      final customer = customers.firstWhere((c) => c.id == _selectedCustomerId);
-      final allTxs = user?.isAdmin == true
-          ? ref.read(allTransactionsProvider).valueOrNull ?? []
-          : ref.read(sellerTransactionsProvider(user!.id)).valueOrNull ?? [];
-      final txs = allTxs
-          .where((t) =>
-              t.customerId == _selectedCustomerId ||
-              t.shopId == _selectedCustomerId)
-          .toList()
-        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+              ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
+                  <ShopModel>[]
+              : <ShopModel>[]);
+      final shop = shops.firstWhere((s) => s.id == _selectedCustomerId);
+
+      // Query Firestore directly for this customer's transactions.
+      // No server-side deleted==false: old docs predate the field and
+      // isEqualTo:false silently excludes them. Filter client-side.
+      final snap = await FirebaseFirestore.instance
+          .collection(Collections.transactions)
+          .where('customer_id', isEqualTo: _selectedCustomerId)
+          .orderBy('created_at')
+          .get();
+      final txs = snap.docs
+          .where((d) => d.data()['deleted'] != true)
+          .map((d) => TransactionModel.fromJson(d.data(), d.id))
+          .toList();
+
       final settings = await ref.read(settingsProvider.future);
       final allUsers = user?.isAdmin == true
           ? ref.read(allUsersProvider).valueOrNull ?? <UserModel>[]
@@ -704,14 +710,23 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       };
       if (user != null) entryByMap[user.id] = user.displayName;
 
+      // Reconcile opening balance so the final running balance equals
+      // the stored customer.balance regardless of transaction-count limits.
+      final netTx = txs.fold<double>(
+        0.0,
+        (s, t) => t.isCashOut ? s + t.amount : s - t.amount,
+      );
+
       final bytes = await buildPdfLedger(
-        customerName: customer.name,
+        customerName: shop.name,
         companyName: settings.companyName,
         generatedBy: user?.displayName ?? '',
-        openingBalance: 0,
+        openingBalance: shop.balance - netTx,
         transactions: txs,
         entryByMap: entryByMap,
         showEntryBy: true,
+        dateFrom: txs.isNotEmpty ? txs.first.createdAt.toDate() : null,
+        dateTo: txs.isNotEmpty ? txs.last.createdAt.toDate() : null,
         labels: _labels(ref),
         locale: locale,
         currency: settings.currency,
@@ -721,7 +736,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       ExportSheet.show(
         context,
         ref,
-        title: '${customer.name} - ${tr('account_statement', ref)}',
+        title: '${shop.name} - ${tr('account_statement', ref)}',
         headers: [
           tr('date', ref),
           tr('type', ref),
@@ -738,7 +753,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
                   t.description ?? '',
                 ])
             .toList(),
-        fileName: 'account_statement_${customer.name.replaceAll(' ', '_')}',
+        fileName: 'account_statement_${shop.name.replaceAll(' ', '_')}',
         pdfBytesBuilder: () async => bytes,
       );
     } catch (e) {
@@ -754,11 +769,11 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
   Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).valueOrNull;
     final routeId = user?.assignedRouteId ?? '';
-    final AsyncValue<List<CustomerModel>> customersAsync = user?.isAdmin == true
-        ? ref.watch(customersProvider)
+    final AsyncValue<List<ShopModel>> shopsAsync = user?.isAdmin == true
+        ? ref.watch(shopsProvider)
         : (routeId.isNotEmpty
-            ? ref.watch(customersByRouteProvider(routeId))
-            : const AsyncData(<CustomerModel>[]));
+            ? ref.watch(shopsByRouteProvider(routeId))
+            : const AsyncData(<ShopModel>[]));  
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -777,19 +792,19 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
               ],
             ),
             const SizedBox(height: 10),
-            customersAsync.when(
+            shopsAsync.when(
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => Text('$e'),
-              data: (customers) => DropdownButtonFormField<String>(
+              data: (shops) => DropdownButtonFormField<String>(
                 initialValue: _selectedCustomerId,
                 decoration: InputDecoration(
                   labelText: tr('customer', ref),
                   isDense: true,
                   border: const OutlineInputBorder(),
                 ),
-                items: customers
-                    .map((c) =>
-                        DropdownMenuItem(value: c.id, child: Text(c.name)))
+                items: shops
+                    .map((s) =>
+                        DropdownMenuItem(value: s.id, child: Text(s.name)))
                     .toList(),
                 onChanged: (v) => setState(() => _selectedCustomerId = v),
               ),
@@ -860,7 +875,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       final inventory =
           ref.read(sellerInventoryProvider(_selectedSellerId!)).valueOrNull ??
               [];
-      final allCustomers = ref.read(customersProvider).valueOrNull ?? [];
+      final allShops = ref.read(shopsProvider).valueOrNull ?? <ShopModel>[];
 
       // Build per-customer summary
       final txsBySeller =
@@ -870,12 +885,9 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
         final cid = tx.customerId ?? tx.shopId;
         if (cid.isEmpty) continue;
         final cname = tx.customerName ??
-            allCustomers
-                .firstWhere((c) => c.id == cid,
-                    orElse: () => allCustomers.first)
-                .name;
+            allShops.where((s) => s.id == cid).firstOrNull?.name ?? '';
         final existing = customerMap[cid];
-        final pairsSold = tx.items.fold<int>(0, (sum, item) => sum + item.qty);
+        final pairsSold = tx.items.fold<int>(0, (acc, item) => acc + item.qty);
         final revenue = tx.isCashOut ? tx.amount : 0.0;
         customerMap[cid] = SellerReportCustomer(
           name: cname,
@@ -884,9 +896,9 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
           outstandingBalance: 0,
         );
       }
-      // Add outstanding balance from customers collection
+      // Add outstanding balance from shops collection
       for (final entry in customerMap.entries) {
-        final match = allCustomers.where((c) => c.id == entry.key);
+        final match = allShops.where((s) => s.id == entry.key);
         if (match.isNotEmpty) {
           customerMap[entry.key] = SellerReportCustomer(
             name: entry.value.name,

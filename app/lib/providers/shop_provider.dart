@@ -5,6 +5,27 @@ import '../core/constants/collections.dart';
 import '../models/shop_model.dart';
 import 'auth_provider.dart';
 
+// =============================================================================
+// ShopProvider — all reads and writes for retail shops.
+//
+// DATA LAYER:
+//   Shops are stored in Firestore collection 'customers' (legacy name).
+//   Use Collections.shops alias in new code — both resolve to 'customers'.
+//
+// PROVIDERS:
+//   shopsProvider                      → admin: all active shops
+//   shopsByRouteProvider(routeId)      → seller/admin: shops on a specific route
+//   shopDetailProvider(id)             → single shop live stream
+//   outstandingShopsProvider           → admin: shops with balance > 0
+//   outstandingShopsByRouteProvider    → seller: outstanding shops on their route
+//
+// NOTIFIER METHODS:
+//   create()         → new shop (seller + admin)
+//   updateShop()     → edit name/address/etc (admin + seller in own route)
+//   markAsBadDebt()  → admin only: zero balance, flag write-off in transactions
+//   deactivate()     → admin only: soft-delete (active=false)
+// =============================================================================
+
 final shopsProvider = StreamProvider.autoDispose<List<ShopModel>>((ref) {
   // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED
   // during auth transitions when seller credentials are active.
@@ -104,6 +125,56 @@ class ShopNotifier extends AsyncNotifier<void> {
         .collection(Collections.customers)
         .doc(id)
         .update({...data, 'updated_at': Timestamp.now()});
+  }
+
+  /// Admin-only: marks a shop as bad debt, writes off outstanding balance.
+  Future<void> markAsBadDebt(String shopId) async {
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) throw StateError('Not authenticated');
+    final me = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(authUser.uid)
+        .get();
+    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
+    if (role != 'admin' && role != 'manager') {
+      throw StateError('Only admin can mark bad debt');
+    }
+
+    final db = FirebaseFirestore.instance;
+    final shopDoc =
+        await db.collection(Collections.customers).doc(shopId).get();
+    final balance = (shopDoc.data()?['balance'] as num?)?.toDouble() ?? 0;
+    if (balance <= 0) throw StateError('No outstanding balance to write off');
+
+    final batch = db.batch();
+
+    // Mark shop as bad debt
+    batch.update(db.collection(Collections.customers).doc(shopId), {
+      'bad_debt': true,
+      'bad_debt_amount': balance,
+      'bad_debt_date': Timestamp.now(),
+      'balance': 0.0,
+      'updated_at': Timestamp.now(),
+    });
+
+    // Create write_off transaction
+    final txRef = db.collection(Collections.transactions).doc();
+    batch.set(txRef, {
+      'type': 'write_off',
+      'shop_id': shopId,
+      'shop_name': shopDoc.data()?['name'] ?? '',
+      'route_id': shopDoc.data()?['route_id'] ?? '',
+      'customer_id': shopId,
+      'customer_name': shopDoc.data()?['name'] ?? '',
+      'amount': balance,
+      'description': 'Bad debt write-off',
+      'items': <Map<String, dynamic>>[],
+      'created_by': authUser.uid,
+      'created_at': Timestamp.now(),
+      'deleted': false,
+    });
+
+    await batch.commit();
   }
 
   Future<void> deactivate(String id, String routeId) async {

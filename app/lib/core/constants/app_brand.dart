@@ -12,12 +12,12 @@ class AppBrand {
   static const String logoAsset = 'assets/images/app_icon.png';
 
   // ─── Version ─────────────────────────────────────────────────────────────
-  static const String appVersion = '3.2.6';
-  static const String buildNumber = '18';
+  static const String appVersion = '3.3.1';
+  static const String buildNumber = '22';
   static const String versionDisplay = 'v$appVersion+$buildNumber';
 
   // ─── Contact / About ─────────────────────────────────────────────────────
-  static const String contactEmail = 'engremran@gmail.com';
+  static const String contactEmail = 'engremran89@gmail.com';
   static const String contactPhonePrimary = '+923067863310';
   static const String contactPhoneSecondary = '+966530421571';
   static const String websiteUrl = 'https://shoeserp-clean-20260327.web.app/';

@@ -1,5 +1,28 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// =============================================================================
+// TransactionModel — single ledger entry for a shop's account.
+//
+// TYPES (canonical — mirrors Firestore rules allowlist):
+//   cash_in   → cash collected from shop (reduces shop.balance)
+//               Use case: collecting outstanding debt, standalone payment
+//   cash_out  → goods delivered / sale recorded (increases shop.balance)
+//               Created with every invoice; also used for quick manual entry
+//   return    → goods returned by shop (reduces shop.balance)
+//               Always linked to InvoiceNotifier.createReturnInvoice()
+//   payment   → standalone payment not tied to a specific invoice
+//   write_off → bad debt: balance zeroed, created by ShopNotifier.markAsBadDebt()
+//
+// FIELD SEMANTICS:
+//   shopId / shop_id     → the retail shop's Firestore document ID
+//   customerId / customer_id → SAME value as shopId (legacy alias, kept for
+//                              backward compatibility with index queries)
+//   invoiceId            → populated when transaction originates from an invoice
+//
+// SOFT DELETE (DI-01):
+//   deleted=true records are excluded client-side (!=true) — never server-side
+//   isEqualTo:false, because pre-DI-01 docs lack the field entirely.
+// =============================================================================
 class TransactionItem {
   final String variantId;
   final String sku;

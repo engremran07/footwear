@@ -1,6 +1,31 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'transaction_model.dart';
 
+// =============================================================================
+// InvoiceModel — sale invoice or credit note for a shop.
+//
+// WHEN TO CREATE AN INVOICE (vs ledger-only):
+//   Invoice required  → seller makes a sale AND stock deduction from
+//                        seller_inventory is needed.
+//   Ledger only       → collecting cash from existing debt (cash_in transaction
+//                        only via TransactionNotifier — no invoice created).
+//
+// FIELD SEMANTICS:
+//   customerId / customer_id  → the shop’s Firestore document ID.
+//                               SAME as shopId. Both fields are populated with
+//                               the same value for index / backward compat.
+//   shopId / shop_id          → same as customerId.
+//
+// LIFECYCLE (state machine):
+//   draft → issued → partial → paid
+//                  → void (terminal, never re-opened)
+//   credit_note is a separate document (type=credit_note) linked via
+//   linkedInvoiceId. Credit notes must be created within 30 days of original.
+//
+// INVOICE NUMBER:
+//   Format INV-YYYY-NNNN. Counter in settings/global.last_invoice_number.
+//   Incremented atomically via Firestore Transaction to prevent duplicates.
+// =============================================================================
 class InvoiceModel {
   final String id;
   final String invoiceNumber; // INV-YYYY-NNNN

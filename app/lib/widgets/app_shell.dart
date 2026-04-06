@@ -19,7 +19,6 @@ class AppShell extends ConsumerStatefulWidget {
     (icon: Icons.dashboard, key: 'dashboard', route: '/'),
     (icon: Icons.route, key: 'routes', route: '/routes'),
     (icon: Icons.storefront, key: 'shops', route: '/shops'),
-    (icon: Icons.people, key: 'customers', route: '/customers'),
     (icon: Icons.inventory_2, key: 'products', route: '/products'),
     (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
     (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
@@ -93,14 +92,6 @@ class _AppShellState extends ConsumerState<AppShell>
             icon: Icons.add_road,
             label: tr('new_route', ref),
             route: '/routes/new'
-          )
-        ];
-      case '/customers':
-        return [
-          (
-            icon: Icons.person_add,
-            label: tr('new_customer', ref),
-            route: '/customers/new'
           )
         ];
       case '/products':
@@ -199,7 +190,7 @@ class _AppShellState extends ConsumerState<AppShell>
     }
     return const [
       (icon: Icons.dashboard, key: 'dashboard', route: '/'),
-      (icon: Icons.people, key: 'customers', route: '/customers'),
+      (icon: Icons.storefront, key: 'shops', route: '/shops'),
       (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
       (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
       (icon: Icons.settings, key: 'settings', route: '/settings'),
@@ -792,7 +783,8 @@ class _DrawerMenuScreen extends StatelessWidget {
                                           shape: BoxShape.circle,
                                           color: AppBrand.successColor,
                                           border: Border.all(
-                                              color: AppBrand.onPrimary, width: 2),
+                                              color: AppBrand.onPrimary,
+                                              width: 2),
                                         ),
                                       ),
                                     ),
@@ -1195,7 +1187,6 @@ class _BreadcrumbTitle extends StatelessWidget {
   });
 
   static const _segmentLabels = <String, String>{
-    'customers': 'Customers',
     'products': 'Products',
     'routes': 'Routes',
     'shops': 'Shops',

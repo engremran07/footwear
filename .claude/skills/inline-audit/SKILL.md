@@ -1,0 +1,100 @@
+---
+name: inline-audit
+description: "Use when: fixing any issue, gap, or error in ShoesERP. This skill enforces a mandatory inline audit of every affected subsystem while the primary fix is being applied. The agent acts as a flying inspector — fix what was asked, but also catch and fix any culprit found while reading the touched files."
+---
+
+# Skill: Inline Audit & Fix Workflow
+
+## Philosophy
+Every change is also an audit pass. When you open a file to fix one thing, you
+are obligated to scan the file for related violations. Leave the code better
+than you found it — but never over-engineer.
+
+## Mandatory Audit Layers (check every time)
+
+### 1. Role/Rules Alignment
+| Check | Source |
+|-------|--------|
+| `isAdmin` / `isSeller` / `canHaveSellerInventory` getters match Firestore rule helpers | `user_model.dart` vs `firestore.rules` |
+| `isAdminRole()` / `isSellerRole()` regex in rules matches all in-flight role strings | `firestore.rules` |
+| Admin-as-seller paths: admin can write their own `seller_inventory` docs | `firestore.rules`, `product_provider.dart` |
+
+### 2. Collection Alignment
+Every Firestore collection reference must use `Collections.*` constants, never
+raw strings.
+
+```dart
+// ✅ Correct
+db.collection(Collections.inventoryTransactions)
+// ❌ Wrong
+db.collection('inventory_transactions')
+```
+
+### 3. Audit Log Routing
+| Operation | Must write to |
+|-----------|--------------|
+| Warehouse → seller transfer | `inventory_transactions` (type: `transfer_out`) |
+| Seller → warehouse return | `inventory_transactions` (type: `return_to_warehouse`) |
+| Sale invoice stock deduction | `seller_inventory` (quantity decrement via batch) |
+| Cash in/out | `transactions` |
+| Invoice lifecycle | `invoices` |
+
+**Never write inventory movement audit logs to `transactions`.**
+
+### 4. Query → Rule → Index Triangle
+For every new or modified Firestore query:
+1. Confirm `firestore.rules` allows the query for the expected role
+2. Confirm `firestore.indexes.json` has the composite index
+3. For `where(A) + orderBy(B)` where A ≠ B → MUST have composite index
+
+### 5. Provider Write Guard Pattern
+All Firestore writes go through provider notifiers, never screens/widgets
+directly. Before submitting any form:
+- Required identity fields (`created_by`, `seller_id`, `route_id`) must be
+  non-empty — validate before batch.commit()
+- Admin operations: validate `adminId.trim().isNotEmpty`
+
+### 6. Deleted-Field Visibility
+Old documents (pre-DI-01 audit) have NO `deleted` field. Never use:
+```dart
+// ❌ Silently excludes docs where field doesn't exist
+.where('deleted', isEqualTo: false)
+```
+Always use client-side:
+```dart
+// ✅ Catches both {deleted: false} and missing-field docs
+.where((d) => d.data()['deleted'] != true)
+```
+
+### 7. Build Hygiene
+- Always fat APK: `flutter build apk --release` — NEVER `--split-per-abi`
+- `app/pubspec.yaml` version == `AppBrand.appVersion + '+' + AppBrand.buildNumber`
+- After touching any user-visible feature: bump PATCH+BUILD, rebuild both APK and web
+
+## Inline Audit Checklist (run mentally on every PR)
+
+```
+[ ] Collections constants used everywhere (no raw strings)
+[ ] Inventory audit logs go to inventory_transactions, not transactions
+[ ] No isValidTransactionType violation (only: cash_out, cash_in, return, payment, write_off)
+[ ] Deleted-field filter is client-side !=true
+[ ] Every where(A)+orderBy(B) query has composite index
+[ ] Admin-as-seller paths: sellerId/sellerName always populated in invoice submit
+[ ] Fat APK build command in all scripts/docs
+[ ] version bumped in pubspec.yaml AND app_brand.dart
+```
+
+## Known Failure Signatures (inline audit catches these)
+
+| Symptom | Root cause | Fix |
+|---------|-----------|-----|
+| Transfer history empty after transfer | audit log in `transactions` not `inventory_transactions` | Move write to `Collections.inventoryTransactions` |
+| Seller rule violation on admin batch | `isValidTransactionType` excludes custom types | Use approved types or write to `inventory_transactions` |
+| Old tx invisible in customer detail | `where(deleted==false)` excludes field-missing docs | Client-side `!=true` filter |
+| Admin sees no items in invoice screen | admin inventory async hardcoded to empty | `ref.watch(sellerInventoryProvider(user.id))` for all |
+| Invoice created with no items | `user.isSeller &&` guard bypassed for admin | Remove role guard; check `deductions.isEmpty` for all |
+| Fat APK not installed, wrong ABI file | build used `--split-per-abi` | Always `flutter build apk --release` |
+
+## AGENTS.md Update Rule
+When this skill catches and fixes a new issue, add it to **AGENTS.md Section 10**
+audit history in the same commit/change set.
