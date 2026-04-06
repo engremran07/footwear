@@ -29,23 +29,33 @@ class DashboardStats {
   });
 }
 
+/// Holds the last successfully computed dashboard stats so we can serve a
+/// cached result during loading states or when sub-providers temporarily error
+/// (e.g. resource-exhausted). This prevents blank-screen regressions.
+final _lastGoodDashboardStatsProvider =
+    StateProvider<DashboardStats?>((ref) => null);
+
 /// Derives dashboard stats reactively from live stream providers.
 /// Role-aware: admin sees all data, seller sees only their route's data.
 final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
   final userAsync = ref.watch(authUserProvider);
-  if (userAsync.isLoading) return const AsyncLoading();
+  if (userAsync.isLoading) {
+    final cached = ref.read(_lastGoodDashboardStatsProvider);
+    return cached != null ? AsyncData(cached) : const AsyncLoading();
+  }
   if (userAsync.hasError && userAsync.error != null) {
     if (AppErrorMapper.isPermissionOrAuthError(userAsync.error!)) {
       return const AsyncLoading();
     }
-    return AsyncError(
-      userAsync.error!,
-      userAsync.stackTrace ?? StackTrace.empty,
-    );
+    final cached = ref.read(_lastGoodDashboardStatsProvider);
+    return cached != null ? AsyncData(cached) : const AsyncLoading();
   }
 
   final user = userAsync.valueOrNull;
-  if (user == null) return const AsyncLoading();
+  if (user == null) {
+    final cached = ref.read(_lastGoodDashboardStatsProvider);
+    return cached != null ? AsyncData(cached) : const AsyncLoading();
+  }
 
   final AsyncValue<List<RouteModel>> routes;
   final AsyncValue<List<ShopModel>> shops;
@@ -66,23 +76,13 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
       shops is AsyncLoading ||
       products is AsyncLoading ||
       variants is AsyncLoading) {
-    return const AsyncLoading();
+    final cached = ref.read(_lastGoodDashboardStatsProvider);
+    return cached != null ? AsyncData(cached) : const AsyncLoading();
   }
 
-  final asyncErrors = [routes, shops, products, variants]
-      .whereType<AsyncError<dynamic>>()
-      .toList();
-  if (asyncErrors.isNotEmpty) {
-    for (final asyncError in asyncErrors) {
-      if (AppErrorMapper.isPermissionOrAuthError(asyncError.error)) {
-        return const AsyncLoading();
-      }
-    }
-
-    final error = asyncErrors.first;
-    return AsyncError(error.error, error.stackTrace);
-  }
-
+  // Degrade gracefully: use zero/empty fallback for any errored sub-provider
+  // instead of propagating AsyncError and blanking the entire dashboard.
+  // A single quota-exhausted stream must never black out all metrics.
   final routeList = routes.valueOrNull ?? const <RouteModel>[];
   final shopList = shops.valueOrNull ?? const <ShopModel>[];
   final productList = products.valueOrNull ?? const <ProductModel>[];
@@ -93,12 +93,19 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
   final totalStockPairs =
       variantList.fold<int>(0, (s, v) => s + v.quantityAvailable);
 
-  return AsyncData(DashboardStats(
+  final stats = DashboardStats(
     totalRoutes: routeList.length,
     totalShops: shopList.length,
     totalProducts: productList.length,
     totalVariants: variantList.length,
     totalOutstanding: totalOutstanding,
     totalStockPairs: totalStockPairs,
-  ));
+  );
+
+  // Persist the latest successful computation for use as a fallback.
+  Future.microtask(
+    () => ref.read(_lastGoodDashboardStatsProvider.notifier).state = stats,
+  );
+
+  return AsyncData(stats);
 });

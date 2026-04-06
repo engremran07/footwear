@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/settings_model.dart';
 
-final settingsProvider = StreamProvider<SettingsModel>((ref) {
+final settingsProvider = StreamProvider.autoDispose<SettingsModel>((ref) {
   return FirebaseFirestore.instance
       .collection(Collections.settings)
       .doc('global')

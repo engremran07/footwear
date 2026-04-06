@@ -73,6 +73,18 @@ class TransactionNotifier extends AsyncNotifier<void> {
     if (normalizedCreatedBy.isEmpty) {
       throw ArgumentError('createdBy must not be empty');
     }
+    // Validate type is in allowed set to prevent arbitrary transaction types
+    const allowedTypes = {
+      'cash_out', 'cash_in', 'return', 'payment', 'write_off'
+    };
+    if (!allowedTypes.contains(type)) {
+      throw ArgumentError(
+        'Invalid transaction type "$type". Allowed: ${allowedTypes.join(', ')}',
+      );
+    }
+    if (amount <= 0) {
+      throw ArgumentError('Transaction amount must be greater than 0');
+    }
     // shopId and routeId are optional for admin-only customer-level transactions;
     // balance update logic already guards on isNotEmpty below.
 

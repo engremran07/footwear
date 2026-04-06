@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/seller_inventory_model.dart';
+import 'auth_provider.dart';
 
 final sellerInventoryProvider = StreamProvider.autoDispose
     .family<List<SellerInventoryModel>, String>((ref, sellerId) {
@@ -29,6 +30,8 @@ final sellerInventoryTotalPairsProvider =
 /// Limit is 100 to keep free-tier Firestore reads within budget.
 final adminAllSellerInventoryProvider =
     StreamProvider.autoDispose<List<SellerInventoryModel>>((ref) {
+  final user = ref.watch(authUserProvider).valueOrNull;
+  if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.sellerInventory)
       .where('active', isEqualTo: true)

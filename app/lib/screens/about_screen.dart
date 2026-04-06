@@ -102,7 +102,7 @@ class AboutScreen extends ConsumerWidget {
                 tooltip: tr('email', ref),
                 icon: const Icon(Icons.email_outlined, size: 18),
                 onTap: () =>
-                    _launchUrl('mailto:${AppBrand.contactEmail}', context),
+                    _launchUrl('mailto:${AppBrand.contactEmail}', context, ref),
               ),
             ],
           ),
@@ -116,7 +116,7 @@ class AboutScreen extends ConsumerWidget {
                 icon: const Icon(Icons.call_outlined, size: 18),
                 onTap: () => _launchUrl(
                     'tel:${AppBrand.contactPhonePrimary.replaceAll('+', '')}',
-                    context),
+                    context, ref),
               ),
               _ActionButton(
                 tooltip: 'WhatsApp',
@@ -124,7 +124,7 @@ class AboutScreen extends ConsumerWidget {
                 backgroundColor: const Color(0xFFE9F9EF),
                 foregroundColor: const Color(0xFF128C7E),
                 onTap: () =>
-                    _openWhatsApp(AppBrand.contactPhonePrimary, context),
+                    _openWhatsApp(AppBrand.contactPhonePrimary, context, ref),
               ),
             ],
           ),
@@ -138,7 +138,7 @@ class AboutScreen extends ConsumerWidget {
                 icon: const Icon(Icons.call_outlined, size: 18),
                 onTap: () => _launchUrl(
                     'tel:${AppBrand.contactPhoneSecondary.replaceAll('+', '')}',
-                    context),
+                    context, ref),
               ),
               _ActionButton(
                 tooltip: 'WhatsApp',
@@ -146,7 +146,7 @@ class AboutScreen extends ConsumerWidget {
                 backgroundColor: const Color(0xFFE9F9EF),
                 foregroundColor: const Color(0xFF128C7E),
                 onTap: () =>
-                    _openWhatsApp(AppBrand.contactPhoneSecondary, context),
+                    _openWhatsApp(AppBrand.contactPhoneSecondary, context, ref),
               ),
             ],
           ),
@@ -155,7 +155,7 @@ class AboutScreen extends ConsumerWidget {
             label: tr('website', ref),
             value: AppBrand.websiteUrl,
             trailingIcon: Icons.open_in_new_outlined,
-            onTap: () => _launchUrl(AppBrand.websiteUrl, context),
+            onTap: () => _launchUrl(AppBrand.websiteUrl, context, ref),
           ),
 
           const SizedBox(height: 16),
@@ -197,25 +197,25 @@ class AboutScreen extends ConsumerWidget {
         .showSnackBar(successSnackBar(tr('copied', ref)));
   }
 
-  Future<void> _launchUrl(String url, BuildContext context) async {
+  Future<void> _launchUrl(String url, BuildContext context, WidgetRef ref) async {
     final uri = Uri.tryParse(url);
     if (uri == null) return;
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(errorSnackBar('Could not open $url'));
+            .showSnackBar(errorSnackBar('${tr('err_url_open', ref)}: $url'));
       }
     }
   }
 
-  Future<void> _openWhatsApp(String phone, BuildContext context) async {
+  Future<void> _openWhatsApp(String phone, BuildContext context, WidgetRef ref) async {
     final ok = await openWhatsApp(
       phone: phone,
-      message: 'Hello ${AppBrand.companyName}',
+      message: '${tr('whatsapp_greeting', ref)} ${AppBrand.companyName}',
     );
     if (!ok && context.mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(errorSnackBar('Could not open WhatsApp'));
+          .showSnackBar(errorSnackBar(tr('err_whatsapp_unavailable', ref)));
     }
   }
 

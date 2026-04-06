@@ -127,6 +127,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_timeout': 'Request timed out. Please try again.',
     'err_unauthenticated': 'You are not signed in. Please sign in first.',
     'err_firebase_generic': 'An unexpected error occurred. Please try again.',
+    'err_url_open': 'Could not open link',
+    'err_whatsapp_unavailable': 'Could not open WhatsApp',
+    'whatsapp_greeting': 'Hello',
     'err_invalid_data': 'Invalid data format. Please check your input.',
     'err_unknown': 'Something went wrong. Please try again.',
     'err_function_not_deployed':
@@ -1176,6 +1179,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_timeout': 'انتهت مهلة الطلب. حاول مرة أخرى.',
     'err_unauthenticated': 'لم يتم تسجيل الدخول. الرجاء تسجيل الدخول أولاً.',
     'err_firebase_generic': 'حدث خطأ غير متوقع. حاول مرة أخرى.',
+    'err_url_open': 'تعذّر فتح الرابط',
+    'err_whatsapp_unavailable': 'تعذّر فتح واتساب',
+    'whatsapp_greeting': 'مرحباً',
     'err_invalid_data': 'تنسيق البيانات غير صحيح. تحقق من المدخلات.',
     'err_unknown': 'حدث خطأ ما. حاول مرة أخرى.',
     'err_function_not_deployed':
@@ -2217,6 +2223,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_timeout': 'درخواست کا وقت ختم۔ دوبارہ کوشش کریں۔',
     'err_unauthenticated': 'سائن ان نہیں ہیں۔ پہلے سائن ان کریں۔',
     'err_firebase_generic': 'غیر متوقع خرابی۔ دوبارہ کوشش کریں۔',
+    'err_url_open': 'لنک نہیں کھلا',
+    'err_whatsapp_unavailable': 'واٹس ایپ نہیں کھلا',
+    'whatsapp_greeting': 'السلام علیکم',
     'err_invalid_data': 'ڈیٹا فارمیٹ غلط ہے۔ اپنی ان پٹ چیک کریں۔',
     'err_unknown': 'کچھ غلط ہو گیا۔ دوبارہ کوشش کریں۔',
     'err_function_not_deployed':

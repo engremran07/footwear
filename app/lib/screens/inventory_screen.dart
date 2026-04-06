@@ -139,7 +139,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           ],
         ),
       ),
-    );
+    ).then((_) {
+      cartonsC.dispose();
+      pairsC.dispose();
+      pairsFn.dispose();
+    });
   }
 
   @override
@@ -529,7 +533,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           ],
         ),
       ),
-    );
+    ).then((_) => qtyC.dispose());
   }
 
   void _showTransferHistory(BuildContext context) {

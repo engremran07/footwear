@@ -180,7 +180,7 @@ void main() {
     test('zero qty entries in rawDeductions are skipped', () {
       final rawDeductions = {'inv-doc-1': 0, 'inv-doc-2': 12};
       final validEntries =
-          rawDeductions.entries.where((e) => (e.value as int) > 0).toList();
+          rawDeductions.entries.where((e) => e.value > 0).toList();
       expect(validEntries.length, equals(1));
       expect(validEntries.first.key, equals('inv-doc-2'));
     });

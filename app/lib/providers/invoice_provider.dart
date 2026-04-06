@@ -33,8 +33,10 @@ final invoicesByShopProvider = StreamProvider.autoDispose
 
 final allInvoicesProvider =
     StreamProvider.autoDispose<List<InvoiceModel>>((ref) {
-  // Prefer roleAwareInvoicesProvider in screens; use this only for admin-only
-  // bulk operations where you need ALL invoices regardless of role.
+  // Admin-only: this provider exposes ALL invoices. Non-admins get an empty
+  // stream — use roleAwareInvoicesProvider or sellerInvoicesProvider instead.
+  final user = ref.watch(authUserProvider).valueOrNull;
+  if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.invoices)
       .orderBy('created_at', descending: true)
@@ -167,6 +169,14 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
     if (amountReceived < 0) {
       throw ArgumentError('amountReceived must not be negative');
+    }
+    // FI-11: amountReceived cannot exceed the invoice total; doing so would
+    // over-credit the customer and corrupt the ledger.
+    if (amountReceived > total) {
+      throw ArgumentError(
+        'amountReceived (${amountReceived.toStringAsFixed(2)}) '
+        'cannot exceed invoice total (${total.toStringAsFixed(2)})',
+      );
     }
     // Max-amount cap prevents fraudulent invoices
     const double maxInvoiceAmount = 999999.99;
@@ -477,25 +487,42 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
     if (createdBy.trim().isEmpty) {
       throw ArgumentError('createdBy must not be empty');
+    }    // Defense-in-depth: enforce admin-only at app level (rules enforce at DB level)
+    final currentUser = ref.read(authUserProvider).valueOrNull;
+    if (currentUser == null || !currentUser.isAdmin) {
+      throw StateError('voidInvoice requires admin privileges');
     }
-
     final db = FirebaseFirestore.instance;
-    // double-void guard — read current status before reversing
-    final invSnap =
-        await db.collection(Collections.invoices).doc(invoiceId).get();
-    if (!invSnap.exists) {
-      throw ArgumentError('Invoice not found: $invoiceId');
-    }
-    final currentStatus = invSnap.data()?['status'] as String? ?? '';
-    if (currentStatus == 'void') {
-      throw StateError('Invoice $invoiceId is already voided');
-    }
+    final invoiceRef = db.collection(Collections.invoices).doc(invoiceId);
+    final now = Timestamp.now();
 
-    final data = invSnap.data()!;
+    // Atomic double-void guard: Firestore transaction atomically reads the
+    // current status and marks the invoice as voided in one round-trip —
+    // prevents two concurrent void calls from both succeeding.
+    late final Map<String, dynamic> data;
+    await db.runTransaction<void>((txn) async {
+      final invSnap = await txn.get(invoiceRef);
+      if (!invSnap.exists) {
+        throw ArgumentError('Invoice not found: $invoiceId');
+      }
+      final currentStatus = invSnap.data()?['status'] as String? ?? '';
+      if (currentStatus == 'void') {
+        throw StateError('Invoice $invoiceId is already voided');
+      }
+      data = invSnap.data()!;
+      txn.update(invoiceRef, {
+        'status': InvoiceModel.statusVoid,
+        'updated_at': now,
+      });
+    });
+
+    // Always read total from the Firestore document — the caller-provided
+    // value is used only as a last-resort fallback if the field is missing.
+    final docTotal = (data['total'] as num?)?.toDouble() ?? total;
     final amountReceived = (data['amount_received'] as num?)?.toDouble() ?? 0.0;
     final outstandingAmount =
         (data['outstanding_amount'] as num?)?.toDouble() ??
-            (total - amountReceived);
+            (docTotal - amountReceived);
     final invoiceNumber = data['invoice_number'] as String? ?? '';
     final routeId = data['route_id'] as String? ?? '';
     final shopId = data['shop_id'] as String? ?? '';
@@ -509,7 +536,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         .get();
 
     final batch = db.batch();
-    final now = Timestamp.now();
 
     Map<String, dynamic> transactionData({
       required String txType,
@@ -540,11 +566,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       };
     }
 
-    batch.update(db.collection(Collections.invoices).doc(invoiceId), {
-      'status': InvoiceModel.statusVoid,
-      'updated_at': now,
-    });
-
+    // Invoice status already set to void atomically in the transaction above.
     for (final tx in linkedTransactions.docs) {
       batch.update(tx.reference, {
         'deleted': true,
@@ -558,9 +580,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (customerId.isNotEmpty) {
       final reversalDelta = switch (type) {
         InvoiceModel.typeSale => refundMode == VoidRefundMode.creditBalance
-            ? -total
+            ? -docTotal
             : -outstandingAmount,
-        _ => total,
+        _ => docTotal,
       };
 
       batch.update(db.collection(Collections.customers).doc(customerId), {
@@ -591,7 +613,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         // Write ONE reversal transaction (the live-ledger reversal entry).
         // The soft-deleted originals above already form the complete audit trail.
         final reversalAmount = refundMode == VoidRefundMode.creditBalance
-            ? total
+            ? docTotal
             : outstandingAmount;
         if (reversalAmount > 0) {
           batch.set(
@@ -631,7 +653,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           db.collection(Collections.transactions).doc(),
           transactionData(
             txType: 'return',
-            amount: total,
+            amount: docTotal,
             description: 'Voided credit note snapshot $invoiceNumber',
             items: rawItems.whereType<Map<String, dynamic>>().toList(),
             txCustomerId: customerId,
@@ -644,7 +666,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           db.collection(Collections.transactions).doc(),
           transactionData(
             txType: 'cash_out',
-            amount: total,
+            amount: docTotal,
             description: 'Reversal for voided credit note $invoiceNumber',
             txCustomerId: customerId,
             txCustomerName: customerName,
@@ -690,8 +712,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       return; // already paid, idempotent
     }
 
-    final outstanding =
-        (invData['outstanding_amount'] as num?)?.toDouble() ?? 0.0;
+    final invoiceTotal = (invData['total'] as num?)?.toDouble() ?? 0.0;
+    final invAmountReceived =
+        (invData['amount_received'] as num?)?.toDouble() ?? 0.0;
+    final outstanding = (invData['outstanding_amount'] as num?)?.toDouble() ??
+        (invoiceTotal - invAmountReceived).clamp(0.0, double.infinity);
     final invoiceNumber = invData['invoice_number'] as String? ?? '';
     final shopId = invData['shop_id'] as String? ?? '';
     final shopName = invData['shop_name'] as String? ?? '';

@@ -193,6 +193,20 @@ Conflict resolution order for instructions:
 
 ## 10) Current Audit Status
 
+2026-04-06 audit v6 — v3.2.6+18:
+
+- 62-issue audit (15-agent synthesis) fully patched across Phases 1–8
+- Financial integrity: createSaleInvoice amountReceived guard, voidInvoice atomic transaction, markAsPaid outstanding fallback fix
+- Security: seller admin data leak guards (allInvoicesProvider, adminAllSellerInventoryProvider), voidInvoice admin-only check, isValidRole() in Firestore rules, invoice math validation in rules, transaction type+amount validation
+- Dashboard: _lastGoodDashboardStatsProvider cache; graceful per-metric zero-fallback; no AsyncError propagation
+- Android: ProGuard rules for 8+ plugins, isMinifyEnabled=true, isShrinkResources=true, signing fallback removed (throws GradleException)
+- Signing: new release keystore footwear-erp.jks at D:\Footwear\footwear-erp.jks; storePassword=ShoeERP2024!; key.properties path fixed + BOM removed
+- L10n: 3 new keys × 3 languages (err_url_open, err_whatsapp_unavailable, whatsapp_greeting)
+- About screen: hardcoded EN strings replaced with tr() calls
+- Dead code: search_provider.dart deleted (0 usages)
+- Tests: 206 → 272 (added sanitizer_test, error_mapper_test, create_sale_invoice_guard_test, mark_paid_outstanding_test)
+- Release: v3.2.6+18, 3 split-per-abi APKs built + web deployed to Firebase Hosting
+
 2026-03-30 enterprise v3.0.0 upgrade:
 
 - Full 6-phase enterprise master plan (22 sections) implemented

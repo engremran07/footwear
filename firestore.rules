@@ -76,6 +76,12 @@ service cloud.firestore {
          type == 'payment' || type == 'write_off');
     }
 
+    // Validates role values to prevent arbitrary role strings being stored
+    function isValidRole(role) {
+      return role is string &&
+        role.matches('(?i)^\\s*(admin|manager|seller)\\s*$');
+    }
+
     // --- users --------------------------------------------------------------
     match /users/{userId} {
       // get (single doc): own doc or admin
@@ -86,6 +92,7 @@ service cloud.firestore {
         (
           isAdmin() &&
           request.resource.data.created_by == request.auth.uid &&
+          isValidRole(request.resource.data.role) &&
           (
             request.resource.data.role != 'seller' ||
             (
@@ -182,7 +189,13 @@ service cloud.firestore {
           request.resource.data.route_id != null &&
           request.resource.data.route_id != '' &&
           isSellerForRoute(request.resource.data.route_id)
-        )) && docSizeOk();
+        )) && docSizeOk()
+        // Admin also requires valid type and positive amount for integrity
+        && (isSeller() || (
+          isValidTransactionType(request.resource.data.type) &&
+          request.resource.data.amount is number &&
+          request.resource.data.amount > 0
+        ));
       allow update: if isAdmin() ||
         (
           isSeller() &&
@@ -256,7 +269,14 @@ service cloud.firestore {
           request.resource.data.route_id != null &&
           request.resource.data.route_id != '' &&
           isSellerForRoute(request.resource.data.route_id)
-        )) && docSizeOk();
+        ))
+        // Invoice math integrity: total must equal subtotal minus discount
+        && request.resource.data.total is number
+        && request.resource.data.subtotal is number
+        && request.resource.data.discount is number
+        && request.resource.data.total >= request.resource.data.subtotal - request.resource.data.discount - 0.01
+        && request.resource.data.total <= request.resource.data.subtotal - request.resource.data.discount + 0.01
+        && docSizeOk();
       allow update: if isAdmin() && docSizeOk();
       allow delete: if isAdmin();
     }

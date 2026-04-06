@@ -792,7 +792,7 @@ class _DrawerMenuScreen extends StatelessWidget {
                                           shape: BoxShape.circle,
                                           color: AppBrand.successColor,
                                           border: Border.all(
-                                              color: Colors.white, width: 2),
+                                              color: AppBrand.onPrimary, width: 2),
                                         ),
                                       ),
                                     ),
@@ -811,7 +811,7 @@ class _DrawerMenuScreen extends StatelessWidget {
                                         style: const TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w600,
-                                          color: Colors.white,
+                                          color: AppBrand.onPrimary,
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -820,7 +820,7 @@ class _DrawerMenuScreen extends StatelessWidget {
                                         user!.email,
                                         style: const TextStyle(
                                             fontSize: 11,
-                                            color: Colors.white70),
+                                            color: AppBrand.onPrimaryMuted),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 5),

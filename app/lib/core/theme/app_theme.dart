@@ -387,7 +387,14 @@ class AppTheme {
       case 'sent':
       case 'in_transit':
       case 'assigned_to_seller':
+      case 'issued':
         return AppBrand.primaryColor;
+      case 'partial':
+        return AppBrand.warningColor;
+      case 'void':
+        return AppBrand.errorColor;
+      case 'credit_note':
+        return AppBrand.successColor;
       case 'ready_for_shipment':
         return Colors.indigo;
       case 'received':

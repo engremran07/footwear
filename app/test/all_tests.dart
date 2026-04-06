@@ -16,7 +16,16 @@ import 'unit/models/product_variant_model_test.dart' as product_variant_model;
 import 'unit/core/validators_test.dart' as validators;
 import 'unit/core/formatters_test.dart' as formatters;
 import 'unit/core/l10n_test.dart' as l10n;
+import 'unit/core/sanitizer_test.dart' as sanitizer;
+import 'unit/core/error_mapper_test.dart' as error_mapper;
 import 'unit/models/seller_inventory_model_test.dart' as seller_inventory_model;
+import 'unit/models/invoice_model_extended_test.dart' as invoice_model_extended;
+import 'unit/business_logic/void_invoice_balance_test.dart'
+    as void_invoice_balance;
+import 'unit/business_logic/create_sale_invoice_guard_test.dart'
+    as create_sale_invoice_guard;
+import 'unit/business_logic/mark_paid_outstanding_test.dart'
+    as mark_paid_outstanding;
 
 void main() {
   user_model.main();
@@ -30,7 +39,13 @@ void main() {
   transaction_model.main();
   product_variant_model.main();
   seller_inventory_model.main();
+  invoice_model_extended.main();
+  void_invoice_balance.main();
+  create_sale_invoice_guard.main();
+  mark_paid_outstanding.main();
   validators.main();
   formatters.main();
   l10n.main();
+  sanitizer.main();
+  error_mapper.main();
 }

@@ -34,3 +34,49 @@
 # share_plus
 -keep class dev.fluttercommunity.plus.share.** { *; }
 -dontwarn dev.fluttercommunity.plus.share.**
+
+# permission_handler
+-keep class com.baseflow.permissionhandler.** { *; }
+-dontwarn com.baseflow.permissionhandler.**
+
+# image_picker / image_picker_android
+-keep class io.flutter.plugins.imagepicker.** { *; }
+-dontwarn io.flutter.plugins.imagepicker.**
+
+# flutter_image_compress
+-keep class com.fluttercandies.flutter_image_compress.** { *; }
+-dontwarn com.fluttercandies.flutter_image_compress.**
+
+# printing (pdf generation via Pdfium)
+-keep class com.advantus.printing.** { *; }
+-dontwarn com.advantus.printing.**
+-keep class com.pdfium.** { *; }
+-dontwarn com.pdfium.**
+
+# url_launcher / url_launcher_android
+-keep class io.flutter.plugins.urllauncher.** { *; }
+-dontwarn io.flutter.plugins.urllauncher.**
+
+# path_provider / path_provider_android
+-keep class io.flutter.plugins.pathprovider.** { *; }
+-dontwarn io.flutter.plugins.pathprovider.**
+
+# fl_chart (pure Dart — no native bridge, but keep its JVM reflection targets)
+-dontwarn com.github.mikephil.charting.**
+
+# shimmer (pure Dart widget — no native bridge needed)
+
+# cached_network_image / flutter_cache_manager
+-keep class com.baseflow.cachemanager.** { *; }
+-dontwarn com.baseflow.cachemanager.**
+
+# shared_preferences / shared_preferences_android
+-keep class io.flutter.plugins.sharedpreferences.** { *; }
+-dontwarn io.flutter.plugins.sharedpreferences.**
+
+# sqflite (used by flutter_cache_manager internally)
+-keep class com.tekartik.sqflite.** { *; }
+-dontwarn com.tekartik.sqflite.**
+
+# Keep app model classes for Firestore data binding
+-keep class footwear.pk.com.** { *; }

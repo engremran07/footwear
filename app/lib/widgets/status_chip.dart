@@ -30,13 +30,17 @@ class StatusChip extends StatelessWidget {
       'rejected' ||
       'cancelled' ||
       'qc_issues' ||
-      'stock_issue' =>
+      'stock_issue' ||
+      'void' =>
         Icons.cancel_outlined,
       'processing' ||
       'in_production' ||
       'in_transit' ||
       'shipped' =>
         Icons.local_shipping_outlined,
+      'partial' => Icons.warning_amber_outlined,
+      'issued' => Icons.send_outlined,
+      'credit_note' => Icons.note_outlined,
       _ => Icons.circle_outlined,
     };
   }
