@@ -20,7 +20,7 @@ class AppBrand {
   static const String contactEmail = 'engremran@gmail.com';
   static const String contactPhonePrimary = '+923067863310';
   static const String contactPhoneSecondary = '+966530421571';
-  static const String websiteUrl = 'https://footwear-erp.com';
+  static const String websiteUrl = 'https://shoeserp-clean-20260327.web.app/';
   static const String aboutDescription =
       'FootWear is a comprehensive enterprise resource planning system '
       'designed for footwear distribution businesses in Saudi Arabia. '

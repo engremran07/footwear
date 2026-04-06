@@ -31,6 +31,17 @@ Prevent regressions caused by architecture drift between code, rules, and agent 
 - Avoid all-or-nothing aggregate pipelines
 - Catch FirebaseException/timeout on each aggregate query and degrade gracefully
 - Maintain last-good dashboard cache fallback
+- Never surface transient permission-denied / unauthenticated errors to users
+  during auth/profile stream warm-up; keep startup in loading or cached state
+
+1. Post-edit access verification
+
+- After edits touching auth, router, dashboard, inventory, or Firestore rules,
+  verify admin and seller flows for `/`, `/inventory`, and login startup
+- Guard admin-only list/stream providers with `authUserProvider` before
+  subscribing so seller credentials never trigger denied reads in the UI
+- Prefer loading, empty, or cached fallback states over raw permission text
+  while role-scoped providers settle
 
 1. Error messaging
 

@@ -30,8 +30,7 @@ Future<void> _ensureFontBytes() async {
     _arabicFontBytes =
         ad.buffer.asUint8List(ad.offsetInBytes, ad.lengthInBytes);
     final ud = await rootBundle.load('assets/fonts/NotoNastaliqUrdu.ttf');
-    _urduFontBytes =
-        ud.buffer.asUint8List(ud.offsetInBytes, ud.lengthInBytes);
+    _urduFontBytes = ud.buffer.asUint8List(ud.offsetInBytes, ud.lengthInBytes);
     loader.complete();
   } catch (error, stackTrace) {
     loader.completeError(error, stackTrace);

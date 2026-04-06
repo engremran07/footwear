@@ -282,6 +282,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isWide = MediaQuery.sizeOf(context).width > 720;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: isWide
             ? _wideLayout(theme, cs, currentLocale, isOnline, isLoading)
@@ -329,45 +330,58 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// Narrow (mobile) layout: single column
   Widget _narrowLayout(ThemeData theme, ColorScheme cs, AppLocale currentLocale,
       AsyncValue<bool> isOnline, bool isLoading) {
+    final viewInsets = MediaQuery.viewInsetsOf(context);
+    final viewPadding = MediaQuery.viewPaddingOf(context);
+
     return Stack(
       children: [
         Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppTokens.s32),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset(
-                    AppBrand.logoAsset,
-                    height: 90,
-                    fit: BoxFit.contain,
-                  ).animate().fadeIn(duration: AppTokens.durNormal).scale(
-                        begin: const Offset(0.8, 0.8),
-                        end: const Offset(1, 1),
-                        curve: AppTokens.curveStd,
-                      ),
-                  const SizedBox(height: AppTokens.s12),
-                  Text(tr('app_name', ref),
-                      style: theme.textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: AppTokens.s4),
-                  Text(tr('sign_in_continue', ref),
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: cs.onSurfaceVariant)),
-                  const SizedBox(height: AppTokens.s24),
-                  _languagePicker(currentLocale),
-                  const SizedBox(height: AppTokens.s24),
-                  _loginForm(theme, cs, isLoading),
-                ],
+          child: AnimatedPadding(
+            duration: AppTokens.durFast,
+            curve: AppTokens.curveStd,
+            padding: EdgeInsets.only(bottom: viewInsets.bottom),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppTokens.s32,
+                AppTokens.s32,
+                AppTokens.s32,
+                AppTokens.s48,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      AppBrand.logoAsset,
+                      height: 90,
+                      fit: BoxFit.contain,
+                    ).animate().fadeIn(duration: AppTokens.durNormal).scale(
+                          begin: const Offset(0.8, 0.8),
+                          end: const Offset(1, 1),
+                          curve: AppTokens.curveStd,
+                        ),
+                    const SizedBox(height: AppTokens.s12),
+                    Text(tr('app_name', ref),
+                        style: theme.textTheme.headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: AppTokens.s4),
+                    Text(tr('sign_in_continue', ref),
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: cs.onSurfaceVariant)),
+                    const SizedBox(height: AppTokens.s24),
+                    _languagePicker(currentLocale),
+                    const SizedBox(height: AppTokens.s24),
+                    _loginForm(theme, cs, isLoading),
+                  ],
+                ),
               ),
             ),
           ),
         ),
         // Online indicator bottom-right
         Positioned(
-          bottom: AppTokens.s12,
+          bottom: viewPadding.bottom + AppTokens.s12,
           right: AppTokens.s12,
           child: _onlineIndicator(isOnline),
         ),

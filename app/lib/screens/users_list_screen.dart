@@ -155,8 +155,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                             user: filtered[i],
                             onReactivate: () =>
                                 _confirmReactivateUser(filtered[i]),
-                          onSendReset: () =>
-                            _sendResetEmailForUser(filtered[i]),
+                            onSendReset: () =>
+                                _sendResetEmailForUser(filtered[i]),
                             onHardDelete: () =>
                                 _confirmHardDeleteUser(filtered[i]),
                           ).listEntry(i)

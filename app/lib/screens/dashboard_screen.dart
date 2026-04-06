@@ -24,6 +24,18 @@ import '../widgets/app_section_header.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/stat_card.dart';
 
+Widget _buildDashboardAsyncError(
+  BuildContext context,
+  WidgetRef ref,
+  Object error, {
+  Widget? fallback,
+}) {
+  if (AppErrorMapper.isPermissionOrAuthError(error)) {
+    return fallback ?? ShimmerLoading.cards();
+  }
+  return Center(child: Text(tr(AppErrorMapper.key(error), ref)));
+}
+
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -189,7 +201,7 @@ class DashboardScreen extends ConsumerWidget {
             );
           },
           loading: () => ShimmerLoading.cards(),
-          error: (e, _) => Center(child: Text(tr(AppErrorMapper.key(e), ref))),
+          error: (e, _) => _buildDashboardAsyncError(context, ref, e),
         ),
       ),
     );
@@ -302,8 +314,12 @@ class _SellerDashboard extends ConsumerWidget {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) =>
-                  Center(child: Text(tr(AppErrorMapper.key(e), ref))),
+              error: (e, _) => _buildDashboardAsyncError(
+                context,
+                ref,
+                e,
+                fallback: const Center(child: CircularProgressIndicator()),
+              ),
             ),
           ],
         ),
@@ -428,8 +444,8 @@ class _RouteAnalyticsSection extends ConsumerWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    Text(tr('dashboard_due', ref).replaceAll(
-                        '%s', AppFormatters.sar(row.outstanding))),
+                    Text(tr('dashboard_due', ref)
+                        .replaceAll('%s', AppFormatters.sar(row.outstanding))),
                   ],
                 ),
                 onTap: () => context.push('/routes/${row.route.id}'),

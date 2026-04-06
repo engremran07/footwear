@@ -110,6 +110,8 @@ lib/
 
 Seller accounts must be provisioned by admin with assigned route.
 
+Dashboard and inventory flows must suppress transient permission-denied states during auth/profile stream warm-up. Admin-only providers should be role-guarded before subscription, and seller/admin startup for `/` and `/inventory` should be verified after related edits.
+
 ---
 
 ## Translations

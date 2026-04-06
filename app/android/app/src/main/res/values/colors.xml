@@ -2,5 +2,5 @@
 <resources>
     <!-- Notification accent color for Firebase Messaging -->
     <color name="notification_color">#D32F2F</color>
-	<color name="ic_launcher_background">#FFFFFF</color>
+	<color name="ic_launcher_background">#01579B</color>
 </resources>

@@ -26,11 +26,12 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 3. Use Timestamp.now() for Firestore timestamps.
 4. Catch and map Firebase exceptions via AppErrorMapper.
 5. Dashboard must never fail all stats when one aggregate fails.
-6. Any where+orderBy query requires index entry when fields differ.
-7. Keep role handling canonical and normalized (trim/lowercase in app writes).
-8. Keep admin-only write enforcement in submit methods (screen-level defense in depth).
-9. Validate required identity fields (for example created_by/route_id/shop_id) before provider writes.
-10. No Firebase Storage — company logos stored as base64 in Firestore, product images use external HTTP URLs. Do not add firebase_storage dependency.
+6. Dashboard and inventory must not surface transient permission-denied or unauthenticated states during startup; keep role-scoped UI in loading, empty, or cached fallback until auth/profile streams settle.
+7. Any where+orderBy query requires index entry when fields differ.
+8. Keep role handling canonical and normalized (trim/lowercase in app writes).
+9. Keep admin-only write enforcement in submit methods (screen-level defense in depth).
+10. Validate required identity fields (for example created_by/route_id/shop_id) before provider writes.
+11. No Firebase Storage — company logos stored as base64 in Firestore, product images use external HTTP URLs. Do not add firebase_storage dependency.
 
 ## Failure Playbooks
 
@@ -71,6 +72,7 @@ Run before marking production ready:
 - flutter analyze lib --no-pub
 - flutter test -r expanded
 - flutter build apk --release
+- Verify admin and seller startup for `/` and `/inventory`; transient permission-denied UI during stream warm-up is a regression.
 - firebase deploy --only firestore:rules,firestore:indexes
 
 ## Security Baseline

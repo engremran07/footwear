@@ -5,6 +5,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 class AppErrorMapper {
   AppErrorMapper._();
 
+  static bool isPermissionOrAuthError(Object error) {
+    final mappedKey = key(error);
+    return mappedKey == 'err_permission_denied' ||
+        mappedKey == 'err_unauthenticated';
+  }
+
   /// Returns a locale key for the given error object.
   static String key(Object error) {
     // ── Firebase Auth errors ───────────────────────────────────────────

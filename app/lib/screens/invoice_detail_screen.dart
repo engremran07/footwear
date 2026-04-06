@@ -92,7 +92,8 @@ class InvoiceDetailScreen extends ConsumerWidget {
                 child: Text(tr('cancel', ref)),
               ),
               OutlinedButton(
-                onPressed: () => Navigator.of(ctx).pop(VoidRefundMode.cashRefund),
+                onPressed: () =>
+                    Navigator.of(ctx).pop(VoidRefundMode.cashRefund),
                 child: Text(tr('cash_in', ref)),
               ),
               FilledButton(

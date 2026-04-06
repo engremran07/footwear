@@ -30,6 +30,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   String _search = '';
   int _adminTab = 0; // 0 = warehouse, 1 = personal seller stock
 
+  Widget _buildAsyncError(Object error, {Widget? fallback}) {
+    if (AppErrorMapper.isPermissionOrAuthError(error)) {
+      return fallback ?? const ShimmerLoading();
+    }
+    return Center(child: Text(tr(AppErrorMapper.key(error), ref)));
+  }
+
   void _showAddStockDialog(ProductVariantModel variant, int ppc) {
     final cartonsC = TextEditingController(text: '0');
     final pairsC = TextEditingController(text: '0');
@@ -361,7 +368,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         );
       },
       loading: () => const ShimmerLoading(),
-      error: (e, st) => Center(child: Text('Error: $e')),
+      error: (e, st) => _buildAsyncError(e),
     );
   }
 
@@ -441,7 +448,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         );
       },
       loading: () => const ShimmerLoading(),
-      error: (e, st) => Center(child: Text('Error: $e')),
+      error: (e, st) => _buildAsyncError(e),
     );
   }
 
@@ -601,7 +608,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       },
                       loading: () =>
                           const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => Center(child: Text('$e')),
+                      error: (e, _) => _buildAsyncError(
+                        e,
+                        fallback: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -672,7 +684,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       ),
                       loading: () =>
                           const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => Center(child: Text('$e')),
+                      error: (e, _) => _buildAsyncError(
+                        e,
+                        fallback: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
                     ),
                   ),
                 ],

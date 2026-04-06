@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/utils/error_mapper.dart';
 import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
 import '../models/route_model.dart';
@@ -32,6 +33,17 @@ class DashboardStats {
 /// Role-aware: admin sees all data, seller sees only their route's data.
 final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
   final userAsync = ref.watch(authUserProvider);
+  if (userAsync.isLoading) return const AsyncLoading();
+  if (userAsync.hasError && userAsync.error != null) {
+    if (AppErrorMapper.isPermissionOrAuthError(userAsync.error!)) {
+      return const AsyncLoading();
+    }
+    return AsyncError(
+      userAsync.error!,
+      userAsync.stackTrace ?? StackTrace.empty,
+    );
+  }
+
   final user = userAsync.valueOrNull;
   if (user == null) return const AsyncLoading();
 
@@ -57,21 +69,18 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
     return const AsyncLoading();
   }
 
-  if (routes is AsyncError) {
-    return AsyncError(
-        routes.error as Object, routes.stackTrace ?? StackTrace.empty);
-  }
-  if (shops is AsyncError) {
-    return AsyncError(
-        shops.error as Object, shops.stackTrace ?? StackTrace.empty);
-  }
-  if (products is AsyncError) {
-    return AsyncError(
-        products.error as Object, products.stackTrace ?? StackTrace.empty);
-  }
-  if (variants is AsyncError) {
-    return AsyncError(
-        variants.error as Object, variants.stackTrace ?? StackTrace.empty);
+  final asyncErrors = [routes, shops, products, variants]
+      .whereType<AsyncError<dynamic>>()
+      .toList();
+  if (asyncErrors.isNotEmpty) {
+    for (final asyncError in asyncErrors) {
+      if (AppErrorMapper.isPermissionOrAuthError(asyncError.error)) {
+        return const AsyncLoading();
+      }
+    }
+
+    final error = asyncErrors.first;
+    return AsyncError(error.error, error.stackTrace);
   }
 
   final routeList = routes.valueOrNull ?? const <RouteModel>[];

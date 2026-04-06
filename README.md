@@ -27,6 +27,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 - View assigned route and customers
 - Record cash-in / cash-out transactions for assigned customers
 - View account statements
+- Dashboard and inventory suppress transient permission startup errors and wait for role-scoped streams to settle before showing access state
 
 ### Multilingual
 

@@ -78,6 +78,10 @@ Seller:
 
 1. Dashboard must degrade gracefully under resource-exhausted.
 
+1. Dashboard and inventory must not show transient permission-denied errors
+  during auth/profile loading; role-scoped providers must stay in loading,
+  empty, or cached fallback state until access is confirmed.
+
 1. Every where(A)+orderBy(B) (A != B) must have composite index in firestore.indexes.json.
 
 1. If runtime behavior changes, update these docs in same change set:
@@ -162,6 +166,8 @@ Before finishing:
 
 - Run flutter analyze lib --no-pub
 - Run flutter test -r expanded
+- Manually or logically verify admin and seller access for `/` and `/inventory`
+  after auth/router/provider/rules edits; no transient permission-denied UI is acceptable
 - Update deep-dive and READMEs if runtime assumptions changed
 - If rules changed, deploy firestore:rules and firestore:indexes
 

@@ -1182,8 +1182,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'send_reset_email': 'إرسال رابط إعادة تعيين كلمة المرور',
     'forgot_password': 'نسيت كلمة المرور؟',
     'enter_email_to_reset': 'أدخل بريدك الإلكتروني لاستلام رابط إعادة التعيين.',
-    'login_reset_email_hint':
-        'يمكنك إدخال اسم المستخدم أو البريد الإلكتروني.',
+    'login_reset_email_hint': 'يمكنك إدخال اسم المستخدم أو البريد الإلكتروني.',
     'confirm_delete_transaction':
         'هل تريد حذف هذه المعاملة وعكس التغيير في الرصيد؟',
     // ── بيع المخزون ──

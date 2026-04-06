@@ -31,11 +31,32 @@ Future<bool> openWhatsApp({
   required String phone,
   required String message,
 }) async {
+  final normalizedPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
   final encoded = Uri.encodeComponent(message);
-  final uri = Uri.parse('https://wa.me/$phone?text=$encoded');
-  if (await canLaunchUrl(uri)) {
-    return launchUrl(uri, mode: LaunchMode.externalApplication);
+  final primaryUri = Uri.parse(
+    'whatsapp://send?phone=$normalizedPhone&text=$encoded',
+  );
+  final fallbackUris = [
+    Uri.parse('https://wa.me/$normalizedPhone?text=$encoded'),
+    Uri.parse(
+      'https://api.whatsapp.com/send?phone=$normalizedPhone&text=$encoded',
+    ),
+    Uri.parse(
+      'https://web.whatsapp.com/send?phone=$normalizedPhone&text=$encoded',
+    ),
+  ];
+
+  if (await launchUrl(primaryUri,
+      mode: LaunchMode.externalNonBrowserApplication)) {
+    return true;
   }
+
+  for (final uri in fallbackUris) {
+    if (await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      return true;
+    }
+  }
+
   return false;
 }
 

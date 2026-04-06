@@ -101,7 +101,8 @@ class AboutScreen extends ConsumerWidget {
               _ActionButton(
                 tooltip: tr('email', ref),
                 icon: const Icon(Icons.email_outlined, size: 18),
-                onTap: () => _launchUrl('mailto:${AppBrand.contactEmail}', context),
+                onTap: () =>
+                    _launchUrl('mailto:${AppBrand.contactEmail}', context),
               ),
             ],
           ),
@@ -113,14 +114,17 @@ class AboutScreen extends ConsumerWidget {
               _ActionButton(
                 tooltip: tr('phone', ref),
                 icon: const Icon(Icons.call_outlined, size: 18),
-                onTap: () => _launchUrl('tel:${AppBrand.contactPhonePrimary.replaceAll('+', '')}', context),
+                onTap: () => _launchUrl(
+                    'tel:${AppBrand.contactPhonePrimary.replaceAll('+', '')}',
+                    context),
               ),
               _ActionButton(
                 tooltip: 'WhatsApp',
                 icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
                 backgroundColor: const Color(0xFFE9F9EF),
                 foregroundColor: const Color(0xFF128C7E),
-                onTap: () => _openWhatsApp(AppBrand.contactPhonePrimary, context),
+                onTap: () =>
+                    _openWhatsApp(AppBrand.contactPhonePrimary, context),
               ),
             ],
           ),
@@ -132,14 +136,17 @@ class AboutScreen extends ConsumerWidget {
               _ActionButton(
                 tooltip: tr('phone', ref),
                 icon: const Icon(Icons.call_outlined, size: 18),
-                onTap: () => _launchUrl('tel:${AppBrand.contactPhoneSecondary.replaceAll('+', '')}', context),
+                onTap: () => _launchUrl(
+                    'tel:${AppBrand.contactPhoneSecondary.replaceAll('+', '')}',
+                    context),
               ),
               _ActionButton(
                 tooltip: 'WhatsApp',
                 icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
                 backgroundColor: const Color(0xFFE9F9EF),
                 foregroundColor: const Color(0xFF128C7E),
-                onTap: () => _openWhatsApp(AppBrand.contactPhoneSecondary, context),
+                onTap: () =>
+                    _openWhatsApp(AppBrand.contactPhoneSecondary, context),
               ),
             ],
           ),
@@ -147,6 +154,7 @@ class AboutScreen extends ConsumerWidget {
             icon: Icons.language_outlined,
             label: tr('website', ref),
             value: AppBrand.websiteUrl,
+            trailingIcon: Icons.open_in_new_outlined,
             onTap: () => _launchUrl(AppBrand.websiteUrl, context),
           ),
 
@@ -160,15 +168,12 @@ class AboutScreen extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.article_outlined),
             title: Text(tr('open_source_licenses', ref)),
-            onTap: () => showLicensePage(
-              context: context,
-              applicationName: AppBrand.appName,
-              applicationVersion: AppBrand.versionDisplay,
-              applicationIcon: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Image.asset(AppBrand.logoAsset, height: 48),
-              ),
+            subtitle: Text(
+              'Open source packages, app version, support contacts, and legal notice.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
             ),
+            onTap: () => _showOpenSourceLicenses(context),
           ),
 
           const SizedBox(height: 32),
@@ -205,13 +210,33 @@ class AboutScreen extends ConsumerWidget {
 
   Future<void> _openWhatsApp(String phone, BuildContext context) async {
     final ok = await openWhatsApp(
-      phone: phone.replaceAll('+', ''),
+      phone: phone,
       message: 'Hello ${AppBrand.companyName}',
     );
     if (!ok && context.mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(errorSnackBar('Could not open WhatsApp'));
     }
+  }
+
+  void _showOpenSourceLicenses(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LicensePage(
+          applicationName: AppBrand.appName,
+          applicationVersion: AppBrand.versionDisplay,
+          applicationIcon: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Image.asset(AppBrand.logoAsset, height: 48),
+          ),
+          applicationLegalese: '© 2026 ${AppBrand.companyName}.\n\n'
+              'Support email: ${AppBrand.contactEmail}\n'
+              'Phone: ${AppBrand.contactPhonePrimary}\n'
+              'Website: ${AppBrand.websiteUrl}\n\n'
+              'This screen lists third-party packages and their licenses in a readable format.',
+        ),
+      ),
+    );
   }
 }
 
@@ -274,12 +299,14 @@ class _InfoTile extends StatelessWidget {
   final String label;
   final String value;
   final VoidCallback? onTap;
+  final IconData? trailingIcon;
 
   const _InfoTile({
     required this.icon,
     required this.label,
     required this.value,
     this.onTap,
+    this.trailingIcon,
   });
 
   @override
@@ -299,7 +326,11 @@ class _InfoTile extends StatelessWidget {
         ),
       ),
       trailing: onTap != null
-          ? Icon(Icons.copy_outlined, size: 16, color: cs.onSurfaceVariant)
+          ? Icon(
+              trailingIcon ?? Icons.copy_outlined,
+              size: 16,
+              color: cs.onSurfaceVariant,
+            )
           : null,
       onTap: onTap,
       mouseCursor: onTap != null ? SystemMouseCursors.click : null,

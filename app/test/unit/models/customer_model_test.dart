@@ -82,8 +82,9 @@ void main() {
     });
 
     test('omits route_id when null', () {
-      final json = CustomerModel.fromJson({...baseJson, 'route_id': null}, 'c11')
-          .toJson();
+      final json =
+          CustomerModel.fromJson({...baseJson, 'route_id': null}, 'c11')
+              .toJson();
       expect(json.containsKey('route_id'), isFalse);
     });
   });
