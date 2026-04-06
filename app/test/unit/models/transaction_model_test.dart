@@ -65,6 +65,7 @@ void main() {
       'invoice_number': 'INV-2026-0001',
       'created_by': 'u1',
       'created_at': ts,
+      'deleted': false,
     };
 
     test('parses all fields correctly', () {
@@ -147,6 +148,32 @@ void main() {
       expect(restored.shopId, original.shopId);
       expect(restored.type, original.type);
       expect(restored.amount, original.amount);
+    });
+
+    test('includes deleted audit fields when present', () {
+      final original = TransactionModel.fromJson({
+        'shop_id': 's1',
+        'shop_name': 'Shop A',
+        'route_id': 'r1',
+        'customer_id': 'c1',
+        'customer_name': 'Customer A',
+        'type': 'cash_in',
+        'sale_type': 'cash',
+        'amount': 5000.0,
+        'description': 'Cash collection',
+        'items': [],
+        'invoice_id': 'inv1',
+        'invoice_number': 'INV-2026-0001',
+        'created_by': 'u1',
+        'created_at': ts,
+        'deleted': true,
+        'deleted_at': ts,
+        'deleted_by': 'admin1',
+      }, 't9');
+      final json = original.toJson();
+      expect(json['deleted'], isTrue);
+      expect(json['deleted_at'], ts);
+      expect(json['deleted_by'], 'admin1');
     });
   });
 

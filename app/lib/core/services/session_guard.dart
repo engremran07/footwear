@@ -39,6 +39,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   Timer? _inactivityTimer;
   DateTime? _backgroundedAt;
   DateTime? _sessionStartedAt;
+  DateTime? _lastActivityAt;
   late final AppLifecycleListener _lifecycleListener;
 
   @override
@@ -50,6 +51,16 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
       onHide: _onAppPaused,
       onResume: _onAppResumed,
     );
+    _resetInactivityTimer();
+  }
+
+  void _registerActivity() {
+    final now = DateTime.now();
+    if (_lastActivityAt != null &&
+        now.difference(_lastActivityAt!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastActivityAt = now;
     _resetInactivityTimer();
   }
 
@@ -139,8 +150,8 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
 
     return Listener(
       behavior: HitTestBehavior.translucent,
-      onPointerDown: (_) => _resetInactivityTimer(),
-      onPointerMove: (_) => _resetInactivityTimer(),
+      onPointerDown: (_) => _registerActivity(),
+      onPointerMove: (_) => _registerActivity(),
       child: widget.child,
     );
   }

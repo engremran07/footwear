@@ -114,13 +114,7 @@ service cloud.firestore {
     match /product_variants/{variantId} {
       allow read: if isActiveUser();
       allow create: if isAdmin() && docSizeOk();
-      // Seller can only increment quantity_available (warehouse returns) — prevents depletion
-      allow update: if (isAdmin() ||
-        (
-          isSeller() &&
-          request.resource.data.quantity_available > resource.data.quantity_available &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity_available', 'updated_at'])
-        )) && docSizeOk();
+      allow update: if isAdmin() && docSizeOk();
       allow delete: if isAdmin();
     }
 
@@ -174,12 +168,7 @@ service cloud.firestore {
             (resource.data.route_id != null &&
              resource.data.route_id != '' &&
              isSellerForRoute(resource.data.route_id)) ||
-            resource.data.created_by == request.auth.uid ||
-            (resource.data.shop_id != null &&
-             resource.data.shop_id != '' &&
-             isSellerForRoute(
-               get(/databases/$(database)/documents/customers/$(resource.data.shop_id)).data.route_id
-             ))
+            resource.data.created_by == request.auth.uid
           )
         );
       // Field validation: type must be in allowed set, amount must be positive
@@ -190,16 +179,9 @@ service cloud.firestore {
           isValidTransactionType(request.resource.data.type) &&
           request.resource.data.amount is number &&
           request.resource.data.amount > 0 &&
-          (
-            (request.resource.data.route_id != null &&
-             request.resource.data.route_id != '' &&
-             isSellerForRoute(request.resource.data.route_id)) ||
-            (request.resource.data.shop_id != null &&
-             request.resource.data.shop_id != '' &&
-             isSellerForRoute(
-               get(/databases/$(database)/documents/customers/$(request.resource.data.shop_id)).data.route_id
-             ))
-          )
+          request.resource.data.route_id != null &&
+          request.resource.data.route_id != '' &&
+          isSellerForRoute(request.resource.data.route_id)
         )) && docSizeOk();
       allow update: if isAdmin() ||
         (

@@ -43,6 +43,49 @@ class _CreateSaleInvoiceScreenState
   bool _submitting = false;
   bool _isDirty = false;
 
+  List<Map<String, dynamic>> _buildInvoiceItems(
+    List<SellerInventoryModel> inventoryList,
+    double subtotal,
+  ) {
+    final deductions =
+        _selectedQtys.entries.where((entry) => entry.value > 0).toList();
+    if (deductions.isEmpty || subtotal <= 0) return const [];
+
+    final inventoryMap = {for (final item in inventoryList) item.id: item};
+    final totalPairs = deductions.fold<int>(0, (sum, entry) => sum + entry.value);
+    if (totalPairs <= 0) return const [];
+
+    final averageUnitPrice = subtotal / totalPairs;
+    final items = <Map<String, dynamic>>[];
+    double allocatedSubtotal = 0;
+
+    for (var index = 0; index < deductions.length; index++) {
+      final entry = deductions[index];
+      final inventory = inventoryMap[entry.key];
+      if (inventory == null) continue;
+
+      final qty = entry.value;
+      final isLast = index == deductions.length - 1;
+      final lineSubtotal = isLast
+          ? subtotal - allocatedSubtotal
+          : averageUnitPrice * qty;
+      allocatedSubtotal += lineSubtotal;
+
+      items.add({
+        'variant_id': inventory.variantId,
+        'sku': '',
+        'product_name': inventory.variantName,
+        'size': '',
+        'color': '',
+        'qty': qty,
+        'unit_price': qty > 0 ? (lineSubtotal / qty) : 0.0,
+        'subtotal': lineSubtotal,
+      });
+    }
+
+    return items;
+  }
+
   @override
   void dispose() {
     _saleAmountC.dispose();
@@ -547,29 +590,20 @@ class _CreateSaleInvoiceScreenState
       return;
     }
 
+    final discount = _discountAmount;
+    if (discount < 0 || discount > saleAmount) {
+      HapticFeedback.vibrate();
+      ScaffoldMessenger.of(context).showSnackBar(
+        warningSnackBar(tr('discount', ref)),
+      );
+      return;
+    }
+
     // Build line items from selected inventory
     final inventoryList =
         ref.read(sellerInventoryProvider(user.id)).valueOrNull ?? [];
-    final inventoryMap = {for (final i in inventoryList) i.id: i};
-
-    final items = <Map<String, dynamic>>[];
-    for (final entry in deductions.entries) {
-      final inv = inventoryMap[entry.key];
-      if (inv == null) continue;
-      items.add({
-        'variant_id': inv.variantId,
-        'sku': '',
-        'product_name': inv.variantName,
-        'size': '',
-        'color': '',
-        'qty': entry.value,
-        'unit_price': 0.0,
-        'subtotal': 0.0,
-      });
-    }
-
-    final discount = _discountAmount;
     final total = _invoiceTotal;
+    final items = _buildInvoiceItems(inventoryList, saleAmount);
     final amountReceived = _amountReceived;
 
     setState(() => _submitting = true);

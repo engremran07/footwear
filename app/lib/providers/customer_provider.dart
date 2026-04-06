@@ -83,6 +83,7 @@ final customerTransactionsProvider =
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
       .where('customer_id', isEqualTo: customerId)
+      .where('deleted', isEqualTo: false)
       .orderBy('created_at', descending: true)
       .limit(100)
       .snapshots()
@@ -163,6 +164,7 @@ class CustomerNotifier extends AsyncNotifier<void> {
       'items': <Map<String, dynamic>>[],
       'created_by': authUser.uid,
       'created_at': Timestamp.now(),
+      'deleted': false,
     });
 
     await batch.commit();

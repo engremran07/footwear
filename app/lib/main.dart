@@ -26,10 +26,21 @@ void main() async {
       return true;
     };
 
-    // S-06: Firebase App Check — play integrity for Android
-    await FirebaseAppCheck.instance.activate(
-      androidProvider: AndroidProvider.playIntegrity,
-    );
+    // S-06: App Check is opt-in for release Android APKs.
+    // Default remains sideload-friendly unless USE_PLAY_INTEGRITY=true is set.
+    const usePlayIntegrity =
+        bool.fromEnvironment('USE_PLAY_INTEGRITY', defaultValue: false);
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      if (kDebugMode) {
+        await FirebaseAppCheck.instance.activate(
+          androidProvider: AndroidProvider.debug,
+        );
+      } else if (usePlayIntegrity) {
+        await FirebaseAppCheck.instance.activate(
+          androidProvider: AndroidProvider.playIntegrity,
+        );
+      }
+    }
 
     // Enable Firestore offline persistence for faster loads
     FirebaseFirestore.instance.settings = const Settings(

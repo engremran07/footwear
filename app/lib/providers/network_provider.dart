@@ -4,13 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Bidirectional online/offline detection via DNS probe.
 /// Emits [true] when reachable, [false] when not.
-/// Probes every 10 seconds; first result within ~100 ms.
+/// Probes every 30 seconds against a Firebase endpoint; first result within ~100 ms.
 final networkStatusProvider = StreamProvider<bool>((ref) {
   final controller = StreamController<bool>();
 
   Future<void> check() async {
     try {
-      final result = await InternetAddress.lookup('8.8.8.8')
+      final result = await InternetAddress.lookup('firestore.googleapis.com')
           .timeout(const Duration(seconds: 5));
       if (!controller.isClosed) {
         controller.add(result.isNotEmpty && result[0].rawAddress.isNotEmpty);
@@ -21,7 +21,7 @@ final networkStatusProvider = StreamProvider<bool>((ref) {
   }
 
   check();
-  final timer = Timer.periodic(const Duration(seconds: 10), (_) => check());
+  final timer = Timer.periodic(const Duration(seconds: 30), (_) => check());
 
   ref.onDispose(() {
     timer.cancel();

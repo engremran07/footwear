@@ -9,6 +9,7 @@ final shopTransactionsProvider = StreamProvider.autoDispose
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
       .where('shop_id', isEqualTo: shopId)
+      .where('deleted', isEqualTo: false)
       .orderBy('created_at', descending: true)
       .limit(100)
       .snapshots()
@@ -24,7 +25,7 @@ final allTransactionsProvider =
   if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
-      .where('deleted', isNotEqualTo: true)
+      .where('deleted', isEqualTo: false)
       .orderBy('created_at', descending: true)
       .limit(200)
       .snapshots()
@@ -39,6 +40,7 @@ final sellerTransactionsProvider = StreamProvider.autoDispose
   return FirebaseFirestore.instance
       .collection(Collections.transactions)
       .where('created_by', isEqualTo: sellerId)
+      .where('deleted', isEqualTo: false)
       .orderBy('created_at', descending: true)
       .limit(200)
       .snapshots()

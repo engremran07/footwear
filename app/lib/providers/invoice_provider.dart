@@ -143,6 +143,12 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (customerId.trim().isEmpty) {
       throw ArgumentError('customerId must not be empty');
     }
+    if (discount < 0 || discount > subtotal) {
+      throw ArgumentError('discount must be between 0 and subtotal');
+    }
+    if (amountReceived < 0) {
+      throw ArgumentError('amountReceived must not be negative');
+    }
     // Max-amount cap prevents fraudulent invoices
     const double maxInvoiceAmount = 999999.99;
     if (total > maxInvoiceAmount) {
@@ -232,6 +238,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'status': invoiceStatus,
       'notes': notes,
       'linked_invoice_id': null,
+      'seller_inventory_deductions': sellerInventoryDeductions,
       'created_by': normalizedCreatedBy,
       'created_at': now,
       'updated_at': now,
@@ -338,6 +345,12 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       final origSnap =
           await db.collection(Collections.invoices).doc(linkedInvoiceId).get();
       if (origSnap.exists) {
+        final origStatus = origSnap.data()?['status'] as String? ?? '';
+        if (origStatus == InvoiceModel.statusVoid) {
+          throw ArgumentError(
+            'Cannot create a credit note against a voided invoice',
+          );
+        }
         final origCreatedAt = origSnap.data()?['created_at'] as Timestamp?;
         if (origCreatedAt != null) {
           final ageInDays =
@@ -371,6 +384,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'subtotal': subtotal,
       'discount': 0,
       'total': total,
+      'amount_received': 0,
+      'outstanding_amount': 0,
+      'sale_type': 'return',
       'status': InvoiceModel.statusIssued,
       'notes': notes,
       'linked_invoice_id': linkedInvoiceId,
@@ -470,6 +486,21 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'balance': FieldValue.increment(reversalDelta),
         'updated_at': now,
       });
+
+      final rawDeductions =
+          (data['seller_inventory_deductions'] as Map<String, dynamic>?) ??
+              const <String, dynamic>{};
+      for (final entry in rawDeductions.entries) {
+        final qty = (entry.value as num?)?.toInt() ?? 0;
+        if (qty <= 0) continue;
+        batch.update(
+          db.collection(Collections.sellerInventory).doc(entry.key),
+          {
+            'quantity_available': FieldValue.increment(qty),
+            'updated_at': now,
+          },
+        );
+      }
     }
 
     await batch.commit();

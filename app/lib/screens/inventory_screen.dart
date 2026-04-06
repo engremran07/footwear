@@ -421,12 +421,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.undo, color: Colors.orange),
-                          tooltip: tr('inventory_return_to_warehouse', ref),
-                          onPressed: () =>
-                              _showReturnToWarehouseDialog(variant, ppc),
-                        ),
+                        trailing: currentUser.isAdmin
+                            ? IconButton(
+                                icon: const Icon(Icons.undo,
+                                    color: Colors.orange),
+                                tooltip:
+                                    tr('inventory_return_to_warehouse', ref),
+                                onPressed: () =>
+                                    _showReturnToWarehouseDialog(variant, ppc),
+                              )
+                            : null,
                       ),
                     ).listEntry(i);
                   },

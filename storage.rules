@@ -1,68 +1,6 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-
-    // Helper: user is authenticated and active
-    function isAuth() {
-      return request.auth != null;
-    }
-
-    function userDoc() {
-      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid));
-    }
-
-    // Helper: check Firestore user role
-    function userRole() {
-      return userDoc().data.role;
-    }
-
-    function isAdminRole(role) {
-      return role.matches('(?i)^\\s*(admin|manager)\\s*$');
-    }
-
-    function isSellerRole(role) {
-      return role.matches('(?i)^\\s*seller\\s*$');
-    }
-
-    function isActiveUser() {
-      return isAuth() && userDoc().data.active == true;
-    }
-
-    function isAdmin() {
-      return isActiveUser() && isAdminRole(userRole());
-    }
-
-    function canUploadBusinessAssets() {
-      return isActiveUser() &&
-             (isAdminRole(userRole()) || isSellerRole(userRole()));
-    }
-
-    // Expense receipts: managers+ can upload, all authenticated can read
-    match /expenses/{fileName} {
-      allow read: if isActiveUser();
-      allow write: if canUploadBusinessAssets()
-                   && request.resource.size < 5 * 1024 * 1024  // 5MB max
-                   && request.resource.contentType.matches('image/.*');
-    }
-
-    // Product images: managers+ can upload, all authenticated can read
-    match /products/{fileName} {
-      allow read: if isActiveUser();
-      allow write: if canUploadBusinessAssets()
-                   && request.resource.size < 5 * 1024 * 1024  // 5MB max
-                   && request.resource.contentType.matches('image/.*');
-    }
-
-    // Company logo: admin only can upload, all authenticated can read
-    match /settings/{fileName} {
-      allow read: if isActiveUser();
-      allow create, update: if isAdmin()
-                   && request.resource.size < 2 * 1024 * 1024  // 2MB max
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if isAdmin();
-    }
-
-    // Deny everything else
     match /{allPaths=**} {
       allow read, write: if false;
     }

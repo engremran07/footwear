@@ -30,6 +30,8 @@ class InvoiceModel {
   static const String statusVoid = 'void';
   final String? notes;
   final String? linkedInvoiceId; // for credit notes referencing original
+  final String? idempotencyKey;
+  final Map<String, int> sellerInventoryDeductions;
   final String createdBy;
   final Timestamp createdAt;
   final Timestamp updatedAt;
@@ -55,6 +57,8 @@ class InvoiceModel {
     required this.status,
     this.notes,
     this.linkedInvoiceId,
+    this.idempotencyKey,
+    this.sellerInventoryDeductions = const {},
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
@@ -71,6 +75,11 @@ class InvoiceModel {
 
   factory InvoiceModel.fromJson(Map<String, dynamic> json, String docId) {
     final rawItems = json['items'] as List<dynamic>?;
+    final total = (json['total'] as num?)?.toDouble() ?? 0;
+    final amountReceived = (json['amount_received'] as num?)?.toDouble() ?? 0;
+    final rawDeductions =
+        (json['seller_inventory_deductions'] as Map<String, dynamic>?) ??
+            const <String, dynamic>{};
     return InvoiceModel(
       id: docId,
       invoiceNumber: json['invoice_number'] as String? ?? '',
@@ -88,13 +97,20 @@ class InvoiceModel {
           [],
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0,
       discount: (json['discount'] as num?)?.toDouble() ?? 0,
-      total: (json['total'] as num?)?.toDouble() ?? 0,
+      total: total,
       saleType: json['sale_type'] as String? ?? 'credit',
-      amountReceived: (json['amount_received'] as num?)?.toDouble() ?? 0,
-      outstandingAmount: (json['outstanding_amount'] as num?)?.toDouble() ?? 0,
+      amountReceived: amountReceived,
+      outstandingAmount:
+          (json['outstanding_amount'] as num?)?.toDouble() ??
+              (total - amountReceived),
       status: json['status'] as String? ?? statusDraft,
       notes: json['notes'] as String?,
       linkedInvoiceId: json['linked_invoice_id'] as String?,
+      idempotencyKey: json['idempotency_key'] as String?,
+      sellerInventoryDeductions: {
+        for (final entry in rawDeductions.entries)
+          entry.key: (entry.value as num?)?.toInt() ?? 0,
+      },
       createdBy: json['created_by'] as String? ?? '',
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
@@ -117,9 +133,13 @@ class InvoiceModel {
         'total': total,
         'sale_type': saleType,
         'amount_received': amountReceived,
+        'outstanding_amount': outstandingAmount,
         'status': status,
         'notes': notes,
         'linked_invoice_id': linkedInvoiceId,
+        if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+        if (sellerInventoryDeductions.isNotEmpty)
+          'seller_inventory_deductions': sellerInventoryDeductions,
         'created_by': createdBy,
         'created_at': createdAt,
         'updated_at': updatedAt,

@@ -137,5 +137,8 @@ class TransactionModel {
         if (invoiceNumber != null) 'invoice_number': invoiceNumber,
         'created_by': createdBy,
         'created_at': createdAt,
+        'deleted': deleted,
+        if (deletedAt != null) 'deleted_at': deletedAt,
+        if (deletedBy != null) 'deleted_by': deletedBy,
       };
 }

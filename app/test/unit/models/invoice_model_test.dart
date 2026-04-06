@@ -31,6 +31,8 @@ void main() {
     'total': 1700.0,
     'sale_type': 'credit',
     'amount_received': 500.0,
+    'outstanding_amount': 1200.0,
+    'idempotency_key': 'idemp-1',
     'status': 'issued',
     'notes': 'Urgent order',
     'created_by': 'u1',
@@ -57,6 +59,8 @@ void main() {
       expect(m.total, 1700.0);
       expect(m.saleType, 'credit');
       expect(m.amountReceived, 500.0);
+      expect(m.outstandingAmount, 1200.0);
+      expect(m.idempotencyKey, 'idemp-1');
       expect(m.status, 'issued');
       expect(m.notes, 'Urgent order');
     });
@@ -71,6 +75,7 @@ void main() {
       expect(m.total, 0);
       expect(m.saleType, 'credit');
       expect(m.amountReceived, 0);
+      expect(m.outstandingAmount, 0);
       expect(m.status, InvoiceModel.statusDraft);
     });
 
@@ -159,7 +164,16 @@ void main() {
       expect(restored.type, original.type);
       expect(restored.total, original.total);
       expect(restored.amountReceived, original.amountReceived);
+      expect(restored.outstandingAmount, original.outstandingAmount);
+      expect(restored.idempotencyKey, original.idempotencyKey);
       expect(restored.items, hasLength(original.items.length));
+    });
+
+    test('toJson includes outstanding_amount and idempotency_key', () {
+      final original = InvoiceModel.fromJson(baseJson, 'inv1');
+      final json = original.toJson();
+      expect(json['outstanding_amount'], 1200.0);
+      expect(json['idempotency_key'], 'idemp-1');
     });
   });
 
