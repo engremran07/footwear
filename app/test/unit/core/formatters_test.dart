@@ -16,6 +16,35 @@ void main() {
       expect(result, contains('﷼'));
       expect(result, contains('1,234.50'));
     });
+
+    test('formats 1234.56 with comma separator', () {
+      // TEST-027
+      final result = AppFormatters.sar(1234.56);
+      expect(result, contains('﷼'));
+      expect(result, contains('1,234.56'));
+    });
+
+    test('formats negative amount keeping rial symbol', () {
+      // TEST-028
+      final result = AppFormatters.sar(-500.0);
+      expect(result, contains('﷼'));
+      expect(result, contains('500.00'));
+    });
+
+    test('formats zero as 0.00', () {
+      // TEST-029
+      final result = AppFormatters.sar(0.0);
+      expect(result, contains('﷼'));
+      expect(result, contains('0.00'));
+    });
+
+    test('formats large amount with full precision not compact', () {
+      // TEST-030
+      final result = AppFormatters.sar(1000000.0);
+      expect(result, contains('﷼'));
+      expect(result, contains('1,000,000.00'));
+      expect(result, isNot(contains('M')));
+    });
   });
 
   group('AppFormatters.currency', () {

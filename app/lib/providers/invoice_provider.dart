@@ -588,35 +588,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       }
 
       if (type == InvoiceModel.typeSale) {
-        batch.set(
-          db.collection(Collections.transactions).doc(),
-          transactionData(
-            txType: 'cash_out',
-            amount: total,
-            description: 'Voided invoice snapshot $invoiceNumber',
-            items: rawItems.whereType<Map<String, dynamic>>().toList(),
-            txCustomerId: customerId,
-            txCustomerName: customerName,
-            txShopId: shopId,
-            txShopName: shopName,
-          ),
-        );
-
-        if (amountReceived > 0) {
-          batch.set(
-            db.collection(Collections.transactions).doc(),
-            transactionData(
-              txType: 'cash_in',
-              amount: amountReceived,
-              description: 'Voided payment snapshot $invoiceNumber',
-              txCustomerId: customerId,
-              txCustomerName: customerName,
-              txShopId: shopId,
-              txShopName: shopName,
-            ),
-          );
-        }
-
+        // Write ONE reversal transaction (the live-ledger reversal entry).
+        // The soft-deleted originals above already form the complete audit trail.
         final reversalAmount = refundMode == VoidRefundMode.creditBalance
             ? total
             : outstandingAmount;
@@ -637,6 +610,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           );
         }
 
+        // Cash refund: record the physical cash disbursement (no balance impact —
+        // the balance was already reversed via reversalDelta above).
         if (refundMode == VoidRefundMode.cashRefund && amountReceived > 0) {
           batch.set(
             db.collection(Collections.transactions).doc(),
@@ -644,6 +619,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
               txType: 'cash_out',
               amount: amountReceived,
               description: 'Cash refund for voided invoice $invoiceNumber',
+              txCustomerId: customerId,
+              txCustomerName: customerName,
+              txShopId: shopId,
+              txShopName: shopName,
             ),
           );
         }

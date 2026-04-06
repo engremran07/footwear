@@ -161,6 +161,14 @@
       ]
     },
     {
+      "collectionGroup": "transactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "invoice_id", "order": "ASCENDING" },
+        { "fieldPath": "deleted", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "inventory_transactions",
       "queryScope": "COLLECTION",
       "fields": [

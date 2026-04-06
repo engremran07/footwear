@@ -94,12 +94,12 @@ class InvoiceDetailScreen extends ConsumerWidget {
               OutlinedButton(
                 onPressed: () =>
                     Navigator.of(ctx).pop(VoidRefundMode.cashRefund),
-                child: Text(tr('cash_in', ref)),
+                child: Text(tr('void_refund_cash', ref)),
               ),
               FilledButton(
                 onPressed: () =>
                     Navigator.of(ctx).pop(VoidRefundMode.creditBalance),
-                child: Text(tr('outstanding_balance', ref)),
+                child: Text(tr('void_refund_credit', ref)),
               ),
             ],
           ),
@@ -180,7 +180,7 @@ class _InvoiceBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final date = invoice.createdAt.toDate();
-    final dateStr = '${date.day}/${date.month}/${date.year}';
+    final dateStr = AppFormatters.dateOnly(date);
 
     Color statusColor;
     switch (invoice.status) {
@@ -188,6 +188,9 @@ class _InvoiceBody extends ConsumerWidget {
         statusColor = AppTheme.clearBg(cs);
         break;
       case InvoiceModel.statusIssued:
+        statusColor = AppTheme.warningBg(cs);
+        break;
+      case InvoiceModel.statusPartial:
         statusColor = AppTheme.warningBg(cs);
         break;
       case 'void':

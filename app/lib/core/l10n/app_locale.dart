@@ -224,6 +224,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'mark_paid': 'Mark as Paid',
     'confirm_void_invoice':
         'Are you sure you want to void this invoice? This will reverse the balance.',
+    'void_refund_cash': 'Cash Refund',
+    'void_refund_credit': 'Credit Balance',
     'linked_invoice': 'Linked Invoice',
     'bad_debt': 'Bad Debt',
     'mark_bad_debt': 'Mark as Bad Debt',
@@ -1270,6 +1272,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'mark_paid': 'تعيين كمدفوعة',
     'confirm_void_invoice':
         'هل أنت متأكد من إلغاء هذه الفاتورة؟ سيتم عكس الرصيد.',
+    'void_refund_cash': 'استرداد نقدي',
+    'void_refund_credit': 'رصيد ائتماني',
     'linked_invoice': 'الفاتورة المرجعية',
     'bad_debt': 'ديون معدومة',
     'mark_bad_debt': 'تعيين كدين معدوم',
@@ -2310,6 +2314,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'mark_paid': 'ادا شدہ نشان زد کریں',
     'confirm_void_invoice':
         'کیا آپ واقعی یہ رسید منسوخ کرنا چاہتے ہیں؟ بیلنس واپس ہو جائے گا۔',
+    'void_refund_cash': 'نقد واپسی',
+    'void_refund_credit': 'کریڈٹ بیلنس',
     'linked_invoice': 'مرجع رسید',
     'bad_debt': 'ناقابل وصول قرض',
     'mark_bad_debt': 'ناقابل وصول قرض نشان زد کریں',
