@@ -70,8 +70,17 @@ class DashboardScreen extends ConsumerWidget {
         },
         child: stats.when(
           data: (s) {
+            // Outstanding balance always from the LIVE shops stream — never from
+            // the dashboardStatsProvider cache. This ensures immediate consistency
+            // after any balance change or DB-level data flush.
+            final totalOutstanding =
+                shopsAsync.valueOrNull?.fold<double>(
+                  0.0,
+                  (sum, sh) => sum + sh.balance,
+                ) ??
+                0.0;
             // Alerts: outstanding > 0 is a warning banner
-            final hasOutstandingAlert = s.totalOutstanding > 0;
+            final hasOutstandingAlert = totalOutstanding > 0;
 
             return ListView(
               padding: const EdgeInsets.all(AppTokens.s16),
@@ -81,39 +90,43 @@ class DashboardScreen extends ConsumerWidget {
                   padding: const EdgeInsets.only(bottom: AppTokens.s16),
                   child: Text(
                     '${tr('welcome', ref)}, ${user.displayName}',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ).animate().fadeIn(duration: AppTokens.durNormal),
 
                 // Alerts banner
                 if (hasOutstandingAlert)
                   Card(
-                    color: AppBrand.warningColor.withValues(alpha: 0.1),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppTokens.brMD,
-                      side: BorderSide(
-                          color: AppBrand.warningColor.withValues(alpha: 0.3)),
-                    ),
-                    child: ListTile(
-                      leading: const Icon(Icons.warning_amber_rounded,
-                          color: AppBrand.warningColor),
-                      title: Text(
-                        tr('dashboard_outstanding_alert', ref).replaceAll(
-                            '%s', AppFormatters.sar(s.totalOutstanding)),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text(tr('dashboard_pending_dues', ref)),
-                      trailing: TextButton(
-                        // NOTE: no /customers route — shops are the customers
-                        onPressed: () => context.go('/shops'),
-                        child: Text(tr('lbl_view', ref)),
-                      ),
-                    ),
-                  )
+                        color: AppBrand.warningColor.withValues(alpha: 0.1),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppTokens.brMD,
+                          side: BorderSide(
+                            color: AppBrand.warningColor.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: ListTile(
+                          leading: const Icon(
+                            Icons.warning_amber_rounded,
+                            color: AppBrand.warningColor,
+                          ),
+                          title: Text(
+                            tr('dashboard_outstanding_alert', ref).replaceAll(
+                              '%s',
+                              AppFormatters.sar(totalOutstanding),
+                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(tr('dashboard_pending_dues', ref)),
+                          trailing: TextButton(
+                            // NOTE: no /customers route — shops are the customers
+                            onPressed: () => context.go('/shops'),
+                            child: Text(tr('lbl_view', ref)),
+                          ),
+                        ),
+                      )
                       .animate()
                       .fadeIn(duration: AppTokens.durNormal)
                       .slideY(begin: -0.1, end: 0, curve: AppTokens.curveStd),
@@ -122,8 +135,9 @@ class DashboardScreen extends ConsumerWidget {
 
                 // Stat cards grid
                 GridView.count(
-                  crossAxisCount:
-                      MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                  crossAxisCount: MediaQuery.of(context).size.width > 600
+                      ? 3
+                      : 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: AppTokens.s8,
@@ -148,9 +162,9 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     StatCard(
                       title: tr('outstanding_balance', ref),
-                      value: AppFormatters.sar(s.totalOutstanding),
+                      value: AppFormatters.sar(totalOutstanding),
                       icon: Icons.account_balance_wallet,
-                      color: s.totalOutstanding > 0
+                      color: totalOutstanding > 0
                           ? AppBrand.errorColor
                           : AppBrand.successColor,
                       staggerIndex: 2,
@@ -175,8 +189,10 @@ class DashboardScreen extends ConsumerWidget {
                     StatCard(
                       title: tr('dashboard_stock_cartons', ref),
                       value: AppFormatters.number(s.totalStockPairs ~/ ppc),
-                      subtitle: tr('dashboard_pairs_remainder', ref)
-                          .replaceAll('%s', '${s.totalStockPairs % ppc}'),
+                      subtitle: tr(
+                        'dashboard_pairs_remainder',
+                        ref,
+                      ).replaceAll('%s', '${s.totalStockPairs % ppc}'),
                       icon: Icons.warehouse,
                       color: AppBrand.stockColor,
                       staggerIndex: 5,
@@ -191,7 +207,6 @@ class DashboardScreen extends ConsumerWidget {
                 _RouteAnalyticsSection(
                   routesAsync: routesAsync,
                   shopsAsync: shopsAsync,
-                  transactionsAsync: transactionsAsync,
                 ),
 
                 const SizedBox(height: AppTokens.s16),
@@ -219,16 +234,15 @@ class _SellerDashboard extends ConsumerWidget {
     if (routeId == null || routeId.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: Text(tr('dashboard', ref))),
-        body: Center(
-          child: Text(tr('dashboard_no_route_assigned', ref)),
-        ),
+        body: Center(child: Text(tr('dashboard_no_route_assigned', ref))),
       );
     }
 
     final routeAsync = ref.watch(routeDetailProvider(routeId));
     final shopsAsync = ref.watch(shopsByRouteProvider(routeId));
-    final inventoryPairsAsync =
-        ref.watch(sellerInventoryTotalPairsProvider(user.id));
+    final inventoryPairsAsync = ref.watch(
+      sellerInventoryTotalPairsProvider(user.id),
+    );
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('dashboard', ref))),
@@ -246,10 +260,9 @@ class _SellerDashboard extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
                 '${tr('welcome', ref)}, ${user.displayName}',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
             routeAsync.when(
@@ -259,8 +272,12 @@ class _SellerDashboard extends ConsumerWidget {
                       child: ListTile(
                         leading: const Icon(Icons.route),
                         title: Text(route.name),
-                        subtitle: Text(tr('dashboard_route_number', ref)
-                            .replaceAll('%s', '${route.routeNumber}')),
+                        subtitle: Text(
+                          tr(
+                            'dashboard_route_number',
+                            ref,
+                          ).replaceAll('%s', '${route.routeNumber}'),
+                        ),
                       ),
                     ),
               loading: () => const SizedBox.shrink(),
@@ -269,12 +286,15 @@ class _SellerDashboard extends ConsumerWidget {
             const SizedBox(height: 12),
             shopsAsync.when(
               data: (shops) {
-                final outstanding =
-                    shops.fold<double>(0, (acc, shop) => acc + shop.balance);
+                final outstanding = shops.fold<double>(
+                  0,
+                  (acc, shop) => acc + shop.balance,
+                );
                 return inventoryPairsAsync.when(
                   data: (pairs) => GridView.count(
-                    crossAxisCount:
-                        MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                    crossAxisCount: MediaQuery.of(context).size.width > 600
+                        ? 3
+                        : 2,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     mainAxisSpacing: 4,
@@ -335,79 +355,53 @@ class _RouteAnalytics {
   final RouteModel route;
   final int totalShops;
   final double outstanding;
-  final double cashOut;
-  final double cashIn;
-  final int transactions;
 
   const _RouteAnalytics({
     required this.route,
     required this.totalShops,
     required this.outstanding,
-    required this.cashOut,
-    required this.cashIn,
-    required this.transactions,
   });
-
-  double get netFlow => cashOut - cashIn;
 }
 
 class _RouteAnalyticsSection extends ConsumerWidget {
   final AsyncValue<List<RouteModel>> routesAsync;
   final AsyncValue<List<ShopModel>> shopsAsync;
-  final AsyncValue<List<TransactionModel>> transactionsAsync;
 
   const _RouteAnalyticsSection({
     required this.routesAsync,
     required this.shopsAsync,
-    required this.transactionsAsync,
   });
 
   List<_RouteAnalytics> _compute(
     List<RouteModel> routes,
     List<ShopModel> shops,
-    List<TransactionModel> transactions,
   ) {
     final routeIds = routes.map((r) => r.id).toSet();
     final shopsByRoute = <String, List<ShopModel>>{};
     for (final s in shops.where((s) => routeIds.contains(s.routeId))) {
       shopsByRoute.putIfAbsent(s.routeId, () => []).add(s);
     }
-    final txByRoute = <String, List<TransactionModel>>{};
-    for (final t in transactions.where((t) => routeIds.contains(t.routeId))) {
-      txByRoute.putIfAbsent(t.routeId, () => []).add(t);
-    }
 
-    final rows = routes.map((route) {
+    return routes.map((route) {
       final rs = shopsByRoute[route.id] ?? const <ShopModel>[];
-      final rt = txByRoute[route.id] ?? const <TransactionModel>[];
       return _RouteAnalytics(
         route: route,
         totalShops: rs.length,
-        outstanding: rs.fold<double>(0, (s, sh) => s + sh.balance),
-        cashOut: rt
-            .where((t) => t.type == 'cash_out')
-            .fold<double>(0, (s, t) => s + t.amount),
-        cashIn: rt
-            .where((t) => t.type == 'cash_in')
-            .fold<double>(0, (s, t) => s + t.amount),
-        transactions: rt.length,
+        outstanding: rs.fold<double>(0.0, (s, sh) => s + sh.balance),
       );
-    }).toList()
-      ..sort((a, b) => b.netFlow.compareTo(a.netFlow));
-    return rows;
+    }).toList()..sort((a, b) => b.outstanding.compareTo(a.outstanding));
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final routes = routesAsync.valueOrNull;
     final shops = shopsAsync.valueOrNull;
-    final txs = transactionsAsync.valueOrNull;
 
-    if (routes == null || shops == null || txs == null) {
+    if (routes == null || shops == null) {
       return const SizedBox.shrink();
     }
 
-    final analytics = _compute(routes, shops, txs);
+    final analytics = _compute(routes, shops);
     if (analytics.isEmpty) return const SizedBox.shrink();
 
     return Card(
@@ -428,26 +422,16 @@ class _RouteAnalyticsSection extends ConsumerWidget {
                   child: Text('${row.route.routeNumber}'),
                 ),
                 title: Text(row.route.name),
-                subtitle: Text(
-                  '${row.totalShops} ${tr('shops', ref)} • ${row.transactions} tx',
-                ),
-                trailing: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      tr('dashboard_net', ref)
-                          .replaceAll('%s', AppFormatters.sar(row.netFlow)),
-                      style: TextStyle(
-                        color: row.netFlow >= 0
-                            ? AppBrand.successColor
-                            : AppBrand.errorColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(tr('dashboard_due', ref)
-                        .replaceAll('%s', AppFormatters.sar(row.outstanding))),
-                  ],
+                subtitle: Text('${row.totalShops} ${tr('shops', ref)}'),
+                trailing: Text(
+                  AppFormatters.sar(row.outstanding),
+                  style: TextStyle(
+                    color: row.outstanding > 0
+                        ? AppBrand.errorColor
+                        : AppBrand.successColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
                 onTap: () => context.push('/routes/${row.route.id}'),
               ),
@@ -509,22 +493,27 @@ class _CashFlowChart extends ConsumerWidget {
       isEmpty: spots1.every((s) => s.y == 0) && spots2.every((s) => s.y == 0),
       legend: [
         ChartLegendItem(
-            color: AppBrand.successColor,
-            label: tr('dashboard_cash_in_legend', ref)),
+          color: AppBrand.successColor,
+          label: tr('dashboard_cash_in_legend', ref),
+        ),
         ChartLegendItem(
-            color: AppBrand.errorColor,
-            label: tr('dashboard_cash_out_legend', ref)),
+          color: AppBrand.errorColor,
+          label: tr('dashboard_cash_out_legend', ref),
+        ),
       ],
       chart: LineChart(
         LineChartData(
           gridData: const FlGridData(show: false),
           titlesData: FlTitlesData(
-            leftTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            leftTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
@@ -533,8 +522,10 @@ class _CashFlowChart extends ConsumerWidget {
                   if (idx < 0 || idx >= monthLabels.length) {
                     return const SizedBox.shrink();
                   }
-                  return Text(monthLabels[idx],
-                      style: const TextStyle(fontSize: 10));
+                  return Text(
+                    monthLabels[idx],
+                    style: const TextStyle(fontSize: 10),
+                  );
                 },
               ),
             ),
@@ -584,8 +575,7 @@ class _AdminSpeedDial extends ConsumerWidget {
       children: [
         FloatingActionButton.small(
           heroTag: 'fab_shop',
-          tooltip: tr('dashboard_new_customer', ref),
-          // NOTE: shops are the customers; /customers/new route was removed
+          tooltip: tr('new_shop', ref),
           onPressed: () => context.push('/shops/new'),
           child: const Icon(Icons.store),
         ),

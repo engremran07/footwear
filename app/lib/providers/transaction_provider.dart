@@ -31,50 +31,56 @@ import 'auth_provider.dart';
 
 final shopTransactionsProvider = StreamProvider.autoDispose
     .family<List<TransactionModel>, String>((ref, shopId) {
-  // Remove server-side deleted==false: old docs predate the field.
-  // Filter client-side with !=true to include legacy docs.
-  return FirebaseFirestore.instance
-      .collection(Collections.transactions)
-      .where('shop_id', isEqualTo: shopId)
-      .orderBy('created_at', descending: true)
-      .limit(200)
-      .snapshots()
-      .map((snap) => snap.docs
-          .where((d) => d.data()['deleted'] != true)
-          .map((d) => TransactionModel.fromJson(d.data(), d.id))
-          .toList());
-});
+      // Remove server-side deleted==false: old docs predate the field.
+      // Filter client-side with !=true to include legacy docs.
+      return FirebaseFirestore.instance
+          .collection(Collections.transactions)
+          .where('shop_id', isEqualTo: shopId)
+          .orderBy('created_at', descending: true)
+          .limit(200)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .where((d) => d.data()['deleted'] != true)
+                .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
 
 final allTransactionsProvider =
     StreamProvider.autoDispose<List<TransactionModel>>((ref) {
-  // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
-  final user = ref.watch(authUserProvider).valueOrNull;
-  if (user == null || !user.isAdmin) return const Stream.empty();
-  return FirebaseFirestore.instance
-      .collection(Collections.transactions)
-      .orderBy('created_at', descending: true)
-      .limit(200)
-      .snapshots()
-      .map((snap) => snap.docs
-          .where((d) => d.data()['deleted'] != true)
-          .map((d) => TransactionModel.fromJson(d.data(), d.id))
-          .toList());
-});
+      // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
+      final user = ref.watch(authUserProvider).valueOrNull;
+      if (user == null || !user.isAdmin) return const Stream.empty();
+      return FirebaseFirestore.instance
+          .collection(Collections.transactions)
+          .orderBy('created_at', descending: true)
+          .limit(200)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .where((d) => d.data()['deleted'] != true)
+                .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
 
 /// Seller-scoped: transactions created by this seller.
 final sellerTransactionsProvider = StreamProvider.autoDispose
     .family<List<TransactionModel>, String>((ref, sellerId) {
-  return FirebaseFirestore.instance
-      .collection(Collections.transactions)
-      .where('created_by', isEqualTo: sellerId)
-      .orderBy('created_at', descending: true)
-      .limit(200)
-      .snapshots()
-      .map((snap) => snap.docs
-          .where((d) => d.data()['deleted'] != true)
-          .map((d) => TransactionModel.fromJson(d.data(), d.id))
-          .toList());
-});
+      return FirebaseFirestore.instance
+          .collection(Collections.transactions)
+          .where('created_by', isEqualTo: sellerId)
+          .orderBy('created_at', descending: true)
+          .limit(200)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .where((d) => d.data()['deleted'] != true)
+                .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
 
 class TransactionNotifier extends AsyncNotifier<void> {
   @override
@@ -106,7 +112,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       'cash_in',
       'return',
       'payment',
-      'write_off'
+      'write_off',
     };
     if (!allowedTypes.contains(type)) {
       throw ArgumentError(
@@ -116,8 +122,15 @@ class TransactionNotifier extends AsyncNotifier<void> {
     if (amount <= 0) {
       throw ArgumentError('Transaction amount must be greater than 0');
     }
-    // shopId and routeId are optional for admin-only customer-level transactions;
-    // balance update logic already guards on isNotEmpty below.
+    if (shopId.trim().isEmpty) {
+      throw ArgumentError('shopId must not be empty');
+    }
+    if (routeId.trim().isEmpty) {
+      throw ArgumentError('routeId must not be empty');
+    }
+    if (customerId != null && customerId.isNotEmpty && customerId != shopId) {
+      throw ArgumentError('customerId must match shopId when provided');
+    }
 
     final db = FirebaseFirestore.instance;
     final batch = db.batch();
@@ -145,16 +158,6 @@ class TransactionNotifier extends AsyncNotifier<void> {
     if (shopId.isNotEmpty) {
       final balanceDelta = type == 'cash_out' ? amount : -amount;
       batch.update(db.collection(Collections.customers).doc(shopId), {
-        'balance': FieldValue.increment(balanceDelta),
-        'updated_at': Timestamp.now(),
-      });
-    }
-
-    // Update customer balance — only when customerId differs from shopId
-    // (prevents duplicate batch writes to the same document).
-    if (customerId != null && customerId.isNotEmpty && customerId != shopId) {
-      final balanceDelta = type == 'cash_out' ? amount : -amount;
-      batch.update(db.collection(Collections.customers).doc(customerId), {
         'balance': FieldValue.increment(balanceDelta),
         'updated_at': Timestamp.now(),
       });
@@ -191,6 +194,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
     required List<TransactionItem> items,
     required Map<String, int> sellerInventoryDeductions,
     required String createdBy,
+    String? idempotencyKey,
     Timestamp? transactionDate,
   }) async {
     final normalizedCreatedBy = createdBy.trim();
@@ -200,16 +204,32 @@ class TransactionNotifier extends AsyncNotifier<void> {
     if (customerId.trim().isEmpty) {
       throw ArgumentError('customerId must not be empty');
     }
+    if (amount <= 0) {
+      throw ArgumentError('Transaction amount must be greater than 0');
+    }
 
     final db = FirebaseFirestore.instance;
     final batch = db.batch();
+
+    final normalizedKey = idempotencyKey?.trim();
+    if (normalizedKey != null && normalizedKey.isNotEmpty) {
+      final existing = await db
+          .collection(Collections.transactions)
+          .where('idempotency_key', isEqualTo: normalizedKey)
+          .limit(1)
+          .get();
+      if (existing.docs.isNotEmpty) {
+        return;
+      }
+    }
 
     final txRef = db.collection(Collections.transactions).doc();
     batch.set(txRef, {
       'shop_id': customerId, // customerId == shopId in our unified architecture
       'shop_name': customerName,
       'route_id': routeId,
-      'customer_id': customerId, // legacy alias retained for index compatibility
+      'customer_id':
+          customerId, // legacy alias retained for index compatibility
       'customer_name': customerName,
       'type': 'cash_out',
       'sale_type': saleType ?? 'cash',
@@ -219,6 +239,8 @@ class TransactionNotifier extends AsyncNotifier<void> {
       'created_by': normalizedCreatedBy,
       'created_at': transactionDate ?? Timestamp.now(),
       'deleted': false, // DI-01: required for isNotEqualTo filter
+      if (normalizedKey != null && normalizedKey.isNotEmpty)
+        'idempotency_key': normalizedKey,
     });
 
     // Customer owes more
@@ -230,13 +252,11 @@ class TransactionNotifier extends AsyncNotifier<void> {
     // Deduct from seller_inventory docs
     for (final entry in sellerInventoryDeductions.entries) {
       if (entry.value > 0) {
-        batch.update(
-          db.collection(Collections.sellerInventory).doc(entry.key),
-          {
-            'quantity_available': FieldValue.increment(-entry.value),
-            'updated_at': Timestamp.now(),
-          },
-        );
+        batch
+            .update(db.collection(Collections.sellerInventory).doc(entry.key), {
+              'quantity_available': FieldValue.increment(-entry.value),
+              'updated_at': Timestamp.now(),
+            });
       }
     }
 
@@ -328,13 +348,11 @@ class TransactionNotifier extends AsyncNotifier<void> {
     // Restore seller inventory stock for returned items
     for (final entry in sellerInventoryRestores.entries) {
       if (entry.value > 0) {
-        batch.update(
-          db.collection(Collections.sellerInventory).doc(entry.key),
-          {
-            'quantity_available': FieldValue.increment(entry.value),
-            'updated_at': Timestamp.now(),
-          },
-        );
+        batch
+            .update(db.collection(Collections.sellerInventory).doc(entry.key), {
+              'quantity_available': FieldValue.increment(entry.value),
+              'updated_at': Timestamp.now(),
+            });
       }
     }
 
@@ -355,6 +373,21 @@ class TransactionNotifier extends AsyncNotifier<void> {
   }) async {
     if (txId.trim().isEmpty) {
       throw ArgumentError('txId must not be empty');
+    }
+    if (newAmount <= 0) {
+      throw ArgumentError('newAmount must be greater than 0');
+    }
+    const allowedTypes = {
+      'cash_out',
+      'cash_in',
+      'return',
+      'payment',
+      'write_off',
+    };
+    if (!allowedTypes.contains(newType)) {
+      throw ArgumentError(
+        'Invalid transaction type "$newType". Allowed: ${allowedTypes.join(', ')}',
+      );
     }
 
     final db = FirebaseFirestore.instance;

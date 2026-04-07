@@ -1,8 +1,8 @@
-﻿# FootWear ERP — Flutter App (v3.0.0)
+﻿# FootWear ERP — Flutter App (v3.3.8)
 
-Mobile-first Android ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record customer transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
+Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record customer transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
-> **v3.0.0** — Enterprise upgrade with design system, animations, hardened security, Isolate PDF export, session guard, dark mode + RTL QA.
+> **v3.3.8+29** — Auth pipeline hardened: 3-step custom-token → ID-token `VERIFY_EMAIL` flow; `cloud-platform` OAuth2 scope; overflow fix on verification badge; SA credentials cached.
 
 ---
 
@@ -30,15 +30,12 @@ Place `google-services.json` in `android/app/` before running (obtain from Fireb
 ## Build
 
 ```bash
-# Release APKs (split per ABI)
-flutter build apk --release --split-per-abi
-# Output: build/app/outputs/flutter-apk/
-#   app-armeabi-v7a-release.apk  (~27MB)
-#   app-arm64-v8a-release.apk   (~29MB)
-#   app-x86_64-release.apk      (~31MB)
+# Release APK (fat, universal)
+flutter build apk --release
+# Output: build/app/outputs/flutter-apk/app-release.apk
 
 # Install to connected device
-adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 
 ---

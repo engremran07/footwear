@@ -12,9 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 // ── Pure-logic mirrors of markAsBadDebt guards ───────────────────────────────
 
 /// Returns error message if write-off preconditions fail; null if valid.
-String? validateBadDebtWriteOff({
-  required double currentBalance,
-}) {
+String? validateBadDebtWriteOff({required double currentBalance}) {
   if (currentBalance <= 0) {
     return 'No outstanding balance to write off';
   }
@@ -45,11 +43,7 @@ Map<String, dynamic> buildWriteOffTransaction({
 
 /// Returns the shop fields that should be updated during write-off.
 Map<String, dynamic> buildWriteOffShopUpdate({required double balance}) {
-  return {
-    'bad_debt': true,
-    'bad_debt_amount': balance,
-    'balance': 0.0,
-  };
+  return {'bad_debt': true, 'bad_debt_amount': balance, 'balance': 0.0};
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -67,17 +61,11 @@ void main() {
     });
 
     test('rejects write-off when balance == 0', () {
-      expect(
-        validateBadDebtWriteOff(currentBalance: 0),
-        isNotNull,
-      );
+      expect(validateBadDebtWriteOff(currentBalance: 0), isNotNull);
     });
 
     test('rejects write-off when balance < 0 (overpayment)', () {
-      expect(
-        validateBadDebtWriteOff(currentBalance: -500),
-        isNotNull,
-      );
+      expect(validateBadDebtWriteOff(currentBalance: -500), isNotNull);
     });
   });
 

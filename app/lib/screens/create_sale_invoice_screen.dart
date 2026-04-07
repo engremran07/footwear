@@ -73,8 +73,9 @@ class _CreateSaleInvoiceScreenState
     double subtotal,
     int ppc,
   ) {
-    final dozenEntries =
-        _selectedQtys.entries.where((entry) => entry.value > 0).toList();
+    final dozenEntries = _selectedQtys.entries
+        .where((entry) => entry.value > 0)
+        .toList();
     if (dozenEntries.isEmpty || subtotal <= 0) return const [];
 
     final inventoryMap = {for (final item in inventoryList) item.id: item};
@@ -112,7 +113,9 @@ class _CreateSaleInvoiceScreenState
         'color': '',
         'qty': dozens, // invoice line qty = dozens (selling unit)
         'extra_pairs': extraPairs,
-        'unit_price': dozens > 0 ? (lineSubtotal / dozens) : 0.0, // price per dozen
+        'unit_price': dozens > 0
+            ? (lineSubtotal / dozens)
+            : 0.0, // price per dozen
         'subtotal': lineSubtotal,
       });
     }
@@ -164,8 +167,8 @@ class _CreateSaleInvoiceScreenState
     final shopsAsync = user.isAdmin
         ? ref.watch(shopsProvider)
         : (routeId.isNotEmpty
-            ? ref.watch(shopsByRouteProvider(routeId))
-            : const AsyncData<List<ShopModel>>([]));
+              ? ref.watch(shopsByRouteProvider(routeId))
+              : const AsyncData<List<ShopModel>>([]));
     // Both admin and seller use their own seller_inventory (vehicle stock).
     // Admin loads stock from warehouse to their own seller_inventory via the
     // Inventory screen transfer, then selects items here to create an invoice.
@@ -197,15 +200,14 @@ class _CreateSaleInvoiceScreenState
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
-          appBar: AppBar(
-            title: Text(tr('create_sale_invoice', ref)),
-          ),
+          appBar: AppBar(title: Text(tr('create_sale_invoice', ref))),
           body: inventoryAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('$e')),
             data: (inventory) {
-              final available =
-                  inventory.where((i) => i.quantityAvailable > 0).toList();
+              final available = inventory
+                  .where((i) => i.quantityAvailable > 0)
+                  .toList();
               return _buildBody(context, user, shopsAsync, available);
             },
           ),
@@ -225,8 +227,9 @@ class _CreateSaleInvoiceScreenState
     final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
 
     // Calculate totals from selected items (_selectedQtys = dozens, quantity_available = pairs)
-    final selectedEntries =
-        _selectedQtys.entries.where((e) => e.value > 0).toList();
+    final selectedEntries = _selectedQtys.entries
+        .where((e) => e.value > 0)
+        .toList();
     final totalDozens = selectedEntries.fold<int>(0, (acc, e) => acc + e.value);
     final totalExtraPairs = selectedEntries.fold<int>(
       0,
@@ -242,9 +245,10 @@ class _CreateSaleInvoiceScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── Shop selector ──
-                Text(tr('select_shop', ref),
-                    style:
-                        ts.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  tr('select_shop', ref),
+                  style: ts.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
                 shopsAsync.when(
                   loading: () => const LinearProgressIndicator(),
@@ -256,8 +260,8 @@ class _CreateSaleInvoiceScreenState
                     final matchedShop = _selectedShop == null
                         ? null
                         : shops
-                            .where((s) => s.id == _selectedShop!.id)
-                            .firstOrNull;
+                              .where((s) => s.id == _selectedShop!.id)
+                              .firstOrNull;
                     return DropdownButtonFormField<ShopModel>(
                       initialValue: matchedShop,
                       isExpanded: true,
@@ -291,16 +295,19 @@ class _CreateSaleInvoiceScreenState
                 const SizedBox(height: 20),
 
                 // ── Items ──
-                Text(tr('select_items', ref),
-                    style:
-                        ts.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  tr('select_items', ref),
+                  style: ts.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
                 if (inventory.isEmpty)
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Center(
-                      child: Text(tr('no_inventory_items', ref),
-                          style: ts.bodyMedium),
+                      child: Text(
+                        tr('no_inventory_items', ref),
+                        style: ts.bodyMedium,
+                      ),
                     ),
                   )
                 else
@@ -312,62 +319,70 @@ class _CreateSaleInvoiceScreenState
                       margin: const EdgeInsets.only(bottom: 8),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(item.variantName,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w500)),
+                            Text(
+                              item.variantName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                             Text(
                               '${tr("available", ref)}: ${AppFormatters.stock(item.quantityAvailable, ppc)}',
-                              style:
-                                  Theme.of(context).textTheme.bodySmall,
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                             const SizedBox(height: 4),
                             // ── Dozens stepper ──
                             Row(
                               children: [
-                                Text(tr('lbl_cartons', ref),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall),
+                                Text(
+                                  tr('lbl_cartons', ref),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
                                 const Spacer(),
                                 IconButton(
                                   icon: const Icon(
-                                      Icons.remove_circle_outline,
-                                      size: 22),
+                                    Icons.remove_circle_outline,
+                                    size: 22,
+                                  ),
                                   tooltip: tr('tooltip_decrease_qty', ref),
                                   onPressed: dozens <= 0
                                       ? null
                                       : () => setState(() {
-                                            _selectedQtys[item.id] =
-                                                dozens - 1;
-                                            if (dozens - 1 == 0) {
-                                              _selectedExtraPairs
-                                                  .remove(item.id);
-                                            }
-                                          }),
+                                          _selectedQtys[item.id] = dozens - 1;
+                                          if (dozens - 1 == 0) {
+                                            _selectedExtraPairs.remove(item.id);
+                                          }
+                                        }),
                                 ),
                                 SizedBox(
                                   width: 32,
-                                  child: Text('$dozens',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16)),
+                                  child: Text(
+                                    '$dozens',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
                                 ),
                                 IconButton(
                                   icon: const Icon(
-                                      Icons.add_circle_outline,
-                                      size: 22),
+                                    Icons.add_circle_outline,
+                                    size: 22,
+                                  ),
                                   tooltip: tr('tooltip_increase_qty', ref),
                                   onPressed: dozens >= maxDozens
                                       ? null
-                                      : () => setState(() =>
-                                          _selectedQtys[item.id] =
-                                              dozens + 1),
+                                      : () => setState(
+                                          () => _selectedQtys[item.id] =
+                                              dozens + 1,
+                                        ),
                                 ),
                               ],
                             ),
@@ -375,42 +390,47 @@ class _CreateSaleInvoiceScreenState
                             if (dozens > 0)
                               Row(
                                 children: [
-                                  Text(tr('lbl_extra_pairs', ref),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall),
+                                  Text(
+                                    tr('lbl_extra_pairs', ref),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
                                   const Spacer(),
                                   IconButton(
                                     icon: const Icon(
-                                        Icons.remove_circle_outline,
-                                        size: 20),
-                                    tooltip:
-                                        tr('tooltip_decrease_qty', ref),
+                                      Icons.remove_circle_outline,
+                                      size: 20,
+                                    ),
+                                    tooltip: tr('tooltip_decrease_qty', ref),
                                     onPressed: extraPairs <= 0
                                         ? null
-                                        : () => setState(() =>
-                                            _selectedExtraPairs[item.id] =
-                                                extraPairs - 1),
+                                        : () => setState(
+                                            () => _selectedExtraPairs[item.id] =
+                                                extraPairs - 1,
+                                          ),
                                   ),
                                   SizedBox(
                                     width: 32,
-                                    child: Text('$extraPairs',
-                                        textAlign: TextAlign.center,
-                                        style:
-                                            const TextStyle(fontSize: 14)),
+                                    child: Text(
+                                      '$extraPairs',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
                                   ),
                                   IconButton(
                                     icon: const Icon(
-                                        Icons.add_circle_outline,
-                                        size: 20),
-                                    tooltip:
-                                        tr('tooltip_increase_qty', ref),
+                                      Icons.add_circle_outline,
+                                      size: 20,
+                                    ),
+                                    tooltip: tr('tooltip_increase_qty', ref),
                                     // max extra pairs = ppc - 1 (a full dozen would be a new dozen)
                                     onPressed: extraPairs >= ppc - 1
                                         ? null
-                                        : () => setState(() =>
-                                            _selectedExtraPairs[item.id] =
-                                                extraPairs + 1),
+                                        : () => setState(
+                                            () => _selectedExtraPairs[item.id] =
+                                                extraPairs + 1,
+                                          ),
                                   ),
                                 ],
                               ),
@@ -425,8 +445,9 @@ class _CreateSaleInvoiceScreenState
                 // ── Sale Amount ──
                 TextField(
                   controller: _saleAmountC,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     labelText: tr('sale_amount', ref),
                     prefixIcon: const Icon(Icons.currency_exchange),
@@ -434,9 +455,7 @@ class _CreateSaleInvoiceScreenState
                   ),
                   textInputAction: TextInputAction.next,
                   onSubmitted: (_) => _discountFn.requestFocus(),
-                  inputFormatters: [
-                    AppInputFormatters.amountFormatter,
-                  ],
+                  inputFormatters: [AppInputFormatters.amountFormatter],
                   onChanged: (_) {
                     if (!_isDirty) _isDirty = true;
                     setState(() {});
@@ -448,8 +467,9 @@ class _CreateSaleInvoiceScreenState
                 // ── Discount ──
                 TextField(
                   controller: _discountC,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     labelText: tr('discount', ref),
                     prefixIcon: const Icon(Icons.percent),
@@ -457,9 +477,7 @@ class _CreateSaleInvoiceScreenState
                   focusNode: _discountFn,
                   textInputAction: TextInputAction.next,
                   onSubmitted: (_) => _amountReceivedFn.requestFocus(),
-                  inputFormatters: [
-                    AppInputFormatters.amountFormatter,
-                  ],
+                  inputFormatters: [AppInputFormatters.amountFormatter],
                   onChanged: (_) {
                     if (!_isDirty) _isDirty = true;
                     setState(() {});
@@ -471,8 +489,9 @@ class _CreateSaleInvoiceScreenState
                 // ── Amount Received ──
                 TextField(
                   controller: _amountReceivedC,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     labelText: tr('amount_received', ref),
                     prefixIcon: const Icon(Icons.payments),
@@ -481,9 +500,7 @@ class _CreateSaleInvoiceScreenState
                   focusNode: _amountReceivedFn,
                   textInputAction: TextInputAction.next,
                   onSubmitted: (_) => _notesFn.requestFocus(),
-                  inputFormatters: [
-                    AppInputFormatters.amountFormatter,
-                  ],
+                  inputFormatters: [AppInputFormatters.amountFormatter],
                   onChanged: (_) {
                     if (!_isDirty) _isDirty = true;
                     setState(() {});
@@ -507,9 +524,7 @@ class _CreateSaleInvoiceScreenState
                   ),
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _submit(context),
-                  inputFormatters: [
-                    AppInputFormatters.maxLength(300),
-                  ],
+                  inputFormatters: [AppInputFormatters.maxLength(300)],
                 ),
               ],
             ),
@@ -537,15 +552,17 @@ class _CreateSaleInvoiceScreenState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Builder(builder: (context) {
-                      final extraLabel = totalExtraPairs > 0
-                          ? ' $totalExtraPairs ${tr("pairs", ref)}'
-                          : '';
-                      return Text(
-                        '${tr("items", ref)}: $totalDozens ${tr("lbl_cartons", ref)}$extraLabel',
-                        style: ts.bodyMedium,
-                      );
-                    }),
+                    Builder(
+                      builder: (context) {
+                        final extraLabel = totalExtraPairs > 0
+                            ? ' $totalExtraPairs ${tr("pairs", ref)}'
+                            : '';
+                        return Text(
+                          '${tr("items", ref)}: $totalDozens ${tr("lbl_cartons", ref)}$extraLabel',
+                          style: ts.bodyMedium,
+                        );
+                      },
+                    ),
                     _buildSaleTypeChip(ts),
                   ],
                 ),
@@ -564,7 +581,9 @@ class _CreateSaleInvoiceScreenState
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Icon(Icons.receipt_long),
                     label: Text(tr('create_sale_invoice', ref)),
@@ -592,52 +611,78 @@ class _CreateSaleInvoiceScreenState
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            Text(tr('payment_summary', ref),
-                style: ts.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              tr('payment_summary', ref),
+              style: ts.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
             const Divider(height: 16),
-            _summaryRow(tr('previous_balance', ref),
-                AppFormatters.currency(prevBal), ts,
-                color: prevBal > 0 ? AppBrand.errorColor : null),
+            _summaryRow(
+              tr('previous_balance', ref),
+              AppFormatters.currency(prevBal),
+              ts,
+              color: prevBal > 0 ? AppBrand.errorColor : null,
+            ),
             const SizedBox(height: 4),
             _summaryRow(
-                tr('current_sale', ref), AppFormatters.currency(sale), ts),
+              tr('current_sale', ref),
+              AppFormatters.currency(sale),
+              ts,
+            ),
             if (_discountAmount > 0) ...[
               const SizedBox(height: 4),
-              _summaryRow(tr('discount', ref),
-                  '- ${AppFormatters.currency(_discountAmount)}', ts,
-                  color: AppBrand.successColor),
+              _summaryRow(
+                tr('discount', ref),
+                '- ${AppFormatters.currency(_discountAmount)}',
+                ts,
+                color: AppBrand.successColor,
+              ),
             ],
             const Divider(height: 12),
-            _summaryRow(tr('total_outstanding', ref),
-                AppFormatters.currency(totalDue), ts,
-                bold: true),
+            _summaryRow(
+              tr('total_outstanding', ref),
+              AppFormatters.currency(totalDue),
+              ts,
+              bold: true,
+            ),
             const SizedBox(height: 4),
-            _summaryRow(tr('amount_received', ref),
-                '- ${AppFormatters.currency(received)}', ts,
-                color: received > 0 ? AppBrand.successColor : null),
+            _summaryRow(
+              tr('amount_received', ref),
+              '- ${AppFormatters.currency(received)}',
+              ts,
+              color: received > 0 ? AppBrand.successColor : null,
+            ),
             const Divider(height: 12),
             _summaryRow(
-                tr('new_balance', ref), AppFormatters.currency(newBal), ts,
-                bold: true,
-                color:
-                    newBal > 0 ? AppBrand.errorColor : AppBrand.successColor),
+              tr('new_balance', ref),
+              AppFormatters.currency(newBal),
+              ts,
+              bold: true,
+              color: newBal > 0 ? AppBrand.errorColor : AppBrand.successColor,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _summaryRow(String label, String value, TextTheme ts,
-      {bool bold = false, Color? color}) {
+  Widget _summaryRow(
+    String label,
+    String value,
+    TextTheme ts, {
+    bool bold = false,
+    Color? color,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: ts.bodySmall),
-        Text(value,
-            style: ts.bodySmall?.copyWith(
-              fontWeight: bold ? FontWeight.bold : null,
-              color: color,
-            )),
+        Text(
+          value,
+          style: ts.bodySmall?.copyWith(
+            fontWeight: bold ? FontWeight.bold : null,
+            color: color,
+          ),
+        ),
       ],
     );
   }
@@ -667,9 +712,10 @@ class _CreateSaleInvoiceScreenState
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: bg.withAlpha(80)),
       ),
-      child: Text(label,
-          style:
-              ts.labelSmall?.copyWith(color: bg, fontWeight: FontWeight.bold)),
+      child: Text(
+        label,
+        style: ts.labelSmall?.copyWith(color: bg, fontWeight: FontWeight.bold),
+      ),
     );
   }
 
@@ -680,9 +726,9 @@ class _CreateSaleInvoiceScreenState
 
     if (_selectedShop == null) {
       HapticFeedback.vibrate();
-      ScaffoldMessenger.of(context).showSnackBar(
-        warningSnackBar(tr('select_shop', ref)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(warningSnackBar(tr('select_shop', ref)));
       return;
     }
 
@@ -690,35 +736,37 @@ class _CreateSaleInvoiceScreenState
     final deductions = Map<String, int>.fromEntries(
       _selectedQtys.entries
           .where((e) => e.value > 0)
-          .map((e) => MapEntry(
-                e.key,
-                e.value * ppc + (_selectedExtraPairs[e.key] ?? 0),
-              )),
+          .map(
+            (e) => MapEntry(
+              e.key,
+              e.value * ppc + (_selectedExtraPairs[e.key] ?? 0),
+            ),
+          ),
     );
     // Invoices are exclusively for stock sales — at least one item is required for all roles
     if (deductions.isEmpty) {
       HapticFeedback.vibrate();
-      ScaffoldMessenger.of(context).showSnackBar(
-        warningSnackBar(tr('select_at_least_one_item', ref)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(warningSnackBar(tr('select_at_least_one_item', ref)));
       return;
     }
 
     final saleAmount = _saleAmount;
     if (saleAmount <= 0) {
       HapticFeedback.vibrate();
-      ScaffoldMessenger.of(context).showSnackBar(
-        warningSnackBar(tr('sale_amount_required', ref)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(warningSnackBar(tr('sale_amount_required', ref)));
       return;
     }
 
     final discount = _discountAmount;
     if (discount < 0 || discount > saleAmount) {
       HapticFeedback.vibrate();
-      ScaffoldMessenger.of(context).showSnackBar(
-        warningSnackBar(tr('discount', ref)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(warningSnackBar(tr('discount', ref)));
       return;
     }
 
@@ -734,35 +782,34 @@ class _CreateSaleInvoiceScreenState
     final router = GoRouter.of(context);
 
     try {
-      final invoiceId =
-          await ref.read(invoiceNotifierProvider.notifier).createSaleInvoice(
-                customerId: _selectedShop!.id,
-                customerName: _selectedShop!.name,
-                shopId: _selectedShop!.id,
-                shopName: _selectedShop!.name,
-                routeId: _selectedShop!.routeId.isNotEmpty
-                    ? _selectedShop!.routeId
-                    : (user.assignedRouteId ?? ''),
-                sellerId: user.id,
-                sellerName: user.displayName,
-                items: items,
-                subtotal: saleAmount,
-                discount: discount,
-                total: total,
-                amountReceived: amountReceived,
-                notes: _notesC.text.trim().isEmpty
-                    ? null
-                    : AppSanitizer.text(_notesC.text, maxLength: 300),
-                createdBy: user.id,
-                sellerInventoryDeductions: deductions,
-              );
+      final invoiceId = await ref
+          .read(invoiceNotifierProvider.notifier)
+          .createSaleInvoice(
+            customerId: _selectedShop!.id,
+            customerName: _selectedShop!.name,
+            shopId: _selectedShop!.id,
+            shopName: _selectedShop!.name,
+            routeId: _selectedShop!.routeId.isNotEmpty
+                ? _selectedShop!.routeId
+                : (user.assignedRouteId ?? ''),
+            sellerId: user.id,
+            sellerName: user.displayName,
+            items: items,
+            subtotal: saleAmount,
+            discount: discount,
+            total: total,
+            amountReceived: amountReceived,
+            notes: _notesC.text.trim().isEmpty
+                ? null
+                : AppSanitizer.text(_notesC.text, maxLength: 300),
+            createdBy: user.id,
+            sellerInventoryDeductions: deductions,
+          );
 
       if (mounted) {
         HapticFeedback.mediumImpact();
         _isDirty = false;
-        messenger.showSnackBar(
-          successSnackBar(tr('invoice_created', ref)),
-        );
+        messenger.showSnackBar(successSnackBar(tr('invoice_created', ref)));
         router.go('/invoices/$invoiceId');
       }
     } catch (e) {

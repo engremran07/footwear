@@ -93,26 +93,26 @@ class ShopModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'route_id': routeId,
-        'route_number': routeNumber,
-        'phone': phone,
-        'address': address,
-        'area': area,
-        'city': city,
-        'contact_name': contactName,
-        'balance': balance,
-        'notes': notes,
-        'latitude': latitude,
-        'longitude': longitude,
-        'active': active,
-        'bad_debt': badDebt,
-        'bad_debt_amount': badDebtAmount,
-        if (badDebtDate != null) 'bad_debt_date': badDebtDate,
-        'created_by': createdBy,
-        'created_at': createdAt,
-        'updated_at': updatedAt,
-      };
+    'name': name,
+    'route_id': routeId,
+    'route_number': routeNumber,
+    'phone': phone,
+    'address': address,
+    'area': area,
+    'city': city,
+    'contact_name': contactName,
+    'balance': balance,
+    'notes': notes,
+    'latitude': latitude,
+    'longitude': longitude,
+    'active': active,
+    'bad_debt': badDebt,
+    'bad_debt_amount': badDebtAmount,
+    if (badDebtDate != null) 'bad_debt_date': badDebtDate,
+    'created_by': createdBy,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+  };
 
   @override
   bool operator ==(Object other) =>

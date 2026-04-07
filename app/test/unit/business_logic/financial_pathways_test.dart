@@ -20,24 +20,17 @@ import 'package:flutter_test/flutter_test.dart';
 double invoiceBalanceDelta({
   required double total,
   required double amountReceived,
-}) =>
-    total - amountReceived;
+}) => total - amountReceived;
 
 /// Mirrors invoice status derivation
-String invoiceStatus({
-  required double total,
-  required double amountReceived,
-}) {
+String invoiceStatus({required double total, required double amountReceived}) {
   if (amountReceived >= total && total > 0) return 'paid';
   if (amountReceived > 0) return 'partial';
   return 'issued';
 }
 
 /// Mirrors sale type derivation
-String saleType({
-  required double total,
-  required double amountReceived,
-}) {
+String saleType({required double total, required double amountReceived}) {
   if (amountReceived >= total && total > 0) return 'cash';
   return 'credit';
 }
@@ -50,8 +43,7 @@ String saleType({
 double transactionBalanceDelta({
   required String type,
   required double amount,
-}) =>
-    type == 'cash_out' ? amount : -amount;
+}) => type == 'cash_out' ? amount : -amount;
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 

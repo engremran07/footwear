@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/collections.dart';
+import '../core/services/admin_identity_service.dart';
 import '../models/user_model.dart';
 import 'dashboard_provider.dart';
 import 'invoice_provider.dart';
+import 'product_provider.dart';
 import 'settings_provider.dart';
+import 'transaction_provider.dart';
 import 'user_provider.dart';
 
 final _logger = Logger();
@@ -50,9 +53,9 @@ final authUserProvider = StreamProvider<UserModel?>((ref) {
           .doc(user.uid)
           .snapshots()
           .map((doc) {
-        if (!doc.exists) return null;
-        return UserModel.fromJson(doc.data()!, doc.id);
-      });
+            if (!doc.exists) return null;
+            return UserModel.fromJson(doc.data()!, doc.id);
+          });
     },
     loading: () => Stream.value(null),
     error: (_, __) => Stream.value(null),
@@ -74,14 +77,19 @@ class AuthNotifier extends AsyncNotifier<void> {
     // previous session do not flash briefly when a new user signs in.
     ref.invalidate(lastGoodDashboardStatsProvider);
     ref.invalidate(settingsProvider);
+    ref.invalidate(allTransactionsProvider);
     ref.invalidate(allInvoicesProvider);
     ref.invalidate(roleAwareInvoicesProvider);
     ref.invalidate(sellerInvoicesProvider);
     ref.invalidate(sellersProvider);
+    ref.invalidate(allVariantsProvider);
   }
 
-  Future<void> signIn(String emailOrUsername, String password,
-      {bool rememberMe = true}) async {
+  Future<void> signIn(
+    String emailOrUsername,
+    String password, {
+    bool rememberMe = true,
+  }) async {
     state = const AsyncLoading();
     final nextState = await AsyncValue.guard(() async {
       try {
@@ -139,16 +147,20 @@ class AuthNotifier extends AsyncNotifier<void> {
           );
         }
 
-        final usersRef =
-            FirebaseFirestore.instance.collection(Collections.users);
+        final usersRef = FirebaseFirestore.instance.collection(
+          Collections.users,
+        );
         final userDoc = await usersRef.doc(uid).get();
 
         if (!userDoc.exists) {
           _logger.w(
-              'Signed in user has no profile document: $uid. Attempting self-heal.');
+            'Signed in user has no profile document: $uid. Attempting self-heal.',
+          );
 
-          final legacyByEmail =
-              await usersRef.where('email', isEqualTo: email).limit(1).get();
+          final legacyByEmail = await usersRef
+              .where('email', isEqualTo: email)
+              .limit(1)
+              .get();
 
           if (legacyByEmail.docs.isNotEmpty) {
             final data = legacyByEmail.docs.first.data();
@@ -173,8 +185,9 @@ class AuthNotifier extends AsyncNotifier<void> {
             final display = cred.user?.displayName?.trim();
             await usersRef.doc(uid).set({
               'email': email,
-              'display_name':
-                  (display != null && display.isNotEmpty) ? display : 'Admin',
+              'display_name': (display != null && display.isNotEmpty)
+                  ? display
+                  : 'Admin',
               'role': 'admin',
               'active': true,
               'created_by': uid,
@@ -193,6 +206,23 @@ class AuthNotifier extends AsyncNotifier<void> {
             message: 'User account is inactive',
           );
         }
+
+        // ── Email-verified sync (Auth → Firestore, non-blocking) ──────────
+        // Reload Auth user to get latest emailVerified from Firebase servers.
+        // If Auth says verified but Firestore doesn't, sync it now so the
+        // Riverpod stream reflects the real state without requiring re-login.
+        try {
+          await FirebaseAuth.instance.currentUser?.reload();
+          final isVerified =
+              FirebaseAuth.instance.currentUser?.emailVerified ?? false;
+          if (isVerified) {
+            await usersRef.doc(uid).update({
+              'email_verified': true,
+              'updated_at': Timestamp.now(),
+            });
+          }
+        } catch (_) {}
+        // ─────────────────────────────────────────────────────────────────
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool(rememberMePrefKey, rememberMe);
@@ -231,12 +261,16 @@ class AuthNotifier extends AsyncNotifier<void> {
       try {
         await FirebaseFirestore.instance.clearPersistence();
       } catch (_) {}
+      // Clear cached SA OAuth2 token so next admin session gets a fresh one.
+      AdminIdentityService.instance.clearCache();
       _invalidateRoleScopedProviders();
     });
   }
 
   Future<void> changePassword(
-      String currentPassword, String newPassword) async {
+    String currentPassword,
+    String newPassword,
+  ) async {
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser == null || firebaseUser.email == null) {
       throw FirebaseAuthException(
@@ -253,5 +287,6 @@ class AuthNotifier extends AsyncNotifier<void> {
   }
 }
 
-final authNotifierProvider =
-    AsyncNotifierProvider<AuthNotifier, void>(AuthNotifier.new);
+final authNotifierProvider = AsyncNotifierProvider<AuthNotifier, void>(
+  AuthNotifier.new,
+);

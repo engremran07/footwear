@@ -15,11 +15,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform);
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
 
     // S-01: Crashlytics — collect in release only
-    await FirebaseCrashlytics.instance
-        .setCrashlyticsCollectionEnabled(!kDebugMode);
+    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
+      !kDebugMode,
+    );
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
     PlatformDispatcher.instance.onError = (error, stack) {
       FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
@@ -28,8 +30,10 @@ void main() async {
 
     // S-06: App Check is opt-in for release Android APKs.
     // Default remains sideload-friendly unless USE_PLAY_INTEGRITY=true is set.
-    const usePlayIntegrity =
-        bool.fromEnvironment('USE_PLAY_INTEGRITY', defaultValue: false);
+    const usePlayIntegrity = bool.fromEnvironment(
+      'USE_PLAY_INTEGRITY',
+      defaultValue: false,
+    );
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       if (kDebugMode) {
         await FirebaseAppCheck.instance.activate(

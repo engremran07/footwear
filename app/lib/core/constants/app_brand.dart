@@ -12,8 +12,8 @@ class AppBrand {
   static const String logoAsset = 'assets/images/app_icon.png';
 
   // ─── Version ─────────────────────────────────────────────────────────────
-  static const String appVersion = '3.3.2';
-  static const String buildNumber = '23';
+  static const String appVersion = '3.3.8';
+  static const String buildNumber = '29';
   static const String versionDisplay = 'v$appVersion+$buildNumber';
 
   // ─── Contact / About ─────────────────────────────────────────────────────
@@ -33,8 +33,9 @@ class AppBrand {
 
   static const Color primaryColor = Color(0xFF01579B); // Glacier Deep Blue
   static const Color secondaryColor = Color(0xFF37474F); // Arctic Slate Rock
-  static const Color tertiaryColor =
-      Color(0xFF5C5FBE); // Northern Lights Indigo
+  static const Color tertiaryColor = Color(
+    0xFF5C5FBE,
+  ); // Northern Lights Indigo
   static const Color errorColor = Color(0xFFBA1A1A); // Ice Alert Red
   static const Color warningColor = Color(0xFFE07C00); // Arctic Flame
   static const Color successColor = Color(0xFF2E7D32); // Glacier Pine

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/services/admin_identity_service.dart';
 import '../firebase_options.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
@@ -18,8 +19,10 @@ final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
       .orderBy('display_name')
       .limit(100)
       .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList());
+      .map(
+        (snap) =>
+            snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList(),
+      );
 });
 
 final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
@@ -32,13 +35,16 @@ final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
       .where('active', isEqualTo: true)
       .limit(100)
       .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList());
+      .map(
+        (snap) =>
+            snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList(),
+      );
 });
 
 /// Admin-only: inactive (deactivated) users ordered by most recently updated.
-final inactiveUsersProvider =
-    StreamProvider.autoDispose<List<UserModel>>((ref) {
+final inactiveUsersProvider = StreamProvider.autoDispose<List<UserModel>>((
+  ref,
+) {
   final user = ref.watch(authUserProvider).valueOrNull;
   if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
@@ -47,8 +53,10 @@ final inactiveUsersProvider =
       .orderBy('updated_at', descending: true)
       .limit(200)
       .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList());
+      .map(
+        (snap) =>
+            snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList(),
+      );
 });
 
 class UserManagementNotifier extends AsyncNotifier<void> {
@@ -115,8 +123,9 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'display_name': trimmedName,
           'role': normalizedRole,
           'assigned_route_id': normalizedRole == 'seller' ? routeId : null,
-          'assigned_route_name':
-              normalizedRole == 'seller' ? assignedRouteName : null,
+          'assigned_route_name': normalizedRole == 'seller'
+              ? assignedRouteName
+              : null,
           'active': true,
           'created_by': FirebaseAuth.instance.currentUser!.uid, // RU-04
           'created_at': now,
@@ -160,8 +169,10 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     final batch = db.batch();
     final now = Timestamp.now();
 
-    batch.update(db.collection(Collections.users).doc(uid),
-        {...updateData, 'updated_at': now});
+    batch.update(db.collection(Collections.users).doc(uid), {
+      ...updateData,
+      'updated_at': now,
+    });
 
     // If route assignment changed, update route doc in same batch
     final newRouteId = data['assigned_route_id'] as String?;
@@ -185,10 +196,10 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         .collection(Collections.routes)
         .doc(routeId)
         .update({
-      'assigned_seller_id': null,
-      'assigned_seller_name': null,
-      'updated_at': Timestamp.now(),
-    });
+          'assigned_seller_id': null,
+          'assigned_seller_name': null,
+          'updated_at': Timestamp.now(),
+        });
   }
 
   Future<void> toggleActive(String uid, bool active) async {
@@ -260,8 +271,9 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     batch.update(db.collection(Collections.users).doc(trimmedUid), {
       'active': true,
       'assigned_route_id': routeId.trim().isNotEmpty ? routeId.trim() : null,
-      'assigned_route_name':
-          routeId.trim().isNotEmpty ? routeName.trim() : null,
+      'assigned_route_name': routeId.trim().isNotEmpty
+          ? routeName.trim()
+          : null,
       'updated_at': now,
     });
 
@@ -292,14 +304,17 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     }
 
     final db = FirebaseFirestore.instance;
-    final userSnap =
-        await db.collection(Collections.users).doc(trimmedUid).get();
+    final userSnap = await db
+        .collection(Collections.users)
+        .doc(trimmedUid)
+        .get();
     if (!userSnap.exists) throw ArgumentError('User not found: $trimmedUid');
 
     final isActive = userSnap.data()?['active'] as bool? ?? true;
     if (isActive) {
       throw StateError(
-          'Only deactivated users can be permanently deleted. Deactivate first.');
+        'Only deactivated users can be permanently deleted. Deactivate first.',
+      );
     }
 
     await db.collection(Collections.users).doc(trimmedUid).delete();
@@ -339,8 +354,77 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     await currentUser.reauthenticateWithCredential(credential);
     await currentUser.updatePassword(trimmedNew);
   }
+
+  // ── Admin 4-Way Sync Auth Pipeline ───────────────────────────────────────
+
+  /// Admin-only: Update email, password, and/or emailVerified for ANY user.
+  ///
+  /// 4-way sync:
+  ///   1. Firebase Auth  → AdminIdentityService (SA JWT → OAuth2 → REST API)
+  ///   2. Firestore      → atomic doc update (email + email_verified fields)
+  ///   3. Riverpod       → allUsersProvider / authUserProvider streams auto-fire
+  ///   4. UI             → re-renders from Riverpod state (no manual refresh needed)
+  ///
+  /// Admin self-email changes are synced the same way — the Riverpod authUserProvider
+  /// stream picks up the Firestore change and the profile re-renders automatically.
+  Future<void> adminUpdateUserAuth({
+    required String uid,
+    String? newEmail,
+    String? newPassword,
+    bool? emailVerified,
+  }) async {
+    final trimmedEmail = newEmail?.trim().toLowerCase();
+    final trimmedPassword = newPassword?.trim();
+
+    final hasEmailChange = trimmedEmail != null && trimmedEmail.isNotEmpty;
+    final hasPasswordChange =
+        trimmedPassword != null && trimmedPassword.isNotEmpty;
+
+    if (!hasEmailChange && !hasPasswordChange && emailVerified == null) return;
+
+    // Step 1: Update Firebase Auth via SA OAuth2 (Identity Toolkit admin API)
+    await AdminIdentityService.instance.updateAuthUser(
+      uid: uid,
+      email: hasEmailChange ? trimmedEmail : null,
+      password: hasPasswordChange ? trimmedPassword : null,
+      // New email → mark unverified; explicit override allowed
+      emailVerified: hasEmailChange ? false : emailVerified,
+    );
+
+    // Step 2: Sync Firestore (only changed fields — keeps batch minimal)
+    final fsUpdate = <String, dynamic>{'updated_at': Timestamp.now()};
+    if (hasEmailChange) {
+      fsUpdate['email'] = trimmedEmail;
+      fsUpdate['email_verified'] = false; // new email, needs re-verification
+    }
+    if (!hasEmailChange && emailVerified != null) {
+      fsUpdate['email_verified'] = emailVerified;
+    }
+
+    await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(uid)
+        .update(fsUpdate);
+    // Steps 3+4: Riverpod allUsersProvider / authUserProvider are real-time
+    // Firestore streams → auto-fire on doc change → UI re-renders.
+  }
+
+  /// Admin-only: Send email verification to any user.
+  /// Requires both [uid] and [email] — see AdminIdentityService for 3-step flow.
+  Future<void> adminSendVerificationEmail(String uid, String email) async {
+    await AdminIdentityService.instance.sendVerificationEmail(
+      uid,
+      email.trim().toLowerCase(),
+    );
+  }
+
+  /// Admin-only: Explicitly mark a user's email as verified in Auth + Firestore.
+  Future<void> adminMarkEmailVerified(String uid) async {
+    await adminUpdateUserAuth(uid: uid, emailVerified: true);
+  }
 }
 
 final userManagementNotifierProvider =
     AsyncNotifierProvider<UserManagementNotifier, void>(
-        UserManagementNotifier.new);
+      UserManagementNotifier.new,
+    );

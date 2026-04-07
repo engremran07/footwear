@@ -889,6 +889,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'select_at_least_one_item': 'Select at least one item',
     'sale_amount': 'Sale Amount',
     'amount_received': 'Amount Received',
+    'outstanding_amount': 'Outstanding Amount',
+    'subtotal': 'Subtotal',
+    'discount': 'Discount',
     'previous_balance': 'Previous Balance',
     'current_sale': 'Current Sale',
     'total_outstanding': 'Total Outstanding',
@@ -953,7 +956,16 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'lbl_email_no_change': 'Email cannot be changed after creation',
     'settings_send_reset_email': 'Send Password Reset Email',
     'msg_reset_email_sent': 'Password reset email sent to %s',
-    'confirm_delete_user': 'Delete user %s? This cannot be undone.',
+    'lbl_set_password': 'Set New Password',
+    'hint_set_password': 'Leave blank to keep current password',
+    'lbl_email_verified': 'Email Verified',
+    'lbl_email_not_verified': 'Email Not Verified',
+    'btn_send_verification': 'Send Verification Email',
+    'msg_verification_sent': 'Verification email sent to %s',
+    'lbl_email_change_note':
+        'Changing email updates Firebase Auth + profile immediately',
+    'msg_auth_updated': 'Account credentials updated successfully',
+    'err_admin_auth_update': 'Credential update failed. Check admin config.',
     'msg_user_deleted': '%s deleted',
     // ISSUE-018/019: missing keys that caused raw key text on screen
     'permission_denied': 'Access Denied',
@@ -965,8 +977,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'hard_delete_user': 'Permanently Delete',
     'confirm_hard_delete_user':
         'Permanently delete %s? Their Firestore profile will be removed. '
-            'On the free tier their Firebase Auth entry persists until '
-            'manually removed via the Firebase console.',
+        'On the free tier their Firebase Auth entry persists until '
+        'manually removed via the Firebase console.',
     'msg_user_hard_deleted': '%s permanently deleted',
     'reactivate': 'Reactivate',
     'confirm_reactivate_user': 'Reactivate %s and restore their access?',
@@ -1933,6 +1945,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'select_at_least_one_item': 'اختر عنصرًا واحدًا على الأقل',
     'sale_amount': 'مبلغ البيع',
     'amount_received': 'المبلغ المستلم',
+    'outstanding_amount': 'المبلغ المستحق',
+    'subtotal': 'الإجمالي الفرعي',
+    'discount': 'الخصم',
     'previous_balance': 'الرصيد السابق',
     'current_sale': 'البيع الحالي',
     'total_outstanding': 'إجمالي المستحق',
@@ -1997,7 +2012,17 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'lbl_email_no_change': 'لا يمكن تغيير البريد الإلكتروني بعد الإنشاء',
     'settings_send_reset_email': 'إرسال بريد إعادة تعيين كلمة المرور',
     'msg_reset_email_sent': 'تم إرسال بريد إعادة تعيين كلمة المرور إلى %s',
-    'confirm_delete_user': 'هل تريد حذف المستخدم %s؟ لا يمكن التراجع عن ذلك.',
+    'lbl_set_password': 'تعيين كلمة مرور جديدة',
+    'hint_set_password': 'اترك فارغًا للاحتفاظ بكلمة المرور الحالية',
+    'lbl_email_verified': 'البريد الإلكتروني مؤكد',
+    'lbl_email_not_verified': 'البريد الإلكتروني غير مؤكد',
+    'btn_send_verification': 'إرسال بريد التحقق',
+    'msg_verification_sent': 'تم إرسال بريد التحقق إلى %s',
+    'lbl_email_change_note':
+        'تغيير البريد يحدت فورًا في Firebase Auth والملف الشخصي',
+    'msg_auth_updated': 'تم تحديث بيانات الحساب بنجاح',
+    'err_admin_auth_update':
+        'فشل تحديث بيانات الاعتماد. تحقق من إعدادات المسؤول.',
     'msg_user_deleted': 'تم حذف %s',
     // ISSUE-018/019: مفاتيح مفقودة
     'permission_denied': 'تم رفض الوصول',
@@ -2010,7 +2035,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'hard_delete_user': 'حذف نهائي',
     'confirm_hard_delete_user':
         'حذف %s نهائيًا؟ سيتم إزالة ملفه الشخصي من قاعدة البيانات. '
-            'في الإصدار المجاني تبقى بيانات المصادقة حتى يتم حذفها يدويًا.',
+        'في الإصدار المجاني تبقى بيانات المصادقة حتى يتم حذفها يدويًا.',
     'msg_user_hard_deleted': 'تم حذف %s نهائيًا',
     'reactivate': 'إعادة تفعيل',
     'confirm_reactivate_user': 'هل تريد إعادة تفعيل %s واستعادة صلاحياتهم؟',
@@ -2984,6 +3009,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'select_at_least_one_item': 'کم از کم ایک آئٹم منتخب کریں',
     'sale_amount': 'فروخت کی رقم',
     'amount_received': 'وصول شدہ رقم',
+    'outstanding_amount': 'واجب الادا رقم',
+    'subtotal': 'ذیلی کل',
+    'discount': 'رعایت',
     'previous_balance': 'پچھلا بیلنس',
     'current_sale': 'موجودہ فروخت',
     'total_outstanding': 'کل واجب الادا',
@@ -3048,7 +3076,16 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'lbl_email_no_change': 'تخلیق کے بعد ای میل تبدیل نہیں ہو سکتی',
     'settings_send_reset_email': 'پاس ورڈ ری سیٹ ای میل بھیجیں',
     'msg_reset_email_sent': '%s کو پاس ورڈ ری سیٹ ای میل بھیج دی گئی',
-    'confirm_delete_user': 'صارف %s کو حذف کریں؟ یہ واپس نہیں ہو سکتا۔',
+    'lbl_set_password': 'نیا پاس ورڈ سیٹ کریں',
+    'hint_set_password': 'موجودہ پاس ورڈ رکھنے کے لیے خالی چھوڑیں',
+    'lbl_email_verified': 'ای میل تصدیق شدہ',
+    'lbl_email_not_verified': 'ای میل تصدیق نہیں ہوئی',
+    'btn_send_verification': 'تصدیقی ای میل بھیجیں',
+    'msg_verification_sent': 'تصدیقی ای میل %s کو بھیج دی گئی',
+    'lbl_email_change_note':
+        'ای میل تبدیلی Firebase Auth + پروفائل میں فوری ہوتی ہے',
+    'msg_auth_updated': 'اکاؤنٹ کی اسنادی معلومات کامیابی سے اپڈیٹ ہو گئیں',
+    'err_admin_auth_update': 'اسناد اپڈیٹ ناکام ہوئی۔ ایڈمن کنفگ چیک کریں۔',
     'msg_user_deleted': '%s حذف ہو گیا',
     // ISSUE-018/019: لاپتہ کلیدیں
     'permission_denied': 'رسائی سے انکار',
@@ -3061,7 +3098,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'hard_delete_user': 'مستقل حذف',
     'confirm_hard_delete_user':
         '%s کو مستقل طور پر حذف کریں؟ ان کا Firestore پروفائل ہٹا دیا جائے گا۔ '
-            'مفت پلان میں Firebase Auth انٹری Firebase کنسول سے دستی طور پر ہٹانی ہوگی۔',
+        'مفت پلان میں Firebase Auth انٹری Firebase کنسول سے دستی طور پر ہٹانی ہوگی۔',
     'msg_user_hard_deleted': '%s مستقل طور پر حذف ہو گیا',
     'reactivate': 'دوبارہ فعال کریں',
     'confirm_reactivate_user':

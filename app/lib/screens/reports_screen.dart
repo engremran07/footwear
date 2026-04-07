@@ -28,6 +28,7 @@ class ReportsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(authUserProvider);
     final stats = ref.watch(dashboardStatsProvider);
+    final shopsAsync = ref.watch(shopsProvider);
     final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
     return Scaffold(
       appBar: AppBar(title: Text(tr('reports', ref))),
@@ -36,40 +37,55 @@ class ReportsScreen extends ConsumerWidget {
         children: [
           // Summary card
           stats.when(
-            data: (s) => Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(tr('summary', ref),
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    _Row(
+            data: (s) {
+              // Outstanding always from live shops stream — never from stats cache
+              final totalOutstanding =
+                  shopsAsync.valueOrNull?.fold<double>(
+                    0.0,
+                    (acc, sh) => acc + sh.balance,
+                  ) ??
+                  0.0;
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr('summary', ref),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      _Row(
                         label: tr('total_routes', ref),
-                        value: '${s.totalRoutes}'),
-                    _Row(
+                        value: '${s.totalRoutes}',
+                      ),
+                      _Row(
                         label: tr('total_shops', ref),
-                        value: '${s.totalShops}'),
-                    _Row(
+                        value: '${s.totalShops}',
+                      ),
+                      _Row(
                         label: tr('outstanding_balance', ref),
-                        value: AppFormatters.sar(s.totalOutstanding)),
-                    _Row(
+                        value: AppFormatters.sar(totalOutstanding),
+                      ),
+                      _Row(
                         label: tr('total_products', ref),
-                        value: '${s.totalProducts}'),
-                    _Row(
+                        value: '${s.totalProducts}',
+                      ),
+                      _Row(
                         label: tr('total_variants', ref),
-                        value: '${s.totalVariants}'),
-                    _Row(
+                        value: '${s.totalVariants}',
+                      ),
+                      _Row(
                         label: tr('stock_pairs', ref),
-                        value: AppFormatters.stock(s.totalStockPairs, ppc)),
-                  ],
+                        value: AppFormatters.stock(s.totalStockPairs, ppc),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Text('$e'),
           ),
@@ -102,11 +118,6 @@ class ReportsScreen extends ConsumerWidget {
             onExport: () => _exportOutstanding(context, ref),
           ),
           _ExportCard(
-            icon: Icons.people,
-            title: tr('customers_report', ref),
-            onExport: () => _exportCustomers(context, ref),
-          ),
-          _ExportCard(
             icon: Icons.money_off,
             title: tr('bad_debts_report', ref),
             onExport: () => _exportBadDebts(context, ref),
@@ -124,9 +135,9 @@ class ReportsScreen extends ConsumerWidget {
     final shops = user?.isAdmin == true
         ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
         : (routeId.isNotEmpty
-            ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
-                <ShopModel>[]
-            : <ShopModel>[]);
+              ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
+                    <ShopModel>[]
+              : <ShopModel>[]);
     ExportSheet.show(
       context,
       ref,
@@ -140,14 +151,16 @@ class ReportsScreen extends ConsumerWidget {
         tr('balance', ref),
       ],
       rows: shops
-          .map((s) => [
-                s.name,
-                'R${s.routeNumber}',
-                s.phone ?? '',
-                s.area ?? '',
-                s.city ?? '',
-                AppFormatters.sar(s.balance),
-              ])
+          .map(
+            (s) => [
+              s.name,
+              'R${s.routeNumber}',
+              s.phone ?? '',
+              s.area ?? '',
+              s.city ?? '',
+              AppFormatters.sar(s.balance),
+            ],
+          )
           .toList(),
       fileName: 'shops_report',
     );
@@ -159,15 +172,14 @@ class ReportsScreen extends ConsumerWidget {
       context,
       ref,
       title: tr('inventory_report', ref),
-      headers: [
-        tr('variant_name', ref),
-        tr('stock_pairs', ref),
-      ],
+      headers: [tr('variant_name', ref), tr('stock_pairs', ref)],
       rows: variants
-          .map((v) => [
-                v.variantName,
-                AppFormatters.stock(v.quantityAvailable, ppc),
-              ])
+          .map(
+            (v) => [
+              v.variantName,
+              AppFormatters.stock(v.quantityAvailable, ppc),
+            ],
+          )
           .toList(),
       fileName: 'inventory_report',
     );
@@ -178,7 +190,7 @@ class ReportsScreen extends ConsumerWidget {
     final txs = user?.isAdmin == true
         ? ref.read(allTransactionsProvider).valueOrNull ?? []
         : ref.read(sellerTransactionsProvider(user?.id ?? '')).valueOrNull ??
-            [];
+              [];
     ExportSheet.show(
       context,
       ref,
@@ -191,13 +203,15 @@ class ReportsScreen extends ConsumerWidget {
         tr('description', ref),
       ],
       rows: txs
-          .map((t) => [
-                AppFormatters.dateTime(t.createdAt),
-                t.shopName,
-                t.type == 'cash_in' ? tr('cash_in', ref) : tr('cash_out', ref),
-                AppFormatters.sar(t.amount),
-                t.description ?? '',
-              ])
+          .map(
+            (t) => [
+              AppFormatters.dateTime(t.createdAt),
+              t.shopName,
+              t.type == 'cash_in' ? tr('cash_in', ref) : tr('cash_out', ref),
+              AppFormatters.sar(t.amount),
+              t.description ?? '',
+            ],
+          )
           .toList(),
       fileName: 'transactions_report',
     );
@@ -209,9 +223,11 @@ class ReportsScreen extends ConsumerWidget {
     final shops = user?.isAdmin == true
         ? ref.read(outstandingShopsProvider).valueOrNull ?? <ShopModel>[]
         : (routeId.isNotEmpty
-            ? ref.read(outstandingShopsByRouteProvider(routeId)).valueOrNull ??
-                <ShopModel>[]
-            : <ShopModel>[]);
+              ? ref
+                        .read(outstandingShopsByRouteProvider(routeId))
+                        .valueOrNull ??
+                    <ShopModel>[]
+              : <ShopModel>[]);
     ExportSheet.show(
       context,
       ref,
@@ -223,45 +239,16 @@ class ReportsScreen extends ConsumerWidget {
         tr('balance', ref),
       ],
       rows: shops
-          .map((s) => [
-                s.name,
-                'R${s.routeNumber}',
-                s.phone ?? '',
-                AppFormatters.sar(s.balance),
-              ])
+          .map(
+            (s) => [
+              s.name,
+              'R${s.routeNumber}',
+              s.phone ?? '',
+              AppFormatters.sar(s.balance),
+            ],
+          )
           .toList(),
       fileName: 'outstanding_report',
-    );
-  }
-
-  void _exportCustomers(BuildContext context, WidgetRef ref) {
-    final user = ref.read(authUserProvider).valueOrNull;
-    final routeId = user?.assignedRouteId ?? '';
-    final shops = user?.isAdmin == true
-        ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
-        : (routeId.isNotEmpty
-            ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
-                <ShopModel>[]
-            : <ShopModel>[]);
-    ExportSheet.show(
-      context,
-      ref,
-      title: tr('customers_report', ref),
-      headers: [
-        tr('name', ref),
-        tr('phone', ref),
-        tr('city', ref),
-        tr('balance', ref),
-      ],
-      rows: shops
-          .map((s) => [
-                s.name,
-                s.phone ?? '',
-                s.city ?? '',
-                AppFormatters.sar(s.balance),
-              ])
-          .toList(),
-      fileName: 'customers_report',
     );
   }
 
@@ -271,9 +258,9 @@ class ReportsScreen extends ConsumerWidget {
     final shops = user?.isAdmin == true
         ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
         : (routeId.isNotEmpty
-            ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
-                <ShopModel>[]
-            : <ShopModel>[]);
+              ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
+                    <ShopModel>[]
+              : <ShopModel>[]);
     final badDebtShops = shops.where((s) => s.badDebt).toList();
     ExportSheet.show(
       context,
@@ -286,14 +273,16 @@ class ReportsScreen extends ConsumerWidget {
         tr('date', ref),
       ],
       rows: badDebtShops
-          .map((s) => [
-                s.name,
-                s.phone ?? '',
-                AppFormatters.sar(s.badDebtAmount),
-                s.badDebtDate != null
-                    ? AppFormatters.dateTime(s.badDebtDate!)
-                    : '',
-              ])
+          .map(
+            (s) => [
+              s.name,
+              s.phone ?? '',
+              AppFormatters.sar(s.badDebtAmount),
+              s.badDebtDate != null
+                  ? AppFormatters.dateTime(s.badDebtDate!)
+                  : '',
+            ],
+          )
           .toList(),
       fileName: 'bad_debts_report',
     );
@@ -331,8 +320,11 @@ class _ExportCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final VoidCallback onExport;
-  const _ExportCard(
-      {required this.icon, required this.title, required this.onExport});
+  const _ExportCard({
+    required this.icon,
+    required this.title,
+    required this.onExport,
+  });
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -378,8 +370,7 @@ class _MonthlyCashFlowChart extends ConsumerWidget {
         }
 
         // Take last 6 months
-        final periods = AppFormatters.last12Periods()
-            .reversed
+        final periods = AppFormatters.last12Periods().reversed
             .take(6)
             .toList()
             .reversed
@@ -396,19 +387,24 @@ class _MonthlyCashFlowChart extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tr('cash_flow', ref),
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  tr('cash_flow', ref),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
                     _LegendDot(
-                        color: AppTheme.clearFg(cs), label: tr('cash_in', ref)),
+                      color: AppTheme.clearFg(cs),
+                      label: tr('cash_in', ref),
+                    ),
                     const SizedBox(width: 12),
                     _LegendDot(
-                        color: AppTheme.debtFg(cs), label: tr('cash_out', ref)),
+                      color: AppTheme.debtFg(cs),
+                      label: tr('cash_out', ref),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -426,14 +422,16 @@ class _MonthlyCashFlowChart extends ConsumerWidget {
                               color: AppTheme.clearFg(cs),
                               width: 10,
                               borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(4)),
+                                top: Radius.circular(4),
+                              ),
                             ),
                             BarChartRodData(
                               toY: cashOut[p] ?? 0,
                               color: AppTheme.debtFg(cs),
                               width: 10,
                               borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(4)),
+                                top: Radius.circular(4),
+                              ),
                             ),
                           ],
                         );
@@ -448,14 +446,18 @@ class _MonthlyCashFlowChart extends ConsumerWidget {
                             getTitlesWidget: (v, _) => Text(
                               AppFormatters.compact(v),
                               style: TextStyle(
-                                  fontSize: 9, color: cs.onSurfaceVariant),
+                                fontSize: 9,
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
                           ),
                         ),
                         rightTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
                         topTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
@@ -466,10 +468,13 @@ class _MonthlyCashFlowChart extends ConsumerWidget {
                                 return const SizedBox.shrink();
                               }
                               return Text(
-                                AppFormatters.period(displayPeriods[idx])
-                                    .substring(0, 3),
+                                AppFormatters.period(
+                                  displayPeriods[idx],
+                                ).substring(0, 3),
                                 style: TextStyle(
-                                    fontSize: 9, color: cs.onSurfaceVariant),
+                                  fontSize: 9,
+                                  color: cs.onSurfaceVariant,
+                                ),
                               );
                             },
                           ),
@@ -498,14 +503,18 @@ class _LegendDot extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+        ),
         const SizedBox(width: 4),
-        Text(label,
-            style: TextStyle(
-                fontSize: 11,
-                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
       ],
     );
   }
@@ -532,8 +541,9 @@ class _OutstandingPieChart extends ConsumerWidget {
 
         // Group: top 5 + "others"
         final top = withDebt.take(5).toList();
-        final othersTotal =
-            withDebt.skip(5).fold<double>(0, (s, sh) => s + sh.balance);
+        final othersTotal = withDebt
+            .skip(5)
+            .fold<double>(0, (s, sh) => s + sh.balance);
 
         final colors = [
           cs.primary,
@@ -546,35 +556,44 @@ class _OutstandingPieChart extends ConsumerWidget {
 
         final sections = <PieChartSectionData>[];
         for (var i = 0; i < top.length; i++) {
-          sections.add(PieChartSectionData(
-            value: top[i].balance,
-            title: AppFormatters.sar(top[i].balance),
-            color: colors[i % colors.length],
-            radius: 50,
-            titleStyle: TextStyle(
+          sections.add(
+            PieChartSectionData(
+              value: top[i].balance,
+              title: AppFormatters.sar(top[i].balance),
+              color: colors[i % colors.length],
+              radius: 50,
+              titleStyle: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: ThemeData.estimateBrightnessForColor(
-                            colors[i % colors.length]) ==
+                color:
+                    ThemeData.estimateBrightnessForColor(
+                          colors[i % colors.length],
+                        ) ==
                         Brightness.dark
                     ? Colors.white
-                    : Colors.black),
-          ));
+                    : Colors.black,
+              ),
+            ),
+          );
         }
         if (othersTotal > 0) {
-          sections.add(PieChartSectionData(
-            value: othersTotal,
-            title: AppFormatters.sar(othersTotal),
-            color: colors.last,
-            radius: 50,
-            titleStyle: TextStyle(
+          sections.add(
+            PieChartSectionData(
+              value: othersTotal,
+              title: AppFormatters.sar(othersTotal),
+              color: colors.last,
+              radius: 50,
+              titleStyle: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: ThemeData.estimateBrightnessForColor(colors.last) ==
+                color:
+                    ThemeData.estimateBrightnessForColor(colors.last) ==
                         Brightness.dark
                     ? Colors.white
-                    : Colors.black),
-          ));
+                    : Colors.black,
+              ),
+            ),
+          );
         }
 
         return Card(
@@ -584,11 +603,12 @@ class _OutstandingPieChart extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tr('outstanding_report', ref),
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  tr('outstanding_report', ref),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 160,
@@ -616,10 +636,7 @@ class _OutstandingPieChart extends ConsumerWidget {
                                   : top[i].name,
                             ),
                           if (othersTotal > 0)
-                            _LegendDot(
-                              color: colors.last,
-                              label: 'Others',
-                            ),
+                            _LegendDot(color: colors.last, label: 'Others'),
                         ],
                       ),
                     ],
@@ -643,7 +660,7 @@ class _AccountStatementCard extends ConsumerStatefulWidget {
 }
 
 class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
-  String? _selectedCustomerId;
+  String? _selectedShopId;
   bool _generating = false;
 
   Map<String, String> _labels(WidgetRef ref) {
@@ -657,7 +674,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       'account_statement',
       'opening_balance',
       'net_payable',
-      'customer',
+      'shop',
       'seller',
       'total',
       'page',
@@ -674,7 +691,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
   }
 
   Future<void> _generate() async {
-    if (_selectedCustomerId == null) return;
+    if (_selectedShopId == null) return;
     setState(() => _generating = true);
     try {
       final locale = ref.read(appLocaleProvider);
@@ -683,17 +700,17 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       final shops = user?.isAdmin == true
           ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
           : (routeId.isNotEmpty
-              ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
-                  <ShopModel>[]
-              : <ShopModel>[]);
-      final shop = shops.firstWhere((s) => s.id == _selectedCustomerId);
+                ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
+                      <ShopModel>[]
+                : <ShopModel>[]);
+      final shop = shops.firstWhere((s) => s.id == _selectedShopId);
 
-      // Query Firestore directly for this customer's transactions.
+      // Query Firestore directly for this shop's transactions.
       // No server-side deleted==false: old docs predate the field and
       // isEqualTo:false silently excludes them. Filter client-side.
       final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)
-          .where('customer_id', isEqualTo: _selectedCustomerId)
+          .where('customer_id', isEqualTo: _selectedShopId)
           .orderBy('created_at')
           .get();
       final txs = snap.docs
@@ -706,7 +723,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
           ? ref.read(allUsersProvider).valueOrNull ?? <UserModel>[]
           : <UserModel>[];
       final entryByMap = <String, String>{
-        for (final u in allUsers) u.id: u.displayName
+        for (final u in allUsers) u.id: u.displayName,
       };
       if (user != null) entryByMap[user.id] = user.displayName;
 
@@ -744,14 +761,14 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
           tr('description', ref),
         ],
         rows: txs
-            .map((t) => [
-                  AppFormatters.dateTime(t.createdAt),
-                  t.type == 'cash_in'
-                      ? tr('cash_in', ref)
-                      : tr('cash_out', ref),
-                  AppFormatters.sar(t.amount),
-                  t.description ?? '',
-                ])
+            .map(
+              (t) => [
+                AppFormatters.dateTime(t.createdAt),
+                t.type == 'cash_in' ? tr('cash_in', ref) : tr('cash_out', ref),
+                AppFormatters.sar(t.amount),
+                t.description ?? '',
+              ],
+            )
             .toList(),
         fileName: 'account_statement_${shop.name.replaceAll(' ', '_')}',
         pdfBytesBuilder: () async => bytes,
@@ -772,8 +789,8 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
     final AsyncValue<List<ShopModel>> shopsAsync = user?.isAdmin == true
         ? ref.watch(shopsProvider)
         : (routeId.isNotEmpty
-            ? ref.watch(shopsByRouteProvider(routeId))
-            : const AsyncData(<ShopModel>[]));  
+              ? ref.watch(shopsByRouteProvider(routeId))
+              : const AsyncData(<ShopModel>[]));
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -783,12 +800,18 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
           children: [
             Row(
               children: [
-                Icon(Icons.account_balance,
-                    color: Theme.of(context).colorScheme.primary),
+                Icon(
+                  Icons.account_balance,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
-                Text(tr('account_statement', ref),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 15)),
+                Text(
+                  tr('account_statement', ref),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -796,31 +819,33 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => Text('$e'),
               data: (shops) => DropdownButtonFormField<String>(
-                initialValue: _selectedCustomerId,
+                initialValue: _selectedShopId,
                 decoration: InputDecoration(
-                  labelText: tr('customer', ref),
+                  labelText: tr('shop', ref),
                   isDense: true,
                   border: const OutlineInputBorder(),
                 ),
                 items: shops
-                    .map((s) =>
-                        DropdownMenuItem(value: s.id, child: Text(s.name)))
+                    .map(
+                      (s) => DropdownMenuItem(value: s.id, child: Text(s.name)),
+                    )
                     .toList(),
-                onChanged: (v) => setState(() => _selectedCustomerId = v),
+                onChanged: (v) => setState(() => _selectedShopId = v),
               ),
             ),
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: _selectedCustomerId == null || _generating
+                onPressed: _selectedShopId == null || _generating
                     ? null
                     : _generate,
                 icon: _generating
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.picture_as_pdf),
                 label: Text(tr('export', ref)),
               ),
@@ -849,8 +874,8 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       'seller',
       'route',
       'inventory',
-      'customers',
-      'customer',
+      'shops',
+      'shop',
       'stock_sold',
       'stock_received',
       'stock_remaining',
@@ -874,18 +899,21 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       final allTxs = ref.read(allTransactionsProvider).valueOrNull ?? [];
       final inventory =
           ref.read(sellerInventoryProvider(_selectedSellerId!)).valueOrNull ??
-              [];
+          [];
       final allShops = ref.read(shopsProvider).valueOrNull ?? <ShopModel>[];
 
       // Build per-customer summary
-      final txsBySeller =
-          allTxs.where((t) => t.createdBy == _selectedSellerId).toList();
+      final txsBySeller = allTxs
+          .where((t) => t.createdBy == _selectedSellerId)
+          .toList();
       final customerMap = <String, SellerReportCustomer>{};
       for (final tx in txsBySeller) {
         final cid = tx.customerId ?? tx.shopId;
         if (cid.isEmpty) continue;
-        final cname = tx.customerName ??
-            allShops.where((s) => s.id == cid).firstOrNull?.name ?? '';
+        final cname =
+            tx.customerName ??
+            allShops.where((s) => s.id == cid).firstOrNull?.name ??
+            '';
         final existing = customerMap[cid];
         final pairsSold = tx.items.fold<int>(0, (acc, item) => acc + item.qty);
         final revenue = tx.isCashOut ? tx.amount : 0.0;
@@ -909,8 +937,10 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
         }
       }
 
-      final stockReceived =
-          inventory.fold<int>(0, (s, i) => s + i.quantityAvailable);
+      final stockReceived = inventory.fold<int>(
+        0,
+        (s, i) => s + i.quantityAvailable,
+      );
       final stockSold = txsBySeller
           .expand((t) => t.items)
           .fold<int>(0, (s, item) => s + item.qty);
@@ -935,18 +965,20 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
         ref,
         title: '${seller.displayName} - ${tr('seller_report', ref)}',
         headers: [
-          tr('customer', ref),
+          tr('shop', ref),
           tr('stock_sold', ref),
           tr('revenue', ref),
           tr('outstanding', ref),
         ],
         rows: customerMap.values
-            .map((c) => [
-                  c.name,
-                  c.totalPairsSold,
-                  AppFormatters.sar(c.totalRevenue),
-                  AppFormatters.sar(c.outstandingBalance),
-                ])
+            .map(
+              (c) => [
+                c.name,
+                c.totalPairsSold,
+                AppFormatters.sar(c.totalRevenue),
+                AppFormatters.sar(c.outstandingBalance),
+              ],
+            )
             .toList(),
         fileName: 'seller_report_${seller.displayName.replaceAll(' ', '_')}',
         pdfBytesBuilder: () async => bytes,
@@ -976,12 +1008,18 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
           children: [
             Row(
               children: [
-                Icon(Icons.bar_chart,
-                    color: Theme.of(context).colorScheme.primary),
+                Icon(
+                  Icons.bar_chart,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
-                Text(tr('seller_report', ref),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 15)),
+                Text(
+                  tr('seller_report', ref),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -998,8 +1036,12 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
                     border: const OutlineInputBorder(),
                   ),
                   items: sellers
-                      .map((u) => DropdownMenuItem(
-                          value: u.id, child: Text(u.displayName)))
+                      .map(
+                        (u) => DropdownMenuItem(
+                          value: u.id,
+                          child: Text(u.displayName),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() => _selectedSellerId = v),
                 );
@@ -1009,13 +1051,15 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed:
-                    _selectedSellerId == null || _generating ? null : _generate,
+                onPressed: _selectedSellerId == null || _generating
+                    ? null
+                    : _generate,
                 icon: _generating
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.picture_as_pdf),
                 label: Text(tr('export', ref)),
               ),

@@ -42,30 +42,37 @@ enum VoidRefundMode { cashRefund, creditBalance }
 // New code must use invoicesByShopProvider.
 final invoicesByCustomerProvider = StreamProvider.autoDispose
     .family<List<InvoiceModel>, String>((ref, customerId) {
-  return FirebaseFirestore.instance
-      .collection(Collections.invoices)
-      .where('customer_id', isEqualTo: customerId)
-      .orderBy('created_at', descending: true)
-      .limit(100)
-      .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => InvoiceModel.fromJson(d.data(), d.id)).toList());
-});
+      return FirebaseFirestore.instance
+          .collection(Collections.invoices)
+          .where('customer_id', isEqualTo: customerId)
+          .orderBy('created_at', descending: true)
+          .limit(100)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((d) => InvoiceModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
 
 final invoicesByShopProvider = StreamProvider.autoDispose
     .family<List<InvoiceModel>, String>((ref, shopId) {
-  return FirebaseFirestore.instance
-      .collection(Collections.invoices)
-      .where('shop_id', isEqualTo: shopId)
-      .orderBy('created_at', descending: true)
-      .limit(100)
-      .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => InvoiceModel.fromJson(d.data(), d.id)).toList());
-});
+      return FirebaseFirestore.instance
+          .collection(Collections.invoices)
+          .where('shop_id', isEqualTo: shopId)
+          .orderBy('created_at', descending: true)
+          .limit(100)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((d) => InvoiceModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
 
-final allInvoicesProvider =
-    StreamProvider.autoDispose<List<InvoiceModel>>((ref) {
+final allInvoicesProvider = StreamProvider.autoDispose<List<InvoiceModel>>((
+  ref,
+) {
   // Admin-only: this provider exposes ALL invoices. Non-admins get an empty
   // stream — use roleAwareInvoicesProvider or sellerInvoicesProvider instead.
   final user = ref.watch(authUserProvider).valueOrNull;
@@ -75,57 +82,70 @@ final allInvoicesProvider =
       .orderBy('created_at', descending: true)
       .limit(200)
       .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => InvoiceModel.fromJson(d.data(), d.id)).toList());
+      .map(
+        (snap) => snap.docs
+            .map((d) => InvoiceModel.fromJson(d.data(), d.id))
+            .toList(),
+      );
 });
 
 /// Seller-scoped: only invoices created by this seller.
 final sellerInvoicesProvider = StreamProvider.autoDispose
     .family<List<InvoiceModel>, String>((ref, sellerId) {
-  return FirebaseFirestore.instance
-      .collection(Collections.invoices)
-      .where('seller_id', isEqualTo: sellerId)
-      .orderBy('created_at', descending: true)
-      .limit(200)
-      .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => InvoiceModel.fromJson(d.data(), d.id)).toList());
-});
+      return FirebaseFirestore.instance
+          .collection(Collections.invoices)
+          .where('seller_id', isEqualTo: sellerId)
+          .orderBy('created_at', descending: true)
+          .limit(200)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((d) => InvoiceModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
 
 /// Role-aware: admins see all, sellers see only their own.
 final roleAwareInvoicesProvider =
     StreamProvider.autoDispose<List<InvoiceModel>>((ref) {
-  final user = ref.watch(authUserProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
-  if (user.isAdmin) {
-    return FirebaseFirestore.instance
-        .collection(Collections.invoices)
-        .orderBy('created_at', descending: true)
-        .limit(200)
-        .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => InvoiceModel.fromJson(d.data(), d.id))
-            .toList());
-  }
-  return FirebaseFirestore.instance
-      .collection(Collections.invoices)
-      .where('seller_id', isEqualTo: user.id)
-      .orderBy('created_at', descending: true)
-      .limit(200)
-      .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => InvoiceModel.fromJson(d.data(), d.id)).toList());
-});
+      final user = ref.watch(authUserProvider).valueOrNull;
+      if (user == null) return Stream.value([]);
+      if (user.isAdmin) {
+        return FirebaseFirestore.instance
+            .collection(Collections.invoices)
+            .orderBy('created_at', descending: true)
+            .limit(200)
+            .snapshots()
+            .map(
+              (snap) => snap.docs
+                  .map((d) => InvoiceModel.fromJson(d.data(), d.id))
+                  .toList(),
+            );
+      }
+      return FirebaseFirestore.instance
+          .collection(Collections.invoices)
+          .where('seller_id', isEqualTo: user.id)
+          .orderBy('created_at', descending: true)
+          .limit(200)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((d) => InvoiceModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
 
-final invoiceByIdProvider =
-    StreamProvider.autoDispose.family<InvoiceModel?, String>((ref, invoiceId) {
-  return FirebaseFirestore.instance
-      .collection(Collections.invoices)
-      .doc(invoiceId)
-      .snapshots()
-      .map((doc) =>
-          doc.exists ? InvoiceModel.fromJson(doc.data()!, doc.id) : null);
-});
+final invoiceByIdProvider = StreamProvider.autoDispose
+    .family<InvoiceModel?, String>((ref, invoiceId) {
+      return FirebaseFirestore.instance
+          .collection(Collections.invoices)
+          .doc(invoiceId)
+          .snapshots()
+          .map(
+            (doc) =>
+                doc.exists ? InvoiceModel.fromJson(doc.data()!, doc.id) : null,
+          );
+    });
 
 class InvoiceNotifier extends AsyncNotifier<void> {
   @override
@@ -188,7 +208,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     required String createdBy,
     Map<String, int> sellerInventoryDeductions = const {},
     String?
-        idempotencyKey, // optional: pass a stable UUID to prevent duplicates on retry
+    idempotencyKey, // optional: pass a stable UUID to prevent duplicates on retry
   }) async {
     final normalizedCreatedBy = createdBy.trim();
     if (normalizedCreatedBy.isEmpty) {
@@ -255,7 +275,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           .get();
       if (existing.docs.isNotEmpty) {
         return existing
-            .docs.first.id; // return existing instead of creating duplicate
+            .docs
+            .first
+            .id; // return existing instead of creating duplicate
       }
     }
 
@@ -362,13 +384,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     // Deduct seller inventory if applicable
     for (final entry in sellerInventoryDeductions.entries) {
       if (entry.value > 0) {
-        batch.update(
-          db.collection(Collections.sellerInventory).doc(entry.key),
-          {
-            'quantity_available': FieldValue.increment(-entry.value),
-            'updated_at': now,
-          },
-        );
+        batch
+            .update(db.collection(Collections.sellerInventory).doc(entry.key), {
+              'quantity_available': FieldValue.increment(-entry.value),
+              'updated_at': now,
+            });
       }
     }
 
@@ -404,8 +424,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final db = FirebaseFirestore.instance;
     // I-12: 30-day time-lock on credit note creation
     if (linkedInvoiceId != null && linkedInvoiceId.isNotEmpty) {
-      final origSnap =
-          await db.collection(Collections.invoices).doc(linkedInvoiceId).get();
+      final origSnap = await db
+          .collection(Collections.invoices)
+          .doc(linkedInvoiceId)
+          .get();
       if (origSnap.exists) {
         final origStatus = origSnap.data()?['status'] as String? ?? '';
         if (origStatus == InvoiceModel.statusVoid) {
@@ -415,8 +437,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         }
         final origCreatedAt = origSnap.data()?['created_at'] as Timestamp?;
         if (origCreatedAt != null) {
-          final ageInDays =
-              DateTime.now().difference(origCreatedAt.toDate()).inDays;
+          final ageInDays = DateTime.now()
+              .difference(origCreatedAt.toDate())
+              .inDays;
           if (ageInDays > 30) {
             throw ArgumentError(
               'Credit notes must be created within 30 days of the original invoice',
@@ -488,13 +511,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     // Restore seller inventory
     for (final entry in sellerInventoryRestores.entries) {
       if (entry.value > 0) {
-        batch.update(
-          db.collection(Collections.sellerInventory).doc(entry.key),
-          {
-            'quantity_available': FieldValue.increment(entry.value),
-            'updated_at': now,
-          },
-        );
+        batch
+            .update(db.collection(Collections.sellerInventory).doc(entry.key), {
+              'quantity_available': FieldValue.increment(entry.value),
+              'updated_at': now,
+            });
       }
     }
 
@@ -555,7 +576,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final amountReceived = (data['amount_received'] as num?)?.toDouble() ?? 0.0;
     final outstandingAmount =
         (data['outstanding_amount'] as num?)?.toDouble() ??
-            (docTotal - amountReceived);
+        (docTotal - amountReceived);
     final invoiceNumber = data['invoice_number'] as String? ?? '';
     final routeId = data['route_id'] as String? ?? '';
     final shopId = data['shop_id'] as String? ?? '';
@@ -615,9 +636,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
 
     if (customerId.isNotEmpty) {
       final reversalDelta = switch (type) {
-        InvoiceModel.typeSale => refundMode == VoidRefundMode.creditBalance
-            ? -docTotal
-            : -outstandingAmount,
+        InvoiceModel.typeSale =>
+          refundMode == VoidRefundMode.creditBalance
+              ? -docTotal
+              : -outstandingAmount,
         _ => docTotal,
       };
 
@@ -628,16 +650,13 @@ class InvoiceNotifier extends AsyncNotifier<void> {
 
       final rawDeductions =
           (data['seller_inventory_deductions'] as Map<String, dynamic>?) ??
-              const <String, dynamic>{};
+          const <String, dynamic>{};
       for (final entry in rawDeductions.entries) {
         final qty = (entry.value as num?)?.toInt() ?? 0;
         if (qty <= 0) continue;
         batch.update(
           db.collection(Collections.sellerInventory).doc(entry.key),
-          {
-            'quantity_available': FieldValue.increment(qty),
-            'updated_at': now,
-          },
+          {'quantity_available': FieldValue.increment(qty), 'updated_at': now},
         );
       }
 
@@ -728,8 +747,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       throw ArgumentError('createdBy must not be empty');
     }
     final db = FirebaseFirestore.instance;
-    final invSnap =
-        await db.collection(Collections.invoices).doc(invoiceId).get();
+    final invSnap = await db
+        .collection(Collections.invoices)
+        .doc(invoiceId)
+        .get();
     if (!invSnap.exists) {
       throw ArgumentError('Invoice not found: $invoiceId');
     }
@@ -745,7 +766,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final invoiceTotal = (invData['total'] as num?)?.toDouble() ?? 0.0;
     final invAmountReceived =
         (invData['amount_received'] as num?)?.toDouble() ?? 0.0;
-    final outstanding = (invData['outstanding_amount'] as num?)?.toDouble() ??
+    final outstanding =
+        (invData['outstanding_amount'] as num?)?.toDouble() ??
         (invoiceTotal - invAmountReceived).clamp(0.0, double.infinity);
     final invoiceNumber = invData['invoice_number'] as String? ?? '';
     final shopId = invData['shop_id'] as String? ?? '';
@@ -757,8 +779,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     // Update invoice: mark paid, zero outstanding
     batch.update(db.collection(Collections.invoices).doc(invoiceId), {
       'status': InvoiceModel.statusPaid,
-      'amount_received':
-          FieldValue.increment(outstanding > 0 ? outstanding : 0),
+      'amount_received': FieldValue.increment(
+        outstanding > 0 ? outstanding : 0,
+      ),
       'outstanding_amount': 0,
       'updated_at': now,
     });
@@ -797,5 +820,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
   }
 }
 
-final invoiceNotifierProvider =
-    AsyncNotifierProvider<InvoiceNotifier, void>(InvoiceNotifier.new);
+final invoiceNotifierProvider = AsyncNotifierProvider<InvoiceNotifier, void>(
+  InvoiceNotifier.new,
+);

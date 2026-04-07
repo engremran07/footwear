@@ -13,13 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 // ── Mirrors TransactionNotifier allowedTypes set ─────────────────────────────
 
-const _allowedTypes = {
-  'cash_out',
-  'cash_in',
-  'return',
-  'payment',
-  'write_off',
-};
+const _allowedTypes = {'cash_out', 'cash_in', 'return', 'payment', 'write_off'};
 
 bool isValidTransactionType(String type) => _allowedTypes.contains(type);
 

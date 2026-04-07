@@ -104,7 +104,7 @@ class InvoiceModel {
     final amountReceived = (json['amount_received'] as num?)?.toDouble() ?? 0;
     final rawDeductions =
         (json['seller_inventory_deductions'] as Map<String, dynamic>?) ??
-            const <String, dynamic>{};
+        const <String, dynamic>{};
     return InvoiceModel(
       id: docId,
       invoiceNumber: json['invoice_number'] as String? ?? '',
@@ -116,7 +116,8 @@ class InvoiceModel {
       routeId: json['route_id'] as String? ?? '',
       sellerId: json['seller_id'] as String? ?? '',
       sellerName: json['seller_name'] as String? ?? '',
-      items: rawItems
+      items:
+          rawItems
               ?.map((e) => TransactionItem.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -127,7 +128,7 @@ class InvoiceModel {
       amountReceived: amountReceived,
       outstandingAmount:
           (json['outstanding_amount'] as num?)?.toDouble() ??
-              (total - amountReceived),
+          (total - amountReceived),
       status: json['status'] as String? ?? statusDraft,
       notes: json['notes'] as String?,
       linkedInvoiceId: json['linked_invoice_id'] as String?,
@@ -143,30 +144,30 @@ class InvoiceModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'invoice_number': invoiceNumber,
-        'type': type,
-        'customer_id': customerId,
-        'customer_name': customerName,
-        'shop_id': shopId,
-        'shop_name': shopName,
-        'route_id': routeId,
-        'seller_id': sellerId,
-        'seller_name': sellerName,
-        'items': items.map((e) => e.toJson()).toList(),
-        'subtotal': subtotal,
-        'discount': discount,
-        'total': total,
-        'sale_type': saleType,
-        'amount_received': amountReceived,
-        'outstanding_amount': outstandingAmount,
-        'status': status,
-        'notes': notes,
-        'linked_invoice_id': linkedInvoiceId,
-        if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
-        if (sellerInventoryDeductions.isNotEmpty)
-          'seller_inventory_deductions': sellerInventoryDeductions,
-        'created_by': createdBy,
-        'created_at': createdAt,
-        'updated_at': updatedAt,
-      };
+    'invoice_number': invoiceNumber,
+    'type': type,
+    'customer_id': customerId,
+    'customer_name': customerName,
+    'shop_id': shopId,
+    'shop_name': shopName,
+    'route_id': routeId,
+    'seller_id': sellerId,
+    'seller_name': sellerName,
+    'items': items.map((e) => e.toJson()).toList(),
+    'subtotal': subtotal,
+    'discount': discount,
+    'total': total,
+    'sale_type': saleType,
+    'amount_received': amountReceived,
+    'outstanding_amount': outstandingAmount,
+    'status': status,
+    'notes': notes,
+    'linked_invoice_id': linkedInvoiceId,
+    if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+    if (sellerInventoryDeductions.isNotEmpty)
+      'seller_inventory_deductions': sellerInventoryDeductions,
+    'created_by': createdBy,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+  };
 }

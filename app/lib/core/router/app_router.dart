@@ -69,8 +69,10 @@ CustomTransitionPage<void> _fadePage(Widget child, GoRouterState state) {
     reverseTransitionDuration: const Duration(milliseconds: 250),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       final fadeIn = CurvedAnimation(parent: animation, curve: Curves.easeOut);
-      final scaleIn =
-          CurvedAnimation(parent: animation, curve: Curves.fastOutSlowIn);
+      final scaleIn = CurvedAnimation(
+        parent: animation,
+        curve: Curves.fastOutSlowIn,
+      );
       return FadeTransition(
         opacity: fadeIn,
         child: ScaleTransition(
@@ -90,11 +92,10 @@ CustomTransitionPage<void> _slidePage(Widget child, GoRouterState state) {
     transitionDuration: const Duration(milliseconds: 320),
     reverseTransitionDuration: const Duration(milliseconds: 250),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final slideIn = Tween<Offset>(
-        begin: const Offset(0, 0.06),
-        end: Offset.zero,
-      ).animate(
-          CurvedAnimation(parent: animation, curve: Curves.fastOutSlowIn));
+      final slideIn =
+          Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(
+            CurvedAnimation(parent: animation, curve: Curves.fastOutSlowIn),
+          );
       final fadeIn = CurvedAnimation(parent: animation, curve: Curves.easeOut);
       return FadeTransition(
         opacity: fadeIn,
@@ -179,110 +180,151 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state, child) => AppShell(child: child),
         routes: [
           GoRoute(
-              path: '/',
-              pageBuilder: (_, s) => _fadePage(const DashboardScreen(), s)),
+            path: '/',
+            pageBuilder: (_, s) => _fadePage(const DashboardScreen(), s),
+          ),
           // Routes
           GoRoute(
-              path: '/routes',
-              pageBuilder: (_, s) => _fadePage(const RoutesListScreen(), s)),
+            path: '/routes',
+            pageBuilder: (_, s) => _fadePage(const RoutesListScreen(), s),
+          ),
           GoRoute(
-              path: '/routes/new',
-              pageBuilder: (_, s) => _slidePage(const RouteFormScreen(), s)),
+            path: '/routes/new',
+            pageBuilder: (_, s) => _slidePage(const RouteFormScreen(), s),
+          ),
           GoRoute(
-              path: '/routes/:id/edit',
-              pageBuilder: (_, s) => _slidePage(
-                  RouteFormScreen(routeId: s.pathParameters['id']!), s)),
+            path: '/routes/:id/edit',
+            pageBuilder: (_, s) => _slidePage(
+              RouteFormScreen(routeId: s.pathParameters['id']!),
+              s,
+            ),
+          ),
           GoRoute(
-              path: '/routes/:id',
-              pageBuilder: (_, s) => _fadePage(
-                  RouteDetailScreen(routeId: s.pathParameters['id']!), s)),
+            path: '/routes/:id',
+            pageBuilder: (_, s) => _fadePage(
+              RouteDetailScreen(routeId: s.pathParameters['id']!),
+              s,
+            ),
+          ),
           // Shops
           GoRoute(
-              path: '/shops',
-              pageBuilder: (_, s) => _fadePage(const ShopsListScreen(), s)),
+            path: '/shops',
+            pageBuilder: (_, s) => _fadePage(const ShopsListScreen(), s),
+          ),
           GoRoute(
-              path: '/shops/new',
-              pageBuilder: (_, s) => _slidePage(
-                  ShopFormScreen(
-                      preselectedRouteId: s.uri.queryParameters['routeId']),
-                  s)),
+            path: '/shops/new',
+            pageBuilder: (_, s) => _slidePage(
+              ShopFormScreen(
+                preselectedRouteId: s.uri.queryParameters['routeId'],
+              ),
+              s,
+            ),
+          ),
           GoRoute(
-              path: '/shops/:id/edit',
-              pageBuilder: (_, s) => _slidePage(
-                  ShopFormScreen(shopId: s.pathParameters['id']!), s)),
+            path: '/shops/:id/edit',
+            pageBuilder: (_, s) =>
+                _slidePage(ShopFormScreen(shopId: s.pathParameters['id']!), s),
+          ),
           GoRoute(
-              path: '/shops/:id',
-              pageBuilder: (_, s) => _fadePage(
-                  ShopDetailScreen(shopId: s.pathParameters['id']!), s)),
+            path: '/shops/:id',
+            pageBuilder: (_, s) =>
+                _fadePage(ShopDetailScreen(shopId: s.pathParameters['id']!), s),
+          ),
           // Products
           GoRoute(
-              path: '/products',
-              pageBuilder: (_, s) => _fadePage(const ProductsListScreen(), s)),
+            path: '/products',
+            pageBuilder: (_, s) => _fadePage(const ProductsListScreen(), s),
+          ),
           GoRoute(
-              path: '/products/new',
-              pageBuilder: (_, s) => _slidePage(const ProductFormScreen(), s)),
+            path: '/products/new',
+            pageBuilder: (_, s) => _slidePage(const ProductFormScreen(), s),
+          ),
           GoRoute(
-              path: '/products/:id/edit',
-              pageBuilder: (_, s) => _slidePage(
-                  ProductFormScreen(productId: s.pathParameters['id']!), s)),
+            path: '/products/:id/edit',
+            pageBuilder: (_, s) => _slidePage(
+              ProductFormScreen(productId: s.pathParameters['id']!),
+              s,
+            ),
+          ),
           GoRoute(
-              path: '/products/:id',
-              pageBuilder: (_, s) => _fadePage(
-                  ProductDetailScreen(productId: s.pathParameters['id']!), s)),
+            path: '/products/:id',
+            pageBuilder: (_, s) => _fadePage(
+              ProductDetailScreen(productId: s.pathParameters['id']!),
+              s,
+            ),
+          ),
           GoRoute(
-              path: '/products/:id/variants/new',
-              pageBuilder: (_, s) => _slidePage(
-                  VariantFormScreen(productId: s.pathParameters['id']!), s)),
+            path: '/products/:id/variants/new',
+            pageBuilder: (_, s) => _slidePage(
+              VariantFormScreen(productId: s.pathParameters['id']!),
+              s,
+            ),
+          ),
           GoRoute(
-              path: '/products/:id/variants/:vid/edit',
-              pageBuilder: (_, s) => _slidePage(
-                  VariantFormScreen(
-                      productId: s.pathParameters['id']!,
-                      variantId: s.pathParameters['vid']!),
-                  s)),
+            path: '/products/:id/variants/:vid/edit',
+            pageBuilder: (_, s) => _slidePage(
+              VariantFormScreen(
+                productId: s.pathParameters['id']!,
+                variantId: s.pathParameters['vid']!,
+              ),
+              s,
+            ),
+          ),
           // Inventory
           GoRoute(
-              path: '/inventory',
-              pageBuilder: (_, s) => _fadePage(const InventoryScreen(), s)),
+            path: '/inventory',
+            pageBuilder: (_, s) => _fadePage(const InventoryScreen(), s),
+          ),
           // Invoices
           GoRoute(
-              path: '/invoices',
-              pageBuilder: (_, s) => _fadePage(const InvoicesListScreen(), s)),
+            path: '/invoices',
+            pageBuilder: (_, s) => _fadePage(const InvoicesListScreen(), s),
+          ),
           GoRoute(
-              path: '/invoices/new',
-              pageBuilder: (_, s) => _slidePage(
-                  CreateSaleInvoiceScreen(
-                      preselectedShopId: s.uri.queryParameters['shopId']),
-                  s)),
+            path: '/invoices/new',
+            pageBuilder: (_, s) => _slidePage(
+              CreateSaleInvoiceScreen(
+                preselectedShopId: s.uri.queryParameters['shopId'],
+              ),
+              s,
+            ),
+          ),
           GoRoute(
-              path: '/invoices/:id',
-              pageBuilder: (_, s) => _fadePage(
-                  InvoiceDetailScreen(invoiceId: s.pathParameters['id']!), s)),
+            path: '/invoices/:id',
+            pageBuilder: (_, s) => _fadePage(
+              InvoiceDetailScreen(invoiceId: s.pathParameters['id']!),
+              s,
+            ),
+          ),
           // Users (admin-only)
           GoRoute(
-              path: '/users',
-              pageBuilder: (_, s) => _fadePage(const UsersListScreen(), s)),
+            path: '/users',
+            pageBuilder: (_, s) => _fadePage(const UsersListScreen(), s),
+          ),
           // Reports
           GoRoute(
-              path: '/reports',
-              pageBuilder: (_, s) => _fadePage(const ReportsScreen(), s)),
+            path: '/reports',
+            pageBuilder: (_, s) => _fadePage(const ReportsScreen(), s),
+          ),
           // Profile
           GoRoute(
-              path: '/profile',
-              pageBuilder: (_, s) => _fadePage(const ProfileScreen(), s)),
+            path: '/profile',
+            pageBuilder: (_, s) => _fadePage(const ProfileScreen(), s),
+          ),
           // About
           GoRoute(
-              path: '/about',
-              pageBuilder: (_, s) => _fadePage(const AboutScreen(), s)),
+            path: '/about',
+            pageBuilder: (_, s) => _fadePage(const AboutScreen(), s),
+          ),
           // Settings
           GoRoute(
-              path: '/settings',
-              pageBuilder: (_, s) => _fadePage(const SettingsScreen(), s)),
+            path: '/settings',
+            pageBuilder: (_, s) => _fadePage(const SettingsScreen(), s),
+          ),
         ],
       ),
     ],
-    errorBuilder: (context, state) => const Scaffold(
-      body: Center(child: Text('Page not found')),
-    ),
+    errorBuilder: (context, state) =>
+        const Scaffold(body: Center(child: Text('Page not found'))),
   );
 });

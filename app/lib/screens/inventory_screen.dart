@@ -47,8 +47,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlgState) => AlertDialog(
-          title: Text(tr('inventory_add_stock_title', ref)
-              .replaceAll('%s', variant.variantName)),
+          title: Text(
+            tr(
+              'inventory_add_stock_title',
+              ref,
+            ).replaceAll('%s', variant.variantName),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -60,8 +64,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   onSubmitted: (_) => pairsFn.requestFocus(),
                   decoration: InputDecoration(
                     labelText: tr('lbl_cartons', ref),
-                    helperText:
-                        tr('lbl_carton_helper', ref).replaceAll('%s', '$ppc'),
+                    helperText: tr(
+                      'lbl_carton_helper',
+                      ref,
+                    ).replaceAll('%s', '$ppc'),
                   ),
                   onChanged: (_) => setDlgState(() {
                     final c = int.tryParse(cartonsC.text) ?? 0;
@@ -87,8 +93,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 if (previewTotal > 0) ...[
                   const SizedBox(height: 12),
                   Text(
-                    tr('lbl_adding_stock', ref).replaceAll(
-                        '%s', AppFormatters.stock(previewTotal, ppc)),
+                    tr(
+                      'lbl_adding_stock',
+                      ref,
+                    ).replaceAll('%s', AppFormatters.stock(previewTotal, ppc)),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -122,15 +130,20 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      successSnackBar(tr('msg_added_stock', ref).replaceAll(
-                          '%s', AppFormatters.stock(totalPairs, ppc))),
+                      successSnackBar(
+                        tr('msg_added_stock', ref).replaceAll(
+                          '%s',
+                          AppFormatters.stock(totalPairs, ppc),
+                        ),
+                      ),
                     );
                   }
                 } catch (e) {
                   if (mounted) {
                     final key = AppErrorMapper.key(e);
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(errorSnackBar(tr(key, ref)));
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(errorSnackBar(tr(key, ref)));
                   }
                 }
               },
@@ -158,8 +171,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     }
     final isAdmin = currentUser.isAdmin;
     final warehouseVariants = ref.watch(allVariantsProvider);
-    final sellerInventoryAsync =
-        ref.watch(sellerInventoryProvider(currentUser.id));
+    final sellerInventoryAsync = ref.watch(
+      sellerInventoryProvider(currentUser.id),
+    );
     final ppc = settingsAsync.valueOrNull?.pairsPerCarton ?? 12;
 
     return Scaffold(
@@ -184,25 +198,33 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   title: tr('inventory_report', ref),
                   headers: [
                     tr('lbl_variant_name', ref),
-                    tr('lbl_quantity_available', ref)
+                    tr('lbl_quantity_available', ref),
                   ],
                   rows: useWarehouse
                       ? warehouseVariants.valueOrNull
-                              ?.map((v) => [
+                                ?.map(
+                                  (v) => [
                                     v.variantName,
-                                    AppFormatters.stock(v.quantityAvailable,
-                                        settings.pairsPerCarton),
-                                  ])
-                              .toList() ??
-                          []
+                                    AppFormatters.stock(
+                                      v.quantityAvailable,
+                                      settings.pairsPerCarton,
+                                    ),
+                                  ],
+                                )
+                                .toList() ??
+                            []
                       : sellerInventoryAsync.valueOrNull
-                              ?.map((v) => [
+                                ?.map(
+                                  (v) => [
                                     v.variantName,
-                                    AppFormatters.stock(v.quantityAvailable,
-                                        settings.pairsPerCarton),
-                                  ])
-                              .toList() ??
-                          [],
+                                    AppFormatters.stock(
+                                      v.quantityAvailable,
+                                      settings.pairsPerCarton,
+                                    ),
+                                  ],
+                                )
+                                .toList() ??
+                            [],
                   fileName: 'inventory_report',
                 );
               },
@@ -239,9 +261,15 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 Expanded(
                   child: _adminTab == 0
                       ? _buildWarehouseList(
-                          warehouseVariants, ppc, settingsAsync)
+                          warehouseVariants,
+                          ppc,
+                          settingsAsync,
+                        )
                       : _buildSellerList(
-                          sellerInventoryAsync, currentUser, ppc),
+                          sellerInventoryAsync,
+                          currentUser,
+                          ppc,
+                        ),
                 ),
               ],
             )
@@ -259,9 +287,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   label: Text(tr('inventory_transfer_to_seller', ref)),
                   onPressed: () => showDialog(
                     context: context,
-                    builder: (_) => _TransferToSellerDialog(
-                      currentUserId: currentUser.id,
-                    ),
+                    builder: (_) =>
+                        _TransferToSellerDialog(currentUserId: currentUser.id),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -296,14 +323,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           );
         }
         final filtered = data
-            .where((v) =>
-                v.variantName.toLowerCase().contains(_search.toLowerCase()))
+            .where(
+              (v) =>
+                  v.variantName.toLowerCase().contains(_search.toLowerCase()),
+            )
             .toList();
         if (filtered.isEmpty) {
-          return EmptyState(
-            icon: Icons.search,
-            message: tr('no_results', ref),
-          );
+          return EmptyState(icon: Icons.search, message: tr('no_results', ref));
         }
         return RefreshIndicator(
           onRefresh: () => ref.refresh(allVariantsProvider.future),
@@ -318,7 +344,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   itemCount: filtered.length,
                   itemBuilder: (ctx, i) {
                     final variant = filtered[i];
-                    final isLowStock = variant.quantityAvailable > 0 &&
+                    final isLowStock =
+                        variant.quantityAvailable > 0 &&
                         variant.quantityAvailable < ppc;
                     final isOutOfStock = variant.quantityAvailable <= 0;
                     final cs = Theme.of(ctx).colorScheme;
@@ -331,9 +358,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         leading: isOutOfStock
                             ? Icon(Icons.cancel, color: cs.error, size: 20)
                             : isLowStock
-                                ? const Icon(Icons.warning_amber,
-                                    color: Colors.orange, size: 20)
-                                : null,
+                            ? const Icon(
+                                Icons.warning_amber,
+                                color: Colors.orange,
+                                size: 20,
+                              )
+                            : null,
                         title: Text(
                           variant.variantName,
                           maxLines: 1,
@@ -341,17 +371,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         ),
                         subtitle: Text(
                           tr('lbl_stock_value', ref).replaceAll(
-                              '%s',
-                              AppFormatters.stock(
-                                  variant.quantityAvailable, ppc)),
+                            '%s',
+                            AppFormatters.stock(variant.quantityAvailable, ppc),
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: isOutOfStock
                                 ? cs.error
                                 : isLowStock
-                                    ? Colors.orange
-                                    : null,
+                                ? Colors.orange
+                                : null,
                             fontWeight: isOutOfStock || isLowStock
                                 ? FontWeight.w600
                                 : null,
@@ -390,14 +420,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           );
         }
         final filtered = data
-            .where((v) =>
-                v.variantName.toLowerCase().contains(_search.toLowerCase()))
+            .where(
+              (v) =>
+                  v.variantName.toLowerCase().contains(_search.toLowerCase()),
+            )
             .toList();
         if (filtered.isEmpty) {
-          return EmptyState(
-            icon: Icons.search,
-            message: tr('no_results', ref),
-          );
+          return EmptyState(icon: Icons.search, message: tr('no_results', ref));
         }
         return RefreshIndicator(
           onRefresh: () =>
@@ -426,18 +455,22 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         ),
                         subtitle: Text(
                           tr('lbl_stock_value', ref).replaceAll(
-                              '%s',
-                              AppFormatters.stock(
-                                  variant.quantityAvailable, ppc)),
+                            '%s',
+                            AppFormatters.stock(variant.quantityAvailable, ppc),
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         trailing: currentUser.isAdmin
                             ? IconButton(
-                                icon: const Icon(Icons.undo,
-                                    color: Colors.orange),
-                                tooltip:
-                                    tr('inventory_return_to_warehouse', ref),
+                                icon: const Icon(
+                                  Icons.undo,
+                                  color: Colors.orange,
+                                ),
+                                tooltip: tr(
+                                  'inventory_return_to_warehouse',
+                                  ref,
+                                ),
                                 onPressed: () =>
                                     _showReturnToWarehouseDialog(variant, ppc),
                               )
@@ -462,13 +495,21 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: Text(tr('inventory_return_title', ref)
-              .replaceAll('%s', item.variantName)),
+          title: Text(
+            tr(
+              'inventory_return_title',
+              ref,
+            ).replaceAll('%s', item.variantName),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(tr('lbl_available_stock', ref).replaceAll(
-                  '%s', AppFormatters.stock(item.quantityAvailable, ppc))),
+              Text(
+                tr('lbl_available_stock', ref).replaceAll(
+                  '%s',
+                  AppFormatters.stock(item.quantityAvailable, ppc),
+                ),
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: qtyC,
@@ -516,15 +557,21 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       );
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(successSnackBar(
-                        tr('msg_returned_stock', ref)
-                            .replaceAll('%s', AppFormatters.stock(qty, ppc))));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      successSnackBar(
+                        tr(
+                          'msg_returned_stock',
+                          ref,
+                        ).replaceAll('%s', AppFormatters.stock(qty, ppc)),
+                      ),
+                    );
                   }
                 } catch (e) {
                   if (ctx.mounted) {
                     final key = AppErrorMapper.key(e);
-                    ScaffoldMessenger.of(ctx)
-                        .showSnackBar(errorSnackBar(tr(key, ref)));
+                    ScaffoldMessenger.of(
+                      ctx,
+                    ).showSnackBar(errorSnackBar(tr(key, ref)));
                   }
                 }
               },
@@ -554,7 +601,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               final historyAsync = user?.isAdmin == true
                   ? cRef.watch(allInventoryTransactionsProvider)
                   : cRef.watch(
-                      sellerInventoryTransactionsProvider(user?.id ?? ''));
+                      sellerInventoryTransactionsProvider(user?.id ?? ''),
+                    );
               return Column(
                 children: [
                   const SizedBox(height: 12),
@@ -562,21 +610,21 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Theme.of(ctx)
-                          .colorScheme
-                          .onSurfaceVariant
-                          .withValues(alpha: 0.4),
+                      color: Theme.of(
+                        ctx,
+                      ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(tr('transfer_history', ref),
-                        style: Theme.of(ctx)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    child: Text(
+                      tr('transfer_history', ref),
+                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   const Divider(),
                   Expanded(
@@ -584,7 +632,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       data: (items) {
                         if (items.isEmpty) {
                           return Center(
-                              child: Text(tr('no_transactions', ref)));
+                            child: Text(tr('no_transactions', ref)),
+                          );
                         }
                         return ListView.builder(
                           controller: scrollController,
@@ -651,21 +700,21 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Theme.of(ctx)
-                          .colorScheme
-                          .onSurfaceVariant
-                          .withValues(alpha: 0.4),
+                      color: Theme.of(
+                        ctx,
+                      ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(tr('inventory_warehouse_stock', ref),
-                        style: Theme.of(ctx)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    child: Text(
+                      tr('inventory_warehouse_stock', ref),
+                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   const Divider(),
                   Expanded(
@@ -680,8 +729,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             title: Text(v.variantName),
                             trailing: Text(
                               AppFormatters.stock(v.quantityAvailable, ppc),
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           );
                         },
@@ -706,10 +756,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   }
 
   void _showAddInventoryDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => const _AddInventoryDialog(),
-    );
+    showDialog(context: context, builder: (_) => const _AddInventoryDialog());
   }
 }
 
@@ -749,9 +796,9 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
     if (_selectedVariant == null) return;
     final total = _total;
     if (total <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        warningSnackBar(tr('msg_enter_stock_gt_zero', ref)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(warningSnackBar(tr('msg_enter_stock_gt_zero', ref)));
       return;
     }
     setState(() => _saving = true);
@@ -762,8 +809,12 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
       if (mounted) Navigator.pop(context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          successSnackBar(tr('msg_added_stock', ref)
-              .replaceAll('%s', AppFormatters.stock(total, _ppc))),
+          successSnackBar(
+            tr(
+              'msg_added_stock',
+              ref,
+            ).replaceAll('%s', AppFormatters.stock(total, _ppc)),
+          ),
         );
       }
     } catch (e) {
@@ -781,9 +832,9 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
     final products = ref.watch(productsProvider).valueOrNull ?? [];
     final variants = _selectedProduct != null
         ? ref
-                .watch(productVariantsProvider(_selectedProduct!.id))
-                .valueOrNull ??
-            []
+                  .watch(productVariantsProvider(_selectedProduct!.id))
+                  .valueOrNull ??
+              []
         : <ProductVariantModel>[];
     final ppc = _ppc;
 
@@ -795,8 +846,9 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             InputDecorator(
-              decoration:
-                  InputDecoration(labelText: tr('lbl_product_required', ref)),
+              decoration: InputDecoration(
+                labelText: tr('lbl_product_required', ref),
+              ),
               child: DropdownButton<ProductModel>(
                 value: _selectedProduct,
                 hint: Text(tr('hint_select_product', ref)),
@@ -826,11 +878,14 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
                   isExpanded: true,
                   underline: const SizedBox.shrink(),
                   items: variants
-                      .map((v) => DropdownMenuItem(
-                            value: v,
-                            child: Text(
-                                '${v.variantName} (${AppFormatters.stock(v.quantityAvailable, ppc)})'),
-                          ))
+                      .map(
+                        (v) => DropdownMenuItem(
+                          value: v,
+                          child: Text(
+                            '${v.variantName} (${AppFormatters.stock(v.quantityAvailable, ppc)})',
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: variants.isEmpty
                       ? null
@@ -846,8 +901,10 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
               onSubmitted: (_) => _pairsFn.requestFocus(),
               decoration: InputDecoration(
                 labelText: tr('lbl_cartons', ref),
-                helperText:
-                    tr('lbl_carton_helper', ref).replaceAll('%s', '$ppc'),
+                helperText: tr(
+                  'lbl_carton_helper',
+                  ref,
+                ).replaceAll('%s', '$ppc'),
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -865,12 +922,13 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
             ),
             const SizedBox(height: 12),
             Text(
-              tr('lbl_adding_stock', ref)
-                  .replaceAll('%s', AppFormatters.stock(_total, ppc)),
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              tr(
+                'lbl_adding_stock',
+                ref,
+              ).replaceAll('%s', AppFormatters.stock(_total, ppc)),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -941,23 +999,27 @@ class _TransferToSellerDialogState
     if (_selectedVariant == null || _selectedSeller == null) return;
     final total = _total;
     if (total <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        warningSnackBar(tr('msg_enter_qty_gt_zero', ref)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(warningSnackBar(tr('msg_enter_qty_gt_zero', ref)));
       return;
     }
     if (total > _selectedVariant!.quantityAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
         errorSnackBar(
-          tr('msg_not_enough_stock', ref).replaceAll('%s',
-              AppFormatters.stock(_selectedVariant!.quantityAvailable, _ppc)),
+          tr('msg_not_enough_stock', ref).replaceAll(
+            '%s',
+            AppFormatters.stock(_selectedVariant!.quantityAvailable, _ppc),
+          ),
         ),
       );
       return;
     }
     setState(() => _saving = true);
     try {
-      await ref.read(productNotifierProvider.notifier).transferToSeller(
+      await ref
+          .read(productNotifierProvider.notifier)
+          .transferToSeller(
             variantId: _selectedVariant!.id,
             variantName: _selectedVariant!.variantName,
             productId: _selectedVariant!.productId,
@@ -994,9 +1056,9 @@ class _TransferToSellerDialogState
     final sellers = ref.watch(allUsersProvider).valueOrNull ?? [];
     final variants = _selectedProduct != null
         ? ref
-                .watch(productVariantsProvider(_selectedProduct!.id))
-                .valueOrNull ??
-            []
+                  .watch(productVariantsProvider(_selectedProduct!.id))
+                  .valueOrNull ??
+              []
         : <ProductVariantModel>[];
     final ppc = _ppc;
 
@@ -1011,8 +1073,9 @@ class _TransferToSellerDialogState
             InputDecorator(
               decoration: InputDecoration(
                 labelText: tr('lbl_seller_required', ref),
-                helperText:
-                    sellers.isEmpty ? tr('msg_no_active_sellers', ref) : null,
+                helperText: sellers.isEmpty
+                    ? tr('msg_no_active_sellers', ref)
+                    : null,
               ),
               child: DropdownButton<UserModel>(
                 value: _selectedSeller,
@@ -1020,10 +1083,12 @@ class _TransferToSellerDialogState
                 isExpanded: true,
                 underline: const SizedBox.shrink(),
                 items: sellers
-                    .map((s) => DropdownMenuItem(
-                          value: s,
-                          child: Text(s.displayName),
-                        ))
+                    .map(
+                      (s) => DropdownMenuItem(
+                        value: s,
+                        child: Text(s.displayName),
+                      ),
+                    )
                     .toList(),
                 onChanged: sellers.isEmpty
                     ? null
@@ -1033,8 +1098,9 @@ class _TransferToSellerDialogState
             const SizedBox(height: 12),
             // Product dropdown
             InputDecorator(
-              decoration:
-                  InputDecoration(labelText: tr('lbl_product_required', ref)),
+              decoration: InputDecoration(
+                labelText: tr('lbl_product_required', ref),
+              ),
               child: DropdownButton<ProductModel>(
                 value: _selectedProduct,
                 hint: Text(tr('hint_select_product', ref)),
@@ -1064,12 +1130,14 @@ class _TransferToSellerDialogState
                   isExpanded: true,
                   underline: const SizedBox.shrink(),
                   items: variants
-                      .map((v) => DropdownMenuItem(
-                            value: v,
-                            child: Text(
-                              '${v.variantName}  •  ${AppFormatters.stock(v.quantityAvailable, ppc)} ${tr('lbl_in_stock', ref)}',
-                            ),
-                          ))
+                      .map(
+                        (v) => DropdownMenuItem(
+                          value: v,
+                          child: Text(
+                            '${v.variantName}  •  ${AppFormatters.stock(v.quantityAvailable, ppc)} ${tr('lbl_in_stock', ref)}',
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: variants.isEmpty
                       ? null
@@ -1085,8 +1153,10 @@ class _TransferToSellerDialogState
               onSubmitted: (_) => _pairsFn.requestFocus(),
               decoration: InputDecoration(
                 labelText: tr('lbl_cartons', ref),
-                helperText:
-                    tr('lbl_carton_helper', ref).replaceAll('%s', '$ppc'),
+                helperText: tr(
+                  'lbl_carton_helper',
+                  ref,
+                ).replaceAll('%s', '$ppc'),
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -1105,21 +1175,25 @@ class _TransferToSellerDialogState
             const SizedBox(height: 12),
             if (_total > 0) ...[
               Text(
-                tr('lbl_transferring', ref)
-                    .replaceAll('%s', AppFormatters.stock(_total, ppc)),
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold),
+                tr(
+                  'lbl_transferring',
+                  ref,
+                ).replaceAll('%s', AppFormatters.stock(_total, ppc)),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               if (_exceedsStock)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     tr('msg_exceeds_stock', ref).replaceAll(
-                        '%s',
-                        AppFormatters.stock(
-                            _selectedVariant!.quantityAvailable, ppc)),
+                      '%s',
+                      AppFormatters.stock(
+                        _selectedVariant!.quantityAvailable,
+                        ppc,
+                      ),
+                    ),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
                       fontWeight: FontWeight.w600,
@@ -1136,7 +1210,8 @@ class _TransferToSellerDialogState
           child: Text(tr('cancel', ref)),
         ),
         ElevatedButton(
-          onPressed: (_saving ||
+          onPressed:
+              (_saving ||
                   _selectedVariant == null ||
                   _selectedSeller == null ||
                   _total <= 0 ||

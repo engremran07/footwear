@@ -58,15 +58,15 @@ class TransactionItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'variant_id': variantId,
-        'sku': sku,
-        'product_name': productName,
-        'size': size,
-        'color': color,
-        'qty': qty,
-        'unit_price': unitPrice,
-        'subtotal': subtotal,
-      };
+    'variant_id': variantId,
+    'sku': sku,
+    'product_name': productName,
+    'size': size,
+    'color': color,
+    'qty': qty,
+    'unit_price': unitPrice,
+    'subtotal': subtotal,
+  };
 }
 
 class TransactionModel {
@@ -131,7 +131,8 @@ class TransactionModel {
       saleType: json['sale_type'] as String?,
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
       description: json['description'] as String?,
-      items: rawItems
+      items:
+          rawItems
               ?.map((e) => TransactionItem.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -146,22 +147,22 @@ class TransactionModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'shop_id': shopId,
-        'shop_name': shopName,
-        'route_id': routeId,
-        'customer_id': customerId,
-        'customer_name': customerName,
-        'type': type,
-        'sale_type': saleType,
-        'amount': amount,
-        'description': description,
-        'items': items.map((e) => e.toJson()).toList(),
-        if (invoiceId != null) 'invoice_id': invoiceId,
-        if (invoiceNumber != null) 'invoice_number': invoiceNumber,
-        'created_by': createdBy,
-        'created_at': createdAt,
-        'deleted': deleted,
-        if (deletedAt != null) 'deleted_at': deletedAt,
-        if (deletedBy != null) 'deleted_by': deletedBy,
-      };
+    'shop_id': shopId,
+    'shop_name': shopName,
+    'route_id': routeId,
+    'customer_id': customerId,
+    'customer_name': customerName,
+    'type': type,
+    'sale_type': saleType,
+    'amount': amount,
+    'description': description,
+    'items': items.map((e) => e.toJson()).toList(),
+    if (invoiceId != null) 'invoice_id': invoiceId,
+    if (invoiceNumber != null) 'invoice_number': invoiceNumber,
+    'created_by': createdBy,
+    'created_at': createdAt,
+    'deleted': deleted,
+    if (deletedAt != null) 'deleted_at': deletedAt,
+    if (deletedBy != null) 'deleted_by': deletedBy,
+  };
 }

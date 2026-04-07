@@ -76,31 +76,32 @@ class _AppShellState extends ConsumerState<AppShell>
   // ─── Quick-action map for long-press on bottom nav ──────────────────────
   // Returns localized quick-action entries for the given route.
   List<({IconData icon, String label, String route})> _quickActionsFor(
-      String route) {
+    String route,
+  ) {
     switch (route) {
       case '/shops':
         return [
           (
             icon: Icons.add_business,
             label: tr('new_shop', ref),
-            route: '/shops/new'
-          )
+            route: '/shops/new',
+          ),
         ];
       case '/routes':
         return [
           (
             icon: Icons.add_road,
             label: tr('new_route', ref),
-            route: '/routes/new'
-          )
+            route: '/routes/new',
+          ),
         ];
       case '/products':
         return [
           (
             icon: Icons.add_box,
             label: tr('new_product', ref),
-            route: '/products/new'
-          )
+            route: '/products/new',
+          ),
         ];
       default:
         return [];
@@ -158,16 +159,19 @@ class _AppShellState extends ConsumerState<AppShell>
   }
 
   List<({IconData icon, String key, String route})> _filteredItems(
-      UserModel? user) {
+    UserModel? user,
+  ) {
     if (user == null) return [];
     if (user.isSeller) {
       return AppShell._navItems
-          .where((e) =>
-              e.route == '/' ||
-              e.route == '/shops' ||
-              e.route == '/products' ||
-              e.route == '/inventory' ||
-              e.route == '/invoices')
+          .where(
+            (e) =>
+                e.route == '/' ||
+                e.route == '/shops' ||
+                e.route == '/products' ||
+                e.route == '/inventory' ||
+                e.route == '/invoices',
+          )
           .toList();
     }
     return AppShell._navItems.where((e) {
@@ -177,7 +181,8 @@ class _AppShellState extends ConsumerState<AppShell>
   }
 
   List<({IconData icon, String key, String route})> _primaryNavItems(
-      UserModel? user) {
+    UserModel? user,
+  ) {
     if (user == null) return [];
     if (user.isSeller) {
       return const [
@@ -197,12 +202,16 @@ class _AppShellState extends ConsumerState<AppShell>
     ];
   }
 
-  int _selectedIndex(List<({IconData icon, String label, String route})> items,
-      String location) {
+  int _selectedIndex(
+    List<({IconData icon, String label, String route})> items,
+    String location,
+  ) {
     if (items.isEmpty) return 0;
-    final idx = items.indexWhere((e) =>
-        e.route == location ||
-        (e.route != '/' && location.startsWith(e.route)));
+    final idx = items.indexWhere(
+      (e) =>
+          e.route == location ||
+          (e.route != '/' && location.startsWith(e.route)),
+    );
     return idx < 0 ? 0 : idx;
   }
 
@@ -315,8 +324,9 @@ class _AppShellState extends ConsumerState<AppShell>
                 offset: Offset(dx, 0),
                 child: Transform.scale(
                   scale: scale,
-                  alignment:
-                      isRtl ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment: isRtl
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(radius),
@@ -359,10 +369,12 @@ class _AppShellState extends ConsumerState<AppShell>
                                 _openDrawer();
                               } else if (vel < -600 &&
                                   primaryItems.length > 1) {
-                                final idx = primaryItems.indexWhere((e) =>
-                                    e.route == currentLocation ||
-                                    (e.route != '/' &&
-                                        currentLocation.startsWith(e.route)));
+                                final idx = primaryItems.indexWhere(
+                                  (e) =>
+                                      e.route == currentLocation ||
+                                      (e.route != '/' &&
+                                          currentLocation.startsWith(e.route)),
+                                );
                                 if (idx >= 0 && idx < primaryItems.length - 1) {
                                   HapticFeedback.selectionClick();
                                   context.go(primaryItems[idx + 1].route);
@@ -372,10 +384,12 @@ class _AppShellState extends ConsumerState<AppShell>
                               if (vel < -200) {
                                 _openDrawer();
                               } else if (vel > 600 && primaryItems.length > 1) {
-                                final idx = primaryItems.indexWhere((e) =>
-                                    e.route == currentLocation ||
-                                    (e.route != '/' &&
-                                        currentLocation.startsWith(e.route)));
+                                final idx = primaryItems.indexWhere(
+                                  (e) =>
+                                      e.route == currentLocation ||
+                                      (e.route != '/' &&
+                                          currentLocation.startsWith(e.route)),
+                                );
                                 if (idx >= 0 && idx < primaryItems.length - 1) {
                                   HapticFeedback.selectionClick();
                                   context.go(primaryItems[idx + 1].route);
@@ -533,7 +547,7 @@ class _ArcticBottomNav extends StatelessWidget {
   final String currentLocation;
   final ValueChanged<String> onTap;
   final void Function(({IconData icon, String label, String route}))
-      onLongPress;
+  onLongPress;
 
   const _ArcticBottomNav({
     required this.items,
@@ -568,7 +582,8 @@ class _ArcticBottomNav extends StatelessWidget {
           height: 62,
           child: Row(
             children: items.map((item) {
-              final isSelected = item.route == currentLocation ||
+              final isSelected =
+                  item.route == currentLocation ||
                   (item.route != '/' && currentLocation.startsWith(item.route));
               return Expanded(
                 child: _ArcticNavItem(
@@ -616,9 +631,10 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
       duration: const Duration(milliseconds: 100),
       value: 0,
     );
-    _scale = Tween<double>(begin: 1.0, end: 0.87).animate(
-      CurvedAnimation(parent: _pressCtrl, curve: Curves.easeInOut),
-    );
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 0.87,
+    ).animate(CurvedAnimation(parent: _pressCtrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -635,8 +651,9 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selectedColor =
-        isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor;
+    final selectedColor = isDark
+        ? const Color(0xFF81D4FA)
+        : AppBrand.primaryColor;
     final color = widget.isSelected ? selectedColor : cs.onSurfaceVariant;
 
     return Semantics(
@@ -667,8 +684,9 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
                   width: widget.isSelected ? 24 : 0,
                   margin: const EdgeInsets.only(bottom: 4),
                   decoration: BoxDecoration(
-                    color:
-                        widget.isSelected ? selectedColor : Colors.transparent,
+                    color: widget.isSelected
+                        ? selectedColor
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -686,8 +704,9 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
                   duration: const Duration(milliseconds: 200),
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight:
-                        widget.isSelected ? FontWeight.w700 : FontWeight.normal,
+                    fontWeight: widget.isSelected
+                        ? FontWeight.w700
+                        : FontWeight.normal,
                     color: color,
                     letterSpacing: widget.isSelected ? 0.2 : 0,
                   ),
@@ -758,13 +777,20 @@ class _DrawerMenuScreen extends StatelessWidget {
                     splashColor: Colors.white12,
                     highlightColor: Colors.white10,
                     child: Padding(
-                      padding:
-                          const EdgeInsetsDirectional.fromSTEB(20, 28, 20, 18),
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        20,
+                        28,
+                        20,
+                        18,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Image.asset(AppBrand.logoAsset,
-                              height: 46, fit: BoxFit.contain),
+                          Image.asset(
+                            AppBrand.logoAsset,
+                            height: 46,
+                            fit: BoxFit.contain,
+                          ),
                           const SizedBox(height: 16),
                           Row(
                             children: [
@@ -783,8 +809,9 @@ class _DrawerMenuScreen extends StatelessWidget {
                                           shape: BoxShape.circle,
                                           color: AppBrand.successColor,
                                           border: Border.all(
-                                              color: AppBrand.onPrimary,
-                                              width: 2),
+                                            color: AppBrand.onPrimary,
+                                            width: 2,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -811,8 +838,9 @@ class _DrawerMenuScreen extends StatelessWidget {
                                       Text(
                                         user!.email,
                                         style: const TextStyle(
-                                            fontSize: 11,
-                                            color: AppBrand.onPrimaryMuted),
+                                          fontSize: 11,
+                                          color: AppBrand.onPrimaryMuted,
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 5),
@@ -836,7 +864,8 @@ class _DrawerMenuScreen extends StatelessWidget {
                     itemCount: navItems.length,
                     itemBuilder: (ctx, i) {
                       final item = navItems[i];
-                      final isSel = item.route == currentLocation ||
+                      final isSel =
+                          item.route == currentLocation ||
                           (item.route != '/' &&
                               currentLocation.startsWith(item.route));
                       return ListTile(
@@ -851,18 +880,24 @@ class _DrawerMenuScreen extends StatelessWidget {
                           item.label,
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight:
-                                isSel ? FontWeight.w600 : FontWeight.normal,
+                            fontWeight: isSel
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                             color: isSel ? AppBrand.primaryColor : cs.onSurface,
                           ),
                         ),
                         selected: isSel,
                         selectedTileColor: AppBrand.primaryColor.withAlpha(20),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         horizontalTitleGap: 8,
-                        contentPadding:
-                            const EdgeInsetsDirectional.fromSTEB(18, 0, 14, 0),
+                        contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                          18,
+                          0,
+                          14,
+                          0,
+                        ),
                         onTap: () => onNavigate(item.route),
                       );
                     },
@@ -873,21 +908,36 @@ class _DrawerMenuScreen extends StatelessWidget {
 
                 // Footer
                 ListTile(
-                  leading: Icon(Icons.person_outline,
-                      color: cs.onSurfaceVariant, size: 22),
-                  title: Text(profileLabel,
-                      style: TextStyle(fontSize: 14, color: cs.onSurface)),
-                  contentPadding:
-                      const EdgeInsetsDirectional.fromSTEB(18, 0, 14, 0),
+                  leading: Icon(
+                    Icons.person_outline,
+                    color: cs.onSurfaceVariant,
+                    size: 22,
+                  ),
+                  title: Text(
+                    profileLabel,
+                    style: TextStyle(fontSize: 14, color: cs.onSurface),
+                  ),
+                  contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                    18,
+                    0,
+                    14,
+                    0,
+                  ),
                   horizontalTitleGap: 8,
                   onTap: onProfile,
                 ),
                 ListTile(
                   leading: Icon(Icons.logout, color: cs.error, size: 22),
-                  title: Text(signOutLabel,
-                      style: TextStyle(fontSize: 14, color: cs.error)),
-                  contentPadding:
-                      const EdgeInsetsDirectional.fromSTEB(18, 0, 14, 0),
+                  title: Text(
+                    signOutLabel,
+                    style: TextStyle(fontSize: 14, color: cs.error),
+                  ),
+                  contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                    18,
+                    0,
+                    14,
+                    0,
+                  ),
                   horizontalTitleGap: 8,
                   onTap: onSignOut,
                 ),
@@ -945,8 +995,12 @@ class _ScrollableNavRail extends StatelessWidget {
                     ? Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Image.asset(AppBrand.logoAsset,
-                              width: 160, height: 66, fit: BoxFit.contain),
+                          Image.asset(
+                            AppBrand.logoAsset,
+                            width: 160,
+                            height: 66,
+                            fit: BoxFit.contain,
+                          ),
                           const SizedBox(height: 4),
                           _ConnectivityDot(isOnline: isOnline),
                         ],
@@ -955,8 +1009,12 @@ class _ScrollableNavRail extends StatelessWidget {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Image.asset(AppBrand.logoAsset,
-                                width: 52, height: 34, fit: BoxFit.contain),
+                            Image.asset(
+                              AppBrand.logoAsset,
+                              width: 52,
+                              height: 34,
+                              fit: BoxFit.contain,
+                            ),
                             const SizedBox(height: 4),
                             _ConnectivityDot(isOnline: isOnline),
                           ],
@@ -972,8 +1030,10 @@ class _ScrollableNavRail extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                   onTap: onProfile,
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 2,
+                      vertical: 2,
+                    ),
                     child: extended
                         ? Row(
                             children: [
@@ -986,9 +1046,10 @@ class _ScrollableNavRail extends StatelessWidget {
                                     Text(
                                       user!.displayName,
                                       style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: cs.onSurface),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: cs.onSurface,
+                                      ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     _RoleBadge(role: user!.role, small: true),
@@ -997,9 +1058,7 @@ class _ScrollableNavRail extends StatelessWidget {
                               ),
                             ],
                           )
-                        : Center(
-                            child: _UserAvatar(user: user, radius: 14),
-                          ),
+                        : Center(child: _UserAvatar(user: user, radius: 14)),
                   ),
                 ),
               ),
@@ -1008,15 +1067,18 @@ class _ScrollableNavRail extends StatelessWidget {
               child: Scrollbar(
                 thumbVisibility: true,
                 child: ListView.builder(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 4,
+                  ),
                   itemCount: items.length,
                   itemBuilder: (ctx, i) {
                     final item = items[i];
                     final sel = selectedIndex == i;
                     final bg = sel ? cs.secondaryContainer : Colors.transparent;
-                    final fg =
-                        sel ? cs.onSecondaryContainer : cs.onSurfaceVariant;
+                    final fg = sel
+                        ? cs.onSecondaryContainer
+                        : cs.onSurfaceVariant;
                     if (extended) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1028,26 +1090,31 @@ class _ScrollableNavRail extends StatelessWidget {
                           borderRadius: BorderRadius.circular(28),
                           child: Ink(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
                             decoration: BoxDecoration(
                               color: bg,
                               borderRadius: BorderRadius.circular(28),
                             ),
-                            child: Row(children: [
-                              Icon(item.icon, size: 20, color: fg),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  item.label,
-                                  style: TextStyle(
+                            child: Row(
+                              children: [
+                                Icon(item.icon, size: 20, color: fg),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    item.label,
+                                    style: TextStyle(
                                       fontSize: 13,
                                       color: fg,
                                       fontWeight: sel
                                           ? FontWeight.w600
-                                          : FontWeight.normal),
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ]),
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -1158,7 +1225,9 @@ class _RoleBadge extends StatelessWidget {
     };
     return Container(
       padding: EdgeInsets.symmetric(
-          horizontal: small ? 6 : 8, vertical: small ? 1 : 2),
+        horizontal: small ? 6 : 8,
+        vertical: small ? 1 : 2,
+      ),
       decoration: BoxDecoration(
         color: color.withAlpha(38),
         borderRadius: BorderRadius.circular(12),
@@ -1181,10 +1250,7 @@ class _BreadcrumbTitle extends StatelessWidget {
   final String location;
   final bool isOnline;
 
-  const _BreadcrumbTitle({
-    required this.location,
-    required this.isOnline,
-  });
+  const _BreadcrumbTitle({required this.location, required this.isOnline});
 
   static const _segmentLabels = <String, String>{
     'products': 'Products',

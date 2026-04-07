@@ -37,35 +37,43 @@ final shopsProvider = StreamProvider.autoDispose<List<ShopModel>>((ref) {
       .orderBy('name')
       .limit(500)
       .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList());
-});
-
-final shopsByRouteProvider =
-    StreamProvider.autoDispose.family<List<ShopModel>, String>((ref, routeId) {
-  return FirebaseFirestore.instance
-      .collection(Collections.customers)
-      .where('route_id', isEqualTo: routeId)
-      .where('active', isEqualTo: true)
-      .orderBy('name')
-      .limit(200)
-      .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList());
-});
-
-final shopDetailProvider =
-    StreamProvider.autoDispose.family<ShopModel?, String>((ref, id) {
-  return FirebaseFirestore.instance
-      .collection(Collections.customers)
-      .doc(id)
-      .snapshots()
       .map(
-          (doc) => doc.exists ? ShopModel.fromJson(doc.data()!, doc.id) : null);
+        (snap) =>
+            snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList(),
+      );
 });
 
-final outstandingShopsProvider =
-    StreamProvider.autoDispose<List<ShopModel>>((ref) {
+final shopsByRouteProvider = StreamProvider.autoDispose
+    .family<List<ShopModel>, String>((ref, routeId) {
+      return FirebaseFirestore.instance
+          .collection(Collections.customers)
+          .where('route_id', isEqualTo: routeId)
+          .where('active', isEqualTo: true)
+          .orderBy('name')
+          .limit(200)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((d) => ShopModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
+
+final shopDetailProvider = StreamProvider.autoDispose
+    .family<ShopModel?, String>((ref, id) {
+      return FirebaseFirestore.instance
+          .collection(Collections.customers)
+          .doc(id)
+          .snapshots()
+          .map(
+            (doc) =>
+                doc.exists ? ShopModel.fromJson(doc.data()!, doc.id) : null,
+          );
+    });
+
+final outstandingShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
+  ref,
+) {
   // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
   final user = ref.watch(authUserProvider).valueOrNull;
   if (user == null || !user.isAdmin) return const Stream.empty();
@@ -76,23 +84,28 @@ final outstandingShopsProvider =
       .orderBy('balance', descending: true)
       .limit(200)
       .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList());
+      .map(
+        (snap) =>
+            snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList(),
+      );
 });
 
-final outstandingShopsByRouteProvider =
-    StreamProvider.autoDispose.family<List<ShopModel>, String>((ref, routeId) {
-  return FirebaseFirestore.instance
-      .collection(Collections.customers)
-      .where('route_id', isEqualTo: routeId)
-      .where('active', isEqualTo: true)
-      .where('balance', isGreaterThan: 0)
-      .orderBy('balance', descending: true)
-      .limit(200)
-      .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList());
-});
+final outstandingShopsByRouteProvider = StreamProvider.autoDispose
+    .family<List<ShopModel>, String>((ref, routeId) {
+      return FirebaseFirestore.instance
+          .collection(Collections.customers)
+          .where('route_id', isEqualTo: routeId)
+          .where('active', isEqualTo: true)
+          .where('balance', isGreaterThan: 0)
+          .orderBy('balance', descending: true)
+          .limit(200)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((d) => ShopModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
 
 class ShopNotifier extends AsyncNotifier<void> {
   @override
@@ -141,8 +154,10 @@ class ShopNotifier extends AsyncNotifier<void> {
     }
 
     final db = FirebaseFirestore.instance;
-    final shopDoc =
-        await db.collection(Collections.customers).doc(shopId).get();
+    final shopDoc = await db
+        .collection(Collections.customers)
+        .doc(shopId)
+        .get();
     final balance = (shopDoc.data()?['balance'] as num?)?.toDouble() ?? 0;
     if (balance <= 0) throw StateError('No outstanding balance to write off');
 
@@ -206,5 +221,6 @@ class ShopNotifier extends AsyncNotifier<void> {
   }
 }
 
-final shopNotifierProvider =
-    AsyncNotifierProvider<ShopNotifier, void>(ShopNotifier.new);
+final shopNotifierProvider = AsyncNotifierProvider<ShopNotifier, void>(
+  ShopNotifier.new,
+);

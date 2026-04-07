@@ -65,8 +65,11 @@ void main() {
         Collections.settings,
       ];
       final unique = all.toSet();
-      expect(unique.length, equals(all.length),
-          reason: 'Duplicate collection constant detected');
+      expect(
+        unique.length,
+        equals(all.length),
+        reason: 'Duplicate collection constant detected',
+      );
     });
   });
 }

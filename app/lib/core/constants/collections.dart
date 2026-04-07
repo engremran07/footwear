@@ -21,8 +21,12 @@ class Collections {
   // 'customers' is the legacy Firestore collection name for shops.
   // Use Collections.shops in new code — both point to the same collection.
   static const customers = 'customers';
-  static const shops = customers; // alias — same Firestore collection 'customers'
+  static const shops =
+      customers; // alias — same Firestore collection 'customers'
   static const transactions = 'transactions';
   static const invoices = 'invoices';
   static const settings = 'settings';
+
+  /// Admin-only collection — stores SA credentials for admin auth pipeline.
+  static const adminConfig = 'admin_config';
 }

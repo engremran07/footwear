@@ -72,8 +72,12 @@ class InvoiceDetailScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _handleAction(BuildContext context, WidgetRef ref, String action,
-      InvoiceModel inv) async {
+  Future<void> _handleAction(
+    BuildContext context,
+    WidgetRef ref,
+    String action,
+    InvoiceModel inv,
+  ) async {
     if (action == 'void') {
       VoidRefundMode refundMode = VoidRefundMode.creditBalance;
       if (inv.amountReceived > 0 && inv.isSale) {
@@ -115,7 +119,9 @@ class InvoiceDetailScreen extends ConsumerWidget {
         if (confirmed != true) return;
       }
       try {
-        await ref.read(invoiceNotifierProvider.notifier).voidInvoice(
+        await ref
+            .read(invoiceNotifierProvider.notifier)
+            .voidInvoice(
               invoiceId: inv.id,
               customerId: inv.customerId,
               total: inv.total,
@@ -126,13 +132,16 @@ class InvoiceDetailScreen extends ConsumerWidget {
       } catch (e) {
         if (context.mounted) {
           final key = AppErrorMapper.key(e);
-          ScaffoldMessenger.of(context)
-              .showSnackBar(errorSnackBar(tr(key, ref)));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(errorSnackBar(tr(key, ref)));
         }
       }
     } else if (action == 'paid') {
       try {
-        await ref.read(invoiceNotifierProvider.notifier).markAsPaid(
+        await ref
+            .read(invoiceNotifierProvider.notifier)
+            .markAsPaid(
               invoiceId: inv.id,
               customerId: inv.customerId,
               routeId: inv.routeId,
@@ -141,15 +150,19 @@ class InvoiceDetailScreen extends ConsumerWidget {
       } catch (e) {
         if (context.mounted) {
           final key = AppErrorMapper.key(e);
-          ScaffoldMessenger.of(context)
-              .showSnackBar(errorSnackBar(tr(key, ref)));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(errorSnackBar(tr(key, ref)));
         }
       }
     }
   }
 
   Future<void> _exportPdf(
-      BuildContext context, WidgetRef ref, InvoiceModel inv) async {
+    BuildContext context,
+    WidgetRef ref,
+    InvoiceModel inv,
+  ) async {
     try {
       final locale = ref.read(appLocaleProvider);
       final settings = await ref.read(settingsProvider.future);
@@ -215,15 +228,15 @@ class _InvoiceBody extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         invoice.invoiceNumber,
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
+                        style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: statusColor,
                         borderRadius: BorderRadius.circular(6),
@@ -231,7 +244,9 @@ class _InvoiceBody extends ConsumerWidget {
                       child: Text(
                         invoice.status.toUpperCase(),
                         style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.bold),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
@@ -248,15 +263,18 @@ class _InvoiceBody extends ConsumerWidget {
                 _PaymentProgressBar(invoice: invoice),
                 const Divider(height: 24),
                 _InfoRow(
-                    label: tr('customer', ref), value: invoice.customerName),
-                if (invoice.shopName.isNotEmpty)
-                  _InfoRow(label: tr('shop', ref), value: invoice.shopName),
+                  label: tr('shop', ref),
+                  value: invoice.shopName.isNotEmpty
+                      ? invoice.shopName
+                      : invoice.customerName,
+                ),
                 _InfoRow(label: tr('date', ref), value: dateStr),
                 if (invoice.linkedInvoiceId != null &&
                     invoice.linkedInvoiceId!.isNotEmpty)
                   _InfoRow(
-                      label: tr('linked_invoice', ref),
-                      value: invoice.linkedInvoiceId!),
+                    label: tr('linked_invoice', ref),
+                    value: invoice.linkedInvoiceId!,
+                  ),
               ],
             ),
           ),
@@ -270,46 +288,55 @@ class _InvoiceBody extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(tr('items', ref),
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(
+                    tr('items', ref),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  ...invoice.items.map((item) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(item.productName,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w500)),
-                                  Text(
-                                    '${item.size} • ${item.color}',
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurfaceVariant),
+                  ...invoice.items.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.productName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                ],
-                              ),
+                                ),
+                                Text(
+                                  '${item.size} • ${item.color}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
                             ),
-                            Expanded(
-                              child: Text('x${item.qty}',
-                                  textAlign: TextAlign.center),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'x${item.qty}',
+                              textAlign: TextAlign.center,
                             ),
-                            Expanded(
-                              child: Text(
-                                AppFormatters.sar(item.subtotal),
-                                textAlign: TextAlign.end,
-                              ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              AppFormatters.sar(item.subtotal),
+                              textAlign: TextAlign.end,
                             ),
-                          ],
-                        ),
-                      )),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -323,13 +350,15 @@ class _InvoiceBody extends ConsumerWidget {
             child: Column(
               children: [
                 _TotalRow(
-                    label: tr('subtotal', ref),
-                    value: AppFormatters.sar(invoice.subtotal)),
+                  label: tr('subtotal', ref),
+                  value: AppFormatters.sar(invoice.subtotal),
+                ),
                 if (invoice.discount > 0)
                   _TotalRow(
-                      label: tr('discount', ref),
-                      value: '-${AppFormatters.sar(invoice.discount)}',
-                      color: cs.primary),
+                    label: tr('discount', ref),
+                    value: '-${AppFormatters.sar(invoice.discount)}',
+                    color: cs.primary,
+                  ),
                 const Divider(),
                 _TotalRow(
                   label: tr('total', ref),
@@ -362,8 +391,10 @@ class _InvoiceBody extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(tr('notes', ref),
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    tr('notes', ref),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 4),
                   Text(invoice.notes!),
                 ],
@@ -389,9 +420,12 @@ class _InfoRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 100,
-            child: Text(label,
-                style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
           Expanded(child: Text(value)),
         ],
@@ -405,11 +439,12 @@ class _TotalRow extends StatelessWidget {
   final String value;
   final bool bold;
   final Color? color;
-  const _TotalRow(
-      {required this.label,
-      required this.value,
-      this.bold = false,
-      this.color});
+  const _TotalRow({
+    required this.label,
+    required this.value,
+    this.bold = false,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -418,16 +453,20 @@ class _TotalRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: bold
-                  ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-                  : null),
-          Text(value,
-              style: TextStyle(
-                fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-                fontSize: bold ? 16 : null,
-                color: color,
-              )),
+          Text(
+            label,
+            style: bold
+                ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                : null,
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+              fontSize: bold ? 16 : null,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
@@ -467,12 +506,14 @@ class _PaymentProgressBar extends ConsumerWidget {
           children: [
             Icon(Icons.cancel, size: 16, color: cs.onErrorContainer),
             const SizedBox(width: 6),
-            Text(tr('invoice_voided', ref),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: cs.onErrorContainer,
-                  fontSize: 12,
-                )),
+            Text(
+              tr('invoice_voided', ref),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: cs.onErrorContainer,
+                fontSize: 12,
+              ),
+            ),
           ],
         ),
       );
@@ -495,9 +536,13 @@ class _PaymentProgressBar extends ConsumerWidget {
                 alignment: Alignment.center,
                 child: isActive
                     ? Icon(Icons.check, size: 14, color: cs.onPrimary)
-                    : Text('${i + 1}',
+                    : Text(
+                        '${i + 1}',
                         style: TextStyle(
-                            fontSize: 11, color: cs.onSurfaceVariant)),
+                          fontSize: 11,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
               ),
               const SizedBox(width: 4),
               Text(

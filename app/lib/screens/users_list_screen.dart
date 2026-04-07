@@ -65,13 +65,19 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
           // Active / Inactive segmented tab
           Padding(
             padding: const EdgeInsetsDirectional.symmetric(
-                horizontal: 12, vertical: 4),
+              horizontal: 12,
+              vertical: 4,
+            ),
             child: SegmentedButton<bool>(
               segments: [
                 ButtonSegment(
-                    value: false, label: Text(tr('tab_active_users', ref))),
+                  value: false,
+                  label: Text(tr('tab_active_users', ref)),
+                ),
                 ButtonSegment(
-                    value: true, label: Text(tr('tab_inactive_users', ref))),
+                  value: true,
+                  label: Text(tr('tab_inactive_users', ref)),
+                ),
               ],
               selected: {_showInactive},
               onSelectionChanged: (s) =>
@@ -107,8 +113,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     selected: _roleFilter == 'seller',
                     color: AppBrand.sellerRoleColor,
                     onTap: () => setState(
-                      () => _roleFilter =
-                          _roleFilter == 'seller' ? null : 'seller',
+                      () => _roleFilter = _roleFilter == 'seller'
+                          ? null
+                          : 'seller',
                     ),
                   ),
                 ],
@@ -121,12 +128,14 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
               error: (e, _) => Center(child: Text('$e')),
               data: (users) {
                 final filtered = users.where((u) {
-                  final matchesSearch = _search.isEmpty ||
+                  final matchesSearch =
+                      _search.isEmpty ||
                       u.displayName.toLowerCase().contains(_search) ||
                       u.email.toLowerCase().contains(_search) ||
                       (u.assignedRouteName?.toLowerCase().contains(_search) ??
                           false);
-                  final matchesRole = _roleFilter == null ||
+                  final matchesRole =
+                      _roleFilter == null ||
                       (_roleFilter == 'admin' ? u.isAdmin : u.isSeller);
                   return matchesSearch && matchesRole;
                 }).toList();
@@ -196,8 +205,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
         builder: (ctx, setS) {
           final routes = ref.watch(routesProvider).valueOrNull ?? [];
           final availableRoutes = routes
-              .where((r) =>
-                  r.assignedSellerId == null || r.assignedSellerId!.isEmpty)
+              .where(
+                (r) =>
+                    r.assignedSellerId == null || r.assignedSellerId!.isEmpty,
+              )
               .toList();
           return AlertDialog(
             title: Text(tr('new_user', ref)),
@@ -229,9 +240,13 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     decoration: InputDecoration(labelText: tr('role', ref)),
                     items: [
                       DropdownMenuItem(
-                          value: 'admin', child: Text(tr('lbl_admin', ref))),
+                        value: 'admin',
+                        child: Text(tr('lbl_admin', ref)),
+                      ),
                       DropdownMenuItem(
-                          value: 'seller', child: Text(tr('lbl_seller', ref))),
+                        value: 'seller',
+                        child: Text(tr('lbl_seller', ref)),
+                      ),
                     ],
                     onChanged: (v) => setS(() {
                       role = v ?? 'seller';
@@ -245,13 +260,16 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       initialValue: selectedRouteId,
-                      decoration:
-                          InputDecoration(labelText: tr('assigned_route', ref)),
+                      decoration: InputDecoration(
+                        labelText: tr('assigned_route', ref),
+                      ),
                       items: availableRoutes
-                          .map((r) => DropdownMenuItem(
-                                value: r.id,
-                                child: Text(r.name),
-                              ))
+                          .map(
+                            (r) => DropdownMenuItem(
+                              value: r.id,
+                              child: Text(r.name),
+                            ),
+                          )
                           .toList(),
                       onChanged: (v) => setS(() {
                         selectedRouteId = v;
@@ -308,8 +326,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     }
                   } catch (e) {
                     if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx)
-                          .showSnackBar(errorSnackBar('$e'));
+                      ScaffoldMessenger.of(
+                        ctx,
+                      ).showSnackBar(errorSnackBar('$e'));
                     }
                   }
                 },
@@ -326,12 +345,15 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
   void _showEditUserDialog(UserModel user) {
     final nameC = TextEditingController(text: user.displayName);
+    final emailC = TextEditingController(text: user.email);
+    final passwordC = TextEditingController();
     String role = user.isAdmin ? 'admin' : 'seller';
     final currentUser = ref.read(authUserProvider).valueOrNull;
     final isSelf = currentUser?.id == user.id;
     String? selectedRouteId = user.assignedRouteId;
     String? selectedRouteName = user.assignedRouteName;
     final oldRouteId = user.assignedRouteId;
+    bool obscurePassword = true;
 
     showDialog(
       context: context,
@@ -339,11 +361,13 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
         builder: (ctx, setS) {
           final routes = ref.watch(routesProvider).valueOrNull ?? [];
           final availableRoutes = routes
-              .where((r) =>
-                  r.id == selectedRouteId ||
-                  r.assignedSellerId == null ||
-                  r.assignedSellerId!.isEmpty ||
-                  r.assignedSellerId == user.id)
+              .where(
+                (r) =>
+                    r.id == selectedRouteId ||
+                    r.assignedSellerId == null ||
+                    r.assignedSellerId!.isEmpty ||
+                    r.assignedSellerId == user.id,
+              )
               .toList();
           return AlertDialog(
             title: Text(tr('edit_user', ref)),
@@ -351,49 +375,124 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // ── Name ──
                   TextField(
                     controller: nameC,
                     decoration: InputDecoration(labelText: tr('name', ref)),
                     textCapitalization: TextCapitalization.words,
                   ),
                   const SizedBox(height: 8),
+                  // ── Email (admin-editable, syncs Auth + Firestore) ──
                   TextField(
-                    controller: TextEditingController(text: user.email),
+                    controller: emailC,
+                    enabled: !isSelf,
                     decoration: InputDecoration(
-                      labelText: tr('lbl_email', ref),
-                      helperText: tr('lbl_email_no_change', ref),
+                      labelText: tr('email', ref),
+                      helperText: isSelf
+                          ? tr('lbl_email_no_change', ref)
+                          : tr('lbl_email_change_note', ref),
+                      helperMaxLines: 2,
                     ),
-                    enabled: false,
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.lock_reset),
-                      label: Text(tr('settings_send_reset_email', ref)),
-                      onPressed: () async {
-                        try {
-                          await ref
-                              .read(userManagementNotifierProvider.notifier)
-                              .sendPasswordResetForSeller(email: user.email);
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              successSnackBar(tr('msg_reset_email_sent', ref)
-                                  .replaceAll('%s', user.email)),
-                            );
-                          }
-                        } catch (e) {
-                          if (ctx.mounted) {
-                            final key = AppErrorMapper.key(e);
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              errorSnackBar(tr(key, ref)),
-                            );
-                          }
-                        }
-                      },
-                    ),
+                    keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 8),
+                  // ── Set Password (optional — blank = no change) ──
+                  TextField(
+                    controller: passwordC,
+                    obscureText: obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: tr('lbl_set_password', ref),
+                      hintText: tr('hint_set_password', ref),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          size: 20,
+                        ),
+                        onPressed: () =>
+                            setS(() => obscurePassword = !obscurePassword),
+                        tooltip: obscurePassword ? 'Show' : 'Hide',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // ── Email Verified badge + Send Verification button ──
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Chip(
+                        avatar: Icon(
+                          user.emailVerified
+                              ? Icons.verified
+                              : Icons.warning_amber_rounded,
+                          size: 16,
+                          color: user.emailVerified
+                              ? Colors.green
+                              : Colors.orange,
+                        ),
+                        label: Text(
+                          tr(
+                            user.emailVerified
+                                ? 'lbl_email_verified'
+                                : 'lbl_email_not_verified',
+                            ref,
+                          ),
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        side: BorderSide.none,
+                      ),
+                      if (!user.emailVerified)
+                        TextButton.icon(
+                          icon: const Icon(Icons.forward_to_inbox, size: 14),
+                          label: Text(
+                            tr('btn_send_verification', ref),
+                            style: const TextStyle(fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          onPressed: () async {
+                            try {
+                              final targetEmail = emailC.text.trim().isNotEmpty
+                                  ? emailC.text.trim()
+                                  : user.email;
+                              await ref
+                                  .read(userManagementNotifierProvider.notifier)
+                                  .adminSendVerificationEmail(
+                                    user.id,
+                                    targetEmail,
+                                  );
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  successSnackBar(
+                                    tr(
+                                      'msg_verification_sent',
+                                      ref,
+                                    ).replaceAll('%s', targetEmail),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(
+                                  ctx,
+                                ).showSnackBar(errorSnackBar('$e'));
+                              }
+                            }
+                          },
+                        ),
+                    ],
+                  ),
+                  const Divider(height: 16),
+                  // ── Role ──
                   if (isSelf)
                     TextField(
                       enabled: false,
@@ -408,10 +507,13 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       decoration: InputDecoration(labelText: tr('role', ref)),
                       items: [
                         DropdownMenuItem(
-                            value: 'admin', child: Text(tr('lbl_admin', ref))),
+                          value: 'admin',
+                          child: Text(tr('lbl_admin', ref)),
+                        ),
                         DropdownMenuItem(
-                            value: 'seller',
-                            child: Text(tr('lbl_seller', ref))),
+                          value: 'seller',
+                          child: Text(tr('lbl_seller', ref)),
+                        ),
                       ],
                       onChanged: (v) => setS(() {
                         role = v ?? 'seller';
@@ -425,13 +527,16 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       initialValue: selectedRouteId,
-                      decoration:
-                          InputDecoration(labelText: tr('assigned_route', ref)),
+                      decoration: InputDecoration(
+                        labelText: tr('assigned_route', ref),
+                      ),
                       items: availableRoutes
-                          .map((r) => DropdownMenuItem(
-                                value: r.id,
-                                child: Text(r.name),
-                              ))
+                          .map(
+                            (r) => DropdownMenuItem(
+                              value: r.id,
+                              child: Text(r.name),
+                            ),
+                          )
                           .toList(),
                       onChanged: (v) => setS(() {
                         selectedRouteId = v;
@@ -473,8 +578,24 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     return;
                   }
                   try {
-                    final notifier =
-                        ref.read(userManagementNotifierProvider.notifier);
+                    final notifier = ref.read(
+                      userManagementNotifierProvider.notifier,
+                    );
+                    // ── Step 1: Auth sync via 4-way pipeline ──────────────
+                    final emailChanged =
+                        !isSelf &&
+                        emailC.text.trim().toLowerCase() !=
+                            user.email.trim().toLowerCase() &&
+                        emailC.text.trim().isNotEmpty;
+                    final passwordSet = passwordC.text.trim().isNotEmpty;
+                    if (emailChanged || passwordSet) {
+                      await notifier.adminUpdateUserAuth(
+                        uid: user.id,
+                        newEmail: emailChanged ? emailC.text.trim() : null,
+                        newPassword: passwordSet ? passwordC.text.trim() : null,
+                      );
+                    }
+                    // ── Step 2: Firestore profile (name / role / route) ───
                     if (oldRouteId != null && oldRouteId != selectedRouteId) {
                       await notifier.clearRouteAssignment(oldRouteId);
                     }
@@ -485,11 +606,15 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       'assigned_route_name': selectedRouteName,
                     });
                     if (ctx.mounted) Navigator.pop(ctx);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        successSnackBar(tr('msg_auth_updated', ref)),
+                      );
+                    }
                   } catch (e) {
                     if (ctx.mounted) {
-                      final key = AppErrorMapper.key(e);
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                        errorSnackBar(tr(key, ref)),
+                        errorSnackBar(tr('err_admin_auth_update', ref)),
                       );
                     }
                   }
@@ -515,24 +640,35 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
           final freeRoutes = routes
-              .where((r) =>
-                  r.assignedSellerId == null || r.assignedSellerId!.isEmpty)
+              .where(
+                (r) =>
+                    r.assignedSellerId == null || r.assignedSellerId!.isEmpty,
+              )
               .toList();
           return AlertDialog(
             title: Text(tr('reactivate', ref)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(tr('confirm_reactivate_user', ref)
-                    .replaceAll('%s', user.displayName)),
+                Text(
+                  tr(
+                    'confirm_reactivate_user',
+                    ref,
+                  ).replaceAll('%s', user.displayName),
+                ),
                 const SizedBox(height: 12),
                 if (user.isSeller)
                   DropdownButtonFormField<String>(
-                    decoration:
-                        InputDecoration(labelText: tr('assigned_route', ref)),
+                    decoration: InputDecoration(
+                      labelText: tr('assigned_route', ref),
+                    ),
                     items: freeRoutes
-                        .map((r) =>
-                            DropdownMenuItem(value: r.id, child: Text(r.name)))
+                        .map(
+                          (r) => DropdownMenuItem(
+                            value: r.id,
+                            child: Text(r.name),
+                          ),
+                        )
                         .toList(),
                     onChanged: (v) => setS(() {
                       selectedRouteId = v;
@@ -546,8 +682,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
             ),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: Text(tr('cancel', ref))),
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(tr('cancel', ref)),
+              ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx, true),
                 child: Text(tr('reactivate', ref)),
@@ -560,16 +697,18 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     if (confirmed != true) return;
 
     try {
-      await ref.read(userManagementNotifierProvider.notifier).reactivateUser(
+      await ref
+          .read(userManagementNotifierProvider.notifier)
+          .reactivateUser(
             uid: user.id,
             routeId: selectedRouteId ?? '',
             routeName: selectedRouteName ?? '',
             displayName: user.displayName,
           );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          successSnackBar(tr('saved_successfully', ref)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       }
     } catch (e) {
       if (mounted) {
@@ -587,8 +726,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     final confirmed = await ConfirmDialog.show(
       context,
       title: tr('hard_delete_user', ref),
-      message: tr('confirm_hard_delete_user', ref)
-          .replaceAll('%s', user.displayName),
+      message: tr(
+        'confirm_hard_delete_user',
+        ref,
+      ).replaceAll('%s', user.displayName),
       isDestructive: true,
     );
     if (confirmed != true) return;
@@ -599,8 +740,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
           .hardDeleteUser(user.id, me!.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          successSnackBar(tr('msg_user_hard_deleted', ref)
-              .replaceAll('%s', user.displayName)),
+          successSnackBar(
+            tr('msg_user_hard_deleted', ref).replaceAll('%s', user.displayName),
+          ),
         );
       }
     } catch (e) {
@@ -621,8 +763,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     final confirmed = await ConfirmDialog.show(
       context,
       title: tr('delete', ref),
-      message:
-          tr('confirm_delete_user', ref).replaceAll('%s', user.displayName),
+      message: tr(
+        'confirm_delete_user',
+        ref,
+      ).replaceAll('%s', user.displayName),
     );
     if (confirmed != true) return;
 
@@ -633,7 +777,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           successSnackBar(
-              tr('msg_user_deleted', ref).replaceAll('%s', user.displayName)),
+            tr('msg_user_deleted', ref).replaceAll('%s', user.displayName),
+          ),
         );
       }
     } catch (e) {
@@ -659,9 +804,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context).showSnackBar(
-          errorSnackBar(tr(key, ref)),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
   }
@@ -719,8 +862,9 @@ class _UserTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSelf = user.id == currentUser?.id;
-    final roleColor =
-        user.isAdmin ? AppBrand.adminRoleColor : AppBrand.sellerRoleColor;
+    final roleColor = user.isAdmin
+        ? AppBrand.adminRoleColor
+        : AppBrand.sellerRoleColor;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -752,14 +896,17 @@ class _UserTile extends StatelessWidget {
                               user.displayName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                           if (!user.active)
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 5, vertical: 1),
+                                horizontal: 5,
+                                vertical: 1,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppBrand.errorBg,
                                 borderRadius: BorderRadius.circular(4),
@@ -791,8 +938,10 @@ class _UserTile extends StatelessWidget {
               children: [
                 // Role chip
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: roleColor.withAlpha(25),
                     borderRadius: BorderRadius.circular(4),
@@ -833,8 +982,11 @@ class _UserTile extends StatelessWidget {
                   Tooltip(
                     message: 'Delete',
                     child: IconButton(
-                      icon: const Icon(Icons.delete,
-                          size: 18, color: AppBrand.errorColor),
+                      icon: const Icon(
+                        Icons.delete,
+                        size: 18,
+                        color: AppBrand.errorColor,
+                      ),
                       onPressed: onDelete,
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
@@ -877,8 +1029,9 @@ class _InactiveUserTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final roleColor =
-        user.isAdmin ? AppBrand.adminRoleColor : AppBrand.sellerRoleColor;
+    final roleColor = user.isAdmin
+        ? AppBrand.adminRoleColor
+        : AppBrand.sellerRoleColor;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -906,26 +1059,28 @@ class _InactiveUserTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withAlpha(140)),
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withAlpha(140),
+                    ),
                   ),
                   Text(
                     user.email,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withAlpha(100)),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withAlpha(100),
+                    ),
                   ),
                   Container(
                     margin: const EdgeInsetsDirectional.only(top: 2),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
                     decoration: BoxDecoration(
                       color: roleColor.withAlpha(25),
                       borderRadius: BorderRadius.circular(4),
@@ -946,8 +1101,11 @@ class _InactiveUserTile extends StatelessWidget {
             Tooltip(
               message: 'Reactivate',
               child: IconButton(
-                icon: const Icon(Icons.person_add_alt_1,
-                    size: 20, color: AppBrand.successColor),
+                icon: const Icon(
+                  Icons.person_add_alt_1,
+                  size: 20,
+                  color: AppBrand.successColor,
+                ),
                 onPressed: onReactivate,
                 visualDensity: VisualDensity.compact,
               ),
@@ -956,8 +1114,11 @@ class _InactiveUserTile extends StatelessWidget {
             Tooltip(
               message: 'Send Reset Email',
               child: IconButton(
-                icon: const Icon(Icons.lock_reset,
-                    size: 20, color: AppBrand.primaryColor),
+                icon: const Icon(
+                  Icons.lock_reset,
+                  size: 20,
+                  color: AppBrand.primaryColor,
+                ),
                 onPressed: onSendReset,
                 visualDensity: VisualDensity.compact,
               ),
@@ -965,8 +1126,11 @@ class _InactiveUserTile extends StatelessWidget {
             Tooltip(
               message: 'Permanently Delete',
               child: IconButton(
-                icon: const Icon(Icons.delete_forever,
-                    size: 20, color: AppBrand.errorColor),
+                icon: const Icon(
+                  Icons.delete_forever,
+                  size: 20,
+                  color: AppBrand.errorColor,
+                ),
                 onPressed: onHardDelete,
                 visualDensity: VisualDensity.compact,
               ),

@@ -66,7 +66,11 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => Padding(
           padding: EdgeInsets.fromLTRB(
-              16, 24, 16, MediaQuery.of(ctx).viewInsets.bottom + 16),
+            16,
+            24,
+            16,
+            MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -79,8 +83,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('cash_in', ref)),
                       selected: txType == 'cash_in',
                       onSelected: (_) => setS(() => txType = 'cash_in'),
-                      selectedColor:
-                          AppTheme.clearBg(Theme.of(ctx).colorScheme),
+                      selectedColor: AppTheme.clearBg(
+                        Theme.of(ctx).colorScheme,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -97,8 +102,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
               const SizedBox(height: 12),
               TextField(
                 controller: amountC,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 decoration: InputDecoration(
                   labelText: tr('amount', ref),
                   prefixIcon: const Icon(Icons.currency_exchange),
@@ -121,8 +127,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('sale_cash', ref)),
                       selected: saleType == 'cash',
                       onSelected: (_) => setS(() => saleType = 'cash'),
-                      selectedColor:
-                          AppTheme.clearBg(Theme.of(ctx).colorScheme),
+                      selectedColor: AppTheme.clearBg(
+                        Theme.of(ctx).colorScheme,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -131,8 +138,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('sale_credit', ref)),
                       selected: saleType == 'credit',
                       onSelected: (_) => setS(() => saleType = 'credit'),
-                      selectedColor:
-                          AppTheme.warningBg(Theme.of(ctx).colorScheme),
+                      selectedColor: AppTheme.warningBg(
+                        Theme.of(ctx).colorScheme,
+                      ),
                     ),
                   ),
                 ],
@@ -154,7 +162,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     prefixIcon: const Icon(Icons.calendar_today),
                   ),
                   child: Text(
-                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}'),
+                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -185,8 +194,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     } catch (e) {
                       if (ctx.mounted) {
                         final key = AppErrorMapper.key(e);
-                        ScaffoldMessenger.of(ctx)
-                            .showSnackBar(errorSnackBar(tr(key, ref)));
+                        ScaffoldMessenger.of(
+                          ctx,
+                        ).showSnackBar(errorSnackBar(tr(key, ref)));
                       }
                     }
                   },
@@ -209,7 +219,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     if (confirmed != true) return;
     try {
       final authUser = ref.read(authUserProvider).valueOrNull;
-      await ref.read(transactionNotifierProvider.notifier).deleteTransaction(
+      await ref
+          .read(transactionNotifierProvider.notifier)
+          .deleteTransaction(
             txId: tx.id,
             customerId:
                 tx.customerId ?? (tx.shopId.isNotEmpty ? tx.shopId : null),
@@ -236,24 +248,24 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   }
 
   Map<String, String> _labels() => {
-        'date': tr('date', ref),
-        'description': tr('description', ref),
-        'debit': tr('debit', ref),
-        'credit': tr('credit', ref),
-        'running_balance': tr('running_balance', ref),
-        'account_statement': tr('account_statement', ref),
-        'opening_balance': tr('opening_balance', ref),
-        'net_payable': tr('net_payable', ref),
-        'page': tr('page', ref),
-        'report_date': tr('report_date', ref),
-        'cash_in': tr('cash_in', ref),
-        'cash_out': tr('cash_out', ref),
-        'total_entries': tr('total_entries', ref),
-        'generated_by': tr('generated_by', ref),
-        'duration': tr('duration', ref),
-        'entry_by': tr('entry_by', ref),
-        'mode': tr('mode', ref),
-      };
+    'date': tr('date', ref),
+    'description': tr('description', ref),
+    'debit': tr('debit', ref),
+    'credit': tr('credit', ref),
+    'running_balance': tr('running_balance', ref),
+    'account_statement': tr('account_statement', ref),
+    'opening_balance': tr('opening_balance', ref),
+    'net_payable': tr('net_payable', ref),
+    'page': tr('page', ref),
+    'report_date': tr('report_date', ref),
+    'cash_in': tr('cash_in', ref),
+    'cash_out': tr('cash_out', ref),
+    'total_entries': tr('total_entries', ref),
+    'generated_by': tr('generated_by', ref),
+    'duration': tr('duration', ref),
+    'entry_by': tr('entry_by', ref),
+    'mode': tr('mode', ref),
+  };
 
   Future<void> _generatePdf(ShopModel shop, List<TransactionModel> txs) async {
     try {
@@ -264,7 +276,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
           ? ref.read(allUsersProvider).valueOrNull ?? <UserModel>[]
           : <UserModel>[];
       final entryByMap = <String, String>{
-        for (final u in allUsers) u.id: u.displayName
+        for (final u in allUsers) u.id: u.displayName,
       };
       if (user != null) entryByMap[user.id] = user.displayName;
       final sorted = [...txs]
@@ -313,7 +325,11 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) => Padding(
           padding: EdgeInsets.fromLTRB(
-              16, 24, 16, MediaQuery.of(ctx).viewInsets.bottom + 16),
+            16,
+            24,
+            16,
+            MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -324,8 +340,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
               const SizedBox(height: 16),
               TextField(
                 controller: amountC,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 decoration: InputDecoration(
                   labelText: tr('amount', ref),
                   prefixIcon: const Icon(Icons.currency_exchange),
@@ -349,8 +366,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('sale_cash', ref)),
                       selected: saleType == 'cash',
                       onSelected: (_) => setModalState(() => saleType = 'cash'),
-                      selectedColor:
-                          AppTheme.clearBg(Theme.of(ctx).colorScheme),
+                      selectedColor: AppTheme.clearBg(
+                        Theme.of(ctx).colorScheme,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -360,8 +378,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       selected: saleType == 'credit',
                       onSelected: (_) =>
                           setModalState(() => saleType = 'credit'),
-                      selectedColor:
-                          AppTheme.warningBg(Theme.of(ctx).colorScheme),
+                      selectedColor: AppTheme.warningBg(
+                        Theme.of(ctx).colorScheme,
+                      ),
                     ),
                   ),
                 ],
@@ -403,8 +422,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                   onPressed: () async {
                     final amount = double.tryParse(amountC.text.trim());
                     if (amount == null || amount <= 0) return;
-                    final shop =
-                        ref.read(shopDetailProvider(widget.shopId)).valueOrNull;
+                    final shop = ref
+                        .read(shopDetailProvider(widget.shopId))
+                        .valueOrNull;
                     if (shop == null) return;
                     final user = ref.read(authUserProvider).valueOrNull;
                     try {
@@ -428,8 +448,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       if (ctx.mounted) Navigator.pop(ctx);
                     } catch (e) {
                       if (ctx.mounted) {
-                        ScaffoldMessenger.of(ctx)
-                            .showSnackBar(errorSnackBar('$e'));
+                        ScaffoldMessenger.of(
+                          ctx,
+                        ).showSnackBar(errorSnackBar('$e'));
                       }
                     }
                   },
@@ -462,11 +483,14 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
         }
         final isDebt = shop.balance > 0;
         final cs = Theme.of(context).colorScheme;
-        final balanceColor =
-            isDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs);
-        final balanceBgColor =
-            isDebt ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs);
-        final canManageShop = user?.isAdmin == true ||
+        final balanceColor = isDebt
+            ? AppTheme.debtFg(cs)
+            : AppTheme.clearFg(cs);
+        final balanceBgColor = isDebt
+            ? AppTheme.debtBg(cs)
+            : AppTheme.clearBg(cs);
+        final canManageShop =
+            user?.isAdmin == true ||
             (user?.isSeller == true && user?.assignedRouteId == shop.routeId);
 
         return Scaffold(
@@ -498,9 +522,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     } catch (e) {
                       if (context.mounted) {
                         final key = AppErrorMapper.key(e);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          errorSnackBar(tr(key, ref)),
-                        );
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(errorSnackBar(tr(key, ref)));
                       }
                     }
                   },
@@ -527,9 +551,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     } catch (e) {
                       if (!context.mounted) return;
                       final key = AppErrorMapper.key(e);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        errorSnackBar(tr(key, ref)),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(errorSnackBar(tr(key, ref)));
                     }
                   },
                 ),
@@ -556,17 +580,19 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       tr('date', ref),
                       tr('type', ref),
                       tr('amount', ref),
-                      tr('description', ref)
+                      tr('description', ref),
                     ],
                     rows: sorted
-                        .map((t) => [
-                              AppFormatters.dateTime(t.createdAt),
-                              t.type == 'cash_in'
-                                  ? tr('cash_in', ref)
-                                  : tr('cash_out', ref),
-                              AppFormatters.sar(t.amount),
-                              t.description ?? '',
-                            ])
+                        .map(
+                          (t) => [
+                            AppFormatters.dateTime(t.createdAt),
+                            t.type == 'cash_in'
+                                ? tr('cash_in', ref)
+                                : tr('cash_out', ref),
+                            AppFormatters.sar(t.amount),
+                            t.description ?? '',
+                          ],
+                        )
                         .toList(),
                     fileName: 'shop_${shop.name}',
                     pdfBytesBuilder: () async {
@@ -575,10 +601,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       final user = ref.read(authUserProvider).valueOrNull;
                       final allUsers = user?.isAdmin == true
                           ? ref.read(allUsersProvider).valueOrNull ??
-                              <UserModel>[]
+                                <UserModel>[]
                           : <UserModel>[];
                       final entryByMap = <String, String>{
-                        for (final u in allUsers) u.id: u.displayName
+                        for (final u in allUsers) u.id: u.displayName,
                       };
                       if (user != null) entryByMap[user.id] = user.displayName;
                       final logoBytes = settings.logoBytes;
@@ -629,8 +655,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             child: Text(
                               'R${shop.routeNumber}',
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: balanceColor),
+                                fontWeight: FontWeight.bold,
+                                color: balanceColor,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -638,24 +665,27 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(shop.name,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                            fontWeight: FontWeight.bold)),
+                                Text(
+                                  shop.name,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
                                 if (shop.phone != null)
-                                  Text(shop.phone!,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall),
+                                  Text(
+                                    shop.phone!,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
                                 if (shop.area != null || shop.city != null)
                                   Text(
-                                    [shop.area, shop.city]
-                                        .where((e) => e != null)
-                                        .join(', '),
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall,
+                                    [
+                                      shop.area,
+                                      shop.city,
+                                    ].where((e) => e != null).join(', '),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
                                   ),
                               ],
                             ),
@@ -667,7 +697,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
-                            vertical: 12, horizontal: 16),
+                          vertical: 12,
+                          horizontal: 16,
+                        ),
                         decoration: BoxDecoration(
                           color: balanceBgColor,
                           borderRadius: BorderRadius.circular(12),
@@ -675,17 +707,15 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         ),
                         child: Column(
                           children: [
-                            Text(tr('balance', ref),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelMedium
-                                    ?.copyWith(color: balanceColor)),
+                            Text(
+                              tr('balance', ref),
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(color: balanceColor),
+                            ),
                             const SizedBox(height: 4),
                             Text(
                               AppFormatters.sar(shop.balance.abs()),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
+                              style: Theme.of(context).textTheme.headlineSmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: balanceColor,
@@ -695,8 +725,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               shop.balance > 0
                                   ? tr('outstanding', ref)
                                   : tr('clear', ref),
-                              style:
-                                  TextStyle(color: balanceColor, fontSize: 12),
+                              style: TextStyle(
+                                color: balanceColor,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
@@ -713,15 +745,18 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                 final sev = days > 60
                                     ? AppBrand.errorColor
                                     : days > 30
-                                        ? Colors.orange
-                                        : cs.onSurfaceVariant;
+                                    ? Colors.orange
+                                    : cs.onSurfaceVariant;
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 8),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.schedule,
-                                          size: 14, color: sev),
+                                      Icon(
+                                        Icons.schedule,
+                                        size: 14,
+                                        color: sev,
+                                      ),
                                       const SizedBox(width: 4),
                                       Text(
                                         '$days ${tr('days_overdue', ref)}',
@@ -740,7 +775,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       // Balance trend mini chart
                       txAsync.whenOrNull(
                             data: (txs) {
-                              if (txs.length < 2) return const SizedBox.shrink();
+                              if (txs.length < 2) {
+                                return const SizedBox.shrink();
+                              }
                               return _BalanceTrendChart(transactions: txs);
                             },
                           ) ??
@@ -758,22 +795,27 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.warning_amber,
-                                  color: Colors.orange),
+                              const Icon(
+                                Icons.warning_amber,
+                                color: Colors.orange,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(tr('bad_debt', ref),
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.orange)),
+                                    Text(
+                                      tr('bad_debt', ref),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.orange,
+                                      ),
+                                    ),
                                     Text(
                                       '${tr('bad_debt_amount', ref)}: ${AppFormatters.sar(shop.badDebtAmount)}',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
                                     ),
                                   ],
                                 ),
@@ -826,8 +868,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
               // Return button (sellers only)
               if (canManageShop && user?.isSeller == true)
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   child: SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -845,8 +889,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
               // Create Sale Invoice button (sellers only)
               if (canManageShop && user?.isSeller == true)
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   child: SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -868,15 +914,18 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    Text(tr('transactions', ref),
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      tr('transactions', ref),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const Spacer(),
                     txAsync.whenOrNull(
-                          data: (txs) => Text('${txs.length}',
-                              style: Theme.of(context).textTheme.bodySmall),
+                          data: (txs) => Text(
+                            '${txs.length}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                         ) ??
                         const SizedBox.shrink(),
                   ],
@@ -904,8 +953,11 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       final monthKey =
                           '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
                       if (monthKey != lastMonth) {
-                        items.add(_TxListItem(
-                            monthHeader: AppFormatters.period(monthKey)));
+                        items.add(
+                          _TxListItem(
+                            monthHeader: AppFormatters.period(monthKey),
+                          ),
+                        );
                         lastMonth = monthKey;
                       }
                       items.add(_TxListItem(tx: tx));
@@ -918,18 +970,20 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         if (item.monthHeader != null) {
                           return Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 6),
-                            color: Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest,
+                              horizontal: 16,
+                              vertical: 6,
+                            ),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
                             child: Text(
                               item.monthHeader!,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           );
@@ -937,7 +991,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         final tx = item.tx!;
                         return _TransactionTile(
                           tx: tx,
-                          canEdit: user?.isAdmin == true ||
+                          canEdit:
+                              user?.isAdmin == true ||
                               (user?.isSeller == true &&
                                   user?.id == tx.createdBy),
                           onEdit: () => _showEditTransactionDialog(tx),
@@ -989,8 +1044,11 @@ class _TransactionTile extends ConsumerWidget {
       ),
       title: Text(
         '$sign ${AppFormatters.sar(tx.amount)}',
-        style:
-            TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 15),
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: color,
+          fontSize: 15,
+        ),
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1001,8 +1059,9 @@ class _TransactionTile extends ConsumerWidget {
             Text(
               'Items: ${AppFormatters.stock(totalQty, ppc)}',
               style: TextStyle(
-                  fontSize: 11,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           Text(
             AppFormatters.dateTime(tx.createdAt),
@@ -1020,21 +1079,30 @@ class _TransactionTile extends ConsumerWidget {
               itemBuilder: (_) => [
                 PopupMenuItem(
                   value: 'edit',
-                  child: Row(children: [
-                    const Icon(Icons.edit, size: 16),
-                    const SizedBox(width: 8),
-                    Text(tr('edit', ref)),
-                  ]),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.edit, size: 16),
+                      const SizedBox(width: 8),
+                      Text(tr('edit', ref)),
+                    ],
+                  ),
                 ),
                 PopupMenuItem(
                   value: 'delete',
-                  child: Row(children: [
-                    const Icon(Icons.delete,
-                        size: 16, color: AppBrand.errorColor),
-                    const SizedBox(width: 8),
-                    Text(tr('delete', ref),
-                        style: const TextStyle(color: AppBrand.errorColor)),
-                  ]),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.delete,
+                        size: 16,
+                        color: AppBrand.errorColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        tr('delete', ref),
+                        style: const TextStyle(color: AppBrand.errorColor),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             )
@@ -1060,8 +1128,18 @@ class _BalanceTrendChart extends StatelessWidget {
 
   String _shortMonth(int m) {
     const names = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return m >= 1 && m <= 12 ? names[m - 1] : '';
   }
@@ -1084,8 +1162,9 @@ class _BalanceTrendChart extends StatelessWidget {
     }
 
     final entries = monthlyBalance.entries.toList();
-    final display =
-        entries.length > 6 ? entries.sublist(entries.length - 6) : entries;
+    final display = entries.length > 6
+        ? entries.sublist(entries.length - 6)
+        : entries;
 
     if (display.length < 2) return const SizedBox.shrink();
 
@@ -1119,11 +1198,14 @@ class _BalanceTrendChart extends StatelessWidget {
                 gridData: const FlGridData(show: false),
                 titlesData: FlTitlesData(
                   leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                   rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                   topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
@@ -1137,7 +1219,9 @@ class _BalanceTrendChart extends StatelessWidget {
                         return Text(
                           _shortMonth(int.tryParse(parts[1]) ?? 1),
                           style: TextStyle(
-                              fontSize: 9, color: cs.onSurfaceVariant),
+                            fontSize: 9,
+                            color: cs.onSurfaceVariant,
+                          ),
                         );
                       },
                     ),
@@ -1204,21 +1288,28 @@ class _ReturnSheetState extends ConsumerState<_ReturnSheet> {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-          16, 24, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+        16,
+        24,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: Text(tr('return', ref),
-                  style: Theme.of(context).textTheme.titleLarge),
+              child: Text(
+                tr('return', ref),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _amountC,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               autofocus: true,
               decoration: InputDecoration(
                 labelText: tr('amount', ref),
@@ -1232,8 +1323,10 @@ class _ReturnSheetState extends ConsumerState<_ReturnSheet> {
             ),
             if (showInventory) ...[
               const SizedBox(height: 16),
-              Text(tr('return_items', ref),
-                  style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                tr('return_items', ref),
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               const SizedBox(height: 4),
               inventoryAsync.when(
                 loading: () => const Padding(
@@ -1249,10 +1342,13 @@ class _ReturnSheetState extends ConsumerState<_ReturnSheet> {
                       return ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        title: Text(item.variantName,
-                            overflow: TextOverflow.ellipsis),
+                        title: Text(
+                          item.variantName,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         subtitle: Text(
-                            '${tr("available", ref)}: ${item.quantityAvailable}'),
+                          '${tr("available", ref)}: ${item.quantityAvailable}',
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1262,15 +1358,19 @@ class _ReturnSheetState extends ConsumerState<_ReturnSheet> {
                               onPressed: qty <= 0
                                   ? null
                                   : () => setState(
-                                      () => _selectedQtys[item.id] = qty - 1),
+                                      () => _selectedQtys[item.id] = qty - 1,
+                                    ),
                             ),
                             SizedBox(
                               width: 30,
-                              child: Text('$qty',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16)),
+                              child: Text(
+                                '$qty',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
                             ),
                             IconButton(
                               icon: const Icon(Icons.add, size: 18),
@@ -1278,7 +1378,8 @@ class _ReturnSheetState extends ConsumerState<_ReturnSheet> {
                               onPressed: qty >= item.quantityAvailable
                                   ? null
                                   : () => setState(
-                                      () => _selectedQtys[item.id] = qty + 1),
+                                      () => _selectedQtys[item.id] = qty + 1,
+                                    ),
                             ),
                           ],
                         ),

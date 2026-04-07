@@ -16,7 +16,6 @@ class DashboardStats {
   final int totalShops;
   final int totalProducts;
   final int totalVariants;
-  final double totalOutstanding;
   final int totalStockPairs;
 
   const DashboardStats({
@@ -24,7 +23,6 @@ class DashboardStats {
     this.totalShops = 0,
     this.totalProducts = 0,
     this.totalVariants = 0,
-    this.totalOutstanding = 0,
     this.totalStockPairs = 0,
   });
 }
@@ -34,8 +32,9 @@ class DashboardStats {
 /// (e.g. resource-exhausted). This prevents blank-screen regressions.
 /// Exposed (not private) so auth_provider can invalidate it on sign-out
 /// to prevent stale stats from flashing when a new user signs in (SM-01).
-final lastGoodDashboardStatsProvider =
-    StateProvider<DashboardStats?>((ref) => null);
+final lastGoodDashboardStatsProvider = StateProvider<DashboardStats?>(
+  (ref) => null,
+);
 final _lastGoodDashboardStatsProvider = lastGoodDashboardStatsProvider;
 
 /// Derives dashboard stats reactively from live stream providers.
@@ -91,17 +90,16 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
   final productList = products.valueOrNull ?? const <ProductModel>[];
   final variantList = variants.valueOrNull ?? const <ProductVariantModel>[];
 
-  final totalOutstanding =
-      shopList.fold<double>(0, (s, shop) => s + shop.balance);
-  final totalStockPairs =
-      variantList.fold<int>(0, (s, v) => s + v.quantityAvailable);
+  final totalStockPairs = variantList.fold<int>(
+    0,
+    (s, v) => s + v.quantityAvailable,
+  );
 
   final stats = DashboardStats(
     totalRoutes: routeList.length,
     totalShops: shopList.length,
     totalProducts: productList.length,
     totalVariants: variantList.length,
-    totalOutstanding: totalOutstanding,
     totalStockPairs: totalStockPairs,
   );
 

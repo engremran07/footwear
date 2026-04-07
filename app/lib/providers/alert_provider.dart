@@ -4,12 +4,12 @@ import '../models/product_variant_model.dart';
 import 'product_provider.dart';
 import 'shop_provider.dart';
 
-/// Alert counts for dashboard: overdue customers + low-stock variants.
+/// Alert counts for dashboard: overdue shops + low-stock variants.
 class AlertCounts {
-  final int overdueCustomers;
+  final int overdueShops;
   final int lowStockVariants;
-  const AlertCounts({this.overdueCustomers = 0, this.lowStockVariants = 0});
-  int get total => overdueCustomers + lowStockVariants;
+  const AlertCounts({this.overdueShops = 0, this.lowStockVariants = 0});
+  int get total => overdueShops + lowStockVariants;
 }
 
 final alertCountsProvider = Provider<AsyncValue<AlertCounts>>((ref) {
@@ -28,8 +28,7 @@ final alertCountsProvider = Provider<AsyncValue<AlertCounts>>((ref) {
   // Variants with stock < 10 pairs considered low-stock
   final lowStock = variants.where((v) => v.quantityAvailable < 10).length;
 
-  return AsyncData(AlertCounts(
-    overdueCustomers: overdueCount,
-    lowStockVariants: lowStock,
-  ));
+  return AsyncData(
+    AlertCounts(overdueShops: overdueCount, lowStockVariants: lowStock),
+  );
 });

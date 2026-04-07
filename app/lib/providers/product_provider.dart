@@ -12,46 +12,55 @@ final productsProvider = StreamProvider.autoDispose<List<ProductModel>>((ref) {
       .orderBy('name')
       .limit(200)
       .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => ProductModel.fromJson(d.data(), d.id)).toList());
+      .map(
+        (snap) => snap.docs
+            .map((d) => ProductModel.fromJson(d.data(), d.id))
+            .toList(),
+      );
 });
 
-final productDetailProvider =
-    StreamProvider.autoDispose.family<ProductModel?, String>((ref, id) {
-  return FirebaseFirestore.instance
-      .collection(Collections.products)
-      .doc(id)
-      .snapshots()
-      .map((doc) =>
-          doc.exists ? ProductModel.fromJson(doc.data()!, doc.id) : null);
-});
+final productDetailProvider = StreamProvider.autoDispose
+    .family<ProductModel?, String>((ref, id) {
+      return FirebaseFirestore.instance
+          .collection(Collections.products)
+          .doc(id)
+          .snapshots()
+          .map(
+            (doc) =>
+                doc.exists ? ProductModel.fromJson(doc.data()!, doc.id) : null,
+          );
+    });
 
 final productVariantsProvider = StreamProvider.autoDispose
     .family<List<ProductVariantModel>, String>((ref, productId) {
-  return FirebaseFirestore.instance
-      .collection(Collections.productVariants)
-      .where('product_id', isEqualTo: productId)
-      .where('active', isEqualTo: true)
-      .orderBy('variant_name')
-      .limit(100)
-      .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
-          .toList());
-});
+      return FirebaseFirestore.instance
+          .collection(Collections.productVariants)
+          .where('product_id', isEqualTo: productId)
+          .where('active', isEqualTo: true)
+          .orderBy('variant_name')
+          .limit(100)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
 
 final allVariantsProvider =
     StreamProvider.autoDispose<List<ProductVariantModel>>((ref) {
-  return FirebaseFirestore.instance
-      .collection(Collections.productVariants)
-      .where('active', isEqualTo: true)
-      .orderBy('variant_name')
-      .limit(500)
-      .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
-          .toList());
-});
+      return FirebaseFirestore.instance
+          .collection(Collections.productVariants)
+          .where('active', isEqualTo: true)
+          .orderBy('variant_name')
+          .limit(500)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
 
 class ProductNotifier extends AsyncNotifier<void> {
   @override
@@ -113,11 +122,11 @@ class ProductNotifier extends AsyncNotifier<void> {
     await FirebaseFirestore.instance
         .collection(Collections.productVariants)
         .add({
-      ...data,
-      'active': true,
-      'created_at': Timestamp.now(),
-      'updated_at': Timestamp.now(),
-    });
+          ...data,
+          'active': true,
+          'created_at': Timestamp.now(),
+          'updated_at': Timestamp.now(),
+        });
   }
 
   Future<void> updateVariant(String id, Map<String, dynamic> data) async {
@@ -141,17 +150,18 @@ class ProductNotifier extends AsyncNotifier<void> {
         .collection(Collections.productVariants)
         .doc(variantId)
         .update({
-      'quantity_available': FieldValue.increment(delta),
-      'updated_at': Timestamp.now(),
-    });
+          'quantity_available': FieldValue.increment(delta),
+          'updated_at': Timestamp.now(),
+        });
   }
 
   Future<void> batchAdjustStock(Map<String, int> updates) async {
     if (updates.isEmpty) return;
 
     final batch = FirebaseFirestore.instance.batch();
-    final collRef =
-        FirebaseFirestore.instance.collection(Collections.productVariants);
+    final collRef = FirebaseFirestore.instance.collection(
+      Collections.productVariants,
+    );
 
     for (final entry in updates.entries) {
       batch.update(collRef.doc(entry.key), {
@@ -187,32 +197,25 @@ class ProductNotifier extends AsyncNotifier<void> {
     final batch = db.batch();
 
     // Decrement warehouse stock
-    batch.update(
-      db.collection(Collections.productVariants).doc(variantId),
-      {
-        'quantity_available': FieldValue.increment(-quantity),
-        'updated_at': Timestamp.now(),
-      },
-    );
+    batch.update(db.collection(Collections.productVariants).doc(variantId), {
+      'quantity_available': FieldValue.increment(-quantity),
+      'updated_at': Timestamp.now(),
+    });
 
     final sellerInventoryRef = db
         .collection(Collections.sellerInventory)
         .doc('${sellerId}_$variantId');
-    batch.set(
-      sellerInventoryRef,
-      {
-        'seller_id': sellerId,
-        'seller_name': sellerName,
-        'product_id': productId,
-        'variant_id': variantId,
-        'variant_name': variantName,
-        'quantity_available': FieldValue.increment(quantity),
-        'active': true,
-        'created_at': Timestamp.now(),
-        'updated_at': Timestamp.now(),
-      },
-      SetOptions(merge: true),
-    );
+    batch.set(sellerInventoryRef, {
+      'seller_id': sellerId,
+      'seller_name': sellerName,
+      'product_id': productId,
+      'variant_id': variantId,
+      'variant_name': variantName,
+      'quantity_available': FieldValue.increment(quantity),
+      'active': true,
+      'created_at': Timestamp.now(),
+      'updated_at': Timestamp.now(),
+    }, SetOptions(merge: true));
 
     // Audit log — write to inventory_transactions (matches allInventoryTransactionsProvider query)
     final auditRef = db.collection(Collections.inventoryTransactions).doc();
@@ -233,5 +236,6 @@ class ProductNotifier extends AsyncNotifier<void> {
   }
 }
 
-final productNotifierProvider =
-    AsyncNotifierProvider<ProductNotifier, void>(ProductNotifier.new);
+final productNotifierProvider = AsyncNotifierProvider<ProductNotifier, void>(
+  ProductNotifier.new,
+);
