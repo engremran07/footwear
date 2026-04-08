@@ -76,6 +76,23 @@ Prevent regressions caused by architecture drift between code, rules, and agent 
 - Provider methods writing created_by/route_id/shop_id must reject empty values.
 - Validate identifiers before creating/committing Firestore batched writes.
 
+## Admin Auth Pipeline Failure Playbook
+
+### INVALID_ID_TOKEN (custom-token 3-step flow)
+When Firebase Auth rejects the admin's ID token mid-session:
+1. Call `auth.currentUser?.getIdToken(forceRefresh: true)`.
+2. If step 1 fails, call `auth.signInWithCustomToken(customToken)` where `customToken` is issued by the secondary FirebaseApp flow.
+3. If step 2 fails, force logout via `authNotifier.signOut()` and redirect to `/login`.
+**Never silently swallow INVALID_ID_TOKEN — always force refresh or sign out.**
+
+### insufficient_request_scope
+- Cause: GCP service account missing `cloud-platform` OAuth scope.
+- Fix: Re-generate service account key with `--scopes=https://www.googleapis.com/auth/cloud-platform` or use Application Default Credentials in CI.
+
+### Service Account Credentials Not Provisioned
+- Cause: `GOOGLE_APPLICATION_CREDENTIALS` env var missing in CI runner.
+- Fix: Add `FIREBASE_SERVICE_ACCOUNT` secret to GitHub Actions; load via `google-github-actions/auth@v2`.
+
 ## Standard Failure Playbooks
 
 ### permission-denied on writes

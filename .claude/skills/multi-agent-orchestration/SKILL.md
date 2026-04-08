@@ -39,6 +39,15 @@ The Orchestrator (Agent 13+) cross-references and synthesizes the final report.
 | 14 | Free-Tier Firebase Compliance | pubspec.yaml, firestore.rules, all providers |
 | 15 | Orchestrator & Cross-Reference | ALL files, synthesizes all findings |
 
+### Agents 16-20: Infrastructure & Governance
+| Agent | Domain | Focus Files |
+|-------|--------|-------------|
+| 16 | Documentation & .md Files Auditor | AGENTS.md, CLAUDE.md, README.md, app/README.md, SYSTEM_DEEP_DIVE |
+| 17 | .github/instructions + Prompts System Architect | .github/instructions/**, .github/prompts/** |
+| 18 | CI/CD Closed-Loop Automation | .github/workflows/**, firebase.json, key.properties |
+| 19 | .claude Skills & CLAUDE.md Completeness Reviewer | .claude/skills/**/* SKILL.md, CLAUDE.md |
+| 20 | Autonomous Orchestrator (meta-agent) | ALL findings from Agents 1-19, synthesis + roadmap |
+
 ## Audit Workflow
 
 ### Phase 1: Parallel Deep Read (All agents simultaneously)
@@ -94,10 +103,26 @@ For every new feature identified as missing:
 
 ## Conflict Resolution Protocol
 When two agents disagree on severity or fix approach:
-- Agent 15 (Orchestrator) rules
+- Agent 15 (Orchestrator) rules; Agent 20 (meta-orchestrator) overrides if systemic
 - Default to MORE conservative (higher severity) finding
 - Document both perspectives in report
 - Recommend A/B if genuinely ambiguous
+
+## Quick Launch Pattern — `/audit` Prompt
+Trigger via `.github/prompts/audit.prompt.md` (mode: agent).
+The prompt deploys all 20 agents concurrently using `runSubagent`.
+Each agent returns a structured finding set in the Issue Template format.
+Agent 20 collates, deduplicates, ranks, and builds the final roadmap.
+
+## Synthesis / Closure Matrix Template
+After all 20 agents report, populate this:
+
+| ISSUE-NNN | Agent(s) | SEVERITY | Domain | Fix accepted | PR/Commit |
+|-----------|----------|----------|--------|--------------|-----------|
+| 001 | 02,06 | CRITICAL | Security | ✅ | abc1234 |
+| 002 | 11 | HIGH | Financial | ✅ | abc1234 |
+
+Mark every row ✅ before signing off a release.
 
 ## Documentation Sync Rule
 Any finding that identifies architecture behavior changes MUST also update:

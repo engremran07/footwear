@@ -1,0 +1,202 @@
+name: Release — Build, Publish & Deploy
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create GitHub Release?'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  validate:
+    name: Release Validation
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from pubspec.yaml
+        id: version
+        run: |
+          VERSION=$(grep "^version:" app/pubspec.yaml | awk '{print $2}')
+          SEMVER=$(echo "$VERSION" | cut -d'+' -f1)
+          BUILD=$(echo "$VERSION" | cut -d'+' -f2)
+          echo "version=$SEMVER" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD" >> $GITHUB_OUTPUT
+          echo "Version: $SEMVER+$BUILD"
+
+      - name: Validate tag matches pubspec version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          PUBSPEC_VER=$(grep "^version:" app/pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
+          if [ "$TAG" != "$PUBSPEC_VER" ]; then
+            echo "❌ Tag v$TAG does not match pubspec version $PUBSPEC_VER"
+            exit 1
+          fi
+          echo "✅ Tag matches pubspec: v$TAG"
+
+      - name: Validate versionCode is monotonic
+        run: |
+          CURRENT_BUILD=$(grep "^version:" app/pubspec.yaml | sed 's/.*+//')
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${GITHUB_REF#refs/tags/}$" | head -1 || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            PREV_BUILD=$(git show "$PREV_TAG:app/pubspec.yaml" 2>/dev/null | grep "^version:" | sed 's/.*+//' || echo "0")
+            if [ "$CURRENT_BUILD" -le "$PREV_BUILD" ]; then
+              echo "❌ versionCode $CURRENT_BUILD must exceed previous $PREV_BUILD (tag: $PREV_TAG)"
+              exit 1
+            fi
+          fi
+          echo "✅ versionCode monotonic: $CURRENT_BUILD"
+
+  build:
+    name: Build APK + Web
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: stable
+          cache: true
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Write firebase_options.dart
+        env:
+          FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
+        run: echo "$FIREBASE_OPTIONS_DART" | base64 -d > app/lib/firebase_options.dart
+
+      - name: Write google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/android/app/google-services.json
+
+      - name: Write keystore
+        env:
+          KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
+        run: echo "$KEYSTORE_FILE" | base64 -d > app/android/footwear-erp.jks
+
+      - name: Write key.properties
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          cat > app/android/key.properties << EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=../footwear-erp.jks
+          EOF
+
+      - name: flutter pub get
+        run: cd app && flutter pub get
+
+      - name: flutter analyze
+        run: cd app && flutter analyze lib --no-pub
+
+      - name: flutter test
+        run: cd app && flutter test -r compact
+
+      - name: Build release APK (fat)
+        run: cd app && flutter build apk --release
+
+      - name: Build web
+        run: cd app && flutter build web --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-release-${{ needs.validate.outputs.version }}
+          path: app/build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-release-${{ needs.validate.outputs.version }}
+          path: app/build/web/
+
+  deploy:
+    name: Deploy to Firebase Hosting
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-release-${{ needs.validate.outputs.version }}
+          path: app/build/web/
+
+      - name: Deploy Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SHOESERP }}
+          projectId: shoeserp-clean-20260327
+          channelId: live
+
+  release:
+    name: Create GitHub Release
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: apk-release-${{ needs.validate.outputs.version }}
+          path: ./artifacts/
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p' || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            COMMITS=$(git log "$PREV_TAG..HEAD" --oneline --no-merges | head -20)
+          else
+            COMMITS=$(git log --oneline --no-merges | head -20)
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.validate.outputs.version }}
+          name: ShoesERP v${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}
+          body: |
+            ## ShoesERP v${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}
+
+            ### Changes
+            ${{ steps.changelog.outputs.changelog }}
+
+            ### Installation
+            Download `app-release.apk` and install (enable Install from Unknown Sources).
+            Web: https://shoeserp-clean-20260327.web.app
+          files: ./artifacts/app-release.apk
+          draft: false
+          prerelease: false

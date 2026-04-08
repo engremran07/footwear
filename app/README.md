@@ -1,8 +1,8 @@
-﻿# FootWear ERP — Flutter App (v3.3.8)
+﻿# FootWear ERP — Flutter App (v3.4.0)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record customer transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
-> **v3.3.8+29** — Auth pipeline hardened: 3-step custom-token → ID-token `VERIFY_EMAIL` flow; `cloud-platform` OAuth2 scope; overflow fix on verification badge; SA credentials cached.
+> **v3.4.0+30** — Autonomous 20-agent CI/CD self-healing system. Seller transaction rules restricted to description+updated_at. Session 7h30m warning dialog. 20-agent audit workflow, hygiene CI gates, 7 skill upgrades.
 
 ---
 
@@ -165,4 +165,4 @@ If the release includes both web and APK:
 - **Dark mode**: theme-aware colors, no hardcoded Colors.white/grey
 - **RTL**: EdgeInsetsDirectional throughout, no hardcoded left/right
 - **Security**: deny-by-default rules, admin defense-in-depth, provider write guards, `_normalizePath()` in router
-- **Release**: v3.0.0+7, 3 split-per-abi APKs, tested Samsung A56 (API 36) + V2247 (API 34)
+- **Release**: v3.0.0+7, fat APK built, tested Samsung A56 (API 36) + V2247 (API 34)

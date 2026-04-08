@@ -235,24 +235,13 @@ service cloud.firestore {
           request.resource.data.amount is number &&
           request.resource.data.amount > 0
         ));
+      // Sellers may only annotate their own route transactions (description only).
+      // Admins can update all financial fields (amount, type, date, soft-delete).
       allow update: if isAdmin() ||
         (
           requestIsSellerRouteTransaction() &&
           request.resource.data.diff(resource.data)
-            .affectedKeys().hasOnly([
-              'amount',
-              'type',
-              'description',
-              'sale_type',
-              'created_at',
-              'updated_at',
-              'deleted',
-              'deleted_at',
-              'deleted_by'
-            ]) &&
-          isValidTransactionType(request.resource.data.type) &&
-          request.resource.data.amount is number &&
-          request.resource.data.amount > 0
+            .affectedKeys().hasOnly(['description', 'updated_at'])
         );
       allow delete: if isAdmin();
     }

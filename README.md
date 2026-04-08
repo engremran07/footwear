@@ -1,8 +1,8 @@
-﻿# FootWear ERP — v3.3.8
+﻿# FootWear ERP — v3.4.0
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase as the backend. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
-> **v3.3.8+29** — Auth pipeline hardened: 3-step custom-token → ID-token flow for `VERIFY_EMAIL`; overflow fix on verification badge row; OAuth2 scope upgraded to `cloud-platform`.
+> **v3.4.0+30** — Autonomous 20-agent CI/CD self-healing system: GitHub Actions (ci.yml hygiene gates, build-apk.yml, release.yml, deploy-web.yml), GitHub prompts (20-agent audit, post-impl checklist), GitHub instructions (collections, financial-integrity, testing, code-quality), 7 skill file updates/additions. Security: seller transaction rules restricted to description+updated_at only; new updateTransactionNote() provider; role-aware edit dialog (seller annotation-only, delete hidden). Session UX: 7h30m warning dialog before 8h hard cutoff, L10n parity across EN/AR/UR.
 
 ---
 
@@ -303,7 +303,7 @@ flutter test -r expanded
 - **Dark mode QA**: theme-aware colors throughout — no hardcoded Colors.white/grey
 - **RTL QA**: EdgeInsetsDirectional throughout — no hardcoded left/right padding
 - **Zero-cost Firebase**: Firestore + Auth only — no Storage, no Cloud Functions
-- **Release**: v3.0.0+7, 3 split-per-abi APKs, tested on Samsung A56 + V2247
+- **Release**: v3.0.0+7, fat APK built, tested on Samsung A56 + V2247
 
 ---
 

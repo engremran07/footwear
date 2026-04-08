@@ -103,6 +103,64 @@ If architecture behavior is changed, update in same patch:
 - app/README.md
 - SYSTEM_DEEP_DIVE_2026-03-27.md
 
+## Breakage Chain Reference
+
+### Chain 1: Collection Rename
+`collections.dart` constant renamed → providers silently break → rules reference stale name → indexes stale  
+**Fix order:** constants.dart → providers → rules → indexes → `firebase deploy --only firestore:rules,firestore:indexes`
+
+### Chain 2: Auth Provider Leak
+New admin-data provider added → not in `_invalidateRoleScopedProviders()` → seller inherits admin data after logout  
+**Fix:** After every new provider, grep-confirm it's in `auth_provider.dart::_invalidateRoleScopedProviders`.
+
+### Chain 3: Rules + App Role Mismatch
+Rules check 'admin' exactly; app writes 'Admin' (casing) → all admin writes fail  
+**Fix:** `isAdminRole()` regex in rules + `role.trim().toLowerCase()` before every Firestore write.
+
+### Chain 4: Composite Index Gap
+`where(A) + orderBy(B)` added → no index → list renders empty, no error in UI  
+**Fix:** Add entry to `firestore.indexes.json` → `firebase deploy --only firestore:indexes`.
+
+## Vibe-Coded Debt Signals
+
+| Pattern seen | What it signals | Correct pattern |
+|-------------|----------------|----------------|
+| `db.collection('transactions')` | Raw collection string | `db.collection(Collections.transactions)` |
+| `if (user.isSeller && ...)` on stock source | Admin silently excluded | `sellerInventoryProvider(user.id)` for all |
+| `.where('deleted', isEqualTo: false)` | Pre-DI-01 docs excluded | Client-side `d.data()['deleted'] != true` |
+| `ref.read(provider)` in `build()` | Stale data guarantee | `ref.watch(provider)` |
+| `flutter build apk --release --split-per-abi` | Wrong split APK | `flutter build apk --release` (fat) |
+| Hardcoded `Colors.red`, `Colors.white` | Dark mode breakage | `AppBrand.errorFg`, `AppBrand.errorBg` |
+| Raw `SnackBar(content: Text(...))` | Unstyled SnackBar | `errorSnackBar()` / `successSnackBar()` |
+
+## Five Non-Negotiable Pre-Commit Checks
+
+```bash
+# 1 — Zero analyze issues
+flutter analyze lib --no-pub
+
+# 2 — All tests green
+flutter test -r expanded
+
+# 3 — No raw collection strings
+grep -rn "\.collection('" app/lib/ | grep -v "Collections\."
+
+# 4 — No Firestore writes in screens/widgets
+grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/
+
+# 5 — No split-per-abi anywhere
+grep -rn "split-per-abi" .github/ app/ --include="*.{yml,yaml,md,sh}"
+```
+
+## Admin Auth Pipeline
+
+When an admin's ID token is rejected mid-session (INVALID_ID_TOKEN):
+1. `auth.currentUser?.getIdToken(forceRefresh: true)` → if OK, continue
+2. If step 1 fails → `auth.signInWithCustomToken(token)` from secondary FirebaseApp
+3. If step 2 fails → `authNotifier.signOut()` + redirect to `/login`
+
+Never silently swallow `INVALID_ID_TOKEN` — always force refresh or sign out.
+
 ## Pre-Signoff Verification
 
 Run before marking production ready:

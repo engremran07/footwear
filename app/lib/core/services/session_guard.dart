@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user_model.dart';
 import '../constants/collections.dart';
+import '../l10n/app_locale.dart';
 
 /// Banking-style session security: inactivity timeout + background lock.
 ///
@@ -41,6 +42,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   DateTime? _sessionStartedAt;
   DateTime? _lastActivityAt;
   DateTime? _lastActiveWriteAt;
+  bool _warningShown = false;
   late final AppLifecycleListener _lifecycleListener;
 
   @override
@@ -115,9 +117,34 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     if (user == null) return;
     if (!user.isAdmin) return;
     final elapsed = DateTime.now().difference(_sessionStartedAt!);
+    // Hard cutoff at 8h
     if (elapsed > widget.adminSessionMax) {
       ref.read(authNotifierProvider.notifier).signOut();
+      return;
     }
+    // Warn at 7h30m (450 minutes) — show once per session
+    if (!_warningShown && elapsed.inMinutes >= 450) {
+      _warningShown = true;
+      _showSessionExpiryWarning();
+    }
+  }
+
+  void _showSessionExpiryWarning() {
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('session_expiring_soon', ref)),
+        content: Text(tr('session_warning_30min', ref)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(tr('ok', ref)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _updateLastActive() {
@@ -148,6 +175,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
       if (prevUser?.id != nextUser?.id && nextUser != null) {
         _sessionStartedAt = DateTime.now();
         _lastActiveWriteAt = null;
+        _warningShown = false; // reset warning flag for new session
       }
       // Force logout if user's active flag cleared remotely
       if (nextUser != null && !nextUser.active) {

@@ -809,6 +809,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Session Security ──
     'session_expired': 'Session expired — please sign in again',
+    'session_expiring_soon': 'Session Expiring Soon',
+    'session_warning_30min': 'Your admin session will expire in 30 minutes. Please save your work.',
 
     // ── Credit Ledger & Quick Cash ──
     'credit_ledger': 'Credit Ledger',
@@ -1867,6 +1869,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Session Security ──
     'session_expired': 'انتهت الجلسة — يرجى تسجيل الدخول مرة أخرى',
+    'session_expiring_soon': 'الجلسة على وشك الانتهاء',
+    'session_warning_30min': 'ستنتهي جلسة المشرف خلال 30 دقيقة. يرجى حفظ عملك.',
 
     // ── Credit Ledger & Quick Cash ──
     'credit_ledger': 'دفتر الائتمان',
@@ -2931,6 +2935,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Session Security ──
     'session_expired': 'سیشن ختم ہو گیا — دوبارہ سائن ان کریں',
+    'session_expiring_soon': 'سیشن جلد ختم ہو گا',
+    'session_warning_30min': 'آپ کا ایڈمن سیشن 30 منٹ میں ختم ہو جائے گا۔ براہ کرم اپنا کام محفوظ کریں۔',
 
     // ── Credit Ledger & Quick Cash ──
     'credit_ledger': 'کریڈٹ لیجر',

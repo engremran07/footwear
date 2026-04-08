@@ -105,6 +105,15 @@ Seller:
   only (zero-cost tier). Company logos are stored as base64 in Firestore.
   Product images use external HTTP URLs. Do not introduce firebase_storage.
 
+1. Any provider that reads admin-only data (e.g. `allTransactionsProvider`,
+  `allInvoicesProvider`, `adminAllSellerInventoryProvider`) MUST be added to
+  `_invalidateRoleScopedProviders()` in `auth_provider.dart`. Failing to do so
+  leaks admin data to seller sessions across hot-restarts and re-logins.
+
+1. All Firestore collection references MUST use `Collections.*` constants from
+  `app/lib/core/constants/collections.dart`. No raw `.collection('string')`
+  calls are permitted anywhere in `app/lib/`.
+
 ## 5) Known Failure Signatures
 
 1. permission-denied on route create/inventory add
@@ -173,6 +182,11 @@ Before finishing:
 
 - Run flutter analyze lib --no-pub
 - Run flutter test -r expanded
+- Run hygiene grep gates (see CI §4 in .github/workflows/ci.yml):
+  1. No raw collection strings: `grep -rn "\.collection('" app/lib/ | grep -v "Collections\."` → zero
+  2. allTransactionsProvider in invalidation list: `grep -q "allTransactionsProvider" app/lib/providers/auth_provider.dart`
+  3. No split-per-abi in scripts: `grep -rn "split-per-abi" .github/ app/` → zero
+  4. No Firestore writes in screens/widgets: `grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/` → zero
 - Manually or logically verify admin and seller access for `/` and `/inventory`
   after auth/router/provider/rules edits; no transient permission-denied UI is acceptable
 - When release/deploy work is requested, verify `app/pubspec.yaml` and
@@ -191,6 +205,24 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-04-07 audit v8 — v3.4.0+30 (autonomous 20-agent system):
+
+- 20-agent CI/CD + self-healing system launched
+- GitHub Actions: ci.yml (6 hygiene gates), build-apk.yml, release.yml, deploy-web.yml
+- GitHub prompts: audit.prompt.md (20-agent run), post-impl-checklist.prompt.md
+- GitHub instructions: collections, financial-integrity, testing, code-quality
+- Skills: multi-agent-orchestration (Agents 16-20 added), inline-audit (breakage chains + grep gates),
+  code-quality (new), shoeserp-runtime-hardening (auth pipeline playbook),
+  user-management (3-step custom-token flow), github-workflows (new),
+  testing-strategy (rules emulator tests, archive 4-test requirement, financial guards)
+- Security fix A3: seller transaction rules restricted to ['description','updated_at'] only;
+  updateTransactionNote() provider method; role-aware UI (seller sees annotation dialog, delete hidden)
+- Session UX fix A4: 7h30m warning dialog before 8h hard cutoff; session_expiring_soon L10n × 3 langs
+- AGENTS.md §4: Rules 17+18 added (provider leak guard, collection constants mandate)
+- AGENTS.md §8: Hygiene grep gates added to pre-commit checklist
+- CLAUDE.md: Breakage Chain Reference, Vibe-Coded Debt Signals, Five Pre-Commit Checks, Auth Pipeline
+- Release: v3.4.0+30, fat APK + web deployed
 
 2026-04-06 audit v7 — v3.3.0+21:
 

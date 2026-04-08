@@ -263,6 +263,28 @@ class TransactionNotifier extends AsyncNotifier<void> {
     await batch.commit();
   }
 
+  /// Seller-safe annotation: updates only the [description] field.
+  /// Firestore rules restrict seller updates to ['description', 'updated_at'].
+  /// Admins should use [updateTransaction] for financial field changes.
+  Future<void> updateTransactionNote({
+    required String txId,
+    required String? description,
+  }) async {
+    if (txId.trim().isEmpty) {
+      throw ArgumentError('txId must not be empty');
+    }
+    await FirebaseFirestore.instance
+        .collection(Collections.transactions)
+        .doc(txId)
+        .update({
+          if (description != null && description.isNotEmpty)
+            'description': description.trim()
+          else
+            'description': FieldValue.delete(),
+          'updated_at': Timestamp.now(),
+        });
+  }
+
   /// Soft-deletes a transaction (sets deleted=true) and reverses its balance
   /// impact on the customer. Preserves audit trail.
   Future<void> deleteTransaction({

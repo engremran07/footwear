@@ -1,0 +1,168 @@
+name: CI — Analyze, Test & Hygiene
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyse:
+    name: Flutter Analyze + Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: stable
+          cache: true
+
+      - name: Write firebase_options.dart
+        env:
+          FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
+        run: |
+          echo "$FIREBASE_OPTIONS_DART" | base64 -d > app/lib/firebase_options.dart
+
+      - name: Write google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/android/app/google-services.json
+
+      - name: flutter pub get
+        run: cd app && flutter pub get
+
+      - name: dart format --set-exit-if-changed
+        run: cd app && dart format --set-exit-if-changed lib test
+
+      - name: flutter analyze
+        run: cd app && flutter analyze lib --no-pub
+
+  test:
+    name: Flutter Test
+    needs: analyse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: stable
+          cache: true
+
+      - name: Write firebase_options.dart
+        env:
+          FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
+        run: echo "$FIREBASE_OPTIONS_DART" | base64 -d > app/lib/firebase_options.dart
+
+      - name: Write google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/android/app/google-services.json
+
+      - name: flutter pub get
+        run: cd app && flutter pub get
+
+      - name: flutter test
+        run: cd app && flutter test -r compact
+
+  hygiene:
+    name: Code Hygiene Gates
+    needs: analyse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gate 1 — No raw Firestore collection literals
+        run: |
+          FOUND=$(grep -rn "\.collection('" app/lib/ | grep -v Collections\. | grep -v '//' | grep -v '\.rules' || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ Raw Firestore collection literal detected (use Collections.* constants):"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✅ No raw collection literals"
+
+      - name: Gate 2 — allTransactionsProvider invalidated on sign-out
+        run: |
+          if ! grep -q "allTransactionsProvider" app/lib/providers/auth_provider.dart; then
+            echo "❌ allTransactionsProvider not found in auth_provider.dart _invalidateRoleScopedProviders"
+            exit 1
+          fi
+          echo "✅ allTransactionsProvider present in auth_provider.dart"
+
+      - name: Gate 3 — No split-per-abi in READMEs (fat APK only)
+        run: |
+          FOUND=$(grep -rn "\-\-split-per-abi" README.md app/README.md AGENTS.md CLAUDE.md -- || true)
+          # Only flag if found in a build command context (not comment lines)
+          CMD=$(echo "$FOUND" | grep "flutter build" | grep -v "#" || true)
+          if [ -n "$CMD" ]; then
+            echo "❌ --split-per-abi found in build command (fat APK only):"
+            echo "$CMD"
+            exit 1
+          fi
+          echo "✅ No --split-per-abi in build commands"
+
+      - name: Gate 4 — No direct Firestore writes from screens/widgets
+        run: |
+          FOUND=$(grep -rn "FirebaseFirestore.instance" app/lib/screens/ app/lib/widgets/ 2>/dev/null | grep -v "//" || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ Direct Firestore write detected in screens/widgets:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✅ No direct Firestore writes in screens/widgets"
+
+      - name: Gate 5 — L10n key parity (EN keys exist in AR and UR)
+        run: |
+          python3 - << 'EOF'
+          import re, sys
+
+          with open('app/lib/core/l10n/app_locale.dart', 'r', encoding='utf-8') as f:
+              content = f.read()
+
+          # Split into language blocks (rough split by the locale map boundaries)
+          blocks = re.split(r"case 'en':|case 'ar':|case 'ur':", content)
+          if len(blocks) < 4:
+              print('❌ Could not parse 3 language blocks')
+              sys.exit(1)
+
+          def extract_keys(block):
+              return set(re.findall(r"'([a-z][a-z0-9_]+)':", block))
+
+          en_keys = extract_keys(blocks[1])
+          ar_keys = extract_keys(blocks[2])
+          ur_keys = extract_keys(blocks[3])
+
+          missing_ar = en_keys - ar_keys
+          missing_ur = en_keys - ur_keys
+
+          if missing_ar:
+              print(f'❌ {len(missing_ar)} keys missing from AR: {sorted(missing_ar)[:10]}')
+              sys.exit(1)
+          if missing_ur:
+              print(f'❌ {len(missing_ur)} keys missing from UR: {sorted(missing_ur)[:10]}')
+              sys.exit(1)
+
+          print(f'✅ L10n parity OK — {len(en_keys)} keys in all 3 languages')
+          EOF
+
+      - name: Gate 6 — PDF generation not on main thread
+        run: |
+          FOUND=$(grep -rn "PdfDocument\|makePdf\|pdf\.save\|computePdf" app/lib/screens/ app/lib/widgets/ 2>/dev/null | grep -v "Isolate\|compute\|spawn\|//" || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ Potential PDF generation on main thread (use Isolate.run):"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✅ No PDF main-thread violations detected"

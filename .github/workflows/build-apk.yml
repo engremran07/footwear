@@ -1,0 +1,107 @@
+name: Build APK (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options: [debug, release]
+      flutter_version:
+        description: 'Flutter version (e.g. 3.22.x)'
+        required: false
+        default: '3.22.x'
+
+jobs:
+  build:
+    name: Build ${{ github.event.inputs.build_type }} APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ github.event.inputs.flutter_version }}
+          channel: stable
+          cache: true
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Write firebase_options.dart
+        env:
+          FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
+        run: echo "$FIREBASE_OPTIONS_DART" | base64 -d > app/lib/firebase_options.dart
+
+      - name: Write google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/android/app/google-services.json
+
+      - name: Write keystore
+        if: github.event.inputs.build_type == 'release'
+        env:
+          KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
+        run: echo "$KEYSTORE_FILE" | base64 -d > app/android/footwear-erp.jks
+
+      - name: Write key.properties
+        if: github.event.inputs.build_type == 'release'
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          cat > app/android/key.properties << EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=../footwear-erp.jks
+          EOF
+
+      - name: Check monotonic versionCode
+        run: |
+          CURRENT_BUILD=$(grep "^version:" app/pubspec.yaml | sed 's/.*+//')
+          echo "Current versionCode: $CURRENT_BUILD"
+          # Get previous tag versionCode if tags exist
+          PREV_TAG=$(git tag --sort=-version:refname | head -1 || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            PREV_BUILD=$(git show $PREV_TAG:app/pubspec.yaml | grep "^version:" | sed 's/.*+//')
+            echo "Previous tag ($PREV_TAG) versionCode: $PREV_BUILD"
+            if [ "$CURRENT_BUILD" -le "$PREV_BUILD" ]; then
+              echo "❌ versionCode $CURRENT_BUILD must be greater than previous $PREV_BUILD"
+              exit 1
+            fi
+          fi
+          echo "✅ versionCode monotonic check passed"
+
+      - name: flutter pub get
+        run: cd app && flutter pub get
+
+      - name: flutter analyze
+        run: cd app && flutter analyze lib --no-pub
+
+      - name: flutter test
+        run: cd app && flutter test -r compact
+
+      - name: Build debug APK
+        if: github.event.inputs.build_type == 'debug'
+        run: cd app && flutter build apk --debug
+
+      - name: Build release APK (fat)
+        if: github.event.inputs.build_type == 'release'
+        run: cd app && flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ github.event.inputs.build_type }}-${{ github.sha }}
+          path: app/build/app/outputs/flutter-apk/app-${{ github.event.inputs.build_type }}.apk
+          retention-days: 14

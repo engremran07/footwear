@@ -54,6 +54,15 @@ class ShopDetailScreen extends ConsumerStatefulWidget {
 
 class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   void _showEditTransactionDialog(TransactionModel tx) {
+    final user = ref.read(authUserProvider).valueOrNull;
+    final isAdmin = user?.isAdmin == true;
+
+    // Sellers can only annotate (description) — admins can change all fields.
+    if (!isAdmin) {
+      _showSellerAnnotateDialog(tx);
+      return;
+    }
+
     final amountC = TextEditingController(text: tx.amount.toStringAsFixed(2));
     final descC = TextEditingController(text: tx.description ?? '');
     String txType = tx.type;
@@ -205,6 +214,73 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Seller-only: annotate a transaction with a description correction.
+  /// Financial fields (amount, type, date) are immutable for sellers.
+  void _showSellerAnnotateDialog(TransactionModel tx) {
+    final descC = TextEditingController(text: tx.description ?? '');
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          24,
+          16,
+          MediaQuery.of(ctx).viewInsets.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(tr('edit', ref), style: Theme.of(ctx).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              tr('description', ref),
+              style: Theme.of(ctx).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descC,
+              decoration: InputDecoration(
+                labelText: tr('description', ref),
+                prefixIcon: const Icon(Icons.notes),
+              ),
+              maxLines: 3,
+              autofocus: true,
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await ref
+                        .read(transactionNotifierProvider.notifier)
+                        .updateTransactionNote(
+                          txId: tx.id,
+                          description: descC.text.trim().isEmpty
+                              ? null
+                              : descC.text.trim(),
+                        );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      final key = AppErrorMapper.key(e);
+                      ScaffoldMessenger.of(
+                        ctx,
+                      ).showSnackBar(errorSnackBar(tr(key, ref)));
+                    }
+                  }
+                },
+                child: Text(tr('save', ref)),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -995,6 +1071,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               user?.isAdmin == true ||
                               (user?.isSeller == true &&
                                   user?.id == tx.createdBy),
+                          canDelete: user?.isAdmin == true,
                           onEdit: () => _showEditTransactionDialog(tx),
                           onDelete: () => _confirmDeleteTransaction(tx),
                         );
@@ -1014,12 +1091,14 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
 class _TransactionTile extends ConsumerWidget {
   final TransactionModel tx;
   final bool canEdit;
+  final bool canDelete;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   const _TransactionTile({
     required this.tx,
     this.canEdit = false,
+    this.canDelete = false,
     this.onEdit,
     this.onDelete,
   });
@@ -1087,23 +1166,24 @@ class _TransactionTile extends ConsumerWidget {
                     ],
                   ),
                 ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.delete,
-                        size: 16,
-                        color: AppBrand.errorColor,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        tr('delete', ref),
-                        style: const TextStyle(color: AppBrand.errorColor),
-                      ),
-                    ],
+                if (canDelete)
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.delete,
+                          size: 16,
+                          color: AppBrand.errorColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          tr('delete', ref),
+                          style: const TextStyle(color: AppBrand.errorColor),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               ],
             )
           : null,

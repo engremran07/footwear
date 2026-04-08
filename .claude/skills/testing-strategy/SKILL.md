@@ -164,3 +164,108 @@ npx firebase emulators:exec --only firestore "npx jest test/firestore_rules_test
 - [ ] PDF generation test with non-ASCII (Arabic/Urdu) content
 - [ ] Firestore rules tests for permission-denied cases
 - [ ] `flutter analyze lib --no-pub` — zero issues
+
+## Firestore Rules Emulator Test Structure
+
+```javascript
+// test/firestore_rules_test.js
+const { initializeTestEnvironment, assertFails, assertSucceeds }
+  = require('@firebase/rules-unit-testing');
+
+describe('transaction update rules', () => {
+  it('seller can only update description', async () => {
+    await assertSucceeds(
+      sellerDb.collection('transactions').doc('tx1')
+        .update({ description: 'note', updated_at: serverTimestamp() })
+    );
+  });
+
+  it('seller cannot update amount', async () => {
+    await assertFails(
+      sellerDb.collection('transactions').doc('tx1')
+        .update({ amount: 9999 })
+    );
+  });
+
+  it('admin can update any field', async () => {
+    await assertSucceeds(
+      adminDb.collection('transactions').doc('tx1')
+        .update({ amount: 100, type: 'cash_in', description: 'fix' })
+    );
+  });
+});
+```
+
+Run with:
+```bash
+npx firebase emulators:exec --only firestore "npx jest test/firestore_rules_test.js"
+```
+
+## Archive / Soft-Delete 4-Test Requirement
+For every model that supports soft-delete (`deleted` field), four tests are mandatory:
+
+```dart
+test('active docs returned when deleted is false', ...);
+test('active docs returned when deleted field is absent', ...); // pre-DI-01 docs
+test('deleted docs filtered out when deleted is true', ...);
+test('batch delete sets deleted=true + deleted_at + deleted_by', ...);
+```
+See `inline-audit SKILL.md §6` for the correct client-side filter pattern.
+
+## Provider Test Template
+
+```dart
+// test/unit/providers/my_provider_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mockito/mockito.dart';
+
+void main() {
+  late ProviderContainer container;
+
+  setUp(() {
+    container = ProviderContainer(
+      overrides: [
+        authUserProvider.overrideWith((ref) => Stream.value(mockAdminUser)),
+      ],
+    );
+  });
+
+  tearDown(() => container.dispose());
+
+  test('provider returns loading when auth is loading', () {
+    final c = ProviderContainer(
+      overrides: [authUserProvider.overrideWith((ref) => const Stream.empty())],
+    );
+    addTearDown(c.dispose);
+    expect(c.read(myProvider), isA<AsyncLoading>());
+  });
+}
+```
+
+## Financial Guard Tests (Required Before Release)
+
+```dart
+// test/unit/providers/create_sale_invoice_guard_test.dart
+test('createSaleInvoice rejects empty items list', () async {
+  expect(
+    () async => await notifier.createSaleInvoice(items: []),
+    throwsA(isA<ArgumentError>()),
+  );
+});
+
+test('createSaleInvoice rejects amountReceived > total', () async {
+  expect(
+    () async => await notifier.createSaleInvoice(
+      items: [item], amountReceived: 99999),
+    throwsA(isA<ArgumentError>()),
+  );
+});
+
+test('voidInvoice is admin-only', () async {
+  expect(
+    () async => sellerNotifier.voidInvoice(invoiceId: 'inv1'),
+    throwsA(isA<PermissionDeniedException>()),
+  );
+});
+```

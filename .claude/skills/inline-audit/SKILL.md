@@ -95,6 +95,48 @@ Always use client-side:
 | Invoice created with no items | `user.isSeller &&` guard bypassed for admin | Remove role guard; check `deductions.isEmpty` for all |
 | Fat APK not installed, wrong ABI file | build used `--split-per-abi` | Always `flutter build apk --release` |
 
+## 4 Canonical Breakage Chains
+
+### Chain 1: Collection Rename
+Collection constant renamed → providers break → rules break → indexes stale  
+**Fix order:** constants.dart → providers → rules → indexes → deploy
+
+### Chain 2: Auth Provider Leak
+Provider added that reads admin-only data → not in `_invalidateRoleScopedProviders` → seller loads stale admin data after logout  
+**Fix:** Grep new providers; add to `_invalidateRoleScopedProviders()` in `auth_provider.dart`
+
+### Chain 3: Firestore Rules + App Role Mismatch
+Rules accept 'admin' only → app writes 'Admin' (capitalized) → every admin write fails  
+**Fix:** `isAdminRole()` regex in rules + `trim().toLowerCase()` on all app role writes
+
+### Chain 4: Composite Index Gap
+Provider adds `where(A) + orderBy(B)` → no composite index → list empty with no UI error  
+**Fix:** Add index to `firestore.indexes.json` → deploy with `firebase deploy --only firestore:indexes`
+
+## Hygiene Grep Gate (run before any commit)
+
+```bash
+# 1. No raw collection strings
+grep -rn "\.collection('" app/lib/ | grep -v "Collections\."
+# Expected: zero matches
+
+# 2. allTransactionsProvider must be in invalidation list
+grep -n "allTransactionsProvider" app/lib/providers/auth_provider.dart
+# Expected: at least 1 match
+
+# 3. No split-per-abi
+grep -rn "split-per-abi" . --include="*.{yml,yaml,md,sh}"
+# Expected: zero matches (historical docs excluded)
+
+# 4. No direct Firestore writes in screens
+grep -rn "FirebaseFirestore\|\.doc(\|\.collection(" app/lib/screens/
+# Expected: zero matches
+
+# 5. Fat APK only
+grep -rn "flutter build apk" . --include="*.{yml,yaml,md,sh}"
+# Expected: all lines use --release, none use --split-per-abi
+```
+
 ## AGENTS.md Update Rule
 When this skill catches and fixes a new issue, add it to **AGENTS.md Section 10**
 audit history in the same commit/change set.
