@@ -6,6 +6,7 @@ import '../core/constants/app_brand.dart';
 import '../core/utils/excel_export.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/share_helper.dart';
+import '../core/utils/snack_helper.dart';
 import '../core/l10n/app_locale.dart';
 
 /// Shows a bottom sheet with export/share options: XLSX, PDF, Share, Print.
@@ -84,6 +85,74 @@ class _ExportSheetContent extends StatelessWidget {
   AppLocale get _locale => ref.read(appLocaleProvider);
   bool get _isRtl => _locale == AppLocale.ar || _locale == AppLocale.ur;
 
+  Future<Uint8List?> _buildPdfBytes(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (rows.isEmpty) {
+      messenger.showSnackBar(infoSnackBar(tr('no_data', ref)));
+      return null;
+    }
+    try {
+      return pdfBytesBuilder != null
+          ? await pdfBytesBuilder!()
+          : await buildPdfTable(
+              title: title,
+              headers: headers,
+              rows: rows,
+              subtitle: subtitle,
+              locale: _locale,
+            );
+    } catch (_) {
+      messenger.showSnackBar(errorSnackBar(tr('err_unknown', ref)));
+      return null;
+    }
+  }
+
+  Future<void> _sharePdf(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final bytes = await _buildPdfBytes(context);
+    if (bytes == null) return;
+    try {
+      await shareFile(
+        bytes: bytes,
+        fileName: '$fileName.pdf',
+        mimeType: 'application/pdf',
+      );
+    } catch (_) {
+      messenger.showSnackBar(errorSnackBar(tr('err_unknown', ref)));
+    }
+  }
+
+  Future<void> _sharePng(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final pdfBytes = await _buildPdfBytes(context);
+    if (pdfBytes == null) return;
+    try {
+      final firstPage = await Printing.raster(pdfBytes, dpi: 200).first;
+      final pngBytes = await firstPage.toPng();
+      await shareFile(
+        bytes: pngBytes,
+        fileName: '$fileName.png',
+        mimeType: 'image/png',
+      );
+    } catch (_) {
+      messenger.showSnackBar(errorSnackBar(tr('err_unknown', ref)));
+    }
+  }
+
+  Future<void> _printPdf(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final bytes = await _buildPdfBytes(context);
+    if (bytes == null) return;
+    try {
+      await Printing.layoutPdf(
+        name: '$fileName.pdf',
+        onLayout: (_) async => Uint8List.fromList(bytes),
+      );
+    } catch (_) {
+      messenger.showSnackBar(errorSnackBar(tr('err_unknown', ref)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -143,20 +212,7 @@ class _ExportSheetContent extends StatelessWidget {
             sublabel: 'PDF',
             onTap: () async {
               Navigator.pop(context);
-              final bytes = pdfBytesBuilder != null
-                  ? await pdfBytesBuilder!()
-                  : await buildPdfTable(
-                      title: title,
-                      headers: headers,
-                      rows: rows,
-                      subtitle: subtitle,
-                      locale: _locale,
-                    );
-              await shareFile(
-                bytes: bytes,
-                fileName: '$fileName.pdf',
-                mimeType: 'application/pdf',
-              );
+              await _sharePdf(context);
             },
           ),
           const SizedBox(height: 8),
@@ -167,24 +223,7 @@ class _ExportSheetContent extends StatelessWidget {
             sublabel: 'PNG',
             onTap: () async {
               Navigator.pop(context);
-              final pdfBytes = pdfBytesBuilder != null
-                  ? await pdfBytesBuilder!()
-                  : await buildPdfTable(
-                      title: title,
-                      headers: headers,
-                      rows: rows,
-                      subtitle: subtitle,
-                      locale: _locale,
-                    );
-              // Rasterize first page of PDF to a high-res PNG
-              final pages = Printing.raster(pdfBytes, dpi: 200);
-              final firstPage = await pages.first;
-              final pngBytes = await firstPage.toPng();
-              await shareFile(
-                bytes: pngBytes,
-                fileName: '$fileName.png',
-                mimeType: 'image/png',
-              );
+              await _sharePng(context);
             },
           ),
           const SizedBox(height: 8),
@@ -195,17 +234,7 @@ class _ExportSheetContent extends StatelessWidget {
             sublabel: '',
             onTap: () async {
               Navigator.pop(context);
-              final bytes = pdfBytesBuilder != null
-                  ? await pdfBytesBuilder!()
-                  : await buildPdfTable(
-                      title: title,
-                      headers: headers,
-                      rows: rows,
-                      subtitle: subtitle,
-                      locale: _locale,
-                    );
-              await Printing.layoutPdf(
-                  onLayout: (_) async => Uint8List.fromList(bytes));
+              await _printPdf(context);
             },
           ),
           const SizedBox(height: 8),

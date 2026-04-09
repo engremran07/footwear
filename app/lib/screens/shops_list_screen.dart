@@ -170,12 +170,18 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                 final sorted = List.of(routes)
                   ..sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   child: InputDecorator(
                     decoration: InputDecoration(
                       labelText: tr('filter_by_route', ref),
                       prefixIcon: const Icon(Icons.route, size: 20),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -222,7 +228,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
             child: shopsAsync.when(
               data: (shops) {
                 final filtered = shops.where((s) {
-                  if (_selectedRouteId != null && s.routeId != _selectedRouteId) {
+                  if (_selectedRouteId != null &&
+                      s.routeId != _selectedRouteId) {
                     return false;
                   }
                   return _matchesSearch(s, _search) && _matchesQuickFilter(s);
@@ -364,7 +371,9 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
     // Add unassigned shops
     final knownIds = routeMap.keys.toSet();
-    final unassigned = shops.where((s) => !knownIds.contains(s.routeId)).toList();
+    final unassigned = shops
+        .where((s) => !knownIds.contains(s.routeId))
+        .toList();
     if (unassigned.isNotEmpty) {
       allRows.add(['── ${tr('shops_unassigned', ref)} ──', '', '', '']);
       for (final s in unassigned) {
@@ -407,9 +416,21 @@ class _ShopStatsStrip extends ConsumerWidget {
         : isSmallPhone
         ? const EdgeInsets.symmetric(horizontal: 4, vertical: 6)
         : const EdgeInsets.symmetric(horizontal: 6, vertical: 8);
-    final valueFontSize = isTablet ? 13.0 : isSmallPhone ? 10.0 : 12.0;
-    final labelFontSize = isTablet ? 11.0 : isSmallPhone ? 9.0 : 10.0;
-    final iconSize = isTablet ? 18.0 : isSmallPhone ? 14.0 : 15.0;
+    final valueFontSize = isTablet
+        ? 13.0
+        : isSmallPhone
+        ? 10.0
+        : 12.0;
+    final labelFontSize = isTablet
+        ? 11.0
+        : isSmallPhone
+        ? 9.0
+        : 10.0;
+    final iconSize = isTablet
+        ? 18.0
+        : isSmallPhone
+        ? 14.0
+        : 15.0;
 
     final totalGave = shops
         .where((s) => s.balance > 0)

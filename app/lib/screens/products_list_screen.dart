@@ -37,15 +37,18 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
           Expanded(
             child: productsAsync.when(
               loading: () => const ShimmerLoading(),
-              error: (e, _) => Center(child: Text(tr(AppErrorMapper.key(e), ref))),
+              error: (e, _) =>
+                  Center(child: Text(tr(AppErrorMapper.key(e), ref))),
               data: (products) {
                 final filtered = _search.isEmpty
                     ? products
                     : products
-                        .where((p) =>
-                            p.name.toLowerCase().contains(_search) ||
-                            p.category.toLowerCase().contains(_search))
-                        .toList();
+                          .where(
+                            (p) =>
+                                p.name.toLowerCase().contains(_search) ||
+                                p.category.toLowerCase().contains(_search),
+                          )
+                          .toList();
                 if (filtered.isEmpty) {
                   return EmptyState(
                     icon: Icons.inventory_2,
@@ -78,9 +81,10 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                                   ),
                                 )
                               : _productIcon(cs),
-                          title: Text(p.name,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600)),
+                          title: Text(
+                            p.name,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
                           subtitle: Text(p.category),
                           trailing: const Icon(Icons.chevron_right, size: 20),
                           onTap: () => context.push('/products/${p.id}'),
@@ -104,8 +108,8 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
   }
 
   Widget _productIcon(ColorScheme cs) => CircleAvatar(
-        radius: 24,
-        backgroundColor: cs.primaryContainer,
-        child: Icon(Icons.inventory_2, color: cs.primary),
-      );
+    radius: 24,
+    backgroundColor: cs.primaryContainer,
+    child: Icon(Icons.inventory_2, color: cs.primary),
+  );
 }

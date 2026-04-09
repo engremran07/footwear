@@ -24,6 +24,10 @@ import '../widgets/export_sheet.dart';
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
 
+  void _showNoData(BuildContext context, WidgetRef ref) {
+    ScaffoldMessenger.of(context).showSnackBar(infoSnackBar(tr('no_data', ref)));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(authUserProvider);
@@ -131,13 +135,21 @@ class ReportsScreen extends ConsumerWidget {
 
   void _exportShops(BuildContext context, WidgetRef ref) {
     final user = ref.read(authUserProvider).valueOrNull;
-    final routeId = user?.assignedRouteId ?? '';
-    final shops = user?.isAdmin == true
+    if (user == null) {
+      _showNoData(context, ref);
+      return;
+    }
+        final routeId = user.assignedRouteId ?? '';
+        final shops = user.isAdmin
         ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
         : (routeId.isNotEmpty
               ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
                     <ShopModel>[]
               : <ShopModel>[]);
+    if (shops.isEmpty) {
+      _showNoData(context, ref);
+      return;
+    }
     ExportSheet.show(
       context,
       ref,
@@ -167,30 +179,56 @@ class ReportsScreen extends ConsumerWidget {
   }
 
   void _exportInventory(BuildContext context, WidgetRef ref, int ppc) {
-    final variants = ref.read(allVariantsProvider).valueOrNull ?? [];
+    final user = ref.read(authUserProvider).valueOrNull;
+    if (user == null) {
+      _showNoData(context, ref);
+      return;
+    }
+    final rows = user.isAdmin
+        ? (ref.read(allVariantsProvider).valueOrNull ?? [])
+              .map(
+                (v) => [
+                  v.variantName,
+                  AppFormatters.stock(v.quantityAvailable, ppc),
+                ],
+              )
+              .toList()
+        : (ref.read(sellerInventoryProvider(user.id)).valueOrNull ?? [])
+              .map(
+                (v) => [
+                  v.variantName,
+                  AppFormatters.stock(v.quantityAvailable, ppc),
+                ],
+              )
+              .toList();
+    if (rows.isEmpty) {
+      _showNoData(context, ref);
+      return;
+    }
     ExportSheet.show(
       context,
       ref,
       title: tr('inventory_report', ref),
       headers: [tr('variant_name', ref), tr('stock_pairs', ref)],
-      rows: variants
-          .map(
-            (v) => [
-              v.variantName,
-              AppFormatters.stock(v.quantityAvailable, ppc),
-            ],
-          )
-          .toList(),
+      rows: rows,
       fileName: 'inventory_report',
     );
   }
 
   void _exportTransactions(BuildContext context, WidgetRef ref) {
     final user = ref.read(authUserProvider).valueOrNull;
-    final txs = user?.isAdmin == true
+    if (user == null) {
+      _showNoData(context, ref);
+      return;
+    }
+    final txs = user.isAdmin
         ? ref.read(allTransactionsProvider).valueOrNull ?? []
-        : ref.read(sellerTransactionsProvider(user?.id ?? '')).valueOrNull ??
+      : ref.read(sellerTransactionsProvider(user.id)).valueOrNull ??
               [];
+    if (txs.isEmpty) {
+      _showNoData(context, ref);
+      return;
+    }
     ExportSheet.show(
       context,
       ref,
@@ -219,8 +257,12 @@ class ReportsScreen extends ConsumerWidget {
 
   void _exportOutstanding(BuildContext context, WidgetRef ref) {
     final user = ref.read(authUserProvider).valueOrNull;
-    final routeId = user?.assignedRouteId ?? '';
-    final shops = user?.isAdmin == true
+    if (user == null) {
+      _showNoData(context, ref);
+      return;
+    }
+    final routeId = user.assignedRouteId ?? '';
+    final shops = user.isAdmin
         ? ref.read(outstandingShopsProvider).valueOrNull ?? <ShopModel>[]
         : (routeId.isNotEmpty
               ? ref
@@ -228,6 +270,10 @@ class ReportsScreen extends ConsumerWidget {
                         .valueOrNull ??
                     <ShopModel>[]
               : <ShopModel>[]);
+    if (shops.isEmpty) {
+      _showNoData(context, ref);
+      return;
+    }
     ExportSheet.show(
       context,
       ref,
@@ -254,14 +300,22 @@ class ReportsScreen extends ConsumerWidget {
 
   void _exportBadDebts(BuildContext context, WidgetRef ref) {
     final user = ref.read(authUserProvider).valueOrNull;
-    final routeId = user?.assignedRouteId ?? '';
-    final shops = user?.isAdmin == true
+    if (user == null) {
+      _showNoData(context, ref);
+      return;
+    }
+        final routeId = user.assignedRouteId ?? '';
+        final shops = user.isAdmin
         ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
         : (routeId.isNotEmpty
               ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
                     <ShopModel>[]
               : <ShopModel>[]);
     final badDebtShops = shops.where((s) => s.badDebt).toList();
+    if (badDebtShops.isEmpty) {
+      _showNoData(context, ref);
+      return;
+    }
     ExportSheet.show(
       context,
       ref,
@@ -549,8 +603,8 @@ class _OutstandingPieChart extends ConsumerWidget {
           cs.primary,
           cs.secondary,
           cs.tertiary,
-          Colors.orange,
-          Colors.teal,
+          AppTheme.warningFg(cs),
+          AppTheme.clearFg(cs),
           cs.onSurfaceVariant,
         ];
 
@@ -570,8 +624,8 @@ class _OutstandingPieChart extends ConsumerWidget {
                           colors[i % colors.length],
                         ) ==
                         Brightness.dark
-                    ? Colors.white
-                    : Colors.black,
+                    ? cs.surface
+                    : cs.onSurface,
               ),
             ),
           );
@@ -589,8 +643,8 @@ class _OutstandingPieChart extends ConsumerWidget {
                 color:
                     ThemeData.estimateBrightnessForColor(colors.last) ==
                         Brightness.dark
-                    ? Colors.white
-                    : Colors.black,
+                    ? cs.surface
+                    : cs.onSurface,
               ),
             ),
           );

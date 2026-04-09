@@ -565,10 +565,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(
-              shop.name,
-              overflow: TextOverflow.ellipsis,
-            ),
+            title: Text(shop.name, overflow: TextOverflow.ellipsis),
             actions: [
               PopupMenuButton<_ShopAction>(
                 icon: const Icon(Icons.more_vert),
@@ -592,8 +589,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       } catch (e) {
                         if (context.mounted) {
                           final key = AppErrorMapper.key(e);
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(errorSnackBar(tr(key, ref)));
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(errorSnackBar(tr(key, ref)));
                         }
                       }
 
@@ -615,8 +613,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       } catch (e) {
                         if (!context.mounted) return;
                         final key = AppErrorMapper.key(e);
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(errorSnackBar(tr(key, ref)));
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(errorSnackBar(tr(key, ref)));
                       }
 
                     case _ShopAction.pdf:
@@ -652,8 +651,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         fileName: 'shop_${shop.name}',
                         pdfBytesBuilder: () async {
                           final locale = ref.read(appLocaleProvider);
-                          final settings =
-                              await ref.read(settingsProvider.future);
+                          final settings = await ref.read(
+                            settingsProvider.future,
+                          );
                           final user = ref.read(authUserProvider).valueOrNull;
                           final allUsers = user?.isAdmin == true
                               ? ref.read(allUsersProvider).valueOrNull ??
@@ -668,8 +668,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           final logoBytes = settings.logoBytes;
                           final netTx = sorted.fold<double>(
                             0.0,
-                            (s, t) =>
-                                t.isCashOut ? s + t.amount : s - t.amount,
+                            (s, t) => t.isCashOut ? s + t.amount : s - t.amount,
                           );
                           return buildPdfLedger(
                             customerName: shop.name,
@@ -709,12 +708,13 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     PopupMenuItem(
                       value: _ShopAction.delete,
                       child: ListTile(
-                        leading:
-                            const Icon(Icons.delete, color: AppBrand.errorColor),
+                        leading: const Icon(
+                          Icons.delete,
+                          color: AppBrand.errorColor,
+                        ),
                         title: Text(
                           tr('tooltip_delete_shop', ref),
-                          style:
-                              const TextStyle(color: AppBrand.errorColor),
+                          style: const TextStyle(color: AppBrand.errorColor),
                         ),
                         contentPadding: EdgeInsets.zero,
                         visualDensity: VisualDensity.compact,
@@ -726,8 +726,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     PopupMenuItem(
                       value: _ShopAction.badDebt,
                       child: ListTile(
-                        leading: const Icon(Icons.money_off,
-                            color: Colors.orange),
+                        leading: const Icon(
+                          Icons.money_off,
+                          color: Colors.orange,
+                        ),
                         title: Text(tr('mark_bad_debt', ref)),
                         contentPadding: EdgeInsets.zero,
                         visualDensity: VisualDensity.compact,
@@ -769,12 +771,15 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: balanceBgColor,
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                  color: balanceColor.withAlpha(80)),
+                                color: balanceColor.withAlpha(80),
+                              ),
                             ),
                             child: Text(
                               'R${shop.routeNumber}',
@@ -785,23 +790,27 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               ),
                             ),
                           ),
-                          if (shop.phone != null) ...[          
+                          if (shop.phone != null) ...[
                             const SizedBox(width: 8),
-                            Icon(Icons.phone_outlined,
-                                size: 12, color: cs.onSurfaceVariant),
+                            Icon(
+                              Icons.phone_outlined,
+                              size: 12,
+                              color: cs.onSurfaceVariant,
+                            ),
                             const SizedBox(width: 3),
-                            Text(shop.phone!,
-                                style:
-                                    Theme.of(context).textTheme.bodySmall),
+                            Text(
+                              shop.phone!,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
                           ],
-                          if (shop.area != null || shop.city != null) ...[   
+                          if (shop.area != null || shop.city != null) ...[
                             const Spacer(),
                             Text(
-                              [shop.area, shop.city]
-                                  .whereType<String>()
-                                  .join(', '),
-                              style:
-                                  Theme.of(context).textTheme.bodySmall,
+                              [
+                                shop.area,
+                                shop.city,
+                              ].whereType<String>().join(', '),
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ],
                         ],
@@ -1065,7 +1074,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         );
                         lastMonth = monthKey;
                       }
-                      items.add(_TxListItem(tx: tx, runningBalance: balanceMap[tx.id]));
+                      items.add(
+                        _TxListItem(tx: tx, runningBalance: balanceMap[tx.id]),
+                      );
                     }
                     return ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1188,8 +1199,8 @@ class _TransactionTile extends ConsumerWidget {
                 color: runningBalance! > 0
                     ? AppBrand.errorColor
                     : runningBalance! < 0
-                        ? AppBrand.successColor
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ? AppBrand.successColor
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
         ],

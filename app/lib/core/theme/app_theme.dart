@@ -25,7 +25,10 @@ class AppTheme {
 
   // ─── Safe font-size scaler (avoids assert when fontSize is null) ────────
   static TextTheme _safeScaleTextTheme(
-      TextTheme base, double factor, String? family) {
+    TextTheme base,
+    double factor,
+    String? family,
+  ) {
     // When factor is 1.0 and no family override, return as-is
     if (factor == 1.0 && family == null) return base;
 
@@ -65,25 +68,31 @@ class AppTheme {
     // ── Arctic M3 Color Scheme ─────────────────────────────────────────────
     // ColorScheme.fromSeed with Arctic Sky Blue seed generates the full tonal
     // palette; we then override specific roles for Arctic-brand alignment.
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppBrand.arcticSeedColor,
-      brightness: brightness,
-    ).copyWith(
-      // Override primary to the deeper glacier blue (avoids M3 auto-brightening)
-      primary: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
-      onPrimary: isDark ? const Color(0xFF003549) : AppBrand.onPrimary,
-      // Arctic surface tones: slightly icy white (light), polar night (dark)
-      surface: isDark ? const Color(0xFF0D1618) : const Color(0xFFF2FAFD),
-      onSurface: isDark ? const Color(0xFFDCF0F8) : const Color(0xFF001F2A),
-      surfaceContainerHighest:
-          isDark ? const Color(0xFF1A2D35) : const Color(0xFFD6EEF8),
-      surfaceContainer:
-          isDark ? const Color(0xFF121F25) : const Color(0xFFE4F3FA),
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: AppBrand.arcticSeedColor,
+          brightness: brightness,
+        ).copyWith(
+          // Override primary to the deeper glacier blue (avoids M3 auto-brightening)
+          primary: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+          onPrimary: isDark ? const Color(0xFF003549) : AppBrand.onPrimary,
+          // Arctic surface tones: slightly icy white (light), polar night (dark)
+          surface: isDark ? const Color(0xFF0D1618) : const Color(0xFFF2FAFD),
+          onSurface: isDark ? const Color(0xFFDCF0F8) : const Color(0xFF001F2A),
+          surfaceContainerHighest: isDark
+              ? const Color(0xFF1A2D35)
+              : const Color(0xFFD6EEF8),
+          surfaceContainer: isDark
+              ? const Color(0xFF121F25)
+              : const Color(0xFFE4F3FA),
+        );
 
     final baseTextTheme = ThemeData(brightness: brightness).textTheme;
-    final textTheme =
-        _safeScaleTextTheme(baseTextTheme, scaleFactor, fontFamily);
+    final textTheme = _safeScaleTextTheme(
+      baseTextTheme,
+      scaleFactor,
+      fontFamily,
+    );
 
     return ThemeData(
       useMaterial3: true,
@@ -101,8 +110,9 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        backgroundColor:
-            isDark ? const Color(0xFF001825) : AppBrand.primaryColor,
+        backgroundColor: isDark
+            ? const Color(0xFF001825)
+            : AppBrand.primaryColor,
         foregroundColor: AppBrand.onPrimary,
         surfaceTintColor: Colors.transparent,
         iconTheme: const IconThemeData(color: AppBrand.onPrimary, size: 24),
@@ -120,8 +130,8 @@ class AppTheme {
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return IconThemeData(
-                color:
-                    isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor);
+              color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+            );
           }
           return IconThemeData(color: colorScheme.onSurfaceVariant);
         }),
@@ -137,8 +147,9 @@ class AppTheme {
             color: baseColor,
           );
         }),
-        overlayColor:
-            WidgetStatePropertyAll(AppBrand.primaryColor.withAlpha(15)),
+        overlayColor: WidgetStatePropertyAll(
+          AppBrand.primaryColor.withAlpha(15),
+        ),
         height: 64,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         indicatorShape: RoundedRectangleBorder(
@@ -148,11 +159,10 @@ class AppTheme {
 
       // ── Navigation Rail ────────────────────────────────────────────────────
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor:
-            isDark ? const Color(0xFF0D1618) : const Color(0xFFE8F5FD),
-        indicatorShape: RoundedRectangleBorder(
-          borderRadius: AppTokens.brMD,
-        ),
+        backgroundColor: isDark
+            ? const Color(0xFF0D1618)
+            : const Color(0xFFE8F5FD),
+        indicatorShape: RoundedRectangleBorder(borderRadius: AppTokens.brMD),
         indicatorColor: isDark
             ? const Color(0xFF003D56)
             : AppBrand.primaryColor.withAlpha(22),
@@ -213,8 +223,10 @@ class AppTheme {
             width: 1,
           ),
         ),
-        margin:
-            const EdgeInsets.symmetric(horizontal: AppTokens.s16, vertical: 6),
+        margin: const EdgeInsets.symmetric(
+          horizontal: AppTokens.s16,
+          vertical: 6,
+        ),
         shadowColor: AppBrand.primaryColor.withAlpha(20),
       ),
 
@@ -231,17 +243,20 @@ class AppTheme {
         enabledBorder: OutlineInputBorder(
           borderRadius: AppTokens.brSM,
           borderSide: BorderSide(
-              color:
-                  isDark ? const Color(0xFF1E3A50) : const Color(0xFFB0D8F0)),
+            color: isDark ? const Color(0xFF1E3A50) : const Color(0xFFB0D8F0),
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: AppTokens.brSM,
           borderSide: BorderSide(
-              color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
-              width: 2),
+            color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+            width: 2,
+          ),
         ),
         contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppTokens.s16, vertical: AppTokens.s12),
+          horizontal: AppTokens.s16,
+          vertical: AppTokens.s12,
+        ),
       ),
 
       // ── Buttons ───────────────────────────────────────────────────────────
@@ -252,7 +267,9 @@ class AppTheme {
           elevation: 2,
           shadowColor: AppBrand.primaryColor.withAlpha(80),
           padding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.s24, vertical: 14),
+            horizontal: AppTokens.s24,
+            vertical: 14,
+          ),
           minimumSize: const Size(0, AppTokens.buttonMinHeight),
           shape: RoundedRectangleBorder(borderRadius: AppTokens.brSM),
         ),
@@ -265,10 +282,12 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor:
-              isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+          foregroundColor: isDark
+              ? const Color(0xFF81D4FA)
+              : AppBrand.primaryColor,
           side: BorderSide(
-              color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor),
+            color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+          ),
           minimumSize: const Size(0, AppTokens.buttonMinHeight),
           shape: RoundedRectangleBorder(borderRadius: AppTokens.brSM),
         ),
@@ -276,8 +295,9 @@ class AppTheme {
 
       // ── Chip ─────────────────────────────────────────────────────────────
       chipTheme: ChipThemeData(
-        backgroundColor:
-            isDark ? const Color(0xFF172530) : const Color(0xFFE1F5FE),
+        backgroundColor: isDark
+            ? const Color(0xFF172530)
+            : const Color(0xFFE1F5FE),
         selectedColor: isDark
             ? const Color(0xFF003D56)
             : AppBrand.primaryColor.withAlpha(30),
@@ -293,8 +313,9 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: AppTokens.brMD),
-        backgroundColor:
-            isDark ? const Color(0xFF1A3040) : const Color(0xFF00344A),
+        backgroundColor: isDark
+            ? const Color(0xFF1A3040)
+            : const Color(0xFF00344A),
         contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
         actionTextColor: const Color(0xFF81D4FA),
       ),
@@ -316,8 +337,9 @@ class AppTheme {
 
       // ── FloatingActionButton ───────────────────────────────────────────────
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor:
-            isDark ? const Color(0xFF003D56) : AppBrand.primaryColor,
+        backgroundColor: isDark
+            ? const Color(0xFF003D56)
+            : AppBrand.primaryColor,
         foregroundColor: AppBrand.onPrimary,
         elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: AppTokens.brLG),

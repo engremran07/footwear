@@ -101,6 +101,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
     List<TransactionItem> items = const [],
     required String createdBy,
     Timestamp? transactionDate,
+    String? idempotencyKey,
   }) async {
     final normalizedCreatedBy = createdBy.trim();
     if (normalizedCreatedBy.isEmpty) {
@@ -134,6 +135,17 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
     final db = FirebaseFirestore.instance;
     final batch = db.batch();
+    final normalizedKey = idempotencyKey?.trim();
+    if (normalizedKey != null && normalizedKey.isNotEmpty) {
+      final existing = await db
+          .collection(Collections.transactions)
+          .where('idempotency_key', isEqualTo: normalizedKey)
+          .limit(1)
+          .get();
+      if (existing.docs.isNotEmpty) {
+        return;
+      }
+    }
 
     // Create transaction doc
     final txRef = db.collection(Collections.transactions).doc();
@@ -152,6 +164,8 @@ class TransactionNotifier extends AsyncNotifier<void> {
       'created_at': transactionDate ?? Timestamp.now(),
       'deleted':
           false, // DI-01: required for isNotEqualTo filter in allTransactionsProvider
+      if (normalizedKey != null && normalizedKey.isNotEmpty)
+        'idempotency_key': normalizedKey,
     });
 
     // Update shop balance: cash_out adds, cash_in subtracts

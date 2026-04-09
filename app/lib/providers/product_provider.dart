@@ -146,13 +146,53 @@ class ProductNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> adjustStock(String variantId, int delta) async {
-    await FirebaseFirestore.instance
-        .collection(Collections.productVariants)
-        .doc(variantId)
-        .update({
-          'quantity_available': FieldValue.increment(delta),
-          'updated_at': Timestamp.now(),
-        });
+    await _requireAdmin();
+    if (variantId.trim().isEmpty) {
+      throw ArgumentError('variantId must not be empty');
+    }
+    if (delta == 0) return;
+
+    final db = FirebaseFirestore.instance;
+    final now = Timestamp.now();
+    final adminId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (adminId.trim().isEmpty) {
+      throw StateError('Not authenticated');
+    }
+
+    await db.runTransaction<void>((txn) async {
+      final variantRef = db.collection(Collections.productVariants).doc(variantId);
+      final variantSnap = await txn.get(variantRef);
+      if (!variantSnap.exists) {
+        throw ArgumentError('Variant not found: $variantId');
+      }
+
+      final currentQty =
+          (variantSnap.data()?['quantity_available'] as num?)?.toInt() ?? 0;
+      final nextQty = currentQty + delta;
+      if (nextQty < 0) {
+        throw ArgumentError('Stock cannot be negative');
+      }
+
+      txn.update(variantRef, {
+        'quantity_available': nextQty,
+        'updated_at': now,
+      });
+
+      final auditRef = db.collection(Collections.inventoryTransactions).doc();
+      txn.set(auditRef, {
+        'type': 'stock_adjustment',
+        'seller_id': '',
+        'seller_name': 'warehouse',
+        'product_id': (variantSnap.data()?['product_id'] as String?) ?? '',
+        'variant_id': variantId,
+        'variant_name': (variantSnap.data()?['variant_name'] as String?) ?? '',
+        'quantity': delta.abs(),
+        'direction': delta >= 0 ? 'in' : 'out',
+        'notes': 'manual_adjustment',
+        'created_by': adminId,
+        'created_at': now,
+      });
+    });
   }
 
   Future<void> batchAdjustStock(Map<String, int> updates) async {
@@ -185,6 +225,7 @@ class ProductNotifier extends AsyncNotifier<void> {
     required int quantity,
     required String adminId,
   }) async {
+    await _requireAdmin();
     final normalizedAdminId = adminId.trim();
     if (normalizedAdminId.isEmpty) {
       throw ArgumentError('adminId must not be empty');
@@ -192,47 +233,62 @@ class ProductNotifier extends AsyncNotifier<void> {
     if (quantity <= 0) {
       throw ArgumentError('quantity must be positive');
     }
-
     final db = FirebaseFirestore.instance;
-    final batch = db.batch();
+    final now = Timestamp.now();
 
-    // Decrement warehouse stock
-    batch.update(db.collection(Collections.productVariants).doc(variantId), {
-      'quantity_available': FieldValue.increment(-quantity),
-      'updated_at': Timestamp.now(),
+    await db.runTransaction<void>((txn) async {
+      final variantRef = db.collection(Collections.productVariants).doc(variantId);
+      final variantSnap = await txn.get(variantRef);
+      if (!variantSnap.exists) {
+        throw ArgumentError('Variant not found: $variantId');
+      }
+
+      final currentQty =
+          (variantSnap.data()?['quantity_available'] as num?)?.toInt() ?? 0;
+      if (currentQty < quantity) {
+        throw ArgumentError('Not enough warehouse stock for transfer');
+      }
+
+      txn.update(variantRef, {
+        'quantity_available': currentQty - quantity,
+        'updated_at': now,
+      });
+
+      final sellerInventoryRef = db
+          .collection(Collections.sellerInventory)
+          .doc('${sellerId}_$variantId');
+      final sellerSnap = await txn.get(sellerInventoryRef);
+      final sellerCurrent =
+          (sellerSnap.data()?['quantity_available'] as num?)?.toInt() ?? 0;
+      txn.set(sellerInventoryRef, {
+        'seller_id': sellerId,
+        'seller_name': sellerName,
+        'product_id': productId,
+        'variant_id': variantId,
+        'variant_name': variantName,
+        'quantity_available': sellerCurrent + quantity,
+        'active': true,
+        'created_at': sellerSnap.exists
+            ? (sellerSnap.data()?['created_at'] ?? now)
+            : now,
+        'updated_at': now,
+      }, SetOptions(merge: true));
+
+      // Audit log — write to inventory_transactions (matches allInventoryTransactionsProvider query)
+      final auditRef = db.collection(Collections.inventoryTransactions).doc();
+      txn.set(auditRef, {
+        'type': 'transfer_out',
+        'seller_id': sellerId,
+        'seller_name': sellerName,
+        'product_id': productId,
+        'variant_id': variantId,
+        'variant_name': variantName,
+        'quantity': quantity,
+        'notes': null,
+        'created_by': normalizedAdminId,
+        'created_at': now,
+      });
     });
-
-    final sellerInventoryRef = db
-        .collection(Collections.sellerInventory)
-        .doc('${sellerId}_$variantId');
-    batch.set(sellerInventoryRef, {
-      'seller_id': sellerId,
-      'seller_name': sellerName,
-      'product_id': productId,
-      'variant_id': variantId,
-      'variant_name': variantName,
-      'quantity_available': FieldValue.increment(quantity),
-      'active': true,
-      'created_at': Timestamp.now(),
-      'updated_at': Timestamp.now(),
-    }, SetOptions(merge: true));
-
-    // Audit log — write to inventory_transactions (matches allInventoryTransactionsProvider query)
-    final auditRef = db.collection(Collections.inventoryTransactions).doc();
-    batch.set(auditRef, {
-      'type': 'transfer_out',
-      'seller_id': sellerId,
-      'seller_name': sellerName,
-      'product_id': productId,
-      'variant_id': variantId,
-      'variant_name': variantName,
-      'quantity': quantity,
-      'notes': null,
-      'created_by': normalizedAdminId,
-      'created_at': Timestamp.now(),
-    });
-
-    await batch.commit();
   }
 }
 

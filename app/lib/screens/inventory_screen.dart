@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/snack_helper.dart';
@@ -358,9 +359,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         leading: isOutOfStock
                             ? Icon(Icons.cancel, color: cs.error, size: 20)
                             : isLowStock
-                            ? const Icon(
+                            ? Icon(
                                 Icons.warning_amber,
-                                color: Colors.orange,
+                                color: AppTheme.warningFg(cs),
                                 size: 20,
                               )
                             : null,
@@ -380,7 +381,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             color: isOutOfStock
                                 ? cs.error
                                 : isLowStock
-                                ? Colors.orange
+                              ? AppTheme.warningFg(cs)
                                 : null,
                             fontWeight: isOutOfStock || isLowStock
                                 ? FontWeight.w600
@@ -463,9 +464,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         ),
                         trailing: currentUser.isAdmin
                             ? IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.undo,
-                                  color: Colors.orange,
+                                  color: AppTheme.warningFg(
+                                    Theme.of(ctx).colorScheme,
+                                  ),
                                 ),
                                 tooltip: tr(
                                   'inventory_return_to_warehouse',
@@ -530,8 +533,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange.shade700,
-                foregroundColor: Colors.white,
+                backgroundColor: AppTheme.warningBg(
+                  Theme.of(ctx).colorScheme,
+                ),
+                foregroundColor: AppTheme.warningFg(
+                  Theme.of(ctx).colorScheme,
+                ),
               ),
               onPressed: () async {
                 final qty = int.tryParse(qtyC.text.trim()) ?? 0;
@@ -553,7 +560,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         sellerName: item.sellerName,
                         variantName: item.variantName,
                         productId: item.productId,
-                        createdBy: user?.id ?? '',
+                        createdBy: user!.id,
                       );
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
@@ -645,7 +652,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                               dense: true,
                               leading: Icon(
                                 isReturn ? Icons.undo : Icons.swap_horiz,
-                                color: isReturn ? Colors.orange : Colors.blue,
+                                color: isReturn
+                                    ? AppTheme.warningFg(
+                                        Theme.of(ctx).colorScheme,
+                                      )
+                                    : Theme.of(ctx).colorScheme.primary,
                               ),
                               title: Text(item.variantName),
                               subtitle: Text(

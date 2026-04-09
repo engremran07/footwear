@@ -11,12 +11,29 @@ List<int>? buildStyledExcelBytes({
   bool isRtl = false,
 }) {
   final excel = Excel.createExcel();
-  excel.rename('Sheet1', sheetName);
-  final sheet = excel[sheetName];
+  final safeSheetName = _safeSheetName(sheetName);
+  excel.rename('Sheet1', safeSheetName);
+  final sheet = excel[safeSheetName];
   if (isRtl) sheet.isRTL = true;
 
   _writeStyledSheet(sheet, headers: headers, rows: rows, isRtl: isRtl);
   return excel.encode();
+}
+
+String _safeSheetName(String raw) {
+  final cleaned = raw
+      .replaceAll(RegExp(r'[\\/*?:\[\]]'), '_')
+      .trim();
+  if (cleaned.isEmpty) return 'Report';
+  return cleaned.length > 31 ? cleaned.substring(0, 31) : cleaned;
+}
+
+String _safeExcelText(String raw) {
+  if (raw.isEmpty) return raw;
+  const dangerousPrefixes = ['=', '+', '-', '@'];
+  final first = raw[0];
+  if (dangerousPrefixes.contains(first)) return "'$raw";
+  return raw;
 }
 
 /// Builds a styled workbook and triggers a file download / save to device.
@@ -50,7 +67,7 @@ void _writeStyledSheet(
     fontFamily: 'Arial',
     fontColorHex: ExcelColor.fromHexString('FFFFFFFF'),
     backgroundColorHex: ExcelColor.fromHexString('FF1565C0'),
-    horizontalAlign: HorizontalAlign.Center,
+    horizontalAlign: isRtl ? HorizontalAlign.Right : HorizontalAlign.Center,
     topBorder: thinBorder,
     bottomBorder: thinBorder,
     leftBorder: thinBorder,
@@ -95,7 +112,7 @@ void _writeStyledSheet(
         cell.value = DoubleCellValue(rawVal.toDouble());
         cell.cellStyle = numStyle;
       } else {
-        cell.value = TextCellValue(rawVal.toString());
+        cell.value = TextCellValue(_safeExcelText(rawVal.toString()));
         cell.cellStyle = dataStyle;
       }
     }

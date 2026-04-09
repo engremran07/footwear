@@ -419,6 +419,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     String? notes,
     required String createdBy,
     Map<String, int> sellerInventoryRestores = const {},
+    String? idempotencyKey,
   }) async {
     final normalizedCreatedBy = createdBy.trim();
     if (normalizedCreatedBy.isEmpty) {
@@ -456,6 +457,22 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       }
     }
 
+    final normalizedKey = idempotencyKey?.trim();
+    final resolvedKey =
+        (normalizedKey != null && normalizedKey.isNotEmpty)
+            ? normalizedKey
+            : const Uuid().v4();
+    if (normalizedKey != null && normalizedKey.isNotEmpty) {
+      final existing = await db
+          .collection(Collections.invoices)
+          .where('idempotency_key', isEqualTo: normalizedKey)
+          .limit(1)
+          .get();
+      if (existing.docs.isNotEmpty) {
+        return existing.docs.first.id;
+      }
+    }
+
     final invoiceNumber = await _nextInvoiceNumber();
     final batch = db.batch();
     final now = Timestamp.now();
@@ -463,7 +480,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final invRef = db.collection(Collections.invoices).doc();
     batch.set(invRef, {
       'invoice_number': invoiceNumber,
-      'idempotency_key': const Uuid().v4(), // dedup guard
+      'idempotency_key': resolvedKey,
       'type': InvoiceModel.typeCreditNote,
       'customer_id': customerId,
       'customer_name': customerName,

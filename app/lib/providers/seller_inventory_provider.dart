@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../models/seller_inventory_model.dart';
@@ -47,6 +48,19 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
+  Future<void> _requireAdmin() async {
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) throw StateError('Not authenticated');
+    final me = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(authUser.uid)
+        .get();
+    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
+    if (role != 'admin' && role != 'manager') {
+      throw StateError('Only admin can return stock to warehouse');
+    }
+  }
+
   /// Deducts [qty] pairs from a single seller_inventory document.
   Future<void> deductStock(String docId, int qty) async {
     if (docId.trim().isEmpty) throw ArgumentError('docId must not be empty');
@@ -76,6 +90,7 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
     required String createdBy,
     String? notes,
   }) async {
+    await _requireAdmin();
     if (sellerInventoryDocId.trim().isEmpty) {
       throw ArgumentError('sellerInventoryDocId must not be empty');
     }
@@ -83,6 +98,10 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
       throw ArgumentError('variantId must not be empty');
     }
     if (qty <= 0) throw ArgumentError('qty must be greater than 0');
+    final normalizedCreatedBy = createdBy.trim();
+    if (normalizedCreatedBy.isEmpty) {
+      throw ArgumentError('createdBy must not be empty');
+    }
 
     final db = FirebaseFirestore.instance;
     final batch = db.batch();
@@ -116,7 +135,7 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
       'product_id': productId,
       'quantity': qty,
       'notes': notes,
-      'created_by': createdBy,
+      'created_by': normalizedCreatedBy,
       'created_at': Timestamp.now(),
     });
 
