@@ -362,25 +362,27 @@ class _ShopTile extends ConsumerWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 120),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: hasDebt ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              hasDebt ? AppFormatters.sar(shop.balance) : tr('clear', ref),
+        // CreditBook-style trailing: amount + I gave / I got label
+        trailing: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              AppFormatters.sar(shop.balance.abs()),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
+                fontSize: 13,
                 color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
+            Text(
+              hasDebt ? tr('i_gave', ref) : tr('clear', ref),
+              style: TextStyle(
+                fontSize: 10,
+                color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
+              ),
+            ),
+          ],
         ),
         onTap: () => context.push('/shops/${shop.id}'),
       ),

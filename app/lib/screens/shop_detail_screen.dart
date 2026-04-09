@@ -16,8 +16,7 @@ import '../providers/settings_provider.dart';
 import '../providers/shop_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/user_provider.dart';
-import '../providers/seller_inventory_provider.dart';
-import '../models/seller_inventory_model.dart';
+
 import '../models/user_model.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
@@ -311,16 +310,6 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
-  }
-
-  void _showReturnDialog(ShopModel shop) {
-    final user = ref.read(authUserProvider).valueOrNull;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => _ReturnSheet(shop: shop, user: user),
-    );
   }
 
   Map<String, String> _labels() => {
@@ -718,63 +707,60 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
             children: [
               // Shop info card
               Card(
-                margin: const EdgeInsets.all(12),
+                margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
+                      // Compact route + contact bar (name already in AppBar title)
                       Row(
                         children: [
-                          CircleAvatar(
-                            radius: 28,
-                            backgroundColor: balanceBgColor,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: balanceBgColor,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                  color: balanceColor.withAlpha(80)),
+                            ),
                             child: Text(
                               'R${shop.routeNumber}',
                               style: TextStyle(
+                                fontSize: 12,
                                 fontWeight: FontWeight.bold,
                                 color: balanceColor,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  shop.name,
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                                if (shop.phone != null)
-                                  Text(
-                                    shop.phone!,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
-                                if (shop.area != null || shop.city != null)
-                                  Text(
-                                    [
-                                      shop.area,
-                                      shop.city,
-                                    ].where((e) => e != null).join(', '),
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
-                              ],
+                          if (shop.phone != null) ...[          
+                            const SizedBox(width: 8),
+                            Icon(Icons.phone_outlined,
+                                size: 12, color: cs.onSurfaceVariant),
+                            const SizedBox(width: 3),
+                            Text(shop.phone!,
+                                style:
+                                    Theme.of(context).textTheme.bodySmall),
+                          ],
+                          if (shop.area != null || shop.city != null) ...[   
+                            const Spacer(),
+                            Text(
+                              [shop.area, shop.city]
+                                  .whereType<String>()
+                                  .join(', '),
+                              style:
+                                  Theme.of(context).textTheme.bodySmall,
                             ),
-                          ),
+                          ],
                         ],
                       ),
-                      const Divider(height: 24),
+                      const SizedBox(height: 8),
                       // Balance display
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 16,
+                          vertical: 8,
+                          horizontal: 12,
                         ),
                         decoration: BoxDecoration(
                           color: balanceBgColor,
@@ -914,7 +900,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppBrand.successColor,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
                         onPressed: canManageShop
                             ? () => _showQuickCash('cash_in')
@@ -929,7 +915,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppBrand.errorColor,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
                         onPressed: canManageShop
                             ? () => _showQuickCash('cash_out')
@@ -941,27 +927,6 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                   ],
                 ),
               ),
-              // Return button (sellers only)
-              if (canManageShop && user?.isSeller == true)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppBrand.warningColor,
-                        side: const BorderSide(color: AppBrand.warningColor),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
-                      onPressed: () => _showReturnDialog(shop),
-                      icon: const Icon(Icons.undo, size: 18),
-                      label: Text(tr('shop_return_btn', ref)),
-                    ),
-                  ),
-                ),
               // Create Sale Invoice button (sellers only)
               if (canManageShop && user?.isSeller == true)
                 Padding(
@@ -1367,185 +1332,4 @@ class _BalanceTrendChart extends StatelessWidget {
 
 // ─── Return Sheet ─────────────────────────────────────────────────────────────
 
-class _ReturnSheet extends ConsumerStatefulWidget {
-  final ShopModel shop;
-  final UserModel? user;
-
-  const _ReturnSheet({required this.shop, this.user});
-
-  @override
-  ConsumerState<_ReturnSheet> createState() => _ReturnSheetState();
-}
-
-class _ReturnSheetState extends ConsumerState<_ReturnSheet> {
-  final _amountC = TextEditingController();
-  final _descC = TextEditingController();
-  final Map<String, int> _selectedQtys = {};
-
-  @override
-  void dispose() {
-    _amountC.dispose();
-    _descC.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final showInventory = widget.user?.isSeller == true;
-    final inventoryAsync = showInventory
-        ? ref.watch(sellerInventoryProvider(widget.user!.id))
-        : const AsyncData<List<SellerInventoryModel>>([]);
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        24,
-        16,
-        MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Text(
-                tr('return', ref),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _amountC,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: tr('amount', ref),
-                prefixIcon: const Icon(Icons.undo),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _descC,
-              decoration: InputDecoration(labelText: tr('description', ref)),
-            ),
-            if (showInventory) ...[
-              const SizedBox(height: 16),
-              Text(
-                tr('return_items', ref),
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 4),
-              inventoryAsync.when(
-                loading: () => const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (_, __) => const SizedBox.shrink(),
-                data: (items) {
-                  if (items.isEmpty) return const SizedBox.shrink();
-                  return Column(
-                    children: items.map((item) {
-                      final qty = _selectedQtys[item.id] ?? 0;
-                      return ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          item.variantName,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          '${tr("available", ref)}: ${item.quantityAvailable}',
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove, size: 18),
-                              tooltip: 'Decrease quantity',
-                              onPressed: qty <= 0
-                                  ? null
-                                  : () => setState(
-                                      () => _selectedQtys[item.id] = qty - 1,
-                                    ),
-                            ),
-                            SizedBox(
-                              width: 30,
-                              child: Text(
-                                '$qty',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add, size: 18),
-                              tooltip: 'Increase quantity',
-                              onPressed: qty >= item.quantityAvailable
-                                  ? null
-                                  : () => setState(
-                                      () => _selectedQtys[item.id] = qty + 1,
-                                    ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  );
-                },
-              ),
-            ],
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppBrand.warningColor,
-                  foregroundColor: AppBrand.onPrimary,
-                ),
-                onPressed: () async {
-                  final amount = double.tryParse(_amountC.text.trim());
-                  if (amount == null || amount <= 0) return;
-                  final restores = Map<String, int>.fromEntries(
-                    _selectedQtys.entries.where((e) => e.value > 0),
-                  );
-                  final navigator = Navigator.of(context);
-                  final messenger = ScaffoldMessenger.of(context);
-                  try {
-                    await ref
-                        .read(transactionNotifierProvider.notifier)
-                        .createReturn(
-                          shopId: widget.shop.id,
-                          shopName: widget.shop.name,
-                          routeId: widget.shop.routeId.isNotEmpty
-                              ? widget.shop.routeId
-                              : (widget.user?.assignedRouteId ?? ''),
-                          amount: amount,
-                          description: _descC.text.trim().isEmpty
-                              ? null
-                              : _descC.text.trim(),
-                          sellerInventoryRestores: restores,
-                          createdBy: widget.user?.id ?? '',
-                        );
-                    if (mounted) navigator.pop();
-                  } catch (e) {
-                    if (mounted) {
-                      final key = AppErrorMapper.key(e);
-                      messenger.showSnackBar(errorSnackBar(tr(key, ref)));
-                    }
-                  }
-                },
-                child: Text(tr('save', ref)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// _ReturnSheet removed — use void-invoice or Cash In/Out with description for adjustments.

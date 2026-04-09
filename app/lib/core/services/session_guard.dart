@@ -264,6 +264,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
 // Shown when the app returns from background after [lockShowDelay].
 // Prevents accidental usage (pocket / sweat / recent-apps preview).
 // User taps or swipes anywhere to dismiss without re-authentication.
+// Full-screen, theme-aware (works with both light and dark themes).
 
 class _AppLockOverlay extends ConsumerWidget {
   final VoidCallback onUnlock;
@@ -272,47 +273,56 @@ class _AppLockOverlay extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onUnlock,
       onVerticalDragEnd: (_) => onUnlock(),
-      child: Container(
-        color: Colors.black.withAlpha(210),
-        child: SafeArea(
-          child: Center(
+      // Material + SizedBox.expand fills the full screen and respects the theme.
+      child: Material(
+        color: cs.surface,
+        child: SizedBox.expand(
+          child: SafeArea(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                // Animated lock icon
-                const Icon(Icons.lock_outline, size: 72, color: Colors.white)
-                    .animate(onPlay: (c) => c.repeat())
-                    .shimmer(
-                      duration: 2400.ms,
-                      color: Colors.white.withAlpha(60),
-                    ),
-                const SizedBox(height: 24),
+                const Spacer(flex: 3),
+                // Lock icon in a themed circle container
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.lock_outline,
+                    size: 48,
+                    color: cs.onPrimaryContainer,
+                  ).animate(onPlay: (c) => c.repeat()).shimmer(
+                        duration: 2400.ms,
+                        color: cs.primary.withAlpha(100),
+                      ),
+                ),
+                const SizedBox(height: 32),
                 Text(
                   tr('lock_screen_session_active', ref),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
+                  style: tt.titleLarge?.copyWith(
                     fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
+                    color: cs.onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   tr('lock_screen_tap_to_continue', ref),
-                  style: TextStyle(
-                    color: Colors.white.withAlpha(178),
-                    fontSize: 14,
+                  style: tt.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 48),
-                // Pulsing pill indicator
+                const Spacer(flex: 4),
+                // Pulsing pill indicator at bottom
                 Container(
                   width: 56,
-                  height: 6,
+                  height: 5,
                   decoration: BoxDecoration(
                     color: cs.primary,
                     borderRadius: BorderRadius.circular(3),
@@ -322,6 +332,7 @@ class _AppLockOverlay extends ConsumerWidget {
                     .fadeIn(duration: 700.ms)
                     .then()
                     .fadeOut(duration: 700.ms),
+                const SizedBox(height: 32),
               ],
             ),
           ),
