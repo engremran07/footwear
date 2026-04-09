@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,7 +7,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_brand.dart';
-import '../core/constants/collections.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/snack_helper.dart';
@@ -160,25 +158,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ) async {
       if (!formKey.currentState!.validate()) return;
       try {
-        var emailOrUsername = emailController.text.trim();
-        if (!emailOrUsername.contains('@')) {
-          final snap = await FirebaseFirestore.instance
-              .collection(Collections.users)
-              .where('display_name', isEqualTo: emailOrUsername)
-              .limit(1)
-              .get();
-          if (snap.docs.isEmpty) {
-            throw FirebaseAuthException(
-              code: 'user-not-found',
-              message: tr('err_user_not_found', ref),
-            );
-          }
-          emailOrUsername =
-              (snap.docs.first.data()['email'] as String? ?? '').trim();
-        }
-
-        await FirebaseAuth.instance.sendPasswordResetEmail(
-          email: emailOrUsername.toLowerCase(),
+        await ref.read(authNotifierProvider.notifier).sendPasswordReset(
+          emailController.text.trim(),
         );
         setDlgState(() => sent = true);
       } on FirebaseAuthException catch (e) {

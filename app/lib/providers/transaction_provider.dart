@@ -82,6 +82,24 @@ final sellerTransactionsProvider = StreamProvider.autoDispose
           );
     });
 
+        final shopTransactionsExportProvider = FutureProvider.autoDispose
+          .family<List<TransactionModel>, String>((ref, shopId) async {
+            final normalizedShopId = shopId.trim();
+            if (normalizedShopId.isEmpty) return const <TransactionModel>[];
+
+            final snap = await FirebaseFirestore.instance
+              .collection(Collections.transactions)
+              .where('shop_id', isEqualTo: normalizedShopId)
+              .orderBy('created_at')
+              .limit(500)
+              .get();
+
+            return snap.docs
+              .where((d) => d.data()['deleted'] != true)
+              .map((d) => TransactionModel.fromJson(d.data(), d.id))
+              .toList();
+          });
+
 class TransactionNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}

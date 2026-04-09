@@ -140,12 +140,18 @@ service cloud.firestore {
             )
           )
         )) && docSizeOk();
-      allow update: if (isAdmin() ||
+      allow update: if (
+        // Admin can update any user fields (including route assignment) without
+        // client write-rate throttling, which otherwise blocks bulk assignment.
+        (isAdmin() && docSizeOk()) ||
         (
           isOwnDoc(userId) &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['display_name', 'updated_at', 'last_active', 'email_verified'])
-        )) && docSizeOk() && withinWriteRate();
+            .hasOnly(['display_name', 'updated_at', 'last_active', 'email_verified']) &&
+          docSizeOk() &&
+          withinWriteRate()
+        )
+      );
       allow delete: if isAdmin();
     }
 

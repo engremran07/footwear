@@ -613,8 +613,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     }
                   } catch (e) {
                     if (ctx.mounted) {
+                      final key = AppErrorMapper.key(e);
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                        errorSnackBar(tr('err_admin_auth_update', ref)),
+                        errorSnackBar(tr(key, ref)),
                       );
                     }
                   }

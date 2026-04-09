@@ -61,13 +61,33 @@ final shopsByRouteProvider = StreamProvider.autoDispose
 
 final shopDetailProvider = StreamProvider.autoDispose
     .family<ShopModel?, String>((ref, id) {
+      final user = ref.watch(authUserProvider).valueOrNull;
+      if (user == null) return const Stream.empty();
+      if (user.isAdmin) {
+        return FirebaseFirestore.instance
+            .collection(Collections.customers)
+            .doc(id)
+            .snapshots()
+            .map(
+              (doc) =>
+                  doc.exists ? ShopModel.fromJson(doc.data()!, doc.id) : null,
+            );
+      }
+      if (!user.isSeller || user.assignedRouteId == null) {
+        return const Stream.empty();
+      }
       return FirebaseFirestore.instance
           .collection(Collections.customers)
-          .doc(id)
+          .where(FieldPath.documentId, isEqualTo: id)
+          .where('route_id', isEqualTo: user.assignedRouteId)
+          .limit(1)
           .snapshots()
           .map(
-            (doc) =>
-                doc.exists ? ShopModel.fromJson(doc.data()!, doc.id) : null,
+            (snap) {
+              if (snap.docs.isEmpty) return null;
+              final doc = snap.docs.first;
+              return ShopModel.fromJson(doc.data(), doc.id);
+            },
           );
     });
 

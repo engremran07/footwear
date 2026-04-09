@@ -1,15 +1,12 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/constants/collections.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/shop_model.dart';
-import '../models/transaction_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
@@ -759,18 +756,9 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
                 : <ShopModel>[]);
       final shop = shops.firstWhere((s) => s.id == _selectedShopId);
 
-      // Query Firestore directly for this shop's transactions.
-      // No server-side deleted==false: old docs predate the field and
-      // isEqualTo:false silently excludes them. Filter client-side.
-      final snap = await FirebaseFirestore.instance
-          .collection(Collections.transactions)
-          .where('customer_id', isEqualTo: _selectedShopId)
-          .orderBy('created_at')
-          .get();
-      final txs = snap.docs
-          .where((d) => d.data()['deleted'] != true)
-          .map((d) => TransactionModel.fromJson(d.data(), d.id))
-          .toList();
+      final txs = await ref.read(
+        shopTransactionsExportProvider(_selectedShopId!).future,
+      );
 
       final settings = await ref.read(settingsProvider.future);
       final allUsers = user?.isAdmin == true

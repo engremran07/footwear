@@ -206,6 +206,15 @@ Conflict resolution order for instructions:
 
 ## 10) Current Audit Status
 
+2026-04-09 audit v9 — v3.4.4+35:
+
+- Firestore hotfix: admin user updates bypass write-rate throttle so route assignment edits no longer fail under rapid admin saves
+- Route/shop detail providers now guard seller subscriptions client-side to avoid transient permission-denied UI
+- Route assignment create/update moved to Firestore transactions; seller reassignment is normalized and concurrency-safe
+- Login password-reset username lookup moved out of screen code into auth provider; account-statement export reads moved out of screen code into transaction provider
+- Firestore index cleanup: removed 8 unused defensive composite indexes; active query coverage remains complete
+- Validation: flutter analyze --no-pub clean, flutter test suite green, screen/widget Firestore hygiene scan cleared
+
 2026-04-07 audit v8 — v3.4.0+30 (autonomous 20-agent system):
 
 - 20-agent CI/CD + self-healing system launched

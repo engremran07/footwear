@@ -298,6 +298,42 @@ class AuthNotifier extends AsyncNotifier<void> {
     await firebaseUser.reauthenticateWithCredential(credential);
     await firebaseUser.updatePassword(newPassword);
   }
+
+  Future<void> sendPasswordReset(String emailOrUsername) async {
+    var normalizedInput = emailOrUsername.trim();
+    if (normalizedInput.isEmpty) {
+      throw FirebaseAuthException(
+        code: 'invalid-email',
+        message: 'Email or username is required',
+      );
+    }
+
+    if (!normalizedInput.contains('@')) {
+      final snap = await FirebaseFirestore.instance
+          .collection(Collections.users)
+          .where('display_name', isEqualTo: normalizedInput)
+          .limit(1)
+          .get();
+      if (snap.docs.isEmpty) {
+        throw FirebaseAuthException(
+          code: 'user-not-found',
+          message: 'No user found with that username',
+        );
+      }
+      normalizedInput =
+          (snap.docs.first.data()['email'] as String? ?? '').trim();
+    }
+
+    final normalizedEmail = normalizedInput.toLowerCase();
+    if (normalizedEmail.isEmpty) {
+      throw FirebaseAuthException(
+        code: 'invalid-email',
+        message: 'Email is required',
+      );
+    }
+
+    await FirebaseAuth.instance.sendPasswordResetEmail(email: normalizedEmail);
+  }
 }
 
 final authNotifierProvider = AsyncNotifierProvider<AuthNotifier, void>(

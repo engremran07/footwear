@@ -227,8 +227,12 @@ class ProductNotifier extends AsyncNotifier<void> {
   }) async {
     await _requireAdmin();
     final normalizedAdminId = adminId.trim();
+    final normalizedSellerId = sellerId.trim();
     if (normalizedAdminId.isEmpty) {
       throw ArgumentError('adminId must not be empty');
+    }
+    if (normalizedSellerId.isEmpty) {
+      throw ArgumentError('sellerId must not be empty');
     }
     if (quantity <= 0) {
       throw ArgumentError('quantity must be positive');
@@ -256,12 +260,12 @@ class ProductNotifier extends AsyncNotifier<void> {
 
       final sellerInventoryRef = db
           .collection(Collections.sellerInventory)
-          .doc('${sellerId}_$variantId');
+          .doc('${normalizedSellerId}_$variantId');
       final sellerSnap = await txn.get(sellerInventoryRef);
       final sellerCurrent =
           (sellerSnap.data()?['quantity_available'] as num?)?.toInt() ?? 0;
       txn.set(sellerInventoryRef, {
-        'seller_id': sellerId,
+        'seller_id': normalizedSellerId,
         'seller_name': sellerName,
         'product_id': productId,
         'variant_id': variantId,
@@ -278,7 +282,7 @@ class ProductNotifier extends AsyncNotifier<void> {
       final auditRef = db.collection(Collections.inventoryTransactions).doc();
       txn.set(auditRef, {
         'type': 'transfer_out',
-        'seller_id': sellerId,
+        'seller_id': normalizedSellerId,
         'seller_name': sellerName,
         'product_id': productId,
         'variant_id': variantId,
