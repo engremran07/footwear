@@ -44,6 +44,9 @@ import '../core/utils/pdf_export.dart';
 // BAD DEBT: admin-only button in AppBar when balance > 0 && !shop.badDebt.
 //           → ShopNotifier.markAsBadDebt() → zeros balance, flags shop.
 // =============================================================================
+
+enum _ShopAction { edit, delete, badDebt, pdf, share }
+
 class ShopDetailScreen extends ConsumerStatefulWidget {
   final String shopId;
   const ShopDetailScreen({super.key, required this.shopId});
@@ -560,146 +563,193 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(shop.name),
+            title: Text(
+              shop.name,
+              overflow: TextOverflow.ellipsis,
+            ),
             actions: [
-              if (canManageShop)
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  tooltip: tr('tooltip_edit_shop', ref),
-                  onPressed: () => context.push('/shops/${shop.id}/edit'),
-                ),
-              if (user?.isAdmin == true)
-                IconButton(
-                  icon: const Icon(Icons.delete, color: AppBrand.errorColor),
-                  tooltip: tr('tooltip_delete_shop', ref),
-                  onPressed: () async {
-                    final ok = await ConfirmDialog.show(
-                      context,
-                      title: tr('delete', ref),
-                      message: tr('confirm_delete_shop', ref),
-                    );
-                    if (ok != true) return;
-                    try {
-                      await ref
-                          .read(shopNotifierProvider.notifier)
-                          .deactivate(shop.id, shop.routeId);
-                      if (context.mounted) context.go('/shops');
-                    } catch (e) {
-                      if (context.mounted) {
-                        final key = AppErrorMapper.key(e);
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(errorSnackBar(tr(key, ref)));
-                      }
-                    }
-                  },
-                ),
-              if (user?.isAdmin == true && shop.balance > 0 && !shop.badDebt)
-                IconButton(
-                  icon: const Icon(Icons.money_off, color: Colors.orange),
-                  tooltip: tr('mark_bad_debt', ref),
-                  onPressed: () async {
-                    final ok = await ConfirmDialog.show(
-                      context,
-                      title: tr('bad_debt', ref),
-                      message: tr('confirm_bad_debt', ref),
-                    );
-                    if (ok != true) return;
-                    try {
-                      await ref
-                          .read(shopNotifierProvider.notifier)
-                          .markAsBadDebt(shop.id);
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        successSnackBar(tr('success_updated', ref)),
-                      );
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      final key = AppErrorMapper.key(e);
-                      ScaffoldMessenger.of(
+              PopupMenuButton<_ShopAction>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (action) async {
+                  switch (action) {
+                    case _ShopAction.edit:
+                      context.push('/shops/${shop.id}/edit');
+
+                    case _ShopAction.delete:
+                      final ok = await ConfirmDialog.show(
                         context,
-                      ).showSnackBar(errorSnackBar(tr(key, ref)));
-                    }
-                  },
-                ),
-              IconButton(
-                icon: const Icon(Icons.picture_as_pdf),
-                tooltip: tr('tooltip_export_pdf', ref),
-                onPressed: () {
-                  final txs = txAsync.valueOrNull ?? [];
-                  _generatePdf(shop, txs);
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.ios_share),
-                tooltip: tr('tooltip_export_statement', ref),
-                onPressed: () {
-                  final txs = txAsync.valueOrNull ?? [];
-                  final sorted = [...txs]
-                    ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-                  ExportSheet.show(
-                    context,
-                    ref,
-                    title: '${shop.name} - ${tr('transactions', ref)}',
-                    headers: [
-                      tr('date', ref),
-                      tr('type', ref),
-                      tr('amount', ref),
-                      tr('description', ref),
-                    ],
-                    rows: sorted
-                        .map(
-                          (t) => [
-                            AppFormatters.dateTime(t.createdAt),
-                            t.type == 'cash_in'
-                                ? tr('cash_in', ref)
-                                : tr('cash_out', ref),
-                            AppFormatters.sar(t.amount),
-                            t.description ?? '',
-                          ],
-                        )
-                        .toList(),
-                    fileName: 'shop_${shop.name}',
-                    pdfBytesBuilder: () async {
-                      final locale = ref.read(appLocaleProvider);
-                      final settings = await ref.read(settingsProvider.future);
-                      final user = ref.read(authUserProvider).valueOrNull;
-                      final allUsers = user?.isAdmin == true
-                          ? ref.read(allUsersProvider).valueOrNull ??
-                                <UserModel>[]
-                          : <UserModel>[];
-                      final entryByMap = <String, String>{
-                        for (final u in allUsers) u.id: u.displayName,
-                      };
-                      if (user != null) entryByMap[user.id] = user.displayName;
-                      final logoBytes = settings.logoBytes;
-                      // Reconcile opening balance
-                      final netTx = sorted.fold<double>(
-                        0.0,
-                        (s, t) => t.isCashOut ? s + t.amount : s - t.amount,
+                        title: tr('delete', ref),
+                        message: tr('confirm_delete_shop', ref),
                       );
-                      return buildPdfLedger(
-                        customerName: shop.name,
-                        companyName: settings.companyName,
-                        generatedBy: user?.displayName ?? '',
-                        openingBalance: shop.balance - netTx,
-                        transactions: sorted,
-                        labels: _labels(),
-                        locale: locale,
-                        showEntryBy: true,
-                        entryByMap: entryByMap,
-                        dateFrom: sorted.isNotEmpty
-                            ? sorted.first.createdAt.toDate()
-                            : null,
-                        dateTo: sorted.isNotEmpty
-                            ? sorted.last.createdAt.toDate()
-                            : null,
-                        currency: settings.currency,
-                        logoBytes: logoBytes,
+                      if (ok != true) return;
+                      try {
+                        await ref
+                            .read(shopNotifierProvider.notifier)
+                            .deactivate(shop.id, shop.routeId);
+                        if (context.mounted) context.go('/shops');
+                      } catch (e) {
+                        if (context.mounted) {
+                          final key = AppErrorMapper.key(e);
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(errorSnackBar(tr(key, ref)));
+                        }
+                      }
+
+                    case _ShopAction.badDebt:
+                      final ok = await ConfirmDialog.show(
+                        context,
+                        title: tr('bad_debt', ref),
+                        message: tr('confirm_bad_debt', ref),
                       );
-                    },
-                  );
+                      if (ok != true) return;
+                      try {
+                        await ref
+                            .read(shopNotifierProvider.notifier)
+                            .markAsBadDebt(shop.id);
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          successSnackBar(tr('success_updated', ref)),
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        final key = AppErrorMapper.key(e);
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(errorSnackBar(tr(key, ref)));
+                      }
+
+                    case _ShopAction.pdf:
+                      final txs = txAsync.valueOrNull ?? [];
+                      _generatePdf(shop, txs);
+
+                    case _ShopAction.share:
+                      final txs = txAsync.valueOrNull ?? [];
+                      final sorted = [...txs]
+                        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+                      ExportSheet.show(
+                        context,
+                        ref,
+                        title: '${shop.name} - ${tr('transactions', ref)}',
+                        headers: [
+                          tr('date', ref),
+                          tr('type', ref),
+                          tr('amount', ref),
+                          tr('description', ref),
+                        ],
+                        rows: sorted
+                            .map(
+                              (t) => [
+                                AppFormatters.dateTime(t.createdAt),
+                                t.type == 'cash_in'
+                                    ? tr('cash_in', ref)
+                                    : tr('cash_out', ref),
+                                AppFormatters.sar(t.amount),
+                                t.description ?? '',
+                              ],
+                            )
+                            .toList(),
+                        fileName: 'shop_${shop.name}',
+                        pdfBytesBuilder: () async {
+                          final locale = ref.read(appLocaleProvider);
+                          final settings =
+                              await ref.read(settingsProvider.future);
+                          final user = ref.read(authUserProvider).valueOrNull;
+                          final allUsers = user?.isAdmin == true
+                              ? ref.read(allUsersProvider).valueOrNull ??
+                                    <UserModel>[]
+                              : <UserModel>[];
+                          final entryByMap = <String, String>{
+                            for (final u in allUsers) u.id: u.displayName,
+                          };
+                          if (user != null) {
+                            entryByMap[user.id] = user.displayName;
+                          }
+                          final logoBytes = settings.logoBytes;
+                          final netTx = sorted.fold<double>(
+                            0.0,
+                            (s, t) =>
+                                t.isCashOut ? s + t.amount : s - t.amount,
+                          );
+                          return buildPdfLedger(
+                            customerName: shop.name,
+                            companyName: settings.companyName,
+                            generatedBy: user?.displayName ?? '',
+                            openingBalance: shop.balance - netTx,
+                            transactions: sorted,
+                            labels: _labels(),
+                            locale: locale,
+                            showEntryBy: true,
+                            entryByMap: entryByMap,
+                            dateFrom: sorted.isNotEmpty
+                                ? sorted.first.createdAt.toDate()
+                                : null,
+                            dateTo: sorted.isNotEmpty
+                                ? sorted.last.createdAt.toDate()
+                                : null,
+                            currency: settings.currency,
+                            logoBytes: logoBytes,
+                          );
+                        },
+                      );
+                  }
                 },
+                itemBuilder: (ctx) => [
+                  if (canManageShop)
+                    PopupMenuItem(
+                      value: _ShopAction.edit,
+                      child: ListTile(
+                        leading: const Icon(Icons.edit),
+                        title: Text(tr('tooltip_edit_shop', ref)),
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  if (user?.isAdmin == true)
+                    PopupMenuItem(
+                      value: _ShopAction.delete,
+                      child: ListTile(
+                        leading:
+                            const Icon(Icons.delete, color: AppBrand.errorColor),
+                        title: Text(
+                          tr('tooltip_delete_shop', ref),
+                          style:
+                              const TextStyle(color: AppBrand.errorColor),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  if (user?.isAdmin == true &&
+                      shop.balance > 0 &&
+                      !shop.badDebt)
+                    PopupMenuItem(
+                      value: _ShopAction.badDebt,
+                      child: ListTile(
+                        leading: const Icon(Icons.money_off,
+                            color: Colors.orange),
+                        title: Text(tr('mark_bad_debt', ref)),
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  PopupMenuItem(
+                    value: _ShopAction.pdf,
+                    child: ListTile(
+                      leading: const Icon(Icons.picture_as_pdf),
+                      title: Text(tr('tooltip_export_pdf', ref)),
+                      contentPadding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ShopAction.share,
+                    child: ListTile(
+                      leading: const Icon(Icons.ios_share),
+                      title: Text(tr('tooltip_export_statement', ref)),
+                      contentPadding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

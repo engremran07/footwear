@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,6 +61,9 @@ class SessionGuard extends ConsumerStatefulWidget {
 }
 
 class _SessionGuardState extends ConsumerState<SessionGuard> {
+  // TEMP tracing: keep enabled while validating lifecycle transitions.
+  static const bool _enableLifecycleTrace = true;
+  static const int _maxTraceEvents = 20;
   Timer? _inactivityTimer;
   DateTime? _backgroundedAt;
   DateTime? _sessionStartedAt;
@@ -67,6 +71,9 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   DateTime? _lastActiveWriteAt;
   bool _warningShown = false;
   bool _isLocked = false;
+  bool _showDebugPanel = false;
+  bool _debugPanelRebuildQueued = false;
+  final List<String> _traceEvents = <String>[];
   late final AppLifecycleListener _lifecycleListener;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -75,6 +82,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   void initState() {
     super.initState();
     _sessionStartedAt = DateTime.now();
+    _trace('init');
     _lifecycleListener = AppLifecycleListener(
       onPause: _onAppPaused,
       onHide: _onAppPaused,
@@ -97,13 +105,70 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     return user?.isAdmin ?? false;
   }
 
+  void _trace(String event, [Map<String, Object?> details = const {}]) {
+    if (!_enableLifecycleTrace) return;
+    final now = DateTime.now();
+    final user = ref.read(authUserProvider).valueOrNull;
+    final role = user == null
+        ? 'none'
+        : (user.isAdmin ? 'admin' : (user.isSeller ? 'seller' : 'other'));
+    final bgForSec = _backgroundedAt == null
+        ? 'n/a'
+        : now.difference(_backgroundedAt!).inSeconds.toString();
+    final sessionForMin = _sessionStartedAt == null
+        ? 'n/a'
+        : now.difference(_sessionStartedAt!).inMinutes.toString();
+    final detailsText = details.entries
+        .map((e) => '${e.key}=${e.value}')
+        .join(', ');
+
+    final line =
+        '[SessionGuard][$event] t=${now.toIso8601String()} '
+        'role=$role locked=$_isLocked bgForSec=$bgForSec sessionForMin=$sessionForMin '
+        '${detailsText.isEmpty ? '' : 'details{$detailsText}'}';
+
+    debugPrint(line);
+
+    if (kDebugMode) {
+      _traceEvents.add(line);
+      if (_traceEvents.length > _maxTraceEvents) {
+        _traceEvents.removeRange(0, _traceEvents.length - _maxTraceEvents);
+      }
+      if (_showDebugPanel && mounted && !_debugPanelRebuildQueued) {
+        _debugPanelRebuildQueued = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _debugPanelRebuildQueued = false;
+          if (mounted) setState(() {});
+        });
+      }
+    }
+  }
+
+  void _toggleDebugPanel() {
+    if (!kDebugMode) return;
+    setState(() => _showDebugPanel = !_showDebugPanel);
+  }
+
+  void _clearTraceEvents() {
+    if (!kDebugMode) return;
+    setState(() => _traceEvents.clear());
+  }
+
   /// Starts inactivity timer for admin only; sellers never get one.
   void _maybeStartInactivityTimer() {
     _inactivityTimer?.cancel();
     _checkAdminSessionExpiry();
-    if (!_currentUserIsAdmin) return; // sellers: no inactivity timeout
-    _inactivityTimer =
-        Timer(widget.adminInactivityTimeout, _onInactivityTimeout);
+    if (!_currentUserIsAdmin) {
+      _trace('timer.skip.nonAdmin');
+      return; // sellers: no inactivity timeout
+    }
+    _inactivityTimer = Timer(
+      widget.adminInactivityTimeout,
+      _onInactivityTimeout,
+    );
+    _trace('timer.start', {
+      'timeoutMin': widget.adminInactivityTimeout.inMinutes,
+    });
   }
 
   void _registerActivity() {
@@ -114,12 +179,15 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
       return;
     }
     _lastActivityAt = now;
+    _trace('activity.registered');
     _maybeStartInactivityTimer();
   }
 
   void _onInactivityTimeout() {
+    _trace('timer.timeout');
     final auth = ref.read(authStateProvider).valueOrNull;
     if (auth != null) {
+      _trace('signout.inactivity');
       ref.read(authNotifierProvider.notifier).signOut();
     }
   }
@@ -127,38 +195,51 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   // ── Lifecycle callbacks ───────────────────────────────────────────────────
 
   void _onAppPaused() {
+    _trace('lifecycle.pause');
     _backgroundedAt = DateTime.now();
     _inactivityTimer?.cancel();
     _updateLastActive();
   }
 
   void _onAppResumed() {
+    _trace('lifecycle.resume.start');
     if (_backgroundedAt != null) {
       final elapsed = DateTime.now().difference(_backgroundedAt!);
       final signOutDelay = _currentUserIsAdmin
           ? widget.adminSignOutDelay
           : widget.sellerSignOutDelay;
+      _trace('lifecycle.resume.elapsed', {
+        'elapsedSec': elapsed.inSeconds,
+        'signoutDelaySec': signOutDelay.inSeconds,
+        'lockDelaySec': widget.lockShowDelay.inSeconds,
+      });
 
       if (elapsed >= signOutDelay) {
         // Away too long → sign out entirely
         final auth = ref.read(authStateProvider).valueOrNull;
         if (auth != null) {
+          _trace('signout.backgroundTimeout');
           ref.read(authNotifierProvider.notifier).signOut();
           _backgroundedAt = null;
           return;
         }
       } else if (elapsed >= widget.lockShowDelay) {
         // Away long enough → show lock overlay; keep session alive
-        if (mounted) setState(() => _isLocked = true);
+        if (mounted) {
+          setState(() => _isLocked = true);
+          _trace('lock.shown.onResume');
+        }
       }
     }
     _backgroundedAt = null;
     _checkAdminSessionExpiry();
     if (!_isLocked) _maybeStartInactivityTimer();
+    _trace('lifecycle.resume.end');
   }
 
   /// Called when user taps or swipes the lock overlay.
   void _unlock() {
+    _trace('lock.dismissed');
     setState(() => _isLocked = false);
     _maybeStartInactivityTimer();
   }
@@ -173,6 +254,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     final elapsed = DateTime.now().difference(_sessionStartedAt!);
     // Hard cutoff
     if (elapsed >= widget.adminSessionMax) {
+      _trace('signout.adminSessionMax', {'elapsedMin': elapsed.inMinutes});
       ref.read(authNotifierProvider.notifier).signOut();
       return;
     }
@@ -180,6 +262,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     final warnAt = widget.adminSessionMax - const Duration(minutes: 30);
     if (!_warningShown && elapsed >= warnAt) {
       _warningShown = true;
+      _trace('warning.adminSessionExpiring', {'elapsedMin': elapsed.inMinutes});
       _showSessionExpiryWarning();
     }
   }
@@ -210,14 +293,18 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
       final now = DateTime.now();
       if (_lastActiveWriteAt != null &&
           now.difference(_lastActiveWriteAt!) < const Duration(minutes: 5)) {
+        _trace('heartbeat.skip.throttled');
         return;
       }
       _lastActiveWriteAt = now;
+      _trace('heartbeat.write', {'userId': user.id});
       FirebaseFirestore.instance
           .collection(Collections.users)
           .doc(user.id)
           .update({'last_active': Timestamp.now()})
-          .catchError((_) {});
+          .catchError((_) {
+            _trace('heartbeat.write.error', {'userId': user.id});
+          });
     }
   }
 
@@ -237,10 +324,12 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
         _lastActiveWriteAt = null;
         _warningShown = false;
         _isLocked = false;
+        _trace('auth.userChanged', {'userId': nextUser.id});
         _maybeStartInactivityTimer();
       }
       // Force logout if user's active flag cleared remotely
       if (nextUser != null && !nextUser.active) {
+        _trace('signout.remoteInactiveUser', {'userId': nextUser.id});
         ref.read(authNotifierProvider.notifier).signOut();
       }
     });
@@ -252,7 +341,15 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
       child: Stack(
         children: [
           widget.child,
-          if (_isLocked) _AppLockOverlay(onUnlock: _unlock),
+          if (_isLocked)
+            Positioned.fill(child: _AppLockOverlay(onUnlock: _unlock)),
+          if (kDebugMode)
+            _SessionGuardDebugPanel(
+              visible: _showDebugPanel,
+              events: _traceEvents,
+              onToggle: _toggleDebugPanel,
+              onClear: _clearTraceEvents,
+            ),
         ],
       ),
     );
@@ -278,66 +375,183 @@ class _AppLockOverlay extends ConsumerWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onUnlock,
       onVerticalDragEnd: (_) => onUnlock(),
-      // Material + SizedBox.expand fills the full screen and respects the theme.
+      // Full-screen overlay with high-contrast, theme-aware background.
       child: Material(
-        color: cs.surface,
+        color: Colors.transparent,
         child: SizedBox.expand(
-          child: SafeArea(
-            child: Column(
-              children: [
-                const Spacer(flex: 3),
-                // Lock icon in a themed circle container
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: cs.primaryContainer,
-                    shape: BoxShape.circle,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [cs.surface, cs.surfaceContainerLowest],
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  const Spacer(flex: 3),
+                  // Lock icon in a themed circle container
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child:
+                        Icon(
+                              Icons.lock_outline,
+                              size: 48,
+                              color: cs.onPrimaryContainer,
+                            )
+                            .animate(onPlay: (c) => c.repeat())
+                            .shimmer(
+                              duration: 2400.ms,
+                              color: cs.primary.withAlpha(100),
+                            ),
                   ),
-                  child: Icon(
-                    Icons.lock_outline,
-                    size: 48,
-                    color: cs.onPrimaryContainer,
-                  ).animate(onPlay: (c) => c.repeat()).shimmer(
-                        duration: 2400.ms,
-                        color: cs.primary.withAlpha(100),
-                      ),
-                ),
-                const SizedBox(height: 32),
-                Text(
-                  tr('lock_screen_session_active', ref),
-                  style: tt.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurface,
+                  const SizedBox(height: 32),
+                  Text(
+                    tr('lock_screen_session_active', ref),
+                    style: tt.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  tr('lock_screen_tap_to_continue', ref),
-                  style: tt.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
+                  const SizedBox(height: 8),
+                  Text(
+                    tr('lock_screen_tap_to_continue', ref),
+                    style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                   ),
-                ),
-                const Spacer(flex: 4),
-                // Pulsing pill indicator at bottom
-                Container(
-                  width: 56,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: cs.primary,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                )
-                    .animate(onPlay: (c) => c.repeat(reverse: true))
-                    .fadeIn(duration: 700.ms)
-                    .then()
-                    .fadeOut(duration: 700.ms),
-                const SizedBox(height: 32),
-              ],
+                  const Spacer(flex: 4),
+                  // Pulsing pill indicator at bottom
+                  Container(
+                        width: 56,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: cs.primary,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      )
+                      .animate(onPlay: (c) => c.repeat(reverse: true))
+                      .fadeIn(duration: 700.ms)
+                      .then()
+                      .fadeOut(duration: 700.ms),
+                  const SizedBox(height: 32),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SessionGuardDebugPanel extends StatelessWidget {
+  final bool visible;
+  final List<String> events;
+  final VoidCallback onToggle;
+  final VoidCallback onClear;
+
+  const _SessionGuardDebugPanel({
+    required this.visible,
+    required this.events,
+    required this.onToggle,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Stack(
+      children: [
+        // Hidden trigger: long-press top-right corner to show/hide panel.
+        Positioned(
+          top: 8,
+          right: 8,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onLongPress: onToggle,
+            child: const SizedBox(width: 36, height: 36),
+          ),
+        ),
+        if (visible)
+          Positioned(
+            top: 48,
+            right: 8,
+            left: 8,
+            child: Material(
+              color: cs.surface,
+              elevation: 8,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 320),
+                decoration: BoxDecoration(
+                  border: Border.all(color: cs.outlineVariant),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(12),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'SessionGuard Trace (debug)',
+                              style: tt.labelLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: onClear,
+                            child: const Text('Clear'),
+                          ),
+                          IconButton(
+                            onPressed: onToggle,
+                            icon: const Icon(Icons.close),
+                            tooltip: 'Hide debug panel',
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        reverse: true,
+                        padding: const EdgeInsets.all(10),
+                        itemCount: events.length,
+                        itemBuilder: (context, index) {
+                          final line = events[events.length - 1 - index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Text(
+                              line,
+                              style: tt.bodySmall?.copyWith(
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

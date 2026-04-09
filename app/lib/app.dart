@@ -15,19 +15,20 @@ class FootwearErpApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
     final appLocale = ref.watch(appLocaleProvider);
     final themeMode = ref.watch(themePreferenceProvider);
-    return SessionGuard(
-      child: Directionality(
-        textDirection: appLocale.direction,
-        child: MaterialApp.router(
-          title: AppBrand.appName,
-          theme: AppTheme.lightTheme(appLocale),
-          darkTheme: AppTheme.darkTheme(appLocale),
-          themeMode: themeMode,
-          locale: appLocale.locale,
-          routerConfig: router,
-          debugShowCheckedModeBanner: false,
-        ),
-      ),
+    return MaterialApp.router(
+      title: AppBrand.appName,
+      theme: AppTheme.lightTheme(appLocale),
+      darkTheme: AppTheme.darkTheme(appLocale),
+      themeMode: themeMode,
+      locale: appLocale.locale,
+      routerConfig: router,
+      debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return Directionality(
+          textDirection: appLocale.direction,
+          child: SessionGuard(child: child ?? const SizedBox.shrink()),
+        );
+      },
     );
   }
 }

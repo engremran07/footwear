@@ -816,6 +816,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'lock_screen_tap_to_continue': 'Tap anywhere to continue',
     'i_got': 'I got',
     'i_gave': 'I gave',
+    'i_will_get': 'I will get',
+    'collective': 'Collective',
     'showing_entries': 'Showing',
 
     // ── Credit Ledger & Quick Cash ──
@@ -1881,6 +1883,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'lock_screen_tap_to_continue': 'اضغط في أي مكان للمتابعة',
     'i_got': 'استلمت',
     'i_gave': 'أعطيت',
+    'i_will_get': 'سأستلم',
+    'collective': 'إجمالي',
     'showing_entries': 'عرض',
 
     // ── Credit Ledger & Quick Cash ──
@@ -2953,6 +2957,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'lock_screen_tap_to_continue': 'جاری رکھنے کے لیے کہیں بھی ٹیپ کریں',
     'i_got': 'ملا',
     'i_gave': 'دیا',
+    'i_will_get': 'ملے گا',
+    'collective': 'اجتماعی',
     'showing_entries': 'دکھایا جا رہا ہے',
 
     // ── Credit Ledger & Quick Cash ──
