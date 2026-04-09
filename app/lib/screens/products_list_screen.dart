@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/utils/error_mapper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../widgets/app_pull_refresh.dart';
@@ -36,7 +37,7 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
           Expanded(
             child: productsAsync.when(
               loading: () => const ShimmerLoading(),
-              error: (e, _) => Center(child: Text('$e')),
+              error: (e, _) => Center(child: Text(tr(AppErrorMapper.key(e), ref))),
               data: (products) {
                 final filtered = _search.isEmpty
                     ? products

@@ -13,6 +13,7 @@ import '../providers/shop_provider.dart';
 import '../widgets/app_pull_refresh.dart';
 import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/export_sheet.dart';
 import '../widgets/shimmer_loading.dart';
 
 class ShopsListScreen extends ConsumerStatefulWidget {
@@ -24,6 +25,7 @@ class ShopsListScreen extends ConsumerStatefulWidget {
 class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
   String _search = '';
   _ShopQuickFilter _filter = _ShopQuickFilter.collective;
+  String? _selectedRouteId;
 
   static final Map<String, String> _searchCharMap = {
     // Arabic/Urdu letter normalization
@@ -112,13 +114,99 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         user != null && (user.isAdmin || user.assignedRouteId != null);
 
     return Scaffold(
-      appBar: AppBar(title: Text(tr('shops', ref))),
+      appBar: AppBar(
+        title: Text(tr('shops', ref)),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.file_download_outlined),
+            tooltip: tr('export_report', ref),
+            onSelected: (value) {
+              final shops = shopsAsync.valueOrNull;
+              if (shops == null || shops.isEmpty) return;
+              final routes = routesAsync?.valueOrNull ?? [];
+              if (value == 'all') {
+                _exportAllShops(shops, routes);
+              } else if (value == 'per_route') {
+                _exportPerRoute(shops, routes);
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'all',
+                child: Row(
+                  children: [
+                    const Icon(Icons.table_chart, size: 20),
+                    const SizedBox(width: 8),
+                    Text(tr('export_all_shops', ref)),
+                  ],
+                ),
+              ),
+              if (user?.isAdmin == true)
+                PopupMenuItem(
+                  value: 'per_route',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.route, size: 20),
+                      const SizedBox(width: 8),
+                      Text(tr('export_per_route', ref)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
       body: Column(
         children: [
           AppSearchBar(
             hintText: tr('search', ref),
             onChanged: (v) => setState(() => _search = _normalizeSearchText(v)),
           ),
+          // Route filter dropdown — admin only
+          if (user?.isAdmin == true && routesAsync != null)
+            routesAsync.when(
+              data: (routes) {
+                if (routes.length <= 1) return const SizedBox.shrink();
+                final sorted = List.of(routes)
+                  ..sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: tr('filter_by_route', ref),
+                      prefixIcon: const Icon(Icons.route, size: 20),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      isDense: true,
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String?>(
+                        value: _selectedRouteId,
+                        isExpanded: true,
+                        isDense: true,
+                        items: [
+                          DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text(tr('all_routes', ref)),
+                          ),
+                          ...sorted.map(
+                            (r) => DropdownMenuItem<String?>(
+                              value: r.id,
+                              child: Text('R${r.routeNumber} · ${r.name}'),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _selectedRouteId = v),
+                      ),
+                    ),
+                  ),
+                );
+              },
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
           // Stats strip — derived from the live shop list
           shopsAsync
                   .whenData(
@@ -134,6 +222,9 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
             child: shopsAsync.when(
               data: (shops) {
                 final filtered = shops.where((s) {
+                  if (_selectedRouteId != null && s.routeId != _selectedRouteId) {
+                    return false;
+                  }
                   return _matchesSearch(s, _search) && _matchesQuickFilter(s);
                 }).toList();
 
@@ -207,6 +298,87 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
               child: const Icon(Icons.add),
             )
           : null,
+    );
+  }
+
+  // ── Export helpers ──────────────────────────────────────────────────────
+
+  void _exportAllShops(List<ShopModel> shops, List<RouteModel> routes) {
+    final routeMap = {for (final r in routes) r.id: r};
+    final headers = [
+      tr('name', ref),
+      tr('route', ref),
+      tr('phone', ref),
+      tr('area', ref),
+      tr('balance', ref),
+    ];
+    final rows = shops.map((s) {
+      final r = routeMap[s.routeId];
+      return <dynamic>[
+        s.name,
+        r != null ? 'R${r.routeNumber} · ${r.name}' : '-',
+        s.phone ?? '-',
+        s.area ?? '-',
+        s.balance,
+      ];
+    }).toList();
+    ExportSheet.show(
+      context,
+      ref,
+      title: tr('export_all_shops', ref),
+      headers: headers,
+      rows: rows,
+      fileName: 'all_shops',
+    );
+  }
+
+  void _exportPerRoute(List<ShopModel> shops, List<RouteModel> routes) {
+    final routeMap = {for (final r in routes) r.id: r};
+    final sorted = List.of(routes)
+      ..sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
+
+    // Group shops by routeId
+    final grouped = <String, List<ShopModel>>{};
+    for (final s in shops) {
+      grouped.putIfAbsent(s.routeId, () => []).add(s);
+    }
+
+    final headers = [
+      tr('name', ref),
+      tr('phone', ref),
+      tr('area', ref),
+      tr('balance', ref),
+    ];
+
+    // Build combined rows with route section headers
+    final allRows = <List<dynamic>>[];
+    for (final r in sorted) {
+      final items = grouped[r.id];
+      if (items == null || items.isEmpty) continue;
+      // Insert route header as a separator row
+      allRows.add(['── R${r.routeNumber} · ${r.name} ──', '', '', '']);
+      for (final s in items) {
+        allRows.add([s.name, s.phone ?? '-', s.area ?? '-', s.balance]);
+      }
+    }
+
+    // Add unassigned shops
+    final knownIds = routeMap.keys.toSet();
+    final unassigned = shops.where((s) => !knownIds.contains(s.routeId)).toList();
+    if (unassigned.isNotEmpty) {
+      allRows.add(['── ${tr('shops_unassigned', ref)} ──', '', '', '']);
+      for (final s in unassigned) {
+        allRows.add([s.name, s.phone ?? '-', s.area ?? '-', s.balance]);
+      }
+    }
+
+    ExportSheet.show(
+      context,
+      ref,
+      title: tr('route_report', ref),
+      headers: headers,
+      rows: allRows,
+      fileName: 'shops_per_route',
     );
   }
 }
@@ -428,14 +600,14 @@ class _ShopTile extends ConsumerWidget {
                   width: 18,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade700,
+                    color: AppTheme.warningFg(cs),
                     shape: BoxShape.circle,
                     border: Border.all(color: cs.surface, width: 1.5),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.priority_high,
                     size: 12,
-                    color: Colors.white,
+                    color: cs.onInverseSurface,
                   ),
                 ),
               ),
