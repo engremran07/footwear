@@ -105,6 +105,15 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   }
                 }
 
+                // Detect duplicate shop names within the current list
+                final nameCount = <String, int>{};
+                for (final s in filtered) {
+                  final k = s.name.toLowerCase();
+                  nameCount[k] = (nameCount[k] ?? 0) + 1;
+                }
+                final duplicateNames =
+                    nameCount.entries.where((e) => e.value > 1).map((e) => e.key).toSet();
+
                 return AppPullRefresh(
                   onRefresh: () async {
                     if (user?.isSeller == true &&
@@ -119,8 +128,11 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   child: ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     itemCount: filtered.length,
-                    itemBuilder: (_, i) =>
-                        _ShopTile(shop: filtered[i]).listEntry(i),
+                    itemBuilder: (_, i) => _ShopTile(
+                      shop: filtered[i],
+                      hasDuplicate: duplicateNames
+                          .contains(filtered[i].name.toLowerCase()),
+                    ).listEntry(i),
                   ),
                 );
               },
@@ -140,7 +152,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
   }
 }
 
-// ── Stats strip ───────────────────────────────────────────────────────────────
+// ── Stats strip — CreditBook style ────────────────────────────────────────────
 
 class _ShopStatsStrip extends ConsumerWidget {
   final List<ShopModel> shops;
@@ -148,41 +160,114 @@ class _ShopStatsStrip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
     final total = shops.length;
-    final withDebt = shops.where((s) => s.balance > 0).toList();
-    final totalOutstanding = withDebt.fold(0.0, (sum, s) => sum + s.balance);
+    // "I gave" = total outstanding (we gave goods on credit, not yet collected)
+    final totalGave = shops
+        .where((s) => s.balance > 0)
+        .fold(0.0, (sum, s) => sum + s.balance);
+    // "I got" = any credit balance (rare: overpaid shops)
+    final totalGot = shops
+        .where((s) => s.balance < 0)
+        .fold(0.0, (sum, s) => sum + s.balance.abs());
+    final withDebt = shops.where((s) => s.balance > 0).length;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withAlpha(20),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Column(
         children: [
-          _Stat(
-            icon: Icons.store,
-            label: tr('stats_total', ref),
-            value: '$total',
-            color: Theme.of(context).colorScheme.primary,
+          // I got / I gave row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                // I got (collection side)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr('i_got', ref),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        AppFormatters.sar(totalGot),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.clearFg(cs),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // I gave (outstanding credit)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        tr('i_gave', ref),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        AppFormatters.sar(totalGave),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: totalGave > 0
+                              ? AppTheme.debtFg(cs)
+                              : AppTheme.clearFg(cs),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          _Divider(),
-          _Stat(
-            icon: Icons.warning_amber,
-            label: tr('stats_overdue', ref),
-            value: '${withDebt.length}',
-            color: AppTheme.warningFg(Theme.of(context).colorScheme),
-          ),
-          _Divider(),
-          _Stat(
-            icon: Icons.account_balance_wallet,
-            label: tr('stats_outstanding', ref),
-            value: AppFormatters.sar(totalOutstanding),
-            color: totalOutstanding > 0
-                ? AppTheme.debtFg(Theme.of(context).colorScheme)
-                : AppTheme.clearFg(Theme.of(context).colorScheme),
+          Divider(height: 1, color: cs.outlineVariant),
+          // Bottom stats row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _Stat(
+                  icon: Icons.store,
+                  label: tr('stats_total', ref),
+                  value: '$total',
+                  color: cs.primary,
+                ),
+                _Divider(),
+                _Stat(
+                  icon: Icons.warning_amber,
+                  label: tr('stats_overdue', ref),
+                  value: '$withDebt',
+                  color: AppTheme.warningFg(cs),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -228,7 +313,8 @@ class _Stat extends StatelessWidget {
 
 class _ShopTile extends ConsumerWidget {
   final ShopModel shop;
-  const _ShopTile({required this.shop});
+  final bool hasDuplicate;
+  const _ShopTile({required this.shop, this.hasDuplicate = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -236,10 +322,32 @@ class _ShopTile extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     return Card(
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: hasDebt ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs),
-          child: Icon(Icons.store,
-              color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs)),
+        leading: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            CircleAvatar(
+              backgroundColor:
+                  hasDebt ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs),
+              child: Icon(Icons.store,
+                  color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs)),
+            ),
+            if (hasDuplicate)
+              Positioned(
+                top: -4,
+                right: -4,
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade700,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: cs.surface, width: 1.5),
+                  ),
+                  child: const Icon(Icons.priority_high,
+                      size: 12, color: Colors.white),
+                ),
+              ),
+          ],
         ),
         title: Text(shop.name,
             maxLines: 1,
@@ -433,7 +541,17 @@ class _AdminGroupedShopsViewState
             ),
           );
         }
-        return _ShopTile(shop: section.items[entry.itemIdx]);
+        // Detect duplicates within the section
+        final sectionNames = <String, int>{};
+        for (final s in section.items) {
+          final k = s.name.toLowerCase();
+          sectionNames[k] = (sectionNames[k] ?? 0) + 1;
+        }
+        final shop = section.items[entry.itemIdx];
+        return _ShopTile(
+          shop: shop,
+          hasDuplicate: (sectionNames[shop.name.toLowerCase()] ?? 0) > 1,
+        );
       },
     );
   }

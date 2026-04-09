@@ -999,7 +999,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     const Spacer(),
                     txAsync.whenOrNull(
                           data: (txs) => Text(
-                            '${txs.length}',
+                            '${tr('showing_entries', ref)} ${txs.length}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ) ??
@@ -1021,6 +1021,18 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         message: tr('no_transactions', ref),
                       );
                     }
+                    // Compute running balance per transaction.
+                    // txs are newest-first from the provider.
+                    // Work backward from shop.balance to reconstruct each tx's
+                    // post-transaction balance.
+                    final balanceMap = <String, double>{};
+                    double bal = shop.balance;
+                    for (final tx in txs) {
+                      balanceMap[tx.id] = bal;
+                      // Reverse the tx to get balance before it was applied
+                      bal = tx.isCashOut ? bal - tx.amount : bal + tx.amount;
+                    }
+
                     // Build grouped items with month headers
                     final items = <_TxListItem>[];
                     String? lastMonth;
@@ -1036,7 +1048,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         );
                         lastMonth = monthKey;
                       }
-                      items.add(_TxListItem(tx: tx));
+                      items.add(_TxListItem(tx: tx, runningBalance: balanceMap[tx.id]));
                     }
                     return ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1067,6 +1079,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         final tx = item.tx!;
                         return _TransactionTile(
                           tx: tx,
+                          runningBalance: item.runningBalance,
                           canEdit:
                               user?.isAdmin == true ||
                               (user?.isSeller == true &&
@@ -1090,6 +1103,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
 
 class _TransactionTile extends ConsumerWidget {
   final TransactionModel tx;
+  final double? runningBalance;
   final bool canEdit;
   final bool canDelete;
   final VoidCallback? onEdit;
@@ -1097,6 +1111,7 @@ class _TransactionTile extends ConsumerWidget {
 
   const _TransactionTile({
     required this.tx,
+    this.runningBalance,
     this.canEdit = false,
     this.canDelete = false,
     this.onEdit,
@@ -1146,6 +1161,20 @@ class _TransactionTile extends ConsumerWidget {
             AppFormatters.dateTime(tx.createdAt),
             style: Theme.of(context).textTheme.bodySmall,
           ),
+          // Running balance (CreditBook-style)
+          if (runningBalance != null)
+            Text(
+              'Balance: ${AppFormatters.sar(runningBalance!)}',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: runningBalance! > 0
+                    ? AppBrand.errorColor
+                    : runningBalance! < 0
+                        ? AppBrand.successColor
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
         ],
       ),
       trailing: canEdit
@@ -1197,7 +1226,8 @@ class _TransactionTile extends ConsumerWidget {
 class _TxListItem {
   final String? monthHeader;
   final TransactionModel? tx;
-  const _TxListItem({this.monthHeader, this.tx});
+  final double? runningBalance;
+  const _TxListItem({this.monthHeader, this.tx, this.runningBalance});
 }
 
 // ─── Balance Trend Mini Chart ─────────────────────────────────────────────────

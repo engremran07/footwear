@@ -187,8 +187,10 @@ class AdminIdentityService {
   Future<void> sendVerificationEmail(String uid, String email) async {
     final creds = await _getOrLoadCreds();
     final clientEmail = creds['client_email'] as String;
-    final privateKeyPem =
-        (creds['private_key'] as String).replaceAll(r'\n', '\n');
+    final privateKeyPem = (creds['private_key'] as String).replaceAll(
+      r'\n',
+      '\n',
+    );
 
     // ── Step 1: mint Firebase custom token for target UID ──────────────────
     final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -208,17 +210,13 @@ class AdminIdentityService {
 
     // ── Step 2: exchange custom token → ephemeral ID token ─────────────────
     final signInResp = await http.post(
-      Uri.parse(
-        '$_itBase/accounts:signInWithCustomToken?key=$_apiKey',
-      ),
+      Uri.parse('$_itBase/accounts:signInWithCustomToken?key=$_apiKey'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'token': customToken, 'returnSecureToken': true}),
     );
     if (signInResp.statusCode != 200) {
       final err = jsonDecode(signInResp.body) as Map<String, dynamic>;
-      throw Exception(
-        (err['error']?['message'] as String?) ?? signInResp.body,
-      );
+      throw Exception((err['error']?['message'] as String?) ?? signInResp.body);
     }
     final idToken =
         (jsonDecode(signInResp.body) as Map<String, dynamic>)['idToken']
