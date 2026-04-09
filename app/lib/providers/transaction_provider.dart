@@ -269,6 +269,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
   Future<void> updateTransactionNote({
     required String txId,
     required String? description,
+    String updatedBy = '',
   }) async {
     if (txId.trim().isEmpty) {
       throw ArgumentError('txId must not be empty');
@@ -281,6 +282,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
             'description': description.trim()
           else
             'description': FieldValue.delete(),
+          if (updatedBy.trim().isNotEmpty) 'updated_by': updatedBy.trim(),
           'updated_at': Timestamp.now(),
         });
   }

@@ -241,7 +241,7 @@ service cloud.firestore {
         (
           requestIsSellerRouteTransaction() &&
           request.resource.data.diff(resource.data)
-            .affectedKeys().hasOnly(['description', 'updated_at'])
+            .affectedKeys().hasOnly(['description', 'updated_at', 'updated_by'])
         );
       allow delete: if isAdmin();
     }

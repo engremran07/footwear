@@ -8,9 +8,13 @@ import '../core/constants/collections.dart';
 import '../core/services/admin_identity_service.dart';
 import '../models/user_model.dart';
 import 'dashboard_provider.dart';
+import 'inventory_transaction_provider.dart';
 import 'invoice_provider.dart';
 import 'product_provider.dart';
+import 'route_provider.dart';
+import 'seller_inventory_provider.dart';
 import 'settings_provider.dart';
+import 'shop_provider.dart';
 import 'transaction_provider.dart';
 import 'user_provider.dart';
 
@@ -83,6 +87,15 @@ class AuthNotifier extends AsyncNotifier<void> {
     ref.invalidate(sellerInvoicesProvider);
     ref.invalidate(sellersProvider);
     ref.invalidate(allVariantsProvider);
+    // A§4-R17: admin-only providers must be invalidated to prevent data leak
+    // across sessions (e.g. admin logs out, seller logs in on same device).
+    ref.invalidate(routesProvider);
+    ref.invalidate(shopsProvider);
+    ref.invalidate(allUsersProvider);
+    ref.invalidate(inactiveUsersProvider);
+    ref.invalidate(adminAllSellerInventoryProvider);
+    ref.invalidate(allInventoryTransactionsProvider);
+    ref.invalidate(outstandingShopsProvider);
   }
 
   Future<void> signIn(

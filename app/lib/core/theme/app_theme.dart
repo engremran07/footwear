@@ -396,11 +396,11 @@ class AppTheme {
       case 'credit_note':
         return AppBrand.successColor;
       case 'ready_for_shipment':
-        return Colors.indigo;
+        return AppBrand.primaryColor;
       case 'received':
         return AppBrand.successColor;
       default:
-        return Colors.grey;
+        return AppBrand.secondaryColor;
     }
   }
 }

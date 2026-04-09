@@ -261,6 +261,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
               child: ElevatedButton(
                 onPressed: () async {
                   try {
+                    final user = ref.read(authUserProvider).valueOrNull;
                     await ref
                         .read(transactionNotifierProvider.notifier)
                         .updateTransactionNote(
@@ -268,6 +269,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           description: descC.text.trim().isEmpty
                               ? null
                               : descC.text.trim(),
+                          updatedBy: user?.id ?? '',
                         );
                     if (ctx.mounted) Navigator.pop(ctx);
                   } catch (e) {

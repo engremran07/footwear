@@ -239,6 +239,13 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         '(${maxInvoiceAmount.toStringAsFixed(2)})',
       );
     }
+    // Per-item validation: reject negative unit_price
+    for (int i = 0; i < items.length; i++) {
+      final price = (items[i]['unit_price'] as num?)?.toDouble() ?? 0;
+      if (price < 0) {
+        throw ArgumentError('Item $i has negative unit_price ($price)');
+      }
+    }
     // Item subtotal integrity check: sum of (qty * unit_price) must equal subtotal
     if (items.isNotEmpty) {
       final computedSubtotal = items.fold<double>(
@@ -566,6 +573,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       data = invSnap.data()!;
       txn.update(invoiceRef, {
         'status': InvoiceModel.statusVoid,
+        'void_by': createdBy.trim(),
+        'void_at': now,
+        'void_reason': 'admin_void',
         'updated_at': now,
       });
     });
