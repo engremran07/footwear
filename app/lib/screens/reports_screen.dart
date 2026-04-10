@@ -778,7 +778,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       );
 
       final bytes = await buildPdfLedger(
-        customerName: shop.name,
+        shopName: shop.name,
         companyName: settings.companyName,
         generatedBy: user?.displayName ?? '',
         openingBalance: shop.balance - netTx,
@@ -951,12 +951,11 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
           .toList();
       final customerMap = <String, SellerReportCustomer>{};
       for (final tx in txsBySeller) {
-        final cid = tx.customerId ?? tx.shopId;
+        final cid = tx.shopId;
         if (cid.isEmpty) continue;
-        final cname =
-            tx.customerName ??
-            allShops.where((s) => s.id == cid).firstOrNull?.name ??
-            '';
+        final cname = tx.shopName.isNotEmpty
+            ? tx.shopName
+            : allShops.where((s) => s.id == cid).firstOrNull?.name ?? '';
         final existing = customerMap[cid];
         final pairsSold = tx.items.fold<int>(0, (acc, item) => acc + item.qty);
         final revenue = tx.isCashOut ? tx.amount : 0.0;

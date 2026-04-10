@@ -82,6 +82,8 @@ Always use client-side:
 [ ] Admin-as-seller paths: sellerId/sellerName always populated in invoice submit
 [ ] Fat APK build command in all scripts/docs
 [ ] version bumped in pubspec.yaml AND app_brand.dart
+[ ] Every transaction/invoice write also updates shop.balance atomically in same batch
+[ ] No screen/widget writes directly to transactions, invoices, or shop.balance
 ```
 
 ## Known Failure Signatures (inline audit catches these)
@@ -94,6 +96,9 @@ Always use client-side:
 | Admin sees no items in invoice screen | admin inventory async hardcoded to empty | `ref.watch(sellerInventoryProvider(user.id))` for all |
 | Invoice created with no items | `user.isSeller &&` guard bypassed for admin | Remove role guard; check `deductions.isEmpty` for all |
 | Fat APK not installed, wrong ABI file | build used `--split-per-abi` | Always `flutter build apk --release` |
+| Stale balance after dev flush | transactions deleted via console/CLI without updating shop.balance | Run `node dev_reset.js` from repo root after any manual flush |
+| `avoid_double_and_int_checks` in `flutter build web` | Transitive dep (image 4.3.0) locked by another pkg (excel) to old archive | Upgrade or replace blocking package; see Chain 5 in CLAUDE.md |
+| `flutter build web --release` exit 1, `Built build/web` still printed | PowerShell interprets Wasm dry-run stderr as error | Check `$LASTEXITCODE` in PowerShell; 0 = real success |
 
 ## 4 Canonical Breakage Chains
 

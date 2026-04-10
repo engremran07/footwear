@@ -7,8 +7,6 @@ void main() {
   final baseJson = <String, dynamic>{
     'invoice_number': 'INV-2026-0001',
     'type': 'sale',
-    'customer_id': 'c1',
-    'customer_name': 'Test Customer',
     'shop_id': 's1',
     'shop_name': 'Test Shop',
     'route_id': 'r1',
@@ -46,8 +44,6 @@ void main() {
       expect(m.id, 'inv1');
       expect(m.invoiceNumber, 'INV-2026-0001');
       expect(m.type, 'sale');
-      expect(m.customerId, 'c1');
-      expect(m.customerName, 'Test Customer');
       expect(m.shopId, 's1');
       expect(m.shopName, 'Test Shop');
       expect(m.routeId, 'r1');
@@ -107,8 +103,10 @@ void main() {
     });
 
     test('isCreditNote is true for credit_note type', () {
-      final m =
-          InvoiceModel.fromJson({...baseJson, 'type': 'credit_note'}, 'inv3');
+      final m = InvoiceModel.fromJson({
+        ...baseJson,
+        'type': 'credit_note',
+      }, 'inv3');
       expect(m.isCreditNote, isTrue);
     });
   });
@@ -130,8 +128,7 @@ void main() {
     });
 
     test('isPartial is true for partial status', () {
-      final m =
-          InvoiceModel.fromJson({...baseJson, 'status': 'partial'}, 'i4');
+      final m = InvoiceModel.fromJson({...baseJson, 'status': 'partial'}, 'i4');
       expect(m.isPartial, isTrue);
       expect(m.isPaid, isFalse);
       expect(m.isIssued, isFalse);
@@ -145,12 +142,16 @@ void main() {
 
     test('status helpers are mutually exclusive for known statuses', () {
       for (final statusVal in ['draft', 'issued', 'paid', 'partial', 'void']) {
-        final m =
-            InvoiceModel.fromJson({...baseJson, 'status': statusVal}, 'sx');
+        final m = InvoiceModel.fromJson({
+          ...baseJson,
+          'status': statusVal,
+        }, 'sx');
         final flags = [m.isDraft, m.isIssued, m.isPaid, m.isPartial, m.isVoid];
-        expect(flags.where((f) => f).length, 1,
-            reason:
-                'Exactly one status flag should be true for "$statusVal"');
+        expect(
+          flags.where((f) => f).length,
+          1,
+          reason: 'Exactly one status flag should be true for "$statusVal"',
+        );
       }
     });
   });
@@ -202,10 +203,10 @@ void main() {
     });
 
     test('non-null linked_invoice_id round-trips correctly', () {
-      final m = InvoiceModel.fromJson(
-        {...baseJson, 'linked_invoice_id': 'orig-inv-42'},
-        'inv-link-2',
-      );
+      final m = InvoiceModel.fromJson({
+        ...baseJson,
+        'linked_invoice_id': 'orig-inv-42',
+      }, 'inv-link-2');
       expect(m.linkedInvoiceId, 'orig-inv-42');
       final json = m.toJson();
       final restored = InvoiceModel.fromJson(json, 'inv-link-2');

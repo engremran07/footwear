@@ -342,6 +342,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'bad_debt_written_off': 'Bad debt written off. Expense pending approval.',
     'write_off': 'Write Off',
     'balance': 'Balance',
+    'total_in': 'Total In',
+    'total_out': 'Total Out',
     'total_orders': 'Total Orders',
 
     // ── Workers ──
@@ -1422,6 +1424,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'bad_debt_written_off': 'تم شطب الدين المعدوم. المصروف بانتظار الموافقة.',
     'write_off': 'شطب',
     'balance': 'الرصيد',
+    'total_in': 'إجمالي الواردات',
+    'total_out': 'إجمالي المستحق',
     'total_orders': 'إجمالي الطلبات',
 
     // ── Workers ──
@@ -2498,6 +2502,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'bad_debt_written_off': 'قرض شطب ہو گیا۔ خرچ منظوری کے انتظار میں ہے۔',
     'write_off': 'شطب کریں',
     'balance': 'بقایا',
+    'total_in': 'کل وصولی',
+    'total_out': 'کل بقایا',
     'total_orders': 'کل آرڈرز',
 
     // ── Workers ──

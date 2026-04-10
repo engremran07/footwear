@@ -32,8 +32,6 @@ Map<String, dynamic> buildWriteOffTransaction({
     'shop_id': shopId,
     'shop_name': shopName,
     'route_id': routeId,
-    'customer_id': shopId, // same as shopId (unified entity)
-    'customer_name': shopName,
     'amount': balance,
     'description': 'Bad debt write-off',
     'items': <Map<String, dynamic>>[],
@@ -86,15 +84,6 @@ void main() {
 
     test('shop_id is set correctly', () {
       expect(tx['shop_id'], 'shop-42');
-    });
-
-    test('customer_id matches shop_id (unified entity)', () {
-      // In this app shops == customers. Must be same value.
-      expect(tx['customer_id'], equals(tx['shop_id']));
-    });
-
-    test('customer_name matches shop_name', () {
-      expect(tx['customer_name'], equals(tx['shop_name']));
     });
 
     test('amount equals outstanding balance', () {

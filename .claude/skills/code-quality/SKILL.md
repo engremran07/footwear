@@ -39,6 +39,16 @@ Rules accept 'admin'; app writes 'Admin' → all admin writes fail with `permiss
 `where(A) + orderBy(B)` query added → no index → list renders empty with no error message  
 **Fix:** Add entry to `firestore.indexes.json` → redeploy.
 
+### Chain 5: Transitive Dep Wasm Lock
+A pub package locks a shared transitive dep (e.g. `archive`) to an old major version → `flutter build web --release` emits `avoid_double_and_int_checks lint violation` FROM a different package that cannot upgrade past the lock.  
+**Diagnosis:**
+1. `flutter pub deps --style=list` → find who pulls in the violating package
+2. `flutter pub outdated` → find the version constraint blocking the upgrade
+3. Check pub changelog for the violating package for "Wasm" / "archive" keywords
+4. Find the parent that locks the shared transitive dep to the old range
+**Fix order:** Replace or upgrade the blocking package. Never force-override `archive` major version — it compiles but breaks caller package API at runtime.  
+**PowerShell gotcha:** `flutter build web --release` appears to exit code 1 via PowerShell `NativeCommandError` even on a clean Wasm build. Check `$LASTEXITCODE` explicitly; exit 0 = real success even when Wasm dry-run messages appear.
+
 ## Five Non-Negotiable Pre-Commit Checks
 
 ```bash

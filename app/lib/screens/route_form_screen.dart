@@ -106,9 +106,11 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       );
     }
 
-    final sellers = (ref.watch(allUsersProvider).valueOrNull ?? [])
-        .where((u) => u.active)
-        .toList();
+    // BUG-002 FIX-A: use sellersProvider (role == 'seller') so admins never
+    // appear in the route seller dropdown — assigning an admin to a route
+    // would incorrectly write assigned_route_id to the admin user doc,
+    // breaking their god-mode and Firestore rule admin path.
+    final sellers = ref.watch(sellersProvider).valueOrNull ?? [];
 
     return PopScope(
       canPop: !_isDirty,

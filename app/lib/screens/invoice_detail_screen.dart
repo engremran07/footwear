@@ -123,7 +123,6 @@ class InvoiceDetailScreen extends ConsumerWidget {
             .read(invoiceNotifierProvider.notifier)
             .voidInvoice(
               invoiceId: inv.id,
-              customerId: inv.customerId,
               total: inv.total,
               type: inv.type,
               createdBy: ref.read(authStateProvider).valueOrNull?.uid ?? '',
@@ -143,7 +142,6 @@ class InvoiceDetailScreen extends ConsumerWidget {
             .read(invoiceNotifierProvider.notifier)
             .markAsPaid(
               invoiceId: inv.id,
-              customerId: inv.customerId,
               routeId: inv.routeId,
               createdBy: ref.read(authStateProvider).valueOrNull?.uid ?? '',
             );
@@ -266,7 +264,7 @@ class _InvoiceBody extends ConsumerWidget {
                   label: tr('shop', ref),
                   value: invoice.shopName.isNotEmpty
                       ? invoice.shopName
-                      : invoice.customerName,
+                      : invoice.shopName,
                 ),
                 _InfoRow(label: tr('date', ref), value: dateStr),
                 if (invoice.linkedInvoiceId != null &&

@@ -819,8 +819,6 @@ class _CreateSaleInvoiceScreenState
       final invoiceId = await ref
           .read(invoiceNotifierProvider.notifier)
           .createSaleInvoice(
-            customerId: _selectedShop!.id,
-            customerName: _selectedShop!.name,
             shopId: _selectedShop!.id,
             shopName: _selectedShop!.name,
             routeId: _selectedShop!.routeId.isNotEmpty

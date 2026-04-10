@@ -119,6 +119,19 @@ Seller:
   keep only root-cause + mandatory guards, rollback non-culprit mitigations,
   and document final keep/remove reasoning.
 
+1. **`shop.balance` is the sole financial source of truth for a shop.**
+  It must ONLY be mutated by `InvoiceNotifier` or `TransactionNotifier` methods
+  through atomic Firestore batch/transaction writes. Balance is NEVER written
+  from screens, widgets, or direct Firestore calls. Every monetary display
+  (shop detail Total In/Out, route detail outstanding, dashboard AR) derives
+  from this single field — either by reading it directly or by summing the
+  live transactions stream that drives it. Manual Firestore operations that
+  delete or modify financial documents (transactions, invoices) WITHOUT
+  updating the corresponding `shop.balance` WILL produce stale UI. If you flush
+  data during dev, always also reset every shop's `balance` field to `0.0` and
+  reset `settings/global.last_invoice_number` to `0`. Use `dev_reset.js` in
+  the repo root for this.
+
 ## 5) Known Failure Signatures
 
 1. permission-denied on route create/inventory add
@@ -187,6 +200,7 @@ Before finishing:
 
 - Run flutter analyze lib --no-pub
 - Run flutter test -r expanded
+- Run `$ErrorActionPreference='Continue'; flutter build web --release; Write-Host "EXIT: $LASTEXITCODE"` — confirm LASTEXITCODE=0 AND no `lint violation` lines in output (PowerShell pipe `2>&1` misrepresents exit code; check `$LASTEXITCODE` directly)
 - Run hygiene grep gates (see CI §4 in .github/workflows/ci.yml):
   1. No raw collection strings: `grep -rn "\.collection('" app/lib/ | grep -v "Collections\."` → zero
   2. allTransactionsProvider in invalidation list: `grep -q "allTransactionsProvider" app/lib/providers/auth_provider.dart`
@@ -222,6 +236,15 @@ Conflict resolution order for instructions:
 - Login password-reset username lookup moved out of screen code into auth provider; account-statement export reads moved out of screen code into transaction provider
 - Firestore index cleanup: removed 8 unused defensive composite indexes; active query coverage remains complete
 - Validation: flutter analyze --no-pub clean, flutter test suite green, screen/widget Firestore hygiene scan cleared
+
+2026-04-10 v3.4.5+36 — Wasm dep-lock eliminated:
+
+- Root cause: `excel 4.0.6` locked `archive ^3.6.1` which prevented `image` from upgrading past 4.3.0; image 4.3.0 had `avoid_double_and_int_checks` violations that caused `flutter build web --release` Wasm dry-run to fail
+- Fix: replaced `excel` with a custom minimal xlsx writer (`app/lib/core/utils/excel_export.dart`) using `archive ^4.0.0` directly; identical public API, same styled output
+- Result: `image` resolved to 4.8.0 (Wasm clean since 4.6.0); `archive` resolved to 4.0.9; `flutter build web --release` Wasm dry-run now reports "succeeded"
+- PowerShell false positive documented: `$LASTEXITCODE` is the authoritative check; pipe artefacts (`NativeCommandError`) do not reflect flutter's real exit code
+- Documented as Chain 5 in CLAUDE.md Breakage Chain Reference + code-quality SKILL + inline-audit SKILL
+- Version bumped to v3.4.5+36, web deployed, APK built
 
 2026-04-10 process upgrade:
 

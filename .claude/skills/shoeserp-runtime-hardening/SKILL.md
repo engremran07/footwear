@@ -76,6 +76,22 @@ Prevent regressions caused by architecture drift between code, rules, and agent 
 - Provider methods writing created_by/route_id/shop_id must reject empty values.
 - Validate identifiers before creating/committing Firestore batched writes.
 
+1. **shop.balance single pipeline — stale-UI failure prevention**
+
+- `shop.balance` is the ONLY field that represents a shop's financial position.
+- It MUST only be written by `InvoiceNotifier` or `TransactionNotifier` methods
+  inside an atomic Firestore batch that also writes the transaction/invoice doc.
+- All monetary displays (Total In/Out, route outstanding, dashboard AR) derive
+  from this single field or from the live `shopTransactionsProvider` stream.
+- **Dev flush scenario:** If transactions/invoices are deleted from Firestore
+  outside the app (console, CLI, script), `shop.balance` will become stale.
+  Always follow any manual flush with `node dev_reset.js` from the repo root.
+  This resets: every shop `balance → 0.0` and `settings/global.last_invoice_number → 0`.
+- **Inline audit trigger:** Any time you touch `transaction_provider.dart`,
+  `invoice_provider.dart`, or `shop_provider.dart`, verify every write to
+  `transactions` or `invoices` also updates `shop.balance` atomically. If any
+  path skips the balance update, that is a critical data-integrity bug.
+
 ## Admin Auth Pipeline Failure Playbook
 
 ### INVALID_ID_TOKEN (custom-token 3-step flow)

@@ -11,10 +11,8 @@ import 'transaction_model.dart';
 //                        only via TransactionNotifier — no invoice created).
 //
 // FIELD SEMANTICS:
-//   customerId / customer_id  → the shop’s Firestore document ID.
-//                               SAME as shopId. Both fields are populated with
-//                               the same value for index / backward compat.
-//   shopId / shop_id          → same as customerId.
+//   shopId / shop_id   → the shop's Firestore document ID (sole identifier).
+//   routeId / route_id → the route this invoice belongs to.
 //
 // LIFECYCLE (state machine):
 //   draft → issued → partial → paid
@@ -33,8 +31,6 @@ class InvoiceModel {
   static const String typeSale = 'sale';
   static const String typeReturn = 'return';
   static const String typeCreditNote = 'credit_note';
-  final String customerId;
-  final String customerName;
   final String shopId;
   final String shopName;
   final String routeId;
@@ -65,10 +61,8 @@ class InvoiceModel {
     required this.id,
     required this.invoiceNumber,
     required this.type,
-    required this.customerId,
-    required this.customerName,
-    this.shopId = '',
-    this.shopName = '',
+    required this.shopId,
+    required this.shopName,
     this.routeId = '',
     this.sellerId = '',
     this.sellerName = '',
@@ -105,14 +99,14 @@ class InvoiceModel {
     final rawDeductions =
         (json['seller_inventory_deductions'] as Map<String, dynamic>?) ??
         const <String, dynamic>{};
+    final shopId = (json['shop_id'] as String?)?.trim() ?? '';
+    final shopName = (json['shop_name'] as String?)?.trim() ?? '';
     return InvoiceModel(
       id: docId,
       invoiceNumber: json['invoice_number'] as String? ?? '',
       type: json['type'] as String? ?? typeSale,
-      customerId: json['customer_id'] as String? ?? '',
-      customerName: json['customer_name'] as String? ?? '',
-      shopId: json['shop_id'] as String? ?? '',
-      shopName: json['shop_name'] as String? ?? '',
+      shopId: shopId,
+      shopName: shopName,
       routeId: json['route_id'] as String? ?? '',
       sellerId: json['seller_id'] as String? ?? '',
       sellerName: json['seller_name'] as String? ?? '',
@@ -146,8 +140,6 @@ class InvoiceModel {
   Map<String, dynamic> toJson() => {
     'invoice_number': invoiceNumber,
     'type': type,
-    'customer_id': customerId,
-    'customer_name': customerName,
     'shop_id': shopId,
     'shop_name': shopName,
     'route_id': routeId,

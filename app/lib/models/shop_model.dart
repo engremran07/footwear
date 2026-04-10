@@ -15,9 +15,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 //   Set by ShopNotifier.markAsBadDebt() — admin only.
 //   When flagged: balance is zeroed, write_off transaction is created.
 //
-// NOTE: 'customerId' / 'customer_id' appearing in related providers and
-// transaction docs always refers to this shop's document ID. The two
-// concepts have been unified — there are no separate Customer entities.
+// NOTE: Shops are the sole customer entity. Transaction and invoice docs
+// reference this shop via shop_id only.
 // =============================================================================
 class ShopModel {
   final String id;

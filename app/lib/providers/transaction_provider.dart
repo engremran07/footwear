@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
@@ -36,68 +35,19 @@ final shopTransactionsProvider = StreamProvider.autoDispose
       if (normalizedShopId.isEmpty) {
         return Stream.value(const <TransactionModel>[]);
       }
-
-      // Merge both query paths because legacy docs may have only customer_id,
-      // while newer docs may have shop_id (and often both).
-      final controller = StreamController<List<TransactionModel>>();
-      List<QueryDocumentSnapshot<Map<String, dynamic>>> shopDocs = const [];
-      List<QueryDocumentSnapshot<Map<String, dynamic>>> customerDocs = const [];
-
-      void emitMerged() {
-        final mergedById = <String, TransactionModel>{};
-        for (final d in [...shopDocs, ...customerDocs]) {
-          final data = d.data();
-          final dataShopId = (data['shop_id'] as String?)?.trim() ?? '';
-          final dataCustomerId = (data['customer_id'] as String?)?.trim() ?? '';
-          if (dataShopId != normalizedShopId &&
-              dataCustomerId != normalizedShopId) {
-            continue;
-          }
-          mergedById[d.id] = TransactionModel.fromJson(data, d.id);
-        }
-
-        final list = mergedById.values.toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        if (!controller.isClosed) {
-          controller.add(list);
-        }
-      }
-
-      final subByShop = FirebaseFirestore.instance
+      // shop_id is the sole identifier. Query by shop_id only.
+      return FirebaseFirestore.instance
           .collection(Collections.transactions)
           .where('shop_id', isEqualTo: normalizedShopId)
           .snapshots()
-          .listen(
-            (snap) {
-              shopDocs = snap.docs;
-              emitMerged();
-            },
-            onError: (Object error, StackTrace stackTrace) {
-              if (!controller.isClosed) controller.addError(error, stackTrace);
-            },
+          .map(
+            (snap) =>
+                snap.docs
+                    .where((d) => d.data()['deleted'] != true)
+                    .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                    .toList()
+                  ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
           );
-
-      final subByCustomer = FirebaseFirestore.instance
-          .collection(Collections.transactions)
-          .where('customer_id', isEqualTo: normalizedShopId)
-          .snapshots()
-          .listen(
-            (snap) {
-              customerDocs = snap.docs;
-              emitMerged();
-            },
-            onError: (Object error, StackTrace stackTrace) {
-              if (!controller.isClosed) controller.addError(error, stackTrace);
-            },
-          );
-
-      ref.onDispose(() async {
-        await subByShop.cancel();
-        await subByCustomer.cancel();
-        await controller.close();
-      });
-
-      return controller.stream;
     });
 
 final allTransactionsProvider =
@@ -139,31 +89,16 @@ final shopTransactionsExportProvider = FutureProvider.autoDispose
     .family<List<TransactionModel>, String>((ref, shopId) async {
       final normalizedShopId = shopId.trim();
       if (normalizedShopId.isEmpty) return const <TransactionModel>[];
-
-      final byShop = await FirebaseFirestore.instance
+      // shop_id is sole source of truth; no dual query needed.
+      final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)
           .where('shop_id', isEqualTo: normalizedShopId)
           .get();
 
-      final byCustomer = await FirebaseFirestore.instance
-          .collection(Collections.transactions)
-          .where('customer_id', isEqualTo: normalizedShopId)
-          .get();
-
-      final mergedById = <String, TransactionModel>{};
-      for (final d in [...byShop.docs, ...byCustomer.docs]) {
-        final data = d.data();
-        if (data['deleted'] == true) continue;
-        final dataShopId = (data['shop_id'] as String?)?.trim() ?? '';
-        final dataCustomerId = (data['customer_id'] as String?)?.trim() ?? '';
-        if (dataShopId != normalizedShopId &&
-            dataCustomerId != normalizedShopId) {
-          continue;
-        }
-        mergedById[d.id] = TransactionModel.fromJson(data, d.id);
-      }
-
-      return mergedById.values.toList()
+      return snap.docs
+          .where((d) => d.data()['deleted'] != true)
+          .map((d) => TransactionModel.fromJson(d.data(), d.id))
+          .toList()
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     });
 
@@ -175,7 +110,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
     required WriteBatch batch,
     required FirebaseFirestore db,
     required String txId,
-    required String? customerId,
+    required String? shopId,
     required double oldAmount,
     required String oldType,
     required double newAmount,
@@ -195,12 +130,12 @@ class TransactionNotifier extends AsyncNotifier<void> {
       'updated_at': Timestamp.now(),
     });
 
-    if (customerId != null && customerId.isNotEmpty) {
+    if (shopId != null && shopId.isNotEmpty) {
       final oldDelta = oldType == 'cash_out' ? oldAmount : -oldAmount;
       final newDelta = newType == 'cash_out' ? newAmount : -newAmount;
       final netChange = -oldDelta + newDelta;
       if (netChange != 0) {
-        batch.update(db.collection(Collections.customers).doc(customerId), {
+        batch.update(db.collection(Collections.customers).doc(shopId), {
           'balance': FieldValue.increment(netChange),
           'updated_at': Timestamp.now(),
         });
@@ -217,8 +152,6 @@ class TransactionNotifier extends AsyncNotifier<void> {
     required String type,
     required double amount,
     String? description,
-    String? customerId,
-    String? customerName,
     String? saleType,
     List<TransactionItem> items = const [],
     required String createdBy,
@@ -251,9 +184,6 @@ class TransactionNotifier extends AsyncNotifier<void> {
     if (routeId.trim().isEmpty) {
       throw ArgumentError('routeId must not be empty');
     }
-    if (customerId != null && customerId.isNotEmpty && customerId != shopId) {
-      throw ArgumentError('customerId must match shopId when provided');
-    }
 
     final db = FirebaseFirestore.instance;
     final batch = db.batch();
@@ -275,8 +205,6 @@ class TransactionNotifier extends AsyncNotifier<void> {
       'shop_id': shopId,
       'shop_name': shopName,
       'route_id': routeId,
-      'customer_id': customerId,
-      'customer_name': customerName,
       'type': type,
       'sale_type': saleType,
       'amount': amount,
@@ -313,17 +241,12 @@ class TransactionNotifier extends AsyncNotifier<void> {
   }
 
   /// Creates a seller-side sale transaction WITHOUT going through invoicing.
-  /// Used for legacy simple sales where no formal invoice is required.
-  ///
   /// NOTE: Prefer InvoiceNotifier.createSaleInvoice() for all new sales that
-  /// involve stock deduction from seller_inventory. This method exists for
-  /// edge-case manual entries only.
-  ///
-  /// IMPORTANT: customerId here IS the shopId (shops = customers in Firestore).
+  /// involve stock deduction from seller_inventory.
   Future<void> createSellerSale({
     required String routeId,
-    required String customerId,
-    required String customerName,
+    required String shopId,
+    required String shopName,
     required double amount,
     String? description,
     String? saleType,
@@ -337,8 +260,8 @@ class TransactionNotifier extends AsyncNotifier<void> {
     if (normalizedCreatedBy.isEmpty) {
       throw ArgumentError('createdBy must not be empty');
     }
-    if (customerId.trim().isEmpty) {
-      throw ArgumentError('customerId must not be empty');
+    if (shopId.trim().isEmpty) {
+      throw ArgumentError('shopId must not be empty');
     }
     if (amount <= 0) {
       throw ArgumentError('Transaction amount must be greater than 0');
@@ -361,12 +284,9 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
     final txRef = db.collection(Collections.transactions).doc();
     batch.set(txRef, {
-      'shop_id': customerId, // customerId == shopId in our unified architecture
-      'shop_name': customerName,
+      'shop_id': shopId,
+      'shop_name': shopName,
       'route_id': routeId,
-      'customer_id':
-          customerId, // legacy alias retained for index compatibility
-      'customer_name': customerName,
       'type': 'cash_out',
       'sale_type': saleType ?? 'cash',
       'amount': amount,
@@ -379,8 +299,8 @@ class TransactionNotifier extends AsyncNotifier<void> {
         'idempotency_key': normalizedKey,
     });
 
-    // Customer owes more
-    batch.update(db.collection(Collections.customers).doc(customerId), {
+    // Shop owes more
+    batch.update(db.collection(Collections.customers).doc(shopId), {
       'balance': FieldValue.increment(amount),
       'updated_at': Timestamp.now(),
     });
@@ -427,7 +347,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
   /// impact on the customer. Preserves audit trail.
   Future<void> deleteTransaction({
     required String txId,
-    required String? customerId,
+    required String? shopId,
     required double amount,
     required String type,
     required String deletedBy,
@@ -448,10 +368,10 @@ class TransactionNotifier extends AsyncNotifier<void> {
       'updated_at': now,
     });
 
-    if (customerId != null && customerId.isNotEmpty) {
+    if (shopId != null && shopId.isNotEmpty) {
       // Reverse: cash_out added to balance, so subtract; cash_in subtracted, so add
       final reversalDelta = type == 'cash_out' ? -amount : amount;
-      batch.update(db.collection(Collections.customers).doc(customerId), {
+      batch.update(db.collection(Collections.customers).doc(shopId), {
         'balance': FieldValue.increment(reversalDelta),
         'updated_at': now,
       });
@@ -485,8 +405,6 @@ class TransactionNotifier extends AsyncNotifier<void> {
       'shop_id': shopId,
       'shop_name': shopName,
       'route_id': routeId,
-      'customer_id': shopId,
-      'customer_name': shopName,
       'type': TransactionModel.typeReturn,
       'sale_type': 'return',
       'amount': amount,
@@ -522,7 +440,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
   /// Updates a transaction and adjusts customer balance for the change.
   Future<void> updateTransaction({
     required String txId,
-    required String? customerId,
+    required String? shopId,
     required double oldAmount,
     required String oldType,
     required double newAmount,
@@ -556,7 +474,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       batch: batch,
       db: db,
       txId: txId,
-      customerId: customerId,
+      shopId: shopId,
       oldAmount: oldAmount,
       oldType: oldType,
       newAmount: newAmount,
@@ -611,9 +529,10 @@ class TransactionNotifier extends AsyncNotifier<void> {
         .doc('global')
         .get();
     final requireApproval =
-        (settingsDoc.data()?['require_admin_approval_for_seller_transaction_edits']
-                as bool?) ??
-            false;
+        (settingsDoc
+                .data()?['require_admin_approval_for_seller_transaction_edits']
+            as bool?) ??
+        false;
 
     if (requireApproval) {
       await txRef.update({
@@ -636,9 +555,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       batch: batch,
       db: db,
       txId: txId,
-      customerId: (data['customer_id'] as String?)?.trim().isNotEmpty == true
-          ? (data['customer_id'] as String)
-          : ((data['shop_id'] as String?)?.trim()),
+      shopId: (data['shop_id'] as String?)?.trim(),
       oldAmount: (data['amount'] as num?)?.toDouble() ?? 0,
       oldType: oldType,
       newAmount: newAmount,
@@ -704,9 +621,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       batch: batch,
       db: db,
       txId: txId,
-      customerId: (data['customer_id'] as String?)?.trim().isNotEmpty == true
-          ? (data['customer_id'] as String)
-          : ((data['shop_id'] as String?)?.trim()),
+      shopId: (data['shop_id'] as String?)?.trim(),
       oldAmount: oldAmount,
       oldType: oldType,
       newAmount: newAmount,

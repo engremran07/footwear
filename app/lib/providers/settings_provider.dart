@@ -11,17 +11,17 @@ final settingsProvider = StreamProvider.autoDispose<SettingsModel>((ref) {
       .doc('global')
       .snapshots()
       .map((doc) {
-    if (!doc.exists) {
-      return SettingsModel(
-        companyName: 'My Business',
-        currency: 'SAR',
-        pairsPerCarton: 12,
-        requireAdminApprovalForSellerTransactionEdits: false,
-        updatedAt: Timestamp.now(),
-      );
-    }
-    return SettingsModel.fromJson(doc.data()!);
-  });
+        if (!doc.exists) {
+          return SettingsModel(
+            companyName: 'My Business',
+            currency: 'SAR',
+            pairsPerCarton: 12,
+            requireAdminApprovalForSellerTransactionEdits: false,
+            updatedAt: Timestamp.now(),
+          );
+        }
+        return SettingsModel.fromJson(doc.data()!);
+      });
 });
 
 class SettingsNotifier extends AsyncNotifier<void> {
@@ -49,5 +49,6 @@ class SettingsNotifier extends AsyncNotifier<void> {
   }
 }
 
-final settingsNotifierProvider =
-    AsyncNotifierProvider<SettingsNotifier, void>(SettingsNotifier.new);
+final settingsNotifierProvider = AsyncNotifierProvider<SettingsNotifier, void>(
+  SettingsNotifier.new,
+);

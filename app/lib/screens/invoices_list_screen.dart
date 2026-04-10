@@ -30,9 +30,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(tr('invoices', ref)),
-      ),
+      appBar: AppBar(title: Text(tr('invoices', ref))),
       floatingActionButton: (user != null && (user.isSeller || user.isAdmin))
           ? FloatingActionButton.extended(
               onPressed: () => context.go('/invoices/new'),
@@ -66,7 +64,10 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
                   _filterChip(InvoiceModel.statusPaid, tr('paid', ref), cs),
                   const SizedBox(width: 8),
                   _filterChip(
-                      InvoiceModel.statusPartial, tr('partial', ref), cs),
+                    InvoiceModel.statusPartial,
+                    tr('partial', ref),
+                    cs,
+                  ),
                   const SizedBox(width: 8),
                   _filterChip('void', tr('void', ref), cs),
                 ],
@@ -78,15 +79,18 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
               data: (invoices) {
                 var filtered = invoices;
                 if (_statusFilter != 'all') {
-                  filtered =
-                      filtered.where((i) => i.status == _statusFilter).toList();
+                  filtered = filtered
+                      .where((i) => i.status == _statusFilter)
+                      .toList();
                 }
                 if (_search.isNotEmpty) {
                   filtered = filtered
-                      .where((i) =>
-                          i.invoiceNumber.toLowerCase().contains(_search) ||
-                          i.customerName.toLowerCase().contains(_search) ||
-                          i.shopName.toLowerCase().contains(_search))
+                      .where(
+                        (i) =>
+                            i.invoiceNumber.toLowerCase().contains(_search) ||
+                            i.shopName.toLowerCase().contains(_search) ||
+                            i.shopName.toLowerCase().contains(_search),
+                      )
                       .toList();
                 }
                 if (filtered.isEmpty) {
@@ -157,8 +161,9 @@ class _InvoiceTile extends ConsumerWidget {
       child: ListTile(
         onTap: () => context.go('/invoices/${invoice.id}'),
         leading: CircleAvatar(
-          backgroundColor:
-              invoice.isSale ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs),
+          backgroundColor: invoice.isSale
+              ? AppTheme.debtBg(cs)
+              : AppTheme.clearBg(cs),
           child: Icon(
             invoice.isSale ? Icons.receipt : Icons.assignment_return,
             size: 20,
@@ -170,7 +175,7 @@ class _InvoiceTile extends ConsumerWidget {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          '${invoice.customerName} • $dateStr',
+          '${invoice.shopName} • $dateStr',
           overflow: TextOverflow.ellipsis,
         ),
         trailing: Column(
@@ -234,7 +239,10 @@ class _InvoiceStatsStrip extends ConsumerWidget {
             color: cs.primary,
           ),
           Container(
-              height: 28, width: 1, color: Theme.of(context).dividerColor),
+            height: 28,
+            width: 1,
+            color: Theme.of(context).dividerColor,
+          ),
           _IStat(
             icon: Icons.check_circle,
             label: tr('paid', ref),
@@ -242,7 +250,10 @@ class _InvoiceStatsStrip extends ConsumerWidget {
             color: AppTheme.clearFg(cs),
           ),
           Container(
-              height: 28, width: 1, color: Theme.of(context).dividerColor),
+            height: 28,
+            width: 1,
+            color: Theme.of(context).dividerColor,
+          ),
           _IStat(
             icon: Icons.pending,
             label: tr('pending', ref),
@@ -260,24 +271,33 @@ class _IStat extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _IStat(
-      {required this.icon,
-      required this.label,
-      required this.value,
-      required this.color});
+  const _IStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(height: 2),
-          Text(value,
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 13, color: color)),
-          Text(label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 18, color: color),
+      const SizedBox(height: 2),
+      Text(
+        value,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+          color: color,
+        ),
+      ),
+      Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    ],
+  );
 }

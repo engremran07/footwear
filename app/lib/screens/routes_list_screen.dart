@@ -7,7 +7,6 @@ import '../models/route_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../widgets/app_pull_refresh.dart';
-import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/shimmer_loading.dart';
 
@@ -19,8 +18,6 @@ class RoutesListScreen extends ConsumerStatefulWidget {
 }
 
 class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
-  String _search = '';
-
   @override
   Widget build(BuildContext context) {
     final ref = this.ref;
@@ -32,56 +29,29 @@ class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('routes', ref))),
-      body: Column(
-        children: [
-          AppSearchBar(
-            hintText: tr('search', ref),
-            onChanged: (v) => setState(() => _search = v.toLowerCase()),
-          ),
-          Expanded(
-            child: routesAsync.when(
-              data: (routes) {
-                final filtered = _search.isEmpty
-                    ? routes
-                    : routes
-                        .where((r) =>
-                            r.name.toLowerCase().contains(_search) ||
-                            (r.area?.toLowerCase().contains(_search) ??
-                                false) ||
-                            (r.assignedSellerName
-                                    ?.toLowerCase()
-                                    .contains(_search) ??
-                                false) ||
-                            r.routeNumber.toString().contains(_search))
-                        .toList();
-                if (filtered.isEmpty) {
-                  return EmptyState(
-                    icon: Icons.route,
-                    message: tr('no_routes', ref),
-                  );
-                }
-                return AppPullRefresh(
-                  onRefresh: () async {
-                    if (isAdmin) {
-                      ref.invalidate(routesProvider);
-                    } else {
-                      ref.invalidate(routesBySellerProvider(user?.id ?? ''));
-                    }
-                    await Future.delayed(const Duration(milliseconds: 300));
-                  },
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: filtered.length,
-                    itemBuilder: (_, i) =>
-                        _RouteTile(route: filtered[i]).listEntry(i),
-                  ),
-                );
-              },
-              loading: () => const ShimmerLoading(),
-              error: (e, _) => Center(child: Text('$e')),
+      body: routesAsync.when(
+        data: (routes) {
+          if (routes.isEmpty) {
+            return EmptyState(icon: Icons.route, message: tr('no_routes', ref));
+          }
+          return AppPullRefresh(
+            onRefresh: () async {
+              if (isAdmin) {
+                ref.invalidate(routesProvider);
+              } else {
+                ref.invalidate(routesBySellerProvider(user?.id ?? ''));
+              }
+              await Future.delayed(const Duration(milliseconds: 300));
+            },
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: routes.length,
+              itemBuilder: (_, i) => _RouteTile(route: routes[i]).listEntry(i),
             ),
-          ),
-        ],
+          );
+        },
+        loading: () => const ShimmerLoading(),
+        error: (e, _) => Center(child: Text('$e')),
       ),
       floatingActionButton: isAdmin
           ? FloatingActionButton(
@@ -111,16 +81,21 @@ class _RouteTile extends ConsumerWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           alignment: Alignment.center,
-          child: Text('R${route.routeNumber}',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: cs.onPrimaryContainer)),
+          child: Text(
+            'R${route.routeNumber}',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: cs.onPrimaryContainer,
+            ),
+          ),
         ),
-        title: Text(route.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Text(
+          route.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -143,10 +118,7 @@ class _RouteTile extends ConsumerWidget {
                       route.assignedSellerName!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.primary,
-                      ),
+                      style: TextStyle(fontSize: 12, color: cs.primary),
                     ),
                   ),
                 ],
@@ -164,12 +136,14 @@ class _RouteTile extends ConsumerWidget {
             children: [
               Icon(Icons.store, size: 14, color: cs.onSurfaceVariant),
               const SizedBox(width: 4),
-              Text('${route.totalShops}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: cs.onSurfaceVariant,
-                  )),
+              Text(
+                '${route.totalShops}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
         ),

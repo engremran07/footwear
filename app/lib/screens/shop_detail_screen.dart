@@ -191,7 +191,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           .read(transactionNotifierProvider.notifier)
                           .updateTransaction(
                             txId: tx.id,
-                            customerId: tx.customerId ?? tx.shopId,
+                            shopId: tx.shopId,
                             oldAmount: tx.amount,
                             oldType: tx.type,
                             newAmount: newAmount,
@@ -272,9 +272,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       label: Text(tr('cash_out', ref)),
                       selected: txType == 'cash_out',
                       onSelected: (_) => setS(() => txType = 'cash_out'),
-                      selectedColor: AppTheme.debtBg(
-                        Theme.of(ctx).colorScheme,
-                      ),
+                      selectedColor: AppTheme.debtBg(Theme.of(ctx).colorScheme),
                     ),
                   ),
                 ],
@@ -400,7 +398,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   Future<void> _reviewEditRequest(TransactionModel tx, bool approved) async {
     try {
       final user = ref.read(authUserProvider).valueOrNull;
-      await ref.read(transactionNotifierProvider.notifier).reviewSellerEditRequest(
+      await ref
+          .read(transactionNotifierProvider.notifier)
+          .reviewSellerEditRequest(
             txId: tx.id,
             approved: approved,
             reviewerId: user?.id ?? '',
@@ -431,8 +431,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
           .read(transactionNotifierProvider.notifier)
           .deleteTransaction(
             txId: tx.id,
-            customerId:
-                tx.customerId ?? (tx.shopId.isNotEmpty ? tx.shopId : null),
+            shopId: tx.shopId.isNotEmpty ? tx.shopId : null,
             amount: tx.amount,
             type: tx.type,
             deletedBy: authUser?.id ?? '',
@@ -487,7 +486,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
         (s, t) => t.isCashOut ? s + t.amount : s - t.amount,
       );
       final bytes = await buildPdfLedger(
-        customerName: shop.name,
+        shopName: shop.name,
         companyName: settings.companyName,
         generatedBy: user?.displayName ?? '',
         openingBalance: shop.balance - netTx,
@@ -799,7 +798,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             (s, t) => t.isCashOut ? s + t.amount : s - t.amount,
                           );
                           return buildPdfLedger(
-                            customerName: shop.name,
+                            shopName: shop.name,
                             companyName: settings.companyName,
                             generatedBy: user?.displayName ?? '',
                             openingBalance: shop.balance - netTx,
@@ -944,45 +943,115 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      // Balance display
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 8,
-                          horizontal: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: balanceBgColor,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: balanceColor.withAlpha(80)),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              tr('balance', ref),
-                              style: Theme.of(context).textTheme.labelMedium
-                                  ?.copyWith(color: balanceColor),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              AppFormatters.sar(shop.balance.abs()),
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: balanceColor,
+                      // Total In / Total Out compact summary row
+                      Row(
+                        children: [
+                          // Total In — cash collected from this shop
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                                horizontal: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.clearBg(cs),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: AppTheme.clearFg(cs).withAlpha(60),
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    tr('total_in', ref),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: AppTheme.clearFg(cs)),
                                   ),
-                            ),
-                            Text(
-                              shop.balance > 0
-                                  ? tr('outstanding', ref)
-                                  : tr('clear', ref),
-                              style: TextStyle(
-                                color: balanceColor,
-                                fontSize: 12,
+                                  const SizedBox(height: 2),
+                                  txAsync.whenOrNull(
+                                        data: (txs) {
+                                          final totalIn = txs
+                                              .where(
+                                                (t) =>
+                                                    !t.deleted && !t.isCashOut,
+                                              )
+                                              .fold(
+                                                0.0,
+                                                (s, t) => s + t.amount,
+                                              );
+                                          return Text(
+                                            AppFormatters.sar(totalIn),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppTheme.clearFg(cs),
+                                                ),
+                                          );
+                                        },
+                                      ) ??
+                                      Text(
+                                        '—',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleSmall,
+                                      ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Total Out — current outstanding balance
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                                horizontal: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: balanceBgColor,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: balanceColor.withAlpha(60),
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    tr('total_out', ref),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: balanceColor),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    AppFormatters.sar(shop.balance.abs()),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: balanceColor,
+                                        ),
+                                  ),
+                                  Text(
+                                    shop.balance > 0
+                                        ? tr('outstanding', ref)
+                                        : tr('clear', ref),
+                                    style: TextStyle(
+                                      color: balanceColor,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       // Days overdue indicator
                       if (shop.balance > 0)
@@ -1126,28 +1195,6 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                   ],
                 ),
               ),
-              // Create Sale Invoice button (sellers only)
-              if (canManageShop && user?.isSeller == true)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppBrand.primaryColor,
-                        foregroundColor: AppBrand.onPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
-                      onPressed: () =>
-                          context.go('/invoices/new?shopId=${shop.id}'),
-                      icon: const Icon(Icons.receipt_long, size: 18),
-                      label: Text(tr('create_sale_invoice', ref)),
-                    ),
-                  ),
-                ),
               const SizedBox(height: 8),
               // Transactions header
               Padding(

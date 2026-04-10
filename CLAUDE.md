@@ -74,6 +74,32 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
     NEVER create an invoice for cash-only collection.
     NEVER create a standalone transaction for a new stock sale (always through invoice).
 
+## shop.balance Single Pipeline (non-negotiable)
+
+`shop.balance` is the **sole source of truth** for every monetary display in the app:
+
+| Screen / Widget | Source |
+|---|---|
+| Shop detail — Total In / Total Out boxes | Live sum of `shopTransactionsProvider` stream |
+| Shop detail — balance badge color | `shop.balance` field |
+| Route detail — outstanding total | `shops.fold(shop.balance)` |
+| Dashboard AR widget | `outstandingShopsProvider` → `shop.balance` |
+
+**Write pipeline (atomic — no exceptions):**
+```
+User action → Screen → Provider notifier (InvoiceNotifier / TransactionNotifier)
+  → Firestore batch: write transaction doc + update shop.balance in same commit
+```
+
+**NEVER bypass this pipeline.** Direct Firestore writes that touch `transactions`
+or `invoices` WITHOUT also updating `shop.balance` will produce stale UI across
+all screens instantly.
+
+**Dev data flush:** If you delete transactions/invoices manually (e.g. in dev),
+always follow with `node dev_reset.js` from the repo root to reset:
+- All shop `balance` fields → `0.0`
+- `settings/global.last_invoice_number` → `0`
+
 ## Failure Playbooks
 
 ### permission-denied
@@ -124,6 +150,17 @@ Rules check 'admin' exactly; app writes 'Admin' (casing) → all admin writes fa
 `where(A) + orderBy(B)` added → no index → list renders empty, no error in UI  
 **Fix:** Add entry to `firestore.indexes.json` → `firebase deploy --only firestore:indexes`.
 
+### Chain 5: Transitive Dep Wasm Lock
+Add a pub package that locks a shared transitive dep (e.g. `archive`) to an old major version → Wasm dry-run violations appear in `flutter build web` from a DIFFERENT package that needs the newer version.  
+**Symptoms:** `avoid_double_and_int_checks lint violation` in `flutter build web --release` from a third-party package file you did NOT write.  
+**Diagnosis triage:**
+1. `flutter pub deps --style=list | grep -A5 '<failing package>'` → find who introduced the dep
+2. `flutter pub outdated` → find latest compatible version
+3. Check pub.dev changelog for the failing package — search for "Wasm" and "archive"
+4. Identify the blocking parent package and what `archive` range it requires
+**Fix:** Replace or upgrade the blocking package, OR write a direct replacement if no compatible version exists. Do NOT use `dependency_overrides` to force incompatible archive versions — it compiles but breaks at runtime.  
+**This project (history):** `excel 4.0.6` locked `archive ^3.x` which blocked `image` from upgrading past 4.3.0 (which had the violations). Fixed by replacing `excel` with a custom xlsx writer using `archive ^4.0.0` directly.
+
 ## Band-Aid Loop Reversal Protocol
 
 Trigger this protocol when all are true:
@@ -153,6 +190,8 @@ Never keep ambiguity-driven workaround code without explicit justification.
 | `flutter build apk --release --split-per-abi` | Wrong split APK | `flutter build apk --release` (fat) |
 | Hardcoded `Colors.red`, `Colors.white` | Dark mode breakage | `AppBrand.errorFg`, `AppBrand.errorBg` |
 | Raw `SnackBar(content: Text(...))` | Unstyled SnackBar | `errorSnackBar()` / `successSnackBar()` |
+| `avoid_double_and_int_checks lint violation` in web build | Transitive dep locked to old `image`/`archive` by another pkg | Find blocking package; replace or upgrade it — see Chain 5 |
+| `flutter build web --release` exits 1 with no Error lines | PowerShell `NativeCommandError` from Wasm dry-run stderr — build IS succeeding | Check `$LASTEXITCODE` explicitly; exit 0 = real success |
 
 ## Five Non-Negotiable Pre-Commit Checks
 

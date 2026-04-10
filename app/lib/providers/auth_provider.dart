@@ -200,6 +200,11 @@ class AuthNotifier extends AsyncNotifier<void> {
           _logger.w(
             'Signed in user has no profile document: $uid. Attempting self-heal.',
           );
+          // DI-05: clear offline persistence so stale pre-flush cache docs do
+          // not serve incorrect state during the self-heal bootstrap flow.
+          try {
+            await FirebaseFirestore.instance.clearPersistence();
+          } catch (_) {}
 
           final legacyByEmail = await usersRef
               .where('email', isEqualTo: email)

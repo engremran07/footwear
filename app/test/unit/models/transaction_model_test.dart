@@ -54,8 +54,6 @@ void main() {
       'shop_id': 's1',
       'shop_name': 'Shop A',
       'route_id': 'r1',
-      'customer_id': 'c1',
-      'customer_name': 'Customer A',
       'type': 'cash_in',
       'sale_type': 'cash',
       'amount': 5000.0,
@@ -74,8 +72,6 @@ void main() {
       expect(m.shopId, 's1');
       expect(m.shopName, 'Shop A');
       expect(m.routeId, 'r1');
-      expect(m.customerId, 'c1');
-      expect(m.customerName, 'Customer A');
       expect(m.type, 'cash_in');
       expect(m.saleType, 'cash');
       expect(m.amount, 5000.0);
@@ -97,22 +93,28 @@ void main() {
 
   group('TransactionModel type helpers', () {
     test('isCashIn', () {
-      final m = TransactionModel.fromJson(
-          {'type': 'cash_in', 'created_at': ts}, 't1');
+      final m = TransactionModel.fromJson({
+        'type': 'cash_in',
+        'created_at': ts,
+      }, 't1');
       expect(m.isCashIn, isTrue);
       expect(m.isCashOut, isFalse);
       expect(m.isReturn, isFalse);
     });
 
     test('isCashOut', () {
-      final m = TransactionModel.fromJson(
-          {'type': 'cash_out', 'created_at': ts}, 't2');
+      final m = TransactionModel.fromJson({
+        'type': 'cash_out',
+        'created_at': ts,
+      }, 't2');
       expect(m.isCashOut, isTrue);
     });
 
     test('isReturn', () {
-      final m =
-          TransactionModel.fromJson({'type': 'return', 'created_at': ts}, 't3');
+      final m = TransactionModel.fromJson({
+        'type': 'return',
+        'created_at': ts,
+      }, 't3');
       expect(m.isReturn, isTrue);
     });
 
@@ -155,8 +157,6 @@ void main() {
         'shop_id': 's1',
         'shop_name': 'Shop A',
         'route_id': 'r1',
-        'customer_id': 'c1',
-        'customer_name': 'Customer A',
         'type': 'cash_in',
         'sale_type': 'cash',
         'amount': 5000.0,

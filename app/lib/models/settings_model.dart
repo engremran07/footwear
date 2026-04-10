@@ -39,7 +39,8 @@ class SettingsModel {
       currency: json['currency'] as String? ?? 'SAR',
       pairsPerCarton: json['pairs_per_carton'] as int? ?? 12,
       requireAdminApprovalForSellerTransactionEdits:
-          json['require_admin_approval_for_seller_transaction_edits'] as bool? ??
+          json['require_admin_approval_for_seller_transaction_edits']
+              as bool? ??
           false,
       logoBase64: json['logo_base64'] as String?,
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
@@ -47,12 +48,12 @@ class SettingsModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'company_name': companyName,
-        'currency': currency,
-        'pairs_per_carton': pairsPerCarton,
-        'require_admin_approval_for_seller_transaction_edits':
-            requireAdminApprovalForSellerTransactionEdits,
-        'logo_base64': logoBase64,
-        'updated_at': updatedAt,
-      };
+    'company_name': companyName,
+    'currency': currency,
+    'pairs_per_carton': pairsPerCarton,
+    'require_admin_approval_for_seller_transaction_edits':
+        requireAdminApprovalForSellerTransactionEdits,
+    'logo_base64': logoBase64,
+    'updated_at': updatedAt,
+  };
 }

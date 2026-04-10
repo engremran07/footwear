@@ -197,8 +197,6 @@ class ShopNotifier extends AsyncNotifier<void> {
       'shop_id': shopId,
       'shop_name': shopDoc.data()?['name'] ?? '',
       'route_id': shopDoc.data()?['route_id'] ?? '',
-      'customer_id': shopId,
-      'customer_name': shopDoc.data()?['name'] ?? '',
       'amount': balance,
       'description': 'Bad debt write-off',
       'items': <Map<String, dynamic>>[],

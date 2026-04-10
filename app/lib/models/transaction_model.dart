@@ -14,10 +14,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 //   write_off → bad debt: balance zeroed, created by ShopNotifier.markAsBadDebt()
 //
 // FIELD SEMANTICS:
-//   shopId / shop_id     → the retail shop's Firestore document ID
-//   customerId / customer_id → SAME value as shopId (legacy alias, kept for
-//                              backward compatibility with index queries)
-//   invoiceId            → populated when transaction originates from an invoice
+//   shopId / shop_id → the retail shop's Firestore document ID (sole truth)
+//   invoiceId        → populated when transaction originates from an invoice
 //
 // SOFT DELETE (DI-01):
 //   deleted=true records are excluded client-side (!=true) — never server-side
@@ -74,8 +72,6 @@ class TransactionModel {
   final String shopId;
   final String shopName;
   final String routeId;
-  final String? customerId;
-  final String? customerName;
   final String type; // cash_in | cash_out | return
   static const String typeCashIn = 'cash_in';
   static const String typeCashOut = 'cash_out';
@@ -108,8 +104,6 @@ class TransactionModel {
     required this.shopId,
     required this.shopName,
     required this.routeId,
-    this.customerId,
-    this.customerName,
     required this.type,
     this.saleType,
     required this.amount,
@@ -142,13 +136,13 @@ class TransactionModel {
 
   factory TransactionModel.fromJson(Map<String, dynamic> json, String docId) {
     final rawItems = json['items'] as List<dynamic>?;
+    final shopId = (json['shop_id'] as String?)?.trim() ?? '';
+    final shopName = (json['shop_name'] as String?)?.trim() ?? '';
     return TransactionModel(
       id: docId,
-      shopId: json['shop_id'] as String? ?? '',
-      shopName: json['shop_name'] as String? ?? '',
+      shopId: shopId,
+      shopName: shopName,
       routeId: json['route_id'] as String? ?? '',
-      customerId: json['customer_id'] as String?,
-      customerName: json['customer_name'] as String?,
       type: json['type'] as String? ?? 'cash_out',
       saleType: json['sale_type'] as String?,
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
@@ -165,20 +159,20 @@ class TransactionModel {
       deleted: json['deleted'] as bool? ?? false,
       deletedAt: json['deleted_at'] as Timestamp?,
       deletedBy: json['deleted_by'] as String?,
-        editRequestPending: json['edit_request_pending'] as bool? ?? false,
-        editRequestStatus: json['edit_request_status'] as String?,
-        editRequestRequestedBy: json['edit_request_requested_by'] as String?,
-        editRequestRequestedAt: json['edit_request_requested_at'] as Timestamp?,
-        editRequestNewAmount: (json['edit_request_new_amount'] as num?)
+      editRequestPending: json['edit_request_pending'] as bool? ?? false,
+      editRequestStatus: json['edit_request_status'] as String?,
+      editRequestRequestedBy: json['edit_request_requested_by'] as String?,
+      editRequestRequestedAt: json['edit_request_requested_at'] as Timestamp?,
+      editRequestNewAmount: (json['edit_request_new_amount'] as num?)
           ?.toDouble(),
-        editRequestNewType: json['edit_request_new_type'] as String?,
-        editRequestNewDescription:
+      editRequestNewType: json['edit_request_new_type'] as String?,
+      editRequestNewDescription:
           json['edit_request_new_description'] as String?,
-        editRequestNewSaleType: json['edit_request_new_sale_type'] as String?,
-        editRequestNewCreatedAt:
+      editRequestNewSaleType: json['edit_request_new_sale_type'] as String?,
+      editRequestNewCreatedAt:
           json['edit_request_new_created_at'] as Timestamp?,
-        editRequestReviewedBy: json['edit_request_reviewed_by'] as String?,
-        editRequestReviewedAt: json['edit_request_reviewed_at'] as Timestamp?,
+      editRequestReviewedBy: json['edit_request_reviewed_by'] as String?,
+      editRequestReviewedAt: json['edit_request_reviewed_at'] as Timestamp?,
     );
   }
 
@@ -186,8 +180,6 @@ class TransactionModel {
     'shop_id': shopId,
     'shop_name': shopName,
     'route_id': routeId,
-    'customer_id': customerId,
-    'customer_name': customerName,
     'type': type,
     'sale_type': saleType,
     'amount': amount,

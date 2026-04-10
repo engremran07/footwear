@@ -11,21 +11,20 @@ void main() {
   InvoiceModel base({
     String status = InvoiceModel.statusIssued,
     Map<String, int> deductions = const {},
-  }) =>
-      InvoiceModel(
-        id: 'inv-ext-1',
-        invoiceNumber: 'INV-2026-0099',
-        type: InvoiceModel.typeSale,
-        customerId: 'c1',
-        customerName: 'Test Customer',
-        subtotal: 1000.0,
-        total: 1000.0,
-        status: status,
-        sellerInventoryDeductions: deductions,
-        createdBy: 'u1',
-        createdAt: ts,
-        updatedAt: ts,
-      );
+  }) => InvoiceModel(
+    id: 'inv-ext-1',
+    invoiceNumber: 'INV-2026-0099',
+    type: InvoiceModel.typeSale,
+    shopId: 'c1',
+    shopName: 'Test Customer',
+    subtotal: 1000.0,
+    total: 1000.0,
+    status: status,
+    sellerInventoryDeductions: deductions,
+    createdBy: 'u1',
+    createdAt: ts,
+    updatedAt: ts,
+  );
 
   group('sellerInventoryDeductions — round-trip (TEST-023)', () {
     test('non-empty deductions survive fromJson/toJson round-trip', () {
@@ -40,21 +39,26 @@ void main() {
     });
   });
 
-  group('sellerInventoryDeductions — empty map excluded from toJson (TEST-024)',
-      () {
-    test('empty deductions map is not written to toJson output', () {
-      final model = base(deductions: const {});
-      final json = model.toJson();
-      expect(json.containsKey('seller_inventory_deductions'), isFalse);
-    });
+  group(
+    'sellerInventoryDeductions — empty map excluded from toJson (TEST-024)',
+    () {
+      test('empty deductions map is not written to toJson output', () {
+        final model = base(deductions: const {});
+        final json = model.toJson();
+        expect(json.containsKey('seller_inventory_deductions'), isFalse);
+      });
 
-    test('non-empty deductions map IS written to toJson output', () {
-      final model = base(deductions: {'doc-A': 3});
-      final json = model.toJson();
-      expect(json.containsKey('seller_inventory_deductions'), isTrue);
-      expect((json['seller_inventory_deductions'] as Map)['doc-A'], equals(3));
-    });
-  });
+      test('non-empty deductions map IS written to toJson output', () {
+        final model = base(deductions: {'doc-A': 3});
+        final json = model.toJson();
+        expect(json.containsKey('seller_inventory_deductions'), isTrue);
+        expect(
+          (json['seller_inventory_deductions'] as Map)['doc-A'],
+          equals(3),
+        );
+      });
+    },
+  );
 
   group('partial status flags — mutual exclusion (TEST-025)', () {
     test('partial status → isPartial=true, all others false', () {
@@ -106,8 +110,8 @@ void main() {
         id: 'r1',
         invoiceNumber: 'INV-2026-0100',
         type: InvoiceModel.typeReturn,
-        customerId: 'c1',
-        customerName: 'Test',
+        shopId: 'c1',
+        shopName: 'Test',
         subtotal: 500,
         total: 500,
         status: InvoiceModel.statusIssued,

@@ -24,9 +24,8 @@ import 'auth_provider.dart';
 //       └ atomic: marks invoice void, soft-deletes linked txs, reverses balance
 //
 // PARAMETER NOTE:
-//   createSaleInvoice / createReturnInvoice each accept both customerId AND
-//   shopId. In this app they MUST be the same value (shopId == customerId).
-//   Both fields are written for backward index compatibility only.
+//   createSaleInvoice / createReturnInvoice use shopId/shopName as sole
+//   identifiers. No customer_id field is written to any document.
 //
 // INVOICE STATE MACHINE:
 //   draft → issued → partial → paid
@@ -37,24 +36,6 @@ enum VoidRefundMode { cashRefund, creditBalance }
 
 // DEPRECATED: Use invoicesByShopProvider instead.
 // Kept for backward compatibility with legacy invoice docs that only have
-// customer_id set (written before the shops-customer unification).
-// In the unified model, customerId == shopId — both refer to the same entity.
-// New code must use invoicesByShopProvider.
-final invoicesByCustomerProvider = StreamProvider.autoDispose
-    .family<List<InvoiceModel>, String>((ref, customerId) {
-      return FirebaseFirestore.instance
-          .collection(Collections.invoices)
-          .where('customer_id', isEqualTo: customerId)
-          .orderBy('created_at', descending: true)
-          .limit(100)
-          .snapshots()
-          .map(
-            (snap) => snap.docs
-                .map((d) => InvoiceModel.fromJson(d.data(), d.id))
-                .toList(),
-          );
-    });
-
 final invoicesByShopProvider = StreamProvider.autoDispose
     .family<List<InvoiceModel>, String>((ref, shopId) {
       return FirebaseFirestore.instance
@@ -198,10 +179,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
   /// - > 0 and < total â†’ partial payment (status: partial)
   /// - >= total â†’ full payment (status: paid); excess reduces old balance
   Future<String> createSaleInvoice({
-    required String customerId,
-    required String customerName,
-    String shopId = '',
-    String shopName = '',
+    required String shopId,
+    required String shopName,
     required String routeId,
     String sellerId = '',
     String sellerName = '',
@@ -220,8 +199,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (normalizedCreatedBy.isEmpty) {
       throw ArgumentError('createdBy must not be empty');
     }
-    if (customerId.trim().isEmpty) {
-      throw ArgumentError('customerId must not be empty');
+    if (shopId.trim().isEmpty) {
+      throw ArgumentError('shopId must not be empty');
     }
     if (discount < 0 || discount > subtotal) {
       throw ArgumentError('discount must be between 0 and subtotal');
@@ -318,8 +297,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'invoice_number': invoiceNumber,
       'idempotency_key': resolvedKey,
       'type': InvoiceModel.typeSale,
-      'customer_id': customerId,
-      'customer_name': customerName,
       'shop_id': shopId,
       'shop_name': shopName,
       'route_id': routeId,
@@ -347,8 +324,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'shop_id': shopId,
       'shop_name': shopName,
       'route_id': routeId,
-      'customer_id': customerId,
-      'customer_name': customerName,
       'type': 'cash_out',
       'sale_type': saleType,
       'amount': total,
@@ -368,8 +343,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'shop_id': shopId,
         'shop_name': shopName,
         'route_id': routeId,
-        'customer_id': customerId,
-        'customer_name': customerName,
         'type': 'cash_in',
         'sale_type': 'cash',
         'amount': amountReceived,
@@ -386,9 +359,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     // Customer balance: net change = sale total âˆ’ amount received
     // e.g. sale 5000, received 2000 â†’ balance +3000
     // e.g. sale 5000, received 8000 â†’ balance âˆ’3000 (pays off old debt)
-    if (customerId.isNotEmpty) {
+    if (shopId.isNotEmpty) {
       final balanceDelta = total - amountReceived;
-      batch.update(db.collection(Collections.customers).doc(customerId), {
+      batch.update(db.collection(Collections.customers).doc(shopId), {
         'balance': FieldValue.increment(balanceDelta),
         'updated_at': now,
       });
@@ -411,10 +384,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
 
   /// Creates a return/credit note invoice that reverses balance and restores stock.
   Future<String> createReturnInvoice({
-    required String customerId,
-    required String customerName,
-    String shopId = '',
-    String shopName = '',
+    required String shopId,
+    required String shopName,
     required String routeId,
     String sellerId = '',
     String sellerName = '',
@@ -431,8 +402,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (normalizedCreatedBy.isEmpty) {
       throw ArgumentError('createdBy must not be empty');
     }
-    if (customerId.trim().isEmpty) {
-      throw ArgumentError('customerId must not be empty');
+    if (shopId.trim().isEmpty) {
+      throw ArgumentError('shopId must not be empty');
     }
 
     final db = FirebaseFirestore.instance;
@@ -487,8 +458,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'invoice_number': invoiceNumber,
       'idempotency_key': resolvedKey,
       'type': InvoiceModel.typeCreditNote,
-      'customer_id': customerId,
-      'customer_name': customerName,
       'shop_id': shopId,
       'shop_name': shopName,
       'route_id': routeId,
@@ -515,8 +484,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'shop_id': shopId,
       'shop_name': shopName,
       'route_id': routeId,
-      'customer_id': customerId,
-      'customer_name': customerName,
       'type': 'return',
       'sale_type': 'return',
       'amount': total,
@@ -529,9 +496,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'deleted': false, // DI-01: required for isNotEqualTo filter
     });
 
-    // Return reduces customer balance
-    if (customerId.isNotEmpty) {
-      batch.update(db.collection(Collections.customers).doc(customerId), {
+    // Return reduces shop balance
+    if (shopId.isNotEmpty) {
+      batch.update(db.collection(Collections.customers).doc(shopId), {
         'balance': FieldValue.increment(-total),
         'updated_at': now,
       });
@@ -559,7 +526,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
   /// Voids an invoice â€” admin only, reverses balance impact.
   Future<void> voidInvoice({
     required String invoiceId,
-    required String customerId,
     required double total,
     required String type,
     required String createdBy,
@@ -613,7 +579,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final routeId = data['route_id'] as String? ?? '';
     final shopId = data['shop_id'] as String? ?? '';
     final shopName = data['shop_name'] as String? ?? '';
-    final customerName = data['customer_name'] as String? ?? '';
     final rawItems = (data['items'] as List<dynamic>?) ?? const [];
     final linkedTransactions = await db
         .collection(Collections.transactions)
@@ -631,8 +596,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       required double amount,
       required String description,
       List<Map<String, dynamic>> items = const <Map<String, dynamic>>[],
-      String txCustomerId = '',
-      String txCustomerName = '',
       String txShopId = '',
       String txShopName = '',
     }) {
@@ -640,8 +603,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'shop_id': txShopId,
         'shop_name': txShopName,
         'route_id': routeId,
-        'customer_id': txCustomerId,
-        'customer_name': txCustomerName,
         'type': txType,
         'sale_type': type == InvoiceModel.typeSale ? 'credit' : 'return',
         'amount': amount,
@@ -666,7 +627,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       });
     }
 
-    if (customerId.isNotEmpty) {
+    if (shopId.isNotEmpty) {
       final reversalDelta = switch (type) {
         InvoiceModel.typeSale =>
           refundMode == VoidRefundMode.creditBalance
@@ -675,7 +636,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         _ => docTotal,
       };
 
-      batch.update(db.collection(Collections.customers).doc(customerId), {
+      batch.update(db.collection(Collections.customers).doc(shopId), {
         'balance': FieldValue.increment(reversalDelta),
         'updated_at': now,
       });
@@ -711,8 +672,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
               description: refundMode == VoidRefundMode.creditBalance
                   ? 'Credit for voided invoice $invoiceNumber'
                   : 'Outstanding reversal for voided invoice $invoiceNumber',
-              txCustomerId: customerId,
-              txCustomerName: customerName,
               txShopId: shopId,
               txShopName: shopName,
             ),
@@ -728,8 +687,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
               txType: 'cash_out',
               amount: amountReceived,
               description: 'Cash refund for voided invoice $invoiceNumber',
-              txCustomerId: customerId,
-              txCustomerName: customerName,
               txShopId: shopId,
               txShopName: shopName,
             ),
@@ -749,8 +706,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             amount: docTotal,
             description: 'Reversed credit note $invoiceNumber',
             items: rawItems.whereType<Map<String, dynamic>>().toList(),
-            txCustomerId: customerId,
-            txCustomerName: customerName,
             txShopId: shopId,
             txShopName: shopName,
           ),
@@ -768,7 +723,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
   /// the customer ledger would be permanently wrong.
   Future<void> markAsPaid({
     required String invoiceId,
-    required String customerId,
     required String routeId,
     required String createdBy,
   }) async {
@@ -804,7 +758,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final invoiceNumber = invData['invoice_number'] as String? ?? '';
     final shopId = invData['shop_id'] as String? ?? '';
     final shopName = invData['shop_name'] as String? ?? '';
-    final customerName = invData['customer_name'] as String? ?? '';
     final now = Timestamp.now();
     final batch = db.batch();
 
@@ -825,8 +778,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'shop_id': shopId,
         'shop_name': shopName,
         'route_id': routeId,
-        'customer_id': customerId,
-        'customer_name': customerName,
         'type': 'cash_in',
         'sale_type': 'cash',
         'amount': outstanding,
@@ -840,8 +791,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       });
 
       // Decrement customer balance
-      if (customerId.isNotEmpty) {
-        batch.update(db.collection(Collections.customers).doc(customerId), {
+      if (shopId.isNotEmpty) {
+        batch.update(db.collection(Collections.customers).doc(shopId), {
           'balance': FieldValue.increment(-outstanding),
           'updated_at': now,
         });
