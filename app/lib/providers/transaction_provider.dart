@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
@@ -31,20 +32,72 @@ import 'auth_provider.dart';
 
 final shopTransactionsProvider = StreamProvider.autoDispose
     .family<List<TransactionModel>, String>((ref, shopId) {
-      // Remove server-side deleted==false: old docs predate the field.
-      // Filter client-side with !=true to include legacy docs.
-      return FirebaseFirestore.instance
+      final normalizedShopId = shopId.trim();
+      if (normalizedShopId.isEmpty) {
+        return Stream.value(const <TransactionModel>[]);
+      }
+
+      // Merge both query paths because legacy docs may have only customer_id,
+      // while newer docs may have shop_id (and often both).
+      final controller = StreamController<List<TransactionModel>>();
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> shopDocs = const [];
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> customerDocs = const [];
+
+      void emitMerged() {
+        final mergedById = <String, TransactionModel>{};
+        for (final d in [...shopDocs, ...customerDocs]) {
+          final data = d.data();
+          final dataShopId = (data['shop_id'] as String?)?.trim() ?? '';
+          final dataCustomerId = (data['customer_id'] as String?)?.trim() ?? '';
+          if (dataShopId != normalizedShopId &&
+              dataCustomerId != normalizedShopId) {
+            continue;
+          }
+          mergedById[d.id] = TransactionModel.fromJson(data, d.id);
+        }
+
+        final list = mergedById.values.toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        if (!controller.isClosed) {
+          controller.add(list);
+        }
+      }
+
+      final subByShop = FirebaseFirestore.instance
           .collection(Collections.transactions)
-          .where('shop_id', isEqualTo: shopId)
-          .orderBy('created_at', descending: true)
-          .limit(200)
+          .where('shop_id', isEqualTo: normalizedShopId)
           .snapshots()
-          .map(
-            (snap) => snap.docs
-                .where((d) => d.data()['deleted'] != true)
-                .map((d) => TransactionModel.fromJson(d.data(), d.id))
-                .toList(),
+          .listen(
+            (snap) {
+              shopDocs = snap.docs;
+              emitMerged();
+            },
+            onError: (Object error, StackTrace stackTrace) {
+              if (!controller.isClosed) controller.addError(error, stackTrace);
+            },
           );
+
+      final subByCustomer = FirebaseFirestore.instance
+          .collection(Collections.transactions)
+          .where('customer_id', isEqualTo: normalizedShopId)
+          .snapshots()
+          .listen(
+            (snap) {
+              customerDocs = snap.docs;
+              emitMerged();
+            },
+            onError: (Object error, StackTrace stackTrace) {
+              if (!controller.isClosed) controller.addError(error, stackTrace);
+            },
+          );
+
+      ref.onDispose(() async {
+        await subByShop.cancel();
+        await subByCustomer.cancel();
+        await controller.close();
+      });
+
+      return controller.stream;
     });
 
 final allTransactionsProvider =
@@ -82,27 +135,78 @@ final sellerTransactionsProvider = StreamProvider.autoDispose
           );
     });
 
-        final shopTransactionsExportProvider = FutureProvider.autoDispose
-          .family<List<TransactionModel>, String>((ref, shopId) async {
-            final normalizedShopId = shopId.trim();
-            if (normalizedShopId.isEmpty) return const <TransactionModel>[];
+final shopTransactionsExportProvider = FutureProvider.autoDispose
+    .family<List<TransactionModel>, String>((ref, shopId) async {
+      final normalizedShopId = shopId.trim();
+      if (normalizedShopId.isEmpty) return const <TransactionModel>[];
 
-            final snap = await FirebaseFirestore.instance
-              .collection(Collections.transactions)
-              .where('shop_id', isEqualTo: normalizedShopId)
-              .orderBy('created_at')
-              .limit(500)
-              .get();
+      final byShop = await FirebaseFirestore.instance
+          .collection(Collections.transactions)
+          .where('shop_id', isEqualTo: normalizedShopId)
+          .get();
 
-            return snap.docs
-              .where((d) => d.data()['deleted'] != true)
-              .map((d) => TransactionModel.fromJson(d.data(), d.id))
-              .toList();
-          });
+      final byCustomer = await FirebaseFirestore.instance
+          .collection(Collections.transactions)
+          .where('customer_id', isEqualTo: normalizedShopId)
+          .get();
+
+      final mergedById = <String, TransactionModel>{};
+      for (final d in [...byShop.docs, ...byCustomer.docs]) {
+        final data = d.data();
+        if (data['deleted'] == true) continue;
+        final dataShopId = (data['shop_id'] as String?)?.trim() ?? '';
+        final dataCustomerId = (data['customer_id'] as String?)?.trim() ?? '';
+        if (dataShopId != normalizedShopId &&
+            dataCustomerId != normalizedShopId) {
+          continue;
+        }
+        mergedById[d.id] = TransactionModel.fromJson(data, d.id);
+      }
+
+      return mergedById.values.toList()
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    });
 
 class TransactionNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
+
+  void _stageTransactionUpdate({
+    required WriteBatch batch,
+    required FirebaseFirestore db,
+    required String txId,
+    required String? customerId,
+    required double oldAmount,
+    required String oldType,
+    required double newAmount,
+    required String newType,
+    String? description,
+    String? saleType,
+    Timestamp? transactionDate,
+    Map<String, dynamic> extraTxFields = const <String, dynamic>{},
+  }) {
+    batch.update(db.collection(Collections.transactions).doc(txId), {
+      'amount': newAmount,
+      'type': newType,
+      if (description != null) 'description': description,
+      if (saleType != null) 'sale_type': saleType,
+      if (transactionDate != null) 'created_at': transactionDate,
+      ...extraTxFields,
+      'updated_at': Timestamp.now(),
+    });
+
+    if (customerId != null && customerId.isNotEmpty) {
+      final oldDelta = oldType == 'cash_out' ? oldAmount : -oldAmount;
+      final newDelta = newType == 'cash_out' ? newAmount : -newAmount;
+      final netChange = -oldDelta + newDelta;
+      if (netChange != 0) {
+        batch.update(db.collection(Collections.customers).doc(customerId), {
+          'balance': FieldValue.increment(netChange),
+          'updated_at': Timestamp.now(),
+        });
+      }
+    }
+  }
 
   /// Creates a transaction and updates shop balance atomically.
   /// For cash_out with items, also deducts stock from variants.
@@ -448,29 +552,180 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
     final db = FirebaseFirestore.instance;
     final batch = db.batch();
+    _stageTransactionUpdate(
+      batch: batch,
+      db: db,
+      txId: txId,
+      customerId: customerId,
+      oldAmount: oldAmount,
+      oldType: oldType,
+      newAmount: newAmount,
+      newType: newType,
+      description: description,
+      saleType: saleType,
+      transactionDate: transactionDate,
+    );
+    await batch.commit();
+  }
 
-    batch.update(db.collection(Collections.transactions).doc(txId), {
-      'amount': newAmount,
-      'type': newType,
-      if (description != null) 'description': description,
-      if (saleType != null) 'sale_type': saleType,
-      if (transactionDate != null) 'created_at': transactionDate,
-      'updated_at': Timestamp.now(),
-    });
-
-    if (customerId != null && customerId.isNotEmpty) {
-      // Reverse old delta, then apply new delta
-      final oldDelta = oldType == 'cash_out' ? oldAmount : -oldAmount;
-      final newDelta = newType == 'cash_out' ? newAmount : -newAmount;
-      final netChange = -oldDelta + newDelta;
-      if (netChange != 0) {
-        batch.update(db.collection(Collections.customers).doc(customerId), {
-          'balance': FieldValue.increment(netChange),
-          'updated_at': Timestamp.now(),
-        });
-      }
+  /// Seller edits cash_in/cash_out transactions.
+  /// Returns true when applied immediately, false when submitted for approval.
+  Future<bool> sellerEditTransaction({
+    required String txId,
+    required String sellerId,
+    required double newAmount,
+    required String newType,
+    String? description,
+    String? saleType,
+    Timestamp? transactionDate,
+  }) async {
+    if (txId.trim().isEmpty) throw ArgumentError('txId must not be empty');
+    if (sellerId.trim().isEmpty) {
+      throw ArgumentError('sellerId must not be empty');
+    }
+    if (newAmount <= 0) {
+      throw ArgumentError('newAmount must be greater than 0');
+    }
+    if (newType != 'cash_in' && newType != 'cash_out') {
+      throw ArgumentError('Seller can edit only cash_in/cash_out transactions');
     }
 
+    final db = FirebaseFirestore.instance;
+    final txRef = db.collection(Collections.transactions).doc(txId);
+    final txDoc = await txRef.get();
+    if (!txDoc.exists) throw StateError('Transaction not found');
+    final data = txDoc.data()!;
+
+    final createdBy = (data['created_by'] as String?)?.trim() ?? '';
+    if (createdBy != sellerId.trim()) {
+      throw StateError('Seller can edit only own transactions');
+    }
+
+    final oldType = (data['type'] as String?) ?? 'cash_out';
+    if (oldType != 'cash_in' && oldType != 'cash_out') {
+      throw StateError('Only cash_in/cash_out transactions can be edited');
+    }
+
+    final settingsDoc = await db
+        .collection(Collections.settings)
+        .doc('global')
+        .get();
+    final requireApproval =
+        (settingsDoc.data()?['require_admin_approval_for_seller_transaction_edits']
+                as bool?) ??
+            false;
+
+    if (requireApproval) {
+      await txRef.update({
+        'edit_request_pending': true,
+        'edit_request_status': 'pending',
+        'edit_request_requested_by': sellerId.trim(),
+        'edit_request_requested_at': Timestamp.now(),
+        'edit_request_new_amount': newAmount,
+        'edit_request_new_type': newType,
+        'edit_request_new_description': description,
+        'edit_request_new_sale_type': saleType,
+        'edit_request_new_created_at': transactionDate,
+        'updated_at': Timestamp.now(),
+      });
+      return false;
+    }
+
+    final batch = db.batch();
+    _stageTransactionUpdate(
+      batch: batch,
+      db: db,
+      txId: txId,
+      customerId: (data['customer_id'] as String?)?.trim().isNotEmpty == true
+          ? (data['customer_id'] as String)
+          : ((data['shop_id'] as String?)?.trim()),
+      oldAmount: (data['amount'] as num?)?.toDouble() ?? 0,
+      oldType: oldType,
+      newAmount: newAmount,
+      newType: newType,
+      description: description,
+      saleType: saleType,
+      transactionDate: transactionDate,
+      extraTxFields: {
+        'edit_request_pending': false,
+        'edit_request_status': 'approved',
+        'edit_request_reviewed_by': sellerId.trim(),
+        'edit_request_reviewed_at': Timestamp.now(),
+        'edit_request_new_amount': FieldValue.delete(),
+        'edit_request_new_type': FieldValue.delete(),
+        'edit_request_new_description': FieldValue.delete(),
+        'edit_request_new_sale_type': FieldValue.delete(),
+        'edit_request_new_created_at': FieldValue.delete(),
+      },
+    );
+    await batch.commit();
+    return true;
+  }
+
+  /// Admin review for seller-submitted transaction edit requests.
+  Future<void> reviewSellerEditRequest({
+    required String txId,
+    required bool approved,
+    required String reviewerId,
+  }) async {
+    if (txId.trim().isEmpty) throw ArgumentError('txId must not be empty');
+    if (reviewerId.trim().isEmpty) {
+      throw ArgumentError('reviewerId must not be empty');
+    }
+
+    final db = FirebaseFirestore.instance;
+    final txRef = db.collection(Collections.transactions).doc(txId);
+    final txDoc = await txRef.get();
+    if (!txDoc.exists) throw StateError('Transaction not found');
+    final data = txDoc.data()!;
+
+    final pending = data['edit_request_pending'] as bool? ?? false;
+    if (!pending) return;
+
+    if (!approved) {
+      await txRef.update({
+        'edit_request_pending': false,
+        'edit_request_status': 'rejected',
+        'edit_request_reviewed_by': reviewerId.trim(),
+        'edit_request_reviewed_at': Timestamp.now(),
+        'updated_at': Timestamp.now(),
+      });
+      return;
+    }
+
+    final oldType = (data['type'] as String?) ?? 'cash_out';
+    final newType = (data['edit_request_new_type'] as String?) ?? oldType;
+    final oldAmount = (data['amount'] as num?)?.toDouble() ?? 0;
+    final newAmount =
+        (data['edit_request_new_amount'] as num?)?.toDouble() ?? oldAmount;
+
+    final batch = db.batch();
+    _stageTransactionUpdate(
+      batch: batch,
+      db: db,
+      txId: txId,
+      customerId: (data['customer_id'] as String?)?.trim().isNotEmpty == true
+          ? (data['customer_id'] as String)
+          : ((data['shop_id'] as String?)?.trim()),
+      oldAmount: oldAmount,
+      oldType: oldType,
+      newAmount: newAmount,
+      newType: newType,
+      description: data['edit_request_new_description'] as String?,
+      saleType: data['edit_request_new_sale_type'] as String?,
+      transactionDate: data['edit_request_new_created_at'] as Timestamp?,
+      extraTxFields: {
+        'edit_request_pending': false,
+        'edit_request_status': 'approved',
+        'edit_request_reviewed_by': reviewerId.trim(),
+        'edit_request_reviewed_at': Timestamp.now(),
+        'edit_request_new_amount': FieldValue.delete(),
+        'edit_request_new_type': FieldValue.delete(),
+        'edit_request_new_description': FieldValue.delete(),
+        'edit_request_new_sale_type': FieldValue.delete(),
+        'edit_request_new_created_at': FieldValue.delete(),
+      },
+    );
     await batch.commit();
   }
 }

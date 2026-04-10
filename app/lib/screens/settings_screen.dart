@@ -28,6 +28,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _companyC = TextEditingController();
   final _currencyC = TextEditingController();
   final _ppcC = TextEditingController();
+  bool _requireAdminApprovalForSellerTransactionEdits = false;
   bool _settingsLoaded = false;
   bool _isDirty = false;
 
@@ -56,6 +57,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         text: ppcStr,
         selection: TextSelection.collapsed(offset: ppcStr.length),
       );
+      _requireAdminApprovalForSellerTransactionEdits =
+          s.requireAdminApprovalForSellerTransactionEdits;
       _settingsLoaded = true;
     }
   }
@@ -66,11 +69,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         'company_name': _companyC.text.trim(),
         'currency': _currencyC.text.trim(),
         'pairs_per_carton': int.tryParse(_ppcC.text.trim()) ?? 12,
+        'require_admin_approval_for_seller_transaction_edits':
+            _requireAdminApprovalForSellerTransactionEdits,
       });
       if (mounted) {
         setState(() => _isDirty = false);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       }
     } catch (e) {
       if (mounted) {
@@ -119,16 +125,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(tr('business_settings', ref),
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      tr('business_settings', ref),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _companyC,
-                      decoration:
-                          InputDecoration(labelText: tr('company_name', ref)),
+                      decoration: InputDecoration(
+                        labelText: tr('company_name', ref),
+                      ),
                       onChanged: (_) {
                         if (!_isDirty) setState(() => _isDirty = true);
                       },
@@ -136,8 +144,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _currencyC,
-                      decoration:
-                          InputDecoration(labelText: tr('currency', ref)),
+                      decoration: InputDecoration(
+                        labelText: tr('currency', ref),
+                      ),
                       onChanged: (_) {
                         if (!_isDirty) setState(() => _isDirty = true);
                       },
@@ -146,11 +155,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     TextField(
                       controller: _ppcC,
                       decoration: InputDecoration(
-                          labelText: tr('pairs_per_carton', ref)),
+                        labelText: tr('pairs_per_carton', ref),
+                      ),
                       keyboardType: TextInputType.number,
                       onChanged: (_) {
                         if (!_isDirty) setState(() => _isDirty = true);
                       },
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: _requireAdminApprovalForSellerTransactionEdits,
+                      onChanged: (value) {
+                        setState(() {
+                          _requireAdminApprovalForSellerTransactionEdits =
+                              value;
+                          _isDirty = true;
+                        });
+                      },
+                      title: const Text(
+                        'Require admin approval for seller transaction edits',
+                      ),
+                      subtitle: const Text(
+                        'ON: seller edits are pending until admin approves. OFF: seller edits are auto-approved.',
+                      ),
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -180,11 +208,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     children: [
                       Row(
                         children: [
-                          Text(tr('users', ref),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(
+                            tr('users', ref),
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
                           const Spacer(),
                           TextButton.icon(
                             onPressed: () => _showCreateUserDialog(),
@@ -210,7 +238,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               final isSelf = u.id == currentUser?.id;
                               return Padding(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 4),
+                                  horizontal: 12,
+                                  vertical: 4,
+                                ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -221,9 +251,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                           radius: 16,
                                           backgroundColor: u.isAdmin
                                               ? AppBrand.adminRoleColor
-                                                  .withAlpha(30)
+                                                    .withAlpha(30)
                                               : AppBrand.sellerRoleColor
-                                                  .withAlpha(30),
+                                                    .withAlpha(30),
                                           child: Icon(
                                             u.isAdmin
                                                 ? Icons.admin_panel_settings
@@ -245,16 +275,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
-                                                    fontWeight:
-                                                        FontWeight.w500),
+                                                  fontWeight: FontWeight.w500,
+                                                ),
                                               ),
                                               Text(
                                                 u.email,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .bodySmall,
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.bodySmall,
                                               ),
                                             ],
                                           ),
@@ -267,14 +297,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       children: [
                                         Container(
                                           padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 1),
+                                            horizontal: 6,
+                                            vertical: 1,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: (u.isAdmin
-                                                    ? AppBrand.adminRoleColor
-                                                    : AppBrand.sellerRoleColor)
-                                                .withAlpha(25),
-                                            borderRadius:
-                                                BorderRadius.circular(4),
+                                            color:
+                                                (u.isAdmin
+                                                        ? AppBrand
+                                                              .adminRoleColor
+                                                        : AppBrand
+                                                              .sellerRoleColor)
+                                                    .withAlpha(25),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
                                           ),
                                           child: Text(
                                             u.role.name,
@@ -295,8 +331,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                               '• ${u.assignedRouteName}',
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style:
-                                                  const TextStyle(fontSize: 11),
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -314,9 +351,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                             onTap: () => _confirmDeleteUser(u),
                                             child: const Padding(
                                               padding: EdgeInsets.all(4),
-                                              child: Icon(Icons.delete,
-                                                  size: 16,
-                                                  color: AppBrand.errorColor),
+                                              child: Icon(
+                                                Icons.delete,
+                                                size: 16,
+                                                color: AppBrand.errorColor,
+                                              ),
                                             ),
                                           ),
                                         SizedBox(
@@ -328,10 +367,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                               onChanged: isSelf
                                                   ? null
                                                   : (v) => ref
-                                                      .read(
+                                                        .read(
                                                           userManagementNotifierProvider
-                                                              .notifier)
-                                                      .toggleActive(u.id, v),
+                                                              .notifier,
+                                                        )
+                                                        .toggleActive(u.id, v),
                                             ),
                                           ),
                                         ),
@@ -406,8 +446,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         builder: (ctx, setS) {
           final routes = ref.watch(routesProvider).valueOrNull ?? [];
           final availableRoutes = routes
-              .where((r) =>
-                  r.assignedSellerId == null || r.assignedSellerId!.isEmpty)
+              .where(
+                (r) =>
+                    r.assignedSellerId == null || r.assignedSellerId!.isEmpty,
+              )
               .toList();
           return AlertDialog(
             title: Text(tr('new_user', ref)),
@@ -438,9 +480,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     decoration: InputDecoration(labelText: tr('role', ref)),
                     items: [
                       DropdownMenuItem(
-                          value: 'admin', child: Text(tr('lbl_admin', ref))),
+                        value: 'admin',
+                        child: Text(tr('lbl_admin', ref)),
+                      ),
                       DropdownMenuItem(
-                          value: 'seller', child: Text(tr('lbl_seller', ref))),
+                        value: 'seller',
+                        child: Text(tr('lbl_seller', ref)),
+                      ),
                     ],
                     onChanged: (v) => setS(() {
                       role = v ?? 'seller';
@@ -458,10 +504,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         labelText: tr('assigned_route', ref),
                       ),
                       items: [
-                        ...availableRoutes.map((r) => DropdownMenuItem(
-                              value: r.id,
-                              child: Text(r.name),
-                            )),
+                        ...availableRoutes.map(
+                          (r) => DropdownMenuItem(
+                            value: r.id,
+                            child: Text(r.name),
+                          ),
+                        ),
                       ],
                       onChanged: (v) => setS(() {
                         selectedRouteId = v;
@@ -493,7 +541,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         SnackBar(
-                            content: Text(tr('msg_seller_needs_route', ref))),
+                          content: Text(tr('msg_seller_needs_route', ref)),
+                        ),
                       );
                     }
                     return;
@@ -514,8 +563,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     }
                   } catch (e) {
                     if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx)
-                          .showSnackBar(errorSnackBar('$e'));
+                      ScaffoldMessenger.of(
+                        ctx,
+                      ).showSnackBar(errorSnackBar('$e'));
                     }
                   }
                 },
@@ -543,11 +593,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         builder: (ctx, setS) {
           final routes = ref.watch(routesProvider).valueOrNull ?? [];
           final availableRoutes = routes
-              .where((r) =>
-                  r.id == selectedRouteId ||
-                  r.assignedSellerId == null ||
-                  r.assignedSellerId!.isEmpty ||
-                  r.assignedSellerId == user.id)
+              .where(
+                (r) =>
+                    r.id == selectedRouteId ||
+                    r.assignedSellerId == null ||
+                    r.assignedSellerId!.isEmpty ||
+                    r.assignedSellerId == user.id,
+              )
               .toList();
           return AlertDialog(
             title: Text(tr('edit_user', ref)),
@@ -581,16 +633,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               .sendPasswordResetForSeller(email: user.email);
                           if (ctx.mounted) {
                             ScaffoldMessenger.of(ctx).showSnackBar(
-                              successSnackBar(tr('msg_reset_email_sent', ref)
-                                  .replaceAll('%s', user.email)),
+                              successSnackBar(
+                                tr(
+                                  'msg_reset_email_sent',
+                                  ref,
+                                ).replaceAll('%s', user.email),
+                              ),
                             );
                           }
                         } catch (e) {
                           if (ctx.mounted) {
                             final key = AppErrorMapper.key(e);
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              errorSnackBar(tr(key, ref)),
-                            );
+                            ScaffoldMessenger.of(
+                              ctx,
+                            ).showSnackBar(errorSnackBar(tr(key, ref)));
                           }
                         }
                       },
@@ -611,10 +667,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       decoration: InputDecoration(labelText: tr('role', ref)),
                       items: [
                         DropdownMenuItem(
-                            value: 'admin', child: Text(tr('lbl_admin', ref))),
+                          value: 'admin',
+                          child: Text(tr('lbl_admin', ref)),
+                        ),
                         DropdownMenuItem(
-                            value: 'seller',
-                            child: Text(tr('lbl_seller', ref))),
+                          value: 'seller',
+                          child: Text(tr('lbl_seller', ref)),
+                        ),
                       ],
                       onChanged: (v) => setS(() {
                         role = v ?? 'seller';
@@ -632,10 +691,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         labelText: tr('assigned_route', ref),
                       ),
                       items: [
-                        ...availableRoutes.map((r) => DropdownMenuItem(
-                              value: r.id,
-                              child: Text(r.name),
-                            )),
+                        ...availableRoutes.map(
+                          (r) => DropdownMenuItem(
+                            value: r.id,
+                            child: Text(r.name),
+                          ),
+                        ),
                       ],
                       onChanged: (v) => setS(() {
                         selectedRouteId = v;
@@ -677,24 +738,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     return;
                   }
                   try {
-                    final notifier =
-                        ref.read(userManagementNotifierProvider.notifier);
-                    if (oldRouteId != null && oldRouteId != selectedRouteId) {
-                      await notifier.clearRouteAssignment(oldRouteId);
-                    }
+                    final notifier = ref.read(
+                      userManagementNotifierProvider.notifier,
+                    );
                     await notifier.updateUser(user.id, {
                       'display_name': nameC.text.trim(),
                       'role': isSelf ? 'admin' : role,
                       'assigned_route_id': selectedRouteId,
                       'assigned_route_name': selectedRouteName,
-                    });
+                    }, previousRouteId: oldRouteId);
                     if (ctx.mounted) Navigator.pop(ctx);
                   } catch (e) {
                     if (ctx.mounted) {
                       final key = AppErrorMapper.key(e);
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        errorSnackBar(tr(key, ref)),
-                      );
+                      ScaffoldMessenger.of(
+                        ctx,
+                      ).showSnackBar(errorSnackBar(tr(key, ref)));
                     }
                   }
                 },
@@ -715,8 +774,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final confirmed = await ConfirmDialog.show(
       context,
       title: tr('delete', ref),
-      message:
-          tr('confirm_delete_user', ref).replaceAll('%s', user.displayName),
+      message: tr(
+        'confirm_delete_user',
+        ref,
+      ).replaceAll('%s', user.displayName),
     );
     if (confirmed != true) return;
 
@@ -727,7 +788,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           successSnackBar(
-              tr('msg_user_deleted', ref).replaceAll('%s', user.displayName)),
+            tr('msg_user_deleted', ref).replaceAll('%s', user.displayName),
+          ),
         );
       }
     } catch (e) {
@@ -791,10 +853,12 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
     const maxRawBytes = 37 * 1024;
     if (bytes.lengthInBytes > maxRawBytes) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(warningSnackBar(
-          'Image is ${_fmtBytes(bytes.lengthInBytes)} — too large. '
-          'Use a simpler image or reduce dimensions to 256×256 px.',
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          warningSnackBar(
+            'Image is ${_fmtBytes(bytes.lengthInBytes)} — too large. '
+            'Use a simpler image or reduce dimensions to 256×256 px.',
+          ),
+        );
       }
       return;
     }
@@ -822,34 +886,37 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
       // S-07: Final base64 size cap — 50 KB max to keep Firestore reads cheap.
       if (encoded.length > 50 * 1024) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(warningSnackBar(
-            'Encoded logo is ${_fmtBytes(encoded.length)} — exceeds 50 KB limit.',
-          ));
+          ScaffoldMessenger.of(context).showSnackBar(
+            warningSnackBar(
+              'Encoded logo is ${_fmtBytes(encoded.length)} — exceeds 50 KB limit.',
+            ),
+          );
         }
         setState(() => _uploading = false);
         return;
       }
 
-      await ref
-          .read(settingsNotifierProvider.notifier)
-          .save({'logo_base64': encoded, 'logo_url': null});
+      await ref.read(settingsNotifierProvider.notifier).save({
+        'logo_base64': encoded,
+        'logo_url': null,
+      });
 
       if (mounted) {
         setState(() {
           _pendingBytes = null;
           _pendingSizeLabel = null;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          successSnackBar(tr('msg_logo_uploaded', ref)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(successSnackBar(tr('msg_logo_uploaded', ref)));
       }
     } catch (e) {
       if (mounted) {
         final detail = e is FirebaseException ? ' [${e.plugin}/${e.code}]' : '';
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context).showSnackBar(
-          errorSnackBar('${tr(key, ref)}$detail'),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar('${tr(key, ref)}$detail'));
       }
     } finally {
       if (mounted) {
@@ -872,9 +939,9 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
     try {
       await ref.read(settingsNotifierProvider.notifier).deleteLogo();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          successSnackBar(tr('msg_logo_removed', ref)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(successSnackBar(tr('msg_logo_removed', ref)));
       }
     } catch (e) {
       if (mounted) {
@@ -901,10 +968,9 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
           children: [
             Text(
               tr('settings_company_logo', ref),
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
@@ -925,10 +991,13 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
               ),
               const SizedBox(height: 4),
               Text(
-                tr('lbl_preview', ref)
-                    .replaceAll('%s', _pendingSizeLabel ?? ''),
+                tr(
+                  'lbl_preview',
+                  ref,
+                ).replaceAll('%s', _pendingSizeLabel ?? ''),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ] else if (savedLogoBytes != null) ...[
               ClipRRect(
@@ -947,7 +1016,8 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: Theme.of(context).colorScheme.outlineVariant),
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 child: Center(
                   child: Icon(
@@ -966,8 +1036,10 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
               const SizedBox(height: 6),
               Text(
                 _uploadProgress != null
-                    ? tr('settings_uploading_pct', ref)
-                        .replaceAll('%s', '${(_uploadProgress! * 100).round()}')
+                    ? tr(
+                        'settings_uploading_pct',
+                        ref,
+                      ).replaceAll('%s', '${(_uploadProgress! * 100).round()}')
                     : tr('settings_uploading', ref),
                 style: Theme.of(context).textTheme.labelSmall,
               ),
@@ -1004,9 +1076,11 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
                     ElevatedButton.icon(
                       onPressed: _pickImage,
                       icon: const Icon(Icons.upload, size: 18),
-                      label: Text(savedLogoBytes != null
-                          ? tr('settings_replace_logo', ref)
-                          : tr('settings_upload_logo', ref)),
+                      label: Text(
+                        savedLogoBytes != null
+                            ? tr('settings_replace_logo', ref)
+                            : tr('settings_upload_logo', ref),
+                      ),
                     ),
                     if (savedLogoBytes != null)
                       OutlinedButton.icon(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
@@ -15,6 +16,7 @@ import '../models/shop_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/invoice_provider.dart';
+import '../providers/network_provider.dart';
 import '../providers/seller_inventory_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/shop_provider.dart';
@@ -62,6 +64,8 @@ class _CreateSaleInvoiceScreenState
   final Map<String, int> _selectedExtraPairs = {};
   bool _submitting = false;
   bool _isDirty = false;
+  String? _pendingInvoiceIdempotencyKey;
+  String? _pendingInvoiceFingerprint;
 
   /// Builds invoice line items.
   /// [ppc] = pairs per dozen (always 12 from settings).
@@ -152,6 +156,22 @@ class _CreateSaleInvoiceScreenState
   double get _totalOutstanding => _previousBalance + _invoiceTotal;
 
   double get _newBalance => _totalOutstanding - _amountReceived;
+
+  String _currentInvoiceFingerprint(Map<String, int> deductions) {
+    final entries = deductions.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    final deductionSignature = entries
+        .map((e) => '${e.key}:${e.value}')
+        .join('|');
+    return [
+      _selectedShop?.id ?? '',
+      _saleAmount.toStringAsFixed(2),
+      _discountAmount.toStringAsFixed(2),
+      _amountReceived.toStringAsFixed(2),
+      AppSanitizer.text(_notesC.text, maxLength: 300),
+      deductionSignature,
+    ].join('::');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -722,6 +742,14 @@ class _CreateSaleInvoiceScreenState
   Future<void> _submit(BuildContext context) async {
     final user = ref.read(authUserProvider).valueOrNull;
     if (user == null) return;
+    final isOnline = ref.read(isOnlineProvider).valueOrNull ?? true;
+    if (!isOnline) {
+      HapticFeedback.vibrate();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(warningSnackBar(tr('warn_offline', ref)));
+      return;
+    }
     final ppc = ref.read(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
 
     if (_selectedShop == null) {
@@ -776,6 +804,12 @@ class _CreateSaleInvoiceScreenState
     final total = _invoiceTotal;
     final items = _buildInvoiceItems(inventoryList, saleAmount, ppc);
     final amountReceived = _amountReceived;
+    final invoiceFingerprint = _currentInvoiceFingerprint(deductions);
+    if (_pendingInvoiceFingerprint != invoiceFingerprint ||
+        _pendingInvoiceIdempotencyKey == null) {
+      _pendingInvoiceFingerprint = invoiceFingerprint;
+      _pendingInvoiceIdempotencyKey = const Uuid().v4();
+    }
 
     setState(() => _submitting = true);
     final messenger = ScaffoldMessenger.of(context);
@@ -804,11 +838,14 @@ class _CreateSaleInvoiceScreenState
                 : AppSanitizer.text(_notesC.text, maxLength: 300),
             createdBy: user.id,
             sellerInventoryDeductions: deductions,
+            idempotencyKey: _pendingInvoiceIdempotencyKey,
           );
 
       if (mounted) {
         HapticFeedback.mediumImpact();
         _isDirty = false;
+        _pendingInvoiceIdempotencyKey = null;
+        _pendingInvoiceFingerprint = null;
         messenger.showSnackBar(successSnackBar(tr('invoice_created', ref)));
         router.go('/invoices/$invoiceId');
       }

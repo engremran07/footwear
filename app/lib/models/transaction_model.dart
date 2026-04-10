@@ -91,6 +91,17 @@ class TransactionModel {
   final bool deleted;
   final Timestamp? deletedAt;
   final String? deletedBy;
+  final bool editRequestPending;
+  final String? editRequestStatus;
+  final String? editRequestRequestedBy;
+  final Timestamp? editRequestRequestedAt;
+  final double? editRequestNewAmount;
+  final String? editRequestNewType;
+  final String? editRequestNewDescription;
+  final String? editRequestNewSaleType;
+  final Timestamp? editRequestNewCreatedAt;
+  final String? editRequestReviewedBy;
+  final Timestamp? editRequestReviewedAt;
 
   const TransactionModel({
     required this.id,
@@ -111,6 +122,17 @@ class TransactionModel {
     this.deleted = false,
     this.deletedAt,
     this.deletedBy,
+    this.editRequestPending = false,
+    this.editRequestStatus,
+    this.editRequestRequestedBy,
+    this.editRequestRequestedAt,
+    this.editRequestNewAmount,
+    this.editRequestNewType,
+    this.editRequestNewDescription,
+    this.editRequestNewSaleType,
+    this.editRequestNewCreatedAt,
+    this.editRequestReviewedBy,
+    this.editRequestReviewedAt,
   });
 
   bool get isCashIn => type == 'cash_in';
@@ -143,6 +165,20 @@ class TransactionModel {
       deleted: json['deleted'] as bool? ?? false,
       deletedAt: json['deleted_at'] as Timestamp?,
       deletedBy: json['deleted_by'] as String?,
+        editRequestPending: json['edit_request_pending'] as bool? ?? false,
+        editRequestStatus: json['edit_request_status'] as String?,
+        editRequestRequestedBy: json['edit_request_requested_by'] as String?,
+        editRequestRequestedAt: json['edit_request_requested_at'] as Timestamp?,
+        editRequestNewAmount: (json['edit_request_new_amount'] as num?)
+          ?.toDouble(),
+        editRequestNewType: json['edit_request_new_type'] as String?,
+        editRequestNewDescription:
+          json['edit_request_new_description'] as String?,
+        editRequestNewSaleType: json['edit_request_new_sale_type'] as String?,
+        editRequestNewCreatedAt:
+          json['edit_request_new_created_at'] as Timestamp?,
+        editRequestReviewedBy: json['edit_request_reviewed_by'] as String?,
+        editRequestReviewedAt: json['edit_request_reviewed_at'] as Timestamp?,
     );
   }
 
@@ -164,5 +200,24 @@ class TransactionModel {
     'deleted': deleted,
     if (deletedAt != null) 'deleted_at': deletedAt,
     if (deletedBy != null) 'deleted_by': deletedBy,
+    'edit_request_pending': editRequestPending,
+    if (editRequestStatus != null) 'edit_request_status': editRequestStatus,
+    if (editRequestRequestedBy != null)
+      'edit_request_requested_by': editRequestRequestedBy,
+    if (editRequestRequestedAt != null)
+      'edit_request_requested_at': editRequestRequestedAt,
+    if (editRequestNewAmount != null)
+      'edit_request_new_amount': editRequestNewAmount,
+    if (editRequestNewType != null) 'edit_request_new_type': editRequestNewType,
+    if (editRequestNewDescription != null)
+      'edit_request_new_description': editRequestNewDescription,
+    if (editRequestNewSaleType != null)
+      'edit_request_new_sale_type': editRequestNewSaleType,
+    if (editRequestNewCreatedAt != null)
+      'edit_request_new_created_at': editRequestNewCreatedAt,
+    if (editRequestReviewedBy != null)
+      'edit_request_reviewed_by': editRequestReviewedBy,
+    if (editRequestReviewedAt != null)
+      'edit_request_reviewed_at': editRequestReviewedAt,
   };
 }

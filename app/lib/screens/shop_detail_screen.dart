@@ -59,9 +59,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     final user = ref.read(authUserProvider).valueOrNull;
     final isAdmin = user?.isAdmin == true;
 
-    // Sellers can only annotate (description) — admins can change all fields.
+    // Sellers can edit cash_in/cash_out; update may require admin approval
+    // depending on settings toggle.
     if (!isAdmin) {
-      _showSellerAnnotateDialog(tx);
+      _showSellerEditTransactionDialog(tx);
       return;
     }
 
@@ -221,73 +222,200 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     );
   }
 
-  /// Seller-only: annotate a transaction with a description correction.
-  /// Financial fields (amount, type, date) are immutable for sellers.
-  void _showSellerAnnotateDialog(TransactionModel tx) {
+  /// Seller edit flow for cash_in/cash_out transactions.
+  /// If admin approval is enabled, this submits a pending request.
+  void _showSellerEditTransactionDialog(TransactionModel tx) {
+    if (tx.type != 'cash_in' && tx.type != 'cash_out') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        warningSnackBar('Seller can edit only cash in/out transactions.'),
+      );
+      return;
+    }
+
+    final amountC = TextEditingController(text: tx.amount.toStringAsFixed(2));
     final descC = TextEditingController(text: tx.description ?? '');
+    String txType = tx.type;
+    String saleType = tx.saleType ?? 'cash';
+    DateTime selectedDate = tx.createdAt.toDate();
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          24,
-          16,
-          MediaQuery.of(ctx).viewInsets.bottom + 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(tr('edit', ref), style: Theme.of(ctx).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(
-              tr('description', ref),
-              style: Theme.of(ctx).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descC,
-              decoration: InputDecoration(
-                labelText: tr('description', ref),
-                prefixIcon: const Icon(Icons.notes),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            24,
+            16,
+            MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(tr('edit', ref), style: Theme.of(ctx).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('cash_in', ref)),
+                      selected: txType == 'cash_in',
+                      onSelected: (_) => setS(() => txType = 'cash_in'),
+                      selectedColor: AppTheme.clearBg(
+                        Theme.of(ctx).colorScheme,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('cash_out', ref)),
+                      selected: txType == 'cash_out',
+                      onSelected: (_) => setS(() => txType = 'cash_out'),
+                      selectedColor: AppTheme.debtBg(
+                        Theme.of(ctx).colorScheme,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              maxLines: 3,
-              autofocus: true,
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () async {
-                  try {
-                    final user = ref.read(authUserProvider).valueOrNull;
-                    await ref
-                        .read(transactionNotifierProvider.notifier)
-                        .updateTransactionNote(
-                          txId: tx.id,
-                          description: descC.text.trim().isEmpty
-                              ? null
-                              : descC.text.trim(),
-                          updatedBy: user?.id ?? '',
-                        );
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  } catch (e) {
-                    if (ctx.mounted) {
-                      final key = AppErrorMapper.key(e);
-                      ScaffoldMessenger.of(
-                        ctx,
-                      ).showSnackBar(errorSnackBar(tr(key, ref)));
-                    }
-                  }
+              const SizedBox(height: 12),
+              TextField(
+                controller: amountC,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: tr('amount', ref),
+                  prefixIcon: const Icon(Icons.currency_exchange),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descC,
+                decoration: InputDecoration(
+                  labelText: tr('description', ref),
+                  prefixIcon: const Icon(Icons.notes),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('sale_cash', ref)),
+                      selected: saleType == 'cash',
+                      onSelected: (_) => setS(() => saleType = 'cash'),
+                      selectedColor: AppTheme.clearBg(
+                        Theme.of(ctx).colorScheme,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('sale_credit', ref)),
+                      selected: saleType == 'credit',
+                      onSelected: (_) => setS(() => saleType = 'credit'),
+                      selectedColor: AppTheme.warningBg(
+                        Theme.of(ctx).colorScheme,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: ctx,
+                    initialDate: selectedDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) setS(() => selectedDate = picked);
                 },
-                child: Text(tr('save', ref)),
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: tr('date', ref),
+                    prefixIcon: const Icon(Icons.calendar_today),
+                  ),
+                  child: Text(
+                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                  ),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final newAmount = double.tryParse(amountC.text.trim());
+                    if (newAmount == null || newAmount <= 0) return;
+                    try {
+                      final user = ref.read(authUserProvider).valueOrNull;
+                      final appliedImmediately = await ref
+                          .read(transactionNotifierProvider.notifier)
+                          .sellerEditTransaction(
+                            txId: tx.id,
+                            sellerId: user?.id ?? '',
+                            newAmount: newAmount,
+                            newType: txType,
+                            description: descC.text.trim().isEmpty
+                                ? null
+                                : descC.text.trim(),
+                            saleType: saleType,
+                            transactionDate: Timestamp.fromDate(selectedDate),
+                          );
+                      if (!mounted) return;
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        successSnackBar(
+                          appliedImmediately
+                              ? tr('saved_successfully', ref)
+                              : 'Edit request submitted for admin approval',
+                        ),
+                      );
+                    } catch (e) {
+                      if (ctx.mounted) {
+                        final key = AppErrorMapper.key(e);
+                        ScaffoldMessenger.of(
+                          ctx,
+                        ).showSnackBar(errorSnackBar(tr(key, ref)));
+                      }
+                    }
+                  },
+                  child: Text(tr('save', ref)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _reviewEditRequest(TransactionModel tx, bool approved) async {
+    try {
+      final user = ref.read(authUserProvider).valueOrNull;
+      await ref.read(transactionNotifierProvider.notifier).reviewSellerEditRequest(
+            txId: tx.id,
+            approved: approved,
+            reviewerId: user?.id ?? '',
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        successSnackBar(
+          approved ? 'Edit request approved' : 'Edit request rejected',
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final key = AppErrorMapper.key(e);
+      ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
+    }
   }
 
   Future<void> _confirmDeleteTransaction(TransactionModel tx) async {
@@ -860,8 +988,13 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       if (shop.balance > 0)
                         txAsync.whenOrNull(
                               data: (txs) {
-                                if (txs.isEmpty) return const SizedBox.shrink();
-                                final oldest = txs.last;
+                                final activeTxs = txs
+                                    .where((t) => !t.deleted)
+                                    .toList();
+                                if (activeTxs.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+                                final oldest = activeTxs.last;
                                 final days = DateTime.now()
                                     .difference(oldest.createdAt.toDate())
                                     .inDays;
@@ -898,10 +1031,15 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       // Balance trend mini chart
                       txAsync.whenOrNull(
                             data: (txs) {
-                              if (txs.length < 2) {
+                              final activeTxs = txs
+                                  .where((t) => !t.deleted)
+                                  .toList();
+                              if (activeTxs.length < 2) {
                                 return const SizedBox.shrink();
                               }
-                              return _BalanceTrendChart(transactions: txs);
+                              return _BalanceTrendChart(
+                                transactions: activeTxs,
+                              );
                             },
                           ) ??
                           const SizedBox.shrink(),
@@ -1047,13 +1185,14 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         message: tr('no_transactions', ref),
                       );
                     }
+                    final activeTxs = txs.where((t) => !t.deleted).toList();
                     // Compute running balance per transaction.
-                    // txs are newest-first from the provider.
+                    // Active txs are newest-first from the provider.
                     // Work backward from shop.balance to reconstruct each tx's
                     // post-transaction balance.
                     final balanceMap = <String, double>{};
                     double bal = shop.balance;
-                    for (final tx in txs) {
+                    for (final tx in activeTxs) {
                       balanceMap[tx.id] = bal;
                       // Reverse the tx to get balance before it was applied
                       bal = tx.isCashOut ? bal - tx.amount : bal + tx.amount;
@@ -1109,11 +1248,18 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           tx: tx,
                           runningBalance: item.runningBalance,
                           canEdit:
-                              user?.isAdmin == true ||
-                              (user?.isSeller == true &&
-                                  user?.id == tx.createdBy),
-                          canDelete: user?.isAdmin == true,
+                              !tx.deleted &&
+                              (user?.isAdmin == true ||
+                                  (user?.isSeller == true &&
+                                      user?.id == tx.createdBy)),
+                          canApproveEdit:
+                              !tx.deleted &&
+                              user?.isAdmin == true &&
+                              tx.editRequestPending,
+                          canDelete: !tx.deleted && user?.isAdmin == true,
                           onEdit: () => _showEditTransactionDialog(tx),
+                          onApproveEdit: () => _reviewEditRequest(tx, true),
+                          onRejectEdit: () => _reviewEditRequest(tx, false),
                           onDelete: () => _confirmDeleteTransaction(tx),
                         );
                       },
@@ -1133,23 +1279,32 @@ class _TransactionTile extends ConsumerWidget {
   final TransactionModel tx;
   final double? runningBalance;
   final bool canEdit;
+  final bool canApproveEdit;
   final bool canDelete;
   final VoidCallback? onEdit;
+  final VoidCallback? onApproveEdit;
+  final VoidCallback? onRejectEdit;
   final VoidCallback? onDelete;
 
   const _TransactionTile({
     required this.tx,
     this.runningBalance,
     this.canEdit = false,
+    this.canApproveEdit = false,
     this.canDelete = false,
     this.onEdit,
+    this.onApproveEdit,
+    this.onRejectEdit,
     this.onDelete,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDeleted = tx.deleted;
     final isCashIn = tx.type == 'cash_in';
-    final color = isCashIn ? AppBrand.successColor : AppBrand.errorColor;
+    final color = isDeleted
+        ? Theme.of(context).colorScheme.onSurfaceVariant
+        : (isCashIn ? AppBrand.successColor : AppBrand.errorColor);
     final sign = isCashIn ? '+' : '-';
     final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
     final totalQty = tx.items.fold<int>(0, (acc, item) => acc + item.qty);
@@ -1159,7 +1314,9 @@ class _TransactionTile extends ConsumerWidget {
         radius: 18,
         backgroundColor: color.withAlpha(25),
         child: Icon(
-          isCashIn ? Icons.arrow_downward : Icons.arrow_upward,
+          isDeleted
+              ? Icons.remove_circle_outline
+              : (isCashIn ? Icons.arrow_downward : Icons.arrow_upward),
           color: color,
           size: 20,
         ),
@@ -1175,6 +1332,24 @@ class _TransactionTile extends ConsumerWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (isDeleted)
+            Text(
+              tr('void', ref).toUpperCase(),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          if (tx.editRequestPending)
+            Text(
+              'PENDING ADMIN APPROVAL',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
           if (tx.description != null && tx.description!.isNotEmpty)
             Text(tx.description!, maxLines: 1, overflow: TextOverflow.ellipsis),
           if (tx.hasItems)
@@ -1205,24 +1380,53 @@ class _TransactionTile extends ConsumerWidget {
             ),
         ],
       ),
-      trailing: canEdit
+      trailing: (canEdit || canApproveEdit)
           ? PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, size: 20),
               onSelected: (v) {
                 if (v == 'edit' && onEdit != null) onEdit!();
+                if (v == 'approve_edit' && onApproveEdit != null) {
+                  onApproveEdit!();
+                }
+                if (v == 'reject_edit' && onRejectEdit != null) {
+                  onRejectEdit!();
+                }
                 if (v == 'delete' && onDelete != null) onDelete!();
               },
               itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.edit, size: 16),
-                      const SizedBox(width: 8),
-                      Text(tr('edit', ref)),
-                    ],
+                if (canEdit)
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.edit, size: 16),
+                        const SizedBox(width: 8),
+                        Text(tr('edit', ref)),
+                      ],
+                    ),
                   ),
-                ),
+                if (canApproveEdit)
+                  const PopupMenuItem(
+                    value: 'approve_edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle, size: 16),
+                        SizedBox(width: 8),
+                        Text('Approve Seller Edit'),
+                      ],
+                    ),
+                  ),
+                if (canApproveEdit)
+                  const PopupMenuItem(
+                    value: 'reject_edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.cancel, size: 16),
+                        SizedBox(width: 8),
+                        Text('Reject Seller Edit'),
+                      ],
+                    ),
+                  ),
                 if (canDelete)
                   PopupMenuItem(
                     value: 'delete',

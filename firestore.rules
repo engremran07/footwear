@@ -69,17 +69,18 @@ service cloud.firestore {
       return isSeller() && assignedRouteId() != null && assignedRouteId() == routeId;
     }
 
-    // Returns the shop document for cross-collection checks.
-    function shopDoc(shopId) {
-      return get(/databases/$(database)/documents/customers/$(shopId));
+    // Returns the route_id for a shop/customer document.
+    // Using a single get() avoids an extra exists() read on every check.
+    function shopRouteId(shopId) {
+      return get(/databases/$(database)/documents/customers/$(shopId)).data.route_id;
     }
 
     // True when the seller owns the route the given shop belongs to.
-    // Guards with exists() to avoid get() errors on missing docs.
     function isSellerForShop(shopId) {
       return isSeller() &&
-        exists(/databases/$(database)/documents/customers/$(shopId)) &&
-        shopDoc(shopId).data.route_id == assignedRouteId();
+        shopId is string &&
+        shopId != '' &&
+        shopRouteId(shopId) == assignedRouteId();
     }
 
     // True when a transaction doc belongs to the seller's assigned route.
@@ -119,6 +120,11 @@ service cloud.firestore {
     function isValidRole(role) {
       return role is string &&
         role.matches('(?i)^\\s*(admin|manager|seller)\\s*$');
+    }
+
+    function requiresSellerTransactionEditApproval() {
+      return get(/databases/$(database)/documents/settings/global)
+        .data.require_admin_approval_for_seller_transaction_edits == true;
     }
 
     // --- users --------------------------------------------------------------
@@ -241,13 +247,59 @@ service cloud.firestore {
           request.resource.data.amount is number &&
           request.resource.data.amount > 0
         ));
-      // Sellers may only annotate their own route transactions (description only).
-      // Admins can update all financial fields (amount, type, date, soft-delete).
+      // Admins can update all financial fields.
+      // Sellers can:
+      // 1) submit edit request fields when approval toggle is ON
+      // 2) directly edit own cash_in/cash_out transactions when toggle is OFF
       allow update: if isAdmin() ||
         (
           requestIsSellerRouteTransaction() &&
-          request.resource.data.diff(resource.data)
-            .affectedKeys().hasOnly(['description', 'updated_at', 'updated_by'])
+          (
+            (
+              requiresSellerTransactionEditApproval() &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'description',
+                'updated_at',
+                'updated_by',
+                'edit_request_pending',
+                'edit_request_status',
+                'edit_request_requested_by',
+                'edit_request_requested_at',
+                'edit_request_new_amount',
+                'edit_request_new_type',
+                'edit_request_new_description',
+                'edit_request_new_sale_type',
+                'edit_request_new_created_at'
+              ]) &&
+              request.resource.data.edit_request_pending == true &&
+              request.resource.data.edit_request_status == 'pending'
+            ) ||
+            (
+              !requiresSellerTransactionEditApproval() &&
+              resource.data.created_by == request.auth.uid &&
+              (resource.data.type == 'cash_in' || resource.data.type == 'cash_out') &&
+              (request.resource.data.type == 'cash_in' || request.resource.data.type == 'cash_out') &&
+              request.resource.data.amount is number &&
+              request.resource.data.amount > 0 &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'amount',
+                'type',
+                'description',
+                'sale_type',
+                'created_at',
+                'updated_at',
+                'edit_request_pending',
+                'edit_request_status',
+                'edit_request_reviewed_by',
+                'edit_request_reviewed_at',
+                'edit_request_new_amount',
+                'edit_request_new_type',
+                'edit_request_new_description',
+                'edit_request_new_sale_type',
+                'edit_request_new_created_at'
+              ])
+            )
+          )
         );
       allow delete: if isAdmin();
     }

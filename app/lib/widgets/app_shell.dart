@@ -219,7 +219,7 @@ class _AppShellState extends ConsumerState<AppShell>
   Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).valueOrNull;
     final isWide = MediaQuery.of(context).size.width >= 720;
-    final isOnline = ref.watch(isOnlineProvider).valueOrNull ?? false;
+    final isOnline = ref.watch(isOnlineProvider).valueOrNull ?? true;
     final currentLocation = GoRouterState.of(context).uri.path;
 
     final rawItems = _filteredItems(user);

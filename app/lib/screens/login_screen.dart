@@ -98,11 +98,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     try {
-      await ref.read(authNotifierProvider.notifier).signIn(
-            _emailC.text.trim(),
-            _passC.text,
-            rememberMe: _remember,
-          );
+      await ref
+          .read(authNotifierProvider.notifier)
+          .signIn(_emailC.text.trim(), _passC.text, rememberMe: _remember);
       _failCount = 0;
       // Persist or clear remembered email for next cold launch
       final prefs = await SharedPreferences.getInstance();
@@ -141,9 +139,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         errorMessage = tr('err_user_not_found', ref);
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        errorSnackBar(errorMessage),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(errorMessage));
     }
   }
 
@@ -158,9 +154,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ) async {
       if (!formKey.currentState!.validate()) return;
       try {
-        await ref.read(authNotifierProvider.notifier).sendPasswordReset(
-          emailController.text.trim(),
-        );
+        await ref
+            .read(authNotifierProvider.notifier)
+            .sendPasswordReset(emailController.text.trim());
         setDlgState(() => sent = true);
       } on FirebaseAuthException catch (e) {
         if (!dialogContext.mounted) return;
@@ -173,17 +169,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             'network-request-failed' => tr('err_network', ref),
             _ => e.message ?? tr('err_auth_generic', ref),
           };
-          ScaffoldMessenger.of(context).showSnackBar(
-            errorSnackBar(errorMessage),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(errorSnackBar(errorMessage));
         }
       } catch (_) {
         if (!dialogContext.mounted) return;
         Navigator.of(dialogContext).pop();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            errorSnackBar(tr('err_auth_generic', ref)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(errorSnackBar(tr('err_auth_generic', ref)));
         }
       }
     }
@@ -218,8 +214,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Text(
                   tr('login_reset_email_hint', ref),
                   style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -246,9 +242,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
 
     if (sent && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        successSnackBar(tr('reset_email_sent', ref)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(successSnackBar(tr('reset_email_sent', ref)));
     }
     emailController.dispose();
   }
@@ -273,8 +269,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   /// Wide layout: brand panel (40%) + form panel (60%)
-  Widget _wideLayout(ThemeData theme, ColorScheme cs, AppLocale currentLocale,
-      AsyncValue<bool> isOnline, bool isLoading) {
+  Widget _wideLayout(
+    ThemeData theme,
+    ColorScheme cs,
+    AppLocale currentLocale,
+    AsyncValue<bool> isOnline,
+    bool isLoading,
+  ) {
     return Row(
       children: [
         // Brand panel
@@ -309,10 +310,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   /// Narrow (mobile) layout: single column
-  Widget _narrowLayout(ThemeData theme, ColorScheme cs, AppLocale currentLocale,
-      AsyncValue<bool> isOnline, bool isLoading) {
+  Widget _narrowLayout(
+    ThemeData theme,
+    ColorScheme cs,
+    AppLocale currentLocale,
+    AsyncValue<bool> isOnline,
+    bool isLoading,
+  ) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final viewPadding = MediaQuery.viewPaddingOf(context);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final horizontalPadding = screenWidth < 380 ? AppTokens.s16 : AppTokens.s24;
 
     return Stack(
       children: [
@@ -322,14 +330,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             curve: AppTokens.curveStd,
             padding: EdgeInsets.only(bottom: viewInsets.bottom),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                AppTokens.s24,
+                horizontalPadding,
                 AppTokens.s32,
-                AppTokens.s32,
-                AppTokens.s32,
-                AppTokens.s48,
               ),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
+                constraints: BoxConstraints(
+                  minWidth: screenWidth - (horizontalPadding * 2),
+                  maxWidth: 420,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -337,23 +348,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       AppBrand.logoAsset,
                       height: 90,
                       fit: BoxFit.contain,
-                    ).animate().fadeIn(duration: AppTokens.durNormal).scale(
-                          begin: const Offset(0.8, 0.8),
-                          end: const Offset(1, 1),
-                          curve: AppTokens.curveStd,
-                        ),
+                    ).animate().fadeIn(duration: AppTokens.durNormal),
                     const SizedBox(height: AppTokens.s12),
-                    Text(tr('app_name', ref),
-                        style: theme.textTheme.headlineMedium
-                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      tr('app_name', ref),
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: AppTokens.s4),
-                    Text(tr('sign_in_continue', ref),
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: cs.onSurfaceVariant)),
-                    const SizedBox(height: AppTokens.s24),
+                    Text(
+                      tr('sign_in_continue', ref),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: AppTokens.s20),
                     _languagePicker(currentLocale),
-                    const SizedBox(height: AppTokens.s24),
-                    _loginForm(theme, cs, isLoading),
+                    const SizedBox(height: AppTokens.s20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _loginForm(theme, cs, isLoading),
+                    ),
                   ],
                 ),
               ),
@@ -373,10 +389,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget _languagePicker(AppLocale currentLocale) {
     return SegmentedButton<AppLocale>(
       segments: AppLocale.values
-          .map((l) => ButtonSegment<AppLocale>(
-                value: l,
-                label: Text(l.label),
-              ))
+          .map((l) => ButtonSegment<AppLocale>(value: l, label: Text(l.label)))
           .toList(),
       selected: {currentLocale},
       onSelectionChanged: (set) {
@@ -385,8 +398,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       showSelectedIcon: false,
       style: ButtonStyle(
         visualDensity: VisualDensity.compact,
-        textStyle:
-            WidgetStatePropertyAll(Theme.of(context).textTheme.labelMedium),
+        textStyle: WidgetStatePropertyAll(
+          Theme.of(context).textTheme.labelMedium,
+        ),
       ),
     );
   }
@@ -401,8 +415,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           Text(
             online ? tr('login_online', ref) : tr('login_offline', ref),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: online ? Colors.green : Colors.grey,
-                ),
+              color: online ? Colors.green : Colors.grey,
+            ),
           ),
         ],
       ),
@@ -412,11 +426,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         children: [
           const AppOnlineIndicator(isOnline: false),
           const SizedBox(width: AppTokens.s4),
-          Text(tr('login_offline', ref),
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: Colors.grey)),
+          Text(
+            tr('login_offline', ref),
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: Colors.grey),
+          ),
         ],
       ),
     );
@@ -438,16 +453,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(tr('sign_in', ref),
-                    style: theme.textTheme.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  tr('sign_in', ref),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: AppTokens.s24),
                 TextFormField(
                   controller: _emailC,
                   focusNode: _emailFocus,
                   autofillHints: const [
                     AutofillHints.email,
-                    AutofillHints.username
+                    AutofillHints.username,
                   ],
                   decoration: InputDecoration(
                     labelText: tr('email', ref),
@@ -458,10 +476,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   validator: (v) => v == null || v.trim().isEmpty
                       ? tr('required', ref)
                       : null,
-                )
-                    .animate()
-                    .fadeIn(delay: 100.ms, duration: AppTokens.durNormal)
-                    .slideX(begin: 0.05, end: 0, curve: AppTokens.curveStd),
+                ).animate().fadeIn(
+                  delay: 100.ms,
+                  duration: AppTokens.durNormal,
+                ),
                 const SizedBox(height: AppTokens.s16),
                 TextFormField(
                   controller: _passC,
@@ -488,10 +506,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onFieldSubmitted: (_) => _submit(),
                   validator: (v) =>
                       v == null || v.isEmpty ? tr('required', ref) : null,
-                )
-                    .animate()
-                    .fadeIn(delay: 200.ms, duration: AppTokens.durNormal)
-                    .slideX(begin: 0.05, end: 0, curve: AppTokens.curveStd),
+                ).animate().fadeIn(
+                  delay: 200.ms,
+                  duration: AppTokens.durNormal,
+                ),
                 const SizedBox(height: AppTokens.s8),
                 Row(
                   children: [
@@ -512,14 +530,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : _isLockedOut
-                            ? Text('${tr('sign_in', ref)} ($_lockoutSeconds s)')
-                            : Text(tr('sign_in', ref)),
+                        ? Text('${tr('sign_in', ref)} ($_lockoutSeconds s)')
+                        : Text(tr('sign_in', ref)),
                   ),
-                )
-                    .animate()
-                    .fadeIn(delay: 300.ms, duration: AppTokens.durNormal),
+                ).animate().fadeIn(
+                  delay: 300.ms,
+                  duration: AppTokens.durNormal,
+                ),
                 const SizedBox(height: AppTokens.s8),
                 Align(
                   alignment: AlignmentDirectional.centerEnd,
@@ -562,11 +584,10 @@ class _BrandPanel extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(
-              AppBrand.logoAsset,
-              height: 120,
-              fit: BoxFit.contain,
-            ).animate().fadeIn(duration: AppTokens.durSlow).scale(
+            Image.asset(AppBrand.logoAsset, height: 120, fit: BoxFit.contain)
+                .animate()
+                .fadeIn(duration: AppTokens.durSlow)
+                .scale(
                   begin: const Offset(0.85, 0.85),
                   end: const Offset(1, 1),
                   curve: AppTokens.curveSpring,

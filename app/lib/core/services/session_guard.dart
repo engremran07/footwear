@@ -61,8 +61,8 @@ class SessionGuard extends ConsumerStatefulWidget {
 }
 
 class _SessionGuardState extends ConsumerState<SessionGuard> {
-  // TEMP tracing: keep enabled while validating lifecycle transitions.
-  static const bool _enableLifecycleTrace = true;
+  // Lifecycle tracing is debug-only to avoid release overhead.
+  static const bool _enableLifecycleTrace = kDebugMode;
   static const int _maxTraceEvents = 20;
   Timer? _inactivityTimer;
   DateTime? _backgroundedAt;

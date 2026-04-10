@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -113,16 +115,38 @@ CustomTransitionPage<void> _slidePage(Widget child, GoRouterState state) {
 /// their current screen (e.g. Settings) instead of bouncing to '/'.
 class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
+  Timer? _debounceTimer;
 
   RouterNotifier(this._ref) {
-    _ref.listen<AsyncValue<User?>>(
-      authStateProvider,
-      (_, __) => notifyListeners(),
-    );
-    _ref.listen<AsyncValue<UserModel?>>(
-      authUserProvider,
-      (_, __) => notifyListeners(),
-    );
+    _ref.listen<AsyncValue<User?>>(authStateProvider, (prev, next) {
+      final prevUid = prev?.valueOrNull?.uid;
+      final nextUid = next.valueOrNull?.uid;
+      if (prevUid != nextUid || prev?.isLoading != next.isLoading) {
+        _scheduleNotify();
+      }
+    });
+    _ref.listen<AsyncValue<UserModel?>>(authUserProvider, (prev, next) {
+      final prevUser = prev?.valueOrNull;
+      final nextUser = next.valueOrNull;
+      final authRelevantChanged =
+          prevUser?.id != nextUser?.id ||
+          prevUser?.role != nextUser?.role ||
+          prevUser?.active != nextUser?.active;
+      if (authRelevantChanged || prev?.isLoading != next.isLoading) {
+        _scheduleNotify();
+      }
+    });
+  }
+
+  void _scheduleNotify() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 100), notifyListeners);
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
   }
 
   String? redirect(BuildContext context, GoRouterState state) {

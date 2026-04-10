@@ -48,6 +48,9 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 16. Admin has no assigned_route_id — admin is the warehouse AND a field seller.
     Admin can own seller_inventory docs (seller_id = adminUid). isAdmin() in Firestore
     rules covers all admin operations including self-stock-allocation.
+17. If a bug was addressed by multiple candidate fixes, and QA/user confirms the
+  real culprit, you MUST run the Band-Aid Loop Reversal protocol: keep root-cause
+  + mandatory guards, rollback non-culprit mitigations, and record final reasoning.
 
 ## Financial Pathways (never mix these)
 
@@ -120,6 +123,24 @@ Rules check 'admin' exactly; app writes 'Admin' (casing) → all admin writes fa
 ### Chain 4: Composite Index Gap
 `where(A) + orderBy(B)` added → no index → list renders empty, no error in UI  
 **Fix:** Add entry to `firestore.indexes.json` → `firebase deploy --only firestore:indexes`.
+
+## Band-Aid Loop Reversal Protocol
+
+Trigger this protocol when all are true:
+
+1. Two or more fixes were applied to the same symptom.
+2. It is unclear which change truly solved the issue.
+3. QA/user confirms the symptom stopped after a specific change.
+
+Required actions:
+
+1. Build a fix ledger: change, hypothesis, observed effect, keep/remove decision.
+2. Classify each fix: `root-cause`, `mandatory-guard`, `temporary-mitigation`.
+3. Rollback temporary mitigations incrementally and re-test after each rollback.
+4. Keep only root-cause + mandatory safeguards.
+5. Publish closure evidence showing exactly which change fixed the bug.
+
+Never keep ambiguity-driven workaround code without explicit justification.
 
 ## Vibe-Coded Debt Signals
 

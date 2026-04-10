@@ -70,6 +70,37 @@ class AuthNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
+  Future<void> _runPostSignInSelfHeal({
+    required String uid,
+    required String role,
+  }) async {
+    final normalizedRole = role.trim().toLowerCase();
+    if (normalizedRole != 'admin' && normalizedRole != 'manager') return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection(Collections.settings)
+          .doc('global')
+          .set({
+            'company_name': 'My Business',
+            'currency': 'SAR',
+            'pairs_per_carton': 12,
+            'require_admin_approval_for_seller_transaction_edits': false,
+            'updated_at': Timestamp.now(),
+          }, SetOptions(merge: true));
+    } catch (e) {
+      _logger.w('Post-sign-in settings self-heal skipped: $e');
+    }
+
+    try {
+      await ref
+          .read(routeNotifierProvider.notifier)
+          .reconcileRouteShopCounters();
+    } catch (e) {
+      _logger.w('Post-sign-in route counter self-heal skipped: $e');
+    }
+  }
+
   void _invalidateRoleScopedProviders() {
     // Invalidate only the role-scoped providers that need to reset on sign-out.
     // Listing all 28 providers was causing 28 concurrent Firestore listener
@@ -220,6 +251,10 @@ class AuthNotifier extends AsyncNotifier<void> {
           );
         }
 
+        final normalizedRole = (refreshedDoc.data()?['role'] as String? ?? '')
+            .trim();
+        await _runPostSignInSelfHeal(uid: uid, role: normalizedRole);
+
         // ── Email-verified sync (Auth → Firestore, non-blocking) ──────────
         // Reload Auth user to get latest emailVerified from Firebase servers.
         // If Auth says verified but Firestore doesn't, sync it now so the
@@ -320,8 +355,8 @@ class AuthNotifier extends AsyncNotifier<void> {
           message: 'No user found with that username',
         );
       }
-      normalizedInput =
-          (snap.docs.first.data()['email'] as String? ?? '').trim();
+      normalizedInput = (snap.docs.first.data()['email'] as String? ?? '')
+          .trim();
     }
 
     final normalizedEmail = normalizedInput.toLowerCase();

@@ -152,20 +152,35 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     });
   }
 
-  Future<void> updateUser(String uid, Map<String, dynamic> data) async {
+  Future<void> updateUser(
+    String uid,
+    Map<String, dynamic> data, {
+    String? previousRouteId,
+  }) async {
     final db = FirebaseFirestore.instance;
     final updateData = <String, dynamic>{...data};
     if (updateData['role'] is String) {
       updateData['role'] = _normalizeRole(updateData['role'] as String);
     }
+
     final updatedRole = updateData['role'] as String?;
-    final updatedRouteId = updateData['assigned_route_id'] as String?;
-    if (updatedRole == 'seller' &&
-        (updatedRouteId == null || updatedRouteId.trim().isEmpty)) {
+    final normalizedPreviousRouteId = (previousRouteId ?? '').trim();
+    final newRouteId = (updateData['assigned_route_id'] as String?)?.trim();
+    final displayName = (updateData['display_name'] as String?)?.trim();
+
+    if (updatedRole == 'seller' && (newRouteId == null || newRouteId.isEmpty)) {
       throw ArgumentError('Seller accounts require an assigned route.');
     }
 
-    // DI-02: use a single WriteBatch for atomicity — user doc + route doc
+    // Non-seller users must not retain a route assignment.
+    if (updatedRole != null && updatedRole != 'seller') {
+      updateData['assigned_route_id'] = null;
+      updateData['assigned_route_name'] = null;
+    } else {
+      updateData['assigned_route_id'] = newRouteId;
+    }
+
+    // DI-02: use a single WriteBatch for atomicity — user doc + route docs.
     final batch = db.batch();
     final now = Timestamp.now();
 
@@ -174,13 +189,20 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       'updated_at': now,
     });
 
-    // If route assignment changed, update route doc in same batch
-    final newRouteId = data['assigned_route_id'] as String?;
-    final displayName = data['display_name'] as String?;
-    if (newRouteId != null &&
-        newRouteId.trim().isNotEmpty &&
-        displayName != null) {
-      batch.update(db.collection(Collections.routes).doc(newRouteId.trim()), {
+    if (normalizedPreviousRouteId.isNotEmpty &&
+        normalizedPreviousRouteId != newRouteId) {
+      batch.update(
+        db.collection(Collections.routes).doc(normalizedPreviousRouteId),
+        {
+          'assigned_seller_id': null,
+          'assigned_seller_name': null,
+          'updated_at': now,
+        },
+      );
+    }
+
+    if (newRouteId != null && newRouteId.isNotEmpty && displayName != null) {
+      batch.update(db.collection(Collections.routes).doc(newRouteId), {
         'assigned_seller_id': uid,
         'assigned_seller_name': displayName,
         'updated_at': now,
@@ -188,18 +210,6 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     }
 
     await batch.commit();
-  }
-
-  /// Clear route assignment from a route doc when seller is unassigned
-  Future<void> clearRouteAssignment(String routeId) async {
-    await FirebaseFirestore.instance
-        .collection(Collections.routes)
-        .doc(routeId)
-        .update({
-          'assigned_seller_id': null,
-          'assigned_seller_name': null,
-          'updated_at': Timestamp.now(),
-        });
   }
 
   Future<void> toggleActive(String uid, bool active) async {
@@ -357,6 +367,25 @@ class UserManagementNotifier extends AsyncNotifier<void> {
 
   // ── Admin 4-Way Sync Auth Pipeline ───────────────────────────────────────
 
+  FirebaseAuthException _mapAdminIdentityError(Object error) {
+    final msg = error.toString();
+    final lower = msg.toLowerCase();
+    if (lower.contains('sa credentials not provisioned')) {
+      return FirebaseAuthException(
+        code: 'operation-not-allowed',
+        message:
+            'Admin credentials are not configured. Contact system administrator.',
+      );
+    }
+    if (lower.contains('timeout') || lower.contains('timed out')) {
+      return FirebaseAuthException(
+        code: 'network-request-failed',
+        message: 'Admin identity service request timed out.',
+      );
+    }
+    return FirebaseAuthException(code: 'operation-not-allowed', message: msg);
+  }
+
   /// Admin-only: Update email, password, and/or emailVerified for ANY user.
   ///
   /// 4-way sync:
@@ -383,13 +412,17 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     if (!hasEmailChange && !hasPasswordChange && emailVerified == null) return;
 
     // Step 1: Update Firebase Auth via SA OAuth2 (Identity Toolkit admin API)
-    await AdminIdentityService.instance.updateAuthUser(
-      uid: uid,
-      email: hasEmailChange ? trimmedEmail : null,
-      password: hasPasswordChange ? trimmedPassword : null,
-      // New email → mark unverified; explicit override allowed
-      emailVerified: hasEmailChange ? false : emailVerified,
-    );
+    try {
+      await AdminIdentityService.instance.updateAuthUser(
+        uid: uid,
+        email: hasEmailChange ? trimmedEmail : null,
+        password: hasPasswordChange ? trimmedPassword : null,
+        // New email → mark unverified; explicit override allowed
+        emailVerified: hasEmailChange ? false : emailVerified,
+      );
+    } catch (e) {
+      throw _mapAdminIdentityError(e);
+    }
 
     // Step 2: Sync Firestore (only changed fields — keeps batch minimal)
     final fsUpdate = <String, dynamic>{'updated_at': Timestamp.now()};
@@ -412,10 +445,14 @@ class UserManagementNotifier extends AsyncNotifier<void> {
   /// Admin-only: Send email verification to any user.
   /// Requires both [uid] and [email] — see AdminIdentityService for 3-step flow.
   Future<void> adminSendVerificationEmail(String uid, String email) async {
-    await AdminIdentityService.instance.sendVerificationEmail(
-      uid,
-      email.trim().toLowerCase(),
-    );
+    try {
+      await AdminIdentityService.instance.sendVerificationEmail(
+        uid,
+        email.trim().toLowerCase(),
+      );
+    } catch (e) {
+      throw _mapAdminIdentityError(e);
+    }
   }
 
   /// Admin-only: Explicitly mark a user's email as verified in Auth + Firestore.

@@ -42,8 +42,9 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
     final detail = ref.read(routeDetailProvider(widget.routeId!)).valueOrNull;
     if (detail != null) {
       _nameC.value = TextEditingValue(
-          text: detail.name,
-          selection: TextSelection.collapsed(offset: detail.name.length));
+        text: detail.name,
+        selection: TextSelection.collapsed(offset: detail.name.length),
+      );
       _sellerId = detail.assignedSellerId;
       _sellerName = detail.assignedSellerName;
       _loaded = true;
@@ -74,14 +75,15 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       if (mounted) {
         HapticFeedback.mediumImpact();
         _isDirty = false;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
         context.pop();
       }
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context).showSnackBar(
-          errorSnackBar(tr(key, ref)),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -139,29 +141,31 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
                   TextFormField(
                     controller: _nameC,
                     decoration: InputDecoration(
-                        labelText: '${tr('route_name', ref)} *'),
+                      labelText: '${tr('route_name', ref)} *',
+                    ),
                     validator: (v) => Validators.notEmpty(v),
                     autofocus: !isEdit,
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) => _save(),
-                    inputFormatters: [
-                      AppInputFormatters.maxLength(200),
-                    ],
+                    inputFormatters: [AppInputFormatters.maxLength(200)],
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     initialValue: _sellerId,
-                    decoration:
-                        InputDecoration(labelText: tr('assigned_seller', ref)),
+                    decoration: InputDecoration(
+                      labelText: tr('assigned_seller', ref),
+                    ),
                     items: [
                       DropdownMenuItem<String>(
                         value: null,
                         child: Text(tr('none', ref)),
                       ),
-                      ...sellers.map((s) => DropdownMenuItem(
-                            value: s.id,
-                            child: Text(s.displayName),
-                          )),
+                      ...sellers.map(
+                        (s) => DropdownMenuItem(
+                          value: s.id,
+                          child: Text(s.displayName),
+                        ),
+                      ),
                     ],
                     onChanged: (v) {
                       setState(() {
@@ -183,7 +187,8 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2))
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : Text(tr('save', ref)),
                     ),
                   ),

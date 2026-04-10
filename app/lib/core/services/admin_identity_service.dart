@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -43,6 +44,7 @@ class AdminIdentityService {
   // Firebase Web API key — used only for the custom-token → ID-token exchange
   // (public value, safe to embed; it is not the SA private key).
   static const _apiKey = 'AIzaSyBkuhoehQ8G7GBCx5Gun_v3KOlM2gqyBDg';
+  static const Duration _requestTimeout = Duration(seconds: 20);
 
   // OAuth2 token cache — valid 55 min (actual SA token lasts 60 min).
   // Scope embedded so a change to _scope automatically invalidates old cache.
@@ -108,14 +110,16 @@ class AdminIdentityService {
       algorithm: JWTAlgorithm.RS256,
     );
 
-    final response = await http.post(
-      Uri.parse(_tokenEndpoint),
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {
-        'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        'assertion': token,
-      },
-    );
+    final response = await http
+        .post(
+          Uri.parse(_tokenEndpoint),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: {
+            'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            'assertion': token,
+          },
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(
@@ -161,14 +165,16 @@ class AdminIdentityService {
       body['emailVerified'] = emailVerified;
     }
 
-    final response = await http.post(
-      Uri.parse('$_itBase/projects/$_projectId/accounts:update'),
-      headers: {
-        'Authorization': 'Bearer $accessToken',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_itBase/projects/$_projectId/accounts:update'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       final err = jsonDecode(response.body) as Map<String, dynamic>;
@@ -209,11 +215,13 @@ class AdminIdentityService {
     );
 
     // ── Step 2: exchange custom token → ephemeral ID token ─────────────────
-    final signInResp = await http.post(
-      Uri.parse('$_itBase/accounts:signInWithCustomToken?key=$_apiKey'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'token': customToken, 'returnSecureToken': true}),
-    );
+    final signInResp = await http
+        .post(
+          Uri.parse('$_itBase/accounts:signInWithCustomToken?key=$_apiKey'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'token': customToken, 'returnSecureToken': true}),
+        )
+        .timeout(_requestTimeout);
     if (signInResp.statusCode != 200) {
       final err = jsonDecode(signInResp.body) as Map<String, dynamic>;
       throw Exception((err['error']?['message'] as String?) ?? signInResp.body);
@@ -223,11 +231,13 @@ class AdminIdentityService {
             as String;
 
     // ── Step 3: send verification email with the user's own ID token ────────
-    final oobResp = await http.post(
-      Uri.parse('$_itBase/accounts:sendOobCode?key=$_apiKey'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'requestType': 'VERIFY_EMAIL', 'idToken': idToken}),
-    );
+    final oobResp = await http
+        .post(
+          Uri.parse('$_itBase/accounts:sendOobCode?key=$_apiKey'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'requestType': 'VERIFY_EMAIL', 'idToken': idToken}),
+        )
+        .timeout(_requestTimeout);
     if (oobResp.statusCode != 200) {
       final err = jsonDecode(oobResp.body) as Map<String, dynamic>;
       final msg = (err['error']?['message'] as String?) ?? oobResp.body;
@@ -240,14 +250,16 @@ class AdminIdentityService {
   Future<void> sendPasswordResetEmail(String email) async {
     // Use the public accounts:sendOobCode endpoint (no admin token needed
     // for PASSWORD_RESET — it accepts just the email + API key).
-    final response = await http.post(
-      Uri.parse('$_itBase/accounts:sendOobCode?key=$_apiKey'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'requestType': 'PASSWORD_RESET',
-        'email': email.trim().toLowerCase(),
-      }),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_itBase/accounts:sendOobCode?key=$_apiKey'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'requestType': 'PASSWORD_RESET',
+            'email': email.trim().toLowerCase(),
+          }),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       final err = jsonDecode(response.body) as Map<String, dynamic>;

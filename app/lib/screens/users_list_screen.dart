@@ -596,15 +596,12 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       );
                     }
                     // ── Step 2: Firestore profile (name / role / route) ───
-                    if (oldRouteId != null && oldRouteId != selectedRouteId) {
-                      await notifier.clearRouteAssignment(oldRouteId);
-                    }
                     await notifier.updateUser(user.id, {
                       'display_name': nameC.text.trim(),
                       'role': isSelf ? 'admin' : role,
                       'assigned_route_id': selectedRouteId,
                       'assigned_route_name': selectedRouteName,
-                    });
+                    }, previousRouteId: oldRouteId);
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -614,9 +611,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                   } catch (e) {
                     if (ctx.mounted) {
                       final key = AppErrorMapper.key(e);
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        errorSnackBar(tr(key, ref)),
-                      );
+                      ScaffoldMessenger.of(
+                        ctx,
+                      ).showSnackBar(errorSnackBar(tr(key, ref)));
                     }
                   }
                 },

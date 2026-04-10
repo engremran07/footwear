@@ -82,13 +82,11 @@ final shopDetailProvider = StreamProvider.autoDispose
           .where('route_id', isEqualTo: user.assignedRouteId)
           .limit(1)
           .snapshots()
-          .map(
-            (snap) {
-              if (snap.docs.isEmpty) return null;
-              final doc = snap.docs.first;
-              return ShopModel.fromJson(doc.data(), doc.id);
-            },
-          );
+          .map((snap) {
+            if (snap.docs.isEmpty) return null;
+            final doc = snap.docs.first;
+            return ShopModel.fromJson(doc.data(), doc.id);
+          });
     });
 
 final outstandingShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((

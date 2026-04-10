@@ -179,7 +179,13 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       final doc = await txn.get(settingsRef);
       final currentNum = (doc.data()?['last_invoice_number'] as int?) ?? 0;
       final nextNum = currentNum + 1;
-      txn.update(settingsRef, {'last_invoice_number': nextNum});
+      if (doc.exists) {
+        txn.update(settingsRef, {'last_invoice_number': nextNum});
+      } else {
+        txn.set(settingsRef, {
+          'last_invoice_number': nextNum,
+        }, SetOptions(merge: true));
+      }
       return nextNum;
     });
     return 'INV-${DateTime.now().year}-${next.toString().padLeft(4, '0')}';
@@ -458,10 +464,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
 
     final normalizedKey = idempotencyKey?.trim();
-    final resolvedKey =
-        (normalizedKey != null && normalizedKey.isNotEmpty)
-            ? normalizedKey
-            : const Uuid().v4();
+    final resolvedKey = (normalizedKey != null && normalizedKey.isNotEmpty)
+        ? normalizedKey
+        : const Uuid().v4();
     if (normalizedKey != null && normalizedKey.isNotEmpty) {
       final existing = await db
           .collection(Collections.invoices)

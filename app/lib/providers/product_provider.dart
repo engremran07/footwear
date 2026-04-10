@@ -160,7 +160,9 @@ class ProductNotifier extends AsyncNotifier<void> {
     }
 
     await db.runTransaction<void>((txn) async {
-      final variantRef = db.collection(Collections.productVariants).doc(variantId);
+      final variantRef = db
+          .collection(Collections.productVariants)
+          .doc(variantId);
       final variantSnap = await txn.get(variantRef);
       if (!variantSnap.exists) {
         throw ArgumentError('Variant not found: $variantId');
@@ -241,7 +243,9 @@ class ProductNotifier extends AsyncNotifier<void> {
     final now = Timestamp.now();
 
     await db.runTransaction<void>((txn) async {
-      final variantRef = db.collection(Collections.productVariants).doc(variantId);
+      final variantRef = db
+          .collection(Collections.productVariants)
+          .doc(variantId);
       final variantSnap = await txn.get(variantRef);
       if (!variantSnap.exists) {
         throw ArgumentError('Variant not found: $variantId');

@@ -16,6 +16,7 @@ final settingsProvider = StreamProvider.autoDispose<SettingsModel>((ref) {
         companyName: 'My Business',
         currency: 'SAR',
         pairsPerCarton: 12,
+        requireAdminApprovalForSellerTransactionEdits: false,
         updatedAt: Timestamp.now(),
       );
     }

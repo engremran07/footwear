@@ -114,6 +114,11 @@ Seller:
   `app/lib/core/constants/collections.dart`. No raw `.collection('string')`
   calls are permitted anywhere in `app/lib/`.
 
+1. If multiple temporary fixes were applied for one bug, and QA/user confirms
+  the real culprit fix, run the Band-Aid Loop Reversal protocol before signoff:
+  keep only root-cause + mandatory guards, rollback non-culprit mitigations,
+  and document final keep/remove reasoning.
+
 ## 5) Known Failure Signatures
 
 1. permission-denied on route create/inventory add
@@ -194,6 +199,9 @@ Before finishing:
   rebuild/deploy/install from that version before commit/push
 - Update deep-dive and READMEs if runtime assumptions changed
 - If rules changed, deploy firestore:rules and firestore:indexes
+- If bug resolution involved multiple candidate fixes, run
+  `.github/instructions/band-aid-loop-reversal.instructions.md` and
+  `.claude/skills/band-aid-loop-reversal/SKILL.md` before commit
 
 ## 9) Runtime Document Hierarchy
 
@@ -214,6 +222,11 @@ Conflict resolution order for instructions:
 - Login password-reset username lookup moved out of screen code into auth provider; account-statement export reads moved out of screen code into transaction provider
 - Firestore index cleanup: removed 8 unused defensive composite indexes; active query coverage remains complete
 - Validation: flutter analyze --no-pub clean, flutter test suite green, screen/widget Firestore hygiene scan cleared
+
+2026-04-10 process upgrade:
+
+- Closed-loop ambiguity control added: Band-Aid Loop Reversal protocol (rule + instruction + skill + custom agent)
+- Post-culprit workflow now requires explicit keep/remove decisioning for temporary mitigations
 
 2026-04-07 audit v8 — v3.4.0+30 (autonomous 20-agent system):
 

@@ -22,7 +22,9 @@ class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
 
   void _showNoData(BuildContext context, WidgetRef ref) {
-    ScaffoldMessenger.of(context).showSnackBar(infoSnackBar(tr('no_data', ref)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(infoSnackBar(tr('no_data', ref)));
   }
 
   @override
@@ -136,8 +138,8 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-        final routeId = user.assignedRouteId ?? '';
-        final shops = user.isAdmin
+    final routeId = user.assignedRouteId ?? '';
+    final shops = user.isAdmin
         ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
         : (routeId.isNotEmpty
               ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
@@ -220,8 +222,7 @@ class ReportsScreen extends ConsumerWidget {
     }
     final txs = user.isAdmin
         ? ref.read(allTransactionsProvider).valueOrNull ?? []
-      : ref.read(sellerTransactionsProvider(user.id)).valueOrNull ??
-              [];
+        : ref.read(sellerTransactionsProvider(user.id)).valueOrNull ?? [];
     if (txs.isEmpty) {
       _showNoData(context, ref);
       return;
@@ -301,8 +302,8 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-        final routeId = user.assignedRouteId ?? '';
-        final shops = user.isAdmin
+    final routeId = user.assignedRouteId ?? '';
+    final shops = user.isAdmin
         ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
         : (routeId.isNotEmpty
               ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??

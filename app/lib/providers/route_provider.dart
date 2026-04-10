@@ -16,55 +16,112 @@ final routesProvider = StreamProvider.autoDispose<List<RouteModel>>((ref) {
       .orderBy('route_number')
       .limit(200)
       .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => RouteModel.fromJson(d.data(), d.id)).toList());
+      .map(
+        (snap) =>
+            snap.docs.map((d) => RouteModel.fromJson(d.data(), d.id)).toList(),
+      );
 });
 
-final routeDetailProvider =
-    StreamProvider.autoDispose.family<RouteModel?, String>((ref, id) {
-  final user = ref.watch(authUserProvider).valueOrNull;
-  if (user == null) return const Stream.empty();
-  if (user.isAdmin) {
-    return FirebaseFirestore.instance
-        .collection(Collections.routes)
-        .doc(id)
-        .snapshots()
-        .map((doc) =>
-            doc.exists ? RouteModel.fromJson(doc.data()!, doc.id) : null);
-  }
-  if (!user.isSeller) return const Stream.empty();
-  return FirebaseFirestore.instance
-      .collection(Collections.routes)
-      .where(FieldPath.documentId, isEqualTo: id)
-      .where('assigned_seller_id', isEqualTo: user.id)
-      .limit(1)
-      .snapshots()
-      .map((snap) {
-        if (snap.docs.isEmpty) return null;
-        final doc = snap.docs.first;
-        return RouteModel.fromJson(doc.data(), doc.id);
-      });
-});
+final routeDetailProvider = StreamProvider.autoDispose
+    .family<RouteModel?, String>((ref, id) {
+      final user = ref.watch(authUserProvider).valueOrNull;
+      if (user == null) return const Stream.empty();
+      if (user.isAdmin) {
+        return FirebaseFirestore.instance
+            .collection(Collections.routes)
+            .doc(id)
+            .snapshots()
+            .map(
+              (doc) =>
+                  doc.exists ? RouteModel.fromJson(doc.data()!, doc.id) : null,
+            );
+      }
+      if (!user.isSeller) return const Stream.empty();
+      return FirebaseFirestore.instance
+          .collection(Collections.routes)
+          .where(FieldPath.documentId, isEqualTo: id)
+          .where('assigned_seller_id', isEqualTo: user.id)
+          .limit(1)
+          .snapshots()
+          .map((snap) {
+            if (snap.docs.isEmpty) return null;
+            final doc = snap.docs.first;
+            return RouteModel.fromJson(doc.data(), doc.id);
+          });
+    });
 
 final routesBySellerProvider = StreamProvider.autoDispose
     .family<List<RouteModel>, String>((ref, sellerId) {
-  final user = ref.watch(authUserProvider).valueOrNull;
-  if (user == null) return const Stream.empty();
-  if (!user.isAdmin && user.id != sellerId) return const Stream.empty();
-  return FirebaseFirestore.instance
-      .collection(Collections.routes)
-      .where('assigned_seller_id', isEqualTo: sellerId)
-      .where('active', isEqualTo: true)
-      .orderBy('route_number')
-      .limit(100)
-      .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => RouteModel.fromJson(d.data(), d.id)).toList());
-});
+      final user = ref.watch(authUserProvider).valueOrNull;
+      if (user == null) return const Stream.empty();
+      if (!user.isAdmin && user.id != sellerId) return const Stream.empty();
+      return FirebaseFirestore.instance
+          .collection(Collections.routes)
+          .where('assigned_seller_id', isEqualTo: sellerId)
+          .where('active', isEqualTo: true)
+          .orderBy('route_number')
+          .limit(100)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((d) => RouteModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
 
 class RouteNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
+
+  /// Reconciles each route's `total_shops` against active shops in Firestore.
+  /// Safe to run after partial DB flushes so route counters self-heal.
+  Future<void> reconcileRouteShopCounters() async {
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) return;
+
+    final db = FirebaseFirestore.instance;
+    final me = await db.collection(Collections.users).doc(authUser.uid).get();
+    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
+    if (role != 'admin' && role != 'manager') return;
+
+    final routesSnap = await db
+        .collection(Collections.routes)
+        .where('active', isEqualTo: true)
+        .limit(500)
+        .get();
+    if (routesSnap.docs.isEmpty) return;
+
+    final shopsSnap = await db
+        .collection(Collections.customers)
+        .where('active', isEqualTo: true)
+        .limit(2000)
+        .get();
+
+    final countsByRoute = <String, int>{};
+    for (final shop in shopsSnap.docs) {
+      final routeId = (shop.data()['route_id'] as String?)?.trim() ?? '';
+      if (routeId.isEmpty) continue;
+      countsByRoute[routeId] = (countsByRoute[routeId] ?? 0) + 1;
+    }
+
+    final batch = db.batch();
+    var changed = 0;
+    for (final route in routesSnap.docs) {
+      final currentTotal = (route.data()['total_shops'] as int?) ?? 0;
+      final computedTotal = countsByRoute[route.id] ?? 0;
+      if (currentTotal != computedTotal) {
+        changed += 1;
+        batch.update(route.reference, {
+          'total_shops': computedTotal,
+          'updated_at': Timestamp.now(),
+        });
+      }
+    }
+
+    if (changed > 0) {
+      await batch.commit();
+    }
+  }
 
   Future<int> _nextRouteNumber(FirebaseFirestore db) async {
     final snap = await db
@@ -82,32 +139,24 @@ class RouteNotifier extends AsyncNotifier<void> {
     final routeRef = db.collection(Collections.routes).doc();
     final assignedSellerId =
         (data['assigned_seller_id'] as String?)?.trim().isNotEmpty == true
-            ? (data['assigned_seller_id'] as String).trim()
-            : null;
+        ? (data['assigned_seller_id'] as String).trim()
+        : null;
     final routeName = data['name'] as String? ?? '';
     final assignedSellerName =
         (data['assigned_seller_name'] as String?)?.trim().isNotEmpty == true
-            ? (data['assigned_seller_name'] as String).trim()
-            : null;
+        ? (data['assigned_seller_name'] as String).trim()
+        : null;
     final routeNumber = ((data['route_number'] as int?) ?? 0) > 0
         ? (data['route_number'] as int)
         : await _nextRouteNumber(db);
 
     await db.runTransaction<void>((txn) async {
-      final now = Timestamp.now();
-      txn.set(routeRef, {
-        ...data,
-        'assigned_seller_id': assignedSellerId,
-        'assigned_seller_name': assignedSellerId == null ? null : assignedSellerName,
-        'route_number': routeNumber,
-        'total_shops': 0,
-        'active': true,
-        'created_at': now,
-        'updated_at': now,
-      });
+      DocumentReference<Map<String, dynamic>>? sellerRef;
+      DocumentReference<Map<String, dynamic>>? previousRouteRef;
+      DocumentSnapshot<Map<String, dynamic>>? previousRouteSnap;
 
       if (assignedSellerId != null) {
-        final sellerRef = db.collection(Collections.users).doc(assignedSellerId);
+        sellerRef = db.collection(Collections.users).doc(assignedSellerId);
         final sellerSnap = await txn.get(sellerRef);
         if (!sellerSnap.exists) {
           throw StateError('Seller not found');
@@ -118,18 +167,36 @@ class RouteNotifier extends AsyncNotifier<void> {
         if (previousRouteId != null &&
             previousRouteId.isNotEmpty &&
             previousRouteId != routeRef.id) {
-          final previousRouteRef =
-              db.collection(Collections.routes).doc(previousRouteId);
-          final previousRouteSnap = await txn.get(previousRouteRef);
-          if (previousRouteSnap.exists) {
-            txn.update(previousRouteRef, {
-              'assigned_seller_id': null,
-              'assigned_seller_name': null,
-              'updated_at': now,
-            });
-          }
+          previousRouteRef = db
+              .collection(Collections.routes)
+              .doc(previousRouteId);
+          previousRouteSnap = await txn.get(previousRouteRef);
         }
+      }
 
+      final now = Timestamp.now();
+      txn.set(routeRef, {
+        ...data,
+        'assigned_seller_id': assignedSellerId,
+        'assigned_seller_name': assignedSellerId == null
+            ? null
+            : assignedSellerName,
+        'route_number': routeNumber,
+        'total_shops': 0,
+        'active': true,
+        'created_at': now,
+        'updated_at': now,
+      });
+
+      if (previousRouteRef != null && previousRouteSnap?.exists == true) {
+        txn.update(previousRouteRef, {
+          'assigned_seller_id': null,
+          'assigned_seller_name': null,
+          'updated_at': now,
+        });
+      }
+
+      if (sellerRef != null) {
         txn.update(sellerRef, {
           'assigned_route_id': routeRef.id,
           'assigned_route_name': routeName,
@@ -143,39 +210,32 @@ class RouteNotifier extends AsyncNotifier<void> {
     final db = FirebaseFirestore.instance;
     final routeRef = db.collection(Collections.routes).doc(id);
     await db.runTransaction<void>((txn) async {
-      final now = Timestamp.now();
       final currentRoute = await txn.get(routeRef);
+      if (!currentRoute.exists) {
+        throw StateError('Route not found');
+      }
+
       final oldSellerId =
           (currentRoute.data()?['assigned_seller_id'] as String?)?.trim();
       final newSellerId =
           (data['assigned_seller_id'] as String?)?.trim().isNotEmpty == true
-              ? (data['assigned_seller_id'] as String).trim()
-              : null;
-      final routeName = data['name'] as String? ??
+          ? (data['assigned_seller_id'] as String).trim()
+          : null;
+      final routeName =
+          data['name'] as String? ??
           currentRoute.data()?['name'] as String? ??
           '';
       final assignedSellerName =
           (data['assigned_seller_name'] as String?)?.trim().isNotEmpty == true
-              ? (data['assigned_seller_name'] as String).trim()
-              : null;
+          ? (data['assigned_seller_name'] as String).trim()
+          : null;
 
-      txn.update(routeRef, {
-        ...data,
-        'assigned_seller_id': newSellerId,
-        'assigned_seller_name': newSellerId == null ? null : assignedSellerName,
-        'updated_at': now,
-      });
-
-      if (oldSellerId != null && oldSellerId.isNotEmpty && oldSellerId != newSellerId) {
-        txn.update(db.collection(Collections.users).doc(oldSellerId), {
-          'assigned_route_id': null,
-          'assigned_route_name': null,
-          'updated_at': now,
-        });
-      }
+      DocumentReference<Map<String, dynamic>>? newSellerRef;
+      DocumentReference<Map<String, dynamic>>? previousRouteRef;
+      DocumentSnapshot<Map<String, dynamic>>? previousRouteSnap;
 
       if (newSellerId != null) {
-        final newSellerRef = db.collection(Collections.users).doc(newSellerId);
+        newSellerRef = db.collection(Collections.users).doc(newSellerId);
         final newSellerSnap = await txn.get(newSellerRef);
         if (!newSellerSnap.exists) {
           throw StateError('Seller not found');
@@ -183,19 +243,43 @@ class RouteNotifier extends AsyncNotifier<void> {
 
         final previousRouteId =
             (newSellerSnap.data()?['assigned_route_id'] as String?)?.trim();
-        if (previousRouteId != null && previousRouteId.isNotEmpty && previousRouteId != id) {
-          final previousRouteRef =
-              db.collection(Collections.routes).doc(previousRouteId);
-          final previousRouteSnap = await txn.get(previousRouteRef);
-          if (previousRouteSnap.exists) {
-            txn.update(previousRouteRef, {
-              'assigned_seller_id': null,
-              'assigned_seller_name': null,
-              'updated_at': now,
-            });
-          }
+        if (previousRouteId != null &&
+            previousRouteId.isNotEmpty &&
+            previousRouteId != id) {
+          previousRouteRef = db
+              .collection(Collections.routes)
+              .doc(previousRouteId);
+          previousRouteSnap = await txn.get(previousRouteRef);
         }
+      }
 
+      final now = Timestamp.now();
+      txn.update(routeRef, {
+        ...data,
+        'assigned_seller_id': newSellerId,
+        'assigned_seller_name': newSellerId == null ? null : assignedSellerName,
+        'updated_at': now,
+      });
+
+      if (oldSellerId != null &&
+          oldSellerId.isNotEmpty &&
+          oldSellerId != newSellerId) {
+        txn.update(db.collection(Collections.users).doc(oldSellerId), {
+          'assigned_route_id': null,
+          'assigned_route_name': null,
+          'updated_at': now,
+        });
+      }
+
+      if (previousRouteRef != null && previousRouteSnap?.exists == true) {
+        txn.update(previousRouteRef, {
+          'assigned_seller_id': null,
+          'assigned_seller_name': null,
+          'updated_at': now,
+        });
+      }
+
+      if (newSellerRef != null) {
         txn.update(newSellerRef, {
           'assigned_route_id': id,
           'assigned_route_name': routeName,
@@ -235,12 +319,13 @@ class RouteNotifier extends AsyncNotifier<void> {
       throw StateError('route_has_shops');
     }
 
-    await db
-        .collection(Collections.routes)
-        .doc(id)
-        .update({'active': false, 'updated_at': Timestamp.now()});
+    await db.collection(Collections.routes).doc(id).update({
+      'active': false,
+      'updated_at': Timestamp.now(),
+    });
   }
 }
 
-final routeNotifierProvider =
-    AsyncNotifierProvider<RouteNotifier, void>(RouteNotifier.new);
+final routeNotifierProvider = AsyncNotifierProvider<RouteNotifier, void>(
+  RouteNotifier.new,
+);
