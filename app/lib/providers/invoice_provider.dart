@@ -363,7 +363,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       final balanceDelta = total - amountReceived;
       batch.update(db.collection(Collections.customers).doc(shopId), {
         'balance': FieldValue.increment(balanceDelta),
-        'updated_at': now,
+        'updated_at':
+            FieldValue.serverTimestamp(), // server time avoids withinWriteRate skew
       });
     }
 
@@ -500,7 +501,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (shopId.isNotEmpty) {
       batch.update(db.collection(Collections.customers).doc(shopId), {
         'balance': FieldValue.increment(-total),
-        'updated_at': now,
+        'updated_at': FieldValue.serverTimestamp(),
       });
     }
 

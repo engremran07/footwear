@@ -60,7 +60,7 @@ service cloud.firestore {
     function isBootstrapAdminCreate(userId) {
       return isOwnDoc(userId)
         && !exists(/databases/$(database)/documents/users/$(userId))
-        && request.auth.token.email == 'admin@footwear.pk'
+        && !exists(/databases/$(database)/documents/settings/global)
         && request.resource.data.role == 'admin'
         && request.resource.data.active == true;
     }
@@ -206,13 +206,16 @@ service cloud.firestore {
           isSellerForRoute(request.resource.data.route_id)
         )) && docSizeOk();
       // Sellers can update customers in their own route only.
+      // SR-08: withinWriteRate() removed from customers — financial ledger writes
+      // (balance increments from invoice batches) must not be throttled; atomic
+      // WriteBatch integrity is the correct guard, not a 1-second time gate.
       allow update: if (isAdmin() ||
         (
           isSeller() &&
           resource.data.route_id is string &&
           resource.data.route_id != '' &&
           isSellerForRoute(resource.data.route_id)
-        )) && docSizeOk() && withinWriteRate();
+        )) && docSizeOk();
       allow delete: if isAdmin();
     }
 

@@ -33,7 +33,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
   Widget _buildAsyncError(Object error, {Widget? fallback}) {
     if (AppErrorMapper.isPermissionOrAuthError(error)) {
-      return fallback ?? const ShimmerLoading();
+      return fallback ??
+          const EmptyState(icon: Icons.lock_outline, message: '');
     }
     return Center(child: Text(tr(AppErrorMapper.key(error), ref)));
   }
@@ -381,7 +382,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             color: isOutOfStock
                                 ? cs.error
                                 : isLowStock
-                              ? AppTheme.warningFg(cs)
+                                ? AppTheme.warningFg(cs)
                                 : null,
                             fontWeight: isOutOfStock || isLowStock
                                 ? FontWeight.w600
@@ -533,12 +534,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.warningBg(
-                  Theme.of(ctx).colorScheme,
-                ),
-                foregroundColor: AppTheme.warningFg(
-                  Theme.of(ctx).colorScheme,
-                ),
+                backgroundColor: AppTheme.warningBg(Theme.of(ctx).colorScheme),
+                foregroundColor: AppTheme.warningFg(Theme.of(ctx).colorScheme),
               ),
               onPressed: () async {
                 final qty = int.tryParse(qtyC.text.trim()) ?? 0;

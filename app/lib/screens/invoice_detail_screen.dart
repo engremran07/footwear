@@ -65,6 +65,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
           if (inv == null) return null;
           return FloatingActionButton(
             onPressed: () => _exportPdf(context, ref, inv),
+            tooltip: tr('share_pdf', ref),
             child: const Icon(Icons.picture_as_pdf),
           );
         },

@@ -99,12 +99,12 @@ class DashboardScreen extends ConsumerWidget {
                 // Alerts banner
                 if (hasOutstandingAlert)
                   Card(
-                        color: AppBrand.warningColor.withValues(alpha: 0.1),
+                        color: AppBrand.warningColor.withAlpha(25),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: AppTokens.brMD,
                           side: BorderSide(
-                            color: AppBrand.warningColor.withValues(alpha: 0.3),
+                            color: AppBrand.warningColor.withAlpha(76),
                           ),
                         ),
                         child: ListTile(
@@ -540,7 +540,7 @@ class _CashFlowChart extends ConsumerWidget {
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: AppBrand.successColor.withValues(alpha: 0.1),
+                color: AppBrand.successColor.withAlpha(25),
               ),
             ),
             LineChartBarData(
@@ -551,7 +551,7 @@ class _CashFlowChart extends ConsumerWidget {
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: AppBrand.errorColor.withValues(alpha: 0.1),
+                color: AppBrand.errorColor.withAlpha(25),
               ),
             ),
           ],

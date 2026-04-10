@@ -16,6 +16,8 @@ pubsub-debug.log
 *_logs.txt
 *_logs_*.txt
 *_errors.txt
+logs_live.txt
+build_output*.txt
 app_logs.txt
 fresh_logs.txt
 fresh_errors.txt
@@ -35,7 +37,7 @@ app/.dart_tool/
 app/.flutter-plugins
 app/.flutter-plugins-dependencies
 app/.packages
-app/pubspec.lock
+# app/pubspec.lock intentionally tracked (F-08: ensures reproducible builds)
 
 # Android Gradle
 app/android/.gradle/

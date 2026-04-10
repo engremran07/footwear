@@ -36,6 +36,7 @@ class _AppShellState extends ConsumerState<AppShell>
   late final AnimationController _drawerCtrl;
   late final Animation<double> _drawerAnim;
   bool _isDrawerOpen = false;
+  DateTime? _lastBackPress; // F-03: double-back-to-exit tracking
 
   @override
   void initState() {
@@ -236,9 +237,23 @@ class _AppShellState extends ConsumerState<AppShell>
       final parent = _parentRoute(currentLocation);
       if (parent != null) {
         context.go(parent);
-      } else {
-        SystemNavigator.pop();
+        return;
       }
+      // At root: require double-back within 2 seconds (F-03)
+      final now = DateTime.now();
+      if (_lastBackPress != null &&
+          now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
+        SystemNavigator.pop();
+        return;
+      }
+      _lastBackPress = now;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(tr('press_back_again_to_exit', ref)),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
 
     // ── Tablet/Desktop: NavigationRail (unchanged) ────────────────────────
@@ -379,6 +394,18 @@ class _AppShellState extends ConsumerState<AppShell>
                                   HapticFeedback.selectionClick();
                                   context.go(primaryItems[idx + 1].route);
                                 }
+                              } else if (vel > 600 && primaryItems.length > 1) {
+                                // F-04: backward swipe (right) → previous tab
+                                final idx = primaryItems.indexWhere(
+                                  (e) =>
+                                      e.route == currentLocation ||
+                                      (e.route != '/' &&
+                                          currentLocation.startsWith(e.route)),
+                                );
+                                if (idx > 0) {
+                                  HapticFeedback.selectionClick();
+                                  context.go(primaryItems[idx - 1].route);
+                                }
                               }
                             } else {
                               if (vel < -200) {
@@ -393,6 +420,19 @@ class _AppShellState extends ConsumerState<AppShell>
                                 if (idx >= 0 && idx < primaryItems.length - 1) {
                                   HapticFeedback.selectionClick();
                                   context.go(primaryItems[idx + 1].route);
+                                }
+                              } else if (vel < -600 &&
+                                  primaryItems.length > 1) {
+                                // F-04: RTL backward swipe (left) → previous tab
+                                final idx = primaryItems.indexWhere(
+                                  (e) =>
+                                      e.route == currentLocation ||
+                                      (e.route != '/' &&
+                                          currentLocation.startsWith(e.route)),
+                                );
+                                if (idx > 0) {
+                                  HapticFeedback.selectionClick();
+                                  context.go(primaryItems[idx - 1].route);
                                 }
                               }
                             }
@@ -690,15 +730,7 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: Icon(
-                    widget.item.icon,
-                    key: ValueKey(widget.isSelected),
-                    size: 22,
-                    color: color,
-                  ),
-                ),
+                Icon(widget.item.icon, size: 22, color: color),
                 const SizedBox(height: 2),
                 AnimatedDefaultTextStyle(
                   duration: const Duration(milliseconds: 200),
@@ -1246,38 +1278,38 @@ class _RoleBadge extends StatelessWidget {
 
 // ─── Breadcrumb Title ─────────────────────────────────────────────────────────
 
-class _BreadcrumbTitle extends StatelessWidget {
+class _BreadcrumbTitle extends ConsumerWidget {
   final String location;
   final bool isOnline;
 
   const _BreadcrumbTitle({required this.location, required this.isOnline});
 
-  static const _segmentLabels = <String, String>{
-    'products': 'Products',
-    'routes': 'Routes',
-    'shops': 'Shops',
-    'inventory': 'Inventory',
-    'invoices': 'Invoices',
-    'reports': 'Reports',
-    'settings': 'Settings',
-    'profile': 'Profile',
-    'variants': 'Variants',
-    'edit': 'Edit',
-    'new': 'New',
-  };
+  // Segment keys that map to locale keys.
+  static const _segmentKeys = <String>[
+    'products',
+    'routes',
+    'shops',
+    'inventory',
+    'invoices',
+    'reports',
+    'settings',
+    'profile',
+    'variants',
+    'edit',
+    'new',
+  ];
 
-  String _buildCrumb() {
+  String _buildCrumb(WidgetRef ref) {
     final segments = location.split('/').where((s) => s.isNotEmpty).toList();
     final labels = <String>[];
     for (final seg in segments) {
-      final label = _segmentLabels[seg];
-      if (label != null) labels.add(label);
+      if (_segmentKeys.contains(seg)) labels.add(tr(seg, ref));
     }
     return labels.isEmpty ? AppBrand.appName : labels.join(' \u203a ');
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1285,7 +1317,7 @@ class _BreadcrumbTitle extends StatelessWidget {
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: Text(
-              _buildCrumb(),
+              _buildCrumb(ref),
               key: ValueKey(location),
               overflow: TextOverflow.ellipsis,
             ),

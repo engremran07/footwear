@@ -29,6 +29,7 @@ import '../../screens/bootstrap_profile_screen.dart';
 import '../../screens/about_screen.dart';
 import '../../screens/users_list_screen.dart';
 import '../../widgets/app_shell.dart';
+import '../l10n/app_locale.dart';
 
 /// Normalize path: strip query params, trailing slashes, collapse double slashes.
 String _normalizePath(String raw) {
@@ -348,7 +349,53 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
     ],
-    errorBuilder: (context, state) =>
-        const Scaffold(body: Center(child: Text('Page not found'))),
+    errorBuilder: (context, state) => _ErrorPage(error: state.error),
   );
 });
+
+// ─── 404 / Error ─────────────────────────────────────────────────────────────
+
+class _ErrorPage extends ConsumerWidget {
+  final Exception? error;
+  const _ErrorPage({this.error});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: theme.colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                tr('error', ref),
+                style: theme.textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                tr('not_found', ref),
+                style: theme.textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              FilledButton.icon(
+                onPressed: () => context.go('/'),
+                icon: const Icon(Icons.home_outlined),
+                label: Text(tr('dashboard', ref)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

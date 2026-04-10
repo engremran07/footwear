@@ -164,16 +164,14 @@ String _styles(bool isRtl) {
       '</styleSheet>';
 }
 
-String _worksheet(
-  List<String> headers,
-  List<List<dynamic>> rows,
-  bool isRtl,
-) {
+String _worksheet(List<String> headers, List<List<dynamic>> rows, bool isRtl) {
   final buf = StringBuffer()
     ..write('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>')
-    ..write('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">')
+    ..write(
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+    )
     ..write('<sheetViews>')
-    ..write('<sheetView workbookViewId="0"${isRtl ? ' rightToLeft="1"' : ''}/>') 
+    ..write('<sheetView workbookViewId="0"${isRtl ? ' rightToLeft="1"' : ''}/>')
     ..write('</sheetViews>')
     ..write('<sheetData>');
 
