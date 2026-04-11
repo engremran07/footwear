@@ -13,6 +13,7 @@ import '../providers/auth_provider.dart';
 import '../providers/invoice_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/error_state.dart';
 
 class InvoiceDetailScreen extends ConsumerWidget {
   final String invoiceId;
@@ -65,7 +66,11 @@ class InvoiceDetailScreen extends ConsumerWidget {
           return _InvoiceBody(invoice: inv);
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => mappedErrorState(
+          error: e,
+          ref: ref,
+          onRetry: () => ref.invalidate(invoiceByIdProvider(invoiceId)),
+        ),
       ),
       floatingActionButton: invoiceAsync.whenOrNull(
         data: (inv) {
@@ -185,7 +190,8 @@ class InvoiceDetailScreen extends ConsumerWidget {
       );
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
   }

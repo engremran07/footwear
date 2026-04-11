@@ -113,13 +113,7 @@ class _AppShellState extends ConsumerState<AppShell>
           ),
         ];
       case '/inventory':
-        return [
-          (
-            icon: Icons.swap_horiz,
-            label: tr('transfer_stock', ref),
-            route: '/inventory',
-          ),
-        ];
+        return [];
       default:
         return [];
     }

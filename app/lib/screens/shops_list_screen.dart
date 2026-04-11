@@ -15,6 +15,7 @@ import '../providers/transaction_provider.dart';
 import '../widgets/app_pull_refresh.dart';
 import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/error_state.dart';
 import '../widgets/export_sheet.dart';
 import '../widgets/shimmer_loading.dart';
 
@@ -121,14 +122,15 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     final canCreateShop =
         user != null && (user.isAdmin || user.assignedRouteId != null);
     final scopedStatsShops = shopsAsync.valueOrNull == null
-      ? null
-      : _scopeShopsByRoute(shopsAsync.valueOrNull!);
-    final flowByShop = scopedStatsShops == null || transactionsAsync.valueOrNull == null
-      ? null
-      : _buildShopFlowStats(
-        shops: scopedStatsShops,
-        transactions: transactionsAsync.valueOrNull!,
-        );
+        ? null
+        : _scopeShopsByRoute(shopsAsync.valueOrNull!);
+    final flowByShop =
+        scopedStatsShops == null || transactionsAsync.valueOrNull == null
+        ? null
+        : _buildShopFlowStats(
+            shops: scopedStatsShops,
+            transactions: transactionsAsync.valueOrNull!,
+          );
 
     return Scaffold(
       appBar: AppBar(
@@ -217,7 +219,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                           ...sorted.map(
                             (r) => DropdownMenuItem<String?>(
                               value: r.id,
-                              child: Text('R${r.routeNumber} · ${r.name}'),
+                              child: Text('${r.routeNumber} · ${r.name}'),
                             ),
                           ),
                         ],
@@ -239,14 +241,15 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
               onSelected: (f) => setState(() => _filter = f),
             )
           else
-              const SizedBox.shrink(),
+            const SizedBox.shrink(),
           Expanded(
             child: shopsAsync.when(
               data: (shops) {
                 final scopedShops = _scopeShopsByRoute(shops);
                 final scopedFlowByShop = _buildShopFlowStats(
                   shops: scopedShops,
-                  transactions: transactionsAsync.valueOrNull ??
+                  transactions:
+                      transactionsAsync.valueOrNull ??
                       const <TransactionModel>[],
                 );
                 final filtered = scopedShops.where((s) {
@@ -259,8 +262,9 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                 switch (_filter) {
                   case _ShopQuickFilter.iGot:
                     filtered.sort(
-                      (a, b) => (scopedFlowByShop[b.id]?.cashIn ?? 0)
-                          .compareTo(scopedFlowByShop[a.id]?.cashIn ?? 0),
+                      (a, b) => (scopedFlowByShop[b.id]?.cashIn ?? 0).compareTo(
+                        scopedFlowByShop[a.id]?.cashIn ?? 0,
+                      ),
                     );
                   case _ShopQuickFilter.iGave:
                     filtered.sort(
@@ -323,7 +327,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                       shop: filtered[i],
                       selectedFilter: _filter,
                       flowStats:
-                          scopedFlowByShop[filtered[i].id] ?? const _ShopFlowStats(),
+                          scopedFlowByShop[filtered[i].id] ??
+                          const _ShopFlowStats(),
                       hasDuplicate: duplicateNames.contains(
                         filtered[i].name.toLowerCase(),
                       ),
@@ -332,7 +337,17 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                 );
               },
               loading: () => const ShimmerLoading(),
-              error: (e, _) => Center(child: Text('$e')),
+              error: (e, _) => mappedErrorState(
+                error: e,
+                ref: ref,
+                onRetry: () {
+                  if (user?.isSeller == true && user?.assignedRouteId != null) {
+                    ref.invalidate(shopsByRouteProvider(user!.assignedRouteId!));
+                  } else {
+                    ref.invalidate(shopsProvider);
+                  }
+                },
+              ),
             ),
           ),
         ],
@@ -361,7 +376,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       final r = routeMap[s.routeId];
       return <dynamic>[
         s.name,
-        r != null ? 'R${r.routeNumber} · ${r.name}' : '-',
+        r != null ? '${r.routeNumber} · ${r.name}' : '-',
         s.phone ?? '-',
         s.area ?? '-',
         s.balance,
@@ -401,7 +416,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       final items = grouped[r.id];
       if (items == null || items.isEmpty) continue;
       // Insert route header as a separator row
-      allRows.add(['── R${r.routeNumber} · ${r.name} ──', '', '', '']);
+      allRows.add(['── ${r.routeNumber} · ${r.name} ──', '', '', '']);
       for (final s in items) {
         allRows.add([s.name, s.phone ?? '-', s.area ?? '-', s.balance]);
       }
@@ -462,8 +477,7 @@ Map<String, _ShopFlowStats> _buildShopFlowStats({
   for (final tx in transactions) {
     final shopId = tx.shopId.trim();
     if (!shopIds.contains(shopId)) continue;
-    flowByShop[shopId] =
-        (flowByShop[shopId] ?? const _ShopFlowStats()).add(tx);
+    flowByShop[shopId] = (flowByShop[shopId] ?? const _ShopFlowStats()).add(tx);
   }
 
   return flowByShop;
@@ -520,8 +534,8 @@ class _ShopStatsStrip extends ConsumerWidget {
       (sum, s) => sum + (flowByShop[s.id]?.cashIn ?? 0),
     );
     final totalWillGet = shops
-      .where((s) => s.balance > 0)
-      .fold(0.0, (sum, s) => sum + s.balance);
+        .where((s) => s.balance > 0)
+        .fold(0.0, (sum, s) => sum + s.balance);
     final totalCollective = shops.length;
 
     return Padding(
@@ -690,9 +704,11 @@ class _ShopTile extends ConsumerWidget {
     final hasDebt = shop.balance > 0;
     final hasCredit = shop.balance < 0;
     final cs = Theme.of(context).colorScheme;
-    final (trailingAmount, trailingLabel, trailingColor) = switch (
-      selectedFilter
-    ) {
+    final (
+      trailingAmount,
+      trailingLabel,
+      trailingColor,
+    ) = switch (selectedFilter) {
       _ShopQuickFilter.iGot => (
         flowStats.cashIn,
         tr('i_got', ref),
@@ -769,7 +785,7 @@ class _ShopTile extends ConsumerWidget {
         subtitle: Text(
           [
             if (shop.phone != null) shop.phone,
-            'R${shop.routeNumber}',
+            '${shop.routeNumber}',
             if (shop.area != null) shop.area,
           ].join(' · '),
           maxLines: 1,
@@ -790,10 +806,7 @@ class _ShopTile extends ConsumerWidget {
             ),
             Text(
               trailingLabel,
-              style: TextStyle(
-                fontSize: 10,
-                color: trailingColor,
-              ),
+              style: TextStyle(fontSize: 10, color: trailingColor),
             ),
           ],
         ),
@@ -904,7 +917,7 @@ class _AdminGroupedShopsViewState
                   Expanded(
                     child: Text(
                       r != null
-                          ? 'R${r.routeNumber} · ${r.name}'
+                          ? '${r.routeNumber} · ${r.name}'
                           : tr('shops_unassigned', ref),
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: cs.primary,

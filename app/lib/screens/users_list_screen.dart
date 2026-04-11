@@ -13,6 +13,7 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/app_search_bar.dart';
 import '../widgets/app_pull_refresh.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
 
 /// Dedicated admin-only user management screen (/users).
@@ -125,7 +126,17 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
           Expanded(
             child: usersAsync.when(
               loading: () => const ShimmerLoading(),
-              error: (e, _) => Center(child: Text('$e')),
+              error: (e, _) => mappedErrorState(
+                error: e,
+                ref: ref,
+                onRetry: () {
+                  if (_showInactive) {
+                    ref.invalidate(inactiveUsersProvider);
+                  } else {
+                    ref.invalidate(allUsersProvider);
+                  }
+                },
+              ),
               data: (users) {
                 final filtered = users.where((u) {
                   final matchesSearch =
@@ -334,9 +345,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     }
                   } catch (e) {
                     if (ctx.mounted) {
+                      final key = AppErrorMapper.key(e);
                       ScaffoldMessenger.of(
                         ctx,
-                      ).showSnackBar(errorSnackBar('$e'));
+                      ).showSnackBar(errorSnackBar(tr(key, ref)));
                     }
                   }
                 },
@@ -490,9 +502,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                               }
                             } catch (e) {
                               if (ctx.mounted) {
+                                final key = AppErrorMapper.key(e);
                                 ScaffoldMessenger.of(
                                   ctx,
-                                ).showSnackBar(errorSnackBar('$e'));
+                                ).showSnackBar(errorSnackBar(tr(key, ref)));
                               }
                             }
                           },
@@ -726,7 +739,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
   }
@@ -761,7 +775,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
   }
@@ -858,7 +873,7 @@ class _RoleChip extends StatelessWidget {
 
 // ─── User tile ────────────────────────────────────────────────────────────────
 
-class _UserTile extends StatelessWidget {
+class _UserTile extends ConsumerWidget {
   final UserModel user;
   final UserModel? currentUser;
   final VoidCallback onEdit;
@@ -874,7 +889,7 @@ class _UserTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isSelf = user.id == currentUser?.id;
     final roleColor = user.isAdmin
         ? AppBrand.adminRoleColor
@@ -925,9 +940,9 @@ class _UserTile extends StatelessWidget {
                                 color: AppBrand.errorBg,
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text(
-                                'inactive',
-                                style: TextStyle(
+                              child: Text(
+                                tr('inactive', ref),
+                                style: const TextStyle(
                                   fontSize: 9,
                                   color: AppBrand.errorFg,
                                   fontWeight: FontWeight.bold,

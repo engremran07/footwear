@@ -1,8 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design/app_tokens.dart';
+import '../core/l10n/app_locale.dart';
+import '../core/utils/error_mapper.dart';
 
 enum ErrorType { network, permission, unknown }
+
+Widget mappedErrorState({
+  required Object error,
+  required WidgetRef ref,
+  VoidCallback? onRetry,
+}) {
+  final key = AppErrorMapper.key(error);
+  final errorType = AppErrorMapper.isPermissionOrAuthError(error)
+      ? ErrorType.permission
+      : (key == 'err_network' ||
+            key == 'err_service_unavailable' ||
+            key == 'err_timeout')
+      ? ErrorType.network
+      : ErrorType.unknown;
+
+  return ErrorState(
+    message: tr(key, ref),
+    errorType: errorType,
+    onRetry: onRetry,
+    retryLabel: tr('retry', ref),
+  );
+}
 
 class ErrorState extends StatelessWidget {
   final String message;

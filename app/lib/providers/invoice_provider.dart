@@ -87,27 +87,16 @@ final sellerInvoicesProvider = StreamProvider.autoDispose
     });
 
 /// Role-aware: admins see all, sellers see only their own.
-/// BUG-09: Admin branch delegates to allInvoicesProvider to avoid duplicate
-/// Firestore listeners — halves admin invoice read cost on Spark tier.
+/// Delegates to existing role-scoped providers so admin uses the shared
+/// listener and AsyncValue loading/error state is preserved.
 final roleAwareInvoicesProvider =
-    StreamProvider.autoDispose<List<InvoiceModel>>((ref) {
+    Provider.autoDispose<AsyncValue<List<InvoiceModel>>>((ref) {
       final user = ref.watch(authUserProvider).valueOrNull;
-      if (user == null) return Stream.value([]);
+      if (user == null) return const AsyncData(<InvoiceModel>[]);
       if (user.isAdmin) {
-        // ignore: deprecated_member_use
-        return ref.watch(allInvoicesProvider.stream);
+        return ref.watch(allInvoicesProvider);
       }
-      return FirebaseFirestore.instance
-          .collection(Collections.invoices)
-          .where('seller_id', isEqualTo: user.id)
-          .orderBy('created_at', descending: true)
-          .limit(200)
-          .snapshots()
-          .map(
-            (snap) => snap.docs
-                .map((d) => InvoiceModel.fromJson(d.data(), d.id))
-                .toList(),
-          );
+      return ref.watch(sellerInvoicesProvider(user.id));
     });
 
 final invoiceByIdProvider = StreamProvider.autoDispose

@@ -39,7 +39,7 @@ if (-not (Test-Path $releasesDir)) {
 }
 
 Push-Location $appDir
-$arm64Apk = $null
+$releaseApk = $null
 
 try {
   # 1. Version bump
@@ -73,7 +73,7 @@ try {
   if (-not $SkipBuild) {
     if (-not $WebOnly) {
       # 4a. Fat APK (single file: arm32 + arm64 + x86_64)
-      # NEVER --split-per-abi — always fat APK per project rules.
+      # Always build the single fat APK per project rules.
       Step "Building fat release APK"
       DRY "flutter build apk --release"
 
@@ -87,7 +87,7 @@ try {
           Copy-Item $src $dest -Force
           $sizeMB = [math]::Round((Get-Item $dest).Length / 1MB, 1)
           OK "$destName ($sizeMB MB) -> releases\"
-          $arm64Apk = $dest
+          $releaseApk = $dest
         }
       } else {
         WARN "[DRY] Would copy app-release.apk to releases\FootWear-V{semver}.apk"
@@ -106,9 +106,10 @@ try {
 
   # 5. adb install
   if (-not $SkipInstall -and -not $WebOnly) {
-    Step "Installing arm64 APK to connected Android device"
+    Step "Installing release APK to connected Android device"
     # Resolve adb: prefer PATH, fall back to Android SDK default locations
-    $adbExe = (Get-Command adb -ErrorAction SilentlyContinue)?.Source
+    $adbCommand = Get-Command adb -ErrorAction SilentlyContinue
+    $adbExe = if ($adbCommand) { $adbCommand.Source } else { $null }
     if (-not $adbExe) {
       $candidates = @(
         "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe",
@@ -118,15 +119,15 @@ try {
       $adbExe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
     }
     if ($DryRun) {
-      WARN "[DRY] adb install FootWear-V{semver}-arm64.apk"
+      WARN "[DRY] adb install FootWear-V{semver}.apk"
     } elseif (-not $adbExe) {
       WARN "adb not found -- skipping install (add platform-tools to PATH)"
-    } elseif ($arm64Apk -and (Test-Path $arm64Apk)) {
+    } elseif ($releaseApk -and (Test-Path $releaseApk)) {
       $devices = (& $adbExe devices 2>$null) | Select-String '^\w' | Where-Object { $_ -notmatch '^List' }
       if ($devices) {
-        & $adbExe install -r $arm64Apk
+        & $adbExe install -r $releaseApk
         if ($LASTEXITCODE -eq 0) {
-          OK "Installed $(Split-Path -Leaf $arm64Apk) to device"
+          OK "Installed $(Split-Path -Leaf $releaseApk) to device"
         } else {
           WARN "adb install returned exit code $LASTEXITCODE -- check device connection"
         }
@@ -134,7 +135,7 @@ try {
         WARN "No Android device connected -- skipping adb install"
       }
     } else {
-      WARN "arm64 APK not found -- skipping adb install"
+      WARN "Release APK not found -- skipping adb install"
     }
   } else {
     WARN "Install skipped (-SkipInstall or -WebOnly)"

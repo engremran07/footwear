@@ -12,6 +12,7 @@ import '../providers/route_provider.dart';
 import '../providers/shop_provider.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/error_state.dart';
 
 class RouteDetailScreen extends ConsumerWidget {
   final String routeId;
@@ -277,14 +278,22 @@ class RouteDetailScreen extends ConsumerWidget {
                   },
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('$e')),
+                  error: (e, _) => mappedErrorState(
+                    error: e,
+                    ref: ref,
+                    onRetry: () => ref.invalidate(shopsByRouteProvider(routeId)),
+                  ),
                 ),
               ),
             ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => mappedErrorState(
+          error: e,
+          ref: ref,
+          onRetry: () => ref.invalidate(routeDetailProvider(routeId)),
+        ),
       ),
       floatingActionButton: canAddShop
           ? FloatingActionButton(

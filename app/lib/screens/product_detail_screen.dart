@@ -10,6 +10,7 @@ import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/error_state.dart';
 
 String _stockLabel(int qty, int ppc) {
   if (qty <= 0) return '0 prs';
@@ -39,8 +40,13 @@ class ProductDetailScreen extends ConsumerWidget {
     return productAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) =>
-          Scaffold(body: Center(child: Text('${tr('error', ref)}: $e'))),
+      error: (e, _) => Scaffold(
+        body: mappedErrorState(
+          error: e,
+          ref: ref,
+          onRetry: () => ref.invalidate(productDetailProvider(productId)),
+        ),
+      ),
       data: (product) {
         if (product == null) {
           return Scaffold(
@@ -209,7 +215,13 @@ class ProductDetailScreen extends ConsumerWidget {
                 child: variantsAsync.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('$e')),
+                  error: (e, _) => mappedErrorState(
+                    error: e,
+                    ref: ref,
+                    onRetry: () => ref.invalidate(
+                      productVariantsProvider(productId),
+                    ),
+                  ),
                   data: (variants) {
                     if (variants.isEmpty) {
                       return EmptyState(

@@ -21,6 +21,7 @@ import '../providers/seller_inventory_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/shop_provider.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/error_state.dart';
 
 // =============================================================================
 // CreateSaleInvoiceScreen — used ONLY for sales where stock is being deducted.
@@ -225,7 +226,11 @@ class _CreateSaleInvoiceScreenState
           appBar: AppBar(title: Text(tr('create_sale_invoice', ref))),
           body: inventoryAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('$e')),
+            error: (e, _) => mappedErrorState(
+              error: e,
+              ref: ref,
+              onRetry: () => ref.invalidate(sellerInventoryProvider(user.id)),
+            ),
             data: (inventory) {
               final available = inventory
                   .where((i) => i.quantityAvailable > 0)
@@ -274,7 +279,18 @@ class _CreateSaleInvoiceScreenState
                 const SizedBox(height: 8),
                 shopsAsync.when(
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => Text('$e'),
+                  error: (e, _) => mappedErrorState(
+                    error: e,
+                    ref: ref,
+                    onRetry: () {
+                      final assignedRouteId = user.assignedRouteId ?? '';
+                      if (user.isAdmin) {
+                        ref.invalidate(shopsProvider);
+                      } else if (assignedRouteId.isNotEmpty) {
+                        ref.invalidate(shopsByRouteProvider(assignedRouteId));
+                      }
+                    },
+                  ),
                   data: (shops) {
                     if (shops.isEmpty) {
                       return Text(tr('no_data', ref));

@@ -132,6 +132,15 @@ class TransactionModel {
   bool get isCashIn => type == 'cash_in';
   bool get isCashOut => type == 'cash_out';
   bool get isReturn => type == 'return';
+  bool get isPayment => type == 'payment';
+  bool get isWriteOff => type == 'write_off';
+  bool get reducesBalance => isCashIn || isReturn || isPayment || isWriteOff;
+  double get balanceImpact => switch (type) {
+    typeCashOut => amount,
+    typeCashIn || typeReturn || 'payment' => -amount,
+    'write_off' => 0,
+    _ => 0,
+  };
   bool get hasItems => items.isNotEmpty;
 
   factory TransactionModel.fromJson(Map<String, dynamic> json, String docId) {

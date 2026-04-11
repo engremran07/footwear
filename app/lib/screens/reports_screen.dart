@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
+import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/shop_model.dart';
+import '../models/transaction_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
@@ -18,6 +20,7 @@ import '../providers/shop_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/export_sheet.dart';
+import '../widgets/error_state.dart';
 
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
@@ -91,7 +94,11 @@ class ReportsScreen extends ConsumerWidget {
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text('$e'),
+            error: (e, _) => mappedErrorState(
+              error: e,
+              ref: ref,
+              onRetry: () => ref.invalidate(dashboardStatsProvider),
+            ),
           ),
           const SizedBox(height: 16),
           // Monthly Cash Flow Chart
@@ -716,6 +723,16 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
   String? _selectedShopId;
   bool _generating = false;
 
+  String _transactionTypeLabel(TransactionModel tx) {
+    return switch (tx.type) {
+      TransactionModel.typeCashIn => tr('cash_in', ref),
+      TransactionModel.typeCashOut => tr('cash_out', ref),
+      TransactionModel.typeReturn => tr('return', ref),
+      'write_off' => tr('write_off', ref),
+      _ => tx.type.replaceAll('_', ' '),
+    };
+  }
+
   Map<String, String> _labels(WidgetRef ref) {
     final keys = [
       'date',
@@ -775,7 +792,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       // the stored customer.balance regardless of transaction-count limits.
       final netTx = txs.fold<double>(
         0.0,
-        (s, t) => t.isCashOut ? s + t.amount : s - t.amount,
+        (s, t) => s + t.balanceImpact,
       );
 
       final bytes = await buildPdfLedger(
@@ -808,7 +825,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
             .map(
               (t) => [
                 AppFormatters.dateTime(t.createdAt),
-                t.type == 'cash_in' ? tr('cash_in', ref) : tr('cash_out', ref),
+                _transactionTypeLabel(t),
                 AppFormatters.sar(t.amount),
                 t.description ?? '',
               ],
@@ -819,7 +836,8 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     } finally {
       if (mounted) setState(() => _generating = false);
@@ -861,7 +879,17 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
             const SizedBox(height: 10),
             shopsAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (e, _) => Text('$e'),
+              error: (e, _) => mappedErrorState(
+                error: e,
+                ref: ref,
+                onRetry: () {
+                  if (user?.isAdmin == true) {
+                    ref.invalidate(shopsProvider);
+                  } else if (routeId.isNotEmpty) {
+                    ref.invalidate(shopsByRouteProvider(routeId));
+                  }
+                },
+              ),
               data: (shops) => DropdownButtonFormField<String>(
                 initialValue: _selectedShopId,
                 decoration: InputDecoration(
@@ -1028,7 +1056,8 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     } finally {
       if (mounted) setState(() => _generating = false);
@@ -1068,7 +1097,11 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
             const SizedBox(height: 10),
             usersAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (e, _) => Text('$e'),
+              error: (e, _) => mappedErrorState(
+                error: e,
+                ref: ref,
+                onRetry: () => ref.invalidate(allUsersProvider),
+              ),
               data: (users) {
                 final sellers = users.where((u) => u.isSeller).toList();
                 return DropdownButtonFormField<String>(

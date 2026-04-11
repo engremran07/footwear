@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/l10n/app_locale.dart';
+import '../core/utils/error_mapper.dart';
 import '../core/utils/snack_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/bootstrap_provider.dart';
@@ -102,8 +103,9 @@ class BootstrapProfileScreen extends ConsumerWidget {
       );
     } catch (e) {
       if (!context.mounted) return;
+      final key = AppErrorMapper.key(e);
       ScaffoldMessenger.of(context).showSnackBar(
-        errorSnackBar('$e'),
+        errorSnackBar(tr(key, ref)),
       );
     }
   }

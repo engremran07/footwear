@@ -1211,6 +1211,9 @@ Future<Uint8List> generateInvoicePdf({
 }) async {
   await _ensureFontBytes();
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
+  final lblSubtotal = trRead('subtotal', locale);
+  final lblDiscount = trRead('discount', locale);
+  final lblNotes = trRead('notes', locale);
   return Isolate.run(() {
     final fonts = _fontsFromBytes(aB, uB);
     final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
@@ -1447,7 +1450,7 @@ Future<Uint8List> generateInvoicePdf({
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Subtotal', style: ts(size: 9)),
+                        pw.Text(lblSubtotal, style: ts(size: 9)),
                         pw.Text(_fmtAmt(invoice.subtotal), style: ts(size: 9)),
                       ],
                     ),
@@ -1457,7 +1460,7 @@ Future<Uint8List> generateInvoicePdf({
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
                           pw.Text(
-                            'Discount',
+                            lblDiscount,
                             style: ts(size: 9, color: PdfColors.green700),
                           ),
                           pw.Text(
@@ -1488,7 +1491,10 @@ Future<Uint8List> generateInvoicePdf({
             pw.SizedBox(height: 14),
 
             if (invoice.notes != null && invoice.notes!.isNotEmpty) ...[
-              pw.Text('Notes:', style: ts(size: 9, fw: pw.FontWeight.bold)),
+              pw.Text(
+                '$lblNotes:',
+                style: ts(size: 9, fw: pw.FontWeight.bold),
+              ),
               pw.Text(_s(invoice.notes!), style: ts(size: 9)),
               pw.SizedBox(height: 8),
             ],

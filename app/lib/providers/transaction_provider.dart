@@ -29,6 +29,9 @@ import 'auth_provider.dart';
 // SOFT DELETE (DI-01): never hard-delete transactions; set deleted=true + reverse balance.
 // =============================================================================
 
+const _shopTransactionsLiveLimit = 150;
+const _shopsAnalyticsTransactionsLimit = 500;
+
 final shopTransactionsProvider = StreamProvider.autoDispose
     .family<List<TransactionModel>, String>((ref, shopId) {
       final normalizedShopId = shopId.trim();
@@ -40,6 +43,7 @@ final shopTransactionsProvider = StreamProvider.autoDispose
           .collection(Collections.transactions)
           .where('shop_id', isEqualTo: normalizedShopId)
           .orderBy('created_at', descending: true)
+          .limit(_shopTransactionsLiveLimit)
           .snapshots()
           .map(
             (snap) => snap.docs
@@ -79,12 +83,16 @@ final shopsAnalyticsTransactionsProvider =
       );
 
       if (user.isAdmin) {
-        return collection.orderBy('created_at', descending: true).snapshots().map(
-          (snap) => snap.docs
-              .where((d) => d.data()['deleted'] != true)
-              .map((d) => TransactionModel.fromJson(d.data(), d.id))
-              .toList(),
-        );
+        return collection
+            .orderBy('created_at', descending: true)
+            .limit(_shopsAnalyticsTransactionsLimit)
+            .snapshots()
+            .map(
+              (snap) => snap.docs
+                  .where((d) => d.data()['deleted'] != true)
+                  .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                  .toList(),
+            );
       }
 
       final routeId = (user.assignedRouteId ?? '').trim();
@@ -95,6 +103,7 @@ final shopsAnalyticsTransactionsProvider =
       return collection
           .where('route_id', isEqualTo: routeId)
           .orderBy('created_at', descending: true)
+          .limit(_shopsAnalyticsTransactionsLimit)
           .snapshots()
           .map(
             (snap) => snap.docs
@@ -149,14 +158,13 @@ final shopTransactionsExportProvider = FutureProvider.autoDispose
       final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)
           .where('shop_id', isEqualTo: normalizedShopId)
+          .orderBy('created_at')
           .get();
 
       return snap.docs
           .where((d) => d.data()['deleted'] != true)
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
-          .toList()
-        // Chronological export keeps running-balance statements readable.
-        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          .toList();
     });
 
 class TransactionNotifier extends AsyncNotifier<void> {

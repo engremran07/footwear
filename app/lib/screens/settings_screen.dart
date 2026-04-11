@@ -18,6 +18,7 @@ import '../providers/route_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/error_state.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -81,7 +82,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
   }
@@ -222,7 +224,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       usersAsync.when(
                         loading: () =>
                             const Center(child: CircularProgressIndicator()),
-                        error: (e, _) => Text('$e'),
+                        error: (e, _) => mappedErrorState(
+                          error: e,
+                          ref: ref,
+                          onRetry: () => ref.invalidate(allUsersProvider),
+                        ),
                         data: (users) {
                           if (users.isEmpty) {
                             return Padding(
@@ -563,9 +569,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     }
                   } catch (e) {
                     if (ctx.mounted) {
+                      final key = AppErrorMapper.key(e);
                       ScaffoldMessenger.of(
                         ctx,
-                      ).showSnackBar(errorSnackBar('$e'));
+                      ).showSnackBar(errorSnackBar(tr(key, ref)));
                     }
                   }
                 },
@@ -1180,7 +1187,7 @@ class _DatabaseFlushSectionState extends ConsumerState<_DatabaseFlushSection> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(errorSnackBar(AppErrorMapper.key(e)));
+        ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
       }
     } finally {
       if (mounted) setState(() => _flushing = false);

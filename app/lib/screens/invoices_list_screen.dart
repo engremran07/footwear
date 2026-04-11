@@ -11,6 +11,7 @@ import '../providers/auth_provider.dart';
 import '../providers/invoice_provider.dart';
 import '../widgets/app_pull_refresh.dart';
 import '../widgets/app_search_bar.dart';
+import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
 
 class InvoicesListScreen extends ConsumerStatefulWidget {
@@ -113,7 +114,11 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
                 );
               },
               loading: () => const ShimmerLoading(),
-              error: (e, _) => Center(child: Text('$e')),
+              error: (e, _) => mappedErrorState(
+                error: e,
+                ref: ref,
+                onRetry: () => ref.invalidate(roleAwareInvoicesProvider),
+              ),
             ),
           ),
         ],

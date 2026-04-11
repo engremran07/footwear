@@ -228,6 +228,12 @@ Conflict resolution order for instructions:
 
 ## 10) Current Audit Status
 
+2026-04-11 audit v12 — v3.4.11+42:
+
+- Spark free-tier hardening: capped the shops analytics listener at 500 docs and the live shop-detail ledger listener at 150 docs, while preserving full-history account-statement exports through one-shot ordered queries
+- Ledger display correctness: running-balance reconstruction now uses typed balance impact, return/payment/write-off entries no longer render like new debt, and the running-balance label is localized in the shop ledger UI
+- Error/i18n + release workflow cleanup: role-aware invoices no longer depend on Riverpod's deprecated `.stream`, mapped localized `ErrorState` now replaces raw async exception text across the affected screens, invoice PDF totals labels and inactive badges are localized, hardcoded route `R` prefixes were removed from touched shop flows, inventory long-press no longer routes to itself, and `tool/release.ps1` is now compatible with Windows PowerShell 5.1
+
 2026-04-11 audit v11 — v3.4.10+41:
 
 - Shops analytics correction: `I got` / `I gave` chips on the shops screen now aggregate real `cash_in` / `cash_out` ledger entries, `I will get` stays tied to current outstanding balance, and seller analytics read route-scoped transactions via a dedicated `route_id + created_at` index

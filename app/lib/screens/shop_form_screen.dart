@@ -176,7 +176,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                     items: routes
                         .map((r) => DropdownMenuItem(
                               value: r.id,
-                              child: Text('R${r.routeNumber} - ${r.name}'),
+                              child: Text('${r.routeNumber} - ${r.name}'),
                             ))
                         .toList(),
                     validator: (v) => v == null ? tr('required', ref) : null,

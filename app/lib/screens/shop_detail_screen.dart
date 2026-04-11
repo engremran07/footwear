@@ -21,6 +21,7 @@ import '../providers/user_provider.dart';
 import '../models/user_model.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/error_state.dart';
 import '../widgets/export_sheet.dart';
 import 'package:printing/printing.dart';
 import '../core/utils/pdf_export.dart';
@@ -467,11 +468,29 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     'mode': tr('mode', ref),
   };
 
-  Future<void> _generatePdf(ShopModel shop, List<TransactionModel> txs) async {
+  String _transactionTypeLabel(TransactionModel tx) {
+    return switch (tx.type) {
+      TransactionModel.typeCashIn => tr('cash_in', ref),
+      TransactionModel.typeCashOut => tr('cash_out', ref),
+      TransactionModel.typeReturn => tr('return', ref),
+      'write_off' => tr('write_off', ref),
+      _ => tx.type.replaceAll('_', ' '),
+    };
+  }
+
+  Future<List<TransactionModel>> _loadFullTransactions() async {
+    final txs = await ref.read(
+      shopTransactionsExportProvider(widget.shopId).future,
+    );
+    return [...txs]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  }
+
+  Future<void> _generatePdf(ShopModel shop) async {
     try {
       final locale = ref.read(appLocaleProvider);
       final settings = await ref.read(settingsProvider.future);
       final user = ref.read(authUserProvider).valueOrNull;
+      final sorted = await _loadFullTransactions();
       final allUsers = user?.isAdmin == true
           ? ref.read(allUsersProvider).valueOrNull ?? <UserModel>[]
           : <UserModel>[];
@@ -479,15 +498,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
         for (final u in allUsers) u.id: u.displayName,
       };
       if (user != null) entryByMap[user.id] = user.displayName;
-      final sorted = [...txs]
-        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
       final logoBytes = settings.logoBytes;
       // Reconcile opening balance: stored balance minus the net of the
       // displayed transactions, so the final running balance equals shop.balance.
-      final netTx = sorted.fold<double>(
-        0.0,
-        (s, t) => t.isCashOut ? s + t.amount : s - t.amount,
-      );
+      final netTx = sorted.fold<double>(0.0, (s, t) => s + t.balanceImpact);
       final bytes = await buildPdfLedger(
         shopName: shop.name,
         companyName: settings.companyName,
@@ -509,7 +523,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar('$e'));
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
   }
@@ -648,9 +663,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       if (ctx.mounted) Navigator.pop(ctx);
                     } catch (e) {
                       if (ctx.mounted) {
+                        final key = AppErrorMapper.key(e);
                         ScaffoldMessenger.of(
                           ctx,
-                        ).showSnackBar(errorSnackBar('$e'));
+                        ).showSnackBar(errorSnackBar(tr(key, ref)));
                       }
                     }
                   },
@@ -672,8 +688,13 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     return shopAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) =>
-          Scaffold(body: Center(child: Text('${tr('error', ref)}: $e'))),
+      error: (e, _) => Scaffold(
+        body: mappedErrorState(
+          error: e,
+          ref: ref,
+          onRetry: () => ref.invalidate(shopDetailProvider(widget.shopId)),
+        ),
+      ),
       data: (shop) {
         if (shop == null) {
           return Scaffold(
@@ -749,13 +770,11 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       }
 
                     case _ShopAction.pdf:
-                      final txs = txAsync.valueOrNull ?? [];
-                      _generatePdf(shop, txs);
+                      _generatePdf(shop);
 
                     case _ShopAction.share:
-                      final txs = txAsync.valueOrNull ?? [];
-                      final sorted = [...txs]
-                        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+                      final sorted = await _loadFullTransactions();
+                      if (!context.mounted) return;
                       ExportSheet.show(
                         context,
                         ref,
@@ -770,9 +789,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             .map(
                               (t) => [
                                 AppFormatters.dateTime(t.createdAt),
-                                t.type == 'cash_in'
-                                    ? tr('cash_in', ref)
-                                    : tr('cash_out', ref),
+                                _transactionTypeLabel(t),
                                 AppFormatters.sar(t.amount),
                                 t.description ?? '',
                               ],
@@ -798,7 +815,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           final logoBytes = settings.logoBytes;
                           final netTx = sorted.fold<double>(
                             0.0,
-                            (s, t) => t.isCashOut ? s + t.amount : s - t.amount,
+                            (s, t) => s + t.balanceImpact,
                           );
                           return buildPdfLedger(
                             shopName: shop.name,
@@ -912,7 +929,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               ),
                             ),
                             child: Text(
-                              'R${shop.routeNumber}',
+                              '${shop.routeNumber}',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -1229,7 +1246,13 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 child: txAsync.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('$e')),
+                  error: (e, _) => mappedErrorState(
+                    error: e,
+                    ref: ref,
+                    onRetry: () => ref.invalidate(
+                      shopTransactionsProvider(widget.shopId),
+                    ),
+                  ),
                   data: (txs) {
                     if (txs.isEmpty) {
                       return EmptyState(
@@ -1247,7 +1270,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     for (final tx in activeTxs) {
                       balanceMap[tx.id] = bal;
                       // Reverse the tx to get balance before it was applied
-                      bal = tx.isCashOut ? bal - tx.amount : bal + tx.amount;
+                      bal -= tx.balanceImpact;
                     }
 
                     // Build grouped items with month headers
@@ -1359,11 +1382,14 @@ class _TransactionTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDeleted = tx.deleted;
-    final isCashIn = tx.type == 'cash_in';
+    final isWriteOff = tx.isWriteOff;
+    final reducesBalance = tx.reducesBalance;
     final color = isDeleted
         ? Theme.of(context).colorScheme.onSurfaceVariant
-        : (isCashIn ? AppBrand.successColor : AppBrand.errorColor);
-    final sign = isCashIn ? '+' : '-';
+      : isWriteOff
+      ? AppBrand.warningColor
+      : (reducesBalance ? AppBrand.successColor : AppBrand.errorColor);
+    final sign = reducesBalance ? '+' : '-';
     final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
     final totalQty = tx.items.fold<int>(0, (acc, item) => acc + item.qty);
 
@@ -1374,7 +1400,11 @@ class _TransactionTile extends ConsumerWidget {
         child: Icon(
           isDeleted
               ? Icons.remove_circle_outline
-              : (isCashIn ? Icons.arrow_downward : Icons.arrow_upward),
+              : tx.isReturn
+              ? Icons.assignment_return
+              : isWriteOff
+              ? Icons.money_off
+              : (reducesBalance ? Icons.arrow_downward : Icons.arrow_upward),
           color: color,
           size: 20,
         ),
@@ -1425,7 +1455,7 @@ class _TransactionTile extends ConsumerWidget {
           // Running balance (CreditBook-style)
           if (runningBalance != null)
             Text(
-              'Balance: ${AppFormatters.sar(runningBalance!)}',
+              '${tr('running_balance', ref)}: ${AppFormatters.sar(runningBalance!)}',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
