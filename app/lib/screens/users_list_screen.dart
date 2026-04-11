@@ -295,6 +295,14 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       passC.text.trim().isEmpty) {
                     return;
                   }
+                  if (passC.text.trim().length < 8) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        warningSnackBar(tr('err_weak_password', ref)),
+                      );
+                    }
+                    return;
+                  }
                   if (role == 'seller' &&
                       (selectedRouteId == null ||
                           selectedRouteId!.trim().isEmpty)) {
@@ -430,8 +438,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                               : Icons.warning_amber_rounded,
                           size: 16,
                           color: user.emailVerified
-                              ? Colors.green
-                              : Colors.orange,
+                              ? AppBrand.successColor
+                              : AppBrand.warningColor,
                         ),
                         label: Text(
                           tr(
@@ -588,6 +596,14 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                             user.email.trim().toLowerCase() &&
                         emailC.text.trim().isNotEmpty;
                     final passwordSet = passwordC.text.trim().isNotEmpty;
+                    if (passwordSet && passwordC.text.trim().length < 8) {
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          warningSnackBar(tr('err_weak_password', ref)),
+                        );
+                      }
+                      return;
+                    }
                     if (emailChanged || passwordSet) {
                       await notifier.adminUpdateUserAuth(
                         uid: user.id,

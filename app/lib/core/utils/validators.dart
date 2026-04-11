@@ -6,8 +6,10 @@ class AppValidators {
   /// Returns a validator function that rejects blank values.
   /// Pass an optional [fieldName] to include it in the error message.
   /// Pass [locale] to get translated messages.
-  static String? Function(String?) required(
-      [String? fieldName, AppLocale? locale]) {
+  static String? Function(String?) required([
+    String? fieldName,
+    AppLocale? locale,
+  ]) {
     return (String? value) {
       if (value == null || value.trim().isEmpty) {
         if (fieldName != null) {
@@ -74,7 +76,10 @@ class AppValidators {
   static String? Function(String?) minLength(int min, [AppLocale? locale]) =>
       (String? value) {
         if (value == null || value.trim().length < min) {
-          return trRead('min_6_chars', locale ?? AppLocale.en);
+          return trRead(
+            'min_n_chars',
+            locale ?? AppLocale.en,
+          ).replaceAll('%d', '$min');
         }
         return null;
       };
@@ -82,7 +87,10 @@ class AppValidators {
   static String? Function(String?) maxLength(int max, [AppLocale? locale]) =>
       (String? value) {
         if (value != null && value.trim().length > max) {
-          return 'Maximum $max characters';
+          return trRead(
+            'max_n_chars',
+            locale ?? AppLocale.en,
+          ).replaceAll('%d', '$max');
         }
         return null;
       };

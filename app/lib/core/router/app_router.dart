@@ -317,7 +317,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/invoices/:id',
             pageBuilder: (_, s) => _fadePage(
-              InvoiceDetailScreen(invoiceId: s.pathParameters['id']!),
+              InvoiceDetailScreen(
+                invoiceId: s.pathParameters['id']!,
+                backTo: s.uri.queryParameters['from'],
+              ),
               s,
             ),
           ),

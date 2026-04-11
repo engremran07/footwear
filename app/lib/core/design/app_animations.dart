@@ -16,19 +16,22 @@ extension AppAnimations on Widget {
       );
 
   /// Staggered list item entrance with index-based delay.
-  Widget listEntry(int index) => animate()
-      .fadeIn(
-        duration: AppTokens.durNormal,
-        delay: Duration(milliseconds: 50 * index),
-        curve: AppTokens.curveEnter,
-      )
-      .slideY(
-        begin: 0.05,
-        end: 0,
-        duration: AppTokens.durNormal,
-        delay: Duration(milliseconds: 50 * index),
-        curve: AppTokens.curveEnter,
-      );
+  Widget listEntry(int index) {
+    final cappedIndex = index.clamp(0, 10);
+    return animate()
+        .fadeIn(
+          duration: AppTokens.durNormal,
+          delay: Duration(milliseconds: 50 * cappedIndex),
+          curve: AppTokens.curveEnter,
+        )
+        .slideY(
+          begin: 0.05,
+          end: 0,
+          duration: AppTokens.durNormal,
+          delay: Duration(milliseconds: 50 * cappedIndex),
+          curve: AppTokens.curveEnter,
+        );
+  }
 
   /// Wraps this widget with tap-reactive press scale feedback.
   /// Uses [PressableWidget] — NOT an infinite loop animation.

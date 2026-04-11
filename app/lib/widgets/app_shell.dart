@@ -104,6 +104,22 @@ class _AppShellState extends ConsumerState<AppShell>
             route: '/products/new',
           ),
         ];
+      case '/invoices':
+        return [
+          (
+            icon: Icons.add_circle_outline,
+            label: tr('sale_invoice', ref),
+            route: '/invoices/new',
+          ),
+        ];
+      case '/inventory':
+        return [
+          (
+            icon: Icons.swap_horiz,
+            label: tr('transfer_stock', ref),
+            route: '/inventory',
+          ),
+        ];
       default:
         return [];
     }
@@ -198,8 +214,8 @@ class _AppShellState extends ConsumerState<AppShell>
       (icon: Icons.dashboard, key: 'dashboard', route: '/'),
       (icon: Icons.storefront, key: 'shops', route: '/shops'),
       (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
+      (icon: Icons.analytics, key: 'reports', route: '/reports'),
       (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
-      (icon: Icons.settings, key: 'settings', route: '/settings'),
     ];
   }
 
@@ -378,62 +394,53 @@ class _AppShellState extends ConsumerState<AppShell>
                               if (isRtl && vel > 200) _closeDrawer();
                               return;
                             }
-                            // Drawer closed: open OR tab-swipe
+                            // Only allow tab swipe on top-level nav routes
+                            final isTopLevel = primaryItems.any(
+                              (e) => e.route == currentLocation,
+                            );
+                            final absVel = vel.abs();
+                            // Drawer closed: tab-swipe (high vel) OR drawer-open (low vel)
                             if (!isRtl) {
-                              if (vel > 200) {
-                                _openDrawer();
-                              } else if (vel < -600 &&
+                              if (absVel >= 400 &&
+                                  isTopLevel &&
                                   primaryItems.length > 1) {
                                 final idx = primaryItems.indexWhere(
-                                  (e) =>
-                                      e.route == currentLocation ||
-                                      (e.route != '/' &&
-                                          currentLocation.startsWith(e.route)),
+                                  (e) => e.route == currentLocation,
                                 );
-                                if (idx >= 0 && idx < primaryItems.length - 1) {
+                                if (vel < 0 &&
+                                    idx >= 0 &&
+                                    idx < primaryItems.length - 1) {
+                                  // Forward swipe (left) → next tab
                                   HapticFeedback.selectionClick();
                                   context.go(primaryItems[idx + 1].route);
-                                }
-                              } else if (vel > 600 && primaryItems.length > 1) {
-                                // F-04: backward swipe (right) → previous tab
-                                final idx = primaryItems.indexWhere(
-                                  (e) =>
-                                      e.route == currentLocation ||
-                                      (e.route != '/' &&
-                                          currentLocation.startsWith(e.route)),
-                                );
-                                if (idx > 0) {
+                                } else if (vel > 0 && idx > 0) {
+                                  // Backward swipe (right) → previous tab
                                   HapticFeedback.selectionClick();
                                   context.go(primaryItems[idx - 1].route);
                                 }
+                              } else if (vel > 200) {
+                                _openDrawer();
                               }
                             } else {
-                              if (vel < -200) {
-                                _openDrawer();
-                              } else if (vel > 600 && primaryItems.length > 1) {
+                              if (absVel >= 400 &&
+                                  isTopLevel &&
+                                  primaryItems.length > 1) {
                                 final idx = primaryItems.indexWhere(
-                                  (e) =>
-                                      e.route == currentLocation ||
-                                      (e.route != '/' &&
-                                          currentLocation.startsWith(e.route)),
+                                  (e) => e.route == currentLocation,
                                 );
-                                if (idx >= 0 && idx < primaryItems.length - 1) {
+                                if (vel > 0 &&
+                                    idx >= 0 &&
+                                    idx < primaryItems.length - 1) {
+                                  // RTL forward swipe (right) → next tab
                                   HapticFeedback.selectionClick();
                                   context.go(primaryItems[idx + 1].route);
-                                }
-                              } else if (vel < -600 &&
-                                  primaryItems.length > 1) {
-                                // F-04: RTL backward swipe (left) → previous tab
-                                final idx = primaryItems.indexWhere(
-                                  (e) =>
-                                      e.route == currentLocation ||
-                                      (e.route != '/' &&
-                                          currentLocation.startsWith(e.route)),
-                                );
-                                if (idx > 0) {
+                                } else if (vel < 0 && idx > 0) {
+                                  // RTL backward swipe (left) → previous tab
                                   HapticFeedback.selectionClick();
                                   context.go(primaryItems[idx - 1].route);
                                 }
+                              } else if (vel < -200) {
+                                _openDrawer();
                               }
                             }
                           },
@@ -1243,17 +1250,17 @@ class _UserAvatar extends StatelessWidget {
 
 // ─── Role Badge ───────────────────────────────────────────────────────────────
 
-class _RoleBadge extends StatelessWidget {
+class _RoleBadge extends ConsumerWidget {
   final UserRole role;
   final bool small;
 
   const _RoleBadge({required this.role, this.small = false});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final (label, color) = switch (role) {
-      UserRole.admin => ('Admin', AppBrand.adminRoleColor),
-      UserRole.seller => ('Seller', AppBrand.sellerRoleColor),
+      UserRole.admin => (tr('role_admin', ref), AppBrand.adminRoleColor),
+      UserRole.seller => (tr('role_seller', ref), AppBrand.sellerRoleColor),
     };
     return Container(
       padding: EdgeInsets.symmetric(
@@ -1302,8 +1309,14 @@ class _BreadcrumbTitle extends ConsumerWidget {
   String _buildCrumb(WidgetRef ref) {
     final segments = location.split('/').where((s) => s.isNotEmpty).toList();
     final labels = <String>[];
-    for (final seg in segments) {
-      if (_segmentKeys.contains(seg)) labels.add(tr(seg, ref));
+    for (int i = 0; i < segments.length; i++) {
+      final seg = segments[i];
+      if (_segmentKeys.contains(seg)) {
+        labels.add(tr(seg, ref));
+      } else if (i > 0 && _segmentKeys.contains(segments[i - 1])) {
+        // BUG-10: ID segment after a known parent → show 'details' label
+        labels.add(tr('details', ref));
+      }
     }
     return labels.isEmpty ? AppBrand.appName : labels.join(' \u203a ');
   }
@@ -1332,22 +1345,27 @@ class _BreadcrumbTitle extends ConsumerWidget {
 
 // ─── Connectivity Dot ─────────────────────────────────────────────────────────
 
-class _ConnectivityDot extends StatelessWidget {
+class _ConnectivityDot extends ConsumerWidget {
   final bool isOnline;
   const _ConnectivityDot({required this.isOnline});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Tooltip(
-      message: isOnline ? 'Online' : 'Offline',
+      message: isOnline ? tr('online', ref) : tr('offline', ref),
       child: Container(
         width: 10,
         height: 10,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isOnline ? Colors.green : Colors.grey,
+          color: isOnline ? AppBrand.successColor : AppBrand.stockColor,
           boxShadow: isOnline
-              ? [BoxShadow(color: Colors.green.withAlpha(100), blurRadius: 4)]
+              ? [
+                  BoxShadow(
+                    color: AppBrand.successColor.withAlpha(100),
+                    blurRadius: 4,
+                  ),
+                ]
               : null,
         ),
       ),

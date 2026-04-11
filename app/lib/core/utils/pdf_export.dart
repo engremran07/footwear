@@ -82,6 +82,8 @@ bool _containsRtlChars(String text) => RegExp(
 pw.TextDirection _cellDir(String text, pw.TextDirection fallback) =>
     _containsRtlChars(text) ? pw.TextDirection.rtl : fallback;
 
+const pw.TextDirection _amountDir = pw.TextDirection.ltr;
+
 /// Builds a PDF document from tabular data and returns bytes.
 /// When [locale] is Arabic or Urdu, loads the appropriate font and
 /// renders all text RTL.
@@ -382,15 +384,15 @@ Future<Uint8List> buildPdfLedger({
             labels['date'] ?? 'Date',
             labels['description'] ?? 'Remark',
             labels['entry_by'] ?? 'Entry By',
-            labels['credit'] ?? 'Cash In',
             labels['debit'] ?? 'Cash Out',
+            labels['credit'] ?? 'Cash In',
             labels['running_balance'] ?? 'Balance',
           ]
         : [
             labels['date'] ?? 'Date',
             labels['description'] ?? 'Remark',
-            labels['credit'] ?? 'Cash In',
             labels['debit'] ?? 'Cash Out',
+            labels['credit'] ?? 'Cash In',
             labels['running_balance'] ?? 'Balance',
           ];
     final colCount = colWidths.length;
@@ -653,7 +655,7 @@ Future<Uint8List> buildPdfLedger({
                             font: primaryFont,
                             fontFallback: ff,
                           ),
-                          textDirection: dir,
+                          textDirection: _amountDir,
                         ),
                       ),
                     ],
@@ -732,6 +734,7 @@ pw.Widget _summaryCell({
               fontFallback: ff,
             ),
             textAlign: pw.TextAlign.center,
+            textDirection: _amountDir,
           ),
         ],
       ),
@@ -801,19 +804,19 @@ pw.Widget _buildLedgerDataRow(
           r.date,
           r.desc,
           r.entryBy,
-          r.cashIn > 0 ? _fmtAmtC(r.cashIn, currencyStr) : '',
           r.cashOut > 0 ? _fmtAmtC(r.cashOut, currencyStr) : '',
+          r.cashIn > 0 ? _fmtAmtC(r.cashIn, currencyStr) : '',
           _fmtAmtC(r.balance, currencyStr),
         ]
       : [
           r.date,
           r.desc,
-          r.cashIn > 0 ? _fmtAmtC(r.cashIn, currencyStr) : '',
           r.cashOut > 0 ? _fmtAmtC(r.cashOut, currencyStr) : '',
+          r.cashIn > 0 ? _fmtAmtC(r.cashIn, currencyStr) : '',
           _fmtAmtC(r.balance, currencyStr),
         ];
-  final cashInIdx = showEntryBy ? 3 : 2;
-  final cashOutIdx = showEntryBy ? 4 : 3;
+  final cashOutIdx = showEntryBy ? 3 : 2;
+  final cashInIdx = showEntryBy ? 4 : 3;
 
   return pw.Container(
     decoration: pw.BoxDecoration(
@@ -846,7 +849,9 @@ pw.Widget _buildLedgerDataRow(
               font: primaryFont,
               fontFallback: ff,
             ),
-            textDirection: _cellDir(cells[i], dir),
+            textDirection: i >= cashOutIdx
+                ? _amountDir
+                : _cellDir(cells[i], dir),
           ),
         );
       }),

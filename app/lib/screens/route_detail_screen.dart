@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
@@ -38,11 +39,11 @@ class RouteDetailScreen extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.edit),
               tooltip: tr('tooltip_edit_route', ref),
-              onPressed: () => context.push('/routes/$routeId/edit'),
+              onPressed: () => context.go('/routes/$routeId/edit'),
             ),
           if (isAdmin)
             IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
+              icon: const Icon(Icons.delete, color: AppBrand.errorColor),
               tooltip: tr('tooltip_delete_route', ref),
               onPressed: () async {
                 final ok = await ConfirmDialog.show(
@@ -59,8 +60,9 @@ class RouteDetailScreen extends ConsumerWidget {
                 } catch (e) {
                   if (context.mounted) {
                     final key = AppErrorMapper.key(e);
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(errorSnackBar(tr(key, ref)));
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(errorSnackBar(tr(key, ref)));
                   }
                 }
               },
@@ -88,29 +90,35 @@ class RouteDetailScreen extends ConsumerWidget {
                           CircleAvatar(
                             backgroundColor: theme.colorScheme.primaryContainer,
                             radius: 24,
-                            child: Text('${route.routeNumber}',
-                                style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color:
-                                        theme.colorScheme.onPrimaryContainer)),
+                            child: Text(
+                              '${route.routeNumber}',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onPrimaryContainer,
+                              ),
+                            ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(route.name,
-                                    style: theme.textTheme.titleLarge?.copyWith(
-                                        fontWeight: FontWeight.bold)),
+                                Text(
+                                  route.name,
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                                 if (route.area != null || route.city != null)
                                   Text(
-                                    [route.area, route.city]
-                                        .where((e) => e != null)
-                                        .join(', '),
+                                    [
+                                      route.area,
+                                      route.city,
+                                    ].where((e) => e != null).join(', '),
                                     style: theme.textTheme.bodyMedium?.copyWith(
-                                        color:
-                                            theme.colorScheme.onSurfaceVariant),
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
                                   ),
                               ],
                             ),
@@ -136,8 +144,10 @@ class RouteDetailScreen extends ConsumerWidget {
                       if (route.description != null &&
                           route.description!.isNotEmpty) ...[
                         const SizedBox(height: 8),
-                        Text(route.description!,
-                            style: theme.textTheme.bodyMedium),
+                        Text(
+                          route.description!,
+                          style: theme.textTheme.bodyMedium,
+                        ),
                       ],
                     ],
                   ),
@@ -148,11 +158,12 @@ class RouteDetailScreen extends ConsumerWidget {
                     data: (shops) {
                       if (shops.isEmpty) return const SizedBox.shrink();
                       final totalOutstanding = shops.fold<double>(
-                          0,
-                          (s, shop) =>
-                              s + (shop.balance > 0 ? shop.balance : 0));
-                      final shopsWithDebt =
-                          shops.where((s) => s.balance > 0).length;
+                        0,
+                        (s, shop) => s + (shop.balance > 0 ? shop.balance : 0),
+                      );
+                      final shopsWithDebt = shops
+                          .where((s) => s.balance > 0)
+                          .length;
                       final cs = Theme.of(context).colorScheme;
                       return Container(
                         margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -183,7 +194,7 @@ class RouteDetailScreen extends ConsumerWidget {
                               label: tr('route_with_debt', ref),
                               value: '$shopsWithDebt',
                               color: shopsWithDebt > 0
-                                  ? Colors.orange
+                                  ? AppBrand.warningColor
                                   : AppTheme.clearFg(cs),
                             ),
                           ],
@@ -195,9 +206,12 @@ class RouteDetailScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(tr('shops', ref),
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                child: Text(
+                  tr('shops', ref),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
               // Shops list
@@ -206,7 +220,9 @@ class RouteDetailScreen extends ConsumerWidget {
                   data: (shops) {
                     if (shops.isEmpty) {
                       return EmptyState(
-                          icon: Icons.store, message: tr('no_shops', ref));
+                        icon: Icons.store,
+                        message: tr('no_shops', ref),
+                      );
                     }
                     // Sort by outstanding balance (highest first)
                     final sorted = [...shops]
@@ -224,18 +240,26 @@ class RouteDetailScreen extends ConsumerWidget {
                               backgroundColor: hasDebt
                                   ? AppTheme.debtBg(cs)
                                   : AppTheme.clearBg(cs),
-                              child: Icon(Icons.store,
-                                  color: hasDebt
-                                      ? AppTheme.debtFg(cs)
-                                      : AppTheme.clearFg(cs)),
+                              child: Icon(
+                                Icons.store,
+                                color: hasDebt
+                                    ? AppTheme.debtFg(cs)
+                                    : AppTheme.clearFg(cs),
+                              ),
                             ),
-                            title: Text(shop.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600)),
-                            subtitle: Text(shop.phone ?? '',
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                            title: Text(
+                              shop.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              shop.phone ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             trailing: Text(
                               AppFormatters.sar(shop.balance),
                               style: TextStyle(
@@ -245,7 +269,7 @@ class RouteDetailScreen extends ConsumerWidget {
                                     : AppTheme.clearFg(cs),
                               ),
                             ),
-                            onTap: () => context.push('/shops/${shop.id}'),
+                            onTap: () => context.go('/shops/${shop.id}'),
                           ),
                         );
                       },
@@ -264,7 +288,7 @@ class RouteDetailScreen extends ConsumerWidget {
       ),
       floatingActionButton: canAddShop
           ? FloatingActionButton(
-              onPressed: () => context.push('/shops/new?routeId=$routeId'),
+              onPressed: () => context.go('/shops/new?routeId=$routeId'),
               child: const Icon(Icons.add),
             )
           : null,
@@ -277,11 +301,12 @@ class _RStat extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _RStat(
-      {required this.icon,
-      required this.label,
-      required this.value,
-      required this.color});
+  const _RStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -289,13 +314,21 @@ class _RStat extends StatelessWidget {
       children: [
         Icon(icon, size: 16, color: color),
         const SizedBox(height: 2),
-        Text(value,
-            style: TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 13, color: color)),
-        Text(label,
-            style: TextStyle(
-                fontSize: 10,
-                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
       ],
     );
   }

@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
@@ -128,7 +129,7 @@ class ReportsScreen extends ConsumerWidget {
           const _AccountStatementCard(),
           const _SellerReportCard(),
         ],
-      ),
+      ).screenEntry(),
     );
   }
 

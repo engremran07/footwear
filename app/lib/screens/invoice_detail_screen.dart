@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:printing/printing.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
@@ -15,7 +16,9 @@ import '../widgets/confirm_dialog.dart';
 
 class InvoiceDetailScreen extends ConsumerWidget {
   final String invoiceId;
-  const InvoiceDetailScreen({super.key, required this.invoiceId});
+  final String? backTo;
+
+  const InvoiceDetailScreen({super.key, required this.invoiceId, this.backTo});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -24,6 +27,10 @@ class InvoiceDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go(backTo ?? '/invoices'),
+        ),
         title: Text(tr('invoice_detail', ref)),
         actions: [
           if (isAdmin)

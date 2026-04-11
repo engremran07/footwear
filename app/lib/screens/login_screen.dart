@@ -415,7 +415,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           Text(
             online ? tr('login_online', ref) : tr('login_offline', ref),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: online ? Colors.green : Colors.grey,
+              color: online ? AppBrand.successColor : AppBrand.stockColor,
             ),
           ),
         ],

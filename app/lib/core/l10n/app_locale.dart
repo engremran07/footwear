@@ -112,7 +112,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_too_many_requests':
         'Too many attempts. Please wait a moment and try again.',
     'err_email_in_use': 'This email is already registered.',
-    'err_weak_password': 'Password is too weak. Use at least 6 characters.',
+    'err_weak_password': 'Password is too weak. Use at least 8 characters.',
     'err_invalid_email': 'Please enter a valid email address.',
     'err_network': 'No internet connection. Check your network and try again.',
     'err_operation_not_allowed': 'This operation is not allowed.',
@@ -144,6 +144,15 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'You can enter either your username or your email address.',
     'confirm_delete_transaction':
         'Delete this transaction and reverse the balance change?',
+    'seller_edit_cash_only': 'Seller can edit only cash in/out transactions.',
+    'edit_request_submitted': 'Edit request submitted for admin approval.',
+    'edit_request_approved': 'Edit request approved.',
+    'edit_request_rejected': 'Edit request rejected.',
+    'pending_admin_approval': 'Pending admin approval',
+    'require_approval_title':
+        'Require admin approval for seller transaction edits',
+    'require_approval_subtitle':
+        'ON: seller edits are pending until approved. OFF: seller edits are auto-approved.',
     // ── Seller Sell-Stock ──
     'sell_stock': 'Sell Stock',
     'no_stock_available': 'No stock available',
@@ -707,6 +716,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'expense_cat_hint': 'Used in expense form and filters.',
     'qc_reasons_hint': 'Used as dropdown options in the QC inspector form.',
     'min_6_chars': 'Minimum 6 characters',
+    'min_n_chars': 'Minimum %d characters',
+    'max_n_chars': 'Maximum %d characters',
     'create_user_hint':
         'The user will be able to sign in immediately with these credentials.',
     'worker_id_match_hint': 'Must match an existing worker document ID',
@@ -914,6 +925,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'outstanding_amount': 'Outstanding Amount',
     'subtotal': 'Subtotal',
     'discount': 'Discount',
+    'discount_amount': 'Discount Amount',
     'previous_balance': 'Previous Balance',
     'current_sale': 'Current Sale',
     'total_outstanding': 'Total Outstanding',
@@ -1022,6 +1034,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Dashboard Screen ──
     'dashboard_outstanding_alert': 'Outstanding balance: %s',
     'dashboard_pending_dues': 'Customers have pending dues',
+    'pending_edit_requests_count':
+        '%s seller edit requests pending your approval',
+    'pending_edit_requests_subtitle':
+        'Open the request list and jump to the related shop to approve or reject.',
     'lbl_view': 'View',
     'dashboard_stock_cartons': 'Stock Cartons',
     'dashboard_pairs_remainder': '%s pairs remainder',
@@ -1118,6 +1134,46 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'filter_all': 'All',
     'routes': 'Routes',
     'menu': 'Menu',
+
+    // ── Danger Zone / Database Flush ──
+    'danger_zone': 'Danger Zone',
+    'danger_zone_subtitle': 'Irreversible database operations',
+    'flush_financial': 'Flush Financial Data',
+    'flush_financial_desc':
+        'Delete all invoices, transactions, and reset shop balances to zero',
+    'flush_inventory': 'Flush Inventory',
+    'flush_inventory_desc':
+        'Delete seller inventory and reset warehouse stock to zero',
+    'flush_shops': 'Flush Shops',
+    'flush_shops_desc': 'Delete all shops and reset route counters',
+    'flush_routes': 'Flush Routes',
+    'flush_routes_desc': 'Delete all routes and clear user route assignments',
+    'flush_products': 'Flush Products',
+    'flush_products_desc': 'Delete all products and product variants',
+    'flush_users': 'Flush Users',
+    'flush_users_desc': 'Delete all user accounts except yours (admin)',
+    'flush_per_user': 'Flush User Data',
+    'flush_per_user_desc':
+        'Delete a specific user\'s inventory, transactions, and history',
+    'flush_all': 'Full Database Reset',
+    'flush_all_desc':
+        'Delete ALL data and reset everything to factory defaults',
+    'flush_settings': 'Reset Settings',
+    'flush_settings_desc': 'Reset all settings to defaults, remove logo',
+    'flush_confirm_title': 'Confirm Destructive Action',
+    'flush_confirm_message':
+        'This will permanently delete %s. This action cannot be undone.',
+    'flush_password_title': 'Enter Password to Confirm',
+    'flush_password_hint': 'Your current password',
+    'flush_password_wrong': 'Incorrect password. Please try again.',
+    'flush_countdown': 'Confirm in %s seconds',
+    'flush_confirm_button': 'PERMANENTLY DELETE',
+    'flush_success': 'Flush complete: %s documents affected',
+    'flush_in_progress': 'Flushing data… Do not close the app.',
+    'flush_include_users': 'Also delete all users (except admin)',
+    'flush_select_user': 'Select user to flush',
+    'approve_seller_edit': 'Approve Seller Edit',
+    'reject_seller_edit': 'Reject Seller Edit',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1200,7 +1256,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_user_disabled': 'تم تعطيل هذا الحساب. تواصل مع المسؤول.',
     'err_too_many_requests': 'محاولات كثيرة. انتظر قليلاً وحاول مرة أخرى.',
     'err_email_in_use': 'هذا البريد الإلكتروني مسجل بالفعل.',
-    'err_weak_password': 'كلمة المرور ضعيفة. استخدم 6 أحرف على الأقل.',
+    'err_weak_password': 'كلمة المرور ضعيفة. استخدم 8 أحرف على الأقل.',
     'err_invalid_email': 'الرجاء إدخال بريد إلكتروني صحيح.',
     'err_network': 'لا يوجد اتصال بالإنترنت. تحقق من الشبكة وحاول مرة أخرى.',
     'err_operation_not_allowed': 'هذه العملية غير مسموح بها.',
@@ -1229,6 +1285,14 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'login_reset_email_hint': 'يمكنك إدخال اسم المستخدم أو البريد الإلكتروني.',
     'confirm_delete_transaction':
         'هل تريد حذف هذه المعاملة وعكس التغيير في الرصيد؟',
+    'seller_edit_cash_only': 'يمكن للبائع تعديل معاملات القبض/الصرف فقط.',
+    'edit_request_submitted': 'تم إرسال طلب التعديل لموافقة المسؤول.',
+    'edit_request_approved': 'تمت الموافقة على طلب التعديل.',
+    'edit_request_rejected': 'تم رفض طلب التعديل.',
+    'pending_admin_approval': 'بانتظار موافقة المسؤول',
+    'require_approval_title': 'طلب موافقة المسؤول على تعديلات البائع للمعاملات',
+    'require_approval_subtitle':
+        'تشغيل: تعديلات البائع تبقى معلقة حتى الموافقة. إيقاف: تُعتمد تلقائياً.',
     // ── بيع المخزون ──
     'sell_stock': 'بيع المخزون',
     'no_stock_available': 'لا يوجد مخزون متاح',
@@ -1793,6 +1857,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'expense_cat_hint': 'تُستخدم في نموذج المصروفات والفلاتر.',
     'qc_reasons_hint': 'تُستخدم كخيارات في نموذج مفتش الجودة.',
     'min_6_chars': '٦ أحرف على الأقل',
+    'min_n_chars': 'الحد الأدنى %d أحرف',
+    'max_n_chars': 'الحد الأقصى %d أحرف',
     'create_user_hint': 'سيتمكن المستخدم من تسجيل الدخول فوراً بهذه البيانات.',
     'worker_id_match_hint': 'يجب أن يطابق معرّف مستند عامل موجود',
     'no_name': '(بدون اسم)',
@@ -1991,6 +2057,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'outstanding_amount': 'المبلغ المستحق',
     'subtotal': 'الإجمالي الفرعي',
     'discount': 'الخصم',
+    'discount_amount': 'مبلغ الخصم',
     'previous_balance': 'الرصيد السابق',
     'current_sale': 'البيع الحالي',
     'total_outstanding': 'إجمالي المستحق',
@@ -2100,6 +2167,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Dashboard Screen ──
     'dashboard_outstanding_alert': 'الرصيد المستحق: %s',
     'dashboard_pending_dues': 'لدى العملاء مستحقات معلقة',
+    'pending_edit_requests_count':
+        'لديك %s طلبات تعديل من البائعين بانتظار الموافقة',
+    'pending_edit_requests_subtitle':
+        'افتح قائمة الطلبات وانتقل إلى المتجر المرتبط للموافقة أو الرفض.',
     'lbl_view': 'عرض',
     'dashboard_stock_cartons': 'كراتين المخزون',
     'dashboard_pairs_remainder': '%s زوج متبقٍ',
@@ -2195,6 +2266,43 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'filter_all': 'الكل',
     'routes': 'المسارات',
     'menu': 'القائمة',
+
+    // ── Danger Zone / Database Flush ──
+    'danger_zone': 'منطقة الخطر',
+    'danger_zone_subtitle': 'عمليات قاعدة بيانات لا رجعة فيها',
+    'flush_financial': 'مسح البيانات المالية',
+    'flush_financial_desc':
+        'حذف جميع الفواتير والمعاملات وإعادة أرصدة المحلات إلى صفر',
+    'flush_inventory': 'مسح المخزون',
+    'flush_inventory_desc': 'حذف مخزون البائعين وإعادة مخزون المستودع إلى صفر',
+    'flush_shops': 'مسح المحلات',
+    'flush_shops_desc': 'حذف جميع المحلات وإعادة عدادات المسارات',
+    'flush_routes': 'مسح المسارات',
+    'flush_routes_desc': 'حذف جميع المسارات ومسح تعيينات المستخدمين',
+    'flush_products': 'مسح المنتجات',
+    'flush_products_desc': 'حذف جميع المنتجات والمتغيرات',
+    'flush_users': 'مسح المستخدمين',
+    'flush_users_desc': 'حذف جميع حسابات المستخدمين ما عدا حسابك (المدير)',
+    'flush_per_user': 'مسح بيانات مستخدم',
+    'flush_per_user_desc': 'حذف مخزون ومعاملات وسجل مستخدم محدد',
+    'flush_all': 'إعادة تعيين قاعدة البيانات بالكامل',
+    'flush_all_desc': 'حذف جميع البيانات وإعادة كل شيء إلى إعدادات المصنع',
+    'flush_settings': 'إعادة تعيين الإعدادات',
+    'flush_settings_desc': 'إعادة جميع الإعدادات إلى الافتراضية وحذف الشعار',
+    'flush_confirm_title': 'تأكيد الإجراء التدميري',
+    'flush_confirm_message':
+        'سيتم حذف %s نهائياً. لا يمكن التراجع عن هذا الإجراء.',
+    'flush_password_title': 'أدخل كلمة المرور للتأكيد',
+    'flush_password_hint': 'كلمة المرور الحالية',
+    'flush_password_wrong': 'كلمة مرور غير صحيحة. يرجى المحاولة مرة أخرى.',
+    'flush_countdown': 'تأكيد خلال %s ثانية',
+    'flush_confirm_button': 'حذف نهائي',
+    'flush_success': 'تم المسح: %s مستند متأثر',
+    'flush_in_progress': 'جارٍ مسح البيانات… لا تغلق التطبيق.',
+    'flush_include_users': 'حذف جميع المستخدمين أيضاً (ما عدا المدير)',
+    'flush_select_user': 'اختر المستخدم للمسح',
+    'approve_seller_edit': 'الموافقة على تعديل البائع',
+    'reject_seller_edit': 'رفض تعديل البائع',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2277,7 +2385,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_too_many_requests':
         'بہت زیادہ کوششیں۔ تھوڑی دیر بعد دوبارہ کوشش کریں۔',
     'err_email_in_use': 'یہ ای میل پہلے سے رجسٹرڈ ہے۔',
-    'err_weak_password': 'پاسورڈ کمزور ہے۔ کم از کم 6 حروف استعمال کریں۔',
+    'err_weak_password': 'پاسورڈ کمزور ہے۔ کم از کم 8 حروف استعمال کریں۔',
     'err_invalid_email': 'براہ کرم درست ای میل درج کریں۔',
     'err_network': 'انٹرنیٹ کنکشن نہیں۔ نیٹ ورک چیک کریں اور دوبارہ کوشش کریں۔',
     'err_operation_not_allowed': 'یہ عمل اجازت یافتہ نہیں ہے۔',
@@ -2308,6 +2416,17 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'آپ اپنا یوزرنیم یا ای میل ایڈریس درج کر سکتے ہیں۔',
     'confirm_delete_transaction':
         'یہ ٹرانزیکشن حذف کریں اور بیلنس تبدیلی واپس کریں؟',
+    'seller_edit_cash_only':
+        'سیلر صرف cash in/out ٹرانزیکشن میں ترمیم کر سکتا ہے۔',
+    'edit_request_submitted':
+        'ترمیم کی درخواست ایڈمن منظوری کے لیے بھیج دی گئی۔',
+    'edit_request_approved': 'ترمیم کی درخواست منظور ہو گئی۔',
+    'edit_request_rejected': 'ترمیم کی درخواست مسترد ہو گئی۔',
+    'pending_admin_approval': 'ایڈمن منظوری زیر التوا',
+    'require_approval_title':
+        'سیلر ٹرانزیکشن ترامیم کے لیے ایڈمن منظوری لازمی کریں',
+    'require_approval_subtitle':
+        'آن: سیلر ترامیم منظوری تک زیر التوا رہیں گی۔ آف: خودکار منظوری ہو گی۔',
     // ── اسٹاک فروخت ──
     'sell_stock': 'اسٹاک بیچیں',
     'no_stock_available': 'کوئی اسٹاک دستیاب نہیں',
@@ -2878,6 +2997,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'qc_reasons_hint':
         'کوالٹی انسپکٹر فارم میں ڈراپ ڈاؤن آپشن کے طور پر استعمال ہوتا ہے۔',
     'min_6_chars': 'کم از کم ۶ حروف',
+    'min_n_chars': 'کم از کم %d حروف',
+    'max_n_chars': 'زیادہ سے زیادہ %d حروف',
     'create_user_hint': 'صارف ان اسناد سے فوری طور پر سائن ان کر سکے گا۔',
     'worker_id_match_hint': 'موجود ورکر دستاویز آئی ڈی سے مماثل ہونا ضروری ہے',
     'no_name': '(کوئی نام نہیں)',
@@ -3077,6 +3198,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'outstanding_amount': 'واجب الادا رقم',
     'subtotal': 'ذیلی کل',
     'discount': 'رعایت',
+    'discount_amount': 'رعایت کی رقم',
     'previous_balance': 'پچھلا بیلنس',
     'current_sale': 'موجودہ فروخت',
     'total_outstanding': 'کل واجب الادا',
@@ -3187,6 +3309,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Dashboard Screen ──
     'dashboard_outstanding_alert': 'واجب الادا بیلنس: %s',
     'dashboard_pending_dues': 'صارفین کے واجبات باقی ہیں',
+    'pending_edit_requests_count':
+        '%s سیلر ترمیمی درخواستیں آپ کی منظوری کی منتظر ہیں',
+    'pending_edit_requests_subtitle':
+        'درخواستوں کی فہرست کھولیں اور منظوری یا رد کے لیے متعلقہ دکان پر جائیں۔',
     'lbl_view': 'دیکھیں',
     'dashboard_stock_cartons': 'اسٹاک کارٹن',
     'dashboard_pairs_remainder': '%s جوڑے باقی',
@@ -3283,5 +3409,44 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'filter_all': 'سب',
     'routes': 'راستے',
     'menu': 'مینو',
+
+    // ── Danger Zone / Database Flush ──
+    'danger_zone': 'خطرناک زون',
+    'danger_zone_subtitle': 'ناقابل واپسی ڈیٹا بیس آپریشنز',
+    'flush_financial': 'مالیاتی ڈیٹا صاف کریں',
+    'flush_financial_desc':
+        'تمام انوائسز، ٹرانزیکشنز حذف کریں اور دکان بیلنس صفر کریں',
+    'flush_inventory': 'انوینٹری صاف کریں',
+    'flush_inventory_desc': 'سیلر انوینٹری حذف کریں اور گودام اسٹاک صفر کریں',
+    'flush_shops': 'دکانیں صاف کریں',
+    'flush_shops_desc': 'تمام دکانیں حذف کریں اور راستوں کے کاؤنٹر ری سیٹ کریں',
+    'flush_routes': 'راستے صاف کریں',
+    'flush_routes_desc': 'تمام راستے حذف کریں اور صارف تعیناتیاں صاف کریں',
+    'flush_products': 'پروڈکٹس صاف کریں',
+    'flush_products_desc': 'تمام پروڈکٹس اور ویرینٹس حذف کریں',
+    'flush_users': 'صارفین صاف کریں',
+    'flush_users_desc': 'آپ (ایڈمن) کے علاوہ تمام صارف اکاؤنٹس حذف کریں',
+    'flush_per_user': 'صارف ڈیٹا صاف کریں',
+    'flush_per_user_desc':
+        'مخصوص صارف کی انوینٹری، ٹرانزیکشنز اور تاریخ حذف کریں',
+    'flush_all': 'مکمل ڈیٹا بیس ری سیٹ',
+    'flush_all_desc':
+        'تمام ڈیٹا حذف کریں اور سب کچھ فیکٹری ڈیفالٹ پر واپس لائیں',
+    'flush_settings': 'سیٹنگز ری سیٹ',
+    'flush_settings_desc': 'تمام سیٹنگز ڈیفالٹ پر ری سیٹ کریں، لوگو ہٹائیں',
+    'flush_confirm_title': 'تباہ کن عمل کی تصدیق',
+    'flush_confirm_message':
+        'یہ %s کو مستقل طور پر حذف کر دے گا۔ یہ عمل واپس نہیں ہو سکتا۔',
+    'flush_password_title': 'تصدیق کے لیے پاس ورڈ درج کریں',
+    'flush_password_hint': 'آپ کا موجودہ پاس ورڈ',
+    'flush_password_wrong': 'غلط پاس ورڈ۔ دوبارہ کوشش کریں۔',
+    'flush_countdown': '%s سیکنڈ میں تصدیق کریں',
+    'flush_confirm_button': 'مستقل طور پر حذف کریں',
+    'flush_success': 'صفائی مکمل: %s دستاویزات متاثر',
+    'flush_in_progress': 'ڈیٹا صاف ہو رہا ہے… ایپ بند نہ کریں۔',
+    'flush_include_users': 'تمام صارفین بھی حذف کریں (ایڈمن کے علاوہ)',
+    'flush_select_user': 'صاف کرنے کے لیے صارف منتخب کریں',
+    'approve_seller_edit': 'سیلر ترمیم منظور کریں',
+    'reject_seller_edit': 'سیلر ترمیم مسترد کریں',
   },
 };

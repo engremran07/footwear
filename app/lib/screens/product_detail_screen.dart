@@ -58,18 +58,23 @@ class ProductDetailScreen extends ConsumerWidget {
                 onPressed: () {
                   final variants = variantsAsync.valueOrNull ?? [];
                   final ppc = settings?.pairsPerCarton ?? 12;
-                  final totalStock =
-                      variants.fold<int>(0, (s, v) => s + v.quantityAvailable);
+                  final totalStock = variants.fold<int>(
+                    0,
+                    (s, v) => s + v.quantityAvailable,
+                  );
                   final buf = StringBuffer()
                     ..writeln(product.name)
                     ..writeln('${tr('category', ref)}: ${product.category}')
                     ..writeln(
-                        '${tr('total_variants', ref)}: ${variants.length}')
+                      '${tr('total_variants', ref)}: ${variants.length}',
+                    )
                     ..writeln(
-                        '${tr('stock_pairs', ref)}: ${_stockLabel(totalStock, ppc)}');
+                      '${tr('stock_pairs', ref)}: ${_stockLabel(totalStock, ppc)}',
+                    );
                   for (final v in variants) {
                     buf.writeln(
-                        '  ${v.variantName}: ${_stockLabel(v.quantityAvailable, ppc)}');
+                      '  ${v.variantName}: ${_stockLabel(v.quantityAvailable, ppc)}',
+                    );
                   }
                   Share.share(buf.toString());
                   HapticFeedback.lightImpact();
@@ -79,7 +84,7 @@ class ProductDetailScreen extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.edit),
                   tooltip: 'Edit product',
-                  onPressed: () => context.push('/products/$productId/edit'),
+                  onPressed: () => context.go('/products/$productId/edit'),
                 ),
             ],
           ),
@@ -110,11 +115,11 @@ class ProductDetailScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(product.name,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.bold)),
+                            Text(
+                              product.name,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
                             const SizedBox(height: 4),
                             Chip(
                               label: Text(product.category),
@@ -133,9 +138,12 @@ class ProductDetailScreen extends ConsumerWidget {
                       if (variants.isEmpty) return const SizedBox.shrink();
                       final ppc = settings?.pairsPerCarton ?? 12;
                       final totalStock = variants.fold<int>(
-                          0, (s, v) => s + v.quantityAvailable);
-                      final inStock =
-                          variants.where((v) => v.quantityAvailable > 0).length;
+                        0,
+                        (s, v) => s + v.quantityAvailable,
+                      );
+                      final inStock = variants
+                          .where((v) => v.quantityAvailable > 0)
+                          .length;
                       final outOfStock = variants.length - inStock;
                       return Container(
                         margin: const EdgeInsets.symmetric(horizontal: 12),
@@ -178,15 +186,18 @@ class ProductDetailScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    Text(tr('variants', ref),
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      tr('variants', ref),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const Spacer(),
                     variantsAsync.whenOrNull(
-                          data: (v) => Text('${v.length}',
-                              style: Theme.of(context).textTheme.bodySmall),
+                          data: (v) => Text(
+                            '${v.length}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                         ) ??
                         const SizedBox.shrink(),
                   ],
@@ -214,18 +225,24 @@ class ProductDetailScreen extends ConsumerWidget {
                         final cs = Theme.of(context).colorScheme;
                         return Card(
                           child: ListTile(
-                            title: Text(v.variantName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600)),
+                            title: Text(
+                              v.variantName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             subtitle: Text(
-                                'Quantity: ${AppFormatters.number(v.quantityAvailable)} pairs'),
+                              'Quantity: ${AppFormatters.number(v.quantityAvailable)} pairs',
+                            ),
                             trailing: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 130),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: v.quantityAvailable > 0
                                       ? AppTheme.clearBg(cs)
@@ -233,8 +250,10 @@ class ProductDetailScreen extends ConsumerWidget {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  _stockLabel(v.quantityAvailable,
-                                      settings?.pairsPerCarton ?? 12),
+                                  _stockLabel(
+                                    v.quantityAvailable,
+                                    settings?.pairsPerCarton ?? 12,
+                                  ),
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
@@ -249,8 +268,9 @@ class ProductDetailScreen extends ConsumerWidget {
                               ),
                             ),
                             onTap: user?.isAdmin == true
-                                ? () => context.push(
-                                    '/products/$productId/variants/${v.id}/edit')
+                                ? () => context.go(
+                                    '/products/$productId/variants/${v.id}/edit',
+                                  )
                                 : null,
                           ),
                         );
@@ -264,7 +284,7 @@ class ProductDetailScreen extends ConsumerWidget {
           floatingActionButton: user?.isAdmin == true
               ? FloatingActionButton(
                   onPressed: () =>
-                      context.push('/products/$productId/variants/new'),
+                      context.go('/products/$productId/variants/new'),
                   child: const Icon(Icons.add),
                 )
               : null,
@@ -274,10 +294,10 @@ class ProductDetailScreen extends ConsumerWidget {
   }
 
   Widget _productAvatar(ColorScheme cs) => CircleAvatar(
-        radius: 40,
-        backgroundColor: cs.primaryContainer,
-        child: Icon(Icons.inventory_2, size: 32, color: cs.primary),
-      );
+    radius: 40,
+    backgroundColor: cs.primaryContainer,
+    child: Icon(Icons.inventory_2, size: 32, color: cs.primary),
+  );
 }
 
 class _PStatChip extends StatelessWidget {
@@ -285,11 +305,12 @@ class _PStatChip extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _PStatChip(
-      {required this.icon,
-      required this.label,
-      required this.value,
-      required this.color});
+  const _PStatChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -297,13 +318,21 @@ class _PStatChip extends StatelessWidget {
       children: [
         Icon(icon, size: 16, color: color),
         const SizedBox(height: 2),
-        Text(value,
-            style: TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 13, color: color)),
-        Text(label,
-            style: TextStyle(
-                fontSize: 10,
-                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
       ],
     );
   }

@@ -182,7 +182,7 @@ Flutter:
 cd app
 flutter pub get
 flutter analyze lib --no-pub
-# Fat APK (canonical — always fat, never --split-per-abi)
+# Fat APK (canonical — always fat, never ABI-split)
 flutter build apk --release
 # Web
 flutter build web --release
@@ -204,7 +204,7 @@ Before finishing:
 - Run hygiene grep gates (see CI §4 in .github/workflows/ci.yml):
   1. No raw collection strings: `grep -rn "\.collection('" app/lib/ | grep -v "Collections\."` → zero
   2. allTransactionsProvider in invalidation list: `grep -q "allTransactionsProvider" app/lib/providers/auth_provider.dart`
-  3. No split-per-abi in scripts: `grep -rn "split-per-abi" .github/ app/` → zero
+  3. No legacy ABI-split APK build commands remain in release docs or scripts
   4. No Firestore writes in screens/widgets: `grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/` → zero
 - Manually or logically verify admin and seller access for `/` and `/inventory`
   after auth/router/provider/rules edits; no transient permission-denied UI is acceptable
@@ -227,6 +227,16 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-04-11 audit v10 — v3.4.9+40:
+
+- Invoice flow resilience: preselected shop auto-selection now uses a one-shot guard, and invoice detail supports back-context routing to the originating shop after invoice creation
+- Seller edit approval hardening: sellers cannot edit invoice-linked transactions or re-submit while a prior edit request is pending; admin pending requests now surface on the dashboard
+- Navigation cleanup: in-shell screen navigation now uses `context.go(...)`; admin quick actions route to the correct in-shell destinations; invoices and inventory bottom-nav long-press actions added
+- Financial UX polish: discount field clarified as an absolute discount amount, invoice list status/search fixes shipped, account-statement PDF now renders Debit left / Credit right with LTR amount cells in RTL locales
+- Validation + l10n: approval-flow strings localized in EN/AR/UR, validator min/max messages parameterized, password minimum raised to 8 chars across profile and admin/user-management paths
+- Firestore coverage: added composite index for `transactions(edit_request_pending, created_at desc)`
+- Android release stabilization: disabled Kotlin incremental compilation in `app/android/gradle.properties` to avoid Windows cross-drive cache crashes when Gradle compiles pub-cache plugins from `C:` against the workspace on `D:`
 
 2026-04-09 audit v9 — v3.4.4+35:
 
@@ -276,7 +286,7 @@ Conflict resolution order for instructions:
 - Transfer dialog: `sellersProvider` → `allUsersProvider` so admin appears as a recipient for self-transfer
 - product_provider.transferToSeller: fixed audit log to write to `inventory_transactions` (not `transactions`); type corrected to `transfer_out` matching InventoryTransactionModel constants — was violating Firestore rules AND not appearing in transfer history
 - customer transaction visibility fixed (v3.2.7+19): client-side `deleted != true` filter on all providers
-- Build standard: fat APK only (`flutter build apk --release`), never --split-per-abi
+- Build standard: fat APK only (`flutter build apk --release`), never ABI-split builds
 - user_model: added `canHaveSellerInventory` getter (always true; admin = god tier)
 
 2026-04-06 audit v6 — v3.2.6+18:
@@ -291,7 +301,7 @@ Conflict resolution order for instructions:
 - About screen: hardcoded EN strings replaced with tr() calls
 - Dead code: search_provider.dart deleted (0 usages)
 - Tests: 206 → 272 (added sanitizer_test, error_mapper_test, create_sale_invoice_guard_test, mark_paid_outstanding_test)
-- Release: v3.2.6+18, 3 split-per-abi APKs built + web deployed to Firebase Hosting
+- Release: v3.2.6+18, 3 ABI-split APKs built + web deployed to Firebase Hosting
 
 2026-03-30 enterprise v3.0.0 upgrade:
 
@@ -324,4 +334,4 @@ Conflict resolution order for instructions:
 - Firestore rules: docSizeOk() <50KB, withinWriteRate() 1s cooldown
 - Dark mode QA: theme-aware colors throughout
 - RTL QA: EdgeInsetsDirectional throughout
-- Release: v3.0.0+7, 3 split-per-abi APKs built
+- Release: v3.0.0+7, 3 ABI-split APKs built

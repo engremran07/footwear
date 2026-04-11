@@ -51,6 +51,7 @@ class CreateSaleInvoiceScreen extends ConsumerStatefulWidget {
 class _CreateSaleInvoiceScreenState
     extends ConsumerState<CreateSaleInvoiceScreen> {
   ShopModel? _selectedShop;
+  bool _shopAutoSelected = false;
   final _saleAmountC = TextEditingController();
   final _amountReceivedC = TextEditingController();
   final _discountC = TextEditingController();
@@ -194,11 +195,12 @@ class _CreateSaleInvoiceScreenState
     // Inventory screen transfer, then selects items here to create an invoice.
     final inventoryAsync = ref.watch(sellerInventoryProvider(user.id));
 
-    // Auto-select shop if preselected
-    if (widget.preselectedShopId != null && _selectedShop == null) {
+    // Auto-select shop if preselected.
+    if (widget.preselectedShopId != null && !_shopAutoSelected) {
       shopsAsync.whenData((shops) {
         final match = shops.where((s) => s.id == widget.preselectedShopId);
         if (match.isNotEmpty && _selectedShop == null) {
+          _shopAutoSelected = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) setState(() => _selectedShop = match.first);
           });
@@ -491,8 +493,8 @@ class _CreateSaleInvoiceScreenState
                     decimal: true,
                   ),
                   decoration: InputDecoration(
-                    labelText: tr('discount', ref),
-                    prefixIcon: const Icon(Icons.percent),
+                    labelText: tr('discount_amount', ref),
+                    prefixIcon: const Icon(Icons.money_off),
                   ),
                   focusNode: _discountFn,
                   textInputAction: TextInputAction.next,
@@ -845,7 +847,10 @@ class _CreateSaleInvoiceScreenState
         _pendingInvoiceIdempotencyKey = null;
         _pendingInvoiceFingerprint = null;
         messenger.showSnackBar(successSnackBar(tr('invoice_created', ref)));
-        router.go('/invoices/$invoiceId');
+        final from = widget.preselectedShopId != null
+            ? '/shops/${widget.preselectedShopId}'
+            : '/invoices';
+        router.go('/invoices/$invoiceId?from=${Uri.encodeComponent(from)}');
       }
     } catch (e) {
       if (mounted) {

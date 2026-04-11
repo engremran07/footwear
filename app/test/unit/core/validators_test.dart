@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:footwear_erp/core/l10n/app_locale.dart';
 import 'package:footwear_erp/core/utils/validators.dart';
 
 void main() {
@@ -158,7 +159,7 @@ void main() {
 
   group('AppValidators.minLength', () {
     test('rejects too-short value', () {
-      expect(AppValidators.minLength(5)('abc'), isNotNull);
+      expect(AppValidators.minLength(5)('abc'), equals('Minimum 5 characters'));
     });
 
     test('accepts value meeting min length', () {
@@ -166,7 +167,31 @@ void main() {
     });
 
     test('returns error for null', () {
-      expect(AppValidators.minLength(3)(null), isNotNull);
+      expect(AppValidators.minLength(3)(null), equals('Minimum 3 characters'));
+    });
+
+    test('localizes and interpolates minimum length', () {
+      expect(
+        AppValidators.minLength(8, AppLocale.en)('short'),
+        equals('Minimum 8 characters'),
+      );
+    });
+  });
+
+  group('AppValidators.maxLength', () {
+    test('rejects too-long value with interpolated message', () {
+      expect(
+        AppValidators.maxLength(4)('12345'),
+        equals('Maximum 4 characters'),
+      );
+    });
+
+    test('accepts value within max length', () {
+      expect(AppValidators.maxLength(5)('12345'), isNull);
+    });
+
+    test('returns null for null input', () {
+      expect(AppValidators.maxLength(5)(null), isNull);
     });
   });
 

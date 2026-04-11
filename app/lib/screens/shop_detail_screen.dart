@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/constants/app_brand.dart';
+import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
@@ -226,9 +227,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   /// If admin approval is enabled, this submits a pending request.
   void _showSellerEditTransactionDialog(TransactionModel tx) {
     if (tx.type != 'cash_in' && tx.type != 'cash_out') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        warningSnackBar('Seller can edit only cash in/out transactions.'),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(warningSnackBar(tr('seller_edit_cash_only', ref)));
       return;
     }
 
@@ -373,7 +374,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         successSnackBar(
                           appliedImmediately
                               ? tr('saved_successfully', ref)
-                              : 'Edit request submitted for admin approval',
+                              : tr('edit_request_submitted', ref),
                         ),
                       );
                     } catch (e) {
@@ -408,7 +409,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         successSnackBar(
-          approved ? 'Edit request approved' : 'Edit request rejected',
+          approved
+              ? tr('edit_request_approved', ref)
+              : tr('edit_request_rejected', ref),
         ),
       );
     } catch (e) {
@@ -699,7 +702,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 onSelected: (action) async {
                   switch (action) {
                     case _ShopAction.edit:
-                      context.push('/shops/${shop.id}/edit');
+                      context.go('/shops/${shop.id}/edit');
 
                     case _ShopAction.delete:
                       final ok = await ConfirmDialog.show(
@@ -855,7 +858,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       child: ListTile(
                         leading: const Icon(
                           Icons.money_off,
-                          color: Colors.orange,
+                          color: AppBrand.warningColor,
                         ),
                         title: Text(tr('mark_bad_debt', ref)),
                         contentPadding: EdgeInsets.zero,
@@ -1070,7 +1073,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                 final sev = days > 60
                                     ? AppBrand.errorColor
                                     : days > 30
-                                    ? Colors.orange
+                                    ? AppBrand.warningColor
                                     : cs.onSurfaceVariant;
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 8),
@@ -1119,15 +1122,17 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
+                            color: AppBrand.warningColor.withAlpha(30),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.orange.shade300),
+                            border: Border.all(
+                              color: AppBrand.warningColor.withAlpha(120),
+                            ),
                           ),
                           child: Row(
                             children: [
                               const Icon(
                                 Icons.warning_amber,
-                                color: Colors.orange,
+                                color: AppBrand.warningColor,
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -1138,7 +1143,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                       tr('bad_debt', ref),
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.orange,
+                                        color: AppBrand.warningColor,
                                       ),
                                     ),
                                     Text(
@@ -1296,9 +1301,15 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           runningBalance: item.runningBalance,
                           canEdit:
                               !tx.deleted &&
+                              !tx.editRequestPending &&
                               (user?.isAdmin == true ||
                                   (user?.isSeller == true &&
-                                      user?.id == tx.createdBy)),
+                                      user?.id == tx.createdBy &&
+                                      (tx.invoiceId == null ||
+                                          tx.invoiceId!.isEmpty) &&
+                                      (tx.type == TransactionModel.typeCashIn ||
+                                          tx.type ==
+                                              TransactionModel.typeCashOut))),
                           canApproveEdit:
                               !tx.deleted &&
                               user?.isAdmin == true &&
@@ -1308,7 +1319,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           onApproveEdit: () => _reviewEditRequest(tx, true),
                           onRejectEdit: () => _reviewEditRequest(tx, false),
                           onDelete: () => _confirmDeleteTransaction(tx),
-                        );
+                        ).listEntry(i);
                       },
                     );
                   },
@@ -1390,7 +1401,7 @@ class _TransactionTile extends ConsumerWidget {
             ),
           if (tx.editRequestPending)
             Text(
-              'PENDING ADMIN APPROVAL',
+              tr('pending_admin_approval', ref).toUpperCase(),
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -1453,24 +1464,24 @@ class _TransactionTile extends ConsumerWidget {
                     ),
                   ),
                 if (canApproveEdit)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'approve_edit',
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle, size: 16),
-                        SizedBox(width: 8),
-                        Text('Approve Seller Edit'),
+                        const Icon(Icons.check_circle, size: 16),
+                        const SizedBox(width: 8),
+                        Text(tr('approve_seller_edit', ref)),
                       ],
                     ),
                   ),
                 if (canApproveEdit)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'reject_edit',
                     child: Row(
                       children: [
-                        Icon(Icons.cancel, size: 16),
-                        SizedBox(width: 8),
-                        Text('Reject Seller Edit'),
+                        const Icon(Icons.cancel, size: 16),
+                        const SizedBox(width: 8),
+                        Text(tr('reject_seller_edit', ref)),
                       ],
                     ),
                   ),

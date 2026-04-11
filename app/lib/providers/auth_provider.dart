@@ -113,6 +113,7 @@ class AuthNotifier extends AsyncNotifier<void> {
     ref.invalidate(lastGoodDashboardStatsProvider);
     ref.invalidate(settingsProvider);
     ref.invalidate(allTransactionsProvider);
+    ref.invalidate(pendingEditRequestsProvider);
     ref.invalidate(allInvoicesProvider);
     ref.invalidate(roleAwareInvoicesProvider);
     ref.invalidate(sellerInvoicesProvider);
@@ -161,8 +162,8 @@ class AuthNotifier extends AsyncNotifier<void> {
                 .get();
             if (snap.docs.isEmpty) {
               throw FirebaseAuthException(
-                code: 'user-not-found',
-                message: 'No user found with that username',
+                code: 'invalid-credential',
+                message: 'Invalid username or password',
               );
             }
             email = (snap.docs.first.data()['email'] as String).trim();
@@ -335,8 +336,15 @@ class AuthNotifier extends AsyncNotifier<void> {
       email: firebaseUser.email!,
       password: currentPassword,
     );
+    final trimmedNew = newPassword.trim();
+    if (trimmedNew.length < 8) {
+      throw FirebaseAuthException(
+        code: 'weak-password',
+        message: 'Password is too weak. Use at least 8 characters.',
+      );
+    }
     await firebaseUser.reauthenticateWithCredential(credential);
-    await firebaseUser.updatePassword(newPassword);
+    await firebaseUser.updatePassword(trimmedNew);
   }
 
   Future<void> sendPasswordReset(String emailOrUsername) async {
@@ -356,8 +364,8 @@ class AuthNotifier extends AsyncNotifier<void> {
           .get();
       if (snap.docs.isEmpty) {
         throw FirebaseAuthException(
-          code: 'user-not-found',
-          message: 'No user found with that username',
+          code: 'invalid-credential',
+          message: 'Invalid username or password',
         );
       }
       normalizedInput = (snap.docs.first.data()['email'] as String? ?? '')

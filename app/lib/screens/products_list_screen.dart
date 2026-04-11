@@ -87,7 +87,7 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                           ),
                           subtitle: Text(p.category),
                           trailing: const Icon(Icons.chevron_right, size: 20),
-                          onTap: () => context.push('/products/${p.id}'),
+                          onTap: () => context.go('/products/${p.id}'),
                         ),
                       ).listEntry(i);
                     },
@@ -100,7 +100,7 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
       ),
       floatingActionButton: user?.isAdmin == true
           ? FloatingActionButton(
-              onPressed: () => context.push('/products/new'),
+              onPressed: () => context.go('/products/new'),
               child: const Icon(Icons.add),
             )
           : null,

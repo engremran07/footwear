@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/constants/app_brand.dart';
+import '../core/design/app_animations.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
@@ -39,6 +40,77 @@ Widget _buildDashboardAsyncError(
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
+  void _showPendingEditRequestsSheet(
+    BuildContext context,
+    WidgetRef ref,
+    List<TransactionModel> pendingEdits,
+  ) {
+    if (pendingEdits.isEmpty) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tr(
+                  'pending_edit_requests_count',
+                  ref,
+                ).replaceAll('%s', '${pendingEdits.length}'),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: AppTokens.s8),
+              Text(
+                tr('pending_edit_requests_subtitle', ref),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: AppTokens.s12),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(sheetContext).size.height * 0.6,
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: pendingEdits.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, index) {
+                    final tx = pendingEdits[index];
+                    return ListTile(
+                      leading: const Icon(
+                        Icons.pending_actions,
+                        color: AppBrand.warningColor,
+                      ),
+                      title: Text(
+                        tx.shopName.isNotEmpty ? tx.shopName : tx.shopId,
+                      ),
+                      subtitle: Text(
+                        '${AppFormatters.dateTime(tx.createdAt)} • '
+                        '${AppFormatters.sar(tx.amount)}',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: tx.shopId.isEmpty
+                          ? null
+                          : () {
+                              Navigator.pop(sheetContext);
+                              context.go('/shops/${tx.shopId}');
+                            },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authUserProvider).valueOrNull;
@@ -57,6 +129,7 @@ class DashboardScreen extends ConsumerWidget {
     final routesAsync = ref.watch(routesProvider);
     final shopsAsync = ref.watch(shopsProvider);
     final transactionsAsync = ref.watch(allTransactionsProvider);
+    final pendingEditsAsync = ref.watch(pendingEditRequestsProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('dashboard', ref))),
@@ -79,8 +152,11 @@ class DashboardScreen extends ConsumerWidget {
                   (sum, sh) => sum + sh.balance,
                 ) ??
                 0.0;
+            final pendingEdits =
+                pendingEditsAsync.valueOrNull ?? const <TransactionModel>[];
             // Alerts: outstanding > 0 is a warning banner
             final hasOutstandingAlert = totalOutstanding > 0;
+            final hasPendingEditRequests = pendingEdits.isNotEmpty;
 
             return ListView(
               padding: const EdgeInsets.all(AppTokens.s16),
@@ -132,6 +208,48 @@ class DashboardScreen extends ConsumerWidget {
                       .slideY(begin: -0.1, end: 0, curve: AppTokens.curveStd),
 
                 if (hasOutstandingAlert) const SizedBox(height: AppTokens.s12),
+
+                if (hasPendingEditRequests)
+                  Card(
+                    color: AppBrand.primaryColor.withAlpha(18),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppTokens.brMD,
+                      side: BorderSide(
+                        color: AppBrand.primaryColor.withAlpha(64),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.pending_actions,
+                        color: AppBrand.primaryColor,
+                      ),
+                      title: Text(
+                        tr(
+                          'pending_edit_requests_count',
+                          ref,
+                        ).replaceAll('%s', '${pendingEdits.length}'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(tr('pending_edit_requests_subtitle', ref)),
+                      trailing: TextButton(
+                        onPressed: () => _showPendingEditRequestsSheet(
+                          context,
+                          ref,
+                          pendingEdits,
+                        ),
+                        child: Text(tr('lbl_view', ref)),
+                      ),
+                      onTap: () => _showPendingEditRequestsSheet(
+                        context,
+                        ref,
+                        pendingEdits,
+                      ),
+                    ),
+                  ).screenEntry(),
+
+                if (hasPendingEditRequests)
+                  const SizedBox(height: AppTokens.s12),
 
                 // Stat cards grid
                 GridView.count(
@@ -214,7 +332,7 @@ class DashboardScreen extends ConsumerWidget {
                 // Cash flow chart
                 _CashFlowChart(transactionsAsync: transactionsAsync),
               ],
-            );
+            ).screenEntry();
           },
           loading: () => ShimmerLoading.cards(),
           error: (e, _) => _buildDashboardAsyncError(context, ref, e),
@@ -433,7 +551,7 @@ class _RouteAnalyticsSection extends ConsumerWidget {
                     fontSize: 13,
                   ),
                 ),
-                onTap: () => context.push('/routes/${row.route.id}'),
+                onTap: () => context.go('/routes/${row.route.id}'),
               ),
             ),
           ],
@@ -576,21 +694,21 @@ class _AdminSpeedDial extends ConsumerWidget {
         FloatingActionButton.small(
           heroTag: 'fab_shop',
           tooltip: tr('new_shop', ref),
-          onPressed: () => context.push('/shops/new'),
+          onPressed: () => context.go('/shops/new'),
           child: const Icon(Icons.store),
         ),
         const SizedBox(height: AppTokens.s8),
         FloatingActionButton.small(
           heroTag: 'fab_invoice',
           tooltip: tr('dashboard_new_invoice', ref),
-          onPressed: () => context.push('/invoices'),
+          onPressed: () => context.go('/invoices/new'),
           child: const Icon(Icons.receipt_long),
         ),
         const SizedBox(height: AppTokens.s8),
         FloatingActionButton(
           heroTag: 'fab_main',
           tooltip: tr('dashboard_quick_actions', ref),
-          onPressed: () => context.push('/inventory'),
+          onPressed: () => context.go('/inventory'),
           child: const Icon(Icons.add),
         ),
       ],

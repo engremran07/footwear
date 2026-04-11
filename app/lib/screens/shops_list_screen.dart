@@ -301,7 +301,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       ),
       floatingActionButton: canCreateShop
           ? FloatingActionButton(
-              onPressed: () => context.push('/shops/new'),
+              onPressed: () => context.go('/shops/new'),
               child: const Icon(Icons.add),
             )
           : null,
@@ -671,7 +671,7 @@ class _ShopTile extends ConsumerWidget {
             ),
           ],
         ),
-        onTap: () => context.push('/shops/${shop.id}'),
+        onTap: () => context.go('/shops/${shop.id}'),
       ),
     );
   }

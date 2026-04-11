@@ -13,6 +13,7 @@ import '../core/utils/error_mapper.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/database_flush_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/user_provider.dart';
@@ -173,12 +174,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           _isDirty = true;
                         });
                       },
-                      title: const Text(
-                        'Require admin approval for seller transaction edits',
-                      ),
-                      subtitle: const Text(
-                        'ON: seller edits are pending until admin approves. OFF: seller edits are auto-approved.',
-                      ),
+                      title: Text(tr('require_approval_title', ref)),
+                      subtitle: Text(tr('require_approval_subtitle', ref)),
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -401,8 +398,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 style: TextStyle(fontSize: 12),
               ),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/about'),
+              onTap: () => context.go('/about'),
             ),
+            const SizedBox(height: 16),
+            // ── Danger Zone ──
+            _DatabaseFlushSection(),
             const SizedBox(height: 16),
             // Sign out
             SizedBox(
@@ -1064,7 +1064,7 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
                         _pendingBytes = null;
                         _pendingSizeLabel = null;
                       }),
-                      child: const Text('Cancel'),
+                      child: Text(tr('cancel', ref)),
                     ),
                   ],
                 )
@@ -1097,6 +1097,443 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Danger Zone — Database Flush Section
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _DatabaseFlushSection extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_DatabaseFlushSection> createState() =>
+      _DatabaseFlushSectionState();
+}
+
+class _DatabaseFlushSectionState extends ConsumerState<_DatabaseFlushSection> {
+  bool _includeUsers = false;
+  String? _selectedUserId;
+  bool _flushing = false;
+
+  Future<void> _executeFlush(
+    String operationKey,
+    String descKey,
+    Future<FlushResult> Function() action,
+  ) async {
+    // Step 1: "Are you sure?" confirmation
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: AppBrand.errorColor,
+              size: 28,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(tr('flush_confirm_title', ref))),
+          ],
+        ),
+        content: Text(
+          tr(
+            'flush_confirm_message',
+            ref,
+          ).replaceAll('%s', tr(descKey, ref).toLowerCase()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(tr('cancel', ref)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppBrand.errorColor),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(tr('flush_confirm_button', ref)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    // Step 2: Password + countdown confirmation
+    final passwordOk = await _showPasswordCountdownDialog();
+    if (passwordOk != true || !mounted) return;
+
+    // Step 3: Execute flush
+    setState(() => _flushing = true);
+    try {
+      final result = await action();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          successSnackBar(
+            tr(
+              'flush_success',
+              ref,
+            ).replaceAll('%s', '${result.totalAffected}'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(AppErrorMapper.key(e)));
+      }
+    } finally {
+      if (mounted) setState(() => _flushing = false);
+    }
+  }
+
+  Future<bool?> _showPasswordCountdownDialog() {
+    final passwordC = TextEditingController();
+    int countdown = 10;
+    String? errorText;
+
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          // Start countdown timer
+          if (countdown > 0) {
+            Future.delayed(const Duration(seconds: 1), () {
+              if (ctx.mounted && countdown > 0) {
+                setS(() => countdown--);
+              }
+            });
+          }
+          return AlertDialog(
+            title: Text(tr('flush_password_title', ref)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: passwordC,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    hintText: tr('flush_password_hint', ref),
+                    errorText: errorText,
+                    prefixIcon: const Icon(Icons.lock_outline),
+                  ),
+                  onChanged: (_) {
+                    if (errorText != null) setS(() => errorText = null);
+                  },
+                ),
+                const SizedBox(height: 16),
+                if (countdown > 0)
+                  Text(
+                    tr('flush_countdown', ref).replaceAll('%s', '$countdown'),
+                    style: const TextStyle(
+                      color: AppBrand.warningColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(tr('cancel', ref)),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppBrand.errorColor,
+                ),
+                onPressed: countdown > 0 || passwordC.text.isEmpty
+                    ? null
+                    : () async {
+                        final ok = await ref
+                            .read(databaseFlushProvider.notifier)
+                            .reauthenticate(passwordC.text);
+                        if (ok) {
+                          if (ctx.mounted) Navigator.pop(ctx, true);
+                        } else {
+                          setS(
+                            () => errorText = tr('flush_password_wrong', ref),
+                          );
+                        }
+                      },
+                child: Text(tr('flush_confirm_button', ref)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUser = ref.watch(authUserProvider).valueOrNull;
+    if (currentUser == null || !currentUser.isAdmin) {
+      return const SizedBox.shrink();
+    }
+    final users = ref.watch(allUsersProvider).valueOrNull ?? [];
+    final nonAdminUsers = users.where((u) => !u.isAdmin).toList();
+
+    return Stack(
+      children: [
+        Card(
+          color: AppBrand.errorColor.withAlpha(15),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: AppBrand.errorColor.withAlpha(80)),
+          ),
+          child: ExpansionTile(
+            leading: const Icon(
+              Icons.warning_amber_rounded,
+              color: AppBrand.errorColor,
+            ),
+            title: Text(
+              tr('danger_zone', ref),
+              style: const TextStyle(
+                color: AppBrand.errorColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: Text(
+              tr('danger_zone_subtitle', ref),
+              style: TextStyle(
+                color: AppBrand.errorColor.withAlpha(180),
+                fontSize: 12,
+              ),
+            ),
+            children: [
+              const Divider(height: 1),
+              // Individual flush options
+              _flushTile(
+                icon: Icons.receipt_long_outlined,
+                titleKey: 'flush_financial',
+                descKey: 'flush_financial_desc',
+                onTap: () => _executeFlush(
+                  'flush_financial',
+                  'flush_financial_desc',
+                  () => ref
+                      .read(databaseFlushProvider.notifier)
+                      .flushFinancialData(),
+                ),
+              ),
+              _flushTile(
+                icon: Icons.inventory_2_outlined,
+                titleKey: 'flush_inventory',
+                descKey: 'flush_inventory_desc',
+                onTap: () => _executeFlush(
+                  'flush_inventory',
+                  'flush_inventory_desc',
+                  () =>
+                      ref.read(databaseFlushProvider.notifier).flushInventory(),
+                ),
+              ),
+              _flushTile(
+                icon: Icons.store_outlined,
+                titleKey: 'flush_shops',
+                descKey: 'flush_shops_desc',
+                onTap: () => _executeFlush(
+                  'flush_shops',
+                  'flush_shops_desc',
+                  () => ref.read(databaseFlushProvider.notifier).flushShops(),
+                ),
+              ),
+              _flushTile(
+                icon: Icons.route_outlined,
+                titleKey: 'flush_routes',
+                descKey: 'flush_routes_desc',
+                onTap: () => _executeFlush(
+                  'flush_routes',
+                  'flush_routes_desc',
+                  () => ref.read(databaseFlushProvider.notifier).flushRoutes(),
+                ),
+              ),
+              _flushTile(
+                icon: Icons.shopping_bag_outlined,
+                titleKey: 'flush_products',
+                descKey: 'flush_products_desc',
+                onTap: () => _executeFlush(
+                  'flush_products',
+                  'flush_products_desc',
+                  () =>
+                      ref.read(databaseFlushProvider.notifier).flushProducts(),
+                ),
+              ),
+              _flushTile(
+                icon: Icons.settings_backup_restore,
+                titleKey: 'flush_settings',
+                descKey: 'flush_settings_desc',
+                onTap: () => _executeFlush(
+                  'flush_settings',
+                  'flush_settings_desc',
+                  () =>
+                      ref.read(databaseFlushProvider.notifier).resetSettings(),
+                ),
+              ),
+
+              const Divider(height: 1),
+
+              // Per-user flush
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tr('flush_per_user', ref),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppBrand.errorColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      tr('flush_per_user_desc', ref),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedUserId,
+                      decoration: InputDecoration(
+                        labelText: tr('flush_select_user', ref),
+                        isDense: true,
+                      ),
+                      items: nonAdminUsers
+                          .map(
+                            (u) => DropdownMenuItem(
+                              value: u.id,
+                              child: Text(u.displayName),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setState(() => _selectedUserId = v),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppBrand.errorColor,
+                          side: const BorderSide(color: AppBrand.errorColor),
+                        ),
+                        onPressed: _selectedUserId == null
+                            ? null
+                            : () => _executeFlush(
+                                'flush_per_user',
+                                'flush_per_user_desc',
+                                () => ref
+                                    .read(databaseFlushProvider.notifier)
+                                    .flushPerUser(_selectedUserId!),
+                              ),
+                        icon: const Icon(
+                          Icons.person_remove_outlined,
+                          size: 18,
+                        ),
+                        label: Text(tr('flush_per_user', ref)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(height: 1),
+
+              // Full database reset (nuclear option)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: _includeUsers,
+                      onChanged: (v) =>
+                          setState(() => _includeUsers = v ?? false),
+                      title: Text(
+                        tr('flush_include_users', ref),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppBrand.errorColor,
+                        ),
+                        onPressed: () => _executeFlush(
+                          'flush_all',
+                          'flush_all_desc',
+                          () => ref
+                              .read(databaseFlushProvider.notifier)
+                              .flushAll(
+                                keepAdminId: currentUser.id,
+                                includeUsers: _includeUsers,
+                              ),
+                        ),
+                        icon: const Icon(Icons.delete_forever, size: 20),
+                        label: Text(
+                          tr('flush_all', ref).toUpperCase(),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Full-screen loading overlay
+        if (_flushing)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(color: Colors.white),
+                    const SizedBox(height: 16),
+                    Text(
+                      tr('flush_in_progress', ref),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _flushTile({
+    required IconData icon,
+    required String titleKey,
+    required String descKey,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: AppBrand.errorColor),
+      title: Text(
+        tr(titleKey, ref),
+        style: const TextStyle(fontWeight: FontWeight.w500),
+      ),
+      subtitle: Text(
+        tr(descKey, ref),
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
     );
   }
 }

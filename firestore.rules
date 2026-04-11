@@ -45,9 +45,17 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // S-07: cap document size at 50 KB to prevent abuse
+    // S-07: cap document field count (request.resource.data.size() returns
+    // field count, NOT byte size). 100 fields is a generous upper bound for
+    // any document in this schema.
     function docSizeOk() {
-      return request.resource.data.size() < 50000;
+      return request.resource.data.size() < 100;
+    }
+
+    // BUG-02: Sellers may only create cash_in or cash_out transactions.
+    // Admin-only types: return, payment, write_off.
+    function isValidSellerTransactionType(type) {
+      return type == 'cash_in' || type == 'cash_out';
     }
 
     // Write-rate guard: at least 1 second between writes (prevent rapid-fire)
@@ -236,7 +244,7 @@ service cloud.firestore {
           request.resource.data.created_by == request.auth.uid &&
           request.resource.data.shop_id != null &&
           request.resource.data.shop_id != '' &&
-          isValidTransactionType(request.resource.data.type) &&
+          isValidSellerTransactionType(request.resource.data.type) &&
           request.resource.data.amount is number &&
           request.resource.data.amount > 0 &&
           request.resource.data.route_id != null &&

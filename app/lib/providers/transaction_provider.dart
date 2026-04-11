@@ -39,14 +39,13 @@ final shopTransactionsProvider = StreamProvider.autoDispose
       return FirebaseFirestore.instance
           .collection(Collections.transactions)
           .where('shop_id', isEqualTo: normalizedShopId)
+          .orderBy('created_at', descending: true)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .where((d) => d.data()['deleted'] != true)
-                    .map((d) => TransactionModel.fromJson(d.data(), d.id))
-                    .toList()
-                  ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
+            (snap) => snap.docs
+                .where((d) => d.data()['deleted'] != true)
+                .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -59,6 +58,26 @@ final allTransactionsProvider =
           .collection(Collections.transactions)
           .orderBy('created_at', descending: true)
           .limit(200)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .where((d) => d.data()['deleted'] != true)
+                .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
+
+final pendingEditRequestsProvider =
+    StreamProvider.autoDispose<List<TransactionModel>>((ref) {
+      final user = ref.watch(authUserProvider).valueOrNull;
+      if (user == null || !user.isAdmin) {
+        return Stream.value(const <TransactionModel>[]);
+      }
+      return FirebaseFirestore.instance
+          .collection(Collections.transactions)
+          .where('edit_request_pending', isEqualTo: true)
+          .orderBy('created_at', descending: true)
+          .limit(50)
           .snapshots()
           .map(
             (snap) => snap.docs
@@ -99,6 +118,7 @@ final shopTransactionsExportProvider = FutureProvider.autoDispose
           .where((d) => d.data()['deleted'] != true)
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList()
+        // Chronological export keeps running-balance statements readable.
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     });
 
@@ -131,6 +151,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
     });
 
     if (shopId != null && shopId.isNotEmpty) {
+      // Treat return/payment/write_off as balance-reducing amounts by default.
       final oldDelta = oldType == 'cash_out' ? oldAmount : -oldAmount;
       final newDelta = newType == 'cash_out' ? newAmount : -newAmount;
       final netChange = -oldDelta + newDelta;
@@ -517,6 +538,22 @@ class TransactionNotifier extends AsyncNotifier<void> {
     final createdBy = (data['created_by'] as String?)?.trim() ?? '';
     if (createdBy != sellerId.trim()) {
       throw StateError('Seller can edit only own transactions');
+    }
+
+    final linkedInvoiceId = (data['invoice_id'] as String?)?.trim() ?? '';
+    if (linkedInvoiceId.isNotEmpty) {
+      throw StateError(
+        'Cannot edit a transaction that is linked to invoice '
+        '$linkedInvoiceId. Void the invoice to make corrections.',
+      );
+    }
+
+    final alreadyPending = data['edit_request_pending'] as bool? ?? false;
+    if (alreadyPending) {
+      throw StateError(
+        'An edit request is already pending for this transaction. '
+        'Wait for admin review before submitting another.',
+      );
     }
 
     final oldType = (data['type'] as String?) ?? 'cash_out';

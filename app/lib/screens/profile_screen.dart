@@ -37,15 +37,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (name.isEmpty || name == me.displayName) return;
 
     try {
-      await ref
-          .read(userManagementNotifierProvider.notifier)
-          .updateUser(me.id, {'display_name': name});
+      await ref.read(userManagementNotifierProvider.notifier).updateUser(
+        me.id,
+        {'display_name': name},
+      );
       if (mounted) {
         HapticFeedback.mediumImpact();
         setState(() => _isDirty = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          successSnackBar(tr('saved_successfully', ref)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       }
     } catch (e) {
       if (mounted) {
@@ -72,8 +73,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             children: [
               TextField(
                 controller: currentPassC,
-                decoration:
-                    InputDecoration(labelText: tr('current_password', ref)),
+                decoration: InputDecoration(
+                  labelText: tr('current_password', ref),
+                ),
                 obscureText: true,
                 keyboardType: TextInputType.visiblePassword,
                 textInputAction: TextInputAction.next,
@@ -93,8 +95,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               TextField(
                 controller: confirmPassC,
                 focusNode: confirmPassFn,
-                decoration:
-                    InputDecoration(labelText: tr('confirm_password', ref)),
+                decoration: InputDecoration(
+                  labelText: tr('confirm_password', ref),
+                ),
                 obscureText: true,
                 keyboardType: TextInputType.visiblePassword,
                 textInputAction: TextInputAction.done,
@@ -110,10 +113,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ElevatedButton(
             onPressed: () async {
               final newPass = newPassC.text.trim();
-              if (newPass.length < 6) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  warningSnackBar(tr('err_weak_password', ref)),
-                );
+              if (newPass.length < 8) {
+                ScaffoldMessenger.of(
+                  ctx,
+                ).showSnackBar(warningSnackBar(tr('err_weak_password', ref)));
                 return;
               }
               if (newPass != confirmPassC.text.trim()) {
@@ -139,9 +142,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               } catch (e) {
                 if (ctx.mounted) {
                   final key = AppErrorMapper.key(e);
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    errorSnackBar(tr(key, ref)),
-                  );
+                  ScaffoldMessenger.of(
+                    ctx,
+                  ).showSnackBar(errorSnackBar(tr(key, ref)));
                 }
               }
             },
@@ -161,8 +164,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (currentUser != null && _nameC.text.isEmpty) {
       _nameC.value = TextEditingValue(
         text: currentUser.displayName,
-        selection:
-            TextSelection.collapsed(offset: currentUser.displayName.length),
+        selection: TextSelection.collapsed(
+          offset: currentUser.displayName.length,
+        ),
       );
     }
 
@@ -198,16 +202,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       TextField(
                         controller: _nameC,
                         decoration: InputDecoration(
-                            labelText: tr('lbl_display_name', ref)),
+                          labelText: tr('lbl_display_name', ref),
+                        ),
                         textCapitalization: TextCapitalization.words,
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => _saveName(),
                         onChanged: (_) {
                           if (!_isDirty) setState(() => _isDirty = true);
                         },
-                        inputFormatters: [
-                          AppInputFormatters.maxLength(100),
-                        ],
+                        inputFormatters: [AppInputFormatters.maxLength(100)],
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
@@ -235,18 +238,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(tr('language', ref),
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        tr('language', ref),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 8),
                       SegmentedButton<AppLocale>(
                         segments: AppLocale.values
-                            .map((l) =>
-                                ButtonSegment(value: l, label: Text(l.label)))
+                            .map(
+                              (l) =>
+                                  ButtonSegment(value: l, label: Text(l.label)),
+                            )
                             .toList(),
                         selected: {locale},
-                        onSelectionChanged: (s) => ref
-                            .read(appLocaleProvider.notifier)
-                            .state = s.first,
+                        onSelectionChanged: (s) =>
+                            ref.read(appLocaleProvider.notifier).state =
+                                s.first,
                       ),
                     ],
                   ),
@@ -259,8 +266,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(tr('profile_appearance', ref),
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        tr('profile_appearance', ref),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 8),
                       SegmentedButton<ThemeMode>(
                         segments: [
@@ -296,8 +305,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(tr('profile_security', ref),
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        tr('profile_security', ref),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 8),
                       SizedBox(
                         width: double.infinity,

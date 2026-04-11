@@ -89,7 +89,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
                         (i) =>
                             i.invoiceNumber.toLowerCase().contains(_search) ||
                             i.shopName.toLowerCase().contains(_search) ||
-                            i.shopName.toLowerCase().contains(_search),
+                            i.sellerName.toLowerCase().contains(_search),
                       )
                       .toList();
                 }
@@ -142,6 +142,13 @@ class _InvoiceTile extends ConsumerWidget {
     final dateStr = '${date.day}/${date.month}/${date.year}';
 
     Color statusColor;
+    final statusLabel = switch (invoice.status) {
+      InvoiceModel.statusPaid => tr('paid', ref),
+      InvoiceModel.statusIssued => tr('issued', ref),
+      InvoiceModel.statusPartial => tr('partial', ref),
+      InvoiceModel.statusVoid => tr('void', ref),
+      _ => invoice.status,
+    };
     switch (invoice.status) {
       case InvoiceModel.statusPaid:
         statusColor = AppTheme.clearBg(cs);
@@ -196,7 +203,7 @@ class _InvoiceTile extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                invoice.status.toUpperCase(),
+                statusLabel.toUpperCase(),
                 style: const TextStyle(fontSize: 10),
               ),
             ),

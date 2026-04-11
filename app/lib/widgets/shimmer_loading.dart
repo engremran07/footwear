@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../core/design/app_tokens.dart';
 
+/// Returns a theme-aware placeholder color for shimmer shapes.
+/// Light mode: white (classic shimmer look). Dark mode: dark grey.
+Color _placeholderColor(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+        ? Colors.grey.shade800
+        : Colors.white;
+
 /// A shimmer placeholder widget for loading states.
 /// Uses the shimmer package for smooth, consistent loading animations.
 class ShimmerLoading extends StatelessWidget {
@@ -69,7 +76,7 @@ class _ShimmerTile extends StatelessWidget {
                 Container(
                   height: 14,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: _placeholderColor(context),
                     borderRadius: AppTokens.brXS,
                   ),
                 ),
@@ -78,7 +85,7 @@ class _ShimmerTile extends StatelessWidget {
                   width: 120,
                   height: 10,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: _placeholderColor(context),
                     borderRadius: AppTokens.brXS,
                   ),
                 ),
@@ -117,7 +124,7 @@ class _ShimmerCards extends StatelessWidget {
             itemCount: count,
             itemBuilder: (_, __) => Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: _placeholderColor(context),
                 borderRadius: AppTokens.brMD,
               ),
             ),
@@ -145,13 +152,13 @@ class _ShimmerDetail extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(height: 24, width: 200, color: Colors.white),
+                Container(height: 24, width: 200, color: _placeholderColor(context)),
                 const SizedBox(height: AppTokens.s16),
-                Container(height: 14, color: Colors.white),
+                Container(height: 14, color: _placeholderColor(context)),
                 const SizedBox(height: AppTokens.s8),
-                Container(height: 14, width: 250, color: Colors.white),
+                Container(height: 14, width: 250, color: _placeholderColor(context)),
                 const SizedBox(height: AppTokens.s24),
-                Container(height: 120, color: Colors.white),
+                Container(height: 120, color: _placeholderColor(context)),
               ],
             ),
           ),
@@ -187,7 +194,7 @@ class _ShimmerGrid extends StatelessWidget {
             itemCount: count,
             itemBuilder: (_, __) => Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: _placeholderColor(context),
                 borderRadius: AppTokens.brMD,
               ),
             ),

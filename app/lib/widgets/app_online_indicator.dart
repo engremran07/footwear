@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/constants/app_brand.dart';
 
 /// Small colored dot indicating online/offline status.
 class AppOnlineIndicator extends StatelessWidget {
@@ -20,7 +21,7 @@ class AppOnlineIndicator extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isOnline ? Colors.green : Colors.grey,
+          color: isOnline ? AppBrand.successColor : AppBrand.stockColor,
           border: Border.all(
             color: Theme.of(context).colorScheme.surface,
             width: 1.5,

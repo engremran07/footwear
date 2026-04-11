@@ -89,6 +89,13 @@ class UserManagementNotifier extends AsyncNotifier<void> {
 
       final trimmedEmail = email.trim().toLowerCase();
       final trimmedName = displayName.trim();
+      final trimmedPassword = password.trim();
+      if (trimmedPassword.length < 8) {
+        throw FirebaseAuthException(
+          code: 'weak-password',
+          message: 'Password is too weak. Use at least 8 characters.',
+        );
+      }
 
       // Use a secondary FirebaseApp so the admin stays signed in
       FirebaseApp? tempApp;
@@ -106,7 +113,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         // Create the Auth account via the disposable secondary app
         final cred = await tempAuth.createUserWithEmailAndPassword(
           email: trimmedEmail,
-          password: password,
+          password: trimmedPassword,
         );
         final newUid = cred.user!.uid;
 
@@ -355,6 +362,12 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     if (trimmedCurrent.isEmpty || trimmedNew.isEmpty) {
       throw ArgumentError('Passwords must not be empty');
     }
+    if (trimmedNew.length < 8) {
+      throw FirebaseAuthException(
+        code: 'weak-password',
+        message: 'Password is too weak. Use at least 8 characters.',
+      );
+    }
 
     final credential = EmailAuthProvider.credential(
       email: email,
@@ -408,6 +421,13 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     final hasEmailChange = trimmedEmail != null && trimmedEmail.isNotEmpty;
     final hasPasswordChange =
         trimmedPassword != null && trimmedPassword.isNotEmpty;
+
+    if (hasPasswordChange && trimmedPassword.length < 8) {
+      throw FirebaseAuthException(
+        code: 'weak-password',
+        message: 'Password is too weak. Use at least 8 characters.',
+      );
+    }
 
     if (!hasEmailChange && !hasPasswordChange && emailVerified == null) return;
 

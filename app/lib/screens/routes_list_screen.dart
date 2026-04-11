@@ -55,7 +55,7 @@ class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
       ),
       floatingActionButton: isAdmin
           ? FloatingActionButton(
-              onPressed: () => context.push('/routes/new'),
+              onPressed: () => context.go('/routes/new'),
               child: const Icon(Icons.add),
             )
           : null,
@@ -147,7 +147,7 @@ class _RouteTile extends ConsumerWidget {
             ],
           ),
         ),
-        onTap: () => context.push('/routes/${route.id}'),
+        onTap: () => context.go('/routes/${route.id}'),
       ),
     );
   }

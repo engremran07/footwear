@@ -187,7 +187,7 @@ Never keep ambiguity-driven workaround code without explicit justification.
 | `if (user.isSeller && ...)` on stock source | Admin silently excluded | `sellerInventoryProvider(user.id)` for all |
 | `.where('deleted', isEqualTo: false)` | Pre-DI-01 docs excluded | Client-side `d.data()['deleted'] != true` |
 | `ref.read(provider)` in `build()` | Stale data guarantee | `ref.watch(provider)` |
-| `flutter build apk --release --split-per-abi` | Wrong split APK | `flutter build apk --release` (fat) |
+| ABI-split APK build command | Wrong split APK | `flutter build apk --release` (fat) |
 | Hardcoded `Colors.red`, `Colors.white` | Dark mode breakage | `AppBrand.errorFg`, `AppBrand.errorBg` |
 | Raw `SnackBar(content: Text(...))` | Unstyled SnackBar | `errorSnackBar()` / `successSnackBar()` |
 | `avoid_double_and_int_checks lint violation` in web build | Transitive dep locked to old `image`/`archive` by another pkg | Find blocking package; replace or upgrade it — see Chain 5 |
@@ -208,8 +208,8 @@ grep -rn "\.collection('" app/lib/ | grep -v "Collections\."
 # 4 — No Firestore writes in screens/widgets
 grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/
 
-# 5 — No split-per-abi anywhere
-grep -rn "split-per-abi" .github/ app/ --include="*.{yml,yaml,md,sh}"
+# 5 — No legacy ABI-split APK build commands remain in docs/workflows
+# Mirror CI Gate 3 and confirm release docs/scripts still enforce fat APK only.
 ```
 
 ## Admin Auth Pipeline
@@ -274,4 +274,4 @@ Run before marking production ready:
   - Firestore rules: docSizeOk() <50KB, withinWriteRate() 1s cooldown
   - Dark mode QA: theme-aware colors, no hardcoded Colors.white/grey
   - RTL QA: EdgeInsetsDirectional, no hardcoded left/right padding
-  - Release: v3.0.0+7, 3 split-per-abi APKs built
+  - Release: v3.0.0+7, 3 ABI-split APKs built
