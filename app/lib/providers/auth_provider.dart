@@ -113,6 +113,7 @@ class AuthNotifier extends AsyncNotifier<void> {
     ref.invalidate(lastGoodDashboardStatsProvider);
     ref.invalidate(settingsProvider);
     ref.invalidate(allTransactionsProvider);
+    ref.invalidate(shopsAnalyticsTransactionsProvider);
     ref.invalidate(pendingEditRequestsProvider);
     ref.invalidate(allInvoicesProvider);
     ref.invalidate(roleAwareInvoicesProvider);

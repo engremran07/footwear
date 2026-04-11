@@ -67,6 +67,43 @@ final allTransactionsProvider =
           );
     });
 
+/// Shop analytics need actual ledger flow, not just current balances.
+/// Admins see all transactions; sellers see all transactions on their route.
+final shopsAnalyticsTransactionsProvider =
+    StreamProvider.autoDispose<List<TransactionModel>>((ref) {
+      final user = ref.watch(authUserProvider).valueOrNull;
+      if (user == null) return Stream.value(const <TransactionModel>[]);
+
+      final collection = FirebaseFirestore.instance.collection(
+        Collections.transactions,
+      );
+
+      if (user.isAdmin) {
+        return collection.orderBy('created_at', descending: true).snapshots().map(
+          (snap) => snap.docs
+              .where((d) => d.data()['deleted'] != true)
+              .map((d) => TransactionModel.fromJson(d.data(), d.id))
+              .toList(),
+        );
+      }
+
+      final routeId = (user.assignedRouteId ?? '').trim();
+      if (!user.isSeller || routeId.isEmpty) {
+        return Stream.value(const <TransactionModel>[]);
+      }
+
+      return collection
+          .where('route_id', isEqualTo: routeId)
+          .orderBy('created_at', descending: true)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .where((d) => d.data()['deleted'] != true)
+                .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                .toList(),
+          );
+    });
+
 final pendingEditRequestsProvider =
     StreamProvider.autoDispose<List<TransactionModel>>((ref) {
       final user = ref.watch(authUserProvider).valueOrNull;

@@ -7,9 +7,11 @@ import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
 import '../models/route_model.dart';
 import '../models/shop_model.dart';
+import '../models/transaction_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/shop_provider.dart';
+import '../providers/transaction_provider.dart';
 import '../widgets/app_pull_refresh.dart';
 import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
@@ -88,14 +90,19 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     return haystack.contains(q);
   }
 
-  bool _matchesQuickFilter(ShopModel s) {
+  List<ShopModel> _scopeShopsByRoute(List<ShopModel> shops) {
+    if (_selectedRouteId == null) return shops;
+    return shops.where((s) => s.routeId == _selectedRouteId).toList();
+  }
+
+  bool _matchesQuickFilter(ShopModel s, _ShopFlowStats flowStats) {
     switch (_filter) {
       case _ShopQuickFilter.collective:
         return true;
       case _ShopQuickFilter.iGave:
-        return s.balance > 0;
+        return flowStats.cashOut > 0;
       case _ShopQuickFilter.iGot:
-        return s.balance < 0;
+        return flowStats.cashIn > 0;
       case _ShopQuickFilter.iWillGet:
         return s.balance > 0;
     }
@@ -107,11 +114,21 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     final shopsAsync = user?.isSeller == true && user?.assignedRouteId != null
         ? ref.watch(shopsByRouteProvider(user!.assignedRouteId!))
         : ref.watch(shopsProvider);
+    final transactionsAsync = ref.watch(shopsAnalyticsTransactionsProvider);
     final routesAsync = user?.isAdmin == true
         ? ref.watch(routesProvider)
         : null;
     final canCreateShop =
         user != null && (user.isAdmin || user.assignedRouteId != null);
+    final scopedStatsShops = shopsAsync.valueOrNull == null
+      ? null
+      : _scopeShopsByRoute(shopsAsync.valueOrNull!);
+    final flowByShop = scopedStatsShops == null || transactionsAsync.valueOrNull == null
+      ? null
+      : _buildShopFlowStats(
+        shops: scopedStatsShops,
+        transactions: transactionsAsync.valueOrNull!,
+        );
 
     return Scaffold(
       appBar: AppBar(
@@ -214,30 +231,46 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
               error: (_, __) => const SizedBox.shrink(),
             ),
           // Stats strip — derived from the live shop list
-          shopsAsync
-                  .whenData(
-                    (shops) => _ShopStatsStrip(
-                      shops: shops,
-                      selected: _filter,
-                      onSelected: (f) => setState(() => _filter = f),
-                    ),
-                  )
-                  .valueOrNull ??
+          if (scopedStatsShops != null && flowByShop != null)
+            _ShopStatsStrip(
+              shops: scopedStatsShops,
+              flowByShop: flowByShop,
+              selected: _filter,
+              onSelected: (f) => setState(() => _filter = f),
+            )
+          else
               const SizedBox.shrink(),
           Expanded(
             child: shopsAsync.when(
               data: (shops) {
-                final filtered = shops.where((s) {
-                  if (_selectedRouteId != null &&
-                      s.routeId != _selectedRouteId) {
-                    return false;
-                  }
-                  return _matchesSearch(s, _search) && _matchesQuickFilter(s);
+                final scopedShops = _scopeShopsByRoute(shops);
+                final scopedFlowByShop = _buildShopFlowStats(
+                  shops: scopedShops,
+                  transactions: transactionsAsync.valueOrNull ??
+                      const <TransactionModel>[],
+                );
+                final filtered = scopedShops.where((s) {
+                  final flowStats =
+                      scopedFlowByShop[s.id] ?? const _ShopFlowStats();
+                  return _matchesSearch(s, _search) &&
+                      _matchesQuickFilter(s, flowStats);
                 }).toList();
 
-                if (_filter == _ShopQuickFilter.iWillGet ||
-                    _filter == _ShopQuickFilter.iGave) {
-                  filtered.sort((a, b) => b.balance.compareTo(a.balance));
+                switch (_filter) {
+                  case _ShopQuickFilter.iGot:
+                    filtered.sort(
+                      (a, b) => (scopedFlowByShop[b.id]?.cashIn ?? 0)
+                          .compareTo(scopedFlowByShop[a.id]?.cashIn ?? 0),
+                    );
+                  case _ShopQuickFilter.iGave:
+                    filtered.sort(
+                      (a, b) => (scopedFlowByShop[b.id]?.cashOut ?? 0)
+                          .compareTo(scopedFlowByShop[a.id]?.cashOut ?? 0),
+                    );
+                  case _ShopQuickFilter.iWillGet:
+                    filtered.sort((a, b) => b.balance.compareTo(a.balance));
+                  case _ShopQuickFilter.collective:
+                    break;
                 }
 
                 if (filtered.isEmpty) {
@@ -254,6 +287,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                     return _AdminGroupedShopsView(
                       shops: filtered,
                       routes: routes,
+                      selectedFilter: _filter,
+                      flowByShop: scopedFlowByShop,
                     );
                   }
                 }
@@ -286,6 +321,9 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                     itemCount: filtered.length,
                     itemBuilder: (_, i) => _ShopTile(
                       shop: filtered[i],
+                      selectedFilter: _filter,
+                      flowStats:
+                          scopedFlowByShop[filtered[i].id] ?? const _ShopFlowStats(),
                       hasDuplicate: duplicateNames.contains(
                         filtered[i].name.toLowerCase(),
                       ),
@@ -392,14 +430,55 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
   }
 }
 
+class _ShopFlowStats {
+  final double cashIn;
+  final double cashOut;
+
+  const _ShopFlowStats({this.cashIn = 0, this.cashOut = 0});
+
+  _ShopFlowStats add(TransactionModel tx) {
+    if (tx.type == TransactionModel.typeCashIn) {
+      return _ShopFlowStats(cashIn: cashIn + tx.amount, cashOut: cashOut);
+    }
+    if (tx.type == TransactionModel.typeCashOut) {
+      return _ShopFlowStats(cashIn: cashIn, cashOut: cashOut + tx.amount);
+    }
+    return this;
+  }
+}
+
+Map<String, _ShopFlowStats> _buildShopFlowStats({
+  required Iterable<ShopModel> shops,
+  required Iterable<TransactionModel> transactions,
+}) {
+  final shopIds = shops
+      .map((s) => s.id.trim())
+      .where((id) => id.isNotEmpty)
+      .toSet();
+  final flowByShop = <String, _ShopFlowStats>{
+    for (final shopId in shopIds) shopId: const _ShopFlowStats(),
+  };
+
+  for (final tx in transactions) {
+    final shopId = tx.shopId.trim();
+    if (!shopIds.contains(shopId)) continue;
+    flowByShop[shopId] =
+        (flowByShop[shopId] ?? const _ShopFlowStats()).add(tx);
+  }
+
+  return flowByShop;
+}
+
 // ── Stats strip — CreditBook style ────────────────────────────────────────────
 
 class _ShopStatsStrip extends ConsumerWidget {
   final List<ShopModel> shops;
+  final Map<String, _ShopFlowStats> flowByShop;
   final _ShopQuickFilter selected;
   final ValueChanged<_ShopQuickFilter> onSelected;
   const _ShopStatsStrip({
     required this.shops,
+    required this.flowByShop,
     required this.selected,
     required this.onSelected,
   });
@@ -432,13 +511,17 @@ class _ShopStatsStrip extends ConsumerWidget {
         ? 14.0
         : 15.0;
 
-    final totalGave = shops
-        .where((s) => s.balance > 0)
-        .fold(0.0, (sum, s) => sum + s.balance);
-    final totalGot = shops
-        .where((s) => s.balance < 0)
-        .fold(0.0, (sum, s) => sum + s.balance.abs());
-    final totalWillGet = totalGot - totalGave;
+    final totalGave = shops.fold(
+      0.0,
+      (sum, s) => sum + (flowByShop[s.id]?.cashOut ?? 0),
+    );
+    final totalGot = shops.fold(
+      0.0,
+      (sum, s) => sum + (flowByShop[s.id]?.cashIn ?? 0),
+    );
+    final totalWillGet = shops
+      .where((s) => s.balance > 0)
+      .fold(0.0, (sum, s) => sum + s.balance);
     final totalCollective = shops.length;
 
     return Padding(
@@ -592,13 +675,56 @@ enum _ShopQuickFilter { collective, iGot, iGave, iWillGet }
 
 class _ShopTile extends ConsumerWidget {
   final ShopModel shop;
+  final _ShopQuickFilter selectedFilter;
+  final _ShopFlowStats flowStats;
   final bool hasDuplicate;
-  const _ShopTile({required this.shop, this.hasDuplicate = false});
+  const _ShopTile({
+    required this.shop,
+    required this.selectedFilter,
+    required this.flowStats,
+    this.hasDuplicate = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hasDebt = shop.balance > 0;
+    final hasCredit = shop.balance < 0;
     final cs = Theme.of(context).colorScheme;
+    final (trailingAmount, trailingLabel, trailingColor) = switch (
+      selectedFilter
+    ) {
+      _ShopQuickFilter.iGot => (
+        flowStats.cashIn,
+        tr('i_got', ref),
+        AppTheme.clearFg(cs),
+      ),
+      _ShopQuickFilter.iGave => (
+        flowStats.cashOut,
+        tr('i_gave', ref),
+        AppTheme.debtFg(cs),
+      ),
+      _ShopQuickFilter.iWillGet => (
+        shop.balance > 0 ? shop.balance : 0.0,
+        tr('i_will_get', ref),
+        AppTheme.debtFg(cs),
+      ),
+      _ShopQuickFilter.collective when hasDebt => (
+        shop.balance.abs(),
+        tr('i_will_get', ref),
+        AppTheme.debtFg(cs),
+      ),
+      _ShopQuickFilter.collective when hasCredit => (
+        shop.balance.abs(),
+        tr('i_got', ref),
+        AppTheme.clearFg(cs),
+      ),
+      _ShopQuickFilter.collective => (
+        0.0,
+        tr('clear', ref),
+        AppTheme.clearFg(cs),
+      ),
+    };
+
     return Card(
       child: ListTile(
         leading: Stack(
@@ -649,24 +775,24 @@ class _ShopTile extends ConsumerWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        // CreditBook-style trailing: amount + I gave / I got label
+        // Show the amount that matches the selected analytics chip.
         trailing: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              AppFormatters.sar(shop.balance.abs()),
+              AppFormatters.sar(trailingAmount),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
-                color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
+                color: trailingColor,
               ),
             ),
             Text(
-              hasDebt ? tr('i_gave', ref) : tr('clear', ref),
+              trailingLabel,
               style: TextStyle(
                 fontSize: 10,
-                color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
+                color: trailingColor,
               ),
             ),
           ],
@@ -682,7 +808,14 @@ class _ShopTile extends ConsumerWidget {
 class _AdminGroupedShopsView extends ConsumerStatefulWidget {
   final List<ShopModel> shops;
   final List<RouteModel> routes;
-  const _AdminGroupedShopsView({required this.shops, required this.routes});
+  final _ShopQuickFilter selectedFilter;
+  final Map<String, _ShopFlowStats> flowByShop;
+  const _AdminGroupedShopsView({
+    required this.shops,
+    required this.routes,
+    required this.selectedFilter,
+    required this.flowByShop,
+  });
 
   @override
   ConsumerState<_AdminGroupedShopsView> createState() =>
@@ -849,6 +982,8 @@ class _AdminGroupedShopsViewState
         final shop = section.items[entry.itemIdx];
         return _ShopTile(
           shop: shop,
+          selectedFilter: widget.selectedFilter,
+          flowStats: widget.flowByShop[shop.id] ?? const _ShopFlowStats(),
           hasDuplicate: (sectionNames[shop.name.toLowerCase()] ?? 0) > 1,
         );
       },

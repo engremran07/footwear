@@ -228,6 +228,10 @@ Conflict resolution order for instructions:
 
 ## 10) Current Audit Status
 
+2026-04-11 audit v11 — v3.4.10+41:
+
+- Shops analytics correction: `I got` / `I gave` chips on the shops screen now aggregate real `cash_in` / `cash_out` ledger entries, `I will get` stays tied to current outstanding balance, and seller analytics read route-scoped transactions via a dedicated `route_id + created_at` index
+
 2026-04-11 audit v10 — v3.4.9+40:
 
 - Invoice flow resilience: preselected shop auto-selection now uses a one-shot guard, and invoice detail supports back-context routing to the originating shop after invoice creation
