@@ -57,13 +57,12 @@ class AppChartCard extends StatelessWidget {
             // Chart or empty state
             SizedBox(
               height: height,
-              child:
-                  isEmpty
-                      ? EmptyState(
-                        icon: Icons.bar_chart_rounded,
-                        message: emptyMessage,
-                      )
-                      : chart,
+              child: isEmpty
+                  ? EmptyState(
+                      icon: Icons.bar_chart_rounded,
+                      message: emptyMessage,
+                    )
+                  : chart,
             ),
 
             // Legend
@@ -72,8 +71,9 @@ class AppChartCard extends StatelessWidget {
               Wrap(
                 spacing: AppTokens.s16,
                 runSpacing: AppTokens.s8,
-                children:
-                    legend!.map((item) => _LegendDot(item: item)).toList(),
+                children: legend!
+                    .map((item) => _LegendDot(item: item))
+                    .toList(),
               ),
             ],
           ],

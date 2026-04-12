@@ -70,21 +70,19 @@ class BootstrapProfileScreen extends ConsumerWidget {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed:
-                            (!canBootstrap || isLoading)
-                                ? null
-                                : () => _bootstrap(context, ref),
-                        icon:
-                            isLoading
-                                ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppBrand.onPrimary,
-                                  ),
-                                )
-                                : const Icon(Icons.build_circle_outlined),
+                        onPressed: (!canBootstrap || isLoading)
+                            ? null
+                            : () => _bootstrap(context, ref),
+                        icon: isLoading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppBrand.onPrimary,
+                                ),
+                              )
+                            : const Icon(Icons.build_circle_outlined),
                         label: Text(tr('bootstrap_create_btn', ref)),
                       ),
                     ),

@@ -10,10 +10,9 @@ List<String> _extractKeys(
 ) {
   final start = source.indexOf(startMarker);
   if (start == -1) return [];
-  final end =
-      endMarker != null
-          ? source.indexOf(endMarker, start + startMarker.length)
-          : source.length;
+  final end = endMarker != null
+      ? source.indexOf(endMarker, start + startMarker.length)
+      : source.length;
   final section = source.substring(start, end == -1 ? source.length : end);
   return RegExp(
     r"'([a-z][a-z0-9_]*)'\s*:",

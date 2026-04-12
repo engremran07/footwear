@@ -68,21 +68,24 @@ class AppTheme {
     // ── Arctic M3 Color Scheme ─────────────────────────────────────────────
     // ColorScheme.fromSeed with Arctic Sky Blue seed generates the full tonal
     // palette; we then override specific roles for Arctic-brand alignment.
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppBrand.arcticSeedColor,
-      brightness: brightness,
-    ).copyWith(
-      // Override primary to the deeper glacier blue (avoids M3 auto-brightening)
-      primary: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
-      onPrimary: isDark ? const Color(0xFF003549) : AppBrand.onPrimary,
-      // Arctic surface tones: slightly icy white (light), polar night (dark)
-      surface: isDark ? const Color(0xFF0D1618) : const Color(0xFFF2FAFD),
-      onSurface: isDark ? const Color(0xFFDCF0F8) : const Color(0xFF001F2A),
-      surfaceContainerHighest:
-          isDark ? const Color(0xFF1A2D35) : const Color(0xFFD6EEF8),
-      surfaceContainer:
-          isDark ? const Color(0xFF121F25) : const Color(0xFFE4F3FA),
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: AppBrand.arcticSeedColor,
+          brightness: brightness,
+        ).copyWith(
+          // Override primary to the deeper glacier blue (avoids M3 auto-brightening)
+          primary: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+          onPrimary: isDark ? const Color(0xFF003549) : AppBrand.onPrimary,
+          // Arctic surface tones: slightly icy white (light), polar night (dark)
+          surface: isDark ? const Color(0xFF0D1618) : const Color(0xFFF2FAFD),
+          onSurface: isDark ? const Color(0xFFDCF0F8) : const Color(0xFF001F2A),
+          surfaceContainerHighest: isDark
+              ? const Color(0xFF1A2D35)
+              : const Color(0xFFD6EEF8),
+          surfaceContainer: isDark
+              ? const Color(0xFF121F25)
+              : const Color(0xFFE4F3FA),
+        );
 
     final baseTextTheme = ThemeData(brightness: brightness).textTheme;
     final textTheme = _safeScaleTextTheme(
@@ -107,8 +110,9 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        backgroundColor:
-            isDark ? const Color(0xFF001825) : AppBrand.primaryColor,
+        backgroundColor: isDark
+            ? const Color(0xFF001825)
+            : AppBrand.primaryColor,
         foregroundColor: AppBrand.onPrimary,
         surfaceTintColor: Colors.transparent,
         iconTheme: const IconThemeData(color: AppBrand.onPrimary, size: 24),
@@ -120,10 +124,9 @@ class AppTheme {
       // These tokens are used by screen-level NavigationBars if any.
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: isDark ? const Color(0xFF0D1618) : colorScheme.surface,
-        indicatorColor:
-            isDark
-                ? const Color(0xFF003D56)
-                : AppBrand.primaryColor.withAlpha(30),
+        indicatorColor: isDark
+            ? const Color(0xFF003D56)
+            : AppBrand.primaryColor.withAlpha(30),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return IconThemeData(
@@ -133,16 +136,14 @@ class AppTheme {
           return IconThemeData(color: colorScheme.onSurfaceVariant);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          final baseColor =
-              states.contains(WidgetState.selected)
-                  ? (isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor)
-                  : colorScheme.onSurfaceVariant;
+          final baseColor = states.contains(WidgetState.selected)
+              ? (isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor)
+              : colorScheme.onSurfaceVariant;
           return TextStyle(
             fontSize: 10,
-            fontWeight:
-                states.contains(WidgetState.selected)
-                    ? FontWeight.w700
-                    : FontWeight.normal,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w700
+                : FontWeight.normal,
             color: baseColor,
           );
         }),
@@ -158,13 +159,13 @@ class AppTheme {
 
       // ── Navigation Rail ────────────────────────────────────────────────────
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor:
-            isDark ? const Color(0xFF0D1618) : const Color(0xFFE8F5FD),
+        backgroundColor: isDark
+            ? const Color(0xFF0D1618)
+            : const Color(0xFFE8F5FD),
         indicatorShape: RoundedRectangleBorder(borderRadius: AppTokens.brMD),
-        indicatorColor:
-            isDark
-                ? const Color(0xFF003D56)
-                : AppBrand.primaryColor.withAlpha(22),
+        indicatorColor: isDark
+            ? const Color(0xFF003D56)
+            : AppBrand.primaryColor.withAlpha(22),
         selectedIconTheme: IconThemeData(
           color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
         ),
@@ -232,10 +233,9 @@ class AppTheme {
       // ── Input ─────────────────────────────────────────────────────────────
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor:
-            isDark
-                ? const Color(0xFF172530)
-                : const Color(0xFFE3F2FD).withAlpha(200),
+        fillColor: isDark
+            ? const Color(0xFF172530)
+            : const Color(0xFFE3F2FD).withAlpha(200),
         border: OutlineInputBorder(
           borderRadius: AppTokens.brSM,
           borderSide: BorderSide(color: colorScheme.outline.withAlpha(100)),
@@ -282,8 +282,9 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor:
-              isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
+          foregroundColor: isDark
+              ? const Color(0xFF81D4FA)
+              : AppBrand.primaryColor,
           side: BorderSide(
             color: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
           ),
@@ -294,12 +295,12 @@ class AppTheme {
 
       // ── Chip ─────────────────────────────────────────────────────────────
       chipTheme: ChipThemeData(
-        backgroundColor:
-            isDark ? const Color(0xFF172530) : const Color(0xFFE1F5FE),
-        selectedColor:
-            isDark
-                ? const Color(0xFF003D56)
-                : AppBrand.primaryColor.withAlpha(30),
+        backgroundColor: isDark
+            ? const Color(0xFF172530)
+            : const Color(0xFFE1F5FE),
+        selectedColor: isDark
+            ? const Color(0xFF003D56)
+            : AppBrand.primaryColor.withAlpha(30),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
@@ -312,18 +313,18 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: AppTokens.brMD),
-        backgroundColor:
-            isDark ? const Color(0xFF1A3040) : const Color(0xFF00344A),
+        backgroundColor: isDark
+            ? const Color(0xFF1A3040)
+            : const Color(0xFF00344A),
         contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
         actionTextColor: const Color(0xFF81D4FA),
       ),
 
       // ── List Tile ─────────────────────────────────────────────────────────
       listTileTheme: ListTileThemeData(
-        selectedTileColor:
-            isDark
-                ? AppBrand.primaryColor.withAlpha(32)
-                : AppBrand.primaryColor.withAlpha(18),
+        selectedTileColor: isDark
+            ? AppBrand.primaryColor.withAlpha(32)
+            : AppBrand.primaryColor.withAlpha(18),
         selectedColor: isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor,
         iconColor: colorScheme.onSurfaceVariant,
       ),
@@ -336,8 +337,9 @@ class AppTheme {
 
       // ── FloatingActionButton ───────────────────────────────────────────────
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor:
-            isDark ? const Color(0xFF003D56) : AppBrand.primaryColor,
+        backgroundColor: isDark
+            ? const Color(0xFF003D56)
+            : AppBrand.primaryColor,
         foregroundColor: AppBrand.onPrimary,
         elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: AppTokens.brLG),

@@ -162,8 +162,9 @@ class RouteDetailScreen extends ConsumerWidget {
                         0,
                         (s, shop) => s + (shop.balance > 0 ? shop.balance : 0),
                       );
-                      final shopsWithDebt =
-                          shops.where((s) => s.balance > 0).length;
+                      final shopsWithDebt = shops
+                          .where((s) => s.balance > 0)
+                          .length;
                       final cs = Theme.of(context).colorScheme;
                       return Container(
                         margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -185,19 +186,17 @@ class RouteDetailScreen extends ConsumerWidget {
                               icon: Icons.warning_amber,
                               label: tr('outstanding', ref),
                               value: AppFormatters.sar(totalOutstanding),
-                              color:
-                                  totalOutstanding > 0
-                                      ? AppTheme.debtFg(cs)
-                                      : AppTheme.clearFg(cs),
+                              color: totalOutstanding > 0
+                                  ? AppTheme.debtFg(cs)
+                                  : AppTheme.clearFg(cs),
                             ),
                             _RStat(
                               icon: Icons.account_balance_wallet,
                               label: tr('route_with_debt', ref),
                               value: '$shopsWithDebt',
-                              color:
-                                  shopsWithDebt > 0
-                                      ? AppBrand.warningColor
-                                      : AppTheme.clearFg(cs),
+                              color: shopsWithDebt > 0
+                                  ? AppBrand.warningColor
+                                  : AppTheme.clearFg(cs),
                             ),
                           ],
                         ),
@@ -239,16 +238,14 @@ class RouteDetailScreen extends ConsumerWidget {
                         return Card(
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor:
-                                  hasDebt
-                                      ? AppTheme.debtBg(cs)
-                                      : AppTheme.clearBg(cs),
+                              backgroundColor: hasDebt
+                                  ? AppTheme.debtBg(cs)
+                                  : AppTheme.clearBg(cs),
                               child: Icon(
                                 Icons.store,
-                                color:
-                                    hasDebt
-                                        ? AppTheme.debtFg(cs)
-                                        : AppTheme.clearFg(cs),
+                                color: hasDebt
+                                    ? AppTheme.debtFg(cs)
+                                    : AppTheme.clearFg(cs),
                               ),
                             ),
                             title: Text(
@@ -268,10 +265,9 @@ class RouteDetailScreen extends ConsumerWidget {
                               AppFormatters.sar(shop.balance),
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color:
-                                    hasDebt
-                                        ? AppTheme.debtFg(cs)
-                                        : AppTheme.clearFg(cs),
+                                color: hasDebt
+                                    ? AppTheme.debtFg(cs)
+                                    : AppTheme.clearFg(cs),
                               ),
                             ),
                             onTap: () => context.go('/shops/${shop.id}'),
@@ -280,35 +276,32 @@ class RouteDetailScreen extends ConsumerWidget {
                       },
                     );
                   },
-                  loading:
-                      () => const Center(child: CircularProgressIndicator()),
-                  error:
-                      (e, _) => mappedErrorState(
-                        error: e,
-                        ref: ref,
-                        onRetry:
-                            () => ref.invalidate(shopsByRouteProvider(routeId)),
-                      ),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => mappedErrorState(
+                    error: e,
+                    ref: ref,
+                    onRetry: () =>
+                        ref.invalidate(shopsByRouteProvider(routeId)),
+                  ),
                 ),
               ),
             ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error:
-            (e, _) => mappedErrorState(
-              error: e,
-              ref: ref,
-              onRetry: () => ref.invalidate(routeDetailProvider(routeId)),
-            ),
+        error: (e, _) => mappedErrorState(
+          error: e,
+          ref: ref,
+          onRetry: () => ref.invalidate(routeDetailProvider(routeId)),
+        ),
       ),
-      floatingActionButton:
-          canAddShop
-              ? FloatingActionButton(
-                onPressed: () => context.push('/shops/new?routeId=$routeId'),
-                child: const Icon(Icons.add),
-              )
-              : null,
+      floatingActionButton: canAddShop
+          ? FloatingActionButton(
+              onPressed: () => context.push('/shops/new?routeId=$routeId'),
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }

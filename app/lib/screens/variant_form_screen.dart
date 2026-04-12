@@ -152,23 +152,22 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
                     width: double.infinity,
                     child: FilledButton(
                       onPressed: _saving ? null : _save,
-                      child:
-                          _saving
-                              ? Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
+                      child: _saving
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(tr('saving', ref)),
-                                ],
-                              )
-                              : Text(tr('save', ref)),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(tr('saving', ref)),
+                              ],
+                            )
+                          : Text(tr('save', ref)),
                     ),
                   ),
                 ],

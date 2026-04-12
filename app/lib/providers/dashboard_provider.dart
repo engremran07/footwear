@@ -67,10 +67,9 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
   } else {
     routes = ref.watch(routesBySellerProvider(user.id));
     final routeId = user.assignedRouteId ?? '';
-    shops =
-        routeId.isNotEmpty
-            ? ref.watch(shopsByRouteProvider(routeId))
-            : const AsyncData([]);
+    shops = routeId.isNotEmpty
+        ? ref.watch(shopsByRouteProvider(routeId))
+        : const AsyncData([]);
   }
   final products = ref.watch(productsProvider);
   final variants = ref.watch(allVariantsProvider);

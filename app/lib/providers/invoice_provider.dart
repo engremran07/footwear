@@ -45,10 +45,9 @@ final invoicesByShopProvider = StreamProvider.autoDispose
           .limit(100)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .map((d) => InvoiceModel.fromJson(d.data(), d.id))
-                    .toList(),
+            (snap) => snap.docs
+                .map((d) => InvoiceModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -65,10 +64,9 @@ final allInvoicesProvider = StreamProvider.autoDispose<List<InvoiceModel>>((
       .limit(200)
       .snapshots()
       .map(
-        (snap) =>
-            snap.docs
-                .map((d) => InvoiceModel.fromJson(d.data(), d.id))
-                .toList(),
+        (snap) => snap.docs
+            .map((d) => InvoiceModel.fromJson(d.data(), d.id))
+            .toList(),
       );
 });
 
@@ -82,10 +80,9 @@ final sellerInvoicesProvider = StreamProvider.autoDispose
           .limit(200)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .map((d) => InvoiceModel.fromJson(d.data(), d.id))
-                    .toList(),
+            (snap) => snap.docs
+                .map((d) => InvoiceModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -246,12 +243,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final db = FirebaseFirestore.instance;
     final resolvedKey = idempotencyKey ?? const Uuid().v4();
     if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
-      final existing =
-          await db
-              .collection(Collections.invoices)
-              .where('idempotency_key', isEqualTo: idempotencyKey)
-              .limit(1)
-              .get();
+      final existing = await db
+          .collection(Collections.invoices)
+          .where('idempotency_key', isEqualTo: idempotencyKey)
+          .limit(1)
+          .get();
       if (existing.docs.isNotEmpty) {
         return existing
             .docs
@@ -397,8 +393,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final db = FirebaseFirestore.instance;
     // I-12: 30-day time-lock on credit note creation
     if (linkedInvoiceId != null && linkedInvoiceId.isNotEmpty) {
-      final origSnap =
-          await db.collection(Collections.invoices).doc(linkedInvoiceId).get();
+      final origSnap = await db
+          .collection(Collections.invoices)
+          .doc(linkedInvoiceId)
+          .get();
       if (origSnap.exists) {
         final origStatus = origSnap.data()?['status'] as String? ?? '';
         if (origStatus == InvoiceModel.statusVoid) {
@@ -408,8 +406,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         }
         final origCreatedAt = origSnap.data()?['created_at'] as Timestamp?;
         if (origCreatedAt != null) {
-          final ageInDays =
-              DateTime.now().difference(origCreatedAt.toDate()).inDays;
+          final ageInDays = DateTime.now()
+              .difference(origCreatedAt.toDate())
+              .inDays;
           if (ageInDays > 30) {
             throw ArgumentError(
               'Credit notes must be created within 30 days of the original invoice',
@@ -420,17 +419,15 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
 
     final normalizedKey = idempotencyKey?.trim();
-    final resolvedKey =
-        (normalizedKey != null && normalizedKey.isNotEmpty)
-            ? normalizedKey
-            : const Uuid().v4();
+    final resolvedKey = (normalizedKey != null && normalizedKey.isNotEmpty)
+        ? normalizedKey
+        : const Uuid().v4();
     if (normalizedKey != null && normalizedKey.isNotEmpty) {
-      final existing =
-          await db
-              .collection(Collections.invoices)
-              .where('idempotency_key', isEqualTo: normalizedKey)
-              .limit(1)
-              .get();
+      final existing = await db
+          .collection(Collections.invoices)
+          .where('idempotency_key', isEqualTo: normalizedKey)
+          .limit(1)
+          .get();
       if (existing.docs.isNotEmpty) {
         return existing.docs.first.id;
       }
@@ -567,16 +564,14 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final shopId = data['shop_id'] as String? ?? '';
     final shopName = data['shop_name'] as String? ?? '';
     final rawItems = (data['items'] as List<dynamic>?) ?? const [];
-    final linkedTransactions =
-        await db
-            .collection(Collections.transactions)
-            .where('invoice_id', isEqualTo: invoiceId)
-            .get();
+    final linkedTransactions = await db
+        .collection(Collections.transactions)
+        .where('invoice_id', isEqualTo: invoiceId)
+        .get();
     // Filter client-side: old docs may not have deleted field
-    final activeTxDocs =
-        linkedTransactions.docs
-            .where((d) => d.data()['deleted'] != true)
-            .toList();
+    final activeTxDocs = linkedTransactions.docs
+        .where((d) => d.data()['deleted'] != true)
+        .toList();
 
     final batch = db.batch();
 
@@ -652,20 +647,18 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       if (type == InvoiceModel.typeSale) {
         // Write ONE reversal transaction (the live-ledger reversal entry).
         // The soft-deleted originals above already form the complete audit trail.
-        final reversalAmount =
-            refundMode == VoidRefundMode.creditBalance
-                ? docTotal
-                : outstandingAmount;
+        final reversalAmount = refundMode == VoidRefundMode.creditBalance
+            ? docTotal
+            : outstandingAmount;
         if (reversalAmount > 0) {
           batch.set(
             db.collection(Collections.transactions).doc(),
             transactionData(
               txType: 'return',
               amount: reversalAmount,
-              description:
-                  refundMode == VoidRefundMode.creditBalance
-                      ? 'Credit for voided invoice $invoiceNumber'
-                      : 'Outstanding reversal for voided invoice $invoiceNumber',
+              description: refundMode == VoidRefundMode.creditBalance
+                  ? 'Credit for voided invoice $invoiceNumber'
+                  : 'Outstanding reversal for voided invoice $invoiceNumber',
               txShopId: shopId,
               txShopName: shopName,
             ),

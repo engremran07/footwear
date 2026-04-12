@@ -61,18 +61,17 @@ class _AppSearchBarState extends State<AppSearchBar> {
         decoration: InputDecoration(
           hintText: widget.hintText,
           prefixIcon: const Icon(Icons.search, size: AppTokens.iconSizeMD),
-          suffixIcon:
-              _controller.text.isNotEmpty
-                  ? IconButton(
-                    icon: const Icon(Icons.clear, size: AppTokens.iconSizeSM),
-                    tooltip: 'Clear search',
-                    onPressed: () {
-                      _controller.clear();
-                      widget.onChanged('');
-                      setState(() {});
-                    },
-                  )
-                  : null,
+          suffixIcon: _controller.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: AppTokens.iconSizeSM),
+                  tooltip: 'Clear search',
+                  onPressed: () {
+                    _controller.clear();
+                    widget.onChanged('');
+                    setState(() {});
+                  },
+                )
+              : null,
           filled: true,
           fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
             alpha: 0.5,

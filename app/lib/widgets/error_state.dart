@@ -13,14 +13,13 @@ Widget mappedErrorState({
   VoidCallback? onRetry,
 }) {
   final key = AppErrorMapper.key(error);
-  final errorType =
-      AppErrorMapper.isPermissionOrAuthError(error)
-          ? ErrorType.permission
-          : (key == 'err_network' ||
-              key == 'err_service_unavailable' ||
-              key == 'err_timeout')
-          ? ErrorType.network
-          : ErrorType.unknown;
+  final errorType = AppErrorMapper.isPermissionOrAuthError(error)
+      ? ErrorType.permission
+      : (key == 'err_network' ||
+            key == 'err_service_unavailable' ||
+            key == 'err_timeout')
+      ? ErrorType.network
+      : ErrorType.unknown;
 
   return ErrorState(
     message: tr(key, ref),

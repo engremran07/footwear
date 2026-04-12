@@ -33,16 +33,15 @@ class ConfirmDialog extends StatefulWidget {
   }) async {
     final result = await showDialog<bool>(
       context: context,
-      builder:
-          (_) => ConfirmDialog(
-            title: title,
-            message: message,
-            confirmLabel: confirmLabel,
-            cancelLabel: cancelLabel,
-            confirmColor: confirmColor,
-            isDestructive: isDestructive,
-            onConfirmAsync: onConfirmAsync,
-          ),
+      builder: (_) => ConfirmDialog(
+        title: title,
+        message: message,
+        confirmLabel: confirmLabel,
+        cancelLabel: cancelLabel,
+        confirmColor: confirmColor,
+        isDestructive: isDestructive,
+        onConfirmAsync: onConfirmAsync,
+      ),
     );
     return result ?? false;
   }
@@ -85,19 +84,17 @@ class _ConfirmDialogState extends State<ConfirmDialog> {
           child: Text(widget.cancelLabel),
         ),
         FilledButton(
-          style:
-              effectiveColor != null
-                  ? FilledButton.styleFrom(backgroundColor: effectiveColor)
-                  : null,
+          style: effectiveColor != null
+              ? FilledButton.styleFrom(backgroundColor: effectiveColor)
+              : null,
           onPressed: _isLoading ? null : _handleConfirm,
-          child:
-              _isLoading
-                  ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                  : Text(widget.confirmLabel),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(widget.confirmLabel),
         ),
       ],
     );

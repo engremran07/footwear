@@ -95,12 +95,10 @@ CustomTransitionPage<void> _slidePage(Widget child, GoRouterState state) {
     transitionDuration: const Duration(milliseconds: 320),
     reverseTransitionDuration: const Duration(milliseconds: 250),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final slideIn = Tween<Offset>(
-        begin: const Offset(0, 0.06),
-        end: Offset.zero,
-      ).animate(
-        CurvedAnimation(parent: animation, curve: Curves.fastOutSlowIn),
-      );
+      final slideIn =
+          Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(
+            CurvedAnimation(parent: animation, curve: Curves.fastOutSlowIn),
+          );
       final fadeIn = CurvedAnimation(parent: animation, curve: Curves.easeOut);
       return FadeTransition(
         opacity: fadeIn,
@@ -221,19 +219,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/routes/:id/edit',
-            pageBuilder:
-                (_, s) => _slidePage(
-                  RouteFormScreen(routeId: s.pathParameters['id']!),
-                  s,
-                ),
+            pageBuilder: (_, s) => _slidePage(
+              RouteFormScreen(routeId: s.pathParameters['id']!),
+              s,
+            ),
           ),
           GoRoute(
             path: '/routes/:id',
-            pageBuilder:
-                (_, s) => _fadePage(
-                  RouteDetailScreen(routeId: s.pathParameters['id']!),
-                  s,
-                ),
+            pageBuilder: (_, s) => _fadePage(
+              RouteDetailScreen(routeId: s.pathParameters['id']!),
+              s,
+            ),
           ),
           // Shops
           GoRoute(
@@ -242,29 +238,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/shops/new',
-            pageBuilder:
-                (_, s) => _slidePage(
-                  ShopFormScreen(
-                    preselectedRouteId: s.uri.queryParameters['routeId'],
-                  ),
-                  s,
-                ),
+            pageBuilder: (_, s) => _slidePage(
+              ShopFormScreen(
+                preselectedRouteId: s.uri.queryParameters['routeId'],
+              ),
+              s,
+            ),
           ),
           GoRoute(
             path: '/shops/:id/edit',
-            pageBuilder:
-                (_, s) => _slidePage(
-                  ShopFormScreen(shopId: s.pathParameters['id']!),
-                  s,
-                ),
+            pageBuilder: (_, s) =>
+                _slidePage(ShopFormScreen(shopId: s.pathParameters['id']!), s),
           ),
           GoRoute(
             path: '/shops/:id',
-            pageBuilder:
-                (_, s) => _fadePage(
-                  ShopDetailScreen(shopId: s.pathParameters['id']!),
-                  s,
-                ),
+            pageBuilder: (_, s) =>
+                _fadePage(ShopDetailScreen(shopId: s.pathParameters['id']!), s),
           ),
           // Products
           GoRoute(
@@ -277,38 +266,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/products/:id/edit',
-            pageBuilder:
-                (_, s) => _slidePage(
-                  ProductFormScreen(productId: s.pathParameters['id']!),
-                  s,
-                ),
+            pageBuilder: (_, s) => _slidePage(
+              ProductFormScreen(productId: s.pathParameters['id']!),
+              s,
+            ),
           ),
           GoRoute(
             path: '/products/:id',
-            pageBuilder:
-                (_, s) => _fadePage(
-                  ProductDetailScreen(productId: s.pathParameters['id']!),
-                  s,
-                ),
+            pageBuilder: (_, s) => _fadePage(
+              ProductDetailScreen(productId: s.pathParameters['id']!),
+              s,
+            ),
           ),
           GoRoute(
             path: '/products/:id/variants/new',
-            pageBuilder:
-                (_, s) => _slidePage(
-                  VariantFormScreen(productId: s.pathParameters['id']!),
-                  s,
-                ),
+            pageBuilder: (_, s) => _slidePage(
+              VariantFormScreen(productId: s.pathParameters['id']!),
+              s,
+            ),
           ),
           GoRoute(
             path: '/products/:id/variants/:vid/edit',
-            pageBuilder:
-                (_, s) => _slidePage(
-                  VariantFormScreen(
-                    productId: s.pathParameters['id']!,
-                    variantId: s.pathParameters['vid']!,
-                  ),
-                  s,
-                ),
+            pageBuilder: (_, s) => _slidePage(
+              VariantFormScreen(
+                productId: s.pathParameters['id']!,
+                variantId: s.pathParameters['vid']!,
+              ),
+              s,
+            ),
           ),
           // Inventory
           GoRoute(
@@ -322,24 +307,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/invoices/new',
-            pageBuilder:
-                (_, s) => _slidePage(
-                  CreateSaleInvoiceScreen(
-                    preselectedShopId: s.uri.queryParameters['shopId'],
-                  ),
-                  s,
-                ),
+            pageBuilder: (_, s) => _slidePage(
+              CreateSaleInvoiceScreen(
+                preselectedShopId: s.uri.queryParameters['shopId'],
+              ),
+              s,
+            ),
           ),
           GoRoute(
             path: '/invoices/:id',
-            pageBuilder:
-                (_, s) => _fadePage(
-                  InvoiceDetailScreen(
-                    invoiceId: s.pathParameters['id']!,
-                    backTo: s.uri.queryParameters['from'],
-                  ),
-                  s,
-                ),
+            pageBuilder: (_, s) => _fadePage(
+              InvoiceDetailScreen(
+                invoiceId: s.pathParameters['id']!,
+                backTo: s.uri.queryParameters['from'],
+              ),
+              s,
+            ),
           ),
           // Users (admin-only)
           GoRoute(

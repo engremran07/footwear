@@ -77,164 +77,150 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder:
-          (ctx) => StatefulBuilder(
-            builder:
-                (ctx, setS) => Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    24,
-                    16,
-                    MediaQuery.of(ctx).viewInsets.bottom + 16,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            24,
+            16,
+            MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(tr('edit', ref), style: Theme.of(ctx).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('cash_in', ref)),
+                      selected: txType == 'cash_in',
+                      onSelected: (_) => setS(() => txType = 'cash_in'),
+                      selectedColor: AppTheme.clearBg(
+                        Theme.of(ctx).colorScheme,
+                      ),
+                    ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        tr('edit', ref),
-                        style: Theme.of(ctx).textTheme.titleLarge,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('cash_out', ref)),
+                      selected: txType == 'cash_out',
+                      onSelected: (_) => setS(() => txType = 'cash_out'),
+                      selectedColor: AppTheme.debtBg(Theme.of(ctx).colorScheme),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: amountC,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: tr('amount', ref),
+                  prefixIcon: const Icon(Icons.currency_exchange),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descC,
+                decoration: InputDecoration(
+                  labelText: tr('description', ref),
+                  prefixIcon: const Icon(Icons.notes),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('sale_cash', ref)),
+                      selected: saleType == 'cash',
+                      onSelected: (_) => setS(() => saleType = 'cash'),
+                      selectedColor: AppTheme.clearBg(
+                        Theme.of(ctx).colorScheme,
                       ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ChoiceChip(
-                              label: Text(tr('cash_in', ref)),
-                              selected: txType == 'cash_in',
-                              onSelected: (_) => setS(() => txType = 'cash_in'),
-                              selectedColor: AppTheme.clearBg(
-                                Theme.of(ctx).colorScheme,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ChoiceChip(
-                              label: Text(tr('cash_out', ref)),
-                              selected: txType == 'cash_out',
-                              onSelected:
-                                  (_) => setS(() => txType = 'cash_out'),
-                              selectedColor: AppTheme.debtBg(
-                                Theme.of(ctx).colorScheme,
-                              ),
-                            ),
-                          ),
-                        ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('sale_credit', ref)),
+                      selected: saleType == 'credit',
+                      onSelected: (_) => setS(() => saleType = 'credit'),
+                      selectedColor: AppTheme.warningBg(
+                        Theme.of(ctx).colorScheme,
                       ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: amountC,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: tr('amount', ref),
-                          prefixIcon: const Icon(Icons.currency_exchange),
-                        ),
-                        autofocus: true,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: descC,
-                        decoration: InputDecoration(
-                          labelText: tr('description', ref),
-                          prefixIcon: const Icon(Icons.notes),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ChoiceChip(
-                              label: Text(tr('sale_cash', ref)),
-                              selected: saleType == 'cash',
-                              onSelected: (_) => setS(() => saleType = 'cash'),
-                              selectedColor: AppTheme.clearBg(
-                                Theme.of(ctx).colorScheme,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ChoiceChip(
-                              label: Text(tr('sale_credit', ref)),
-                              selected: saleType == 'credit',
-                              onSelected:
-                                  (_) => setS(() => saleType = 'credit'),
-                              selectedColor: AppTheme.warningBg(
-                                Theme.of(ctx).colorScheme,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      InkWell(
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: ctx,
-                            initialDate: selectedDate,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime.now(),
-                          );
-                          if (picked != null) setS(() => selectedDate = picked);
-                        },
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: tr('date', ref),
-                            prefixIcon: const Icon(Icons.calendar_today),
-                          ),
-                          child: Text(
-                            '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            final newAmount = double.tryParse(
-                              amountC.text.trim(),
-                            );
-                            if (newAmount == null || newAmount <= 0) return;
-                            try {
-                              await ref
-                                  .read(transactionNotifierProvider.notifier)
-                                  .updateTransaction(
-                                    txId: tx.id,
-                                    shopId: tx.shopId,
-                                    oldAmount: tx.amount,
-                                    oldType: tx.type,
-                                    newAmount: newAmount,
-                                    newType: txType,
-                                    description:
-                                        descC.text.trim().isEmpty
-                                            ? null
-                                            : descC.text.trim(),
-                                    saleType: saleType,
-                                    transactionDate: Timestamp.fromDate(
-                                      selectedDate,
-                                    ),
-                                  );
-                              if (ctx.mounted) Navigator.pop(ctx);
-                            } catch (e) {
-                              if (ctx.mounted) {
-                                final key = AppErrorMapper.key(e);
-                                ScaffoldMessenger.of(
-                                  ctx,
-                                ).showSnackBar(errorSnackBar(tr(key, ref)));
-                              }
-                            }
-                          },
-                          child: Text(tr('save', ref)),
-                        ),
-                      ),
-                    ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: ctx,
+                    initialDate: selectedDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) setS(() => selectedDate = picked);
+                },
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: tr('date', ref),
+                    prefixIcon: const Icon(Icons.calendar_today),
+                  ),
+                  child: Text(
+                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                   ),
                 ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final newAmount = double.tryParse(amountC.text.trim());
+                    if (newAmount == null || newAmount <= 0) return;
+                    try {
+                      await ref
+                          .read(transactionNotifierProvider.notifier)
+                          .updateTransaction(
+                            txId: tx.id,
+                            shopId: tx.shopId,
+                            oldAmount: tx.amount,
+                            oldType: tx.type,
+                            newAmount: newAmount,
+                            newType: txType,
+                            description: descC.text.trim().isEmpty
+                                ? null
+                                : descC.text.trim(),
+                            saleType: saleType,
+                            transactionDate: Timestamp.fromDate(selectedDate),
+                          );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    } catch (e) {
+                      if (ctx.mounted) {
+                        final key = AppErrorMapper.key(e);
+                        ScaffoldMessenger.of(
+                          ctx,
+                        ).showSnackBar(errorSnackBar(tr(key, ref)));
+                      }
+                    }
+                  },
+                  child: Text(tr('save', ref)),
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -257,172 +243,157 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder:
-          (ctx) => StatefulBuilder(
-            builder:
-                (ctx, setS) => Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    24,
-                    16,
-                    MediaQuery.of(ctx).viewInsets.bottom + 16,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            24,
+            16,
+            MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(tr('edit', ref), style: Theme.of(ctx).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('cash_in', ref)),
+                      selected: txType == 'cash_in',
+                      onSelected: (_) => setS(() => txType = 'cash_in'),
+                      selectedColor: AppTheme.clearBg(
+                        Theme.of(ctx).colorScheme,
+                      ),
+                    ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        tr('edit', ref),
-                        style: Theme.of(ctx).textTheme.titleLarge,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('cash_out', ref)),
+                      selected: txType == 'cash_out',
+                      onSelected: (_) => setS(() => txType = 'cash_out'),
+                      selectedColor: AppTheme.debtBg(Theme.of(ctx).colorScheme),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: amountC,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: tr('amount', ref),
+                  prefixIcon: const Icon(Icons.currency_exchange),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descC,
+                decoration: InputDecoration(
+                  labelText: tr('description', ref),
+                  prefixIcon: const Icon(Icons.notes),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('sale_cash', ref)),
+                      selected: saleType == 'cash',
+                      onSelected: (_) => setS(() => saleType = 'cash'),
+                      selectedColor: AppTheme.clearBg(
+                        Theme.of(ctx).colorScheme,
                       ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ChoiceChip(
-                              label: Text(tr('cash_in', ref)),
-                              selected: txType == 'cash_in',
-                              onSelected: (_) => setS(() => txType = 'cash_in'),
-                              selectedColor: AppTheme.clearBg(
-                                Theme.of(ctx).colorScheme,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ChoiceChip(
-                              label: Text(tr('cash_out', ref)),
-                              selected: txType == 'cash_out',
-                              onSelected:
-                                  (_) => setS(() => txType = 'cash_out'),
-                              selectedColor: AppTheme.debtBg(
-                                Theme.of(ctx).colorScheme,
-                              ),
-                            ),
-                          ),
-                        ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('sale_credit', ref)),
+                      selected: saleType == 'credit',
+                      onSelected: (_) => setS(() => saleType = 'credit'),
+                      selectedColor: AppTheme.warningBg(
+                        Theme.of(ctx).colorScheme,
                       ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: amountC,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: tr('amount', ref),
-                          prefixIcon: const Icon(Icons.currency_exchange),
-                        ),
-                        autofocus: true,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: descC,
-                        decoration: InputDecoration(
-                          labelText: tr('description', ref),
-                          prefixIcon: const Icon(Icons.notes),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ChoiceChip(
-                              label: Text(tr('sale_cash', ref)),
-                              selected: saleType == 'cash',
-                              onSelected: (_) => setS(() => saleType = 'cash'),
-                              selectedColor: AppTheme.clearBg(
-                                Theme.of(ctx).colorScheme,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ChoiceChip(
-                              label: Text(tr('sale_credit', ref)),
-                              selected: saleType == 'credit',
-                              onSelected:
-                                  (_) => setS(() => saleType = 'credit'),
-                              selectedColor: AppTheme.warningBg(
-                                Theme.of(ctx).colorScheme,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      InkWell(
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: ctx,
-                            initialDate: selectedDate,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime.now(),
-                          );
-                          if (picked != null) setS(() => selectedDate = picked);
-                        },
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: tr('date', ref),
-                            prefixIcon: const Icon(Icons.calendar_today),
-                          ),
-                          child: Text(
-                            '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            final newAmount = double.tryParse(
-                              amountC.text.trim(),
-                            );
-                            if (newAmount == null || newAmount <= 0) return;
-                            try {
-                              final user =
-                                  ref.read(authUserProvider).valueOrNull;
-                              final appliedImmediately = await ref
-                                  .read(transactionNotifierProvider.notifier)
-                                  .sellerEditTransaction(
-                                    txId: tx.id,
-                                    sellerId: user?.id ?? '',
-                                    newAmount: newAmount,
-                                    newType: txType,
-                                    description:
-                                        descC.text.trim().isEmpty
-                                            ? null
-                                            : descC.text.trim(),
-                                    saleType: saleType,
-                                    transactionDate: Timestamp.fromDate(
-                                      selectedDate,
-                                    ),
-                                  );
-                              if (!mounted) return;
-                              if (ctx.mounted) Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                successSnackBar(
-                                  appliedImmediately
-                                      ? tr('saved_successfully', ref)
-                                      : tr('edit_request_submitted', ref),
-                                ),
-                              );
-                            } catch (e) {
-                              if (ctx.mounted) {
-                                final key = AppErrorMapper.key(e);
-                                ScaffoldMessenger.of(
-                                  ctx,
-                                ).showSnackBar(errorSnackBar(tr(key, ref)));
-                              }
-                            }
-                          },
-                          child: Text(tr('save', ref)),
-                        ),
-                      ),
-                    ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: ctx,
+                    initialDate: selectedDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) setS(() => selectedDate = picked);
+                },
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: tr('date', ref),
+                    prefixIcon: const Icon(Icons.calendar_today),
+                  ),
+                  child: Text(
+                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                   ),
                 ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final newAmount = double.tryParse(amountC.text.trim());
+                    if (newAmount == null || newAmount <= 0) return;
+                    try {
+                      final user = ref.read(authUserProvider).valueOrNull;
+                      final appliedImmediately = await ref
+                          .read(transactionNotifierProvider.notifier)
+                          .sellerEditTransaction(
+                            txId: tx.id,
+                            sellerId: user?.id ?? '',
+                            newAmount: newAmount,
+                            newType: txType,
+                            description: descC.text.trim().isEmpty
+                                ? null
+                                : descC.text.trim(),
+                            saleType: saleType,
+                            transactionDate: Timestamp.fromDate(selectedDate),
+                          );
+                      if (!mounted) return;
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        successSnackBar(
+                          appliedImmediately
+                              ? tr('saved_successfully', ref)
+                              : tr('edit_request_submitted', ref),
+                        ),
+                      );
+                    } catch (e) {
+                      if (ctx.mounted) {
+                        final key = AppErrorMapper.key(e);
+                        ScaffoldMessenger.of(
+                          ctx,
+                        ).showSnackBar(errorSnackBar(tr(key, ref)));
+                      }
+                    }
+                  },
+                  child: Text(tr('save', ref)),
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -520,10 +491,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       final settings = await ref.read(settingsProvider.future);
       final user = ref.read(authUserProvider).valueOrNull;
       final sorted = await _loadFullTransactions();
-      final allUsers =
-          user?.isAdmin == true
-              ? ref.read(allUsersProvider).valueOrNull ?? <UserModel>[]
-              : <UserModel>[];
+      final allUsers = user?.isAdmin == true
+          ? ref.read(allUsersProvider).valueOrNull ?? <UserModel>[]
+          : <UserModel>[];
       final entryByMap = <String, String>{
         for (final u in allUsers) u.id: u.displayName,
       };
@@ -567,158 +537,146 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder:
-          (ctx) => StatefulBuilder(
-            builder:
-                (ctx, setModalState) => Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    24,
-                    16,
-                    MediaQuery.of(ctx).viewInsets.bottom + 16,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            24,
+            16,
+            MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                type == 'cash_in' ? tr('cash_in', ref) : tr('cash_out', ref),
+                style: Theme.of(ctx).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountC,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: tr('amount', ref),
+                  prefixIcon: const Icon(Icons.currency_exchange),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descC,
+                decoration: InputDecoration(
+                  labelText: tr('description', ref),
+                  prefixIcon: const Icon(Icons.notes),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Sale type selector
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('sale_cash', ref)),
+                      selected: saleType == 'cash',
+                      onSelected: (_) => setModalState(() => saleType = 'cash'),
+                      selectedColor: AppTheme.clearBg(
+                        Theme.of(ctx).colorScheme,
+                      ),
+                    ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        type == 'cash_in'
-                            ? tr('cash_in', ref)
-                            : tr('cash_out', ref),
-                        style: Theme.of(ctx).textTheme.titleLarge,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(tr('sale_credit', ref)),
+                      selected: saleType == 'credit',
+                      onSelected: (_) =>
+                          setModalState(() => saleType = 'credit'),
+                      selectedColor: AppTheme.warningBg(
+                        Theme.of(ctx).colorScheme,
                       ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: amountC,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: tr('amount', ref),
-                          prefixIcon: const Icon(Icons.currency_exchange),
-                        ),
-                        autofocus: true,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: descC,
-                        decoration: InputDecoration(
-                          labelText: tr('description', ref),
-                          prefixIcon: const Icon(Icons.notes),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Sale type selector
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ChoiceChip(
-                              label: Text(tr('sale_cash', ref)),
-                              selected: saleType == 'cash',
-                              onSelected:
-                                  (_) => setModalState(() => saleType = 'cash'),
-                              selectedColor: AppTheme.clearBg(
-                                Theme.of(ctx).colorScheme,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ChoiceChip(
-                              label: Text(tr('sale_credit', ref)),
-                              selected: saleType == 'credit',
-                              onSelected:
-                                  (_) =>
-                                      setModalState(() => saleType = 'credit'),
-                              selectedColor: AppTheme.warningBg(
-                                Theme.of(ctx).colorScheme,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      InkWell(
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: ctx,
-                            initialDate: selectedDate,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime.now(),
-                          );
-                          if (picked != null) {
-                            setModalState(() => selectedDate = picked);
-                          }
-                        },
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: tr('date', ref),
-                            prefixIcon: const Icon(Icons.calendar_today),
-                          ),
-                          child: Text(
-                            '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                type == 'cash_in'
-                                    ? AppBrand.successColor
-                                    : AppBrand.errorColor,
-                            foregroundColor: AppBrand.onPrimary,
-                          ),
-                          onPressed: () async {
-                            final amount = double.tryParse(amountC.text.trim());
-                            if (amount == null || amount <= 0) return;
-                            final shop =
-                                ref
-                                    .read(shopDetailProvider(widget.shopId))
-                                    .valueOrNull;
-                            if (shop == null) return;
-                            final user = ref.read(authUserProvider).valueOrNull;
-                            try {
-                              await ref
-                                  .read(transactionNotifierProvider.notifier)
-                                  .create(
-                                    shopId: shop.id,
-                                    shopName: shop.name,
-                                    routeId:
-                                        shop.routeId.isNotEmpty
-                                            ? shop.routeId
-                                            : (user?.assignedRouteId ?? ''),
-                                    type: type,
-                                    saleType: saleType,
-                                    amount: amount,
-                                    description:
-                                        descC.text.trim().isEmpty
-                                            ? null
-                                            : descC.text.trim(),
-                                    createdBy: user?.id ?? '',
-                                    transactionDate: Timestamp.fromDate(
-                                      selectedDate,
-                                    ),
-                                  );
-                              if (ctx.mounted) Navigator.pop(ctx);
-                            } catch (e) {
-                              if (ctx.mounted) {
-                                final key = AppErrorMapper.key(e);
-                                ScaffoldMessenger.of(
-                                  ctx,
-                                ).showSnackBar(errorSnackBar(tr(key, ref)));
-                              }
-                            }
-                          },
-                          child: Text(tr('save', ref)),
-                        ),
-                      ),
-                    ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: ctx,
+                    initialDate: selectedDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    setModalState(() => selectedDate = picked);
+                  }
+                },
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: tr('date', ref),
+                    prefixIcon: const Icon(Icons.calendar_today),
+                  ),
+                  child: Text(
+                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                   ),
                 ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: type == 'cash_in'
+                        ? AppBrand.successColor
+                        : AppBrand.errorColor,
+                    foregroundColor: AppBrand.onPrimary,
+                  ),
+                  onPressed: () async {
+                    final amount = double.tryParse(amountC.text.trim());
+                    if (amount == null || amount <= 0) return;
+                    final shop = ref
+                        .read(shopDetailProvider(widget.shopId))
+                        .valueOrNull;
+                    if (shop == null) return;
+                    final user = ref.read(authUserProvider).valueOrNull;
+                    try {
+                      await ref
+                          .read(transactionNotifierProvider.notifier)
+                          .create(
+                            shopId: shop.id,
+                            shopName: shop.name,
+                            routeId: shop.routeId.isNotEmpty
+                                ? shop.routeId
+                                : (user?.assignedRouteId ?? ''),
+                            type: type,
+                            saleType: saleType,
+                            amount: amount,
+                            description: descC.text.trim().isEmpty
+                                ? null
+                                : descC.text.trim(),
+                            createdBy: user?.id ?? '',
+                            transactionDate: Timestamp.fromDate(selectedDate),
+                          );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    } catch (e) {
+                      if (ctx.mounted) {
+                        final key = AppErrorMapper.key(e);
+                        ScaffoldMessenger.of(
+                          ctx,
+                        ).showSnackBar(errorSnackBar(tr(key, ref)));
+                      }
+                    }
+                  },
+                  child: Text(tr('save', ref)),
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -728,17 +686,15 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     final txAsync = ref.watch(shopTransactionsProvider(widget.shopId));
     final user = ref.watch(authUserProvider).valueOrNull;
     return shopAsync.when(
-      loading:
-          () =>
-              const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error:
-          (e, _) => Scaffold(
-            body: mappedErrorState(
-              error: e,
-              ref: ref,
-              onRetry: () => ref.invalidate(shopDetailProvider(widget.shopId)),
-            ),
-          ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, _) => Scaffold(
+        body: mappedErrorState(
+          error: e,
+          ref: ref,
+          onRetry: () => ref.invalidate(shopDetailProvider(widget.shopId)),
+        ),
+      ),
       data: (shop) {
         if (shop == null) {
           return Scaffold(
@@ -748,10 +704,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
         }
         final isDebt = shop.balance > 0;
         final cs = Theme.of(context).colorScheme;
-        final balanceColor =
-            isDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs);
-        final balanceBgColor =
-            isDebt ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs);
+        final balanceColor = isDebt
+            ? AppTheme.debtFg(cs)
+            : AppTheme.clearFg(cs);
+        final balanceBgColor = isDebt
+            ? AppTheme.debtBg(cs)
+            : AppTheme.clearBg(cs);
         final canManageShop =
             user?.isAdmin == true ||
             (user?.isSeller == true && user?.assignedRouteId == shop.routeId);
@@ -827,17 +785,16 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           tr('amount', ref),
                           tr('description', ref),
                         ],
-                        rows:
-                            sorted
-                                .map(
-                                  (t) => [
-                                    AppFormatters.dateTime(t.createdAt),
-                                    _transactionTypeLabel(t),
-                                    AppFormatters.sar(t.amount),
-                                    t.description ?? '',
-                                  ],
-                                )
-                                .toList(),
+                        rows: sorted
+                            .map(
+                              (t) => [
+                                AppFormatters.dateTime(t.createdAt),
+                                _transactionTypeLabel(t),
+                                AppFormatters.sar(t.amount),
+                                t.description ?? '',
+                              ],
+                            )
+                            .toList(),
                         fileName: 'shop_${shop.name}',
                         pdfBytesBuilder: () async {
                           final locale = ref.read(appLocaleProvider);
@@ -845,11 +802,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             settingsProvider.future,
                           );
                           final user = ref.read(authUserProvider).valueOrNull;
-                          final allUsers =
-                              user?.isAdmin == true
-                                  ? ref.read(allUsersProvider).valueOrNull ??
-                                      <UserModel>[]
-                                  : <UserModel>[];
+                          final allUsers = user?.isAdmin == true
+                              ? ref.read(allUsersProvider).valueOrNull ??
+                                    <UserModel>[]
+                              : <UserModel>[];
                           final entryByMap = <String, String>{
                             for (final u in allUsers) u.id: u.displayName,
                           };
@@ -871,14 +827,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             locale: locale,
                             showEntryBy: true,
                             entryByMap: entryByMap,
-                            dateFrom:
-                                sorted.isNotEmpty
-                                    ? sorted.first.createdAt.toDate()
-                                    : null,
-                            dateTo:
-                                sorted.isNotEmpty
-                                    ? sorted.last.createdAt.toDate()
-                                    : null,
+                            dateFrom: sorted.isNotEmpty
+                                ? sorted.first.createdAt.toDate()
+                                : null,
+                            dateTo: sorted.isNotEmpty
+                                ? sorted.last.createdAt.toDate()
+                                : null,
                             currency: settings.currency,
                             logoBytes: logoBytes,
                           );
@@ -886,70 +840,67 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       );
                   }
                 },
-                itemBuilder:
-                    (ctx) => [
-                      if (canManageShop)
-                        PopupMenuItem(
-                          value: _ShopAction.edit,
-                          child: ListTile(
-                            leading: const Icon(Icons.edit),
-                            title: Text(tr('tooltip_edit_shop', ref)),
-                            contentPadding: EdgeInsets.zero,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                      if (user?.isAdmin == true)
-                        PopupMenuItem(
-                          value: _ShopAction.delete,
-                          child: ListTile(
-                            leading: const Icon(
-                              Icons.delete,
-                              color: AppBrand.errorColor,
-                            ),
-                            title: Text(
-                              tr('tooltip_delete_shop', ref),
-                              style: const TextStyle(
-                                color: AppBrand.errorColor,
-                              ),
-                            ),
-                            contentPadding: EdgeInsets.zero,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                      if (user?.isAdmin == true &&
-                          shop.balance > 0 &&
-                          !shop.badDebt)
-                        PopupMenuItem(
-                          value: _ShopAction.badDebt,
-                          child: ListTile(
-                            leading: const Icon(
-                              Icons.money_off,
-                              color: AppBrand.warningColor,
-                            ),
-                            title: Text(tr('mark_bad_debt', ref)),
-                            contentPadding: EdgeInsets.zero,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                      PopupMenuItem(
-                        value: _ShopAction.pdf,
-                        child: ListTile(
-                          leading: const Icon(Icons.picture_as_pdf),
-                          title: Text(tr('tooltip_export_pdf', ref)),
-                          contentPadding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
-                        ),
+                itemBuilder: (ctx) => [
+                  if (canManageShop)
+                    PopupMenuItem(
+                      value: _ShopAction.edit,
+                      child: ListTile(
+                        leading: const Icon(Icons.edit),
+                        title: Text(tr('tooltip_edit_shop', ref)),
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
                       ),
-                      PopupMenuItem(
-                        value: _ShopAction.share,
-                        child: ListTile(
-                          leading: const Icon(Icons.ios_share),
-                          title: Text(tr('tooltip_export_statement', ref)),
-                          contentPadding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
+                    ),
+                  if (user?.isAdmin == true)
+                    PopupMenuItem(
+                      value: _ShopAction.delete,
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.delete,
+                          color: AppBrand.errorColor,
                         ),
+                        title: Text(
+                          tr('tooltip_delete_shop', ref),
+                          style: const TextStyle(color: AppBrand.errorColor),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
                       ),
-                    ],
+                    ),
+                  if (user?.isAdmin == true &&
+                      shop.balance > 0 &&
+                      !shop.badDebt)
+                    PopupMenuItem(
+                      value: _ShopAction.badDebt,
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.money_off,
+                          color: AppBrand.warningColor,
+                        ),
+                        title: Text(tr('mark_bad_debt', ref)),
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  PopupMenuItem(
+                    value: _ShopAction.pdf,
+                    child: ListTile(
+                      leading: const Icon(Icons.picture_as_pdf),
+                      title: Text(tr('tooltip_export_pdf', ref)),
+                      contentPadding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ShopAction.share,
+                    child: ListTile(
+                      leading: const Icon(Icons.ios_share),
+                      title: Text(tr('tooltip_export_statement', ref)),
+                      contentPadding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1052,21 +1003,21 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                               );
                                           return Text(
                                             AppFormatters.sar(totalIn),
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.titleSmall?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                              color: AppTheme.clearFg(cs),
-                                            ),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppTheme.clearFg(cs),
+                                                ),
                                           );
                                         },
                                       ) ??
                                       Text(
                                         '—',
-                                        style:
-                                            Theme.of(
-                                              context,
-                                            ).textTheme.titleSmall,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleSmall,
                                       ),
                                 ],
                               ),
@@ -1099,12 +1050,13 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                   const SizedBox(height: 2),
                                   Text(
                                     AppFormatters.sar(shop.balance.abs()),
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: balanceColor,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: balanceColor,
+                                        ),
                                   ),
                                   Text(
                                     shop.balance > 0
@@ -1125,22 +1077,21 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       if (shop.balance > 0)
                         txAsync.whenOrNull(
                               data: (txs) {
-                                final activeTxs =
-                                    txs.where((t) => !t.deleted).toList();
+                                final activeTxs = txs
+                                    .where((t) => !t.deleted)
+                                    .toList();
                                 if (activeTxs.isEmpty) {
                                   return const SizedBox.shrink();
                                 }
                                 final oldest = activeTxs.last;
-                                final days =
-                                    DateTime.now()
-                                        .difference(oldest.createdAt.toDate())
-                                        .inDays;
-                                final sev =
-                                    days > 60
-                                        ? AppBrand.errorColor
-                                        : days > 30
-                                        ? AppBrand.warningColor
-                                        : cs.onSurfaceVariant;
+                                final days = DateTime.now()
+                                    .difference(oldest.createdAt.toDate())
+                                    .inDays;
+                                final sev = days > 60
+                                    ? AppBrand.errorColor
+                                    : days > 30
+                                    ? AppBrand.warningColor
+                                    : cs.onSurfaceVariant;
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 8),
                                   child: Row(
@@ -1169,8 +1120,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       // Balance trend mini chart
                       txAsync.whenOrNull(
                             data: (txs) {
-                              final activeTxs =
-                                  txs.where((t) => !t.deleted).toList();
+                              final activeTxs = txs
+                                  .where((t) => !t.deleted)
+                                  .toList();
                               if (activeTxs.length < 2) {
                                 return const SizedBox.shrink();
                               }
@@ -1213,8 +1165,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                     ),
                                     Text(
                                       '${tr('bad_debt_amount', ref)}: ${AppFormatters.sar(shop.badDebtAmount)}',
-                                      style:
-                                          Theme.of(context).textTheme.bodySmall,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
                                     ),
                                   ],
                                 ),
@@ -1239,10 +1192,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           foregroundColor: AppBrand.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
-                        onPressed:
-                            canManageShop
-                                ? () => _showQuickCash('cash_in')
-                                : null,
+                        onPressed: canManageShop
+                            ? () => _showQuickCash('cash_in')
+                            : null,
                         icon: const Icon(Icons.add),
                         label: Text(tr('cash_in', ref)),
                       ),
@@ -1255,10 +1207,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           foregroundColor: AppBrand.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
-                        onPressed:
-                            canManageShop
-                                ? () => _showQuickCash('cash_out')
-                                : null,
+                        onPressed: canManageShop
+                            ? () => _showQuickCash('cash_out')
+                            : null,
                         icon: const Icon(Icons.remove),
                         label: Text(tr('cash_out', ref)),
                       ),
@@ -1280,11 +1231,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     ),
                     const Spacer(),
                     txAsync.whenOrNull(
-                          data:
-                              (txs) => Text(
-                                '${tr('showing_entries', ref)} ${txs.length}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
+                          data: (txs) => Text(
+                            '${tr('showing_entries', ref)} ${txs.length}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                         ) ??
                         const SizedBox.shrink(),
                   ],
@@ -1294,17 +1244,14 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
               // Transaction list
               Expanded(
                 child: txAsync.when(
-                  loading:
-                      () => const Center(child: CircularProgressIndicator()),
-                  error:
-                      (e, _) => mappedErrorState(
-                        error: e,
-                        ref: ref,
-                        onRetry:
-                            () => ref.invalidate(
-                              shopTransactionsProvider(widget.shopId),
-                            ),
-                      ),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => mappedErrorState(
+                    error: e,
+                    ref: ref,
+                    onRetry: () =>
+                        ref.invalidate(shopTransactionsProvider(widget.shopId)),
+                  ),
                   data: (txs) {
                     if (txs.isEmpty) {
                       return EmptyState(
@@ -1355,19 +1302,17 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               horizontal: 16,
                               vertical: 6,
                             ),
-                            color:
-                                Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHighest,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
                             child: Text(
                               item.monthHeader!,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
-                                color:
-                                    Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           );
@@ -1438,12 +1383,11 @@ class _TransactionTile extends ConsumerWidget {
     final isDeleted = tx.deleted;
     final isWriteOff = tx.isWriteOff;
     final reducesBalance = tx.reducesBalance;
-    final color =
-        isDeleted
-            ? Theme.of(context).colorScheme.onSurfaceVariant
-            : isWriteOff
-            ? AppBrand.warningColor
-            : (reducesBalance ? AppBrand.successColor : AppBrand.errorColor);
+    final color = isDeleted
+        ? Theme.of(context).colorScheme.onSurfaceVariant
+        : isWriteOff
+        ? AppBrand.warningColor
+        : (reducesBalance ? AppBrand.successColor : AppBrand.errorColor);
     final sign = reducesBalance ? '+' : '-';
     final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
     final totalQty = tx.items.fold<int>(0, (acc, item) => acc + item.qty);
@@ -1514,88 +1458,83 @@ class _TransactionTile extends ConsumerWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color:
-                    runningBalance! > 0
-                        ? AppBrand.errorColor
-                        : runningBalance! < 0
-                        ? AppBrand.successColor
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                color: runningBalance! > 0
+                    ? AppBrand.errorColor
+                    : runningBalance! < 0
+                    ? AppBrand.successColor
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
         ],
       ),
-      trailing:
-          (canEdit || canApproveEdit)
-              ? PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, size: 20),
-                onSelected: (v) {
-                  if (v == 'edit' && onEdit != null) onEdit!();
-                  if (v == 'approve_edit' && onApproveEdit != null) {
-                    onApproveEdit!();
-                  }
-                  if (v == 'reject_edit' && onRejectEdit != null) {
-                    onRejectEdit!();
-                  }
-                  if (v == 'delete' && onDelete != null) onDelete!();
-                },
-                itemBuilder:
-                    (_) => [
-                      if (canEdit)
-                        PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.edit, size: 16),
-                              const SizedBox(width: 8),
-                              Text(tr('edit', ref)),
-                            ],
-                          ),
+      trailing: (canEdit || canApproveEdit)
+          ? PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, size: 20),
+              onSelected: (v) {
+                if (v == 'edit' && onEdit != null) onEdit!();
+                if (v == 'approve_edit' && onApproveEdit != null) {
+                  onApproveEdit!();
+                }
+                if (v == 'reject_edit' && onRejectEdit != null) {
+                  onRejectEdit!();
+                }
+                if (v == 'delete' && onDelete != null) onDelete!();
+              },
+              itemBuilder: (_) => [
+                if (canEdit)
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.edit, size: 16),
+                        const SizedBox(width: 8),
+                        Text(tr('edit', ref)),
+                      ],
+                    ),
+                  ),
+                if (canApproveEdit)
+                  PopupMenuItem(
+                    value: 'approve_edit',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle, size: 16),
+                        const SizedBox(width: 8),
+                        Text(tr('approve_seller_edit', ref)),
+                      ],
+                    ),
+                  ),
+                if (canApproveEdit)
+                  PopupMenuItem(
+                    value: 'reject_edit',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.cancel, size: 16),
+                        const SizedBox(width: 8),
+                        Text(tr('reject_seller_edit', ref)),
+                      ],
+                    ),
+                  ),
+                if (canDelete)
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.delete,
+                          size: 16,
+                          color: AppBrand.errorColor,
                         ),
-                      if (canApproveEdit)
-                        PopupMenuItem(
-                          value: 'approve_edit',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.check_circle, size: 16),
-                              const SizedBox(width: 8),
-                              Text(tr('approve_seller_edit', ref)),
-                            ],
-                          ),
+                        const SizedBox(width: 8),
+                        Text(
+                          tr('delete', ref),
+                          style: const TextStyle(color: AppBrand.errorColor),
                         ),
-                      if (canApproveEdit)
-                        PopupMenuItem(
-                          value: 'reject_edit',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.cancel, size: 16),
-                              const SizedBox(width: 8),
-                              Text(tr('reject_seller_edit', ref)),
-                            ],
-                          ),
-                        ),
-                      if (canDelete)
-                        PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.delete,
-                                size: 16,
-                                color: AppBrand.errorColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                tr('delete', ref),
-                                style: const TextStyle(
-                                  color: AppBrand.errorColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-              )
-              : null,
+                      ],
+                    ),
+                  ),
+              ],
+            )
+          : null,
       dense: true,
     );
   }
@@ -1652,8 +1591,9 @@ class _BalanceTrendChart extends StatelessWidget {
     }
 
     final entries = monthlyBalance.entries.toList();
-    final display =
-        entries.length > 6 ? entries.sublist(entries.length - 6) : entries;
+    final display = entries.length > 6
+        ? entries.sublist(entries.length - 6)
+        : entries;
 
     if (display.length < 2) return const SizedBox.shrink();
 

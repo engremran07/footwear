@@ -15,12 +15,9 @@ final allInventoryTransactionsProvider =
           .limit(200)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .map(
-                      (d) => InventoryTransactionModel.fromJson(d.data(), d.id),
-                    )
-                    .toList(),
+            (snap) => snap.docs
+                .map((d) => InventoryTransactionModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -36,11 +33,8 @@ final sellerInventoryTransactionsProvider = StreamProvider.autoDispose
           .limit(100)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .map(
-                      (d) => InventoryTransactionModel.fromJson(d.data(), d.id),
-                    )
-                    .toList(),
+            (snap) => snap.docs
+                .map((d) => InventoryTransactionModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });

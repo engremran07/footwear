@@ -13,10 +13,9 @@ final productsProvider = StreamProvider.autoDispose<List<ProductModel>>((ref) {
       .limit(200)
       .snapshots()
       .map(
-        (snap) =>
-            snap.docs
-                .map((d) => ProductModel.fromJson(d.data(), d.id))
-                .toList(),
+        (snap) => snap.docs
+            .map((d) => ProductModel.fromJson(d.data(), d.id))
+            .toList(),
       );
 });
 
@@ -42,10 +41,9 @@ final productVariantsProvider = StreamProvider.autoDispose
           .limit(100)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
-                    .toList(),
+            (snap) => snap.docs
+                .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -58,10 +56,9 @@ final allVariantsProvider =
           .limit(500)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
-                    .toList(),
+            (snap) => snap.docs
+                .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -72,11 +69,10 @@ class ProductNotifier extends AsyncNotifier<void> {
   Future<void> _requireAdmin() async {
     final authUser = FirebaseAuth.instance.currentUser;
     if (authUser == null) throw StateError('Not authenticated');
-    final me =
-        await FirebaseFirestore.instance
-            .collection(Collections.users)
-            .doc(authUser.uid)
-            .get();
+    final me = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(authUser.uid)
+        .get();
     final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
     if (role != 'admin' && role != 'manager') {
       throw StateError('Only admin can manage products');
@@ -280,8 +276,9 @@ class ProductNotifier extends AsyncNotifier<void> {
         'variant_name': variantName,
         'quantity_available': sellerCurrent + quantity,
         'active': true,
-        'created_at':
-            sellerSnap.exists ? (sellerSnap.data()?['created_at'] ?? now) : now,
+        'created_at': sellerSnap.exists
+            ? (sellerSnap.data()?['created_at'] ?? now)
+            : now,
         'updated_at': now,
       }, SetOptions(merge: true));
 

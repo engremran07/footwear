@@ -11,10 +11,9 @@ void downloadBytes(List<int> bytes, String fileName) {
     ),
   );
   final url = web.URL.createObjectURL(blob);
-  final anchor =
-      web.document.createElement('a') as web.HTMLAnchorElement
-        ..href = url
-        ..download = fileName;
+  final anchor = web.document.createElement('a') as web.HTMLAnchorElement
+    ..href = url
+    ..download = fileName;
   anchor.click();
   web.URL.revokeObjectURL(url);
 }

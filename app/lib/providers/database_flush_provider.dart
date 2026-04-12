@@ -75,12 +75,11 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
   ) async {
     int deleted = 0;
     while (true) {
-      final snap =
-          await _db
-              .collection(collectionPath)
-              .where(field, isEqualTo: value)
-              .limit(400)
-              .get();
+      final snap = await _db
+          .collection(collectionPath)
+          .where(field, isEqualTo: value)
+          .limit(400)
+          .get();
       if (snap.docs.isEmpty) break;
       final batch = _db.batch();
       for (final doc in snap.docs) {
@@ -164,8 +163,9 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
       final variants = await _db.collection(Collections.productVariants).get();
       for (var i = 0; i < variants.docs.length; i += 400) {
         final batch = _db.batch();
-        final end =
-            (i + 400 > variants.docs.length) ? variants.docs.length : i + 400;
+        final end = (i + 400 > variants.docs.length)
+            ? variants.docs.length
+            : i + 400;
         for (var j = i; j < end; j++) {
           batch.update(variants.docs[j].reference, {
             'quantity_available': 0,
@@ -201,8 +201,9 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
       final routes = await _db.collection(Collections.routes).get();
       for (var i = 0; i < routes.docs.length; i += 400) {
         final batch = _db.batch();
-        final end =
-            (i + 400 > routes.docs.length) ? routes.docs.length : i + 400;
+        final end = (i + 400 > routes.docs.length)
+            ? routes.docs.length
+            : i + 400;
         for (var j = i; j < end; j++) {
           batch.update(routes.docs[j].reference, {
             'total_shops': 0,

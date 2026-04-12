@@ -39,106 +39,104 @@ class ReportsScreen extends ConsumerWidget {
     final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
     return Scaffold(
       appBar: AppBar(title: Text(tr('reports', ref))),
-      body:
-          ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              // Summary card
-              stats.when(
-                data: (s) {
-                  // Outstanding always from live shops stream — never from stats cache
-                  final totalOutstanding =
-                      shopsAsync.valueOrNull?.fold<double>(
-                        0.0,
-                        (acc, sh) => acc + sh.balance,
-                      ) ??
-                      0.0;
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            tr('summary', ref),
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 12),
-                          _Row(
-                            label: tr('total_routes', ref),
-                            value: '${s.totalRoutes}',
-                          ),
-                          _Row(
-                            label: tr('total_shops', ref),
-                            value: '${s.totalShops}',
-                          ),
-                          _Row(
-                            label: tr('outstanding_balance', ref),
-                            value: AppFormatters.sar(totalOutstanding),
-                          ),
-                          _Row(
-                            label: tr('total_products', ref),
-                            value: '${s.totalProducts}',
-                          ),
-                          _Row(
-                            label: tr('total_variants', ref),
-                            value: '${s.totalVariants}',
-                          ),
-                          _Row(
-                            label: tr('stock_pairs', ref),
-                            value: AppFormatters.stock(s.totalStockPairs, ppc),
-                          ),
-                        ],
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Summary card
+          stats.when(
+            data: (s) {
+              // Outstanding always from live shops stream — never from stats cache
+              final totalOutstanding =
+                  shopsAsync.valueOrNull?.fold<double>(
+                    0.0,
+                    (acc, sh) => acc + sh.balance,
+                  ) ??
+                  0.0;
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr('summary', ref),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
-                    ),
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error:
-                    (e, _) => mappedErrorState(
-                      error: e,
-                      ref: ref,
-                      onRetry: () => ref.invalidate(dashboardStatsProvider),
-                    ),
-              ),
-              const SizedBox(height: 16),
-              // Monthly Cash Flow Chart
-              _MonthlyCashFlowChart(),
-              const SizedBox(height: 16),
-              // Outstanding Distribution Chart
-              _OutstandingPieChart(),
-              const SizedBox(height: 16),
-              // Export sections
-              _ExportCard(
-                icon: Icons.storefront,
-                title: tr('shops_report', ref),
-                onExport: () => _exportShops(context, ref),
-              ),
-              _ExportCard(
-                icon: Icons.inventory_2,
-                title: tr('inventory_report', ref),
-                onExport: () => _exportInventory(context, ref, ppc),
-              ),
-              _ExportCard(
-                icon: Icons.receipt_long,
-                title: tr('transactions_report', ref),
-                onExport: () => _exportTransactions(context, ref),
-              ),
-              _ExportCard(
-                icon: Icons.account_balance_wallet,
-                title: tr('outstanding_report', ref),
-                onExport: () => _exportOutstanding(context, ref),
-              ),
-              _ExportCard(
-                icon: Icons.money_off,
-                title: tr('bad_debts_report', ref),
-                onExport: () => _exportBadDebts(context, ref),
-              ),
-              const _AccountStatementCard(),
-              const _SellerReportCard(),
-            ],
-          ).screenEntry(),
+                      const SizedBox(height: 12),
+                      _Row(
+                        label: tr('total_routes', ref),
+                        value: '${s.totalRoutes}',
+                      ),
+                      _Row(
+                        label: tr('total_shops', ref),
+                        value: '${s.totalShops}',
+                      ),
+                      _Row(
+                        label: tr('outstanding_balance', ref),
+                        value: AppFormatters.sar(totalOutstanding),
+                      ),
+                      _Row(
+                        label: tr('total_products', ref),
+                        value: '${s.totalProducts}',
+                      ),
+                      _Row(
+                        label: tr('total_variants', ref),
+                        value: '${s.totalVariants}',
+                      ),
+                      _Row(
+                        label: tr('stock_pairs', ref),
+                        value: AppFormatters.stock(s.totalStockPairs, ppc),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => mappedErrorState(
+              error: e,
+              ref: ref,
+              onRetry: () => ref.invalidate(dashboardStatsProvider),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Monthly Cash Flow Chart
+          _MonthlyCashFlowChart(),
+          const SizedBox(height: 16),
+          // Outstanding Distribution Chart
+          _OutstandingPieChart(),
+          const SizedBox(height: 16),
+          // Export sections
+          _ExportCard(
+            icon: Icons.storefront,
+            title: tr('shops_report', ref),
+            onExport: () => _exportShops(context, ref),
+          ),
+          _ExportCard(
+            icon: Icons.inventory_2,
+            title: tr('inventory_report', ref),
+            onExport: () => _exportInventory(context, ref, ppc),
+          ),
+          _ExportCard(
+            icon: Icons.receipt_long,
+            title: tr('transactions_report', ref),
+            onExport: () => _exportTransactions(context, ref),
+          ),
+          _ExportCard(
+            icon: Icons.account_balance_wallet,
+            title: tr('outstanding_report', ref),
+            onExport: () => _exportOutstanding(context, ref),
+          ),
+          _ExportCard(
+            icon: Icons.money_off,
+            title: tr('bad_debts_report', ref),
+            onExport: () => _exportBadDebts(context, ref),
+          ),
+          const _AccountStatementCard(),
+          const _SellerReportCard(),
+        ],
+      ).screenEntry(),
     );
   }
 
@@ -149,13 +147,12 @@ class ReportsScreen extends ConsumerWidget {
       return;
     }
     final routeId = user.assignedRouteId ?? '';
-    final shops =
-        user.isAdmin
-            ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
-            : (routeId.isNotEmpty
-                ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
+    final shops = user.isAdmin
+        ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
+        : (routeId.isNotEmpty
+              ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
                     <ShopModel>[]
-                : <ShopModel>[]);
+              : <ShopModel>[]);
     if (shops.isEmpty) {
       _showNoData(context, ref);
       return;
@@ -172,19 +169,18 @@ class ReportsScreen extends ConsumerWidget {
         tr('city', ref),
         tr('balance', ref),
       ],
-      rows:
-          shops
-              .map(
-                (s) => [
-                  s.name,
-                  'R${s.routeNumber}',
-                  s.phone ?? '',
-                  s.area ?? '',
-                  s.city ?? '',
-                  AppFormatters.sar(s.balance),
-                ],
-              )
-              .toList(),
+      rows: shops
+          .map(
+            (s) => [
+              s.name,
+              'R${s.routeNumber}',
+              s.phone ?? '',
+              s.area ?? '',
+              s.city ?? '',
+              AppFormatters.sar(s.balance),
+            ],
+          )
+          .toList(),
       fileName: 'shops_report',
     );
   }
@@ -195,24 +191,23 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final rows =
-        user.isAdmin
-            ? (ref.read(allVariantsProvider).valueOrNull ?? [])
-                .map(
-                  (v) => [
-                    v.variantName,
-                    AppFormatters.stock(v.quantityAvailable, ppc),
-                  ],
-                )
-                .toList()
-            : (ref.read(sellerInventoryProvider(user.id)).valueOrNull ?? [])
-                .map(
-                  (v) => [
-                    v.variantName,
-                    AppFormatters.stock(v.quantityAvailable, ppc),
-                  ],
-                )
-                .toList();
+    final rows = user.isAdmin
+        ? (ref.read(allVariantsProvider).valueOrNull ?? [])
+              .map(
+                (v) => [
+                  v.variantName,
+                  AppFormatters.stock(v.quantityAvailable, ppc),
+                ],
+              )
+              .toList()
+        : (ref.read(sellerInventoryProvider(user.id)).valueOrNull ?? [])
+              .map(
+                (v) => [
+                  v.variantName,
+                  AppFormatters.stock(v.quantityAvailable, ppc),
+                ],
+              )
+              .toList();
     if (rows.isEmpty) {
       _showNoData(context, ref);
       return;
@@ -233,10 +228,9 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final txs =
-        user.isAdmin
-            ? ref.read(allTransactionsProvider).valueOrNull ?? []
-            : ref.read(sellerTransactionsProvider(user.id)).valueOrNull ?? [];
+    final txs = user.isAdmin
+        ? ref.read(allTransactionsProvider).valueOrNull ?? []
+        : ref.read(sellerTransactionsProvider(user.id)).valueOrNull ?? [];
     if (txs.isEmpty) {
       _showNoData(context, ref);
       return;
@@ -252,20 +246,17 @@ class ReportsScreen extends ConsumerWidget {
         tr('amount', ref),
         tr('description', ref),
       ],
-      rows:
-          txs
-              .map(
-                (t) => [
-                  AppFormatters.dateTime(t.createdAt),
-                  t.shopName,
-                  t.type == 'cash_in'
-                      ? tr('cash_in', ref)
-                      : tr('cash_out', ref),
-                  AppFormatters.sar(t.amount),
-                  t.description ?? '',
-                ],
-              )
-              .toList(),
+      rows: txs
+          .map(
+            (t) => [
+              AppFormatters.dateTime(t.createdAt),
+              t.shopName,
+              t.type == 'cash_in' ? tr('cash_in', ref) : tr('cash_out', ref),
+              AppFormatters.sar(t.amount),
+              t.description ?? '',
+            ],
+          )
+          .toList(),
       fileName: 'transactions_report',
     );
   }
@@ -277,15 +268,14 @@ class ReportsScreen extends ConsumerWidget {
       return;
     }
     final routeId = user.assignedRouteId ?? '';
-    final shops =
-        user.isAdmin
-            ? ref.read(outstandingShopsProvider).valueOrNull ?? <ShopModel>[]
-            : (routeId.isNotEmpty
-                ? ref
+    final shops = user.isAdmin
+        ? ref.read(outstandingShopsProvider).valueOrNull ?? <ShopModel>[]
+        : (routeId.isNotEmpty
+              ? ref
                         .read(outstandingShopsByRouteProvider(routeId))
                         .valueOrNull ??
                     <ShopModel>[]
-                : <ShopModel>[]);
+              : <ShopModel>[]);
     if (shops.isEmpty) {
       _showNoData(context, ref);
       return;
@@ -300,17 +290,16 @@ class ReportsScreen extends ConsumerWidget {
         tr('phone', ref),
         tr('balance', ref),
       ],
-      rows:
-          shops
-              .map(
-                (s) => [
-                  s.name,
-                  'R${s.routeNumber}',
-                  s.phone ?? '',
-                  AppFormatters.sar(s.balance),
-                ],
-              )
-              .toList(),
+      rows: shops
+          .map(
+            (s) => [
+              s.name,
+              'R${s.routeNumber}',
+              s.phone ?? '',
+              AppFormatters.sar(s.balance),
+            ],
+          )
+          .toList(),
       fileName: 'outstanding_report',
     );
   }
@@ -322,13 +311,12 @@ class ReportsScreen extends ConsumerWidget {
       return;
     }
     final routeId = user.assignedRouteId ?? '';
-    final shops =
-        user.isAdmin
-            ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
-            : (routeId.isNotEmpty
-                ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
+    final shops = user.isAdmin
+        ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
+        : (routeId.isNotEmpty
+              ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
                     <ShopModel>[]
-                : <ShopModel>[]);
+              : <ShopModel>[]);
     final badDebtShops = shops.where((s) => s.badDebt).toList();
     if (badDebtShops.isEmpty) {
       _showNoData(context, ref);
@@ -344,19 +332,18 @@ class ReportsScreen extends ConsumerWidget {
         tr('bad_debt_amount', ref),
         tr('date', ref),
       ],
-      rows:
-          badDebtShops
-              .map(
-                (s) => [
-                  s.name,
-                  s.phone ?? '',
-                  AppFormatters.sar(s.badDebtAmount),
-                  s.badDebtDate != null
-                      ? AppFormatters.dateTime(s.badDebtDate!)
-                      : '',
-                ],
-              )
-              .toList(),
+      rows: badDebtShops
+          .map(
+            (s) => [
+              s.name,
+              s.phone ?? '',
+              AppFormatters.sar(s.badDebtAmount),
+              s.badDebtDate != null
+                  ? AppFormatters.dateTime(s.badDebtDate!)
+                  : '',
+            ],
+          )
+          .toList(),
       fileName: 'bad_debts_report',
     );
   }
@@ -418,10 +405,9 @@ class _MonthlyCashFlowChart extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authUserProvider).valueOrNull;
-    final txsAsync =
-        user?.isAdmin == true
-            ? ref.watch(allTransactionsProvider)
-            : ref.watch(sellerTransactionsProvider(user?.id ?? ''));
+    final txsAsync = user?.isAdmin == true
+        ? ref.watch(allTransactionsProvider)
+        : ref.watch(sellerTransactionsProvider(user?.id ?? ''));
     final cs = Theme.of(context).colorScheme;
 
     return txsAsync.when(
@@ -444,16 +430,14 @@ class _MonthlyCashFlowChart extends ConsumerWidget {
         }
 
         // Take last 6 months
-        final periods =
-            AppFormatters.last12Periods().reversed
-                .take(6)
-                .toList()
-                .reversed
-                .toList();
-        final displayPeriods =
-            periods
-                .where((p) => (cashIn[p] ?? 0) > 0 || (cashOut[p] ?? 0) > 0)
-                .toList();
+        final periods = AppFormatters.last12Periods().reversed
+            .take(6)
+            .toList()
+            .reversed
+            .toList();
+        final displayPeriods = periods
+            .where((p) => (cashIn[p] ?? 0) > 0 || (cashOut[p] ?? 0) > 0)
+            .toList();
         if (displayPeriods.isEmpty) return const SizedBox.shrink();
 
         return Card(
@@ -519,14 +503,13 @@ class _MonthlyCashFlowChart extends ConsumerWidget {
                           sideTitles: SideTitles(
                             showTitles: true,
                             reservedSize: 48,
-                            getTitlesWidget:
-                                (v, _) => Text(
-                                  AppFormatters.compact(v),
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                ),
+                            getTitlesWidget: (v, _) => Text(
+                              AppFormatters.compact(v),
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
                           ),
                         ),
                         rightTitles: const AxisTitles(
@@ -603,19 +586,17 @@ class _OutstandingPieChart extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authUserProvider).valueOrNull;
-    final shopsAsync =
-        user?.isAdmin == true
-            ? ref.watch(shopsProvider)
-            : ref.watch(shopsByRouteProvider(user?.assignedRouteId ?? ''));
+    final shopsAsync = user?.isAdmin == true
+        ? ref.watch(shopsProvider)
+        : ref.watch(shopsByRouteProvider(user?.assignedRouteId ?? ''));
     final cs = Theme.of(context).colorScheme;
 
     return shopsAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
       data: (shops) {
-        final withDebt =
-            shops.where((s) => s.balance > 0).toList()
-              ..sort((a, b) => b.balance.compareTo(a.balance));
+        final withDebt = shops.where((s) => s.balance > 0).toList()
+          ..sort((a, b) => b.balance.compareTo(a.balance));
         if (withDebt.isEmpty) return const SizedBox.shrink();
 
         // Group: top 5 + "others"
@@ -646,11 +627,11 @@ class _OutstandingPieChart extends ConsumerWidget {
                 fontWeight: FontWeight.bold,
                 color:
                     ThemeData.estimateBrightnessForColor(
-                              colors[i % colors.length],
-                            ) ==
-                            Brightness.dark
-                        ? cs.surface
-                        : cs.onSurface,
+                          colors[i % colors.length],
+                        ) ==
+                        Brightness.dark
+                    ? cs.surface
+                    : cs.onSurface,
               ),
             ),
           );
@@ -667,9 +648,9 @@ class _OutstandingPieChart extends ConsumerWidget {
                 fontWeight: FontWeight.bold,
                 color:
                     ThemeData.estimateBrightnessForColor(colors.last) ==
-                            Brightness.dark
-                        ? cs.surface
-                        : cs.onSurface,
+                        Brightness.dark
+                    ? cs.surface
+                    : cs.onSurface,
               ),
             ),
           );
@@ -710,10 +691,9 @@ class _OutstandingPieChart extends ConsumerWidget {
                           for (var i = 0; i < top.length; i++)
                             _LegendDot(
                               color: colors[i % colors.length],
-                              label:
-                                  top[i].name.length > 12
-                                      ? '${top[i].name.substring(0, 12)}…'
-                                      : top[i].name,
+                              label: top[i].name.length > 12
+                                  ? '${top[i].name.substring(0, 12)}…'
+                                  : top[i].name,
                             ),
                           if (othersTotal > 0)
                             _LegendDot(color: colors.last, label: 'Others'),
@@ -787,13 +767,12 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       final locale = ref.read(appLocaleProvider);
       final user = ref.read(authUserProvider).valueOrNull;
       final routeId = user?.assignedRouteId ?? '';
-      final shops =
-          user?.isAdmin == true
-              ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
-              : (routeId.isNotEmpty
-                  ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
+      final shops = user?.isAdmin == true
+          ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
+          : (routeId.isNotEmpty
+                ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
                       <ShopModel>[]
-                  : <ShopModel>[]);
+                : <ShopModel>[]);
       final shop = shops.firstWhere((s) => s.id == _selectedShopId);
 
       final txs = await ref.read(
@@ -801,10 +780,9 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       );
 
       final settings = await ref.read(settingsProvider.future);
-      final allUsers =
-          user?.isAdmin == true
-              ? ref.read(allUsersProvider).valueOrNull ?? <UserModel>[]
-              : <UserModel>[];
+      final allUsers = user?.isAdmin == true
+          ? ref.read(allUsersProvider).valueOrNull ?? <UserModel>[]
+          : <UserModel>[];
       final entryByMap = <String, String>{
         for (final u in allUsers) u.id: u.displayName,
       };
@@ -840,17 +818,16 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
           tr('amount', ref),
           tr('description', ref),
         ],
-        rows:
-            txs
-                .map(
-                  (t) => [
-                    AppFormatters.dateTime(t.createdAt),
-                    _transactionTypeLabel(t),
-                    AppFormatters.sar(t.amount),
-                    t.description ?? '',
-                  ],
-                )
-                .toList(),
+        rows: txs
+            .map(
+              (t) => [
+                AppFormatters.dateTime(t.createdAt),
+                _transactionTypeLabel(t),
+                AppFormatters.sar(t.amount),
+                t.description ?? '',
+              ],
+            )
+            .toList(),
         fileName: 'account_statement_${shop.name.replaceAll(' ', '_')}',
         pdfBytesBuilder: () async => bytes,
       );
@@ -868,12 +845,11 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
   Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).valueOrNull;
     final routeId = user?.assignedRouteId ?? '';
-    final AsyncValue<List<ShopModel>> shopsAsync =
-        user?.isAdmin == true
-            ? ref.watch(shopsProvider)
-            : (routeId.isNotEmpty
-                ? ref.watch(shopsByRouteProvider(routeId))
-                : const AsyncData(<ShopModel>[]));
+    final AsyncValue<List<ShopModel>> shopsAsync = user?.isAdmin == true
+        ? ref.watch(shopsProvider)
+        : (routeId.isNotEmpty
+              ? ref.watch(shopsByRouteProvider(routeId))
+              : const AsyncData(<ShopModel>[]));
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -900,52 +876,46 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
             const SizedBox(height: 10),
             shopsAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error:
-                  (e, _) => mappedErrorState(
-                    error: e,
-                    ref: ref,
-                    onRetry: () {
-                      if (user?.isAdmin == true) {
-                        ref.invalidate(shopsProvider);
-                      } else if (routeId.isNotEmpty) {
-                        ref.invalidate(shopsByRouteProvider(routeId));
-                      }
-                    },
-                  ),
-              data:
-                  (shops) => DropdownButtonFormField<String>(
-                    initialValue: _selectedShopId,
-                    decoration: InputDecoration(
-                      labelText: tr('shop', ref),
-                      isDense: true,
-                      border: const OutlineInputBorder(),
-                    ),
-                    items:
-                        shops
-                            .map(
-                              (s) => DropdownMenuItem(
-                                value: s.id,
-                                child: Text(s.name),
-                              ),
-                            )
-                            .toList(),
-                    onChanged: (v) => setState(() => _selectedShopId = v),
-                  ),
+              error: (e, _) => mappedErrorState(
+                error: e,
+                ref: ref,
+                onRetry: () {
+                  if (user?.isAdmin == true) {
+                    ref.invalidate(shopsProvider);
+                  } else if (routeId.isNotEmpty) {
+                    ref.invalidate(shopsByRouteProvider(routeId));
+                  }
+                },
+              ),
+              data: (shops) => DropdownButtonFormField<String>(
+                initialValue: _selectedShopId,
+                decoration: InputDecoration(
+                  labelText: tr('shop', ref),
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                ),
+                items: shops
+                    .map(
+                      (s) => DropdownMenuItem(value: s.id, child: Text(s.name)),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedShopId = v),
+              ),
             ),
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed:
-                    _selectedShopId == null || _generating ? null : _generate,
-                icon:
-                    _generating
-                        ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                        : const Icon(Icons.picture_as_pdf),
+                onPressed: _selectedShopId == null || _generating
+                    ? null
+                    : _generate,
+                icon: _generating
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.picture_as_pdf),
                 label: Text(tr('export', ref)),
               ),
             ),
@@ -1002,16 +972,16 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       final allShops = ref.read(shopsProvider).valueOrNull ?? <ShopModel>[];
 
       // Build per-customer summary
-      final txsBySeller =
-          allTxs.where((t) => t.createdBy == _selectedSellerId).toList();
+      final txsBySeller = allTxs
+          .where((t) => t.createdBy == _selectedSellerId)
+          .toList();
       final customerMap = <String, SellerReportCustomer>{};
       for (final tx in txsBySeller) {
         final cid = tx.shopId;
         if (cid.isEmpty) continue;
-        final cname =
-            tx.shopName.isNotEmpty
-                ? tx.shopName
-                : allShops.where((s) => s.id == cid).firstOrNull?.name ?? '';
+        final cname = tx.shopName.isNotEmpty
+            ? tx.shopName
+            : allShops.where((s) => s.id == cid).firstOrNull?.name ?? '';
         final existing = customerMap[cid];
         final pairsSold = tx.items.fold<int>(0, (acc, item) => acc + item.qty);
         final revenue = tx.isCashOut ? tx.amount : 0.0;
@@ -1068,17 +1038,16 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
           tr('revenue', ref),
           tr('outstanding', ref),
         ],
-        rows:
-            customerMap.values
-                .map(
-                  (c) => [
-                    c.name,
-                    c.totalPairsSold,
-                    AppFormatters.sar(c.totalRevenue),
-                    AppFormatters.sar(c.outstandingBalance),
-                  ],
-                )
-                .toList(),
+        rows: customerMap.values
+            .map(
+              (c) => [
+                c.name,
+                c.totalPairsSold,
+                AppFormatters.sar(c.totalRevenue),
+                AppFormatters.sar(c.outstandingBalance),
+              ],
+            )
+            .toList(),
         fileName: 'seller_report_${seller.displayName.replaceAll(' ', '_')}',
         pdfBytesBuilder: () async => bytes,
       );
@@ -1125,12 +1094,11 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
             const SizedBox(height: 10),
             usersAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error:
-                  (e, _) => mappedErrorState(
-                    error: e,
-                    ref: ref,
-                    onRetry: () => ref.invalidate(allUsersProvider),
-                  ),
+              error: (e, _) => mappedErrorState(
+                error: e,
+                ref: ref,
+                onRetry: () => ref.invalidate(allUsersProvider),
+              ),
               data: (users) {
                 final sellers = users.where((u) => u.isSeller).toList();
                 return DropdownButtonFormField<String>(
@@ -1140,15 +1108,14 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
                     isDense: true,
                     border: const OutlineInputBorder(),
                   ),
-                  items:
-                      sellers
-                          .map(
-                            (u) => DropdownMenuItem(
-                              value: u.id,
-                              child: Text(u.displayName),
-                            ),
-                          )
-                          .toList(),
+                  items: sellers
+                      .map(
+                        (u) => DropdownMenuItem(
+                          value: u.id,
+                          child: Text(u.displayName),
+                        ),
+                      )
+                      .toList(),
                   onChanged: (v) => setState(() => _selectedSellerId = v),
                 );
               },
@@ -1157,16 +1124,16 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed:
-                    _selectedSellerId == null || _generating ? null : _generate,
-                icon:
-                    _generating
-                        ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                        : const Icon(Icons.picture_as_pdf),
+                onPressed: _selectedSellerId == null || _generating
+                    ? null
+                    : _generate,
+                icon: _generating
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.picture_as_pdf),
                 label: Text(tr('export', ref)),
               ),
             ),

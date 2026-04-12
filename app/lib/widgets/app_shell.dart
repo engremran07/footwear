@@ -129,34 +129,30 @@ class _AppShellState extends ConsumerState<AppShell>
     if (actions.isEmpty) return;
     showModalBottomSheet<void>(
       context: ctx,
-      builder:
-          (_) => Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Text(
-                  item.label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-              for (final action in actions)
-                ListTile(
-                  leading: Icon(action.icon, color: AppBrand.primaryColor),
-                  title: Text(action.label),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    context.push(action.route);
-                  },
-                ),
-              const SizedBox(height: 16),
-            ],
+      builder: (_) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Text(
+              item.label,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
           ),
+          const Divider(height: 1),
+          for (final action in actions)
+            ListTile(
+              leading: Icon(action.icon, color: AppBrand.primaryColor),
+              title: Text(action.label),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push(action.route);
+              },
+            ),
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 
@@ -239,10 +235,9 @@ class _AppShellState extends ConsumerState<AppShell>
     final currentLocation = GoRouterState.of(context).uri.path;
 
     final rawItems = _filteredItems(user);
-    final navItems =
-        rawItems
-            .map((e) => (icon: e.icon, label: tr(e.key, ref), route: e.route))
-            .toList();
+    final navItems = rawItems
+        .map((e) => (icon: e.icon, label: tr(e.key, ref), route: e.route))
+        .toList();
 
     void onPopInvoked(bool didPop, dynamic result) {
       if (didPop) return;
@@ -282,8 +277,8 @@ class _AppShellState extends ConsumerState<AppShell>
                 selectedIndex: _selectedIndex(navItems, currentLocation),
                 items: navItems,
                 onItem: (i) => context.go(navItems[i].route),
-                onLogout:
-                    () => ref.read(authNotifierProvider.notifier).signOut(),
+                onLogout: () =>
+                    ref.read(authNotifierProvider.notifier).signOut(),
                 onProfile: () => context.go('/profile'),
                 user: user,
                 signOutTooltip: tr('sign_out', ref),
@@ -299,10 +294,9 @@ class _AppShellState extends ConsumerState<AppShell>
 
     // ── Mobile: Zoom Drawer + WhatsApp AppBar + Bottom Nav ────────────────
     final rawPrimary = _primaryNavItems(user);
-    final primaryItems =
-        rawPrimary
-            .map((e) => (icon: e.icon, label: tr(e.key, ref), route: e.route))
-            .toList();
+    final primaryItems = rawPrimary
+        .map((e) => (icon: e.icon, label: tr(e.key, ref), route: e.route))
+        .toList();
 
     final isRtl = Directionality.of(context) == TextDirection.rtl;
     final slideWidth = MediaQuery.of(context).size.width * 0.74;
@@ -342,8 +336,8 @@ class _AppShellState extends ConsumerState<AppShell>
                     _closeDrawer();
                     context.go('/profile');
                   },
-                  onSignOut:
-                      () => ref.read(authNotifierProvider.notifier).signOut(),
+                  onSignOut: () =>
+                      ref.read(authNotifierProvider.notifier).signOut(),
                 ),
               ),
 
@@ -352,8 +346,9 @@ class _AppShellState extends ConsumerState<AppShell>
                 offset: Offset(dx, 0),
                 child: Transform.scale(
                   scale: scale,
-                  alignment:
-                      isRtl ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment: isRtl
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(radius),
@@ -446,20 +441,19 @@ class _AppShellState extends ConsumerState<AppShell>
                             child: widget.child,
                           ),
                         ),
-                        bottomNavigationBar:
-                            primaryItems.isEmpty
-                                ? null
-                                : _ArcticBottomNav(
-                                  items: primaryItems,
-                                  currentLocation: currentLocation,
-                                  onTap: (route) {
-                                    HapticFeedback.selectionClick();
-                                    if (_isDrawerOpen) _closeDrawer();
-                                    context.go(route);
-                                  },
-                                  onLongPress:
-                                      (item) => _onNavLongPress(context, item),
-                                ),
+                        bottomNavigationBar: primaryItems.isEmpty
+                            ? null
+                            : _ArcticBottomNav(
+                                items: primaryItems,
+                                currentLocation: currentLocation,
+                                onTap: (route) {
+                                  HapticFeedback.selectionClick();
+                                  if (_isDrawerOpen) _closeDrawer();
+                                  context.go(route);
+                                },
+                                onLongPress: (item) =>
+                                    _onNavLongPress(context, item),
+                              ),
                       ),
                     ),
                   ),
@@ -509,10 +503,9 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
       // Arctic glacier gradient fills the full AppBar area
       flexibleSpace: DecoratedBox(
         decoration: BoxDecoration(
-          gradient:
-              isDark
-                  ? AppBrand.appBarGradientDark
-                  : AppBrand.appBarGradientLight,
+          gradient: isDark
+              ? AppBrand.appBarGradientDark
+              : AppBrand.appBarGradientLight,
         ),
         child: const SizedBox.expand(),
       ),
@@ -626,21 +619,19 @@ class _ArcticBottomNav extends StatelessWidget {
         child: SizedBox(
           height: 62,
           child: Row(
-            children:
-                items.map((item) {
-                  final isSelected =
-                      item.route == currentLocation ||
-                      (item.route != '/' &&
-                          currentLocation.startsWith(item.route));
-                  return Expanded(
-                    child: _ArcticNavItem(
-                      item: item,
-                      isSelected: isSelected,
-                      onTap: () => onTap(item.route),
-                      onLongPress: () => onLongPress(item),
-                    ),
-                  );
-                }).toList(),
+            children: items.map((item) {
+              final isSelected =
+                  item.route == currentLocation ||
+                  (item.route != '/' && currentLocation.startsWith(item.route));
+              return Expanded(
+                child: _ArcticNavItem(
+                  item: item,
+                  isSelected: isSelected,
+                  onTap: () => onTap(item.route),
+                  onLongPress: () => onLongPress(item),
+                ),
+              );
+            }).toList(),
           ),
         ),
       ),
@@ -698,8 +689,9 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selectedColor =
-        isDark ? const Color(0xFF81D4FA) : AppBrand.primaryColor;
+    final selectedColor = isDark
+        ? const Color(0xFF81D4FA)
+        : AppBrand.primaryColor;
     final color = widget.isSelected ? selectedColor : cs.onSurfaceVariant;
 
     return Semantics(
@@ -715,9 +707,8 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
         behavior: HitTestBehavior.opaque,
         child: AnimatedBuilder(
           animation: _scale,
-          builder:
-              (context, child) =>
-                  Transform.scale(scale: _scale.value, child: child),
+          builder: (context, child) =>
+              Transform.scale(scale: _scale.value, child: child),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Column(
@@ -731,8 +722,9 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
                   width: widget.isSelected ? 24 : 0,
                   margin: const EdgeInsets.only(bottom: 4),
                   decoration: BoxDecoration(
-                    color:
-                        widget.isSelected ? selectedColor : Colors.transparent,
+                    color: widget.isSelected
+                        ? selectedColor
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -742,8 +734,9 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
                   duration: const Duration(milliseconds: 200),
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight:
-                        widget.isSelected ? FontWeight.w700 : FontWeight.normal,
+                    fontWeight: widget.isSelected
+                        ? FontWeight.w700
+                        : FontWeight.normal,
                     color: color,
                     letterSpacing: widget.isSelected ? 0.2 : 0,
                   ),
@@ -913,17 +906,17 @@ class _DrawerMenuScreen extends StatelessWidget {
                         leading: Icon(
                           item.icon,
                           size: 22,
-                          color:
-                              isSel
-                                  ? AppBrand.primaryColor
-                                  : cs.onSurfaceVariant,
+                          color: isSel
+                              ? AppBrand.primaryColor
+                              : cs.onSurfaceVariant,
                         ),
                         title: Text(
                           item.label,
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight:
-                                isSel ? FontWeight.w600 : FontWeight.normal,
+                            fontWeight: isSel
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                             color: isSel ? AppBrand.primaryColor : cs.onSurface,
                           ),
                         ),
@@ -1032,36 +1025,35 @@ class _ScrollableNavRail extends StatelessWidget {
               bottom: false,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                child:
-                    extended
-                        ? Column(
+                child: extended
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Image.asset(
+                            AppBrand.logoAsset,
+                            width: 160,
+                            height: 66,
+                            fit: BoxFit.contain,
+                          ),
+                          const SizedBox(height: 4),
+                          _ConnectivityDot(isOnline: isOnline),
+                        ],
+                      )
+                    : Center(
+                        child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Image.asset(
                               AppBrand.logoAsset,
-                              width: 160,
-                              height: 66,
+                              width: 52,
+                              height: 34,
                               fit: BoxFit.contain,
                             ),
                             const SizedBox(height: 4),
                             _ConnectivityDot(isOnline: isOnline),
                           ],
-                        )
-                        : Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Image.asset(
-                                AppBrand.logoAsset,
-                                width: 52,
-                                height: 34,
-                                fit: BoxFit.contain,
-                              ),
-                              const SizedBox(height: 4),
-                              _ConnectivityDot(isOnline: isOnline),
-                            ],
-                          ),
                         ),
+                      ),
               ),
             ),
             const Divider(height: 1),
@@ -1076,35 +1068,31 @@ class _ScrollableNavRail extends StatelessWidget {
                       horizontal: 2,
                       vertical: 2,
                     ),
-                    child:
-                        extended
-                            ? Row(
-                              children: [
-                                _UserAvatar(user: user, radius: 16),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        user!.displayName,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: cs.onSurface,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
+                    child: extended
+                        ? Row(
+                            children: [
+                              _UserAvatar(user: user, radius: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user!.displayName,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: cs.onSurface,
                                       ),
-                                      _RoleBadge(role: user!.role, small: true),
-                                    ],
-                                  ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    _RoleBadge(role: user!.role, small: true),
+                                  ],
                                 ),
-                              ],
-                            )
-                            : Center(
-                              child: _UserAvatar(user: user, radius: 14),
-                            ),
+                              ),
+                            ],
+                          )
+                        : Center(child: _UserAvatar(user: user, radius: 14)),
                   ),
                 ),
               ),
@@ -1122,8 +1110,9 @@ class _ScrollableNavRail extends StatelessWidget {
                     final item = items[i];
                     final sel = selectedIndex == i;
                     final bg = sel ? cs.secondaryContainer : Colors.transparent;
-                    final fg =
-                        sel ? cs.onSecondaryContainer : cs.onSurfaceVariant;
+                    final fg = sel
+                        ? cs.onSecondaryContainer
+                        : cs.onSurfaceVariant;
                     if (extended) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1152,10 +1141,9 @@ class _ScrollableNavRail extends StatelessWidget {
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: fg,
-                                      fontWeight:
-                                          sel
-                                              ? FontWeight.w600
-                                              : FontWeight.normal,
+                                      fontWeight: sel
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
                                     ),
                                   ),
                                 ),
@@ -1224,10 +1212,9 @@ class _UserAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final initials = _initials(user?.displayName ?? '');
-    final borderColor =
-        user?.isAdmin == true
-            ? AppBrand.adminRoleColor
-            : AppBrand.sellerRoleColor;
+    final borderColor = user?.isAdmin == true
+        ? AppBrand.adminRoleColor
+        : AppBrand.sellerRoleColor;
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -1367,15 +1354,14 @@ class _ConnectivityDot extends ConsumerWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: isOnline ? AppBrand.successColor : AppBrand.stockColor,
-          boxShadow:
-              isOnline
-                  ? [
-                    BoxShadow(
-                      color: AppBrand.successColor.withAlpha(100),
-                      blurRadius: 4,
-                    ),
-                  ]
-                  : null,
+          boxShadow: isOnline
+              ? [
+                  BoxShadow(
+                    color: AppBrand.successColor.withAlpha(100),
+                    blurRadius: 4,
+                  ),
+                ]
+              : null,
         ),
       ),
     );

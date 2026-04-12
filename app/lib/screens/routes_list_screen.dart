@@ -24,10 +24,9 @@ class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
     final ref = this.ref;
     final user = ref.watch(authUserProvider).valueOrNull;
     final isAdmin = user?.isAdmin ?? false;
-    final routesAsync =
-        isAdmin
-            ? ref.watch(routesProvider)
-            : ref.watch(routesBySellerProvider(user?.id ?? ''));
+    final routesAsync = isAdmin
+        ? ref.watch(routesProvider)
+        : ref.watch(routesBySellerProvider(user?.id ?? ''));
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('routes', ref))),
@@ -53,26 +52,24 @@ class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
           );
         },
         loading: () => const ShimmerLoading(),
-        error:
-            (e, _) => mappedErrorState(
-              error: e,
-              ref: ref,
-              onRetry: () {
-                if (isAdmin) {
-                  ref.invalidate(routesProvider);
-                } else {
-                  ref.invalidate(routesBySellerProvider(user?.id ?? ''));
-                }
-              },
-            ),
+        error: (e, _) => mappedErrorState(
+          error: e,
+          ref: ref,
+          onRetry: () {
+            if (isAdmin) {
+              ref.invalidate(routesProvider);
+            } else {
+              ref.invalidate(routesBySellerProvider(user?.id ?? ''));
+            }
+          },
+        ),
       ),
-      floatingActionButton:
-          isAdmin
-              ? FloatingActionButton(
-                onPressed: () => context.push('/routes/new'),
-                child: const Icon(Icons.add),
-              )
-              : null,
+      floatingActionButton: isAdmin
+          ? FloatingActionButton(
+              onPressed: () => context.push('/routes/new'),
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }

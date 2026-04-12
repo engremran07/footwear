@@ -46,11 +46,10 @@ final shopTransactionsProvider = StreamProvider.autoDispose
           .limit(_shopTransactionsLiveLimit)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .where((d) => d.data()['deleted'] != true)
-                    .map((d) => TransactionModel.fromJson(d.data(), d.id))
-                    .toList(),
+            (snap) => snap.docs
+                .where((d) => d.data()['deleted'] != true)
+                .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -65,11 +64,10 @@ final allTransactionsProvider =
           .limit(200)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .where((d) => d.data()['deleted'] != true)
-                    .map((d) => TransactionModel.fromJson(d.data(), d.id))
-                    .toList(),
+            (snap) => snap.docs
+                .where((d) => d.data()['deleted'] != true)
+                .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -90,11 +88,10 @@ final shopsAnalyticsTransactionsProvider =
             .limit(_shopsAnalyticsTransactionsLimit)
             .snapshots()
             .map(
-              (snap) =>
-                  snap.docs
-                      .where((d) => d.data()['deleted'] != true)
-                      .map((d) => TransactionModel.fromJson(d.data(), d.id))
-                      .toList(),
+              (snap) => snap.docs
+                  .where((d) => d.data()['deleted'] != true)
+                  .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                  .toList(),
             );
       }
 
@@ -109,11 +106,10 @@ final shopsAnalyticsTransactionsProvider =
           .limit(_shopsAnalyticsTransactionsLimit)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .where((d) => d.data()['deleted'] != true)
-                    .map((d) => TransactionModel.fromJson(d.data(), d.id))
-                    .toList(),
+            (snap) => snap.docs
+                .where((d) => d.data()['deleted'] != true)
+                .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -130,11 +126,10 @@ final pendingEditRequestsProvider =
           .limit(50)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .where((d) => d.data()['deleted'] != true)
-                    .map((d) => TransactionModel.fromJson(d.data(), d.id))
-                    .toList(),
+            (snap) => snap.docs
+                .where((d) => d.data()['deleted'] != true)
+                .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -148,11 +143,10 @@ final sellerTransactionsProvider = StreamProvider.autoDispose
           .limit(200)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .where((d) => d.data()['deleted'] != true)
-                    .map((d) => TransactionModel.fromJson(d.data(), d.id))
-                    .toList(),
+            (snap) => snap.docs
+                .where((d) => d.data()['deleted'] != true)
+                .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -161,12 +155,11 @@ final shopTransactionsExportProvider = FutureProvider.autoDispose
       final normalizedShopId = shopId.trim();
       if (normalizedShopId.isEmpty) return const <TransactionModel>[];
       // shop_id is sole source of truth; no dual query needed.
-      final snap =
-          await FirebaseFirestore.instance
-              .collection(Collections.transactions)
-              .where('shop_id', isEqualTo: normalizedShopId)
-              .orderBy('created_at')
-              .get();
+      final snap = await FirebaseFirestore.instance
+          .collection(Collections.transactions)
+          .where('shop_id', isEqualTo: normalizedShopId)
+          .orderBy('created_at')
+          .get();
 
       return snap.docs
           .where((d) => d.data()['deleted'] != true)
@@ -262,12 +255,11 @@ class TransactionNotifier extends AsyncNotifier<void> {
     final batch = db.batch();
     final normalizedKey = idempotencyKey?.trim();
     if (normalizedKey != null && normalizedKey.isNotEmpty) {
-      final existing =
-          await db
-              .collection(Collections.transactions)
-              .where('idempotency_key', isEqualTo: normalizedKey)
-              .limit(1)
-              .get();
+      final existing = await db
+          .collection(Collections.transactions)
+          .where('idempotency_key', isEqualTo: normalizedKey)
+          .limit(1)
+          .get();
       if (existing.docs.isNotEmpty) {
         return;
       }
@@ -346,12 +338,11 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
     final normalizedKey = idempotencyKey?.trim();
     if (normalizedKey != null && normalizedKey.isNotEmpty) {
-      final existing =
-          await db
-              .collection(Collections.transactions)
-              .where('idempotency_key', isEqualTo: normalizedKey)
-              .limit(1)
-              .get();
+      final existing = await db
+          .collection(Collections.transactions)
+          .where('idempotency_key', isEqualTo: normalizedKey)
+          .limit(1)
+          .get();
       if (existing.docs.isNotEmpty) {
         return;
       }
@@ -615,8 +606,10 @@ class TransactionNotifier extends AsyncNotifier<void> {
       throw StateError('Only cash_in/cash_out transactions can be edited');
     }
 
-    final settingsDoc =
-        await db.collection(Collections.settings).doc('global').get();
+    final settingsDoc = await db
+        .collection(Collections.settings)
+        .doc('global')
+        .get();
     final requireApproval =
         (settingsDoc
                 .data()?['require_admin_approval_for_seller_transaction_edits']

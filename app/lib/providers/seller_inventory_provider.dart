@@ -15,10 +15,9 @@ final sellerInventoryProvider = StreamProvider.autoDispose
           .limit(500)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
-                    .toList(),
+            (snap) => snap.docs
+                .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -44,10 +43,9 @@ final adminAllSellerInventoryProvider =
           .limit(100)
           .snapshots()
           .map(
-            (snap) =>
-                snap.docs
-                    .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
-                    .toList(),
+            (snap) => snap.docs
+                .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
+                .toList(),
           );
     });
 
@@ -58,11 +56,10 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
   Future<void> _requireAdmin() async {
     final authUser = FirebaseAuth.instance.currentUser;
     if (authUser == null) throw StateError('Not authenticated');
-    final me =
-        await FirebaseFirestore.instance
-            .collection(Collections.users)
-            .doc(authUser.uid)
-            .get();
+    final me = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(authUser.uid)
+        .get();
     final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
     if (role != 'admin' && role != 'manager') {
       throw StateError('Only admin can return stock to warehouse');

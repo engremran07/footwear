@@ -69,13 +69,12 @@ class StatCard extends StatelessWidget {
           child: Card(
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap:
-                  onTap != null
-                      ? () {
-                        HapticFeedback.lightImpact();
-                        onTap!();
-                      }
-                      : null,
+              onTap: onTap != null
+                  ? () {
+                      HapticFeedback.lightImpact();
+                      onTap!();
+                    }
+                  : null,
               child: Padding(
                 padding: const EdgeInsets.all(AppTokens.s12),
                 child: Column(
@@ -136,10 +135,9 @@ class StatCard extends StatelessWidget {
                                 ? Icons.trending_up
                                 : Icons.trending_down,
                             size: 16,
-                            color:
-                                trend! > 0
-                                    ? AppBrand.successColor
-                                    : AppBrand.errorColor,
+                            color: trend! > 0
+                                ? AppBrand.successColor
+                                : AppBrand.errorColor,
                           ),
                         ],
                       ],

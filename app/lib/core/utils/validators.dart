@@ -73,29 +73,27 @@ class AppValidators {
     return null;
   }
 
-  static String? Function(String?) minLength(int min, [AppLocale? locale]) => (
-    String? value,
-  ) {
-    if (value == null || value.trim().length < min) {
-      return trRead(
-        'min_n_chars',
-        locale ?? AppLocale.en,
-      ).replaceAll('%d', '$min');
-    }
-    return null;
-  };
+  static String? Function(String?) minLength(int min, [AppLocale? locale]) =>
+      (String? value) {
+        if (value == null || value.trim().length < min) {
+          return trRead(
+            'min_n_chars',
+            locale ?? AppLocale.en,
+          ).replaceAll('%d', '$min');
+        }
+        return null;
+      };
 
-  static String? Function(String?) maxLength(int max, [AppLocale? locale]) => (
-    String? value,
-  ) {
-    if (value != null && value.trim().length > max) {
-      return trRead(
-        'max_n_chars',
-        locale ?? AppLocale.en,
-      ).replaceAll('%d', '$max');
-    }
-    return null;
-  };
+  static String? Function(String?) maxLength(int max, [AppLocale? locale]) =>
+      (String? value) {
+        if (value != null && value.trim().length > max) {
+          return trRead(
+            'max_n_chars',
+            locale ?? AppLocale.en,
+          ).replaceAll('%d', '$max');
+        }
+        return null;
+      };
 }
 
 /// Convenience alias so screens can use `Validators.notEmpty` etc.

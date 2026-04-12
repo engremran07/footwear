@@ -37,19 +37,18 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
           Expanded(
             child: productsAsync.when(
               loading: () => const ShimmerLoading(),
-              error:
-                  (e, _) => Center(child: Text(tr(AppErrorMapper.key(e), ref))),
+              error: (e, _) =>
+                  Center(child: Text(tr(AppErrorMapper.key(e), ref))),
               data: (products) {
-                final filtered =
-                    _search.isEmpty
-                        ? products
-                        : products
-                            .where(
-                              (p) =>
-                                  p.name.toLowerCase().contains(_search) ||
-                                  p.category.toLowerCase().contains(_search),
-                            )
-                            .toList();
+                final filtered = _search.isEmpty
+                    ? products
+                    : products
+                          .where(
+                            (p) =>
+                                p.name.toLowerCase().contains(_search) ||
+                                p.category.toLowerCase().contains(_search),
+                          )
+                          .toList();
                 if (filtered.isEmpty) {
                   return EmptyState(
                     icon: Icons.inventory_2,
@@ -69,20 +68,19 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                       final p = filtered[i];
                       return Card(
                         child: ListTile(
-                          leading:
-                              p.imageUrl != null
-                                  ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.network(
-                                      p.imageUrl!,
-                                      width: 48,
-                                      height: 48,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (_, __, ___) => _productIcon(cs),
-                                    ),
-                                  )
-                                  : _productIcon(cs),
+                          leading: p.imageUrl != null
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    p.imageUrl!,
+                                    width: 48,
+                                    height: 48,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        _productIcon(cs),
+                                  ),
+                                )
+                              : _productIcon(cs),
                           title: Text(
                             p.name,
                             style: const TextStyle(fontWeight: FontWeight.w600),
@@ -100,13 +98,12 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
           ),
         ],
       ),
-      floatingActionButton:
-          user?.isAdmin == true
-              ? FloatingActionButton(
-                onPressed: () => context.push('/products/new'),
-                child: const Icon(Icons.add),
-              )
-              : null,
+      floatingActionButton: user?.isAdmin == true
+          ? FloatingActionButton(
+              onPressed: () => context.push('/products/new'),
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 

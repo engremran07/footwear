@@ -172,8 +172,8 @@ class TransactionModel {
       editRequestStatus: json['edit_request_status'] as String?,
       editRequestRequestedBy: json['edit_request_requested_by'] as String?,
       editRequestRequestedAt: json['edit_request_requested_at'] as Timestamp?,
-      editRequestNewAmount:
-          (json['edit_request_new_amount'] as num?)?.toDouble(),
+      editRequestNewAmount: (json['edit_request_new_amount'] as num?)
+          ?.toDouble(),
       editRequestNewType: json['edit_request_new_type'] as String?,
       editRequestNewDescription:
           json['edit_request_new_description'] as String?,

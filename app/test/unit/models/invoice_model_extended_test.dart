@@ -30,11 +30,10 @@ void main() {
     test('non-empty deductions survive fromJson/toJson round-trip', () {
       final deductions = {'doc-A': 12, 'doc-B': 6};
       final original = base(deductions: deductions);
-      final json =
-          original.toJson()
-            ..['status'] = original.status
-            ..['created_at'] = original.createdAt
-            ..['updated_at'] = original.updatedAt;
+      final json = original.toJson()
+        ..['status'] = original.status
+        ..['created_at'] = original.createdAt
+        ..['updated_at'] = original.updatedAt;
       final restored = InvoiceModel.fromJson(json, original.id);
       expect(restored.sellerInventoryDeductions, equals(deductions));
     });
@@ -72,11 +71,10 @@ void main() {
     });
 
     test('partial status fromJson round-trip preserves status', () {
-      final json =
-          base(status: 'partial').toJson()
-            ..['status'] = 'partial'
-            ..['created_at'] = ts
-            ..['updated_at'] = ts;
+      final json = base(status: 'partial').toJson()
+        ..['status'] = 'partial'
+        ..['created_at'] = ts
+        ..['updated_at'] = ts;
       final m = InvoiceModel.fromJson(json, 'inv-p');
       expect(m.isPartial, isTrue);
     });
@@ -93,11 +91,10 @@ void main() {
     });
 
     test('void status fromJson round-trip preserves status', () {
-      final json =
-          base(status: 'void').toJson()
-            ..['status'] = 'void'
-            ..['created_at'] = ts
-            ..['updated_at'] = ts;
+      final json = base(status: 'void').toJson()
+        ..['status'] = 'void'
+        ..['created_at'] = ts
+        ..['updated_at'] = ts;
       final m = InvoiceModel.fromJson(json, 'inv-v');
       expect(m.isVoid, isTrue);
     });

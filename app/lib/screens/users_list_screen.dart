@@ -45,10 +45,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       );
     }
 
-    final usersAsync =
-        _showInactive
-            ? ref.watch(inactiveUsersProvider)
-            : ref.watch(allUsersProvider);
+    final usersAsync = _showInactive
+        ? ref.watch(inactiveUsersProvider)
+        : ref.watch(allUsersProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('users', ref))),
@@ -82,8 +81,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                 ),
               ],
               selected: {_showInactive},
-              onSelectionChanged:
-                  (s) => setState(() => _showInactive = s.first),
+              onSelectionChanged: (s) =>
+                  setState(() => _showInactive = s.first),
               style: const ButtonStyle(visualDensity: VisualDensity.compact),
             ),
           ),
@@ -104,24 +103,21 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     label: tr('lbl_admin', ref),
                     selected: _roleFilter == 'admin',
                     color: AppBrand.adminRoleColor,
-                    onTap:
-                        () => setState(
-                          () =>
-                              _roleFilter =
-                                  _roleFilter == 'admin' ? null : 'admin',
-                        ),
+                    onTap: () => setState(
+                      () =>
+                          _roleFilter = _roleFilter == 'admin' ? null : 'admin',
+                    ),
                   ),
                   const SizedBox(width: 8),
                   _RoleChip(
                     label: tr('lbl_seller', ref),
                     selected: _roleFilter == 'seller',
                     color: AppBrand.sellerRoleColor,
-                    onTap:
-                        () => setState(
-                          () =>
-                              _roleFilter =
-                                  _roleFilter == 'seller' ? null : 'seller',
-                        ),
+                    onTap: () => setState(
+                      () => _roleFilter = _roleFilter == 'seller'
+                          ? null
+                          : 'seller',
+                    ),
                   ),
                 ],
               ),
@@ -130,34 +126,30 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
           Expanded(
             child: usersAsync.when(
               loading: () => const ShimmerLoading(),
-              error:
-                  (e, _) => mappedErrorState(
-                    error: e,
-                    ref: ref,
-                    onRetry: () {
-                      if (_showInactive) {
-                        ref.invalidate(inactiveUsersProvider);
-                      } else {
-                        ref.invalidate(allUsersProvider);
-                      }
-                    },
-                  ),
+              error: (e, _) => mappedErrorState(
+                error: e,
+                ref: ref,
+                onRetry: () {
+                  if (_showInactive) {
+                    ref.invalidate(inactiveUsersProvider);
+                  } else {
+                    ref.invalidate(allUsersProvider);
+                  }
+                },
+              ),
               data: (users) {
-                final filtered =
-                    users.where((u) {
-                      final matchesSearch =
-                          _search.isEmpty ||
-                          u.displayName.toLowerCase().contains(_search) ||
-                          u.email.toLowerCase().contains(_search) ||
-                          (u.assignedRouteName?.toLowerCase().contains(
-                                _search,
-                              ) ??
-                              false);
-                      final matchesRole =
-                          _roleFilter == null ||
-                          (_roleFilter == 'admin' ? u.isAdmin : u.isSeller);
-                      return matchesSearch && matchesRole;
-                    }).toList();
+                final filtered = users.where((u) {
+                  final matchesSearch =
+                      _search.isEmpty ||
+                      u.displayName.toLowerCase().contains(_search) ||
+                      u.email.toLowerCase().contains(_search) ||
+                      (u.assignedRouteName?.toLowerCase().contains(_search) ??
+                          false);
+                  final matchesRole =
+                      _roleFilter == null ||
+                      (_roleFilter == 'admin' ? u.isAdmin : u.isSeller);
+                  return matchesSearch && matchesRole;
+                }).toList();
 
                 if (filtered.isEmpty) {
                   return EmptyState(
@@ -179,33 +171,25 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     itemCount: filtered.length,
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.only(bottom: 88),
-                    itemBuilder:
-                        (_, i) =>
-                            _showInactive
-                                ? _InactiveUserTile(
-                                  user: filtered[i],
-                                  onReactivate:
-                                      () => _confirmReactivateUser(filtered[i]),
-                                  onSendReset:
-                                      () => _sendResetEmailForUser(filtered[i]),
-                                  onHardDelete:
-                                      () => _confirmHardDeleteUser(filtered[i]),
-                                ).listEntry(i)
-                                : _UserTile(
-                                  user: filtered[i],
-                                  currentUser: currentUser,
-                                  onEdit:
-                                      () => _showEditUserDialog(filtered[i]),
-                                  onDelete:
-                                      () => _confirmDeleteUser(filtered[i]),
-                                  onToggle:
-                                      (v) => ref
-                                          .read(
-                                            userManagementNotifierProvider
-                                                .notifier,
-                                          )
-                                          .toggleActive(filtered[i].id, v),
-                                ).listEntry(i),
+                    itemBuilder: (_, i) => _showInactive
+                        ? _InactiveUserTile(
+                            user: filtered[i],
+                            onReactivate: () =>
+                                _confirmReactivateUser(filtered[i]),
+                            onSendReset: () =>
+                                _sendResetEmailForUser(filtered[i]),
+                            onHardDelete: () =>
+                                _confirmHardDeleteUser(filtered[i]),
+                          ).listEntry(i)
+                        : _UserTile(
+                            user: filtered[i],
+                            currentUser: currentUser,
+                            onEdit: () => _showEditUserDialog(filtered[i]),
+                            onDelete: () => _confirmDeleteUser(filtered[i]),
+                            onToggle: (v) => ref
+                                .read(userManagementNotifierProvider.notifier)
+                                .toggleActive(filtered[i].id, v),
+                          ).listEntry(i),
                   ),
                 );
               },
@@ -228,163 +212,152 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
     showDialog(
       context: context,
-      builder:
-          (ctx) => StatefulBuilder(
-            builder: (ctx, setS) {
-              final routes = ref.watch(routesProvider).valueOrNull ?? [];
-              final availableRoutes =
-                  routes
-                      .where(
-                        (r) =>
-                            r.assignedSellerId == null ||
-                            r.assignedSellerId!.isEmpty,
-                      )
-                      .toList();
-              return AlertDialog(
-                title: Text(tr('new_user', ref)),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextField(
-                        controller: nameC,
-                        decoration: InputDecoration(labelText: tr('name', ref)),
-                        textCapitalization: TextCapitalization.words,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final routes = ref.watch(routesProvider).valueOrNull ?? [];
+          final availableRoutes = routes
+              .where(
+                (r) =>
+                    r.assignedSellerId == null || r.assignedSellerId!.isEmpty,
+              )
+              .toList();
+          return AlertDialog(
+            title: Text(tr('new_user', ref)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameC,
+                    decoration: InputDecoration(labelText: tr('name', ref)),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: emailC,
+                    decoration: InputDecoration(labelText: tr('email', ref)),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: passC,
+                    decoration: InputDecoration(labelText: tr('password', ref)),
+                    obscureText: true,
+                    keyboardType: TextInputType.visiblePassword,
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: role,
+                    decoration: InputDecoration(labelText: tr('role', ref)),
+                    items: [
+                      DropdownMenuItem(
+                        value: 'admin',
+                        child: Text(tr('lbl_admin', ref)),
                       ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: emailC,
-                        decoration: InputDecoration(
-                          labelText: tr('email', ref),
-                        ),
-                        keyboardType: TextInputType.emailAddress,
+                      DropdownMenuItem(
+                        value: 'seller',
+                        child: Text(tr('lbl_seller', ref)),
                       ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: passC,
-                        decoration: InputDecoration(
-                          labelText: tr('password', ref),
-                        ),
-                        obscureText: true,
-                        keyboardType: TextInputType.visiblePassword,
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        initialValue: role,
-                        decoration: InputDecoration(labelText: tr('role', ref)),
-                        items: [
-                          DropdownMenuItem(
-                            value: 'admin',
-                            child: Text(tr('lbl_admin', ref)),
-                          ),
-                          DropdownMenuItem(
-                            value: 'seller',
-                            child: Text(tr('lbl_seller', ref)),
-                          ),
-                        ],
-                        onChanged:
-                            (v) => setS(() {
-                              role = v ?? 'seller';
-                              if (role != 'seller') {
-                                selectedRouteId = null;
-                                selectedRouteName = null;
-                              }
-                            }),
-                      ),
-                      if (role == 'seller') ...[
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          initialValue: selectedRouteId,
-                          decoration: InputDecoration(
-                            labelText: tr('assigned_route', ref),
-                          ),
-                          items:
-                              availableRoutes
-                                  .map(
-                                    (r) => DropdownMenuItem(
-                                      value: r.id,
-                                      child: Text(r.name),
-                                    ),
-                                  )
-                                  .toList(),
-                          onChanged:
-                              (v) => setS(() {
-                                selectedRouteId = v;
-                                selectedRouteName =
-                                    routes
-                                        .where((r) => r.id == v)
-                                        .map((r) => r.name)
-                                        .firstOrNull;
-                              }),
-                        ),
-                      ],
                     ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: Text(tr('cancel', ref)),
-                  ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      if (nameC.text.trim().isEmpty ||
-                          emailC.text.trim().isEmpty ||
-                          passC.text.trim().isEmpty) {
-                        return;
+                    onChanged: (v) => setS(() {
+                      role = v ?? 'seller';
+                      if (role != 'seller') {
+                        selectedRouteId = null;
+                        selectedRouteName = null;
                       }
-                      if (passC.text.trim().length < 8) {
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            warningSnackBar(tr('err_weak_password', ref)),
-                          );
-                        }
-                        return;
-                      }
-                      if (role == 'seller' &&
-                          (selectedRouteId == null ||
-                              selectedRouteId!.trim().isEmpty)) {
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(
-                              content: Text(tr('msg_seller_needs_route', ref)),
+                    }),
+                  ),
+                  if (role == 'seller') ...[
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedRouteId,
+                      decoration: InputDecoration(
+                        labelText: tr('assigned_route', ref),
+                      ),
+                      items: availableRoutes
+                          .map(
+                            (r) => DropdownMenuItem(
+                              value: r.id,
+                              child: Text(r.name),
                             ),
-                          );
-                        }
-                        return;
-                      }
-                      try {
-                        await ref
-                            .read(userManagementNotifierProvider.notifier)
-                            .createUser(
-                              email: emailC.text.trim(),
-                              password: passC.text.trim(),
-                              displayName: nameC.text.trim(),
-                              role: role,
-                              assignedRouteId: selectedRouteId,
-                              assignedRouteName: selectedRouteName,
-                            );
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            successSnackBar(tr('saved_successfully', ref)),
-                          );
-                        }
-                      } catch (e) {
-                        if (ctx.mounted) {
-                          final key = AppErrorMapper.key(e);
-                          ScaffoldMessenger.of(
-                            ctx,
-                          ).showSnackBar(errorSnackBar(tr(key, ref)));
-                        }
-                      }
-                    },
-                    child: Text(tr('create', ref)),
-                  ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setS(() {
+                        selectedRouteId = v;
+                        selectedRouteName = routes
+                            .where((r) => r.id == v)
+                            .map((r) => r.name)
+                            .firstOrNull;
+                      }),
+                    ),
+                  ],
                 ],
-              );
-            },
-          ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(tr('cancel', ref)),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (nameC.text.trim().isEmpty ||
+                      emailC.text.trim().isEmpty ||
+                      passC.text.trim().isEmpty) {
+                    return;
+                  }
+                  if (passC.text.trim().length < 8) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        warningSnackBar(tr('err_weak_password', ref)),
+                      );
+                    }
+                    return;
+                  }
+                  if (role == 'seller' &&
+                      (selectedRouteId == null ||
+                          selectedRouteId!.trim().isEmpty)) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          content: Text(tr('msg_seller_needs_route', ref)),
+                        ),
+                      );
+                    }
+                    return;
+                  }
+                  try {
+                    await ref
+                        .read(userManagementNotifierProvider.notifier)
+                        .createUser(
+                          email: emailC.text.trim(),
+                          password: passC.text.trim(),
+                          displayName: nameC.text.trim(),
+                          role: role,
+                          assignedRouteId: selectedRouteId,
+                          assignedRouteName: selectedRouteName,
+                        );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        successSnackBar(tr('saved_successfully', ref)),
+                      );
+                    }
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      final key = AppErrorMapper.key(e);
+                      ScaffoldMessenger.of(
+                        ctx,
+                      ).showSnackBar(errorSnackBar(tr(key, ref)));
+                    }
+                  }
+                },
+                child: Text(tr('create', ref)),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -404,302 +377,281 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
     showDialog(
       context: context,
-      builder:
-          (ctx) => StatefulBuilder(
-            builder: (ctx, setS) {
-              final routes = ref.watch(routesProvider).valueOrNull ?? [];
-              final availableRoutes =
-                  routes
-                      .where(
-                        (r) =>
-                            r.id == selectedRouteId ||
-                            r.assignedSellerId == null ||
-                            r.assignedSellerId!.isEmpty ||
-                            r.assignedSellerId == user.id,
-                      )
-                      .toList();
-              return AlertDialog(
-                title: Text(tr('edit_user', ref)),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final routes = ref.watch(routesProvider).valueOrNull ?? [];
+          final availableRoutes = routes
+              .where(
+                (r) =>
+                    r.id == selectedRouteId ||
+                    r.assignedSellerId == null ||
+                    r.assignedSellerId!.isEmpty ||
+                    r.assignedSellerId == user.id,
+              )
+              .toList();
+          return AlertDialog(
+            title: Text(tr('edit_user', ref)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Name ──
+                  TextField(
+                    controller: nameC,
+                    decoration: InputDecoration(labelText: tr('name', ref)),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 8),
+                  // ── Email (admin-editable, syncs Auth + Firestore) ──
+                  TextField(
+                    controller: emailC,
+                    enabled: !isSelf,
+                    decoration: InputDecoration(
+                      labelText: tr('email', ref),
+                      helperText: isSelf
+                          ? tr('lbl_email_no_change', ref)
+                          : tr('lbl_email_change_note', ref),
+                      helperMaxLines: 2,
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 8),
+                  // ── Set Password (optional — blank = no change) ──
+                  TextField(
+                    controller: passwordC,
+                    obscureText: obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: tr('lbl_set_password', ref),
+                      hintText: tr('hint_set_password', ref),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          size: 20,
+                        ),
+                        onPressed: () =>
+                            setS(() => obscurePassword = !obscurePassword),
+                        tooltip: obscurePassword ? 'Show' : 'Hide',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // ── Email Verified badge + Send Verification button ──
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      // ── Name ──
-                      TextField(
-                        controller: nameC,
-                        decoration: InputDecoration(labelText: tr('name', ref)),
-                        textCapitalization: TextCapitalization.words,
-                      ),
-                      const SizedBox(height: 8),
-                      // ── Email (admin-editable, syncs Auth + Firestore) ──
-                      TextField(
-                        controller: emailC,
-                        enabled: !isSelf,
-                        decoration: InputDecoration(
-                          labelText: tr('email', ref),
-                          helperText:
-                              isSelf
-                                  ? tr('lbl_email_no_change', ref)
-                                  : tr('lbl_email_change_note', ref),
-                          helperMaxLines: 2,
+                      Chip(
+                        avatar: Icon(
+                          user.emailVerified
+                              ? Icons.verified
+                              : Icons.warning_amber_rounded,
+                          size: 16,
+                          color: user.emailVerified
+                              ? AppBrand.successColor
+                              : AppBrand.warningColor,
                         ),
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 8),
-                      // ── Set Password (optional — blank = no change) ──
-                      TextField(
-                        controller: passwordC,
-                        obscureText: obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: tr('lbl_set_password', ref),
-                          hintText: tr('hint_set_password', ref),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                              size: 20,
-                            ),
-                            onPressed:
-                                () => setS(
-                                  () => obscurePassword = !obscurePassword,
-                                ),
-                            tooltip: obscurePassword ? 'Show' : 'Hide',
+                        label: Text(
+                          tr(
+                            user.emailVerified
+                                ? 'lbl_email_verified'
+                                : 'lbl_email_not_verified',
+                            ref,
                           ),
+                          style: const TextStyle(fontSize: 11),
                         ),
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        side: BorderSide.none,
                       ),
-                      const SizedBox(height: 10),
-                      // ── Email Verified badge + Send Verification button ──
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Chip(
-                            avatar: Icon(
-                              user.emailVerified
-                                  ? Icons.verified
-                                  : Icons.warning_amber_rounded,
-                              size: 16,
-                              color:
-                                  user.emailVerified
-                                      ? AppBrand.successColor
-                                      : AppBrand.warningColor,
-                            ),
-                            label: Text(
-                              tr(
-                                user.emailVerified
-                                    ? 'lbl_email_verified'
-                                    : 'lbl_email_not_verified',
-                                ref,
-                              ),
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                            padding: EdgeInsets.zero,
+                      if (!user.emailVerified)
+                        TextButton.icon(
+                          icon: const Icon(Icons.forward_to_inbox, size: 14),
+                          label: Text(
+                            tr('btn_send_verification', ref),
+                            style: const TextStyle(fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
                             visualDensity: VisualDensity.compact,
-                            side: BorderSide.none,
                           ),
-                          if (!user.emailVerified)
-                            TextButton.icon(
-                              icon: const Icon(
-                                Icons.forward_to_inbox,
-                                size: 14,
-                              ),
-                              label: Text(
-                                tr('btn_send_verification', ref),
-                                style: const TextStyle(fontSize: 11),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                ),
-                                visualDensity: VisualDensity.compact,
-                              ),
-                              onPressed: () async {
-                                try {
-                                  final targetEmail =
-                                      emailC.text.trim().isNotEmpty
-                                          ? emailC.text.trim()
-                                          : user.email;
-                                  await ref
-                                      .read(
-                                        userManagementNotifierProvider.notifier,
-                                      )
-                                      .adminSendVerificationEmail(
-                                        user.id,
-                                        targetEmail,
-                                      );
-                                  if (ctx.mounted) {
-                                    ScaffoldMessenger.of(ctx).showSnackBar(
-                                      successSnackBar(
-                                        tr(
-                                          'msg_verification_sent',
-                                          ref,
-                                        ).replaceAll('%s', targetEmail),
-                                      ),
-                                    );
-                                  }
-                                } catch (e) {
-                                  if (ctx.mounted) {
-                                    final key = AppErrorMapper.key(e);
-                                    ScaffoldMessenger.of(
-                                      ctx,
-                                    ).showSnackBar(errorSnackBar(tr(key, ref)));
-                                  }
-                                }
-                              },
-                            ),
-                        ],
-                      ),
-                      const Divider(height: 16),
-                      // ── Role ──
-                      if (isSelf)
-                        TextField(
-                          enabled: false,
-                          decoration: InputDecoration(
-                            labelText: tr('role', ref),
-                            hintText: role,
-                          ),
-                        )
-                      else
-                        DropdownButtonFormField<String>(
-                          initialValue: role,
-                          decoration: InputDecoration(
-                            labelText: tr('role', ref),
-                          ),
-                          items: [
-                            DropdownMenuItem(
-                              value: 'admin',
-                              child: Text(tr('lbl_admin', ref)),
-                            ),
-                            DropdownMenuItem(
-                              value: 'seller',
-                              child: Text(tr('lbl_seller', ref)),
-                            ),
-                          ],
-                          onChanged:
-                              (v) => setS(() {
-                                role = v ?? 'seller';
-                                if (role != 'seller') {
-                                  selectedRouteId = null;
-                                  selectedRouteName = null;
-                                }
-                              }),
+                          onPressed: () async {
+                            try {
+                              final targetEmail = emailC.text.trim().isNotEmpty
+                                  ? emailC.text.trim()
+                                  : user.email;
+                              await ref
+                                  .read(userManagementNotifierProvider.notifier)
+                                  .adminSendVerificationEmail(
+                                    user.id,
+                                    targetEmail,
+                                  );
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  successSnackBar(
+                                    tr(
+                                      'msg_verification_sent',
+                                      ref,
+                                    ).replaceAll('%s', targetEmail),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (ctx.mounted) {
+                                final key = AppErrorMapper.key(e);
+                                ScaffoldMessenger.of(
+                                  ctx,
+                                ).showSnackBar(errorSnackBar(tr(key, ref)));
+                              }
+                            }
+                          },
                         ),
-                      if (role == 'seller') ...[
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          initialValue: selectedRouteId,
-                          decoration: InputDecoration(
-                            labelText: tr('assigned_route', ref),
-                          ),
-                          items:
-                              availableRoutes
-                                  .map(
-                                    (r) => DropdownMenuItem(
-                                      value: r.id,
-                                      child: Text(r.name),
-                                    ),
-                                  )
-                                  .toList(),
-                          onChanged:
-                              (v) => setS(() {
-                                selectedRouteId = v;
-                                selectedRouteName =
-                                    routes
-                                        .where((r) => r.id == v)
-                                        .map((r) => r.name)
-                                        .firstOrNull;
-                              }),
-                        ),
-                      ],
                     ],
                   ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: Text(tr('cancel', ref)),
-                  ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      final me = ref.read(authUserProvider).valueOrNull;
-                      if (me?.isAdmin != true) {
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            errorSnackBar(tr('err_permission_denied', ref)),
-                          );
+                  const Divider(height: 16),
+                  // ── Role ──
+                  if (isSelf)
+                    TextField(
+                      enabled: false,
+                      decoration: InputDecoration(
+                        labelText: tr('role', ref),
+                        hintText: role,
+                      ),
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      initialValue: role,
+                      decoration: InputDecoration(labelText: tr('role', ref)),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'admin',
+                          child: Text(tr('lbl_admin', ref)),
+                        ),
+                        DropdownMenuItem(
+                          value: 'seller',
+                          child: Text(tr('lbl_seller', ref)),
+                        ),
+                      ],
+                      onChanged: (v) => setS(() {
+                        role = v ?? 'seller';
+                        if (role != 'seller') {
+                          selectedRouteId = null;
+                          selectedRouteName = null;
                         }
-                        return;
-                      }
-                      if (nameC.text.trim().isEmpty) return;
-                      if (role == 'seller' &&
-                          (selectedRouteId == null ||
-                              selectedRouteId!.trim().isEmpty)) {
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            warningSnackBar(tr('msg_seller_needs_route', ref)),
-                          );
-                        }
-                        return;
-                      }
-                      try {
-                        final notifier = ref.read(
-                          userManagementNotifierProvider.notifier,
-                        );
-                        // ── Step 1: Auth sync via 4-way pipeline ──────────────
-                        final emailChanged =
-                            !isSelf &&
-                            emailC.text.trim().toLowerCase() !=
-                                user.email.trim().toLowerCase() &&
-                            emailC.text.trim().isNotEmpty;
-                        final passwordSet = passwordC.text.trim().isNotEmpty;
-                        if (passwordSet && passwordC.text.trim().length < 8) {
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              warningSnackBar(tr('err_weak_password', ref)),
-                            );
-                          }
-                          return;
-                        }
-                        if (emailChanged || passwordSet) {
-                          await notifier.adminUpdateUserAuth(
-                            uid: user.id,
-                            newEmail: emailChanged ? emailC.text.trim() : null,
-                            newPassword:
-                                passwordSet ? passwordC.text.trim() : null,
-                          );
-                        }
-                        // ── Step 2: Firestore profile (name / role / route) ───
-                        await notifier.updateUser(user.id, {
-                          'display_name': nameC.text.trim(),
-                          'role': isSelf ? 'admin' : role,
-                          'assigned_route_id': selectedRouteId,
-                          'assigned_route_name': selectedRouteName,
-                        }, previousRouteId: oldRouteId);
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            successSnackBar(tr('msg_auth_updated', ref)),
-                          );
-                        }
-                      } catch (e) {
-                        if (ctx.mounted) {
-                          final key = AppErrorMapper.key(e);
-                          ScaffoldMessenger.of(
-                            ctx,
-                          ).showSnackBar(errorSnackBar(tr(key, ref)));
-                        }
-                      }
-                    },
-                    child: Text(tr('save', ref)),
-                  ),
+                      }),
+                    ),
+                  if (role == 'seller') ...[
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedRouteId,
+                      decoration: InputDecoration(
+                        labelText: tr('assigned_route', ref),
+                      ),
+                      items: availableRoutes
+                          .map(
+                            (r) => DropdownMenuItem(
+                              value: r.id,
+                              child: Text(r.name),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setS(() {
+                        selectedRouteId = v;
+                        selectedRouteName = routes
+                            .where((r) => r.id == v)
+                            .map((r) => r.name)
+                            .firstOrNull;
+                      }),
+                    ),
+                  ],
                 ],
-              );
-            },
-          ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(tr('cancel', ref)),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final me = ref.read(authUserProvider).valueOrNull;
+                  if (me?.isAdmin != true) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        errorSnackBar(tr('err_permission_denied', ref)),
+                      );
+                    }
+                    return;
+                  }
+                  if (nameC.text.trim().isEmpty) return;
+                  if (role == 'seller' &&
+                      (selectedRouteId == null ||
+                          selectedRouteId!.trim().isEmpty)) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        warningSnackBar(tr('msg_seller_needs_route', ref)),
+                      );
+                    }
+                    return;
+                  }
+                  try {
+                    final notifier = ref.read(
+                      userManagementNotifierProvider.notifier,
+                    );
+                    // ── Step 1: Auth sync via 4-way pipeline ──────────────
+                    final emailChanged =
+                        !isSelf &&
+                        emailC.text.trim().toLowerCase() !=
+                            user.email.trim().toLowerCase() &&
+                        emailC.text.trim().isNotEmpty;
+                    final passwordSet = passwordC.text.trim().isNotEmpty;
+                    if (passwordSet && passwordC.text.trim().length < 8) {
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          warningSnackBar(tr('err_weak_password', ref)),
+                        );
+                      }
+                      return;
+                    }
+                    if (emailChanged || passwordSet) {
+                      await notifier.adminUpdateUserAuth(
+                        uid: user.id,
+                        newEmail: emailChanged ? emailC.text.trim() : null,
+                        newPassword: passwordSet ? passwordC.text.trim() : null,
+                      );
+                    }
+                    // ── Step 2: Firestore profile (name / role / route) ───
+                    await notifier.updateUser(user.id, {
+                      'display_name': nameC.text.trim(),
+                      'role': isSelf ? 'admin' : role,
+                      'assigned_route_id': selectedRouteId,
+                      'assigned_route_name': selectedRouteName,
+                    }, previousRouteId: oldRouteId);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        successSnackBar(tr('msg_auth_updated', ref)),
+                      );
+                    }
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      final key = AppErrorMapper.key(e);
+                      ScaffoldMessenger.of(
+                        ctx,
+                      ).showSnackBar(errorSnackBar(tr(key, ref)));
+                    }
+                  }
+                },
+                child: Text(tr('save', ref)),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -712,68 +664,62 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (ctx) => StatefulBuilder(
-            builder: (ctx, setS) {
-              final freeRoutes =
-                  routes
-                      .where(
-                        (r) =>
-                            r.assignedSellerId == null ||
-                            r.assignedSellerId!.isEmpty,
-                      )
-                      .toList();
-              return AlertDialog(
-                title: Text(tr('reactivate', ref)),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      tr(
-                        'confirm_reactivate_user',
-                        ref,
-                      ).replaceAll('%s', user.displayName),
-                    ),
-                    const SizedBox(height: 12),
-                    if (user.isSeller)
-                      DropdownButtonFormField<String>(
-                        decoration: InputDecoration(
-                          labelText: tr('assigned_route', ref),
-                        ),
-                        items:
-                            freeRoutes
-                                .map(
-                                  (r) => DropdownMenuItem(
-                                    value: r.id,
-                                    child: Text(r.name),
-                                  ),
-                                )
-                                .toList(),
-                        onChanged:
-                            (v) => setS(() {
-                              selectedRouteId = v;
-                              selectedRouteName =
-                                  routes
-                                      .where((r) => r.id == v)
-                                      .map((r) => r.name)
-                                      .firstOrNull;
-                            }),
-                      ),
-                  ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final freeRoutes = routes
+              .where(
+                (r) =>
+                    r.assignedSellerId == null || r.assignedSellerId!.isEmpty,
+              )
+              .toList();
+          return AlertDialog(
+            title: Text(tr('reactivate', ref)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  tr(
+                    'confirm_reactivate_user',
+                    ref,
+                  ).replaceAll('%s', user.displayName),
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(tr('cancel', ref)),
+                const SizedBox(height: 12),
+                if (user.isSeller)
+                  DropdownButtonFormField<String>(
+                    decoration: InputDecoration(
+                      labelText: tr('assigned_route', ref),
+                    ),
+                    items: freeRoutes
+                        .map(
+                          (r) => DropdownMenuItem(
+                            value: r.id,
+                            child: Text(r.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setS(() {
+                      selectedRouteId = v;
+                      selectedRouteName = routes
+                          .where((r) => r.id == v)
+                          .map((r) => r.name)
+                          .firstOrNull;
+                    }),
                   ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: Text(tr('reactivate', ref)),
-                  ),
-                ],
-              );
-            },
-          ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(tr('cancel', ref)),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(tr('reactivate', ref)),
+              ),
+            ],
+          );
+        },
+      ),
     );
     if (confirmed != true) return;
 
@@ -945,8 +891,9 @@ class _UserTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isSelf = user.id == currentUser?.id;
-    final roleColor =
-        user.isAdmin ? AppBrand.adminRoleColor : AppBrand.sellerRoleColor;
+    final roleColor = user.isAdmin
+        ? AppBrand.adminRoleColor
+        : AppBrand.sellerRoleColor;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -1111,8 +1058,9 @@ class _InactiveUserTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final roleColor =
-        user.isAdmin ? AppBrand.adminRoleColor : AppBrand.sellerRoleColor;
+    final roleColor = user.isAdmin
+        ? AppBrand.adminRoleColor
+        : AppBrand.sellerRoleColor;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

@@ -95,12 +95,12 @@ class _ExportSheetContent extends StatelessWidget {
       return pdfBytesBuilder != null
           ? await pdfBytesBuilder!()
           : await buildPdfTable(
-            title: title,
-            headers: headers,
-            rows: rows,
-            subtitle: subtitle,
-            locale: _locale,
-          );
+              title: title,
+              headers: headers,
+              rows: rows,
+              subtitle: subtitle,
+              locale: _locale,
+            );
     } catch (_) {
       messenger.showSnackBar(errorSnackBar(tr('err_unknown', ref)));
       return null;
@@ -307,10 +307,9 @@ class _OptionTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color:
-                      theme.brightness == Brightness.dark
-                          ? color.withValues(alpha: 0.22)
-                          : color.withValues(alpha: 0.1),
+                  color: theme.brightness == Brightness.dark
+                      ? color.withValues(alpha: 0.22)
+                      : color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: color, size: 22),
@@ -331,10 +330,9 @@ class _OptionTile extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color:
-                        theme.brightness == Brightness.dark
-                            ? color.withValues(alpha: 0.22)
-                            : color.withValues(alpha: 0.1),
+                    color: theme.brightness == Brightness.dark
+                        ? color.withValues(alpha: 0.22)
+                        : color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
