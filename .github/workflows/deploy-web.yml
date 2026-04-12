@@ -23,11 +23,6 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Write firebase_options.dart
-        env:
-          FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
-        run: echo "$FIREBASE_OPTIONS_DART" | base64 -d > app/lib/firebase_options.dart
-
       - name: Write google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
