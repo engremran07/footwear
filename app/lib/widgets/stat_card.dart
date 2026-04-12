@@ -65,95 +65,102 @@ class StatCard extends StatelessWidget {
     }
 
     return Semantics(
-      label: '$title: $value',
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap != null
-              ? () {
-                  HapticFeedback.lightImpact();
-                  onTap!();
-                }
-              : null,
-          child: Padding(
-            padding: const EdgeInsets.all(AppTokens.s12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          label: '$title: $value',
+          child: Card(
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap:
+                  onTap != null
+                      ? () {
+                        HapticFeedback.lightImpact();
+                        onTap!();
+                      }
+                      : null,
+              child: Padding(
+                padding: const EdgeInsets.all(AppTokens.s12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: cardColor.withValues(alpha: 0.12),
-                        borderRadius: AppTokens.brSM,
-                      ),
-                      child: Icon(icon,
-                          color: cardColor, size: AppTokens.iconSizeSM),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: AnimatedSwitcher(
-                        duration: AppTokens.durNormal,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: AlignmentDirectional.centerStart,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
                           child: Text(
-                            value,
-                            key: ValueKey(value),
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: cardColor,
+                            title,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: cardColor.withValues(alpha: 0.12),
+                            borderRadius: AppTokens.brSM,
+                          ),
+                          child: Icon(
+                            icon,
+                            color: cardColor,
+                            size: AppTokens.iconSizeSM,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: AppTokens.durNormal,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text(
+                                value,
+                                key: ValueKey(value),
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: cardColor,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                        if (trend != null) ...[
+                          const SizedBox(width: AppTokens.s4),
+                          Icon(
+                            trend! > 0
+                                ? Icons.trending_up
+                                : Icons.trending_down,
+                            size: 16,
+                            color:
+                                trend! > 0
+                                    ? AppBrand.successColor
+                                    : AppBrand.errorColor,
+                          ),
+                        ],
+                      ],
                     ),
-                    if (trend != null) ...[
-                      const SizedBox(width: AppTokens.s4),
-                      Icon(
-                        trend! > 0 ? Icons.trending_up : Icons.trending_down,
-                        size: 16,
-                        color: trend! > 0
-                            ? AppBrand.successColor
-                            : AppBrand.errorColor,
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ],
                 ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
-        ),
-      ),
-    )
+        )
         .animate()
         .fadeIn(
           duration: AppTokens.durNormal,

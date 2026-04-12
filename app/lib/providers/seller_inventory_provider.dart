@@ -7,42 +7,49 @@ import 'auth_provider.dart';
 
 final sellerInventoryProvider = StreamProvider.autoDispose
     .family<List<SellerInventoryModel>, String>((ref, sellerId) {
-  return FirebaseFirestore.instance
-      .collection(Collections.sellerInventory)
-      .where('seller_id', isEqualTo: sellerId)
-      .where('active', isEqualTo: true)
-      .orderBy('variant_name')
-      .limit(500)
-      .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
-          .toList());
-});
+      return FirebaseFirestore.instance
+          .collection(Collections.sellerInventory)
+          .where('seller_id', isEqualTo: sellerId)
+          .where('active', isEqualTo: true)
+          .orderBy('variant_name')
+          .limit(500)
+          .snapshots()
+          .map(
+            (snap) =>
+                snap.docs
+                    .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
+                    .toList(),
+          );
+    });
 
 final sellerInventoryTotalPairsProvider =
     Provider.family<AsyncValue<int>, String>((ref, sellerId) {
-  final itemsAsync = ref.watch(sellerInventoryProvider(sellerId));
-  return itemsAsync.whenData(
-    (items) => items.fold<int>(0, (acc, item) => acc + item.quantityAvailable),
-  );
-});
+      final itemsAsync = ref.watch(sellerInventoryProvider(sellerId));
+      return itemsAsync.whenData(
+        (items) =>
+            items.fold<int>(0, (acc, item) => acc + item.quantityAvailable),
+      );
+    });
 
 /// Streams ALL active seller-inventory items (admin use for reports).
 /// Limit is 100 to keep free-tier Firestore reads within budget.
 final adminAllSellerInventoryProvider =
     StreamProvider.autoDispose<List<SellerInventoryModel>>((ref) {
-  final user = ref.watch(authUserProvider).valueOrNull;
-  if (user == null || !user.isAdmin) return const Stream.empty();
-  return FirebaseFirestore.instance
-      .collection(Collections.sellerInventory)
-      .where('active', isEqualTo: true)
-      .orderBy('variant_name')
-      .limit(100)
-      .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
-          .toList());
-});
+      final user = ref.watch(authUserProvider).valueOrNull;
+      if (user == null || !user.isAdmin) return const Stream.empty();
+      return FirebaseFirestore.instance
+          .collection(Collections.sellerInventory)
+          .where('active', isEqualTo: true)
+          .orderBy('variant_name')
+          .limit(100)
+          .snapshots()
+          .map(
+            (snap) =>
+                snap.docs
+                    .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
+                    .toList(),
+          );
+    });
 
 class SellerInventoryNotifier extends AsyncNotifier<void> {
   @override
@@ -51,10 +58,11 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
   Future<void> _requireAdmin() async {
     final authUser = FirebaseAuth.instance.currentUser;
     if (authUser == null) throw StateError('Not authenticated');
-    final me = await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(authUser.uid)
-        .get();
+    final me =
+        await FirebaseFirestore.instance
+            .collection(Collections.users)
+            .doc(authUser.uid)
+            .get();
     final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
     if (role != 'admin' && role != 'manager') {
       throw StateError('Only admin can return stock to warehouse');
@@ -69,9 +77,9 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
         .collection(Collections.sellerInventory)
         .doc(docId)
         .update({
-      'quantity_available': FieldValue.increment(-qty),
-      'updated_at': Timestamp.now(),
-    });
+          'quantity_available': FieldValue.increment(-qty),
+          'updated_at': Timestamp.now(),
+        });
   }
 
   /// Returns [qty] pairs of a seller inventory item back to the warehouse.
@@ -116,13 +124,10 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
     );
 
     // Increment warehouse stock (Firestore rules allow seller to *increase* quantity_available)
-    batch.update(
-      db.collection(Collections.productVariants).doc(variantId),
-      {
-        'quantity_available': FieldValue.increment(qty),
-        'updated_at': Timestamp.now(),
-      },
-    );
+    batch.update(db.collection(Collections.productVariants).doc(variantId), {
+      'quantity_available': FieldValue.increment(qty),
+      'updated_at': Timestamp.now(),
+    });
 
     // Audit log in inventory_transactions
     final auditRef = db.collection(Collections.inventoryTransactions).doc();
@@ -145,4 +150,5 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
 
 final sellerInventoryNotifierProvider =
     AsyncNotifierProvider<SellerInventoryNotifier, void>(
-        SellerInventoryNotifier.new);
+      SellerInventoryNotifier.new,
+    );

@@ -30,10 +30,15 @@ class EmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              icon,
-              size: 64,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ).animate().fadeIn(duration: AppTokens.durSlow).scale(
+                  icon,
+                  size: 64,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.5,
+                  ),
+                )
+                .animate()
+                .fadeIn(duration: AppTokens.durSlow)
+                .scale(
                   begin: const Offset(0.6, 0.6),
                   end: const Offset(1.0, 1.0),
                   curve: AppTokens.curveSpring,

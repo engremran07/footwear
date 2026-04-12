@@ -50,17 +50,17 @@ class RouteModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'route_number': routeNumber,
-        'name': name,
-        'area': area,
-        'city': city,
-        'description': description,
-        'total_shops': totalShops,
-        'assigned_seller_id': assignedSellerId,
-        'assigned_seller_name': assignedSellerName,
-        'active': active,
-        'created_by': createdBy,
-        'created_at': createdAt,
-        'updated_at': updatedAt,
-      };
+    'route_number': routeNumber,
+    'name': name,
+    'area': area,
+    'city': city,
+    'description': description,
+    'total_shops': totalShops,
+    'assigned_seller_id': assignedSellerId,
+    'assigned_seller_name': assignedSellerName,
+    'active': active,
+    'created_by': createdBy,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+  };
 }

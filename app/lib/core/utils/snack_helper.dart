@@ -5,41 +5,41 @@ import '../constants/app_brand.dart';
 
 /// Returns a styled error SnackBar widget for use with ScaffoldMessenger.
 SnackBar errorSnackBar(String msg) => _styledSnackBar(
-      msg: msg,
-      bg: AppBrand.errorBg,
-      fg: AppBrand.errorFg,
-      accent: AppBrand.errorAccent,
-      icon: Icons.error_rounded,
-      duration: const Duration(seconds: 4),
-    );
+  msg: msg,
+  bg: AppBrand.errorBg,
+  fg: AppBrand.errorFg,
+  accent: AppBrand.errorAccent,
+  icon: Icons.error_rounded,
+  duration: const Duration(seconds: 4),
+);
 
 /// Returns a styled success SnackBar widget for use with ScaffoldMessenger.
 SnackBar successSnackBar(String msg) => _styledSnackBar(
-      msg: msg,
-      bg: AppBrand.successBg,
-      fg: AppBrand.successFg,
-      accent: AppBrand.successAccent,
-      icon: Icons.check_circle_rounded,
-    );
+  msg: msg,
+  bg: AppBrand.successBg,
+  fg: AppBrand.successFg,
+  accent: AppBrand.successAccent,
+  icon: Icons.check_circle_rounded,
+);
 
 /// Returns a styled warning SnackBar widget for use with ScaffoldMessenger.
 SnackBar warningSnackBar(String msg) => _styledSnackBar(
-      msg: msg,
-      bg: AppBrand.warningBg,
-      fg: AppBrand.warningFg,
-      accent: AppBrand.warningAccent,
-      icon: Icons.warning_rounded,
-      duration: const Duration(seconds: 4),
-    );
+  msg: msg,
+  bg: AppBrand.warningBg,
+  fg: AppBrand.warningFg,
+  accent: AppBrand.warningAccent,
+  icon: Icons.warning_rounded,
+  duration: const Duration(seconds: 4),
+);
 
 /// Returns a styled info SnackBar widget for use with ScaffoldMessenger.
 SnackBar infoSnackBar(String msg) => _styledSnackBar(
-      msg: msg,
-      bg: AppBrand.infoBg,
-      fg: AppBrand.infoFg,
-      accent: AppBrand.infoAccent,
-      icon: Icons.info_rounded,
-    );
+  msg: msg,
+  bg: AppBrand.infoBg,
+  fg: AppBrand.infoFg,
+  accent: AppBrand.infoAccent,
+  icon: Icons.info_rounded,
+);
 
 SnackBar _styledSnackBar({
   required String msg,

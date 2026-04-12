@@ -30,11 +30,12 @@ class BootstrapNotifier extends AsyncNotifier<void> {
         return;
       }
 
-      final adminSnap = await db
-          .collection(Collections.users)
-          .where('role', whereIn: ['admin', 'manager'])
-          .limit(1)
-          .get();
+      final adminSnap =
+          await db
+              .collection(Collections.users)
+              .where('role', whereIn: ['admin', 'manager'])
+              .limit(1)
+              .get();
 
       if (adminSnap.docs.isNotEmpty &&
           adminSnap.docs.first.id != authUser.uid) {

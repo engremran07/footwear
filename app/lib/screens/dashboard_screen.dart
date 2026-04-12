@@ -49,65 +49,67 @@ class DashboardScreen extends ConsumerWidget {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                tr(
-                  'pending_edit_requests_count',
-                  ref,
-                ).replaceAll('%s', '${pendingEdits.length}'),
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+      builder:
+          (sheetContext) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tr(
+                      'pending_edit_requests_count',
+                      ref,
+                    ).replaceAll('%s', '${pendingEdits.length}'),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: AppTokens.s8),
+                  Text(
+                    tr('pending_edit_requests_subtitle', ref),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: AppTokens.s12),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(sheetContext).size.height * 0.6,
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: pendingEdits.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (_, index) {
+                        final tx = pendingEdits[index];
+                        return ListTile(
+                          leading: const Icon(
+                            Icons.pending_actions,
+                            color: AppBrand.warningColor,
+                          ),
+                          title: Text(
+                            tx.shopName.isNotEmpty ? tx.shopName : tx.shopId,
+                          ),
+                          subtitle: Text(
+                            '${AppFormatters.dateTime(tx.createdAt)} • '
+                            '${AppFormatters.sar(tx.amount)}',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap:
+                              tx.shopId.isEmpty
+                                  ? null
+                                  : () {
+                                    Navigator.pop(sheetContext);
+                                    context.go('/shops/${tx.shopId}');
+                                  },
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: AppTokens.s8),
-              Text(
-                tr('pending_edit_requests_subtitle', ref),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: AppTokens.s12),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(sheetContext).size.height * 0.6,
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: pendingEdits.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, index) {
-                    final tx = pendingEdits[index];
-                    return ListTile(
-                      leading: const Icon(
-                        Icons.pending_actions,
-                        color: AppBrand.warningColor,
-                      ),
-                      title: Text(
-                        tx.shopName.isNotEmpty ? tx.shopName : tx.shopId,
-                      ),
-                      subtitle: Text(
-                        '${AppFormatters.dateTime(tx.createdAt)} • '
-                        '${AppFormatters.sar(tx.amount)}',
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: tx.shopId.isEmpty
-                          ? null
-                          : () {
-                              Navigator.pop(sheetContext);
-                              context.go('/shops/${tx.shopId}');
-                            },
-                    );
-                  },
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -233,18 +235,20 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                       subtitle: Text(tr('pending_edit_requests_subtitle', ref)),
                       trailing: TextButton(
-                        onPressed: () => _showPendingEditRequestsSheet(
-                          context,
-                          ref,
-                          pendingEdits,
-                        ),
+                        onPressed:
+                            () => _showPendingEditRequestsSheet(
+                              context,
+                              ref,
+                              pendingEdits,
+                            ),
                         child: Text(tr('lbl_view', ref)),
                       ),
-                      onTap: () => _showPendingEditRequestsSheet(
-                        context,
-                        ref,
-                        pendingEdits,
-                      ),
+                      onTap:
+                          () => _showPendingEditRequestsSheet(
+                            context,
+                            ref,
+                            pendingEdits,
+                          ),
                     ),
                   ).screenEntry(),
 
@@ -253,9 +257,8 @@ class DashboardScreen extends ConsumerWidget {
 
                 // Stat cards grid
                 GridView.count(
-                  crossAxisCount: MediaQuery.of(context).size.width > 600
-                      ? 3
-                      : 2,
+                  crossAxisCount:
+                      MediaQuery.of(context).size.width > 600 ? 3 : 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: AppTokens.s8,
@@ -282,9 +285,10 @@ class DashboardScreen extends ConsumerWidget {
                       title: tr('outstanding_balance', ref),
                       value: AppFormatters.sar(totalOutstanding),
                       icon: Icons.account_balance_wallet,
-                      color: totalOutstanding > 0
-                          ? AppBrand.errorColor
-                          : AppBrand.successColor,
+                      color:
+                          totalOutstanding > 0
+                              ? AppBrand.errorColor
+                              : AppBrand.successColor,
                       staggerIndex: 2,
                       onTap: () => context.go('/shops'),
                     ),
@@ -384,20 +388,22 @@ class _SellerDashboard extends ConsumerWidget {
               ),
             ),
             routeAsync.when(
-              data: (route) => route == null
-                  ? const SizedBox.shrink()
-                  : Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.route),
-                        title: Text(route.name),
-                        subtitle: Text(
-                          tr(
-                            'dashboard_route_number',
-                            ref,
-                          ).replaceAll('%s', '${route.routeNumber}'),
-                        ),
-                      ),
-                    ),
+              data:
+                  (route) =>
+                      route == null
+                          ? const SizedBox.shrink()
+                          : Card(
+                            child: ListTile(
+                              leading: const Icon(Icons.route),
+                              title: Text(route.name),
+                              subtitle: Text(
+                                tr(
+                                  'dashboard_route_number',
+                                  ref,
+                                ).replaceAll('%s', '${route.routeNumber}'),
+                              ),
+                            ),
+                          ),
               loading: () => const SizedBox.shrink(),
               error: (_, __) => const SizedBox.shrink(),
             ),
@@ -409,56 +415,58 @@ class _SellerDashboard extends ConsumerWidget {
                   (acc, shop) => acc + shop.balance,
                 );
                 return inventoryPairsAsync.when(
-                  data: (pairs) => GridView.count(
-                    crossAxisCount: MediaQuery.of(context).size.width > 600
-                        ? 3
-                        : 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 4,
-                    crossAxisSpacing: 4,
-                    childAspectRatio: 1.5,
-                    children: [
-                      StatCard(
-                        title: tr('dashboard_my_shops', ref),
-                        value: shops.length.toString(),
-                        icon: Icons.store,
-                        color: AppBrand.secondaryColor,
-                        staggerIndex: 0,
-                        onTap: () => context.go('/shops'),
+                  data:
+                      (pairs) => GridView.count(
+                        crossAxisCount:
+                            MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 4,
+                        crossAxisSpacing: 4,
+                        childAspectRatio: 1.5,
+                        children: [
+                          StatCard(
+                            title: tr('dashboard_my_shops', ref),
+                            value: shops.length.toString(),
+                            icon: Icons.store,
+                            color: AppBrand.secondaryColor,
+                            staggerIndex: 0,
+                            onTap: () => context.go('/shops'),
+                          ),
+                          StatCard(
+                            title: tr('dashboard_outstanding', ref),
+                            value: AppFormatters.sar(outstanding),
+                            icon: Icons.account_balance_wallet,
+                            color:
+                                outstanding > 0
+                                    ? AppBrand.errorColor
+                                    : AppBrand.successColor,
+                            staggerIndex: 1,
+                            onTap: () => context.go('/shops'),
+                          ),
+                          StatCard(
+                            title: tr('dashboard_my_inventory', ref),
+                            value: AppFormatters.compact(pairs.toDouble()),
+                            icon: Icons.inventory,
+                            color: AppBrand.stockColor,
+                            staggerIndex: 2,
+                            onTap: () => context.go('/inventory'),
+                          ),
+                        ],
                       ),
-                      StatCard(
-                        title: tr('dashboard_outstanding', ref),
-                        value: AppFormatters.sar(outstanding),
-                        icon: Icons.account_balance_wallet,
-                        color: outstanding > 0
-                            ? AppBrand.errorColor
-                            : AppBrand.successColor,
-                        staggerIndex: 1,
-                        onTap: () => context.go('/shops'),
-                      ),
-                      StatCard(
-                        title: tr('dashboard_my_inventory', ref),
-                        value: AppFormatters.compact(pairs.toDouble()),
-                        icon: Icons.inventory,
-                        color: AppBrand.stockColor,
-                        staggerIndex: 2,
-                        onTap: () => context.go('/inventory'),
-                      ),
-                    ],
-                  ),
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
+                  loading:
+                      () => const Center(child: CircularProgressIndicator()),
                   error: (_, __) => const SizedBox.shrink(),
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => _buildDashboardAsyncError(
-                context,
-                ref,
-                e,
-                fallback: const Center(child: CircularProgressIndicator()),
-              ),
+              error:
+                  (e, _) => _buildDashboardAsyncError(
+                    context,
+                    ref,
+                    e,
+                    fallback: const Center(child: CircularProgressIndicator()),
+                  ),
             ),
           ],
         ),
@@ -501,13 +509,14 @@ class _RouteAnalyticsSection extends ConsumerWidget {
     }
 
     return routes.map((route) {
-      final rs = shopsByRoute[route.id] ?? const <ShopModel>[];
-      return _RouteAnalytics(
-        route: route,
-        totalShops: rs.length,
-        outstanding: rs.fold<double>(0.0, (s, sh) => s + sh.balance),
-      );
-    }).toList()..sort((a, b) => b.outstanding.compareTo(a.outstanding));
+        final rs = shopsByRoute[route.id] ?? const <ShopModel>[];
+        return _RouteAnalytics(
+          route: route,
+          totalShops: rs.length,
+          outstanding: rs.fold<double>(0.0, (s, sh) => s + sh.balance),
+        );
+      }).toList()
+      ..sort((a, b) => b.outstanding.compareTo(a.outstanding));
   }
 
   @override
@@ -544,9 +553,10 @@ class _RouteAnalyticsSection extends ConsumerWidget {
                 trailing: Text(
                   AppFormatters.sar(row.outstanding),
                   style: TextStyle(
-                    color: row.outstanding > 0
-                        ? AppBrand.errorColor
-                        : AppBrand.successColor,
+                    color:
+                        row.outstanding > 0
+                            ? AppBrand.errorColor
+                            : AppBrand.successColor,
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),

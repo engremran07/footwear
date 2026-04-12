@@ -6,11 +6,7 @@ class AppOnlineIndicator extends StatelessWidget {
   final bool isOnline;
   final double size;
 
-  const AppOnlineIndicator({
-    super.key,
-    required this.isOnline,
-    this.size = 10,
-  });
+  const AppOnlineIndicator({super.key, required this.isOnline, this.size = 10});
 
   @override
   Widget build(BuildContext context) {

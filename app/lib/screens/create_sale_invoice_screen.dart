@@ -79,9 +79,8 @@ class _CreateSaleInvoiceScreenState
     double subtotal,
     int ppc,
   ) {
-    final dozenEntries = _selectedQtys.entries
-        .where((entry) => entry.value > 0)
-        .toList();
+    final dozenEntries =
+        _selectedQtys.entries.where((entry) => entry.value > 0).toList();
     if (dozenEntries.isEmpty || subtotal <= 0) return const [];
 
     final inventoryMap = {for (final item in inventoryList) item.id: item};
@@ -106,9 +105,8 @@ class _CreateSaleInvoiceScreenState
       final extraPairs = _selectedExtraPairs[entry.key] ?? 0;
       final linePairs = dozens * ppc + extraPairs;
       final isLast = index == dozenEntries.length - 1;
-      final lineSubtotal = isLast
-          ? subtotal - allocatedSubtotal
-          : pricePerPair * linePairs;
+      final lineSubtotal =
+          isLast ? subtotal - allocatedSubtotal : pricePerPair * linePairs;
       allocatedSubtotal += lineSubtotal;
 
       items.add({
@@ -119,9 +117,8 @@ class _CreateSaleInvoiceScreenState
         'color': '',
         'qty': dozens, // invoice line qty = dozens (selling unit)
         'extra_pairs': extraPairs,
-        'unit_price': dozens > 0
-            ? (lineSubtotal / dozens)
-            : 0.0, // price per dozen
+        'unit_price':
+            dozens > 0 ? (lineSubtotal / dozens) : 0.0, // price per dozen
         'subtotal': lineSubtotal,
       });
     }
@@ -160,8 +157,8 @@ class _CreateSaleInvoiceScreenState
   double get _newBalance => _totalOutstanding - _amountReceived;
 
   String _currentInvoiceFingerprint(Map<String, int> deductions) {
-    final entries = deductions.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
+    final entries =
+        deductions.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
     final deductionSignature = entries
         .map((e) => '${e.key}:${e.value}')
         .join('|');
@@ -186,11 +183,12 @@ class _CreateSaleInvoiceScreenState
     }
 
     final routeId = user.assignedRouteId ?? '';
-    final shopsAsync = user.isAdmin
-        ? ref.watch(shopsProvider)
-        : (routeId.isNotEmpty
-              ? ref.watch(shopsByRouteProvider(routeId))
-              : const AsyncData<List<ShopModel>>([]));
+    final shopsAsync =
+        user.isAdmin
+            ? ref.watch(shopsProvider)
+            : (routeId.isNotEmpty
+                ? ref.watch(shopsByRouteProvider(routeId))
+                : const AsyncData<List<ShopModel>>([]));
     // Both admin and seller use their own seller_inventory (vehicle stock).
     // Admin loads stock from warehouse to their own seller_inventory via the
     // Inventory screen transfer, then selects items here to create an invoice.
@@ -226,15 +224,16 @@ class _CreateSaleInvoiceScreenState
           appBar: AppBar(title: Text(tr('create_sale_invoice', ref))),
           body: inventoryAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => mappedErrorState(
-              error: e,
-              ref: ref,
-              onRetry: () => ref.invalidate(sellerInventoryProvider(user.id)),
-            ),
+            error:
+                (e, _) => mappedErrorState(
+                  error: e,
+                  ref: ref,
+                  onRetry:
+                      () => ref.invalidate(sellerInventoryProvider(user.id)),
+                ),
             data: (inventory) {
-              final available = inventory
-                  .where((i) => i.quantityAvailable > 0)
-                  .toList();
+              final available =
+                  inventory.where((i) => i.quantityAvailable > 0).toList();
               return _buildBody(context, user, shopsAsync, available);
             },
           ),
@@ -254,9 +253,8 @@ class _CreateSaleInvoiceScreenState
     final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
 
     // Calculate totals from selected items (_selectedQtys = dozens, quantity_available = pairs)
-    final selectedEntries = _selectedQtys.entries
-        .where((e) => e.value > 0)
-        .toList();
+    final selectedEntries =
+        _selectedQtys.entries.where((e) => e.value > 0).toList();
     final totalDozens = selectedEntries.fold<int>(0, (acc, e) => acc + e.value);
     final totalExtraPairs = selectedEntries.fold<int>(
       0,
@@ -279,27 +277,31 @@ class _CreateSaleInvoiceScreenState
                 const SizedBox(height: 8),
                 shopsAsync.when(
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => mappedErrorState(
-                    error: e,
-                    ref: ref,
-                    onRetry: () {
-                      final assignedRouteId = user.assignedRouteId ?? '';
-                      if (user.isAdmin) {
-                        ref.invalidate(shopsProvider);
-                      } else if (assignedRouteId.isNotEmpty) {
-                        ref.invalidate(shopsByRouteProvider(assignedRouteId));
-                      }
-                    },
-                  ),
+                  error:
+                      (e, _) => mappedErrorState(
+                        error: e,
+                        ref: ref,
+                        onRetry: () {
+                          final assignedRouteId = user.assignedRouteId ?? '';
+                          if (user.isAdmin) {
+                            ref.invalidate(shopsProvider);
+                          } else if (assignedRouteId.isNotEmpty) {
+                            ref.invalidate(
+                              shopsByRouteProvider(assignedRouteId),
+                            );
+                          }
+                        },
+                      ),
                   data: (shops) {
                     if (shops.isEmpty) {
                       return Text(tr('no_data', ref));
                     }
-                    final matchedShop = _selectedShop == null
-                        ? null
-                        : shops
-                              .where((s) => s.id == _selectedShop!.id)
-                              .firstOrNull;
+                    final matchedShop =
+                        _selectedShop == null
+                            ? null
+                            : shops
+                                .where((s) => s.id == _selectedShop!.id)
+                                .firstOrNull;
                     return DropdownButtonFormField<ShopModel>(
                       initialValue: matchedShop,
                       isExpanded: true,
@@ -308,12 +310,16 @@ class _CreateSaleInvoiceScreenState
                         hintText: tr('select_shop', ref),
                         isDense: true,
                       ),
-                      items: shops.map((s) {
-                        return DropdownMenuItem(
-                          value: s,
-                          child: Text(s.name, overflow: TextOverflow.ellipsis),
-                        );
-                      }).toList(),
+                      items:
+                          shops.map((s) {
+                            return DropdownMenuItem(
+                              value: s,
+                              child: Text(
+                                s.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
                       onChanged: (v) => setState(() => _selectedShop = v),
                     );
                   },
@@ -323,9 +329,10 @@ class _CreateSaleInvoiceScreenState
                   Text(
                     '${tr('previous_balance', ref)}: ${AppFormatters.currency(_previousBalance)}',
                     style: ts.bodySmall?.copyWith(
-                      color: _previousBalance > 0
-                          ? AppBrand.errorColor
-                          : AppBrand.successColor,
+                      color:
+                          _previousBalance > 0
+                              ? AppBrand.errorColor
+                              : AppBrand.successColor,
                     ),
                   ),
                 ],
@@ -389,14 +396,17 @@ class _CreateSaleInvoiceScreenState
                                     size: 22,
                                   ),
                                   tooltip: tr('tooltip_decrease_qty', ref),
-                                  onPressed: dozens <= 0
-                                      ? null
-                                      : () => setState(() {
-                                          _selectedQtys[item.id] = dozens - 1;
-                                          if (dozens - 1 == 0) {
-                                            _selectedExtraPairs.remove(item.id);
-                                          }
-                                        }),
+                                  onPressed:
+                                      dozens <= 0
+                                          ? null
+                                          : () => setState(() {
+                                            _selectedQtys[item.id] = dozens - 1;
+                                            if (dozens - 1 == 0) {
+                                              _selectedExtraPairs.remove(
+                                                item.id,
+                                              );
+                                            }
+                                          }),
                                 ),
                                 SizedBox(
                                   width: 32,
@@ -415,12 +425,14 @@ class _CreateSaleInvoiceScreenState
                                     size: 22,
                                   ),
                                   tooltip: tr('tooltip_increase_qty', ref),
-                                  onPressed: dozens >= maxDozens
-                                      ? null
-                                      : () => setState(
-                                          () => _selectedQtys[item.id] =
-                                              dozens + 1,
-                                        ),
+                                  onPressed:
+                                      dozens >= maxDozens
+                                          ? null
+                                          : () => setState(
+                                            () =>
+                                                _selectedQtys[item.id] =
+                                                    dozens + 1,
+                                          ),
                                 ),
                               ],
                             ),
@@ -430,9 +442,8 @@ class _CreateSaleInvoiceScreenState
                                 children: [
                                   Text(
                                     tr('lbl_extra_pairs', ref),
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
                                   ),
                                   const Spacer(),
                                   IconButton(
@@ -441,12 +452,14 @@ class _CreateSaleInvoiceScreenState
                                       size: 20,
                                     ),
                                     tooltip: tr('tooltip_decrease_qty', ref),
-                                    onPressed: extraPairs <= 0
-                                        ? null
-                                        : () => setState(
-                                            () => _selectedExtraPairs[item.id] =
-                                                extraPairs - 1,
-                                          ),
+                                    onPressed:
+                                        extraPairs <= 0
+                                            ? null
+                                            : () => setState(
+                                              () =>
+                                                  _selectedExtraPairs[item.id] =
+                                                      extraPairs - 1,
+                                            ),
                                   ),
                                   SizedBox(
                                     width: 32,
@@ -463,12 +476,14 @@ class _CreateSaleInvoiceScreenState
                                     ),
                                     tooltip: tr('tooltip_increase_qty', ref),
                                     // max extra pairs = ppc - 1 (a full dozen would be a new dozen)
-                                    onPressed: extraPairs >= ppc - 1
-                                        ? null
-                                        : () => setState(
-                                            () => _selectedExtraPairs[item.id] =
-                                                extraPairs + 1,
-                                          ),
+                                    onPressed:
+                                        extraPairs >= ppc - 1
+                                            ? null
+                                            : () => setState(
+                                              () =>
+                                                  _selectedExtraPairs[item.id] =
+                                                      extraPairs + 1,
+                                            ),
                                   ),
                                 ],
                               ),
@@ -594,9 +609,10 @@ class _CreateSaleInvoiceScreenState
                   children: [
                     Builder(
                       builder: (context) {
-                        final extraLabel = totalExtraPairs > 0
-                            ? ' $totalExtraPairs ${tr("pairs", ref)}'
-                            : '';
+                        final extraLabel =
+                            totalExtraPairs > 0
+                                ? ' $totalExtraPairs ${tr("pairs", ref)}'
+                                : '';
                         return Text(
                           '${tr("items", ref)}: $totalDozens ${tr("lbl_cartons", ref)}$extraLabel',
                           style: ts.bodyMedium,
@@ -616,16 +632,17 @@ class _CreateSaleInvoiceScreenState
                       foregroundColor: AppBrand.onPrimary,
                     ),
                     onPressed: _submitting ? null : () => _submit(context),
-                    icon: _submitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppBrand.onPrimary,
-                            ),
-                          )
-                        : const Icon(Icons.receipt_long),
+                    icon:
+                        _submitting
+                            ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppBrand.onPrimary,
+                              ),
+                            )
+                            : const Icon(Icons.receipt_long),
                     label: Text(tr('create_sale_invoice', ref)),
                   ),
                 ),
@@ -841,9 +858,10 @@ class _CreateSaleInvoiceScreenState
           .createSaleInvoice(
             shopId: _selectedShop!.id,
             shopName: _selectedShop!.name,
-            routeId: _selectedShop!.routeId.isNotEmpty
-                ? _selectedShop!.routeId
-                : (user.assignedRouteId ?? ''),
+            routeId:
+                _selectedShop!.routeId.isNotEmpty
+                    ? _selectedShop!.routeId
+                    : (user.assignedRouteId ?? ''),
             sellerId: user.id,
             sellerName: user.displayName,
             items: items,
@@ -851,9 +869,10 @@ class _CreateSaleInvoiceScreenState
             discount: discount,
             total: total,
             amountReceived: amountReceived,
-            notes: _notesC.text.trim().isEmpty
-                ? null
-                : AppSanitizer.text(_notesC.text, maxLength: 300),
+            notes:
+                _notesC.text.trim().isEmpty
+                    ? null
+                    : AppSanitizer.text(_notesC.text, maxLength: 300),
             createdBy: user.id,
             sellerInventoryDeductions: deductions,
             idempotencyKey: _pendingInvoiceIdempotencyKey,
@@ -865,9 +884,10 @@ class _CreateSaleInvoiceScreenState
         _pendingInvoiceIdempotencyKey = null;
         _pendingInvoiceFingerprint = null;
         messenger.showSnackBar(successSnackBar(tr('invoice_created', ref)));
-        final from = widget.preselectedShopId != null
-            ? '/shops/${widget.preselectedShopId}'
-            : '/invoices';
+        final from =
+            widget.preselectedShopId != null
+                ? '/shops/${widget.preselectedShopId}'
+                : '/invoices';
         router.go('/invoices/$invoiceId?from=${Uri.encodeComponent(from)}');
       }
     } catch (e) {

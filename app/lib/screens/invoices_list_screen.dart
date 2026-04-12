@@ -32,15 +32,16 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('invoices', ref))),
-      floatingActionButton: (user != null && (user.isSeller || user.isAdmin))
-          ? FloatingActionButton.extended(
-              onPressed: () => context.go('/invoices/new'),
-              backgroundColor: AppBrand.primaryColor,
-              foregroundColor: AppBrand.onPrimary,
-              icon: const Icon(Icons.add),
-              label: Text(tr('sale_invoice', ref)),
-            )
-          : null,
+      floatingActionButton:
+          (user != null && (user.isSeller || user.isAdmin))
+              ? FloatingActionButton.extended(
+                onPressed: () => context.go('/invoices/new'),
+                backgroundColor: AppBrand.primaryColor,
+                foregroundColor: AppBrand.onPrimary,
+                icon: const Icon(Icons.add),
+                label: Text(tr('sale_invoice', ref)),
+              )
+              : null,
       body: Column(
         children: [
           AppSearchBar(
@@ -80,19 +81,21 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
               data: (invoices) {
                 var filtered = invoices;
                 if (_statusFilter != 'all') {
-                  filtered = filtered
-                      .where((i) => i.status == _statusFilter)
-                      .toList();
+                  filtered =
+                      filtered.where((i) => i.status == _statusFilter).toList();
                 }
                 if (_search.isNotEmpty) {
-                  filtered = filtered
-                      .where(
-                        (i) =>
-                            i.invoiceNumber.toLowerCase().contains(_search) ||
-                            i.shopName.toLowerCase().contains(_search) ||
-                            i.sellerName.toLowerCase().contains(_search),
-                      )
-                      .toList();
+                  filtered =
+                      filtered
+                          .where(
+                            (i) =>
+                                i.invoiceNumber.toLowerCase().contains(
+                                  _search,
+                                ) ||
+                                i.shopName.toLowerCase().contains(_search) ||
+                                i.sellerName.toLowerCase().contains(_search),
+                          )
+                          .toList();
                 }
                 if (filtered.isEmpty) {
                   return Center(child: Text(tr('no_data', ref)));
@@ -114,11 +117,12 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
                 );
               },
               loading: () => const ShimmerLoading(),
-              error: (e, _) => mappedErrorState(
-                error: e,
-                ref: ref,
-                onRetry: () => ref.invalidate(roleAwareInvoicesProvider),
-              ),
+              error:
+                  (e, _) => mappedErrorState(
+                    error: e,
+                    ref: ref,
+                    onRetry: () => ref.invalidate(roleAwareInvoicesProvider),
+                  ),
             ),
           ),
         ],
@@ -173,9 +177,8 @@ class _InvoiceTile extends ConsumerWidget {
       child: ListTile(
         onTap: () => context.go('/invoices/${invoice.id}'),
         leading: CircleAvatar(
-          backgroundColor: invoice.isSale
-              ? AppTheme.debtBg(cs)
-              : AppTheme.clearBg(cs),
+          backgroundColor:
+              invoice.isSale ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs),
           child: Icon(
             invoice.isSale ? Icons.receipt : Icons.assignment_return,
             size: 20,

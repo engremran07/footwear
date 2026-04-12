@@ -59,10 +59,11 @@ class AdminIdentityService {
 
   Future<Map<String, dynamic>> _getOrLoadCreds() async {
     if (_cachedCreds != null) return _cachedCreds!;
-    final snap = await FirebaseFirestore.instance
-        .collection(Collections.adminConfig)
-        .doc('sa_credentials')
-        .get();
+    final snap =
+        await FirebaseFirestore.instance
+            .collection(Collections.adminConfig)
+            .doc('sa_credentials')
+            .get();
     if (!snap.exists || snap.data() == null) {
       throw Exception(
         'SA credentials not provisioned. '

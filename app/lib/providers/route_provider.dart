@@ -63,9 +63,10 @@ final routesBySellerProvider = StreamProvider.autoDispose
           .limit(100)
           .snapshots()
           .map(
-            (snap) => snap.docs
-                .map((d) => RouteModel.fromJson(d.data(), d.id))
-                .toList(),
+            (snap) =>
+                snap.docs
+                    .map((d) => RouteModel.fromJson(d.data(), d.id))
+                    .toList(),
           );
     });
 
@@ -84,18 +85,20 @@ class RouteNotifier extends AsyncNotifier<void> {
     final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
     if (role != 'admin' && role != 'manager') return;
 
-    final routesSnap = await db
-        .collection(Collections.routes)
-        .where('active', isEqualTo: true)
-        .limit(500)
-        .get();
+    final routesSnap =
+        await db
+            .collection(Collections.routes)
+            .where('active', isEqualTo: true)
+            .limit(500)
+            .get();
     if (routesSnap.docs.isEmpty) return;
 
-    final shopsSnap = await db
-        .collection(Collections.customers)
-        .where('active', isEqualTo: true)
-        .limit(2000)
-        .get();
+    final shopsSnap =
+        await db
+            .collection(Collections.customers)
+            .where('active', isEqualTo: true)
+            .limit(2000)
+            .get();
 
     final countsByRoute = <String, int>{};
     for (final shop in shopsSnap.docs) {
@@ -124,11 +127,12 @@ class RouteNotifier extends AsyncNotifier<void> {
   }
 
   Future<int> _nextRouteNumber(FirebaseFirestore db) async {
-    final snap = await db
-        .collection(Collections.routes)
-        .orderBy('route_number', descending: true)
-        .limit(1)
-        .get();
+    final snap =
+        await db
+            .collection(Collections.routes)
+            .orderBy('route_number', descending: true)
+            .limit(1)
+            .get();
     if (snap.docs.isEmpty) return 1;
     final currentMax = snap.docs.first.data()['route_number'] as int? ?? 0;
     return currentMax + 1;
@@ -139,16 +143,17 @@ class RouteNotifier extends AsyncNotifier<void> {
     final routeRef = db.collection(Collections.routes).doc();
     final assignedSellerId =
         (data['assigned_seller_id'] as String?)?.trim().isNotEmpty == true
-        ? (data['assigned_seller_id'] as String).trim()
-        : null;
+            ? (data['assigned_seller_id'] as String).trim()
+            : null;
     final routeName = data['name'] as String? ?? '';
     final assignedSellerName =
         (data['assigned_seller_name'] as String?)?.trim().isNotEmpty == true
-        ? (data['assigned_seller_name'] as String).trim()
-        : null;
-    final routeNumber = ((data['route_number'] as int?) ?? 0) > 0
-        ? (data['route_number'] as int)
-        : await _nextRouteNumber(db);
+            ? (data['assigned_seller_name'] as String).trim()
+            : null;
+    final routeNumber =
+        ((data['route_number'] as int?) ?? 0) > 0
+            ? (data['route_number'] as int)
+            : await _nextRouteNumber(db);
 
     await db.runTransaction<void>((txn) async {
       DocumentReference<Map<String, dynamic>>? sellerRef;
@@ -178,9 +183,8 @@ class RouteNotifier extends AsyncNotifier<void> {
       txn.set(routeRef, {
         ...data,
         'assigned_seller_id': assignedSellerId,
-        'assigned_seller_name': assignedSellerId == null
-            ? null
-            : assignedSellerName,
+        'assigned_seller_name':
+            assignedSellerId == null ? null : assignedSellerName,
         'route_number': routeNumber,
         'total_shops': 0,
         'active': true,
@@ -219,16 +223,16 @@ class RouteNotifier extends AsyncNotifier<void> {
           (currentRoute.data()?['assigned_seller_id'] as String?)?.trim();
       final newSellerId =
           (data['assigned_seller_id'] as String?)?.trim().isNotEmpty == true
-          ? (data['assigned_seller_id'] as String).trim()
-          : null;
+              ? (data['assigned_seller_id'] as String).trim()
+              : null;
       final routeName =
           data['name'] as String? ??
           currentRoute.data()?['name'] as String? ??
           '';
       final assignedSellerName =
           (data['assigned_seller_name'] as String?)?.trim().isNotEmpty == true
-          ? (data['assigned_seller_name'] as String).trim()
-          : null;
+              ? (data['assigned_seller_name'] as String).trim()
+              : null;
 
       DocumentReference<Map<String, dynamic>>? newSellerRef;
       DocumentReference<Map<String, dynamic>>? previousRouteRef;
@@ -309,12 +313,13 @@ class RouteNotifier extends AsyncNotifier<void> {
     }
 
     // Check for active shops/customers linked to this route
-    final shopsSnap = await db
-        .collection(Collections.customers)
-        .where('route_id', isEqualTo: id)
-        .where('active', isEqualTo: true)
-        .limit(1)
-        .get();
+    final shopsSnap =
+        await db
+            .collection(Collections.customers)
+            .where('route_id', isEqualTo: id)
+            .where('active', isEqualTo: true)
+            .limit(1)
+            .get();
     if (shopsSnap.docs.isNotEmpty) {
       throw StateError('route_has_shops');
     }

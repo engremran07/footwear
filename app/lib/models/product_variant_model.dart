@@ -20,7 +20,9 @@ class ProductVariantModel {
   });
 
   factory ProductVariantModel.fromJson(
-      Map<String, dynamic> json, String docId) {
+    Map<String, dynamic> json,
+    String docId,
+  ) {
     return ProductVariantModel(
       id: docId,
       productId: json['product_id'] as String? ?? '',
@@ -63,4 +65,3 @@ class ProductVariantModel {
     );
   }
 }
-

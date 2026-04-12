@@ -93,12 +93,14 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
         'name': AppSanitizer.name(_nameC.text),
         'route_id': _routeId,
         'route_number': _routeNumber,
-        'phone': _phoneC.text.trim().isEmpty
-            ? null
-            : AppSanitizer.phone(_phoneC.text),
-        'city': _cityC.text.trim().isEmpty
-            ? null
-            : AppSanitizer.text(_cityC.text, maxLength: 100),
+        'phone':
+            _phoneC.text.trim().isEmpty
+                ? null
+                : AppSanitizer.phone(_phoneC.text),
+        'city':
+            _cityC.text.trim().isEmpty
+                ? null
+                : AppSanitizer.text(_cityC.text, maxLength: 100),
       };
       if (isEdit) {
         await ref
@@ -134,14 +136,16 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       _loadExisting();
     }
     final user = ref.watch(authUserProvider).valueOrNull;
-    final routesAsync = user?.isAdmin == true
-        ? ref.watch(routesProvider)
-        : ref.watch(routesBySellerProvider(user?.id ?? ''));
+    final routesAsync =
+        user?.isAdmin == true
+            ? ref.watch(routesProvider)
+            : ref.watch(routesBySellerProvider(user?.id ?? ''));
     final routesLoading = user != null && routesAsync.isLoading;
     final allRoutes = routesAsync.valueOrNull ?? [];
-    final routes = user?.isAdmin == true
-        ? allRoutes
-        : allRoutes.where((r) => r.id == user?.assignedRouteId).toList();
+    final routes =
+        user?.isAdmin == true
+            ? allRoutes
+            : allRoutes.where((r) => r.id == user?.assignedRouteId).toList();
 
     // Seller: set route directly from user profile without waiting for routes to load.
     // Guard with !isEdit so edit-mode shops keep their stored route_id.
@@ -196,33 +200,35 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                     initialValue: _routeId,
                     decoration: InputDecoration(
                       labelText: '${tr('route', ref)} *',
-                      suffixIcon: routesLoading
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                      suffixIcon:
+                          routesLoading
+                              ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
-                              ),
-                            )
-                          : null,
+                              )
+                              : null,
                     ),
                     // When _routeId is set but the list hasn't loaded yet (e.g. seller
                     // offline / slow connection), provide a placeholder item so that
                     // Flutter's assertion (value must be in items) does not fire.
-                    items: routes.isNotEmpty
-                        ? routes
-                              .map(
-                                (r) => DropdownMenuItem(
-                                  value: r.id,
-                                  child: Text('${r.routeNumber} - ${r.name}'),
-                                ),
-                              )
-                              .toList()
-                        : (_routeId != null
-                              ? [
+                    items:
+                        routes.isNotEmpty
+                            ? routes
+                                .map(
+                                  (r) => DropdownMenuItem(
+                                    value: r.id,
+                                    child: Text('${r.routeNumber} - ${r.name}'),
+                                  ),
+                                )
+                                .toList()
+                            : (_routeId != null
+                                ? [
                                   DropdownMenuItem(
                                     value: _routeId,
                                     child: Text(
@@ -232,21 +238,23 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                                     ),
                                   ),
                                 ]
-                              : []),
+                                : []),
                     validator: (v) => v == null ? tr('required', ref) : null,
-                    onChanged: user?.isAdmin == true
-                        ? routesLoading
-                              ? null
-                              : (v) {
-                                  final r = routes
-                                      .where((r) => r.id == v)
-                                      .firstOrNull;
+                    onChanged:
+                        user?.isAdmin == true
+                            ? routesLoading
+                                ? null
+                                : (v) {
+                                  final r =
+                                      routes
+                                          .where((r) => r.id == v)
+                                          .firstOrNull;
                                   setState(() {
                                     _routeId = v;
                                     _routeNumber = r?.routeNumber ?? 0;
                                   });
                                 }
-                        : null,
+                            : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -285,18 +293,21 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                     child: FilledButton(
                       onPressed:
                           _saving ||
-                              (routesLoading &&
-                                  user.isAdmin &&
-                                  _routeId == null)
-                          ? null
-                          : _save,
-                      child: _saving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(tr('save', ref)),
+                                  (routesLoading &&
+                                      user.isAdmin &&
+                                      _routeId == null)
+                              ? null
+                              : _save,
+                      child:
+                          _saving
+                              ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : Text(tr('save', ref)),
                     ),
                   ),
                 ],

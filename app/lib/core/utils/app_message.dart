@@ -50,8 +50,13 @@ class AppMessage {
 
   // ── Internal ────────────────────────────────────────────────────────
 
-  static void _show(BuildContext context, WidgetRef ref, String key, _Type type,
-      {Duration? duration}) {
+  static void _show(
+    BuildContext context,
+    WidgetRef ref,
+    String key,
+    _Type type, {
+    Duration? duration,
+  }) {
     final messenger = ScaffoldMessenger.maybeOf(context);
     if (messenger == null) return;
 
@@ -61,29 +66,29 @@ class AppMessage {
 
     final (Color bg, Color fg, Color accent, IconData icon) = switch (type) {
       _Type.success => (
-          AppBrand.successBg,
-          AppBrand.successFg,
-          AppBrand.successAccent,
-          Icons.check_circle_rounded
-        ),
+        AppBrand.successBg,
+        AppBrand.successFg,
+        AppBrand.successAccent,
+        Icons.check_circle_rounded,
+      ),
       _Type.error => (
-          AppBrand.errorBg,
-          AppBrand.errorFg,
-          AppBrand.errorAccent,
-          Icons.error_rounded
-        ),
+        AppBrand.errorBg,
+        AppBrand.errorFg,
+        AppBrand.errorAccent,
+        Icons.error_rounded,
+      ),
       _Type.warning => (
-          AppBrand.warningBg,
-          AppBrand.warningFg,
-          AppBrand.warningAccent,
-          Icons.warning_rounded
-        ),
+        AppBrand.warningBg,
+        AppBrand.warningFg,
+        AppBrand.warningAccent,
+        Icons.warning_rounded,
+      ),
       _Type.info => (
-          AppBrand.infoBg,
-          AppBrand.infoFg,
-          AppBrand.infoAccent,
-          Icons.info_rounded
-        ),
+        AppBrand.infoBg,
+        AppBrand.infoFg,
+        AppBrand.infoAccent,
+        Icons.info_rounded,
+      ),
     };
 
     messenger.showSnackBar(
@@ -122,7 +127,8 @@ class AppMessage {
         ),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        duration: duration ??
+        duration:
+            duration ??
             (type == _Type.error ? _normalDuration : _shortDuration),
         dismissDirection: DismissDirection.horizontal,
       ),

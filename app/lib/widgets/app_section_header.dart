@@ -21,22 +21,26 @@ class AppSectionHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.s16, vertical: AppTokens.s8),
+        horizontal: AppTokens.s16,
+        vertical: AppTokens.s8,
+      ),
       child: Row(
         children: [
           Expanded(
             child: Text(
               title,
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w600),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           if (actionLabel != null && onAction != null)
             TextButton.icon(
               onPressed: onAction,
-              icon: actionIcon != null
-                  ? Icon(actionIcon, size: AppTokens.iconSizeSM)
-                  : null,
+              icon:
+                  actionIcon != null
+                      ? Icon(actionIcon, size: AppTokens.iconSizeSM)
+                      : null,
               label: Text(actionLabel!),
             ),
         ],

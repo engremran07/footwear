@@ -52,33 +52,39 @@ class _AppSearchBarState extends State<AppSearchBar> {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.s16, vertical: AppTokens.s8),
+        horizontal: AppTokens.s16,
+        vertical: AppTokens.s8,
+      ),
       child: TextField(
         controller: _controller,
         onChanged: _onChanged,
         decoration: InputDecoration(
           hintText: widget.hintText,
           prefixIcon: const Icon(Icons.search, size: AppTokens.iconSizeMD),
-          suffixIcon: _controller.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, size: AppTokens.iconSizeSM),
-                  tooltip: 'Clear search',
-                  onPressed: () {
-                    _controller.clear();
-                    widget.onChanged('');
-                    setState(() {});
-                  },
-                )
-              : null,
+          suffixIcon:
+              _controller.text.isNotEmpty
+                  ? IconButton(
+                    icon: const Icon(Icons.clear, size: AppTokens.iconSizeSM),
+                    tooltip: 'Clear search',
+                    onPressed: () {
+                      _controller.clear();
+                      widget.onChanged('');
+                      setState(() {});
+                    },
+                  )
+                  : null,
           filled: true,
-          fillColor:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.5,
+          ),
           border: OutlineInputBorder(
             borderRadius: AppTokens.brFull,
             borderSide: BorderSide.none,
           ),
           contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.s16, vertical: AppTokens.s12),
+            horizontal: AppTokens.s16,
+            vertical: AppTokens.s12,
+          ),
         ),
         textInputAction: TextInputAction.search,
         onTapOutside: (_) => FocusScope.of(context).unfocus(),

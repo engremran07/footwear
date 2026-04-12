@@ -109,15 +109,18 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     if (!_enableLifecycleTrace) return;
     final now = DateTime.now();
     final user = ref.read(authUserProvider).valueOrNull;
-    final role = user == null
-        ? 'none'
-        : (user.isAdmin ? 'admin' : (user.isSeller ? 'seller' : 'other'));
-    final bgForSec = _backgroundedAt == null
-        ? 'n/a'
-        : now.difference(_backgroundedAt!).inSeconds.toString();
-    final sessionForMin = _sessionStartedAt == null
-        ? 'n/a'
-        : now.difference(_sessionStartedAt!).inMinutes.toString();
+    final role =
+        user == null
+            ? 'none'
+            : (user.isAdmin ? 'admin' : (user.isSeller ? 'seller' : 'other'));
+    final bgForSec =
+        _backgroundedAt == null
+            ? 'n/a'
+            : now.difference(_backgroundedAt!).inSeconds.toString();
+    final sessionForMin =
+        _sessionStartedAt == null
+            ? 'n/a'
+            : now.difference(_sessionStartedAt!).inMinutes.toString();
     final detailsText = details.entries
         .map((e) => '${e.key}=${e.value}')
         .join(', ');
@@ -205,9 +208,10 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     _trace('lifecycle.resume.start');
     if (_backgroundedAt != null) {
       final elapsed = DateTime.now().difference(_backgroundedAt!);
-      final signOutDelay = _currentUserIsAdmin
-          ? widget.adminSignOutDelay
-          : widget.sellerSignOutDelay;
+      final signOutDelay =
+          _currentUserIsAdmin
+              ? widget.adminSignOutDelay
+              : widget.sellerSignOutDelay;
       _trace('lifecycle.resume.elapsed', {
         'elapsedSec': elapsed.inSeconds,
         'signoutDelaySec': signOutDelay.inSeconds,
@@ -272,16 +276,17 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     showDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => AlertDialog(
-        title: Text(tr('session_expiring_soon', ref)),
-        content: Text(tr('session_warning_30min', ref)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(tr('ok', ref)),
+      builder:
+          (ctx) => AlertDialog(
+            title: Text(tr('session_expiring_soon', ref)),
+            content: Text(tr('session_warning_30min', ref)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(tr('ok', ref)),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -399,17 +404,16 @@ class _AppLockOverlay extends ConsumerWidget {
                       color: cs.primaryContainer,
                       shape: BoxShape.circle,
                     ),
-                    child:
-                        Icon(
-                              Icons.lock_outline,
-                              size: 48,
-                              color: cs.onPrimaryContainer,
-                            )
-                            .animate(onPlay: (c) => c.repeat())
-                            .shimmer(
-                              duration: 2400.ms,
-                              color: cs.primary.withAlpha(100),
-                            ),
+                    child: Icon(
+                          Icons.lock_outline,
+                          size: 48,
+                          color: cs.onPrimaryContainer,
+                        )
+                        .animate(onPlay: (c) => c.repeat())
+                        .shimmer(
+                          duration: 2400.ms,
+                          color: cs.primary.withAlpha(100),
+                        ),
                   ),
                   const SizedBox(height: 32),
                   Text(

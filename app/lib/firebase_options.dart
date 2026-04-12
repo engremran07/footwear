@@ -37,5 +37,4 @@ class DefaultFirebaseOptions {
     projectId: 'shoeserp-clean-20260327',
     storageBucket: 'shoeserp-clean-20260327.firebasestorage.app',
   );
-
 }

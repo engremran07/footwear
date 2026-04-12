@@ -6,10 +6,10 @@ import '../core/design/app_tokens.dart';
 /// Light mode: white (classic shimmer look). Dark mode: dark grey.
 Color _placeholderColor(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
-    ? Colors
-          .grey
-          .shade800 // shimmer
-    : Colors.white; // shimmer
+        ? Colors
+            .grey
+            .shade800 // shimmer
+        : Colors.white; // shimmer
 
 /// A shimmer placeholder widget for loading states.
 /// Uses the shimmer package for smooth, consistent loading animations.
@@ -35,12 +35,10 @@ class ShimmerLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseColor = isDark
-        ? Colors.grey.shade800
-        : Colors.grey.shade300; // shimmer
-    final highlightColor = isDark
-        ? Colors.grey.shade700
-        : Colors.grey.shade100; // shimmer
+    final baseColor =
+        isDark ? Colors.grey.shade800 : Colors.grey.shade300; // shimmer
+    final highlightColor =
+        isDark ? Colors.grey.shade700 : Colors.grey.shade100; // shimmer
 
     return Semantics(
       label: 'Loading data, please wait',
@@ -117,12 +115,10 @@ class _ShimmerCards extends StatelessWidget {
       label: 'Loading statistics',
       child: ExcludeSemantics(
         child: Shimmer.fromColors(
-          baseColor: isDark
-              ? Colors.grey.shade800
-              : Colors.grey.shade300, // shimmer
-          highlightColor: isDark
-              ? Colors.grey.shade700
-              : Colors.grey.shade100, // shimmer
+          baseColor:
+              isDark ? Colors.grey.shade800 : Colors.grey.shade300, // shimmer
+          highlightColor:
+              isDark ? Colors.grey.shade700 : Colors.grey.shade100, // shimmer
           child: GridView.builder(
             physics: const NeverScrollableScrollPhysics(),
             shrinkWrap: true,
@@ -134,12 +130,13 @@ class _ShimmerCards extends StatelessWidget {
               childAspectRatio: 1.6,
             ),
             itemCount: count,
-            itemBuilder: (_, __) => Container(
-              decoration: BoxDecoration(
-                color: _placeholderColor(context),
-                borderRadius: AppTokens.brMD,
-              ),
-            ),
+            itemBuilder:
+                (_, __) => Container(
+                  decoration: BoxDecoration(
+                    color: _placeholderColor(context),
+                    borderRadius: AppTokens.brMD,
+                  ),
+                ),
           ),
         ),
       ),
@@ -157,12 +154,10 @@ class _ShimmerDetail extends StatelessWidget {
       label: 'Loading details',
       child: ExcludeSemantics(
         child: Shimmer.fromColors(
-          baseColor: isDark
-              ? Colors.grey.shade800
-              : Colors.grey.shade300, // shimmer
-          highlightColor: isDark
-              ? Colors.grey.shade700
-              : Colors.grey.shade100, // shimmer
+          baseColor:
+              isDark ? Colors.grey.shade800 : Colors.grey.shade300, // shimmer
+          highlightColor:
+              isDark ? Colors.grey.shade700 : Colors.grey.shade100, // shimmer
           child: Padding(
             padding: const EdgeInsets.all(AppTokens.s16),
             child: Column(
@@ -203,12 +198,10 @@ class _ShimmerGrid extends StatelessWidget {
       label: 'Loading items',
       child: ExcludeSemantics(
         child: Shimmer.fromColors(
-          baseColor: isDark
-              ? Colors.grey.shade800
-              : Colors.grey.shade300, // shimmer
-          highlightColor: isDark
-              ? Colors.grey.shade700
-              : Colors.grey.shade100, // shimmer
+          baseColor:
+              isDark ? Colors.grey.shade800 : Colors.grey.shade300, // shimmer
+          highlightColor:
+              isDark ? Colors.grey.shade700 : Colors.grey.shade100, // shimmer
           child: GridView.builder(
             physics: const NeverScrollableScrollPhysics(),
             shrinkWrap: true,
@@ -220,12 +213,13 @@ class _ShimmerGrid extends StatelessWidget {
               childAspectRatio: 0.75,
             ),
             itemCount: count,
-            itemBuilder: (_, __) => Container(
-              decoration: BoxDecoration(
-                color: _placeholderColor(context),
-                borderRadius: AppTokens.brMD,
-              ),
-            ),
+            itemBuilder:
+                (_, __) => Container(
+                  decoration: BoxDecoration(
+                    color: _placeholderColor(context),
+                    borderRadius: AppTokens.brMD,
+                  ),
+                ),
           ),
         ),
       ),

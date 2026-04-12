@@ -112,25 +112,26 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).valueOrNull;
-    final shopsAsync = user?.isSeller == true && user?.assignedRouteId != null
-        ? ref.watch(shopsByRouteProvider(user!.assignedRouteId!))
-        : ref.watch(shopsProvider);
+    final shopsAsync =
+        user?.isSeller == true && user?.assignedRouteId != null
+            ? ref.watch(shopsByRouteProvider(user!.assignedRouteId!))
+            : ref.watch(shopsProvider);
     final transactionsAsync = ref.watch(shopsAnalyticsTransactionsProvider);
-    final routesAsync = user?.isAdmin == true
-        ? ref.watch(routesProvider)
-        : null;
+    final routesAsync =
+        user?.isAdmin == true ? ref.watch(routesProvider) : null;
     final canCreateShop =
         user != null && (user.isAdmin || user.assignedRouteId != null);
-    final scopedStatsShops = shopsAsync.valueOrNull == null
-        ? null
-        : _scopeShopsByRoute(shopsAsync.valueOrNull!);
+    final scopedStatsShops =
+        shopsAsync.valueOrNull == null
+            ? null
+            : _scopeShopsByRoute(shopsAsync.valueOrNull!);
     final flowByShop =
         scopedStatsShops == null || transactionsAsync.valueOrNull == null
-        ? null
-        : _buildShopFlowStats(
-            shops: scopedStatsShops,
-            transactions: transactionsAsync.valueOrNull!,
-          );
+            ? null
+            : _buildShopFlowStats(
+              shops: scopedStatsShops,
+              transactions: transactionsAsync.valueOrNull!,
+            );
 
     return Scaffold(
       appBar: AppBar(
@@ -149,29 +150,30 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                 _exportPerRoute(shops, routes);
               }
             },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'all',
-                child: Row(
-                  children: [
-                    const Icon(Icons.table_chart, size: 20),
-                    const SizedBox(width: 8),
-                    Text(tr('export_all_shops', ref)),
-                  ],
-                ),
-              ),
-              if (user?.isAdmin == true)
-                PopupMenuItem(
-                  value: 'per_route',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.route, size: 20),
-                      const SizedBox(width: 8),
-                      Text(tr('export_per_route', ref)),
-                    ],
+            itemBuilder:
+                (_) => [
+                  PopupMenuItem(
+                    value: 'all',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.table_chart, size: 20),
+                        const SizedBox(width: 8),
+                        Text(tr('export_all_shops', ref)),
+                      ],
+                    ),
                   ),
-                ),
-            ],
+                  if (user?.isAdmin == true)
+                    PopupMenuItem(
+                      value: 'per_route',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.route, size: 20),
+                          const SizedBox(width: 8),
+                          Text(tr('export_per_route', ref)),
+                        ],
+                      ),
+                    ),
+                ],
           ),
         ],
       ),
@@ -252,12 +254,13 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                       transactionsAsync.valueOrNull ??
                       const <TransactionModel>[],
                 );
-                final filtered = scopedShops.where((s) {
-                  final flowStats =
-                      scopedFlowByShop[s.id] ?? const _ShopFlowStats();
-                  return _matchesSearch(s, _search) &&
-                      _matchesQuickFilter(s, flowStats);
-                }).toList();
+                final filtered =
+                    scopedShops.where((s) {
+                      final flowStats =
+                          scopedFlowByShop[s.id] ?? const _ShopFlowStats();
+                      return _matchesSearch(s, _search) &&
+                          _matchesQuickFilter(s, flowStats);
+                    }).toList();
 
                 switch (_filter) {
                   case _ShopQuickFilter.iGot:
@@ -303,10 +306,11 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   final k = s.name.toLowerCase();
                   nameCount[k] = (nameCount[k] ?? 0) + 1;
                 }
-                final duplicateNames = nameCount.entries
-                    .where((e) => e.value > 1)
-                    .map((e) => e.key)
-                    .toSet();
+                final duplicateNames =
+                    nameCount.entries
+                        .where((e) => e.value > 1)
+                        .map((e) => e.key)
+                        .toSet();
 
                 return AppPullRefresh(
                   onRefresh: () async {
@@ -323,43 +327,47 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   child: ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     itemCount: filtered.length,
-                    itemBuilder: (_, i) => _ShopTile(
-                      shop: filtered[i],
-                      selectedFilter: _filter,
-                      flowStats:
-                          scopedFlowByShop[filtered[i].id] ??
-                          const _ShopFlowStats(),
-                      hasDuplicate: duplicateNames.contains(
-                        filtered[i].name.toLowerCase(),
-                      ),
-                    ).listEntry(i),
+                    itemBuilder:
+                        (_, i) => _ShopTile(
+                          shop: filtered[i],
+                          selectedFilter: _filter,
+                          flowStats:
+                              scopedFlowByShop[filtered[i].id] ??
+                              const _ShopFlowStats(),
+                          hasDuplicate: duplicateNames.contains(
+                            filtered[i].name.toLowerCase(),
+                          ),
+                        ).listEntry(i),
                   ),
                 );
               },
               loading: () => const ShimmerLoading(),
-              error: (e, _) => mappedErrorState(
-                error: e,
-                ref: ref,
-                onRetry: () {
-                  if (user?.isSeller == true && user?.assignedRouteId != null) {
-                    ref.invalidate(
-                      shopsByRouteProvider(user!.assignedRouteId!),
-                    );
-                  } else {
-                    ref.invalidate(shopsProvider);
-                  }
-                },
-              ),
+              error:
+                  (e, _) => mappedErrorState(
+                    error: e,
+                    ref: ref,
+                    onRetry: () {
+                      if (user?.isSeller == true &&
+                          user?.assignedRouteId != null) {
+                        ref.invalidate(
+                          shopsByRouteProvider(user!.assignedRouteId!),
+                        );
+                      } else {
+                        ref.invalidate(shopsProvider);
+                      }
+                    },
+                  ),
             ),
           ),
         ],
       ),
-      floatingActionButton: canCreateShop
-          ? FloatingActionButton(
-              onPressed: () => context.push('/shops/new'),
-              child: const Icon(Icons.add),
-            )
-          : null,
+      floatingActionButton:
+          canCreateShop
+              ? FloatingActionButton(
+                onPressed: () => context.push('/shops/new'),
+                child: const Icon(Icons.add),
+              )
+              : null,
     );
   }
 
@@ -374,16 +382,17 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       tr('area', ref),
       tr('balance', ref),
     ];
-    final rows = shops.map((s) {
-      final r = routeMap[s.routeId];
-      return <dynamic>[
-        s.name,
-        r != null ? '${r.routeNumber} · ${r.name}' : '-',
-        s.phone ?? '-',
-        s.area ?? '-',
-        s.balance,
-      ];
-    }).toList();
+    final rows =
+        shops.map((s) {
+          final r = routeMap[s.routeId];
+          return <dynamic>[
+            s.name,
+            r != null ? '${r.routeNumber} · ${r.name}' : '-',
+            s.phone ?? '-',
+            s.area ?? '-',
+            s.balance,
+          ];
+        }).toList();
     ExportSheet.show(
       context,
       ref,
@@ -426,9 +435,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
     // Add unassigned shops
     final knownIds = routeMap.keys.toSet();
-    final unassigned = shops
-        .where((s) => !knownIds.contains(s.routeId))
-        .toList();
+    final unassigned =
+        shops.where((s) => !knownIds.contains(s.routeId)).toList();
     if (unassigned.isNotEmpty) {
       allRows.add(['── ${tr('shops_unassigned', ref)} ──', '', '', '']);
       for (final s in unassigned) {
@@ -468,10 +476,8 @@ Map<String, _ShopFlowStats> _buildShopFlowStats({
   required Iterable<ShopModel> shops,
   required Iterable<TransactionModel> transactions,
 }) {
-  final shopIds = shops
-      .map((s) => s.id.trim())
-      .where((id) => id.isNotEmpty)
-      .toSet();
+  final shopIds =
+      shops.map((s) => s.id.trim()).where((id) => id.isNotEmpty).toSet();
   final flowByShop = <String, _ShopFlowStats>{
     for (final shopId in shopIds) shopId: const _ShopFlowStats(),
   };
@@ -506,26 +512,30 @@ class _ShopStatsStrip extends ConsumerWidget {
     final isTablet = width >= 700;
     final isSmallPhone = width < 360;
 
-    final cardPadding = isTablet
-        ? const EdgeInsets.symmetric(horizontal: 8, vertical: 10)
-        : isSmallPhone
-        ? const EdgeInsets.symmetric(horizontal: 4, vertical: 6)
-        : const EdgeInsets.symmetric(horizontal: 6, vertical: 8);
-    final valueFontSize = isTablet
-        ? 13.0
-        : isSmallPhone
-        ? 10.0
-        : 12.0;
-    final labelFontSize = isTablet
-        ? 11.0
-        : isSmallPhone
-        ? 9.0
-        : 10.0;
-    final iconSize = isTablet
-        ? 18.0
-        : isSmallPhone
-        ? 14.0
-        : 15.0;
+    final cardPadding =
+        isTablet
+            ? const EdgeInsets.symmetric(horizontal: 8, vertical: 10)
+            : isSmallPhone
+            ? const EdgeInsets.symmetric(horizontal: 4, vertical: 6)
+            : const EdgeInsets.symmetric(horizontal: 6, vertical: 8);
+    final valueFontSize =
+        isTablet
+            ? 13.0
+            : isSmallPhone
+            ? 10.0
+            : 12.0;
+    final labelFontSize =
+        isTablet
+            ? 11.0
+            : isSmallPhone
+            ? 9.0
+            : 10.0;
+    final iconSize =
+        isTablet
+            ? 18.0
+            : isSmallPhone
+            ? 14.0
+            : 15.0;
 
     final totalGave = shops.fold(
       0.0,
@@ -579,9 +589,10 @@ class _ShopStatsStrip extends ConsumerWidget {
               icon: Icons.schedule,
               label: tr('i_will_get', ref),
               value: AppFormatters.sar(totalWillGet),
-              color: totalWillGet >= 0
-                  ? AppTheme.warningFg(cs)
-                  : AppTheme.debtFg(cs),
+              color:
+                  totalWillGet >= 0
+                      ? AppTheme.warningFg(cs)
+                      : AppTheme.debtFg(cs),
               selected: selected == _ShopQuickFilter.iWillGet,
               onTap: () => onSelected(_ShopQuickFilter.iWillGet),
               contentPadding: cardPadding,
@@ -749,9 +760,8 @@ class _ShopTile extends ConsumerWidget {
           clipBehavior: Clip.none,
           children: [
             CircleAvatar(
-              backgroundColor: hasDebt
-                  ? AppTheme.debtBg(cs)
-                  : AppTheme.clearBg(cs),
+              backgroundColor:
+                  hasDebt ? AppTheme.debtBg(cs) : AppTheme.clearBg(cs),
               child: Icon(
                 Icons.store,
                 color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
@@ -864,9 +874,8 @@ class _AdminGroupedShopsViewState
       }
     }
     final knownIds = routeMap.keys.toSet();
-    final unassigned = widget.shops
-        .where((s) => !knownIds.contains(s.routeId))
-        .toList();
+    final unassigned =
+        widget.shops.where((s) => !knownIds.contains(s.routeId)).toList();
     if (unassigned.isNotEmpty) {
       sections.add((route: null, key: '__unassigned', items: unassigned));
     }
@@ -902,13 +911,14 @@ class _AdminGroupedShopsViewState
           final cs = Theme.of(context).colorScheme;
           final isCollapsed = _collapsed.contains(entry.sectionKey);
           return InkWell(
-            onTap: () => setState(() {
-              if (isCollapsed) {
-                _collapsed.remove(entry.sectionKey);
-              } else {
-                _collapsed.add(entry.sectionKey);
-              }
-            }),
+            onTap:
+                () => setState(() {
+                  if (isCollapsed) {
+                    _collapsed.remove(entry.sectionKey);
+                  } else {
+                    _collapsed.add(entry.sectionKey);
+                  }
+                }),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               color: cs.surfaceContainerHighest,

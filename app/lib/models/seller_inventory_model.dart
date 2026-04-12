@@ -26,7 +26,9 @@ class SellerInventoryModel {
   });
 
   factory SellerInventoryModel.fromJson(
-      Map<String, dynamic> json, String docId) {
+    Map<String, dynamic> json,
+    String docId,
+  ) {
     return SellerInventoryModel(
       id: docId,
       sellerId: json['seller_id'] as String? ?? '',
@@ -42,14 +44,14 @@ class SellerInventoryModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'seller_id': sellerId,
-        'seller_name': sellerName,
-        'product_id': productId,
-        'variant_id': variantId,
-        'variant_name': variantName,
-        'quantity_available': quantityAvailable,
-        'active': active,
-        'created_at': createdAt,
-        'updated_at': updatedAt,
-      };
+    'seller_id': sellerId,
+    'seller_name': sellerName,
+    'product_id': productId,
+    'variant_id': variantId,
+    'variant_name': variantName,
+    'quantity_available': quantityAvailable,
+    'active': active,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+  };
 }

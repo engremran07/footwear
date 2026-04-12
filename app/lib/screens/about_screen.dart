@@ -24,9 +24,7 @@ class AboutScreen extends ConsumerWidget {
     final cs = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(tr('about_us', ref)),
-      ),
+      appBar: AppBar(title: Text(tr('about_us', ref))),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         children: [
@@ -42,16 +40,18 @@ class AboutScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Text(
                   AppBrand.appName,
-                  style: theme.textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 _VersionBadge(cs: cs),
                 const SizedBox(height: 8),
                 Text(
                   AppBrand.aboutDescription,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: cs.onSurfaceVariant),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -67,8 +67,8 @@ class AboutScreen extends ConsumerWidget {
             icon: Icons.info_outline,
             label: tr('app_version', ref),
             value: AppBrand.versionDisplay,
-            onTap: () =>
-                _copyToClipboard(context, AppBrand.versionDisplay, ref),
+            onTap:
+                () => _copyToClipboard(context, AppBrand.versionDisplay, ref),
           ),
           _InfoTile(
             icon: Icons.build_outlined,
@@ -101,8 +101,12 @@ class AboutScreen extends ConsumerWidget {
               _ActionButton(
                 tooltip: tr('email', ref),
                 icon: const Icon(Icons.email_outlined, size: 18),
-                onTap: () =>
-                    _launchUrl('mailto:${AppBrand.contactEmail}', context, ref),
+                onTap:
+                    () => _launchUrl(
+                      'mailto:${AppBrand.contactEmail}',
+                      context,
+                      ref,
+                    ),
               ),
             ],
           ),
@@ -114,18 +118,24 @@ class AboutScreen extends ConsumerWidget {
               _ActionButton(
                 tooltip: tr('phone', ref),
                 icon: const Icon(Icons.call_outlined, size: 18),
-                onTap: () => _launchUrl(
-                    'tel:${AppBrand.contactPhonePrimary.replaceAll('+', '')}',
-                    context,
-                    ref),
+                onTap:
+                    () => _launchUrl(
+                      'tel:${AppBrand.contactPhonePrimary.replaceAll('+', '')}',
+                      context,
+                      ref,
+                    ),
               ),
               _ActionButton(
                 tooltip: 'WhatsApp',
                 icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
                 backgroundColor: const Color(0xFFE9F9EF),
                 foregroundColor: const Color(0xFF128C7E),
-                onTap: () =>
-                    _openWhatsApp(AppBrand.contactPhonePrimary, context, ref),
+                onTap:
+                    () => _openWhatsApp(
+                      AppBrand.contactPhonePrimary,
+                      context,
+                      ref,
+                    ),
               ),
             ],
           ),
@@ -137,18 +147,24 @@ class AboutScreen extends ConsumerWidget {
               _ActionButton(
                 tooltip: tr('phone', ref),
                 icon: const Icon(Icons.call_outlined, size: 18),
-                onTap: () => _launchUrl(
-                    'tel:${AppBrand.contactPhoneSecondary.replaceAll('+', '')}',
-                    context,
-                    ref),
+                onTap:
+                    () => _launchUrl(
+                      'tel:${AppBrand.contactPhoneSecondary.replaceAll('+', '')}',
+                      context,
+                      ref,
+                    ),
               ),
               _ActionButton(
                 tooltip: 'WhatsApp',
                 icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
                 backgroundColor: const Color(0xFFE9F9EF),
                 foregroundColor: const Color(0xFF128C7E),
-                onTap: () =>
-                    _openWhatsApp(AppBrand.contactPhoneSecondary, context, ref),
+                onTap:
+                    () => _openWhatsApp(
+                      AppBrand.contactPhoneSecondary,
+                      context,
+                      ref,
+                    ),
               ),
             ],
           ),
@@ -172,8 +188,9 @@ class AboutScreen extends ConsumerWidget {
             title: Text(tr('open_source_licenses', ref)),
             subtitle: Text(
               'Open source packages, app version, support contacts, and legal notice.',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: cs.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
             ),
             onTap: () => _showOpenSourceLicenses(context),
           ),
@@ -182,8 +199,9 @@ class AboutScreen extends ConsumerWidget {
           Center(
             child: Text(
               '© 2026 ${AppBrand.companyName}. All rights reserved.',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: cs.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ),
@@ -195,50 +213,61 @@ class AboutScreen extends ConsumerWidget {
 
   void _copyToClipboard(BuildContext context, String text, WidgetRef ref) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context)
-        .showSnackBar(successSnackBar(tr('copied', ref)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(successSnackBar(tr('copied', ref)));
   }
 
   Future<void> _launchUrl(
-      String url, BuildContext context, WidgetRef ref) async {
+    String url,
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
     final uri = Uri.tryParse(url);
     if (uri == null) return;
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(errorSnackBar('${tr('err_url_open', ref)}: $url'));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar('${tr('err_url_open', ref)}: $url'));
       }
     }
   }
 
   Future<void> _openWhatsApp(
-      String phone, BuildContext context, WidgetRef ref) async {
+    String phone,
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
     final ok = await openWhatsApp(
       phone: phone,
       message: '${tr('whatsapp_greeting', ref)} ${AppBrand.companyName}',
     );
     if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(errorSnackBar(tr('err_whatsapp_unavailable', ref)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(errorSnackBar(tr('err_whatsapp_unavailable', ref)));
     }
   }
 
   void _showOpenSourceLicenses(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => LicensePage(
-          applicationName: AppBrand.appName,
-          applicationVersion: AppBrand.versionDisplay,
-          applicationIcon: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Image.asset(AppBrand.logoAsset, height: 48),
-          ),
-          applicationLegalese: '© 2026 ${AppBrand.companyName}.\n\n'
-              'Support email: ${AppBrand.contactEmail}\n'
-              'Phone: ${AppBrand.contactPhonePrimary}\n'
-              'Website: ${AppBrand.websiteUrl}\n\n'
-              'This screen lists third-party packages and their licenses in a readable format.',
-        ),
+        builder:
+            (_) => LicensePage(
+              applicationName: AppBrand.appName,
+              applicationVersion: AppBrand.versionDisplay,
+              applicationIcon: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Image.asset(AppBrand.logoAsset, height: 48),
+              ),
+              applicationLegalese:
+                  '© 2026 ${AppBrand.companyName}.\n\n'
+                  'Support email: ${AppBrand.contactEmail}\n'
+                  'Phone: ${AppBrand.contactPhonePrimary}\n'
+                  'Website: ${AppBrand.websiteUrl}\n\n'
+                  'This screen lists third-party packages and their licenses in a readable format.',
+            ),
       ),
     );
   }
@@ -319,8 +348,10 @@ class _InfoTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(icon, color: cs.onSurfaceVariant, size: 20),
-      title: Text(label,
-          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+      title: Text(
+        label,
+        style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+      ),
       subtitle: Text(
         value,
         style: TextStyle(
@@ -329,13 +360,14 @@ class _InfoTile extends StatelessWidget {
           fontWeight: FontWeight.w500,
         ),
       ),
-      trailing: onTap != null
-          ? Icon(
-              trailingIcon ?? Icons.copy_outlined,
-              size: 16,
-              color: cs.onSurfaceVariant,
-            )
-          : null,
+      trailing:
+          onTap != null
+              ? Icon(
+                trailingIcon ?? Icons.copy_outlined,
+                size: 16,
+                color: cs.onSurfaceVariant,
+              )
+              : null,
       onTap: onTap,
       mouseCursor: onTap != null ? SystemMouseCursors.click : null,
     );
@@ -371,8 +403,10 @@ class _ContactActionTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   value,
@@ -425,10 +459,7 @@ class _ActionButton extends StatelessWidget {
           ),
           alignment: Alignment.center,
           child: IconTheme(
-            data: IconThemeData(
-              color: foregroundColor ?? cs.primary,
-              size: 18,
-            ),
+            data: IconThemeData(color: foregroundColor ?? cs.primary, size: 18),
             child: icon,
           ),
         ),

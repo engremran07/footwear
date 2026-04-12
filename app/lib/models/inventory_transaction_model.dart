@@ -34,7 +34,9 @@ class InventoryTransactionModel {
   });
 
   factory InventoryTransactionModel.fromJson(
-      Map<String, dynamic> json, String docId) {
+    Map<String, dynamic> json,
+    String docId,
+  ) {
     return InventoryTransactionModel(
       id: docId,
       type: json['type'] as String? ?? '',
@@ -51,15 +53,15 @@ class InventoryTransactionModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'type': type,
-        'seller_id': sellerId,
-        'seller_name': sellerName,
-        'variant_id': variantId,
-        'variant_name': variantName,
-        'product_id': productId,
-        'quantity': quantity,
-        'notes': notes,
-        'created_by': createdBy,
-        'created_at': createdAt,
-      };
+    'type': type,
+    'seller_id': sellerId,
+    'seller_name': sellerName,
+    'variant_id': variantId,
+    'variant_name': variantName,
+    'product_id': productId,
+    'quantity': quantity,
+    'notes': notes,
+    'created_by': createdBy,
+    'created_at': createdAt,
+  };
 }

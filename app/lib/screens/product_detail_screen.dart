@@ -38,15 +38,17 @@ class ProductDetailScreen extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
 
     return productAsync.when(
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(
-        body: mappedErrorState(
-          error: e,
-          ref: ref,
-          onRetry: () => ref.invalidate(productDetailProvider(productId)),
-        ),
-      ),
+      loading:
+          () =>
+              const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error:
+          (e, _) => Scaffold(
+            body: mappedErrorState(
+              error: e,
+              ref: ref,
+              onRetry: () => ref.invalidate(productDetailProvider(productId)),
+            ),
+          ),
       data: (product) {
         if (product == null) {
           return Scaffold(
@@ -68,15 +70,16 @@ class ProductDetailScreen extends ConsumerWidget {
                     0,
                     (s, v) => s + v.quantityAvailable,
                   );
-                  final buf = StringBuffer()
-                    ..writeln(product.name)
-                    ..writeln('${tr('category', ref)}: ${product.category}')
-                    ..writeln(
-                      '${tr('total_variants', ref)}: ${variants.length}',
-                    )
-                    ..writeln(
-                      '${tr('stock_pairs', ref)}: ${_stockLabel(totalStock, ppc)}',
-                    );
+                  final buf =
+                      StringBuffer()
+                        ..writeln(product.name)
+                        ..writeln('${tr('category', ref)}: ${product.category}')
+                        ..writeln(
+                          '${tr('total_variants', ref)}: ${variants.length}',
+                        )
+                        ..writeln(
+                          '${tr('stock_pairs', ref)}: ${_stockLabel(totalStock, ppc)}',
+                        );
                   for (final v in variants) {
                     buf.writeln(
                       '  ${v.variantName}: ${_stockLabel(v.quantityAvailable, ppc)}',
@@ -147,9 +150,8 @@ class ProductDetailScreen extends ConsumerWidget {
                         0,
                         (s, v) => s + v.quantityAvailable,
                       );
-                      final inStock = variants
-                          .where((v) => v.quantityAvailable > 0)
-                          .length;
+                      final inStock =
+                          variants.where((v) => v.quantityAvailable > 0).length;
                       final outOfStock = variants.length - inStock;
                       return Container(
                         margin: const EdgeInsets.symmetric(horizontal: 12),
@@ -200,10 +202,11 @@ class ProductDetailScreen extends ConsumerWidget {
                     ),
                     const Spacer(),
                     variantsAsync.whenOrNull(
-                          data: (v) => Text(
-                            '${v.length}',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                          data:
+                              (v) => Text(
+                                '${v.length}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
                         ) ??
                         const SizedBox.shrink(),
                   ],
@@ -213,14 +216,17 @@ class ProductDetailScreen extends ConsumerWidget {
               // Variants list
               Expanded(
                 child: variantsAsync.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => mappedErrorState(
-                    error: e,
-                    ref: ref,
-                    onRetry: () =>
-                        ref.invalidate(productVariantsProvider(productId)),
-                  ),
+                  loading:
+                      () => const Center(child: CircularProgressIndicator()),
+                  error:
+                      (e, _) => mappedErrorState(
+                        error: e,
+                        ref: ref,
+                        onRetry:
+                            () => ref.invalidate(
+                              productVariantsProvider(productId),
+                            ),
+                      ),
                   data: (variants) {
                     if (variants.isEmpty) {
                       return EmptyState(
@@ -255,9 +261,10 @@ class ProductDetailScreen extends ConsumerWidget {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: v.quantityAvailable > 0
-                                      ? AppTheme.clearBg(cs)
-                                      : AppTheme.debtBg(cs),
+                                  color:
+                                      v.quantityAvailable > 0
+                                          ? AppTheme.clearBg(cs)
+                                          : AppTheme.debtBg(cs),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -268,9 +275,10 @@ class ProductDetailScreen extends ConsumerWidget {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
-                                    color: v.quantityAvailable > 0
-                                        ? AppTheme.clearFg(cs)
-                                        : AppTheme.debtFg(cs),
+                                    color:
+                                        v.quantityAvailable > 0
+                                            ? AppTheme.clearFg(cs)
+                                            : AppTheme.debtFg(cs),
                                   ),
                                   textAlign: TextAlign.center,
                                   maxLines: 1,
@@ -278,11 +286,12 @@ class ProductDetailScreen extends ConsumerWidget {
                                 ),
                               ),
                             ),
-                            onTap: user?.isAdmin == true
-                                ? () => context.push(
-                                    '/products/$productId/variants/${v.id}/edit',
-                                  )
-                                : null,
+                            onTap:
+                                user?.isAdmin == true
+                                    ? () => context.push(
+                                      '/products/$productId/variants/${v.id}/edit',
+                                    )
+                                    : null,
                           ),
                         );
                       },
@@ -292,13 +301,14 @@ class ProductDetailScreen extends ConsumerWidget {
               ),
             ],
           ),
-          floatingActionButton: user?.isAdmin == true
-              ? FloatingActionButton(
-                  onPressed: () =>
-                      context.push('/products/$productId/variants/new'),
-                  child: const Icon(Icons.add),
-                )
-              : null,
+          floatingActionButton:
+              user?.isAdmin == true
+                  ? FloatingActionButton(
+                    onPressed:
+                        () => context.push('/products/$productId/variants/new'),
+                    child: const Icon(Icons.add),
+                  )
+                  : null,
         );
       },
     );

@@ -37,26 +37,33 @@ class AppChartCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Header
-            Text(title,
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w600)),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             if (subtitle != null) ...[
               const SizedBox(height: AppTokens.s4),
-              Text(subtitle!,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              Text(
+                subtitle!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ],
             const SizedBox(height: AppTokens.s16),
 
             // Chart or empty state
             SizedBox(
               height: height,
-              child: isEmpty
-                  ? EmptyState(
-                      icon: Icons.bar_chart_rounded,
-                      message: emptyMessage,
-                    )
-                  : chart,
+              child:
+                  isEmpty
+                      ? EmptyState(
+                        icon: Icons.bar_chart_rounded,
+                        message: emptyMessage,
+                      )
+                      : chart,
             ),
 
             // Legend
@@ -95,10 +102,7 @@ class _LegendDot extends StatelessWidget {
         Container(
           width: 10,
           height: 10,
-          decoration: BoxDecoration(
-            color: item.color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: item.color, shape: BoxShape.circle),
         ),
         const SizedBox(width: AppTokens.s4),
         Text(item.label, style: Theme.of(context).textTheme.labelSmall),

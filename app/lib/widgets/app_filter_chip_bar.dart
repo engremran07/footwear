@@ -35,14 +35,16 @@ class AppFilterChipBar extends StatelessWidget {
                 onSelected: (_) => onSelected(null),
               ),
             ),
-          ...labels.map((label) => Padding(
-                padding: const EdgeInsetsDirectional.only(end: AppTokens.s8),
-                child: FilterChip(
-                  label: Text(label),
-                  selected: selected == label,
-                  onSelected: (sel) => onSelected(sel ? label : null),
-                ),
-              )),
+          ...labels.map(
+            (label) => Padding(
+              padding: const EdgeInsetsDirectional.only(end: AppTokens.s8),
+              child: FilterChip(
+                label: Text(label),
+                selected: selected == label,
+                onSelected: (sel) => onSelected(sel ? label : null),
+              ),
+            ),
+          ),
         ],
       ),
     );

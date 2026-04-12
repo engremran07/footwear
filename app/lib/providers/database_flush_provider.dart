@@ -55,8 +55,7 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
   Future<int> _deleteCollection(String collectionPath) async {
     int deleted = 0;
     while (true) {
-      final snap =
-          await _db.collection(collectionPath).limit(400).get();
+      final snap = await _db.collection(collectionPath).limit(400).get();
       if (snap.docs.isEmpty) break;
       final batch = _db.batch();
       for (final doc in snap.docs) {
@@ -76,11 +75,12 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
   ) async {
     int deleted = 0;
     while (true) {
-      final snap = await _db
-          .collection(collectionPath)
-          .where(field, isEqualTo: value)
-          .limit(400)
-          .get();
+      final snap =
+          await _db
+              .collection(collectionPath)
+              .where(field, isEqualTo: value)
+              .limit(400)
+              .get();
       if (snap.docs.isEmpty) break;
       final batch = _db.batch();
       for (final doc in snap.docs) {
@@ -115,18 +115,17 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
       deleted += await _deleteCollection(Collections.inventoryTransactions);
 
       // Reset invoice counter
-      await _db.collection(Collections.settings).doc('global').set(
-        {'last_invoice_number': 0, 'updated_at': Timestamp.now()},
-        SetOptions(merge: true),
-      );
+      await _db.collection(Collections.settings).doc('global').set({
+        'last_invoice_number': 0,
+        'updated_at': Timestamp.now(),
+      }, SetOptions(merge: true));
       reset++;
 
       // Reset all shop balances
       final shops = await _db.collection(Collections.shops).get();
       for (var i = 0; i < shops.docs.length; i += 400) {
         final batch = _db.batch();
-        final end =
-            (i + 400 > shops.docs.length) ? shops.docs.length : i + 400;
+        final end = (i + 400 > shops.docs.length) ? shops.docs.length : i + 400;
         for (var j = i; j < end; j++) {
           batch.update(shops.docs[j].reference, {
             'balance': 0.0,
@@ -162,14 +161,11 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
       deleted += await _deleteCollection(Collections.sellerInventory);
 
       // Reset warehouse stock (product_variants.quantity_available → 0)
-      final variants = await _db
-          .collection(Collections.productVariants)
-          .get();
+      final variants = await _db.collection(Collections.productVariants).get();
       for (var i = 0; i < variants.docs.length; i += 400) {
         final batch = _db.batch();
-        final end = (i + 400 > variants.docs.length)
-            ? variants.docs.length
-            : i + 400;
+        final end =
+            (i + 400 > variants.docs.length) ? variants.docs.length : i + 400;
         for (var j = i; j < end; j++) {
           batch.update(variants.docs[j].reference, {
             'quantity_available': 0,
@@ -205,9 +201,8 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
       final routes = await _db.collection(Collections.routes).get();
       for (var i = 0; i < routes.docs.length; i += 400) {
         final batch = _db.batch();
-        final end = (i + 400 > routes.docs.length)
-            ? routes.docs.length
-            : i + 400;
+        final end =
+            (i + 400 > routes.docs.length) ? routes.docs.length : i + 400;
         for (var j = i; j < end; j++) {
           batch.update(routes.docs[j].reference, {
             'total_shops': 0,
@@ -243,8 +238,7 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
       final users = await _db.collection(Collections.users).get();
       for (var i = 0; i < users.docs.length; i += 400) {
         final batch = _db.batch();
-        final end =
-            (i + 400 > users.docs.length) ? users.docs.length : i + 400;
+        final end = (i + 400 > users.docs.length) ? users.docs.length : i + 400;
         for (var j = i; j < end; j++) {
           batch.update(users.docs[j].reference, {
             'assigned_route_id': null,
@@ -298,12 +292,8 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
     return AsyncValue.guard(() async {
       int deleted = 0;
       while (true) {
-        final snap = await _db
-            .collection(Collections.users)
-            .limit(400)
-            .get();
-        final toDelete =
-            snap.docs.where((d) => d.id != keepAdminId).toList();
+        final snap = await _db.collection(Collections.users).limit(400).get();
+        final toDelete = snap.docs.where((d) => d.id != keepAdminId).toList();
         if (toDelete.isEmpty) break;
         final batch = _db.batch();
         for (final doc in toDelete) {
@@ -383,11 +373,7 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
         'require_admin_approval_for_seller_transaction_edits': false,
         'updated_at': Timestamp.now(),
       });
-      return FlushResult(
-        deletedCount: 0,
-        resetCount: 1,
-        operation: 'settings',
-      );
+      return FlushResult(deletedCount: 0, resetCount: 1, operation: 'settings');
     }).then((v) {
       state = v;
       return v.value!;
@@ -456,5 +442,5 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
 
 final databaseFlushProvider =
     AsyncNotifierProvider<DatabaseFlushNotifier, void>(
-  DatabaseFlushNotifier.new,
-);
+      DatabaseFlushNotifier.new,
+    );

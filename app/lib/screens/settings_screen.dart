@@ -100,9 +100,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
     // Only watch allUsersProvider when the current user is confirmed admin.
     // This prevents permission-denied errors from firing for seller accounts.
-    final usersAsync = currentUser?.isAdmin == true
-        ? ref.watch(allUsersProvider)
-        : const AsyncValue<List<UserModel>>.loading();
+    final usersAsync =
+        currentUser?.isAdmin == true
+            ? ref.watch(allUsersProvider)
+            : const AsyncValue<List<UserModel>>.loading();
     settingsAsync.whenData((_) => _loadSettings());
 
     return PopScope(
@@ -222,13 +223,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       const Divider(),
                       usersAsync.when(
-                        loading: () =>
-                            const Center(child: CircularProgressIndicator()),
-                        error: (e, _) => mappedErrorState(
-                          error: e,
-                          ref: ref,
-                          onRetry: () => ref.invalidate(allUsersProvider),
-                        ),
+                        loading:
+                            () => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                        error:
+                            (e, _) => mappedErrorState(
+                              error: e,
+                              ref: ref,
+                              onRetry: () => ref.invalidate(allUsersProvider),
+                            ),
                         data: (users) {
                           if (users.isEmpty) {
                             return Padding(
@@ -237,154 +241,177 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             );
                           }
                           return Column(
-                            children: users.map((u) {
-                              final isSelf = u.id == currentUser?.id;
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 4,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // ── Top row: avatar + name + email + role ──
-                                    Row(
+                            children:
+                                users.map((u) {
+                                  final isSelf = u.id == currentUser?.id;
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 4,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        CircleAvatar(
-                                          radius: 16,
-                                          backgroundColor: u.isAdmin
-                                              ? AppBrand.adminRoleColor
-                                                    .withAlpha(30)
-                                              : AppBrand.sellerRoleColor
-                                                    .withAlpha(30),
-                                          child: Icon(
-                                            u.isAdmin
-                                                ? Icons.admin_panel_settings
-                                                : Icons.person,
-                                            size: 16,
-                                            color: u.isAdmin
-                                                ? AppBrand.adminRoleColor
-                                                : AppBrand.sellerRoleColor,
-                                          ),
+                                        // ── Top row: avatar + name + email + role ──
+                                        Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 16,
+                                              backgroundColor:
+                                                  u.isAdmin
+                                                      ? AppBrand.adminRoleColor
+                                                          .withAlpha(30)
+                                                      : AppBrand.sellerRoleColor
+                                                          .withAlpha(30),
+                                              child: Icon(
+                                                u.isAdmin
+                                                    ? Icons.admin_panel_settings
+                                                    : Icons.person,
+                                                size: 16,
+                                                color:
+                                                    u.isAdmin
+                                                        ? AppBrand
+                                                            .adminRoleColor
+                                                        : AppBrand
+                                                            .sellerRoleColor,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    u.displayName,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    u.email,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style:
+                                                        Theme.of(
+                                                          context,
+                                                        ).textTheme.bodySmall,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                u.displayName,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w500,
+                                        const SizedBox(height: 4),
+                                        // ── Bottom row: role chip + route + actions ──
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 1,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: (u.isAdmin
+                                                        ? AppBrand
+                                                            .adminRoleColor
+                                                        : AppBrand
+                                                            .sellerRoleColor)
+                                                    .withAlpha(25),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                u.role.name,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color:
+                                                      u.isAdmin
+                                                          ? AppBrand
+                                                              .adminRoleColor
+                                                          : AppBrand
+                                                              .sellerRoleColor,
+                                                  fontWeight: FontWeight.w600,
                                                 ),
                                               ),
-                                              Text(
-                                                u.email,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: Theme.of(
-                                                  context,
-                                                ).textTheme.bodySmall,
+                                            ),
+                                            if (u.isSeller &&
+                                                u.assignedRouteName !=
+                                                    null) ...[
+                                              const SizedBox(width: 4),
+                                              Flexible(
+                                                child: Text(
+                                                  '• ${u.assignedRouteName}',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
                                               ),
                                             ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    // ── Bottom row: role chip + route + actions ──
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 1,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                (u.isAdmin
-                                                        ? AppBrand
-                                                              .adminRoleColor
-                                                        : AppBrand
-                                                              .sellerRoleColor)
-                                                    .withAlpha(25),
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            u.role.name,
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: u.isAdmin
-                                                  ? AppBrand.adminRoleColor
-                                                  : AppBrand.sellerRoleColor,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                        if (u.isSeller &&
-                                            u.assignedRouteName != null) ...[
-                                          const SizedBox(width: 4),
-                                          Flexible(
-                                            child: Text(
-                                              '• ${u.assignedRouteName}',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 11,
+                                            const Spacer(),
+                                            // ── Action buttons ──
+                                            GestureDetector(
+                                              onTap:
+                                                  () => _showEditUserDialog(u),
+                                              child: const Padding(
+                                                padding: EdgeInsets.all(4),
+                                                child: Icon(
+                                                  Icons.edit,
+                                                  size: 16,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                        const Spacer(),
-                                        // ── Action buttons ──
-                                        GestureDetector(
-                                          onTap: () => _showEditUserDialog(u),
-                                          child: const Padding(
-                                            padding: EdgeInsets.all(4),
-                                            child: Icon(Icons.edit, size: 16),
-                                          ),
-                                        ),
-                                        if (!isSelf && !u.isAdmin)
-                                          GestureDetector(
-                                            onTap: () => _confirmDeleteUser(u),
-                                            child: const Padding(
-                                              padding: EdgeInsets.all(4),
-                                              child: Icon(
-                                                Icons.delete,
-                                                size: 16,
-                                                color: AppBrand.errorColor,
+                                            if (!isSelf && !u.isAdmin)
+                                              GestureDetector(
+                                                onTap:
+                                                    () => _confirmDeleteUser(u),
+                                                child: const Padding(
+                                                  padding: EdgeInsets.all(4),
+                                                  child: Icon(
+                                                    Icons.delete,
+                                                    size: 16,
+                                                    color: AppBrand.errorColor,
+                                                  ),
+                                                ),
+                                              ),
+                                            SizedBox(
+                                              width: 36,
+                                              height: 24,
+                                              child: FittedBox(
+                                                child: Switch(
+                                                  value: u.active,
+                                                  onChanged:
+                                                      isSelf
+                                                          ? null
+                                                          : (v) => ref
+                                                              .read(
+                                                                userManagementNotifierProvider
+                                                                    .notifier,
+                                                              )
+                                                              .toggleActive(
+                                                                u.id,
+                                                                v,
+                                                              ),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        SizedBox(
-                                          width: 36,
-                                          height: 24,
-                                          child: FittedBox(
-                                            child: Switch(
-                                              value: u.active,
-                                              onChanged: isSelf
-                                                  ? null
-                                                  : (v) => ref
-                                                        .read(
-                                                          userManagementNotifierProvider
-                                                              .notifier,
-                                                        )
-                                                        .toggleActive(u.id, v),
-                                            ),
-                                          ),
+                                          ],
                                         ),
+                                        const Divider(height: 8),
                                       ],
                                     ),
-                                    const Divider(height: 8),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
+                                  );
+                                }).toList(),
                           );
                         },
                       ),
@@ -448,140 +475,150 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) {
-          final routes = ref.watch(routesProvider).valueOrNull ?? [];
-          final availableRoutes = routes
-              .where(
-                (r) =>
-                    r.assignedSellerId == null || r.assignedSellerId!.isEmpty,
-              )
-              .toList();
-          return AlertDialog(
-            title: Text(tr('new_user', ref)),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameC,
-                    decoration: InputDecoration(labelText: tr('name', ref)),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: emailC,
-                    decoration: InputDecoration(labelText: tr('email', ref)),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: passC,
-                    decoration: InputDecoration(labelText: tr('password', ref)),
-                    obscureText: true,
-                    keyboardType: TextInputType.visiblePassword,
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    initialValue: role,
-                    decoration: InputDecoration(labelText: tr('role', ref)),
-                    items: [
-                      DropdownMenuItem(
-                        value: 'admin',
-                        child: Text(tr('lbl_admin', ref)),
+      builder:
+          (ctx) => StatefulBuilder(
+            builder: (ctx, setS) {
+              final routes = ref.watch(routesProvider).valueOrNull ?? [];
+              final availableRoutes =
+                  routes
+                      .where(
+                        (r) =>
+                            r.assignedSellerId == null ||
+                            r.assignedSellerId!.isEmpty,
+                      )
+                      .toList();
+              return AlertDialog(
+                title: Text(tr('new_user', ref)),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: nameC,
+                        decoration: InputDecoration(labelText: tr('name', ref)),
                       ),
-                      DropdownMenuItem(
-                        value: 'seller',
-                        child: Text(tr('lbl_seller', ref)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: emailC,
+                        decoration: InputDecoration(
+                          labelText: tr('email', ref),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
                       ),
-                    ],
-                    onChanged: (v) => setS(() {
-                      role = v ?? 'seller';
-                      if (role != 'seller') {
-                        selectedRouteId = null;
-                        selectedRouteName = null;
-                      }
-                    }),
-                  ),
-                  if (role == 'seller') ...[
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedRouteId,
-                      decoration: InputDecoration(
-                        labelText: tr('assigned_route', ref),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: passC,
+                        decoration: InputDecoration(
+                          labelText: tr('password', ref),
+                        ),
+                        obscureText: true,
+                        keyboardType: TextInputType.visiblePassword,
                       ),
-                      items: [
-                        ...availableRoutes.map(
-                          (r) => DropdownMenuItem(
-                            value: r.id,
-                            child: Text(r.name),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: role,
+                        decoration: InputDecoration(labelText: tr('role', ref)),
+                        items: [
+                          DropdownMenuItem(
+                            value: 'admin',
+                            child: Text(tr('lbl_admin', ref)),
                           ),
+                          DropdownMenuItem(
+                            value: 'seller',
+                            child: Text(tr('lbl_seller', ref)),
+                          ),
+                        ],
+                        onChanged:
+                            (v) => setS(() {
+                              role = v ?? 'seller';
+                              if (role != 'seller') {
+                                selectedRouteId = null;
+                                selectedRouteName = null;
+                              }
+                            }),
+                      ),
+                      if (role == 'seller') ...[
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          initialValue: selectedRouteId,
+                          decoration: InputDecoration(
+                            labelText: tr('assigned_route', ref),
+                          ),
+                          items: [
+                            ...availableRoutes.map(
+                              (r) => DropdownMenuItem(
+                                value: r.id,
+                                child: Text(r.name),
+                              ),
+                            ),
+                          ],
+                          onChanged:
+                              (v) => setS(() {
+                                selectedRouteId = v;
+                                selectedRouteName =
+                                    routes
+                                        .where((r) => r.id == v)
+                                        .map((r) => r.name)
+                                        .firstOrNull;
+                              }),
                         ),
                       ],
-                      onChanged: (v) => setS(() {
-                        selectedRouteId = v;
-                        selectedRouteName = routes
-                            .where((r) => r.id == v)
-                            .map((r) => r.name)
-                            .firstOrNull;
-                      }),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(tr('cancel', ref)),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (nameC.text.trim().isEmpty ||
+                          emailC.text.trim().isEmpty ||
+                          passC.text.trim().isEmpty) {
+                        return;
+                      }
+                      if (role == 'seller' &&
+                          (selectedRouteId == null ||
+                              selectedRouteId!.trim().isEmpty)) {
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: Text(tr('msg_seller_needs_route', ref)),
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                      try {
+                        await ref
+                            .read(userManagementNotifierProvider.notifier)
+                            .createUser(
+                              email: emailC.text.trim(),
+                              password: passC.text.trim(),
+                              displayName: nameC.text.trim(),
+                              role: role,
+                              assignedRouteId: selectedRouteId,
+                              assignedRouteName: selectedRouteName,
+                            );
+                        if (mounted) {
+                          Navigator.of(context, rootNavigator: true).pop();
+                        }
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          final key = AppErrorMapper.key(e);
+                          ScaffoldMessenger.of(
+                            ctx,
+                          ).showSnackBar(errorSnackBar(tr(key, ref)));
+                        }
+                      }
+                    },
+                    child: Text(tr('create', ref)),
+                  ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(tr('cancel', ref)),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  if (nameC.text.trim().isEmpty ||
-                      emailC.text.trim().isEmpty ||
-                      passC.text.trim().isEmpty) {
-                    return;
-                  }
-                  if (role == 'seller' &&
-                      (selectedRouteId == null ||
-                          selectedRouteId!.trim().isEmpty)) {
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(
-                          content: Text(tr('msg_seller_needs_route', ref)),
-                        ),
-                      );
-                    }
-                    return;
-                  }
-                  try {
-                    await ref
-                        .read(userManagementNotifierProvider.notifier)
-                        .createUser(
-                          email: emailC.text.trim(),
-                          password: passC.text.trim(),
-                          displayName: nameC.text.trim(),
-                          role: role,
-                          assignedRouteId: selectedRouteId,
-                          assignedRouteName: selectedRouteName,
-                        );
-                    if (mounted) {
-                      Navigator.of(context, rootNavigator: true).pop();
-                    }
-                  } catch (e) {
-                    if (ctx.mounted) {
-                      final key = AppErrorMapper.key(e);
-                      ScaffoldMessenger.of(
-                        ctx,
-                      ).showSnackBar(errorSnackBar(tr(key, ref)));
-                    }
-                  }
-                },
-                child: Text(tr('create', ref)),
-              ),
-            ],
-          );
-        },
-      ),
+              );
+            },
+          ),
     );
   }
 
@@ -596,180 +633,190 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) {
-          final routes = ref.watch(routesProvider).valueOrNull ?? [];
-          final availableRoutes = routes
-              .where(
-                (r) =>
-                    r.id == selectedRouteId ||
-                    r.assignedSellerId == null ||
-                    r.assignedSellerId!.isEmpty ||
-                    r.assignedSellerId == user.id,
-              )
-              .toList();
-          return AlertDialog(
-            title: Text(tr('edit_user', ref)),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameC,
-                    decoration: InputDecoration(labelText: tr('name', ref)),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: TextEditingController(text: user.email),
-                    decoration: InputDecoration(
-                      labelText: tr('lbl_email', ref),
-                      helperText: tr('lbl_email_no_change', ref),
-                    ),
-                    enabled: false,
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.lock_reset),
-                      label: Text(tr('settings_send_reset_email', ref)),
-                      onPressed: () async {
-                        try {
-                          await ref
-                              .read(userManagementNotifierProvider.notifier)
-                              .sendPasswordResetForSeller(email: user.email);
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              successSnackBar(
-                                tr(
-                                  'msg_reset_email_sent',
-                                  ref,
-                                ).replaceAll('%s', user.email),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (ctx.mounted) {
-                            final key = AppErrorMapper.key(e);
-                            ScaffoldMessenger.of(
-                              ctx,
-                            ).showSnackBar(errorSnackBar(tr(key, ref)));
-                          }
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (isSelf)
-                    TextField(
-                      enabled: false,
-                      decoration: InputDecoration(
-                        labelText: tr('role', ref),
-                        hintText: role,
+      builder:
+          (ctx) => StatefulBuilder(
+            builder: (ctx, setS) {
+              final routes = ref.watch(routesProvider).valueOrNull ?? [];
+              final availableRoutes =
+                  routes
+                      .where(
+                        (r) =>
+                            r.id == selectedRouteId ||
+                            r.assignedSellerId == null ||
+                            r.assignedSellerId!.isEmpty ||
+                            r.assignedSellerId == user.id,
+                      )
+                      .toList();
+              return AlertDialog(
+                title: Text(tr('edit_user', ref)),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: nameC,
+                        decoration: InputDecoration(labelText: tr('name', ref)),
                       ),
-                    )
-                  else
-                    DropdownButtonFormField<String>(
-                      initialValue: role,
-                      decoration: InputDecoration(labelText: tr('role', ref)),
-                      items: [
-                        DropdownMenuItem(
-                          value: 'admin',
-                          child: Text(tr('lbl_admin', ref)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: TextEditingController(text: user.email),
+                        decoration: InputDecoration(
+                          labelText: tr('lbl_email', ref),
+                          helperText: tr('lbl_email_no_change', ref),
                         ),
-                        DropdownMenuItem(
-                          value: 'seller',
-                          child: Text(tr('lbl_seller', ref)),
-                        ),
-                      ],
-                      onChanged: (v) => setS(() {
-                        role = v ?? 'seller';
-                        if (role != 'seller') {
-                          selectedRouteId = null;
-                          selectedRouteName = null;
-                        }
-                      }),
-                    ),
-                  if (role == 'seller') ...[
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedRouteId,
-                      decoration: InputDecoration(
-                        labelText: tr('assigned_route', ref),
+                        enabled: false,
                       ),
-                      items: [
-                        ...availableRoutes.map(
-                          (r) => DropdownMenuItem(
-                            value: r.id,
-                            child: Text(r.name),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.lock_reset),
+                          label: Text(tr('settings_send_reset_email', ref)),
+                          onPressed: () async {
+                            try {
+                              await ref
+                                  .read(userManagementNotifierProvider.notifier)
+                                  .sendPasswordResetForSeller(
+                                    email: user.email,
+                                  );
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  successSnackBar(
+                                    tr(
+                                      'msg_reset_email_sent',
+                                      ref,
+                                    ).replaceAll('%s', user.email),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (ctx.mounted) {
+                                final key = AppErrorMapper.key(e);
+                                ScaffoldMessenger.of(
+                                  ctx,
+                                ).showSnackBar(errorSnackBar(tr(key, ref)));
+                              }
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (isSelf)
+                        TextField(
+                          enabled: false,
+                          decoration: InputDecoration(
+                            labelText: tr('role', ref),
+                            hintText: role,
                           ),
+                        )
+                      else
+                        DropdownButtonFormField<String>(
+                          initialValue: role,
+                          decoration: InputDecoration(
+                            labelText: tr('role', ref),
+                          ),
+                          items: [
+                            DropdownMenuItem(
+                              value: 'admin',
+                              child: Text(tr('lbl_admin', ref)),
+                            ),
+                            DropdownMenuItem(
+                              value: 'seller',
+                              child: Text(tr('lbl_seller', ref)),
+                            ),
+                          ],
+                          onChanged:
+                              (v) => setS(() {
+                                role = v ?? 'seller';
+                                if (role != 'seller') {
+                                  selectedRouteId = null;
+                                  selectedRouteName = null;
+                                }
+                              }),
+                        ),
+                      if (role == 'seller') ...[
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          initialValue: selectedRouteId,
+                          decoration: InputDecoration(
+                            labelText: tr('assigned_route', ref),
+                          ),
+                          items: [
+                            ...availableRoutes.map(
+                              (r) => DropdownMenuItem(
+                                value: r.id,
+                                child: Text(r.name),
+                              ),
+                            ),
+                          ],
+                          onChanged:
+                              (v) => setS(() {
+                                selectedRouteId = v;
+                                selectedRouteName =
+                                    routes
+                                        .where((r) => r.id == v)
+                                        .map((r) => r.name)
+                                        .firstOrNull;
+                              }),
                         ),
                       ],
-                      onChanged: (v) => setS(() {
-                        selectedRouteId = v;
-                        selectedRouteName = routes
-                            .where((r) => r.id == v)
-                            .map((r) => r.name)
-                            .firstOrNull;
-                      }),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(tr('cancel', ref)),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final currentUser =
+                          ref.read(authUserProvider).valueOrNull;
+                      if (currentUser?.isAdmin != true) {
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            errorSnackBar(tr('err_permission_denied', ref)),
+                          );
+                        }
+                        return;
+                      }
+                      if (nameC.text.trim().isEmpty) return;
+                      if (role == 'seller' &&
+                          (selectedRouteId == null ||
+                              selectedRouteId!.trim().isEmpty)) {
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            warningSnackBar(tr('msg_seller_needs_route', ref)),
+                          );
+                        }
+                        return;
+                      }
+                      try {
+                        final notifier = ref.read(
+                          userManagementNotifierProvider.notifier,
+                        );
+                        await notifier.updateUser(user.id, {
+                          'display_name': nameC.text.trim(),
+                          'role': isSelf ? 'admin' : role,
+                          'assigned_route_id': selectedRouteId,
+                          'assigned_route_name': selectedRouteName,
+                        }, previousRouteId: oldRouteId);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          final key = AppErrorMapper.key(e);
+                          ScaffoldMessenger.of(
+                            ctx,
+                          ).showSnackBar(errorSnackBar(tr(key, ref)));
+                        }
+                      }
+                    },
+                    child: Text(tr('save', ref)),
+                  ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(tr('cancel', ref)),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final currentUser = ref.read(authUserProvider).valueOrNull;
-                  if (currentUser?.isAdmin != true) {
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        errorSnackBar(tr('err_permission_denied', ref)),
-                      );
-                    }
-                    return;
-                  }
-                  if (nameC.text.trim().isEmpty) return;
-                  if (role == 'seller' &&
-                      (selectedRouteId == null ||
-                          selectedRouteId!.trim().isEmpty)) {
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        warningSnackBar(tr('msg_seller_needs_route', ref)),
-                      );
-                    }
-                    return;
-                  }
-                  try {
-                    final notifier = ref.read(
-                      userManagementNotifierProvider.notifier,
-                    );
-                    await notifier.updateUser(user.id, {
-                      'display_name': nameC.text.trim(),
-                      'role': isSelf ? 'admin' : role,
-                      'assigned_route_id': selectedRouteId,
-                      'assigned_route_name': selectedRouteName,
-                    }, previousRouteId: oldRouteId);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  } catch (e) {
-                    if (ctx.mounted) {
-                      final key = AppErrorMapper.key(e);
-                      ScaffoldMessenger.of(
-                        ctx,
-                      ).showSnackBar(errorSnackBar(tr(key, ref)));
-                    }
-                  }
-                },
-                child: Text(tr('save', ref)),
-              ),
-            ],
-          );
-        },
-      ),
+              );
+            },
+          ),
     );
   }
 
@@ -1044,9 +1091,9 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
               Text(
                 _uploadProgress != null
                     ? tr(
-                        'settings_uploading_pct',
-                        ref,
-                      ).replaceAll('%s', '${(_uploadProgress! * 100).round()}')
+                      'settings_uploading_pct',
+                      ref,
+                    ).replaceAll('%s', '${(_uploadProgress! * 100).round()}')
                     : tr('settings_uploading', ref),
                 style: Theme.of(context).textTheme.labelSmall,
               ),
@@ -1067,10 +1114,11 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
                       label: Text(tr('lbl_upload', ref)),
                     ),
                     OutlinedButton(
-                      onPressed: () => setState(() {
-                        _pendingBytes = null;
-                        _pendingSizeLabel = null;
-                      }),
+                      onPressed:
+                          () => setState(() {
+                            _pendingBytes = null;
+                            _pendingSizeLabel = null;
+                          }),
                       child: Text(tr('cancel', ref)),
                     ),
                   ],
@@ -1132,36 +1180,39 @@ class _DatabaseFlushSectionState extends ConsumerState<_DatabaseFlushSection> {
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(
-              Icons.warning_amber_rounded,
-              color: AppBrand.errorColor,
-              size: 28,
+      builder:
+          (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: AppBrand.errorColor,
+                  size: 28,
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: Text(tr('flush_confirm_title', ref))),
+              ],
             ),
-            const SizedBox(width: 8),
-            Expanded(child: Text(tr('flush_confirm_title', ref))),
-          ],
-        ),
-        content: Text(
-          tr(
-            'flush_confirm_message',
-            ref,
-          ).replaceAll('%s', tr(descKey, ref).toLowerCase()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(tr('cancel', ref)),
+            content: Text(
+              tr(
+                'flush_confirm_message',
+                ref,
+              ).replaceAll('%s', tr(descKey, ref).toLowerCase()),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(tr('cancel', ref)),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppBrand.errorColor,
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(tr('flush_confirm_button', ref)),
+              ),
+            ],
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppBrand.errorColor),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(tr('flush_confirm_button', ref)),
-          ),
-        ],
-      ),
     );
     if (confirmed != true || !mounted) return;
 
@@ -1202,73 +1253,82 @@ class _DatabaseFlushSectionState extends ConsumerState<_DatabaseFlushSection> {
     return showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) {
-          // Start countdown timer
-          if (countdown > 0) {
-            Future.delayed(const Duration(seconds: 1), () {
-              if (ctx.mounted && countdown > 0) {
-                setS(() => countdown--);
+      builder:
+          (ctx) => StatefulBuilder(
+            builder: (ctx, setS) {
+              // Start countdown timer
+              if (countdown > 0) {
+                Future.delayed(const Duration(seconds: 1), () {
+                  if (ctx.mounted && countdown > 0) {
+                    setS(() => countdown--);
+                  }
+                });
               }
-            });
-          }
-          return AlertDialog(
-            title: Text(tr('flush_password_title', ref)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: passwordC,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    hintText: tr('flush_password_hint', ref),
-                    errorText: errorText,
-                    prefixIcon: const Icon(Icons.lock_outline),
-                  ),
-                  onChanged: (_) {
-                    if (errorText != null) setS(() => errorText = null);
-                  },
-                ),
-                const SizedBox(height: 16),
-                if (countdown > 0)
-                  Text(
-                    tr('flush_countdown', ref).replaceAll('%s', '$countdown'),
-                    style: const TextStyle(
-                      color: AppBrand.warningColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text(tr('cancel', ref)),
-              ),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppBrand.errorColor,
-                ),
-                onPressed: countdown > 0 || passwordC.text.isEmpty
-                    ? null
-                    : () async {
-                        final ok = await ref
-                            .read(databaseFlushProvider.notifier)
-                            .reauthenticate(passwordC.text);
-                        if (ok) {
-                          if (ctx.mounted) Navigator.pop(ctx, true);
-                        } else {
-                          setS(
-                            () => errorText = tr('flush_password_wrong', ref),
-                          );
-                        }
+              return AlertDialog(
+                title: Text(tr('flush_password_title', ref)),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: passwordC,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        hintText: tr('flush_password_hint', ref),
+                        errorText: errorText,
+                        prefixIcon: const Icon(Icons.lock_outline),
+                      ),
+                      onChanged: (_) {
+                        if (errorText != null) setS(() => errorText = null);
                       },
-                child: Text(tr('flush_confirm_button', ref)),
-              ),
-            ],
-          );
-        },
-      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (countdown > 0)
+                      Text(
+                        tr(
+                          'flush_countdown',
+                          ref,
+                        ).replaceAll('%s', '$countdown'),
+                        style: const TextStyle(
+                          color: AppBrand.warningColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text(tr('cancel', ref)),
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppBrand.errorColor,
+                    ),
+                    onPressed:
+                        countdown > 0 || passwordC.text.isEmpty
+                            ? null
+                            : () async {
+                              final ok = await ref
+                                  .read(databaseFlushProvider.notifier)
+                                  .reauthenticate(passwordC.text);
+                              if (ok) {
+                                if (ctx.mounted) Navigator.pop(ctx, true);
+                              } else {
+                                setS(
+                                  () =>
+                                      errorText = tr(
+                                        'flush_password_wrong',
+                                        ref,
+                                      ),
+                                );
+                              }
+                            },
+                    child: Text(tr('flush_confirm_button', ref)),
+                  ),
+                ],
+              );
+            },
+          ),
     );
   }
 
@@ -1315,66 +1375,83 @@ class _DatabaseFlushSectionState extends ConsumerState<_DatabaseFlushSection> {
                 icon: Icons.receipt_long_outlined,
                 titleKey: 'flush_financial',
                 descKey: 'flush_financial_desc',
-                onTap: () => _executeFlush(
-                  'flush_financial',
-                  'flush_financial_desc',
-                  () => ref
-                      .read(databaseFlushProvider.notifier)
-                      .flushFinancialData(),
-                ),
+                onTap:
+                    () => _executeFlush(
+                      'flush_financial',
+                      'flush_financial_desc',
+                      () =>
+                          ref
+                              .read(databaseFlushProvider.notifier)
+                              .flushFinancialData(),
+                    ),
               ),
               _flushTile(
                 icon: Icons.inventory_2_outlined,
                 titleKey: 'flush_inventory',
                 descKey: 'flush_inventory_desc',
-                onTap: () => _executeFlush(
-                  'flush_inventory',
-                  'flush_inventory_desc',
-                  () =>
-                      ref.read(databaseFlushProvider.notifier).flushInventory(),
-                ),
+                onTap:
+                    () => _executeFlush(
+                      'flush_inventory',
+                      'flush_inventory_desc',
+                      () =>
+                          ref
+                              .read(databaseFlushProvider.notifier)
+                              .flushInventory(),
+                    ),
               ),
               _flushTile(
                 icon: Icons.store_outlined,
                 titleKey: 'flush_shops',
                 descKey: 'flush_shops_desc',
-                onTap: () => _executeFlush(
-                  'flush_shops',
-                  'flush_shops_desc',
-                  () => ref.read(databaseFlushProvider.notifier).flushShops(),
-                ),
+                onTap:
+                    () => _executeFlush(
+                      'flush_shops',
+                      'flush_shops_desc',
+                      () =>
+                          ref.read(databaseFlushProvider.notifier).flushShops(),
+                    ),
               ),
               _flushTile(
                 icon: Icons.route_outlined,
                 titleKey: 'flush_routes',
                 descKey: 'flush_routes_desc',
-                onTap: () => _executeFlush(
-                  'flush_routes',
-                  'flush_routes_desc',
-                  () => ref.read(databaseFlushProvider.notifier).flushRoutes(),
-                ),
+                onTap:
+                    () => _executeFlush(
+                      'flush_routes',
+                      'flush_routes_desc',
+                      () =>
+                          ref
+                              .read(databaseFlushProvider.notifier)
+                              .flushRoutes(),
+                    ),
               ),
               _flushTile(
                 icon: Icons.shopping_bag_outlined,
                 titleKey: 'flush_products',
                 descKey: 'flush_products_desc',
-                onTap: () => _executeFlush(
-                  'flush_products',
-                  'flush_products_desc',
-                  () =>
-                      ref.read(databaseFlushProvider.notifier).flushProducts(),
-                ),
+                onTap:
+                    () => _executeFlush(
+                      'flush_products',
+                      'flush_products_desc',
+                      () =>
+                          ref
+                              .read(databaseFlushProvider.notifier)
+                              .flushProducts(),
+                    ),
               ),
               _flushTile(
                 icon: Icons.settings_backup_restore,
                 titleKey: 'flush_settings',
                 descKey: 'flush_settings_desc',
-                onTap: () => _executeFlush(
-                  'flush_settings',
-                  'flush_settings_desc',
-                  () =>
-                      ref.read(databaseFlushProvider.notifier).resetSettings(),
-                ),
+                onTap:
+                    () => _executeFlush(
+                      'flush_settings',
+                      'flush_settings_desc',
+                      () =>
+                          ref
+                              .read(databaseFlushProvider.notifier)
+                              .resetSettings(),
+                    ),
               ),
 
               const Divider(height: 1),
@@ -1407,14 +1484,15 @@ class _DatabaseFlushSectionState extends ConsumerState<_DatabaseFlushSection> {
                         labelText: tr('flush_select_user', ref),
                         isDense: true,
                       ),
-                      items: nonAdminUsers
-                          .map(
-                            (u) => DropdownMenuItem(
-                              value: u.id,
-                              child: Text(u.displayName),
-                            ),
-                          )
-                          .toList(),
+                      items:
+                          nonAdminUsers
+                              .map(
+                                (u) => DropdownMenuItem(
+                                  value: u.id,
+                                  child: Text(u.displayName),
+                                ),
+                              )
+                              .toList(),
                       onChanged: (v) => setState(() => _selectedUserId = v),
                     ),
                     const SizedBox(height: 8),
@@ -1425,15 +1503,16 @@ class _DatabaseFlushSectionState extends ConsumerState<_DatabaseFlushSection> {
                           foregroundColor: AppBrand.errorColor,
                           side: const BorderSide(color: AppBrand.errorColor),
                         ),
-                        onPressed: _selectedUserId == null
-                            ? null
-                            : () => _executeFlush(
-                                'flush_per_user',
-                                'flush_per_user_desc',
-                                () => ref
-                                    .read(databaseFlushProvider.notifier)
-                                    .flushPerUser(_selectedUserId!),
-                              ),
+                        onPressed:
+                            _selectedUserId == null
+                                ? null
+                                : () => _executeFlush(
+                                  'flush_per_user',
+                                  'flush_per_user_desc',
+                                  () => ref
+                                      .read(databaseFlushProvider.notifier)
+                                      .flushPerUser(_selectedUserId!),
+                                ),
                         icon: const Icon(
                           Icons.person_remove_outlined,
                           size: 18,
@@ -1455,8 +1534,8 @@ class _DatabaseFlushSectionState extends ConsumerState<_DatabaseFlushSection> {
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
                       value: _includeUsers,
-                      onChanged: (v) =>
-                          setState(() => _includeUsers = v ?? false),
+                      onChanged:
+                          (v) => setState(() => _includeUsers = v ?? false),
                       title: Text(
                         tr('flush_include_users', ref),
                         style: const TextStyle(fontSize: 14),
@@ -1470,16 +1549,17 @@ class _DatabaseFlushSectionState extends ConsumerState<_DatabaseFlushSection> {
                         style: FilledButton.styleFrom(
                           backgroundColor: AppBrand.errorColor,
                         ),
-                        onPressed: () => _executeFlush(
-                          'flush_all',
-                          'flush_all_desc',
-                          () => ref
-                              .read(databaseFlushProvider.notifier)
-                              .flushAll(
-                                keepAdminId: currentUser.id,
-                                includeUsers: _includeUsers,
-                              ),
-                        ),
+                        onPressed:
+                            () => _executeFlush(
+                              'flush_all',
+                              'flush_all_desc',
+                              () => ref
+                                  .read(databaseFlushProvider.notifier)
+                                  .flushAll(
+                                    keepAdminId: currentUser.id,
+                                    includeUsers: _includeUsers,
+                                  ),
+                            ),
                         icon: const Icon(Icons.delete_forever, size: 20),
                         label: Text(
                           tr('flush_all', ref).toUpperCase(),

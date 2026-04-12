@@ -68,8 +68,10 @@ void main() {
     });
 
     test('toJson preserves quantity_available correctly', () {
-      final m = ProductVariantModel.fromJson(
-          {...baseJson, 'quantity_available': 100}, 'pv1');
+      final m = ProductVariantModel.fromJson({
+        ...baseJson,
+        'quantity_available': 100,
+      }, 'pv1');
       expect(m.toJson()['quantity_available'], 100);
     });
   });

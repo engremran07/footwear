@@ -41,7 +41,8 @@ class AppSanitizer {
     // Keep only first decimal point
     final firstDot = s.indexOf('.');
     if (firstDot >= 0) {
-      s = s.substring(0, firstDot + 1) +
+      s =
+          s.substring(0, firstDot + 1) +
           s.substring(firstDot + 1).replaceAll('.', '');
     }
     return s;

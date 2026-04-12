@@ -7,13 +7,14 @@ void downloadBytes(List<int> bytes, String fileName) {
   final blob = web.Blob(
     [data.toJS].toJS,
     web.BlobPropertyBag(
-        type:
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ),
   );
   final url = web.URL.createObjectURL(blob);
-  final anchor = web.document.createElement('a') as web.HTMLAnchorElement
-    ..href = url
-    ..download = fileName;
+  final anchor =
+      web.document.createElement('a') as web.HTMLAnchorElement
+        ..href = url
+        ..download = fileName;
   anchor.click();
   web.URL.revokeObjectURL(url);
 }

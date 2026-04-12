@@ -10,14 +10,14 @@ List<String> _extractKeys(
 ) {
   final start = source.indexOf(startMarker);
   if (start == -1) return [];
-  final end = endMarker != null
-      ? source.indexOf(endMarker, start + startMarker.length)
-      : source.length;
+  final end =
+      endMarker != null
+          ? source.indexOf(endMarker, start + startMarker.length)
+          : source.length;
   final section = source.substring(start, end == -1 ? source.length : end);
-  return RegExp(r"'([a-z][a-z0-9_]*)'\s*:")
-      .allMatches(section)
-      .map((m) => m.group(1)!)
-      .toList();
+  return RegExp(
+    r"'([a-z][a-z0-9_]*)'\s*:",
+  ).allMatches(section).map((m) => m.group(1)!).toList();
 }
 
 void main() {
@@ -38,20 +38,31 @@ void main() {
     });
 
     test('EN locale has at least 372 keys (regression floor)', () {
-      expect(enKeys.length, greaterThanOrEqualTo(372),
-          reason: 'EN key count dropped below baseline. Keys added/removed?');
+      expect(
+        enKeys.length,
+        greaterThanOrEqualTo(372),
+        reason: 'EN key count dropped below baseline. Keys added/removed?',
+      );
     });
 
     test('AR key count equals EN key count', () {
-      expect(arKeys.length, equals(enKeys.length),
-          reason: 'AR has ${arKeys.length} keys but EN has ${enKeys.length}. '
-              'Run: grep the missing keys and add translations.');
+      expect(
+        arKeys.length,
+        equals(enKeys.length),
+        reason:
+            'AR has ${arKeys.length} keys but EN has ${enKeys.length}. '
+            'Run: grep the missing keys and add translations.',
+      );
     });
 
     test('UR key count equals EN key count', () {
-      expect(urKeys.length, equals(enKeys.length),
-          reason: 'UR has ${urKeys.length} keys but EN has ${enKeys.length}. '
-              'Run: grep the missing keys and add translations.');
+      expect(
+        urKeys.length,
+        equals(enKeys.length),
+        reason:
+            'UR has ${urKeys.length} keys but EN has ${enKeys.length}. '
+            'Run: grep the missing keys and add translations.',
+      );
     });
 
     test('AR contains every EN key', () {

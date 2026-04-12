@@ -157,11 +157,12 @@ class AuthNotifier extends AsyncNotifier<void> {
         // If not an email, look up by display_name in Firestore
         if (!email.contains('@')) {
           try {
-            final snap = await FirebaseFirestore.instance
-                .collection(Collections.users)
-                .where('display_name', isEqualTo: email)
-                .limit(1)
-                .get();
+            final snap =
+                await FirebaseFirestore.instance
+                    .collection(Collections.users)
+                    .where('display_name', isEqualTo: email)
+                    .limit(1)
+                    .get();
             if (snap.docs.isEmpty) {
               throw FirebaseAuthException(
                 code: 'invalid-credential',
@@ -209,10 +210,8 @@ class AuthNotifier extends AsyncNotifier<void> {
             await FirebaseFirestore.instance.clearPersistence();
           } catch (_) {}
 
-          final legacyByEmail = await usersRef
-              .where('email', isEqualTo: email)
-              .limit(1)
-              .get();
+          final legacyByEmail =
+              await usersRef.where('email', isEqualTo: email).limit(1).get();
 
           if (legacyByEmail.docs.isNotEmpty) {
             final data = legacyByEmail.docs.first.data();
@@ -237,9 +236,8 @@ class AuthNotifier extends AsyncNotifier<void> {
             final display = cred.user?.displayName?.trim();
             await usersRef.doc(uid).set({
               'email': email,
-              'display_name': (display != null && display.isNotEmpty)
-                  ? display
-                  : 'Admin',
+              'display_name':
+                  (display != null && display.isNotEmpty) ? display : 'Admin',
               'role': 'admin',
               'active': true,
               'created_by': uid,
@@ -259,8 +257,8 @@ class AuthNotifier extends AsyncNotifier<void> {
           );
         }
 
-        final normalizedRole = (refreshedDoc.data()?['role'] as String? ?? '')
-            .trim();
+        final normalizedRole =
+            (refreshedDoc.data()?['role'] as String? ?? '').trim();
         await _runPostSignInSelfHeal(uid: uid, role: normalizedRole);
 
         // ── Email-verified sync (Auth → Firestore, non-blocking) ──────────
@@ -370,19 +368,20 @@ class AuthNotifier extends AsyncNotifier<void> {
     }
 
     if (!normalizedInput.contains('@')) {
-      final snap = await FirebaseFirestore.instance
-          .collection(Collections.users)
-          .where('display_name', isEqualTo: normalizedInput)
-          .limit(1)
-          .get();
+      final snap =
+          await FirebaseFirestore.instance
+              .collection(Collections.users)
+              .where('display_name', isEqualTo: normalizedInput)
+              .limit(1)
+              .get();
       if (snap.docs.isEmpty) {
         throw FirebaseAuthException(
           code: 'invalid-credential',
           message: 'Invalid username or password',
         );
       }
-      normalizedInput = (snap.docs.first.data()['email'] as String? ?? '')
-          .trim();
+      normalizedInput =
+          (snap.docs.first.data()['email'] as String? ?? '').trim();
     }
 
     final normalizedEmail = normalizedInput.toLowerCase();

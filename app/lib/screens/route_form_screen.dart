@@ -176,10 +176,11 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
                     onChanged: (v) {
                       setState(() {
                         _sellerId = v;
-                        _sellerName = sellers
-                            .where((s) => s.id == v)
-                            .map((s) => s.displayName)
-                            .firstOrNull;
+                        _sellerName =
+                            sellers
+                                .where((s) => s.id == v)
+                                .map((s) => s.displayName)
+                                .firstOrNull;
                       });
                     },
                   ),
@@ -189,13 +190,16 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
                     height: 48,
                     child: FilledButton(
                       onPressed: _saving ? null : _save,
-                      child: _saving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(tr('save', ref)),
+                      child:
+                          _saving
+                              ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : Text(tr('save', ref)),
                     ),
                   ),
                 ],

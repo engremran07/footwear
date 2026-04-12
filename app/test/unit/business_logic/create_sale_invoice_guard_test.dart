@@ -38,24 +38,15 @@ bool isInvoiceMathValid({
 void main() {
   group('createSaleInvoice — amountReceived guard', () {
     test('passes when amountReceived equals total (fully paid)', () {
-      expect(
-        validateAmountReceived(amountReceived: 1000, total: 1000),
-        isNull,
-      );
+      expect(validateAmountReceived(amountReceived: 1000, total: 1000), isNull);
     });
 
     test('passes when amountReceived is zero (unpaid)', () {
-      expect(
-        validateAmountReceived(amountReceived: 0, total: 1000),
-        isNull,
-      );
+      expect(validateAmountReceived(amountReceived: 0, total: 1000), isNull);
     });
 
     test('passes when amountReceived is partial', () {
-      expect(
-        validateAmountReceived(amountReceived: 400, total: 1000),
-        isNull,
-      );
+      expect(validateAmountReceived(amountReceived: 400, total: 1000), isNull);
     });
 
     test('fails when amountReceived exceeds total by 1 paisa', () {

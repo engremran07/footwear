@@ -30,7 +30,10 @@ void main() {
     test('uses stored outstanding when present', () {
       expect(
         resolveOutstanding(
-            storedOutstanding: 300, total: 1000, amountReceived: 700),
+          storedOutstanding: 300,
+          total: 1000,
+          amountReceived: 700,
+        ),
         equals(300),
       );
     });
@@ -38,7 +41,10 @@ void main() {
     test('fallback computes total minus amountReceived', () {
       expect(
         resolveOutstanding(
-            storedOutstanding: null, total: 1000, amountReceived: 700),
+          storedOutstanding: null,
+          total: 1000,
+          amountReceived: 700,
+        ),
         equals(300),
       );
     });
@@ -46,7 +52,10 @@ void main() {
     test('fallback with zero amountReceived returns full total', () {
       expect(
         resolveOutstanding(
-            storedOutstanding: null, total: 1500, amountReceived: 0),
+          storedOutstanding: null,
+          total: 1500,
+          amountReceived: 0,
+        ),
         equals(1500),
       );
     });
@@ -54,7 +63,10 @@ void main() {
     test('fallback with full payment returns zero', () {
       expect(
         resolveOutstanding(
-            storedOutstanding: null, total: 1000, amountReceived: 1000),
+          storedOutstanding: null,
+          total: 1000,
+          amountReceived: 1000,
+        ),
         equals(0.0),
       );
     });
@@ -63,7 +75,10 @@ void main() {
       // amountReceived > total — stored outstanding missing; must not go negative
       expect(
         resolveOutstanding(
-            storedOutstanding: null, total: 1000, amountReceived: 1200),
+          storedOutstanding: null,
+          total: 1000,
+          amountReceived: 1200,
+        ),
         equals(0.0),
       );
     });
@@ -71,7 +86,10 @@ void main() {
     test('stored outstanding of zero is used as-is (not treated as null)', () {
       expect(
         resolveOutstanding(
-            storedOutstanding: 0, total: 1000, amountReceived: 0),
+          storedOutstanding: 0,
+          total: 1000,
+          amountReceived: 0,
+        ),
         equals(0.0),
       );
     });
@@ -79,7 +97,10 @@ void main() {
     test('fallback fractional result is preserved', () {
       expect(
         resolveOutstanding(
-            storedOutstanding: null, total: 999.99, amountReceived: 333.33),
+          storedOutstanding: null,
+          total: 999.99,
+          amountReceived: 333.33,
+        ),
         closeTo(666.66, 0.01),
       );
     });

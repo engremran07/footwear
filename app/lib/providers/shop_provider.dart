@@ -53,9 +53,10 @@ final shopsByRouteProvider = StreamProvider.autoDispose
           .limit(200)
           .snapshots()
           .map(
-            (snap) => snap.docs
-                .map((d) => ShopModel.fromJson(d.data(), d.id))
-                .toList(),
+            (snap) =>
+                snap.docs
+                    .map((d) => ShopModel.fromJson(d.data(), d.id))
+                    .toList(),
           );
     });
 
@@ -119,9 +120,10 @@ final outstandingShopsByRouteProvider = StreamProvider.autoDispose
           .limit(200)
           .snapshots()
           .map(
-            (snap) => snap.docs
-                .map((d) => ShopModel.fromJson(d.data(), d.id))
-                .toList(),
+            (snap) =>
+                snap.docs
+                    .map((d) => ShopModel.fromJson(d.data(), d.id))
+                    .toList(),
           );
     });
 
@@ -168,20 +170,19 @@ class ShopNotifier extends AsyncNotifier<void> {
   Future<void> markAsBadDebt(String shopId) async {
     final authUser = FirebaseAuth.instance.currentUser;
     if (authUser == null) throw StateError('Not authenticated');
-    final me = await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(authUser.uid)
-        .get();
+    final me =
+        await FirebaseFirestore.instance
+            .collection(Collections.users)
+            .doc(authUser.uid)
+            .get();
     final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
     if (role != 'admin' && role != 'manager') {
       throw StateError('Only admin can mark bad debt');
     }
 
     final db = FirebaseFirestore.instance;
-    final shopDoc = await db
-        .collection(Collections.customers)
-        .doc(shopId)
-        .get();
+    final shopDoc =
+        await db.collection(Collections.customers).doc(shopId).get();
     final balance = (shopDoc.data()?['balance'] as num?)?.toDouble() ?? 0;
     if (balance <= 0) throw StateError('No outstanding balance to write off');
 
@@ -219,10 +220,11 @@ class ShopNotifier extends AsyncNotifier<void> {
     if (authUser == null) {
       throw StateError('Not authenticated');
     }
-    final me = await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(authUser.uid)
-        .get();
+    final me =
+        await FirebaseFirestore.instance
+            .collection(Collections.users)
+            .doc(authUser.uid)
+            .get();
     final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
     if (role != 'admin' && role != 'manager') {
       throw StateError('Only admin can delete shops');

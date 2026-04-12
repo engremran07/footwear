@@ -65,93 +65,96 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(tr('change_password', ref)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: currentPassC,
-                decoration: InputDecoration(
-                  labelText: tr('current_password', ref),
-                ),
-                obscureText: true,
-                keyboardType: TextInputType.visiblePassword,
-                textInputAction: TextInputAction.next,
-                onSubmitted: (_) => newPassFn.requestFocus(),
+      builder:
+          (ctx) => AlertDialog(
+            title: Text(tr('change_password', ref)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: currentPassC,
+                    decoration: InputDecoration(
+                      labelText: tr('current_password', ref),
+                    ),
+                    obscureText: true,
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => newPassFn.requestFocus(),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: newPassC,
+                    focusNode: newPassFn,
+                    decoration: InputDecoration(
+                      labelText: tr('new_password', ref),
+                    ),
+                    obscureText: true,
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => confirmPassFn.requestFocus(),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: confirmPassC,
+                    focusNode: confirmPassFn,
+                    decoration: InputDecoration(
+                      labelText: tr('confirm_password', ref),
+                    ),
+                    obscureText: true,
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.done,
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: newPassC,
-                focusNode: newPassFn,
-                decoration: InputDecoration(labelText: tr('new_password', ref)),
-                obscureText: true,
-                keyboardType: TextInputType.visiblePassword,
-                textInputAction: TextInputAction.next,
-                onSubmitted: (_) => confirmPassFn.requestFocus(),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(tr('cancel', ref)),
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: confirmPassC,
-                focusNode: confirmPassFn,
-                decoration: InputDecoration(
-                  labelText: tr('confirm_password', ref),
-                ),
-                obscureText: true,
-                keyboardType: TextInputType.visiblePassword,
-                textInputAction: TextInputAction.done,
+              ElevatedButton(
+                onPressed: () async {
+                  final newPass = newPassC.text.trim();
+                  if (newPass.length < 8) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      warningSnackBar(tr('err_weak_password', ref)),
+                    );
+                    return;
+                  }
+                  if (newPass != confirmPassC.text.trim()) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      warningSnackBar(tr('passwords_dont_match', ref)),
+                    );
+                    return;
+                  }
+
+                  try {
+                    await ref
+                        .read(userManagementNotifierProvider.notifier)
+                        .changeOwnPassword(
+                          currentPassword: currentPassC.text,
+                          newPassword: newPass,
+                        );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        successSnackBar(tr('saved_successfully', ref)),
+                      );
+                    }
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      final key = AppErrorMapper.key(e);
+                      ScaffoldMessenger.of(
+                        ctx,
+                      ).showSnackBar(errorSnackBar(tr(key, ref)));
+                    }
+                  }
+                },
+                child: Text(tr('save', ref)),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(tr('cancel', ref)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newPass = newPassC.text.trim();
-              if (newPass.length < 8) {
-                ScaffoldMessenger.of(
-                  ctx,
-                ).showSnackBar(warningSnackBar(tr('err_weak_password', ref)));
-                return;
-              }
-              if (newPass != confirmPassC.text.trim()) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  warningSnackBar(tr('passwords_dont_match', ref)),
-                );
-                return;
-              }
-
-              try {
-                await ref
-                    .read(userManagementNotifierProvider.notifier)
-                    .changeOwnPassword(
-                      currentPassword: currentPassC.text,
-                      newPassword: newPass,
-                    );
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    successSnackBar(tr('saved_successfully', ref)),
-                  );
-                }
-              } catch (e) {
-                if (ctx.mounted) {
-                  final key = AppErrorMapper.key(e);
-                  ScaffoldMessenger.of(
-                    ctx,
-                  ).showSnackBar(errorSnackBar(tr(key, ref)));
-                }
-              }
-            },
-            child: Text(tr('save', ref)),
-          ),
-        ],
-      ),
     );
   }
 
@@ -244,16 +247,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                       const SizedBox(height: 8),
                       SegmentedButton<AppLocale>(
-                        segments: AppLocale.values
-                            .map(
-                              (l) =>
-                                  ButtonSegment(value: l, label: Text(l.label)),
-                            )
-                            .toList(),
+                        segments:
+                            AppLocale.values
+                                .map(
+                                  (l) => ButtonSegment(
+                                    value: l,
+                                    label: Text(l.label),
+                                  ),
+                                )
+                                .toList(),
                         selected: {locale},
-                        onSelectionChanged: (s) =>
-                            ref.read(appLocaleProvider.notifier).state =
-                                s.first,
+                        onSelectionChanged:
+                            (s) =>
+                                ref.read(appLocaleProvider.notifier).state =
+                                    s.first,
                       ),
                     ],
                   ),
@@ -290,9 +297,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                         ],
                         selected: {currentTheme},
-                        onSelectionChanged: (s) => ref
-                            .read(themePreferenceProvider.notifier)
-                            .setThemeMode(s.first),
+                        onSelectionChanged:
+                            (s) => ref
+                                .read(themePreferenceProvider.notifier)
+                                .setThemeMode(s.first),
                       ),
                     ],
                   ),

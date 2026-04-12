@@ -41,17 +41,16 @@ class AppBalanceBadge extends StatelessWidget {
       label: 'Balance: $text',
       child: Container(
         padding: const EdgeInsets.symmetric(
-            horizontal: AppTokens.s8, vertical: AppTokens.s4),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: AppTokens.brSM,
+          horizontal: AppTokens.s8,
+          vertical: AppTokens.s4,
         ),
+        decoration: BoxDecoration(color: bg, borderRadius: AppTokens.brSM),
         child: Text(
           text,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: fg,
-                fontWeight: FontWeight.w600,
-              ),
+            color: fg,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );

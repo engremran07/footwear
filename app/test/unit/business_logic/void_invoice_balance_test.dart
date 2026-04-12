@@ -31,8 +31,7 @@ double _computeReversalDelta({
 bool _writeCashRefundTx({
   required VoidRefundMode refundMode,
   required double amountReceived,
-}) =>
-    refundMode == VoidRefundMode.cashRefund && amountReceived > 0;
+}) => refundMode == VoidRefundMode.cashRefund && amountReceived > 0;
 
 // ── tests ────────────────────────────────────────────────────────────────────
 
@@ -127,16 +126,18 @@ void main() {
       expect(delta, equals(2000.0));
     });
 
-    test('reversalDelta is +total for credit note regardless of refundMode',
-        () {
-      final delta = _computeReversalDelta(
-        type: 'credit_note',
-        total: 1500,
-        outstandingAmount: 1500,
-        refundMode: VoidRefundMode.cashRefund,
-      );
-      expect(delta, equals(1500.0));
-    });
+    test(
+      'reversalDelta is +total for credit note regardless of refundMode',
+      () {
+        final delta = _computeReversalDelta(
+          type: 'credit_note',
+          total: 1500,
+          outstandingAmount: 1500,
+          refundMode: VoidRefundMode.cashRefund,
+        );
+        expect(delta, equals(1500.0));
+      },
+    );
   });
 
   group('voidInvoice — guard validation', () {

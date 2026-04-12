@@ -95,12 +95,12 @@ class _ExportSheetContent extends StatelessWidget {
       return pdfBytesBuilder != null
           ? await pdfBytesBuilder!()
           : await buildPdfTable(
-              title: title,
-              headers: headers,
-              rows: rows,
-              subtitle: subtitle,
-              locale: _locale,
-            );
+            title: title,
+            headers: headers,
+            rows: rows,
+            subtitle: subtitle,
+            locale: _locale,
+          );
     } catch (_) {
       messenger.showSnackBar(errorSnackBar(tr('err_unknown', ref)));
       return null;
@@ -298,7 +298,8 @@ class _OptionTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             border: Border.all(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -306,9 +307,10 @@ class _OptionTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: theme.brightness == Brightness.dark
-                      ? color.withValues(alpha: 0.22)
-                      : color.withValues(alpha: 0.1),
+                  color:
+                      theme.brightness == Brightness.dark
+                          ? color.withValues(alpha: 0.22)
+                          : color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: color, size: 22),
@@ -324,25 +326,31 @@ class _OptionTile extends StatelessWidget {
               ),
               if (sublabel.isNotEmpty)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: theme.brightness == Brightness.dark
-                        ? color.withValues(alpha: 0.22)
-                        : color.withValues(alpha: 0.1),
+                    color:
+                        theme.brightness == Brightness.dark
+                            ? color.withValues(alpha: 0.22)
+                            : color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     sublabel,
                     style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: color),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
                   ),
                 ),
               const SizedBox(width: 8),
-              Icon(Icons.chevron_right,
-                  color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),

@@ -32,11 +32,11 @@ class ProductModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'category': category,
-        'image_url': imageUrl,
-        'active': active,
-        'created_at': createdAt,
-        'updated_at': updatedAt,
-      };
+    'name': name,
+    'category': category,
+    'image_url': imageUrl,
+    'active': active,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+  };
 }

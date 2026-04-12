@@ -154,8 +154,11 @@ void main() {
 
     test('all periods have YYYY-MM format', () {
       for (final p in AppFormatters.last12Periods()) {
-        expect(RegExp(r'^\d{4}-\d{2}$').hasMatch(p), isTrue,
-            reason: '$p does not match YYYY-MM');
+        expect(
+          RegExp(r'^\d{4}-\d{2}$').hasMatch(p),
+          isTrue,
+          reason: '$p does not match YYYY-MM',
+        );
       }
     });
   });

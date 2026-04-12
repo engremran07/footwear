@@ -39,19 +39,20 @@ class InvoiceDetailScreen extends ConsumerWidget {
                   data: (inv) {
                     if (inv == null || inv.status == 'void') return null;
                     return PopupMenuButton<String>(
-                      onSelected: (action) =>
-                          _handleAction(context, ref, action, inv),
-                      itemBuilder: (_) => [
-                        if (inv.status != InvoiceModel.statusPaid)
-                          PopupMenuItem(
-                            value: 'paid',
-                            child: Text(tr('mark_paid', ref)),
-                          ),
-                        PopupMenuItem(
-                          value: 'void',
-                          child: Text(tr('void', ref)),
-                        ),
-                      ],
+                      onSelected:
+                          (action) => _handleAction(context, ref, action, inv),
+                      itemBuilder:
+                          (_) => [
+                            if (inv.status != InvoiceModel.statusPaid)
+                              PopupMenuItem(
+                                value: 'paid',
+                                child: Text(tr('mark_paid', ref)),
+                              ),
+                            PopupMenuItem(
+                              value: 'void',
+                              child: Text(tr('void', ref)),
+                            ),
+                          ],
                     );
                   },
                 ) ??
@@ -66,11 +67,12 @@ class InvoiceDetailScreen extends ConsumerWidget {
           return _InvoiceBody(invoice: inv);
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => mappedErrorState(
-          error: e,
-          ref: ref,
-          onRetry: () => ref.invalidate(invoiceByIdProvider(invoiceId)),
-        ),
+        error:
+            (e, _) => mappedErrorState(
+              error: e,
+              ref: ref,
+              onRetry: () => ref.invalidate(invoiceByIdProvider(invoiceId)),
+            ),
       ),
       floatingActionButton: invoiceAsync.whenOrNull(
         data: (inv) {
@@ -96,30 +98,32 @@ class InvoiceDetailScreen extends ConsumerWidget {
       if (inv.amountReceived > 0 && inv.isSale) {
         final selectedMode = await showDialog<VoidRefundMode>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(tr('void', ref)),
-            content: Text(
-              '${tr('confirm_void_invoice', ref)}\n\n'
-              '${tr('amount_received', ref)}: ${AppFormatters.sar(inv.amountReceived)}\n'
-              '${tr('outstanding_amount', ref)}: ${AppFormatters.sar(inv.outstandingAmount)}',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(tr('cancel', ref)),
+          builder:
+              (ctx) => AlertDialog(
+                title: Text(tr('void', ref)),
+                content: Text(
+                  '${tr('confirm_void_invoice', ref)}\n\n'
+                  '${tr('amount_received', ref)}: ${AppFormatters.sar(inv.amountReceived)}\n'
+                  '${tr('outstanding_amount', ref)}: ${AppFormatters.sar(inv.outstandingAmount)}',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: Text(tr('cancel', ref)),
+                  ),
+                  OutlinedButton(
+                    onPressed:
+                        () => Navigator.of(ctx).pop(VoidRefundMode.cashRefund),
+                    child: Text(tr('void_refund_cash', ref)),
+                  ),
+                  FilledButton(
+                    onPressed:
+                        () =>
+                            Navigator.of(ctx).pop(VoidRefundMode.creditBalance),
+                    child: Text(tr('void_refund_credit', ref)),
+                  ),
+                ],
               ),
-              OutlinedButton(
-                onPressed: () =>
-                    Navigator.of(ctx).pop(VoidRefundMode.cashRefund),
-                child: Text(tr('void_refund_cash', ref)),
-              ),
-              FilledButton(
-                onPressed: () =>
-                    Navigator.of(ctx).pop(VoidRefundMode.creditBalance),
-                child: Text(tr('void_refund_credit', ref)),
-              ),
-            ],
-          ),
         );
         if (selectedMode == null) return;
         refundMode = selectedMode;
@@ -276,9 +280,10 @@ class _InvoiceBody extends ConsumerWidget {
                 const Divider(height: 24),
                 _InfoRow(
                   label: tr('shop', ref),
-                  value: invoice.shopName.isNotEmpty
-                      ? invoice.shopName
-                      : invoice.shopName,
+                  value:
+                      invoice.shopName.isNotEmpty
+                          ? invoice.shopName
+                          : invoice.shopName,
                 ),
                 _InfoRow(label: tr('date', ref), value: dateStr),
                 if (invoice.linkedInvoiceId != null &&
@@ -467,9 +472,10 @@ class _TotalRow extends StatelessWidget {
         children: [
           Text(
             label,
-            style: bold
-                ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-                : null,
+            style:
+                bold
+                    ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                    : null,
           ),
           Text(
             value,
@@ -501,9 +507,10 @@ class _PaymentProgressBar extends ConsumerWidget {
       tr('partial', ref),
       tr('invoice_step_paid', ref),
     ];
-    final currentIdx = invoice.status == InvoiceModel.statusVoid
-        ? -1
-        : steps.indexOf(invoice.status);
+    final currentIdx =
+        invoice.status == InvoiceModel.statusVoid
+            ? -1
+            : steps.indexOf(invoice.status);
     final isVoid = invoice.status == 'void';
 
     if (isVoid) {
@@ -546,15 +553,16 @@ class _PaymentProgressBar extends ConsumerWidget {
                   color: isActive ? cs.primary : cs.surfaceContainerHighest,
                 ),
                 alignment: Alignment.center,
-                child: isActive
-                    ? Icon(Icons.check, size: 14, color: cs.onPrimary)
-                    : Text(
-                        '${i + 1}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: cs.onSurfaceVariant,
+                child:
+                    isActive
+                        ? Icon(Icons.check, size: 14, color: cs.onPrimary)
+                        : Text(
+                          '${i + 1}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
-                      ),
               ),
               const SizedBox(width: 4),
               Text(
@@ -570,9 +578,10 @@ class _PaymentProgressBar extends ConsumerWidget {
                   child: Container(
                     height: 2,
                     margin: const EdgeInsets.symmetric(horizontal: 4),
-                    color: i < currentIdx
-                        ? cs.primary
-                        : cs.surfaceContainerHighest,
+                    color:
+                        i < currentIdx
+                            ? cs.primary
+                            : cs.surfaceContainerHighest,
                   ),
                 ),
             ],

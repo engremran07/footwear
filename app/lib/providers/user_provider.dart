@@ -130,9 +130,8 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'display_name': trimmedName,
           'role': normalizedRole,
           'assigned_route_id': normalizedRole == 'seller' ? routeId : null,
-          'assigned_route_name': normalizedRole == 'seller'
-              ? assignedRouteName
-              : null,
+          'assigned_route_name':
+              normalizedRole == 'seller' ? assignedRouteName : null,
           'active': true,
           'created_by': FirebaseAuth.instance.currentUser!.uid, // RU-04
           'created_at': now,
@@ -238,11 +237,12 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     final now = Timestamp.now();
 
     // Clear any route assignments for this seller
-    final routeSnap = await db
-        .collection(Collections.routes)
-        .where('assigned_seller_id', isEqualTo: trimmedUid)
-        .limit(20)
-        .get();
+    final routeSnap =
+        await db
+            .collection(Collections.routes)
+            .where('assigned_seller_id', isEqualTo: trimmedUid)
+            .limit(20)
+            .get();
 
     final batch = db.batch();
     for (final routeDoc in routeSnap.docs) {
@@ -288,9 +288,8 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     batch.update(db.collection(Collections.users).doc(trimmedUid), {
       'active': true,
       'assigned_route_id': routeId.trim().isNotEmpty ? routeId.trim() : null,
-      'assigned_route_name': routeId.trim().isNotEmpty
-          ? routeName.trim()
-          : null,
+      'assigned_route_name':
+          routeId.trim().isNotEmpty ? routeName.trim() : null,
       'updated_at': now,
     });
 
@@ -321,10 +320,8 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     }
 
     final db = FirebaseFirestore.instance;
-    final userSnap = await db
-        .collection(Collections.users)
-        .doc(trimmedUid)
-        .get();
+    final userSnap =
+        await db.collection(Collections.users).doc(trimmedUid).get();
     if (!userSnap.exists) throw ArgumentError('User not found: $trimmedUid');
 
     final isActive = userSnap.data()?['active'] as bool? ?? true;

@@ -186,59 +186,65 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     await showDialog<void>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlgState) => AlertDialog(
-          title: Text(tr('forgot_password', ref)),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(tr('enter_email_to_reset', ref)),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: emailController,
-                  decoration: InputDecoration(
-                    labelText: tr('email', ref),
-                    prefixIcon: const Icon(Icons.email_outlined),
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (ctx, setDlgState) => AlertDialog(
+                  title: Text(tr('forgot_password', ref)),
+                  content: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(tr('enter_email_to_reset', ref)),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: emailController,
+                          decoration: InputDecoration(
+                            labelText: tr('email', ref),
+                            prefixIcon: const Icon(Icons.email_outlined),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.done,
+                          autofocus: emailController.text.isEmpty,
+                          validator:
+                              (v) =>
+                                  (v == null || v.trim().isEmpty)
+                                      ? tr('required', ref)
+                                      : null,
+                          onFieldSubmitted:
+                              (_) => submitReset(setDlgState, ctx),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          tr('login_reset_email_hint', ref),
+                          style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.done,
-                  autofocus: emailController.text.isEmpty,
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? tr('required', ref)
-                      : null,
-                  onFieldSubmitted: (_) => submitReset(setDlgState, ctx),
+                  actions:
+                      sent
+                          ? [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(),
+                              child: Text(tr('ok', ref)),
+                            ),
+                          ]
+                          : [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(),
+                              child: Text(tr('cancel', ref)),
+                            ),
+                            FilledButton(
+                              onPressed: () => submitReset(setDlgState, ctx),
+                              child: Text(tr('send_reset_email', ref)),
+                            ),
+                          ],
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  tr('login_reset_email_hint', ref),
-                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
           ),
-          actions: sent
-              ? [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: Text(tr('ok', ref)),
-                  ),
-                ]
-              : [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: Text(tr('cancel', ref)),
-                  ),
-                  FilledButton(
-                    onPressed: () => submitReset(setDlgState, ctx),
-                    child: Text(tr('send_reset_email', ref)),
-                  ),
-                ],
-        ),
-      ),
     );
 
     if (sent && mounted) {
@@ -261,9 +267,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: SafeArea(
-        child: isWide
-            ? _wideLayout(theme, cs, currentLocale, isOnline, isLoading)
-            : _narrowLayout(theme, cs, currentLocale, isOnline, isLoading),
+        child:
+            isWide
+                ? _wideLayout(theme, cs, currentLocale, isOnline, isLoading)
+                : _narrowLayout(theme, cs, currentLocale, isOnline, isLoading),
       ),
     );
   }
@@ -279,10 +286,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Row(
       children: [
         // Brand panel
-        Expanded(
-          flex: 4,
-          child: _BrandPanel(theme: theme, cs: cs),
-        ),
+        Expanded(flex: 4, child: _BrandPanel(theme: theme, cs: cs)),
         // Form panel
         Expanded(
           flex: 6,
@@ -388,9 +392,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Widget _languagePicker(AppLocale currentLocale) {
     return SegmentedButton<AppLocale>(
-      segments: AppLocale.values
-          .map((l) => ButtonSegment<AppLocale>(value: l, label: Text(l.label)))
-          .toList(),
+      segments:
+          AppLocale.values
+              .map(
+                (l) => ButtonSegment<AppLocale>(value: l, label: Text(l.label)),
+              )
+              .toList(),
       selected: {currentLocale},
       onSelectionChanged: (set) {
         ref.read(appLocaleProvider.notifier).state = set.first;
@@ -407,33 +414,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Widget _onlineIndicator(AsyncValue<bool> isOnline) {
     return isOnline.when(
-      data: (online) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppOnlineIndicator(isOnline: online),
-          const SizedBox(width: AppTokens.s4),
-          Text(
-            online ? tr('login_online', ref) : tr('login_offline', ref),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: online ? AppBrand.successColor : AppBrand.stockColor,
-            ),
+      data:
+          (online) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppOnlineIndicator(isOnline: online),
+              const SizedBox(width: AppTokens.s4),
+              Text(
+                online ? tr('login_online', ref) : tr('login_offline', ref),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: online ? AppBrand.successColor : AppBrand.stockColor,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const AppOnlineIndicator(isOnline: false),
-          const SizedBox(width: AppTokens.s4),
-          Text(
-            tr('login_offline', ref),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.outline,
-            ),
+      error:
+          (_, __) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const AppOnlineIndicator(isOnline: false),
+              const SizedBox(width: AppTokens.s4),
+              Text(
+                tr('login_offline', ref),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -473,9 +482,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
-                  validator: (v) => v == null || v.trim().isEmpty
-                      ? tr('required', ref)
-                      : null,
+                  validator:
+                      (v) =>
+                          v == null || v.trim().isEmpty
+                              ? tr('required', ref)
+                              : null,
                 ).animate().fadeIn(
                   delay: 100.ms,
                   duration: AppTokens.durNormal,
@@ -496,16 +507,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           key: ValueKey(_obscure),
                         ),
                       ),
-                      tooltip: _obscure
-                          ? tr('tooltip_show_password', ref)
-                          : tr('tooltip_hide_password', ref),
+                      tooltip:
+                          _obscure
+                              ? tr('tooltip_show_password', ref)
+                              : tr('tooltip_hide_password', ref),
                       onPressed: () => setState(() => _obscure = !_obscure),
                     ),
                   ),
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _submit(),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? tr('required', ref) : null,
+                  validator:
+                      (v) =>
+                          v == null || v.isEmpty ? tr('required', ref) : null,
                 ).animate().fadeIn(
                   delay: 200.ms,
                   duration: AppTokens.durNormal,
@@ -525,18 +538,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   height: AppTokens.buttonMinHeight,
                   child: FilledButton(
                     onPressed: (isLoading || _isLockedOut) ? null : _submit,
-                    child: isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppBrand.onPrimary,
-                            ),
-                          )
-                        : _isLockedOut
-                        ? Text('${tr('sign_in', ref)} ($_lockoutSeconds s)')
-                        : Text(tr('sign_in', ref)),
+                    child:
+                        isLoading
+                            ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppBrand.onPrimary,
+                              ),
+                            )
+                            : _isLockedOut
+                            ? Text('${tr('sign_in', ref)} ($_lockoutSeconds s)')
+                            : Text(tr('sign_in', ref)),
                   ),
                 ).animate().fadeIn(
                   delay: 300.ms,
