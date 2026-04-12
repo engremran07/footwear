@@ -6,6 +6,57 @@
 
 ---
 
+## SESSION-011 — 2026-04-12 — v3.5.2+45 / Shop creation race fix + full commit + audit
+
+**Agent:** GitHub Copilot (Claude Sonnet 4.6) — 88-agent governance pack v2.0
+**Baseline:** v3.5.1+44 (SESSION-010, post-markdown-fixes) — all changes uncommitted since v3.4.11+42
+**Trigger:** "previous 10 audits broke everything apart ... rules firestore and firebase alignment ... check free tier API calls limit"
+
+### Work Performed
+
+**Phase 1 — Root cause audit of uncommitted changes:**
+- `git status` revealed 30+ modified files, all uncommitted since v3.4.11+42
+- `flutter analyze` found 1 warning: `shop_form_screen.dart:282` `invalid_null_aware_operator`
+- Root: `routesLoading = user != null && ...` → Dart flow-promotes `user` to non-null
+  in `routesLoading && user?.isAdmin` — fixed to `user.isAdmin` (no operator needed)
+- `firebase deploy --only firestore:rules,firestore:indexes` → confirmed already deployed,
+  re-deployed to ensure alignment: DEPLOY_EXIT:0
+
+**Phase 2 — Hygiene gate verification:**
+- Raw `.collection('string')` scan → 0 hits (all use `Collections.*`)
+- Hardcoded `Colors.white/grey/red/black` scan → only shimmer_loading.dart (dark-mode ternary pattern, intentional) and app_shell.dart legacy (pre-existing, not regressed)
+- allTransactionsProvider in `_invalidateRoleScopedProviders` → confirmed present
+- Firestore writes in screens/widgets scan → 0 hits
+
+**Phase 3 — Fix + commit:**
+- `shop_form_screen.dart:282`: `user?.isAdmin == true` / `user!.isAdmin` → `user.isAdmin` (flow-promoted)
+- All uncommitted work since v3.4.11+42 committed as: `becdebe Release v3.5.2+45`
+  39 files changed, 1818 insertions, 173 deletions
+  New files: REGRESSION_REGISTRY.md, SESSION_LOG.md, MASTER_BLUEPRINT.md, CHANGELOG.md,
+  AUDIT_REPORT_FOOTWEAR_ERP.md, tests/firestore-rules/, .github/baselines/
+
+**Phase 4 — Rebuild + deploy:**
+- `flutter build apk --release` → 75.0MB ✅
+- `firebase deploy --only firestore:rules,firestore:indexes` → DEPLOY_EXIT:0 ✅
+- `firebase deploy --only hosting` → DEPLOY_EXIT:0 ✅
+
+### Firebase Free Tier (Spark Plan) Status
+See AGENTS.md §4 and firebase-free-tier SKILL.md for full limits.
+Daily resets: Firestore reads (50k/day), writes (20k/day), deletes (20k/day).
+Monthly resets: Auth (10k operations/month).
+Storage limit: 1 GB total (this app: 0 bytes — no Firebase Storage used).
+Check live usage: Firebase Console → Build → Firestore → Usage tab.
+
+### Outcomes
+- flutter analyze lib --no-pub: **0 issues** ✅
+- flutter test -r compact: **340/340 passed** ✅
+- flutter build apk --release: **✅ app-release.apk 75.0MB**
+- firebase deploy firestore:rules + firestore:indexes: **✅ DEPLOY_EXIT:0**
+- firebase deploy hosting: **✅ DEPLOY_EXIT:0**
+- git commit: **✅ becdebe** (39 files, 1818 insertions)
+
+---
+
 ## SESSION-010 — 2026-04-12 — v3.5.1+44 / Markdown zero-violation + FIND-008 Crashlytics keys + CI Gate 12
 
 **Agent:** GitHub Copilot (Claude Sonnet 4.6) — 88-agent governance pack v2.0
