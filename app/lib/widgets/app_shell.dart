@@ -147,7 +147,7 @@ class _AppShellState extends ConsumerState<AppShell>
               title: Text(action.label),
               onTap: () {
                 Navigator.pop(ctx);
-                context.go(action.route);
+                context.push(action.route);
               },
             ),
           const SizedBox(height: 16),

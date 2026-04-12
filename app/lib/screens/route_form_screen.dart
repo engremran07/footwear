@@ -57,6 +57,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       return;
     }
     setState(() => _saving = true);
+    bool saved = false;
     try {
       final user = ref.read(authUserProvider).valueOrNull;
       final Map<String, dynamic> data = {
@@ -72,14 +73,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
         data['created_by'] = user?.id ?? '';
         await ref.read(routeNotifierProvider.notifier).create(data);
       }
-      if (mounted) {
-        HapticFeedback.mediumImpact();
-        _isDirty = false;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
-        context.pop();
-      }
+      saved = true;
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
@@ -87,6 +81,15 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+    // context.pop() is OUTSIDE the try-catch so a navigation exception
+    // cannot trigger the error SnackBar after a successful save.
+    if (saved && mounted) {
+      HapticFeedback.mediumImpact();
+      _isDirty = false;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
+      context.pop();
     }
   }
 

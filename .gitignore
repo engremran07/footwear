@@ -22,6 +22,11 @@ app_logs.txt
 fresh_logs.txt
 fresh_errors.txt
 device_logs_*.txt
+live_logs_debug.txt
+release_logs_*_raw.txt
+
+# Session audit / temp reports
+AUDIT_REPORT_*.txt
 
 # Firebase
 .firebase/

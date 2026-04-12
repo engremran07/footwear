@@ -64,6 +64,7 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
     }
 
     setState(() => _saving = true);
+    bool saved = false;
     try {
       final data = {
         'product_id': widget.productId,
@@ -77,14 +78,7 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
       } else {
         await notifier.createVariant(data);
       }
-      if (mounted) {
-        HapticFeedback.mediumImpact();
-        _isDirty = false;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
-        context.pop();
-      }
+      saved = true;
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
@@ -94,6 +88,13 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+    if (saved && mounted) {
+      HapticFeedback.mediumImpact();
+      _isDirty = false;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
+      context.pop();
     }
   }
 

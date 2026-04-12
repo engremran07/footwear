@@ -241,3 +241,13 @@ jobs:
             exit 1
           fi
           echo "✅ No raw SnackBar in screens/widgets"
+
+      - name: Gate 14 — No context.go() for form screen routes
+        run: |
+          FOUND=$(grep -rn "context\.go('[^']*/(new\|edit)" app/lib/ 2>/dev/null | grep -v "//" || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ context.go() used for form route — use context.push() for create/edit screens:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✅ No context.go() for form routes"
