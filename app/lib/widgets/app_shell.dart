@@ -804,8 +804,12 @@ class _DrawerMenuScreen extends StatelessWidget {
                   ),
                   child: InkWell(
                     onTap: onProfile,
-                    splashColor: const Color(0x1FFFFFFF), // white12 — ink on dark gradient header
-                    highlightColor: const Color(0x1AFFFFFF), // white10 — ink on dark gradient header
+                    splashColor: const Color(
+                      0x1FFFFFFF,
+                    ), // white12 — ink on dark gradient header
+                    highlightColor: const Color(
+                      0x1AFFFFFF,
+                    ), // white10 — ink on dark gradient header
                     child: Padding(
                       padding: const EdgeInsetsDirectional.fromSTEB(
                         20,

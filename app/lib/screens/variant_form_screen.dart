@@ -41,8 +41,9 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
     final v = variants.where((v) => v.id == widget.variantId).firstOrNull;
     if (v != null) {
       _variantNameC.value = TextEditingValue(
-          text: v.variantName,
-          selection: TextSelection.collapsed(offset: v.variantName.length));
+        text: v.variantName,
+        selection: TextSelection.collapsed(offset: v.variantName.length),
+      );
       _loaded = true;
     }
   }
@@ -56,9 +57,9 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
     final user = ref.read(authUserProvider).valueOrNull;
     if (user?.isAdmin != true) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          errorSnackBar(tr('permission_denied', ref)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
       }
       return;
     }
@@ -82,9 +83,7 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context).showSnackBar(
-          errorSnackBar(tr(key, ref)),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -92,8 +91,9 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
     if (saved && mounted) {
       HapticFeedback.mediumImpact();
       _isDirty = false;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       context.pop();
     }
   }
@@ -122,8 +122,9 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
           appBar: AppBar(
-            title:
-                Text(isEdit ? tr('edit_variant', ref) : tr('new_variant', ref)),
+            title: Text(
+              isEdit ? tr('edit_variant', ref) : tr('new_variant', ref),
+            ),
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -144,9 +145,7 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
                     autofocus: !isEdit,
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) => _save(),
-                    inputFormatters: [
-                      AppInputFormatters.maxLength(200),
-                    ],
+                    inputFormatters: [AppInputFormatters.maxLength(200)],
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
@@ -160,8 +159,9 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
                                 const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 Text(tr('saving', ref)),

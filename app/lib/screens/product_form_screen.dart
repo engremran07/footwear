@@ -39,8 +39,9 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     final p = ref.read(productDetailProvider(widget.productId!)).valueOrNull;
     if (p != null) {
       _nameC.value = TextEditingValue(
-          text: p.name,
-          selection: TextSelection.collapsed(offset: p.name.length));
+        text: p.name,
+        selection: TextSelection.collapsed(offset: p.name.length),
+      );
       _loaded = true;
     }
   }
@@ -54,9 +55,9 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     final user = ref.read(authUserProvider).valueOrNull;
     if (user?.isAdmin != true) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          errorSnackBar(tr('permission_denied', ref)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
       }
       return;
     }
@@ -64,9 +65,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     setState(() => _saving = true);
     bool saved = false;
     try {
-      final data = {
-        'name': AppSanitizer.name(_nameC.text),
-      };
+      final data = {'name': AppSanitizer.name(_nameC.text)};
       final notifier = ref.read(productNotifierProvider.notifier);
       if (isEdit) {
         await notifier.updateProduct(widget.productId!, data);
@@ -85,8 +84,9 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     if (saved && mounted) {
       HapticFeedback.mediumImpact();
       _isDirty = false;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       context.pop();
     }
   }
@@ -115,8 +115,9 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
           appBar: AppBar(
-            title:
-                Text(isEdit ? tr('edit_product', ref) : tr('new_product', ref)),
+            title: Text(
+              isEdit ? tr('edit_product', ref) : tr('new_product', ref),
+            ),
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -130,14 +131,13 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                   TextFormField(
                     controller: _nameC,
                     decoration: InputDecoration(
-                        labelText: '${tr('product_name', ref)} *'),
+                      labelText: '${tr('product_name', ref)} *',
+                    ),
                     validator: (v) => Validators.notEmpty(v),
                     autofocus: !isEdit,
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) => _save(),
-                    inputFormatters: [
-                      AppInputFormatters.maxLength(200),
-                    ],
+                    inputFormatters: [AppInputFormatters.maxLength(200)],
                   ),
                   const SizedBox(height: 32),
                   SizedBox(
@@ -149,7 +149,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2))
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : Text(tr('save', ref)),
                     ),
                   ),

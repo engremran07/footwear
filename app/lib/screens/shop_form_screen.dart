@@ -120,8 +120,9 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     if (saved && mounted) {
       HapticFeedback.mediumImpact();
       _isDirty = false;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       context.pop();
     }
   }
@@ -213,37 +214,38 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                     // Flutter's assertion (value must be in items) does not fire.
                     items: routes.isNotEmpty
                         ? routes
-                            .map(
-                              (r) => DropdownMenuItem(
-                                value: r.id,
-                                child: Text('${r.routeNumber} - ${r.name}'),
-                              ),
-                            )
-                            .toList()
-                        : (_routeId != null
-                            ? [
-                                DropdownMenuItem(
-                                  value: _routeId,
-                                  child: Text(
-                                    routesLoading
-                                        ? tr('loading', ref)
-                                        : _routeId!,
-                                  ),
+                              .map(
+                                (r) => DropdownMenuItem(
+                                  value: r.id,
+                                  child: Text('${r.routeNumber} - ${r.name}'),
                                 ),
-                              ]
-                            : []),
+                              )
+                              .toList()
+                        : (_routeId != null
+                              ? [
+                                  DropdownMenuItem(
+                                    value: _routeId,
+                                    child: Text(
+                                      routesLoading
+                                          ? tr('loading', ref)
+                                          : _routeId!,
+                                    ),
+                                  ),
+                                ]
+                              : []),
                     validator: (v) => v == null ? tr('required', ref) : null,
                     onChanged: user?.isAdmin == true
                         ? routesLoading
-                            ? null
-                            : (v) {
-                                final r =
-                                    routes.where((r) => r.id == v).firstOrNull;
-                                setState(() {
-                                  _routeId = v;
-                                  _routeNumber = r?.routeNumber ?? 0;
-                                });
-                              }
+                              ? null
+                              : (v) {
+                                  final r = routes
+                                      .where((r) => r.id == v)
+                                      .firstOrNull;
+                                  setState(() {
+                                    _routeId = v;
+                                    _routeNumber = r?.routeNumber ?? 0;
+                                  });
+                                }
                         : null,
                   ),
                   const SizedBox(height: 16),
@@ -281,7 +283,8 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                     width: double.infinity,
                     height: 48,
                     child: FilledButton(
-                      onPressed: _saving ||
+                      onPressed:
+                          _saving ||
                               (routesLoading &&
                                   user.isAdmin &&
                                   _routeId == null)

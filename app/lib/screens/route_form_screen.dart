@@ -87,8 +87,9 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
     if (saved && mounted) {
       HapticFeedback.mediumImpact();
       _isDirty = false;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       context.pop();
     }
   }
