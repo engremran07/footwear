@@ -356,7 +356,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       ),
       floatingActionButton: canCreateShop
           ? FloatingActionButton(
-              onPressed: () => context.go('/shops/new'),
+              onPressed: () => context.push('/shops/new'),
               child: const Icon(Icons.add),
             )
           : null,

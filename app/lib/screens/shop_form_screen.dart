@@ -110,6 +110,9 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       if (mounted) {
         HapticFeedback.mediumImpact();
         _isDirty = false;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
         context.pop();
       }
     } catch (e) {

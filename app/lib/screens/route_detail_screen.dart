@@ -40,7 +40,7 @@ class RouteDetailScreen extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.edit),
               tooltip: tr('tooltip_edit_route', ref),
-              onPressed: () => context.go('/routes/$routeId/edit'),
+              onPressed: () => context.push('/routes/$routeId/edit'),
             ),
           if (isAdmin)
             IconButton(
@@ -298,7 +298,7 @@ class RouteDetailScreen extends ConsumerWidget {
       ),
       floatingActionButton: canAddShop
           ? FloatingActionButton(
-              onPressed: () => context.go('/shops/new?routeId=$routeId'),
+              onPressed: () => context.push('/shops/new?routeId=$routeId'),
               child: const Icon(Icons.add),
             )
           : null,

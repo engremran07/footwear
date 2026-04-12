@@ -66,7 +66,7 @@ class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
       ),
       floatingActionButton: isAdmin
           ? FloatingActionButton(
-              onPressed: () => context.go('/routes/new'),
+              onPressed: () => context.push('/routes/new'),
               child: const Icon(Icons.add),
             )
           : null,

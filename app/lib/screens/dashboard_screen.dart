@@ -694,7 +694,7 @@ class _AdminSpeedDial extends ConsumerWidget {
         FloatingActionButton.small(
           heroTag: 'fab_shop',
           tooltip: tr('new_shop', ref),
-          onPressed: () => context.go('/shops/new'),
+          onPressed: () => context.push('/shops/new'),
           child: const Icon(Icons.store),
         ),
         const SizedBox(height: AppTokens.s8),

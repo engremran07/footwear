@@ -90,7 +90,7 @@ class ProductDetailScreen extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.edit),
                   tooltip: 'Edit product',
-                  onPressed: () => context.go('/products/$productId/edit'),
+                  onPressed: () => context.push('/products/$productId/edit'),
                 ),
             ],
           ),
@@ -279,7 +279,7 @@ class ProductDetailScreen extends ConsumerWidget {
                               ),
                             ),
                             onTap: user?.isAdmin == true
-                                ? () => context.go(
+                                ? () => context.push(
                                     '/products/$productId/variants/${v.id}/edit',
                                   )
                                 : null,
@@ -295,7 +295,7 @@ class ProductDetailScreen extends ConsumerWidget {
           floatingActionButton: user?.isAdmin == true
               ? FloatingActionButton(
                   onPressed: () =>
-                      context.go('/products/$productId/variants/new'),
+                      context.push('/products/$productId/variants/new'),
                   child: const Icon(Icons.add),
                 )
               : null,

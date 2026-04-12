@@ -723,7 +723,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 onSelected: (action) async {
                   switch (action) {
                     case _ShopAction.edit:
-                      context.go('/shops/${shop.id}/edit');
+                      context.push('/shops/${shop.id}/edit');
 
                     case _ShopAction.delete:
                       final ok = await ConfirmDialog.show(
