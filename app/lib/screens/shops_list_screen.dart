@@ -342,7 +342,9 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                 ref: ref,
                 onRetry: () {
                   if (user?.isSeller == true && user?.assignedRouteId != null) {
-                    ref.invalidate(shopsByRouteProvider(user!.assignedRouteId!));
+                    ref.invalidate(
+                      shopsByRouteProvider(user!.assignedRouteId!),
+                    );
                   } else {
                     ref.invalidate(shopsProvider);
                   }

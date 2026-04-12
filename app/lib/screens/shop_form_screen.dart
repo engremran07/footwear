@@ -31,6 +31,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
   bool _loaded = false;
   bool _saving = false;
   bool _isDirty = false;
+  bool _routeAutoAssigned = false;
 
   bool get isEdit => widget.shopId != null;
 
@@ -53,15 +54,19 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     final shop = ref.read(shopDetailProvider(widget.shopId!)).valueOrNull;
     if (shop != null) {
       _nameC.value = TextEditingValue(
-          text: shop.name,
-          selection: TextSelection.collapsed(offset: shop.name.length));
+        text: shop.name,
+        selection: TextSelection.collapsed(offset: shop.name.length),
+      );
       final phone = shop.phone ?? '';
       _phoneC.value = TextEditingValue(
-          text: phone,
-          selection: TextSelection.collapsed(offset: phone.length));
+        text: phone,
+        selection: TextSelection.collapsed(offset: phone.length),
+      );
       final city = shop.city ?? '';
       _cityC.value = TextEditingValue(
-          text: city, selection: TextSelection.collapsed(offset: city.length));
+        text: city,
+        selection: TextSelection.collapsed(offset: city.length),
+      );
       _routeId = shop.routeId;
       _routeNumber = shop.routeNumber;
       _loaded = true;
@@ -69,19 +74,20 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
   }
 
   Future<void> _save() async {
+    if (_saving) return; // synchronous guard — prevents double-submit race
     if (!_formKey.currentState!.validate()) {
       HapticFeedback.vibrate();
       return;
     }
     if (_routeId == null) {
       HapticFeedback.vibrate();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(warningSnackBar(tr('select_route', ref)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(warningSnackBar(tr('select_route', ref)));
       return;
     }
     setState(() => _saving = true);
     try {
-      final user = ref.read(authUserProvider).valueOrNull;
       final data = {
         'name': AppSanitizer.name(_nameC.text),
         'route_id': _routeId,
@@ -98,7 +104,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
             .read(shopNotifierProvider.notifier)
             .updateShop(widget.shopId!, data);
       } else {
-        data['created_by'] = user?.id ?? '';
+        // created_by is set by the provider from Firebase Auth uid directly.
         await ref.read(shopNotifierProvider.notifier).create(data);
       }
       if (mounted) {
@@ -109,9 +115,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     } catch (e) {
       if (mounted) {
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context).showSnackBar(
-          errorSnackBar(tr(key, ref)),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -125,21 +129,34 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       _loadExisting();
     }
     final user = ref.watch(authUserProvider).valueOrNull;
-    final allRoutes = user?.isAdmin == true
-        ? ref.watch(routesProvider).valueOrNull ?? []
-        : ref.watch(routesBySellerProvider(user?.id ?? '')).valueOrNull ?? [];
+    final routesAsync = user?.isAdmin == true
+        ? ref.watch(routesProvider)
+        : ref.watch(routesBySellerProvider(user?.id ?? ''));
+    final routesLoading = user != null && routesAsync.isLoading;
+    final allRoutes = routesAsync.valueOrNull ?? [];
     final routes = user?.isAdmin == true
         ? allRoutes
         : allRoutes.where((r) => r.id == user?.assignedRouteId).toList();
 
-    if (_routeId == null &&
+    // Seller: set route directly from user profile without waiting for routes to load.
+    // Guard with !isEdit so edit-mode shops keep their stored route_id.
+    if (!_routeAutoAssigned &&
+        _routeId == null &&
+        !isEdit &&
         user?.isSeller == true &&
         user?.assignedRouteId != null) {
-      final assigned =
-          routes.where((r) => r.id == user!.assignedRouteId).firstOrNull;
-      if (assigned != null) {
-        _routeId = assigned.id;
-        _routeNumber = assigned.routeNumber;
+      _routeAutoAssigned = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _routeId = user!.assignedRouteId);
+      });
+    }
+    // Sync routeNumber once route list loads (works for both admin and seller).
+    if (_routeId != null && _routeNumber == 0) {
+      final r = allRoutes.where((r) => r.id == _routeId).firstOrNull;
+      if (r != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _routeNumber = r.routeNumber);
+        });
       }
     }
 
@@ -170,32 +187,67 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
               child: Column(
                 children: [
                   DropdownButtonFormField<String>(
+                    key: ValueKey(_routeId),
                     initialValue: _routeId,
-                    decoration:
-                        InputDecoration(labelText: '${tr('route', ref)} *'),
-                    items: routes
-                        .map((r) => DropdownMenuItem(
-                              value: r.id,
-                              child: Text('${r.routeNumber} - ${r.name}'),
-                            ))
-                        .toList(),
+                    decoration: InputDecoration(
+                      labelText: '${tr('route', ref)} *',
+                      suffixIcon: routesLoading
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                    // When _routeId is set but the list hasn't loaded yet (e.g. seller
+                    // offline / slow connection), provide a placeholder item so that
+                    // Flutter's assertion (value must be in items) does not fire.
+                    items: routes.isNotEmpty
+                        ? routes
+                            .map(
+                              (r) => DropdownMenuItem(
+                                value: r.id,
+                                child: Text('${r.routeNumber} - ${r.name}'),
+                              ),
+                            )
+                            .toList()
+                        : (_routeId != null
+                            ? [
+                                DropdownMenuItem(
+                                  value: _routeId,
+                                  child: Text(
+                                    routesLoading
+                                        ? tr('loading', ref)
+                                        : _routeId!,
+                                  ),
+                                ),
+                              ]
+                            : []),
                     validator: (v) => v == null ? tr('required', ref) : null,
                     onChanged: user?.isAdmin == true
-                        ? (v) {
-                            final r =
-                                routes.where((r) => r.id == v).firstOrNull;
-                            setState(() {
-                              _routeId = v;
-                              _routeNumber = r?.routeNumber ?? 0;
-                            });
-                          }
+                        ? routesLoading
+                            ? null
+                            : (v) {
+                                final r =
+                                    routes.where((r) => r.id == v).firstOrNull;
+                                setState(() {
+                                  _routeId = v;
+                                  _routeNumber = r?.routeNumber ?? 0;
+                                });
+                              }
                         : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _nameC,
-                    decoration:
-                        InputDecoration(labelText: '${tr('shop_name', ref)} *'),
+                    decoration: InputDecoration(
+                      labelText: '${tr('shop_name', ref)} *',
+                    ),
                     validator: (v) => Validators.notEmpty(v),
                     inputFormatters: [AppInputFormatters.maxLength(200)],
                     textInputAction: TextInputAction.next,
@@ -225,12 +277,18 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                     width: double.infinity,
                     height: 48,
                     child: FilledButton(
-                      onPressed: _saving ? null : _save,
+                      onPressed: _saving ||
+                              (routesLoading &&
+                                  user.isAdmin &&
+                                  _routeId == null)
+                          ? null
+                          : _save,
                       child: _saving
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2))
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : Text(tr('save', ref)),
                     ),
                   ),

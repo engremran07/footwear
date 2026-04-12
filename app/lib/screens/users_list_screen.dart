@@ -1071,11 +1071,13 @@ class _InactiveUserTile extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor: Colors.grey.withAlpha(40),
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.outline.withValues(alpha: 0.16),
               child: Icon(
                 user.isAdmin ? Icons.admin_panel_settings : Icons.person_off,
                 size: 18,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.outline,
               ),
             ),
             const SizedBox(width: 10),

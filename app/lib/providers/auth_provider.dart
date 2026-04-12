@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
@@ -283,6 +284,12 @@ class AuthNotifier extends AsyncNotifier<void> {
         await prefs.setBool(rememberMePrefKey, rememberMe);
 
         _invalidateRoleScopedProviders();
+        // S-01: Crashlytics context keys for crash correlation (FIND-008)
+        if (!kIsWeb) {
+          FirebaseCrashlytics.instance.setUserIdentifier(uid);
+          FirebaseCrashlytics.instance.setCustomKey('role', normalizedRole);
+          FirebaseCrashlytics.instance.setCustomKey('app_version', '3.5.2+45');
+        }
       } on FirebaseAuthException catch (e) {
         _logger.e('Auth error [${e.code}]: ${e.message}');
         rethrow;
@@ -318,6 +325,11 @@ class AuthNotifier extends AsyncNotifier<void> {
       } catch (_) {}
       // Clear cached SA OAuth2 token so next admin session gets a fresh one.
       AdminIdentityService.instance.clearCache();
+      // S-01: Clear Crashlytics identity on sign-out (FIND-008)
+      if (!kIsWeb) {
+        FirebaseCrashlytics.instance.setUserIdentifier('');
+        FirebaseCrashlytics.instance.setCustomKey('role', 'signed_out');
+      }
       _invalidateRoleScopedProviders();
     });
   }

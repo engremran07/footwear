@@ -1498,19 +1498,21 @@ class _DatabaseFlushSectionState extends ConsumerState<_DatabaseFlushSection> {
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.black54,
+                color: Theme.of(
+                  context,
+                ).colorScheme.scrim.withValues(alpha: 0.54),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircularProgressIndicator(color: Colors.white),
+                    const CircularProgressIndicator(color: AppBrand.onPrimary),
                     const SizedBox(height: 16),
                     Text(
                       tr('flush_in_progress', ref),
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: AppBrand.onPrimary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

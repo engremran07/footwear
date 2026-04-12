@@ -288,17 +288,10 @@ service cloud.firestore {
             (
               !requiresSellerTransactionEditApproval() &&
               resource.data.created_by == request.auth.uid &&
-              (resource.data.type == 'cash_in' || resource.data.type == 'cash_out') &&
-              (request.resource.data.type == 'cash_in' || request.resource.data.type == 'cash_out') &&
-              request.resource.data.amount is number &&
-              request.resource.data.amount > 0 &&
               request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-                'amount',
-                'type',
                 'description',
-                'sale_type',
-                'created_at',
                 'updated_at',
+                'updated_by',
                 'edit_request_pending',
                 'edit_request_status',
                 'edit_request_reviewed_by',

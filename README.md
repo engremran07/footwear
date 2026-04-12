@@ -1,8 +1,8 @@
-﻿# FootWear ERP — v3.4.0
+﻿# FootWear ERP — v3.5.1+44
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase as the backend. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
-> **v3.4.0+30** — Autonomous 20-agent CI/CD self-healing system: GitHub Actions (ci.yml hygiene gates, build-apk.yml, release.yml, deploy-web.yml), GitHub prompts (20-agent audit, post-impl checklist), GitHub instructions (collections, financial-integrity, testing, code-quality), 7 skill file updates/additions. Security: seller transaction rules restricted to description+updated_at only; new updateTransactionNote() provider; role-aware edit dialog (seller annotation-only, delete hidden). Session UX: 7h30m warning dialog before 8h hard cutoff, L10n parity across EN/AR/UR.
+> **v3.5.0+43** — 88-agent Ultimate Governance Pack v2.0: GitHub Actions (ci.yml hygiene gates, build-apk.yml, release.yml, deploy-web.yml), GitHub prompts (20-agent audit, post-impl checklist), GitHub instructions (collections, financial-integrity, testing, code-quality), 7 skill file updates/additions. Security: seller transaction rules restricted to description+updated_at only; new updateTransactionNote() provider; role-aware edit dialog (seller annotation-only, delete hidden). Session UX: 7h30m warning dialog before 8h hard cutoff, L10n parity across EN/AR/UR.
 
 ---
 
@@ -168,7 +168,7 @@ Version 3.3.7 introduces a fully autonomous 4-way authentication sync pipeline. 
 
 ### Architecture
 
-```
+```text
 Admin taps Save in Edit User dialog
          │
          ▼
@@ -207,6 +207,7 @@ Admin taps Save in Edit User dialog
 ### Email Verified badge
 
 Each user shows a **Verified** (green) or **Unverified** (orange) chip.
+
 - On admin sign-in, `emailVerified` is synced from `FirebaseAuth.currentUser.emailVerified` → Firestore.
 - The **Send Verification** button calls `accounts:sendOobCode` with `VERIFY_EMAIL` action code.
 

@@ -8,6 +8,7 @@ import '../models/user_model.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/services/permissions_service.dart';
+import '../core/utils/snack_helper.dart';
 
 // ─── App Shell ───────────────────────────────────────────────────────────────
 
@@ -257,13 +258,9 @@ class _AppShellState extends ConsumerState<AppShell>
         return;
       }
       _lastBackPress = now;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(tr('press_back_again_to_exit', ref)),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(infoSnackBar(tr('press_back_again_to_exit', ref)));
     }
 
     // ── Tablet/Desktop: NavigationRail (unchanged) ────────────────────────

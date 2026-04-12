@@ -44,10 +44,10 @@ class ErrorState extends StatelessWidget {
   });
 
   IconData get _icon => switch (errorType) {
-        ErrorType.network => Icons.wifi_off_rounded,
-        ErrorType.permission => Icons.lock_outline_rounded,
-        ErrorType.unknown => Icons.error_outline_rounded,
-      };
+    ErrorType.network => Icons.wifi_off_rounded,
+    ErrorType.permission => Icons.lock_outline_rounded,
+    ErrorType.unknown => Icons.error_outline_rounded,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -58,9 +58,11 @@ class ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(_icon, size: 64, color: theme.colorScheme.error)
-                .animate()
-                .shakeX(hz: 3, amount: 5, duration: AppTokens.durSlow),
+            Icon(
+              _icon,
+              size: 64,
+              color: theme.colorScheme.error,
+            ).animate().shakeX(hz: 3, amount: 5, duration: AppTokens.durSlow),
             const SizedBox(height: AppTokens.s16),
             Text(
               message,

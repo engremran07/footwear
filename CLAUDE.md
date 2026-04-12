@@ -49,44 +49,47 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
     Admin can own seller_inventory docs (seller_id = adminUid). isAdmin() in Firestore
     rules covers all admin operations including self-stock-allocation.
 17. If a bug was addressed by multiple candidate fixes, and QA/user confirms the
-  real culprit, you MUST run the Band-Aid Loop Reversal protocol: keep root-cause
-  + mandatory guards, rollback non-culprit mitigations, and record final reasoning.
+    real culprit, you MUST run the Band-Aid Loop Reversal protocol: keep root-cause
+    and mandatory guards, rollback non-culprit mitigations, and record final reasoning.
 
 ## Financial Pathways (never mix these)
 
-    Pathway 1: SALE WITH STOCK
-      → CreateSaleInvoiceScreen → InvoiceNotifier.createSaleInvoice()
-      → Invoice + cash_out tx + optional cash_in tx + seller_inventory deduction
-         (all in one atomic batch)
-      → USE WHEN: new goods delivered to shop, stock deduction required
+```text
+Pathway 1: SALE WITH STOCK
+  → CreateSaleInvoiceScreen → InvoiceNotifier.createSaleInvoice()
+  → Invoice + cash_out tx + optional cash_in tx + seller_inventory deduction
+     (all in one atomic batch)
+  → USE WHEN: new goods delivered to shop, stock deduction required
 
-    Pathway 2: CASH COLLECTION (old debt, no new goods)
-      → ShopDetailScreen → TransactionNotifier.create(type: 'cash_in')
-      → Cash_in ledger entry ONLY. No invoice. No stock movement.
-      → USE WHEN: collecting outstanding balance, no new delivery
+Pathway 2: CASH COLLECTION (old debt, no new goods)
+  → ShopDetailScreen → TransactionNotifier.create(type: 'cash_in')
+  → Cash_in ledger entry ONLY. No invoice. No stock movement.
+  → USE WHEN: collecting outstanding balance, no new delivery
 
-    VOID / RETURN:
-      → InvoiceNotifier.voidInvoice() — admin only
-      → Returns stock to inventory (seller_inventory or warehouse)
-      → Two refund modes: cashRefund (cheque/cash paid back) or creditBalance (deduct from balance)
-      → Issues ONE reversal transaction (return tx). Cash refund adds a second cash_out tx.
+VOID / RETURN:
+  → InvoiceNotifier.voidInvoice() — admin only
+  → Returns stock to inventory (seller_inventory or warehouse)
+  → Two refund modes: cashRefund (cheque/cash paid back) or creditBalance (deduct from balance)
+  → Issues ONE reversal transaction (return tx). Cash refund adds a second cash_out tx.
 
-    NEVER create an invoice for cash-only collection.
-    NEVER create a standalone transaction for a new stock sale (always through invoice).
+NEVER create an invoice for cash-only collection.
+NEVER create a standalone transaction for a new stock sale (always through invoice).
+```
 
 ## shop.balance Single Pipeline (non-negotiable)
 
 `shop.balance` is the **sole source of truth** for every monetary display in the app:
 
 | Screen / Widget | Source |
-|---|---|
+| --- | --- |
 | Shop detail — Total In / Total Out boxes | Live sum of `shopTransactionsProvider` stream |
 | Shop detail — balance badge color | `shop.balance` field |
 | Route detail — outstanding total | `shops.fold(shop.balance)` |
 | Dashboard AR widget | `outstandingShopsProvider` → `shop.balance` |
 
 **Write pipeline (atomic — no exceptions):**
-```
+
+```text
 User action → Screen → Provider notifier (InvoiceNotifier / TransactionNotifier)
   → Firestore batch: write transaction doc + update shop.balance in same commit
 ```
@@ -97,6 +100,7 @@ all screens instantly.
 
 **Dev data flush:** If you delete transactions/invoices manually (e.g. in dev),
 always follow with `node dev_reset.js` from the repo root to reset:
+
 - All shop `balance` fields → `0.0`
 - `settings/global.last_invoice_number` → `0`
 
@@ -135,25 +139,31 @@ If architecture behavior is changed, update in same patch:
 ## Breakage Chain Reference
 
 ### Chain 1: Collection Rename
+
 `collections.dart` constant renamed → providers silently break → rules reference stale name → indexes stale  
 **Fix order:** constants.dart → providers → rules → indexes → `firebase deploy --only firestore:rules,firestore:indexes`
 
 ### Chain 2: Auth Provider Leak
+
 New admin-data provider added → not in `_invalidateRoleScopedProviders()` → seller inherits admin data after logout  
 **Fix:** After every new provider, grep-confirm it's in `auth_provider.dart::_invalidateRoleScopedProviders`.
 
 ### Chain 3: Rules + App Role Mismatch
+
 Rules check 'admin' exactly; app writes 'Admin' (casing) → all admin writes fail  
 **Fix:** `isAdminRole()` regex in rules + `role.trim().toLowerCase()` before every Firestore write.
 
 ### Chain 4: Composite Index Gap
+
 `where(A) + orderBy(B)` added → no index → list renders empty, no error in UI  
 **Fix:** Add entry to `firestore.indexes.json` → `firebase deploy --only firestore:indexes`.
 
 ### Chain 5: Transitive Dep Wasm Lock
+
 Add a pub package that locks a shared transitive dep (e.g. `archive`) to an old major version → Wasm dry-run violations appear in `flutter build web` from a DIFFERENT package that needs the newer version.  
 **Symptoms:** `avoid_double_and_int_checks lint violation` in `flutter build web --release` from a third-party package file you did NOT write.  
 **Diagnosis triage:**
+
 1. `flutter pub deps --style=list | grep -A5 '<failing package>'` → find who introduced the dep
 2. `flutter pub outdated` → find latest compatible version
 3. Check pub.dev changelog for the failing package — search for "Wasm" and "archive"
@@ -182,7 +192,7 @@ Never keep ambiguity-driven workaround code without explicit justification.
 ## Vibe-Coded Debt Signals
 
 | Pattern seen | What it signals | Correct pattern |
-|-------------|----------------|----------------|
+| --- | --- | --- |
 | `db.collection('transactions')` | Raw collection string | `db.collection(Collections.transactions)` |
 | `if (user.isSeller && ...)` on stock source | Admin silently excluded | `sellerInventoryProvider(user.id)` for all |
 | `.where('deleted', isEqualTo: false)` | Pre-DI-01 docs excluded | Client-side `d.data()['deleted'] != true` |
@@ -193,7 +203,7 @@ Never keep ambiguity-driven workaround code without explicit justification.
 | `avoid_double_and_int_checks lint violation` in web build | Transitive dep locked to old `image`/`archive` by another pkg | Find blocking package; replace or upgrade it — see Chain 5 |
 | `flutter build web --release` exits 1 with no Error lines | PowerShell `NativeCommandError` from Wasm dry-run stderr — build IS succeeding | Check `$LASTEXITCODE` explicitly; exit 0 = real success |
 
-## Five Non-Negotiable Pre-Commit Checks
+## Six Non-Negotiable Pre-Commit Checks
 
 ```bash
 # 1 — Zero analyze issues
@@ -210,11 +220,15 @@ grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/
 
 # 5 — No legacy ABI-split APK build commands remain in docs/workflows
 # Mirror CI Gate 3 and confirm release docs/scripts still enforce fat APK only.
+
+# 6 — Zero markdown lint issues (Problems tab must be empty)
+markdownlint "**/*.md" --ignore node_modules --ignore app/build
 ```
 
 ## Admin Auth Pipeline
 
 When an admin's ID token is rejected mid-session (INVALID_ID_TOKEN):
+
 1. `auth.currentUser?.getIdToken(forceRefresh: true)` → if OK, continue
 2. If step 1 fails → `auth.signInWithCustomToken(token)` from secondary FirebaseApp
 3. If step 2 fails → `authNotifier.signOut()` + redirect to `/login`
@@ -242,6 +256,7 @@ Run before marking production ready:
 
 ## Done In This Baseline
 
+- v3.5.0+43 (audit v13): Governance layer (REGRESSION_REGISTRY.md, SESSION_LOG.md, MASTER_BLUEPRINT.md, CHANGELOG.md, AUDIT_REPORT_FOOTWEAR_ERP.md), CI/CD hardened (Flutter 3.29.2 pinned, timeouts, --coverage, 11 hygiene gates, APK size gate), 15 hardcoded Colors.* eliminated in 6 screens (RR-011), widget_test.dart placeholder replaced (RR-013), Firestore rules emulator test scaffold
 - Firebase Storage fully removed — zero cost architecture
 - Cloud Functions dependency removed — user CRUD via secondary FirebaseApp (no server needed)
 - Role normalization in app user parsing and writes

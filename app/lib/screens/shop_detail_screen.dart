@@ -1189,7 +1189,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppBrand.successColor,
-                          foregroundColor: Colors.white,
+                          foregroundColor: AppBrand.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
                         onPressed: canManageShop
@@ -1204,7 +1204,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppBrand.errorColor,
-                          foregroundColor: Colors.white,
+                          foregroundColor: AppBrand.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
                         onPressed: canManageShop
@@ -1249,9 +1249,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                   error: (e, _) => mappedErrorState(
                     error: e,
                     ref: ref,
-                    onRetry: () => ref.invalidate(
-                      shopTransactionsProvider(widget.shopId),
-                    ),
+                    onRetry: () =>
+                        ref.invalidate(shopTransactionsProvider(widget.shopId)),
                   ),
                   data: (txs) {
                     if (txs.isEmpty) {
@@ -1386,9 +1385,9 @@ class _TransactionTile extends ConsumerWidget {
     final reducesBalance = tx.reducesBalance;
     final color = isDeleted
         ? Theme.of(context).colorScheme.onSurfaceVariant
-      : isWriteOff
-      ? AppBrand.warningColor
-      : (reducesBalance ? AppBrand.successColor : AppBrand.errorColor);
+        : isWriteOff
+        ? AppBrand.warningColor
+        : (reducesBalance ? AppBrand.successColor : AppBrand.errorColor);
     final sign = reducesBalance ? '+' : '-';
     final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
     final totalQty = tx.items.fold<int>(0, (acc, item) => acc + item.qty);

@@ -1491,10 +1491,7 @@ Future<Uint8List> generateInvoicePdf({
             pw.SizedBox(height: 14),
 
             if (invoice.notes != null && invoice.notes!.isNotEmpty) ...[
-              pw.Text(
-                '$lblNotes:',
-                style: ts(size: 9, fw: pw.FontWeight.bold),
-              ),
+              pw.Text('$lblNotes:', style: ts(size: 9, fw: pw.FontWeight.bold)),
               pw.Text(_s(invoice.notes!), style: ts(size: 9)),
               pw.SizedBox(height: 8),
             ],

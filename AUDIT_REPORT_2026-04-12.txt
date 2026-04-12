@@ -1,0 +1,173 @@
+ShoesERP Autonomous Agent Audit Report
+=======================================
+Date      : 2026-04-12 10:45
+Version   : v3.5.0+43
+Flutter   : 3.29.2
+Session   : ce5b22c6 (GitHub Copilot — Claude Sonnet 4.6)
+
+EXECUTIVE SUMMARY
+-----------------
+10-domain parallel audit completed. All domains PASS.
+One critical bug fixed (shop double-submit race).
+Firestore rules deployed. APK built. Web deployed.
+
+═══════════════════════════════════════════════════════════
+BUG FIXED
+═══════════════════════════════════════════════════════════
+
+BUG-1 [CRITICAL] — Shop duplicate creation via double-submit race
+  File  : app/lib/screens/shop_form_screen.dart
+  Root  : _save() lacked a synchronous guard before setState(() => _saving = true).
+          In Flutter, pointer events are processed in the same frame before the
+          widget rebuilds. Two rapid taps fired two separate Firestore .set() calls
+          before the button's onPressed: _saving ? null : _save rebuilt to null.
+          The onFieldSubmitted keyboard handler also bypassed the button disable.
+  Fix   : Added `if (_saving) return;` as the FIRST statement of _save() —
+          synchronous, zero overhead, prevents all double-submit paths.
+  Impact: Stops duplicate shop docs from being created. Also fixes potential
+          duplicate shop edits from keyboard submit while button save is in flight.
+
+BUG-2 [Stale Rules] — Admin unable to create shops (and other permission-denied)
+  Root  : Firestore rules in Firebase were stale — repo rules updated in v3.5.0+43
+          audit but `firebase deploy --only firestore:rules` had not been run.
+  Fix   : firebase deploy --only firestore:rules,firestore:indexes → SUCCESS.
+  Impact: Admin shop creation, seller route-scoped writes, invoice math checks all
+          re-aligned with current repo version.
+
+═══════════════════════════════════════════════════════════
+MULTI-DOMAIN AUDIT RESULTS (10 Domains)
+═══════════════════════════════════════════════════════════
+
+Domain 01 — Financial Integrity                   PASS
+  createSaleInvoice: batch write, idempotency key, amountReceived guard ✓
+  voidInvoice: Firestore transaction (double-void guard), atomic batch ✓
+  markAsBadDebt: atomic batch (balance + write_off tx) ✓
+  All monetary writes include `deleted: false` (DI-01) ✓
+  _nextInvoiceNumber: Firestore transaction for concurrent numbering ✓
+  shop.balance only written by InvoiceNotifier / TransactionNotifier ✓
+
+Domain 02 — Firestore Rules Security              PASS
+  Products/variants/routes: admin-only create/update/delete ✓
+  Transaction update sellers: restricted to 6 allowed fields ✓
+  Invoice void: admin-only ✓
+  isValidRole() regex: case-insensitive match (admin|manager|seller) ✓
+  docSizeOk() and withinWriteRate() guards in place ✓
+  Users collection: sellers cannot read/write peers ✓
+  Invoice math validation in rules ✓
+
+Domain 03 — Provider Leak / Role Isolation        PASS
+  _invalidateRoleScopedProviders() covers all 19 admin/role-scoped providers ✓
+  SM-01 last-good cache invalidated on signout ✓
+  All admin providers guard on user.isAdmin before subscribing ✓
+
+Domain 04 — Collection Constants Hygiene          PASS
+  Zero raw .collection('string') calls in app/lib/ ✓
+  All references use Collections.* constants ✓
+
+Domain 05 — Error Mapping Coverage                PASS
+  FirebaseAuthException, FirebaseException, StateError, ArgumentError mapped ✓
+  'sellerId must not be empty' → err_unauthenticated ✓
+  No catch blocks that silently swallow errors ✓
+
+Domain 06 — Index Coverage                        PASS
+  21 composite indexes deployed ✓
+  All where(A)+orderBy(B) queries have matching index ✓
+  No silent-empty-list risk detected ✓
+
+Domain 07 — Navigation / Router Guards            PASS
+  _isAdminOnlyPath() and _isSellerBlockedPath() correctly aligned ✓
+  Unauthenticated / inactive users → /login ✓
+  Seller on admin-only routes → / ✓
+
+Domain 08 — Free-tier Firebase Limits             PASS
+  Dashboard uses computed stats, no count/sum aggregates ✓
+  All listeners capped with .limit() (routes:200, shops:500, tx:150-200) ✓
+  Per-metric zero-fallback prevents quota exhaustion cascade ✓
+
+Domain 09 — L10n Completeness                     PASS
+  400+ keys × EN / AR (RTL) / UR (RTL) with full parity ✓
+  tr() defaults to English if key missing ✓
+  No hardcoded English strings in screens detected ✓
+
+Domain 10 — APK Size / Dead Code                  PASS
+  No firebase_storage dependency (zero-cost tier) ✓
+  excel replaced by custom xlsx writer (Chain 5 fix retained) ✓
+  No dead providers or unused dependencies ✓
+
+═══════════════════════════════════════════════════════════
+NAVIGATION SYSTEM VERIFICATION
+═══════════════════════════════════════════════════════════
+
+Zoom Drawer (custom implementation — no flutter_zoom_drawer package):
+  app/lib/widgets/app_shell.dart
+  AnimationController (280ms, fastOutSlowIn) ✓
+  Transform.translate + Transform.scale zoom effect ✓
+  ClipRRect corner radius animation (0→22px) ✓
+  BoxShadow alpha animation (0→64) ✓
+  RTL-aware: isRtl flag flips dx direction ✓
+  Back gesture: closes drawer before navigating up ✓
+  AbsorbPointer on main content when drawer is open ✓
+
+WhatsApp-style App Bar (_WhatsAppBar):
+  Arctic glacier gradient + 2px aurora accent stripe ✓
+  Animated menu/close icon (AnimatedIcons.menu_close) ✓
+  Company logo + breadcrumb title ✓
+  Profile avatar with live online indicator dot ✓
+
+Arctic Bottom Navigation (_ArcticBottomNav):
+  Role-scoped: seller (5 items), admin (5 items) ✓
+  Press animation (scale 1.0→0.87) ✓
+  Long-press quick actions (new shop, new route, etc.) ✓
+  Swipe gesture tab switching (400+ px/s velocity) ✓
+  RTL swipe direction inverted ✓
+
+Drawer Menu (_DrawerMenuScreen):
+  User header with avatar + role badge ✓
+  All role-filtered nav items as ListTiles ✓
+  Profile and Sign Out at bottom ✓
+
+═══════════════════════════════════════════════════════════
+DEPLOY RECORD
+═══════════════════════════════════════════════════════════
+
+flutter analyze lib --no-pub      → No issues found (0 errors) ✓
+flutter test -r expanded          → 340/340 tests passed ✓
+firebase deploy firestore:rules   → SUCCESS ✓
+firebase deploy firestore:indexes → SUCCESS ✓
+flutter build apk --release       → EXIT 0, app-release.apk built ✓
+flutter build web --release       → EXIT 0, build/web generated ✓
+firebase deploy hosting           → 41 files deployed, release complete ✓
+
+Hosting URL: https://shoeserp-clean-20260327.web.app
+APK path   : app/build/app/outputs/flutter-apk/app-release.apk
+
+NOTE: Physical device for APK install was not connected during this session.
+      Run `flutter install --release` after connecting via USB (debugging on).
+
+═══════════════════════════════════════════════════════════
+REGRESSION REGISTRY UPDATES REQUIRED
+═══════════════════════════════════════════════════════════
+
+New entry to add to REGRESSION_REGISTRY.md:
+  RR-016: Shop double-submit race → duplicate shops
+    Status: FIXED
+    Root cause: _save() lacked synchronous guard before setState
+    Fix: Added `if (_saving) return;` as first statement of _save()
+    File: app/lib/screens/shop_form_screen.dart
+
+═══════════════════════════════════════════════════════════
+OVERALL SCORE
+═══════════════════════════════════════════════════════════
+
+Previous audit score: 79/100 (v3.5.0+43 audit v13)
+Post-fix score      : 81/100
+
++2 points: BUG-1 (shop double-submit) fixed
++0 points: BUG-2 (stale rules) resolved by deploy — no code change needed
+
+Score ceiling is held by: missing emulator test coverage for financial rules
+(tests/firestore-rules/rules.test.js scaffold exists but not fully expanded).
+
+═══════════════════════════════════════════════════════════
+END OF REPORT
+═══════════════════════════════════════════════════════════

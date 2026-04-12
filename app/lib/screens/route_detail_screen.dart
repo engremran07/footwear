@@ -281,7 +281,8 @@ class RouteDetailScreen extends ConsumerWidget {
                   error: (e, _) => mappedErrorState(
                     error: e,
                     ref: ref,
-                    onRetry: () => ref.invalidate(shopsByRouteProvider(routeId)),
+                    onRetry: () =>
+                        ref.invalidate(shopsByRouteProvider(routeId)),
                   ),
                 ),
               ),

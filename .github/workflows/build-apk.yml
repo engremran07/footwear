@@ -12,12 +12,13 @@ on:
       flutter_version:
         description: 'Flutter version (e.g. 3.29.x)'
         required: false
-        default: '3.29.x'
+        default: '3.29.2'
 
 jobs:
   build:
     name: Build ${{ github.event.inputs.build_type }} APK
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:

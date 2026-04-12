@@ -206,6 +206,7 @@ Before finishing:
   2. allTransactionsProvider in invalidation list: `grep -q "allTransactionsProvider" app/lib/providers/auth_provider.dart`
   3. No legacy ABI-split APK build commands remain in release docs or scripts
   4. No Firestore writes in screens/widgets: `grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/` → zero
+  5. Zero markdown lint issues: `markdownlint "**/*.md" --ignore node_modules --ignore app/build` → zero
 - Manually or logically verify admin and seller access for `/` and `/inventory`
   after auth/router/provider/rules edits; no transient permission-denied UI is acceptable
 - When release/deploy work is requested, verify `app/pubspec.yaml` and
@@ -227,6 +228,16 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-04-11 audit v13 — v3.5.0+43:
+
+- Governance layer established: REGRESSION_REGISTRY.md (15 RR entries, 6 PI items), SESSION_LOG.md (8 sessions), MASTER_BLUEPRINT.md, CHANGELOG.md, AUDIT_REPORT_FOOTWEAR_ERP.md
+- CI/CD hardened: all 4 workflows pinned to Flutter 3.29.2; timeout-minutes added (20/30/10/45 mins); test job now runs with --coverage; 11 hygiene gates (was 6); APK size gate in release.yml; .github/baselines/apk_size_kb.txt established
+- Color hygiene: 15 hardcoded Colors.white/grey/red/black54/black.withAlpha instances in 6 screens replaced with `AppBrand.*` / `cs.*` constants (dark-mode safe) — RR-011 closed
+- widget_test.dart placeholder replaced with auth-flow smoke tests + GoRouter absent-state check — RR-013 closed
+- Firestore rules emulator test scaffold created: tests/firestore-rules/ (package.json + rules.test.js)
+- Security fix RR-015: Firestore transaction rule approval-disabled path over-permissioned `amount`+`type` fields for sellers; restricted to `description`, `updated_at`, `updated_by`, `edit_request_*` only — prevents fraudulent amount/type manipulation
+- Audit score: 72/100 → 79/100
 
 2026-04-11 audit v12 — v3.4.11+42:
 

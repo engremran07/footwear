@@ -57,8 +57,10 @@ void main() {
 
   group('AppErrorMapper.key — FirebaseException (Firestore)', () {
     test('permission-denied → err_permission_denied', () {
-      final e =
-          FirebaseException(plugin: 'firestore', code: 'permission-denied');
+      final e = FirebaseException(
+        plugin: 'firestore',
+        code: 'permission-denied',
+      );
       expect(AppErrorMapper.key(e), equals('err_permission_denied'));
     });
 
@@ -73,8 +75,10 @@ void main() {
     });
 
     test('resource-exhausted → err_resource_exhausted', () {
-      final e =
-          FirebaseException(plugin: 'firestore', code: 'resource-exhausted');
+      final e = FirebaseException(
+        plugin: 'firestore',
+        code: 'resource-exhausted',
+      );
       expect(AppErrorMapper.key(e), equals('err_resource_exhausted'));
     });
 
@@ -128,6 +132,23 @@ void main() {
       );
     });
 
+    test('StateError "Not authenticated" → err_unauthenticated', () {
+      expect(
+        AppErrorMapper.key(StateError('Not authenticated')),
+        equals('err_unauthenticated'),
+      );
+    });
+
+    test(
+      'ArgumentError "sellerId must not be empty" → err_unauthenticated',
+      () {
+        expect(
+          AppErrorMapper.key(ArgumentError('sellerId must not be empty')),
+          equals('err_unauthenticated'),
+        );
+      },
+    );
+
     test('unrecognised exception → err_unknown', () {
       expect(
         AppErrorMapper.key(Exception('something completely random xyz')),
@@ -138,8 +159,10 @@ void main() {
 
   group('AppErrorMapper.isPermissionOrAuthError', () {
     test('permission-denied error returns true', () {
-      final e =
-          FirebaseException(plugin: 'firestore', code: 'permission-denied');
+      final e = FirebaseException(
+        plugin: 'firestore',
+        code: 'permission-denied',
+      );
       expect(AppErrorMapper.isPermissionOrAuthError(e), isTrue);
     });
 

@@ -218,9 +218,8 @@ class ProductDetailScreen extends ConsumerWidget {
                   error: (e, _) => mappedErrorState(
                     error: e,
                     ref: ref,
-                    onRetry: () => ref.invalidate(
-                      productVariantsProvider(productId),
-                    ),
+                    onRetry: () =>
+                        ref.invalidate(productVariantsProvider(productId)),
                   ),
                   data: (variants) {
                     if (variants.isEmpty) {

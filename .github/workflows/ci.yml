@@ -15,13 +15,14 @@ jobs:
   analyse:
     name: Flutter Analyze + Format
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
+          flutter-version: '3.29.2'
           channel: stable
           cache: true
 
@@ -50,13 +51,14 @@ jobs:
     name: Flutter Test
     needs: analyse
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
+          flutter-version: '3.29.2'
           channel: stable
           cache: true
 
@@ -74,12 +76,13 @@ jobs:
         run: cd app && flutter pub get
 
       - name: flutter test
-        run: cd app && flutter test -r compact
+        run: cd app && flutter test -r compact --coverage
 
   hygiene:
     name: Code Hygiene Gates
     needs: analyse
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -166,3 +169,65 @@ jobs:
             exit 1
           fi
           echo "✅ No PDF main-thread violations detected"
+
+      - name: Gate 7 — No hardcoded Colors.white/grey/red/black in screens/widgets
+        run: |
+          FOUND=$(grep -rn "Colors\.white\|Colors\.grey\|Colors\.red\|Colors\.black[^5]\|Colors\.black54" app/lib/screens/ app/lib/widgets/ 2>/dev/null | grep -v "//" || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ Hardcoded Color.* detected — use AppBrand.* or cs.* constants:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✅ No hardcoded Colors.* in screens/widgets"
+
+      - name: Gate 8 — pubspec version == app_brand version
+        run: |
+          PUBSPEC_VER=$(grep '^version:' app/pubspec.yaml | sed 's/version: //' | tr -d '[:space:]')
+          BRAND_VER=$(grep 'static const String appVersion' app/lib/core/constants/app_brand.dart | sed "s/.*'\(.*\)';/\1/" | tr -d '[:space:]')
+          BRAND_BUILD=$(grep 'static const String buildNumber' app/lib/core/constants/app_brand.dart | sed "s/.*'\(.*\)';/\1/" | tr -d '[:space:]')
+          BRAND_COMBINED="${BRAND_VER}+${BRAND_BUILD}"
+          if [ "$PUBSPEC_VER" != "$BRAND_COMBINED" ]; then
+            echo "❌ Version mismatch: pubspec=$PUBSPEC_VER app_brand=$BRAND_COMBINED"
+            exit 1
+          fi
+          echo "✅ Version in sync: $PUBSPEC_VER"
+
+      - name: Gate 9 — widget_test.dart is not a placeholder
+        run: |
+          if grep -q "Text('OK')" app/test/widget_test.dart 2>/dev/null; then
+            echo "❌ widget_test.dart still contains placeholder smoke test — replace with real test"
+            exit 1
+          fi
+          echo "✅ widget_test.dart is not a placeholder"
+
+      - name: Gate 10 — No Colors.black with opacity patterns in screens
+        run: |
+          FOUND=$(grep -rn "Colors\.black\.with" app/lib/screens/ app/lib/widgets/ 2>/dev/null | grep -v "//" || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ Colors.black.with* opacity pattern detected — use cs.shadow or AppBrand constants:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✅ No Colors.black.with* patterns in screens/widgets"
+
+      - name: Gate 11 — Zero markdown lint issues
+        run: |
+          npm install -g markdownlint-cli@0.43.0 --silent
+          FOUND=$(markdownlint "**/*.md" --ignore node_modules --ignore app/build --ignore functions/node_modules 2>&1 || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ Markdown lint errors detected — zero problems tolerance:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✅ All markdown files lint-clean"
+
+      - name: Gate 12 — No untracked TODO/FIXME in production code
+        run: |
+          FOUND=$(grep -rn "TODO\|FIXME\|HACK" app/lib/ 2>/dev/null \
+            | grep -v "//.*\(RR-[0-9]\|PI-[0-9]\)" || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ Untracked TODO/FIXME in production code — add RR-/PI- reference:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✅ No untracked TODO/FIXME in app/lib/"

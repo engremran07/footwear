@@ -16,6 +16,7 @@ jobs:
   validate:
     name: Release Validation
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.version.outputs.build_number }}
@@ -62,13 +63,14 @@ jobs:
     name: Build APK + Web
     needs: validate
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
+          flutter-version: '3.29.2'
           channel: stable
           cache: true
 
@@ -117,6 +119,17 @@ jobs:
 
       - name: Build release APK (fat)
         run: cd app && flutter build apk --release
+
+      - name: APK size gate
+        run: |
+          BASELINE=75000
+          APK_SIZE=$(du -k app/build/app/outputs/flutter-apk/app-release.apk | cut -f1)
+          echo "📊 APK size: ${APK_SIZE} KB (baseline: ${BASELINE} KB)"
+          if [ "$APK_SIZE" -gt "$((BASELINE + 5000))" ]; then
+            echo "❌ APK size ${APK_SIZE} KB exceeds baseline ${BASELINE} KB by more than 5 MB"
+            exit 1
+          fi
+          echo "✅ APK size within acceptable range"
 
       - name: Build web
         run: cd app && flutter build web --release

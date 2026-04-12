@@ -18,8 +18,7 @@ class AppErrorMapper {
       return switch (error.code) {
         'invalid-credential' ||
         'wrong-password' ||
-        'INVALID_LOGIN_CREDENTIALS' =>
-          'err_invalid_credentials',
+        'INVALID_LOGIN_CREDENTIALS' => 'err_invalid_credentials',
         'user-not-found' => 'err_user_not_found',
         'user-disabled' => 'err_user_disabled',
         'too-many-requests' => 'err_too_many_requests',
@@ -52,6 +51,11 @@ class AppErrorMapper {
     if (msg.contains('route_has_seller')) return 'route_has_seller';
     if (msg.contains('route_has_shops')) return 'route_has_shops';
     if (msg.contains('no user found')) return 'err_user_not_found';
+    if (msg.contains('not authenticated') ||
+        msg.contains('sellerid must not be empty') ||
+        msg.contains('seller_id must not be empty')) {
+      return 'err_unauthenticated';
+    }
     if (msg.contains('socket') ||
         msg.contains('network') ||
         msg.contains('connection')) {

@@ -428,9 +428,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           const SizedBox(width: AppTokens.s4),
           Text(
             tr('login_offline', ref),
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(color: Colors.grey),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.outline,
+            ),
           ),
         ],
       ),
@@ -531,7 +531,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: AppBrand.onPrimary,
                             ),
                           )
                         : _isLockedOut
@@ -596,14 +596,16 @@ class _BrandPanel extends ConsumerWidget {
             Text(
               AppBrand.appName,
               style: theme.textTheme.headlineLarge?.copyWith(
-                color: Colors.white,
+                color: AppBrand.onPrimary,
                 fontWeight: FontWeight.bold,
               ),
             ).animate().fadeIn(delay: 200.ms, duration: AppTokens.durNormal),
             const SizedBox(height: AppTokens.s8),
             Text(
               tr('login_tagline', ref),
-              style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: AppBrand.onPrimaryMuted,
+              ),
             ).animate().fadeIn(delay: 400.ms, duration: AppTokens.durNormal),
           ],
         ),

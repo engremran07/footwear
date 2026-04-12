@@ -576,7 +576,9 @@ class _CreateSaleInvoiceScreenState
             color: cs.surface,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withAlpha(20),
+                color: Theme.of(
+                  context,
+                ).colorScheme.shadow.withValues(alpha: 0.08),
                 blurRadius: 4,
                 offset: const Offset(0, -2),
               ),
@@ -620,7 +622,7 @@ class _CreateSaleInvoiceScreenState
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: AppBrand.onPrimary,
                             ),
                           )
                         : const Icon(Icons.receipt_long),

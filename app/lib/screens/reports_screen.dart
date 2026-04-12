@@ -790,10 +790,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
 
       // Reconcile opening balance so the final running balance equals
       // the stored customer.balance regardless of transaction-count limits.
-      final netTx = txs.fold<double>(
-        0.0,
-        (s, t) => s + t.balanceImpact,
-      );
+      final netTx = txs.fold<double>(0.0, (s, t) => s + t.balanceImpact);
 
       final bytes = await buildPdfLedger(
         shopName: shop.name,
