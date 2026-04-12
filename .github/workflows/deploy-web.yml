@@ -40,7 +40,7 @@ jobs:
         run: cd app && flutter analyze lib --no-pub
 
       - name: flutter test
-        run: cd app && flutter test -r compact
+        run: cd app && flutter test -r expanded
 
       - name: Build web release
         run: cd app && flutter build web --release

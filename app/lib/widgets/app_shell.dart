@@ -354,7 +354,7 @@ class _AppShellState extends ConsumerState<AppShell>
                       borderRadius: BorderRadius.circular(radius),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withAlpha(shadowAlpha),
+                          color: const Color(0xFF000000).withAlpha(shadowAlpha),
                           blurRadius: 28,
                           spreadRadius: 4,
                         ),
@@ -599,7 +599,7 @@ class _ArcticBottomNav extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0D1618) : Colors.white,
+        color: isDark ? const Color(0xFF0D1618) : const Color(0xFFFFFFFF),
         border: Border(
           top: BorderSide(
             color: isDark ? const Color(0xFF1E3340) : const Color(0xFFB6DFF0),
@@ -804,8 +804,8 @@ class _DrawerMenuScreen extends StatelessWidget {
                   ),
                   child: InkWell(
                     onTap: onProfile,
-                    splashColor: Colors.white12,
-                    highlightColor: Colors.white10,
+                    splashColor: const Color(0x1FFFFFFF), // white12 — ink on dark gradient header
+                    highlightColor: const Color(0x1AFFFFFF), // white10 — ink on dark gradient header
                     child: Padding(
                       padding: const EdgeInsetsDirectional.fromSTEB(
                         20,

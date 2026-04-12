@@ -231,3 +231,13 @@ jobs:
             exit 1
           fi
           echo "✅ No untracked TODO/FIXME in app/lib/"
+
+      - name: Gate 13 — No raw SnackBar in screens/widgets
+        run: |
+          FOUND=$(grep -rn "showSnackBar(SnackBar(" app/lib/screens/ app/lib/widgets/ 2>/dev/null | grep -v "//" || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ Raw SnackBar detected — use errorSnackBar/successSnackBar/infoSnackBar/warningSnackBar helpers:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✅ No raw SnackBar in screens/widgets"

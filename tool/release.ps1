@@ -60,6 +60,73 @@ try {
   DRY "flutter analyze lib --no-pub"
   if (-not $DryRun) { OK "Analyzer clean" }
 
+  # 2.5 Hygiene gates (local enforcement mirrors CI gates 1,2,3,4,7,8,12,13)
+  Step "Hygiene gates (local)"
+  if (-not $DryRun) {
+    $gateErrors = @()
+
+    # Gate 1 — No raw .collection('  strings in app/lib/
+    $g1 = Get-ChildItem -Path (Join-Path $appDir "lib") -Recurse -Filter "*.dart" |
+          Select-String "\.collection\('" | Where-Object { $_.Line -notmatch "Collections\." }
+    if ($g1) { $gateErrors += "Gate 1: Raw .collection() strings detected:`n$($g1 | ForEach-Object { "  $_" } | Out-String)" }
+    else      { OK "Gate 1 — No raw .collection() strings" }
+
+    # Gate 2 — allTransactionsProvider in _invalidateRoleScopedProviders
+    $g2 = Select-String "allTransactionsProvider" (Join-Path $appDir "lib\providers\auth_provider.dart") -ErrorAction SilentlyContinue
+    if (-not $g2) { $gateErrors += "Gate 2: allTransactionsProvider not found in auth_provider.dart" }
+    else          { OK "Gate 2 — allTransactionsProvider in auth_provider.dart" }
+
+    # Gate 3 — No --split-per-abi in build command context
+    $g3 = Select-String "\-\-split-per-abi" (Join-Path $rootDir "README.md"), (Join-Path $rootDir "AGENTS.md"), (Join-Path $rootDir "CLAUDE.md") -ErrorAction SilentlyContinue |
+          Where-Object { $_.Line -match "flutter build" -and $_.Line -notmatch "^#" }
+    if ($g3) { $gateErrors += "Gate 3: --split-per-abi in build command docs" }
+    else     { OK "Gate 3 — No --split-per-abi in build commands" }
+
+    # Gate 4 — No direct Firestore writes from screens/widgets
+    $g4 = Get-ChildItem (Join-Path $appDir "lib\screens"), (Join-Path $appDir "lib\widgets") -Recurse -Filter "*.dart" -ErrorAction SilentlyContinue |
+          Select-String "FirebaseFirestore\.instance" | Where-Object { $_.Line -notmatch "^\s*//" }
+    if ($g4) { $gateErrors += "Gate 4: Direct Firestore write in screens/widgets:`n$($g4 | ForEach-Object { "  $_" } | Out-String)" }
+    else     { OK "Gate 4 — No Firestore writes in screens/widgets" }
+
+    # Gate 7 — No hardcoded Colors.white/grey/red/black in screens/widgets
+    $g7 = Get-ChildItem (Join-Path $appDir "lib\screens"), (Join-Path $appDir "lib\widgets") -Recurse -Filter "*.dart" -ErrorAction SilentlyContinue |
+          Select-String "Colors\.(white|grey|red|black(?!5|\.with))" | Where-Object { $_.Line -notmatch "^\s*//" }
+    if ($g7) { $gateErrors += "Gate 7: Hardcoded Colors.* in screens/widgets:`n$($g7 | ForEach-Object { "  $_" } | Out-String)" }
+    else     { OK "Gate 7 — No hardcoded Colors.* in screens/widgets" }
+
+    # Gate 8 — pubspec version == app_brand version
+    $pubspecVer = (Get-Content $pubspec | Select-String '^version:').Line -replace 'version:\s*', '' -replace '\s', ''
+    $brandContent = Get-Content (Join-Path $appDir "lib\core\constants\app_brand.dart") -Raw
+    $brandVer = if ($brandContent -match "appVersion\s*=\s*'([^']+)'") { $Matches[1] } else { '' }
+    $brandBuild = if ($brandContent -match "buildNumber\s*=\s*'([^']+)'") { $Matches[1] } else { '' }
+    $brandCombined = "${brandVer}+${brandBuild}"
+    if ($pubspecVer -ne $brandCombined) { $gateErrors += "Gate 8: Version mismatch — pubspec=$pubspecVer app_brand=$brandCombined" }
+    else                                { OK "Gate 8 — Version in sync: $pubspecVer" }
+
+    # Gate 12 — No untracked TODO/FIXME
+    $g12 = Get-ChildItem (Join-Path $appDir "lib") -Recurse -Filter "*.dart" |
+           Select-String "(TODO|FIXME|HACK)" | Where-Object { $_.Line -notmatch "RR-\d|PI-\d" }
+    if ($g12) { $gateErrors += "Gate 12: Untracked TODO/FIXME (add RR-/PI- reference):`n$($g12 | ForEach-Object { "  $_" } | Out-String)" }
+    else      { OK "Gate 12 — No untracked TODO/FIXME" }
+
+    # Gate 13 — No raw SnackBar
+    $g13 = Get-ChildItem (Join-Path $appDir "lib\screens"), (Join-Path $appDir "lib\widgets") -Recurse -Filter "*.dart" -ErrorAction SilentlyContinue |
+           Select-String "showSnackBar\(SnackBar\(" | Where-Object { $_.Line -notmatch "^\s*//" }
+    if ($g13) { $gateErrors += "Gate 13: Raw SnackBar usage — use errorSnackBar/successSnackBar/infoSnackBar/warningSnackBar:`n$($g13 | ForEach-Object { "  $_" } | Out-String)" }
+    else      { OK "Gate 13 — No raw SnackBar" }
+
+    if ($gateErrors.Count -gt 0) {
+      Write-Host ""
+      foreach ($err in $gateErrors) {
+        Write-Host "    [FAIL] $err" -ForegroundColor Red
+      }
+      DIE "$($gateErrors.Count) hygiene gate(s) failed — fix before release"
+    }
+    OK "All hygiene gates passed"
+  } else {
+    WARN "[DRY] Hygiene gates would run here"
+  }
+
   # 3. Tests
   if (-not $SkipTests) {
     Step "flutter test"

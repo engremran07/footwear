@@ -138,7 +138,7 @@ Defined in `app/lib/core/router/app_router.dart`. Auth guard redirects unauthent
 
 | File | Trigger | Key steps |
 |------|---------|-----------|
-| `.github/workflows/ci.yml` | push/PR to main | analyse (3.29.2) → test --coverage → hygiene (12 gates) |
+| `.github/workflows/ci.yml` | push/PR to main | analyse (3.29.2) → test --coverage → hygiene (13 gates) |
 | `.github/workflows/build-apk.yml` | workflow_dispatch | fat APK build + monotonic versionCode check |
 | `.github/workflows/deploy-web.yml` | push to main | analyze → test → build web → Firebase Hosting deploy |
 | `.github/workflows/release.yml` | tag push / workflow_dispatch | validate → build APK + web → deploy → GitHub Release |
@@ -155,8 +155,9 @@ Defined in `app/lib/core/router/app_router.dart`. Auth guard redirects unauthent
 8. App version in pubspec.yaml == app_brand.dart
 9. widget_test.dart is not a placeholder (no `'OK'` text)
 10. No `Colors.black` with opacity patterns in screens/widgets
-11. No raw SnackBar — use `infoSnackBar`/`errorSnackBar`/`successSnackBar`/`warningSnackBar` helpers
+11. Zero markdown lint issues (`markdownlint-cli@0.43.0` — zero violation tolerance)
 12. No untracked TODO/FIXME — all must reference `RR-/PI-` registry entries
+13. No raw SnackBar — use `infoSnackBar`/`errorSnackBar`/`successSnackBar`/`warningSnackBar` helpers
 
 ---
 
@@ -175,9 +176,9 @@ Defined in `app/lib/core/router/app_router.dart`. Auth guard redirects unauthent
 
 | Field | Current | File |
 |-------|---------|------|
-| `appVersion` | `3.5.0` | `app/lib/core/constants/app_brand.dart` |
-| `buildNumber` | `43` | `app/lib/core/constants/app_brand.dart` |
-| `version` | `3.5.0+43` | `app/pubspec.yaml` |
+| `appVersion` | `3.5.2` | `app/lib/core/constants/app_brand.dart` |
+| `buildNumber` | `45` | `app/lib/core/constants/app_brand.dart` |
+| `version` | `3.5.2+45` | `app/pubspec.yaml` |
 
 Both files **must stay in sync** before every release. Bump both together.
 
