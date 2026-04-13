@@ -9,12 +9,16 @@ void downloadBytes(List<int> bytes, String fileName) async {
   final file = File('${dir.path}/$fileName');
   await file.writeAsBytes(Uint8List.fromList(bytes));
 
-  await Share.shareXFiles([
-    XFile(
-      file.path,
-      mimeType:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      name: fileName,
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [
+        XFile(
+          file.path,
+          mimeType:
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          name: fileName,
+        ),
+      ],
     ),
-  ]);
+  );
 }

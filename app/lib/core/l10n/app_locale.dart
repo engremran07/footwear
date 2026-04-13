@@ -14,7 +14,16 @@ enum AppLocale {
 }
 
 /// Current locale state — defaults to English.
-final appLocaleProvider = StateProvider<AppLocale>((ref) => AppLocale.en);
+final appLocaleProvider = NotifierProvider<AppLocaleNotifier, AppLocale>(
+  AppLocaleNotifier.new,
+);
+
+class AppLocaleNotifier extends Notifier<AppLocale> {
+  @override
+  AppLocale build() => AppLocale.en;
+
+  void set(AppLocale locale) => state = locale;
+}
 
 /// Translation lookup shortcut.
 String tr(String key, WidgetRef ref) {
@@ -129,6 +138,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_timeout': 'Request timed out. Please try again.',
     'err_unauthenticated': 'You are not signed in. Please sign in first.',
     'err_firebase_generic': 'An unexpected error occurred. Please try again.',
+    'err_index_missing': 'Data query failed. Please contact support.',
     'err_url_open': 'Could not open link',
     'err_whatsapp_unavailable': 'Could not open WhatsApp',
     'whatsapp_greeting': 'Hello',
@@ -1064,6 +1074,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'profile_theme_auto': 'Auto',
     'profile_theme_light': 'Light',
     'profile_theme_dark': 'Dark',
+    'profile_theme_high_contrast': 'High Contrast',
     'profile_security': 'Security',
 
     // ── Bootstrap Profile Screen ──
@@ -1271,6 +1282,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_timeout': 'انتهت مهلة الطلب. حاول مرة أخرى.',
     'err_unauthenticated': 'لم يتم تسجيل الدخول. الرجاء تسجيل الدخول أولاً.',
     'err_firebase_generic': 'حدث خطأ غير متوقع. حاول مرة أخرى.',
+    'err_index_missing': 'فشل الاستعلام. يرجى التواصل مع الدعم.',
     'err_url_open': 'تعذّر فتح الرابط',
     'err_whatsapp_unavailable': 'تعذّر فتح واتساب',
     'whatsapp_greeting': 'مرحباً',
@@ -2197,6 +2209,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'profile_theme_auto': 'تلقائي',
     'profile_theme_light': 'فاتح',
     'profile_theme_dark': 'داكن',
+    'profile_theme_high_contrast': 'تباين عالي',
     'profile_security': 'الأمان',
 
     // ── Bootstrap Profile Screen ──
@@ -2401,6 +2414,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_timeout': 'درخواست کا وقت ختم۔ دوبارہ کوشش کریں۔',
     'err_unauthenticated': 'سائن ان نہیں ہیں۔ پہلے سائن ان کریں۔',
     'err_firebase_generic': 'غیر متوقع خرابی۔ دوبارہ کوشش کریں۔',
+    'err_index_missing': 'ڈیٹا کوئری ناکام۔ سپورٹ سے رابطہ کریں۔',
     'err_url_open': 'لنک نہیں کھلا',
     'err_whatsapp_unavailable': 'واٹس ایپ نہیں کھلا',
     'whatsapp_greeting': 'السلام علیکم',
@@ -3339,6 +3353,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'profile_theme_auto': 'خودکار',
     'profile_theme_light': 'لائٹ',
     'profile_theme_dark': 'ڈارک',
+    'profile_theme_high_contrast': 'ہائی کنٹراسٹ',
     'profile_security': 'سیکیورٹی',
 
     // ── Bootstrap Profile Screen ──

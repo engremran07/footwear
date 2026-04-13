@@ -229,9 +229,9 @@ class _AppShellState extends ConsumerState<AppShell>
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     final isWide = MediaQuery.of(context).size.width >= 720;
-    final isOnline = ref.watch(isOnlineProvider).valueOrNull ?? true;
+    final isOnline = ref.watch(isOnlineProvider).value ?? true;
     final currentLocation = GoRouterState.of(context).uri.path;
 
     final rawItems = _filteredItems(user);
@@ -369,7 +369,18 @@ class _AppShellState extends ConsumerState<AppShell>
                           isOnline: isOnline,
                           menuLabel: menuLabel,
                           drawerAnim: _drawerAnim,
+                          isTopLevel: primaryItems.any(
+                            (e) => e.route == currentLocation,
+                          ),
                           onMenuTap: _toggleDrawer,
+                          onBack: () {
+                            if (_isDrawerOpen) {
+                              _closeDrawer();
+                              return;
+                            }
+                            final parent = _parentRoute(currentLocation);
+                            if (parent != null) context.go(parent);
+                          },
                           onProfileTap: () {
                             if (_isDrawerOpen) _closeDrawer();
                             context.go('/profile');
@@ -410,7 +421,15 @@ class _AppShellState extends ConsumerState<AppShell>
                                   context.go(primaryItems[idx - 1].route);
                                 }
                               } else if (vel > 200) {
-                                _openDrawer();
+                                if (!isTopLevel) {
+                                  final parent = _parentRoute(currentLocation);
+                                  if (parent != null) {
+                                    HapticFeedback.lightImpact();
+                                    context.go(parent);
+                                  }
+                                } else {
+                                  _openDrawer();
+                                }
                               }
                             } else {
                               if (absVel >= 400 &&
@@ -431,7 +450,15 @@ class _AppShellState extends ConsumerState<AppShell>
                                   context.go(primaryItems[idx - 1].route);
                                 }
                               } else if (vel < -200) {
-                                _openDrawer();
+                                if (!isTopLevel) {
+                                  final parent = _parentRoute(currentLocation);
+                                  if (parent != null) {
+                                    HapticFeedback.lightImpact();
+                                    context.go(parent);
+                                  }
+                                } else {
+                                  _openDrawer();
+                                }
                               }
                             }
                           },
@@ -477,6 +504,8 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Animation<double> drawerAnim;
   final VoidCallback onMenuTap;
   final VoidCallback onProfileTap;
+  final bool isTopLevel;
+  final VoidCallback onBack;
 
   const _WhatsAppBar({
     required this.user,
@@ -486,6 +515,8 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.drawerAnim,
     required this.onMenuTap,
     required this.onProfileTap,
+    required this.isTopLevel,
+    required this.onBack,
   });
 
   @override
@@ -517,29 +548,24 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
           child: SizedBox(height: 2, width: double.infinity),
         ),
       ),
-      leading: Tooltip(
-        message: menuLabel,
-        child: IconButton(
-          icon: AnimatedIcon(
-            icon: AnimatedIcons.menu_close,
-            progress: drawerAnim,
-            semanticLabel: menuLabel,
-          ),
-          onPressed: onMenuTap,
-        ),
-      ),
-      title: Row(
-        children: [
-          Image.asset(AppBrand.logoAsset, height: 30, fit: BoxFit.contain),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _BreadcrumbTitle(
-              location: currentLocation,
-              isOnline: isOnline,
+      leading: isTopLevel
+          ? Tooltip(
+              message: menuLabel,
+              child: IconButton(
+                icon: AnimatedIcon(
+                  icon: AnimatedIcons.menu_close,
+                  progress: drawerAnim,
+                  semanticLabel: menuLabel,
+                ),
+                onPressed: onMenuTap,
+              ),
+            )
+          : IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new),
+              tooltip: 'Back',
+              onPressed: onBack,
             ),
-          ),
-        ],
-      ),
+      title: _BreadcrumbTitle(location: currentLocation, isOnline: isOnline),
       actions: [
         if (user != null)
           Padding(
@@ -1210,8 +1236,6 @@ class _UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final initials = _initials(user?.displayName ?? '');
     final borderColor = user?.isAdmin == true
         ? AppBrand.adminRoleColor
         : AppBrand.sellerRoleColor;
@@ -1222,24 +1246,9 @@ class _UserAvatar extends StatelessWidget {
       ),
       child: CircleAvatar(
         radius: radius,
-        backgroundColor: cs.primaryContainer,
-        child: Text(
-          initials,
-          style: TextStyle(
-            fontSize: radius * 0.7,
-            fontWeight: FontWeight.w600,
-            color: cs.onPrimaryContainer,
-          ),
-        ),
+        backgroundImage: const AssetImage(AppBrand.logoAsset),
       ),
     );
-  }
-
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '?';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 }
 

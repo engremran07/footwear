@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
 import '../core/services/admin_identity_service.dart';
 import '../models/user_model.dart';
@@ -63,7 +64,7 @@ final authUserProvider = StreamProvider<UserModel?>((ref) {
           });
     },
     loading: () => Stream.value(null),
-    error: (_, __) => Stream.value(null),
+    error: (_, _) => Stream.value(null),
   );
 });
 
@@ -288,7 +289,10 @@ class AuthNotifier extends AsyncNotifier<void> {
         if (!kIsWeb) {
           FirebaseCrashlytics.instance.setUserIdentifier(uid);
           FirebaseCrashlytics.instance.setCustomKey('role', normalizedRole);
-          FirebaseCrashlytics.instance.setCustomKey('app_version', '3.5.2+45');
+          FirebaseCrashlytics.instance.setCustomKey(
+            'app_version',
+            AppBrand.versionDisplay,
+          );
         }
       } on FirebaseAuthException catch (e) {
         _logger.e('Auth error [${e.code}]: ${e.message}');
@@ -332,6 +336,36 @@ class AuthNotifier extends AsyncNotifier<void> {
       }
       _invalidateRoleScopedProviders();
     });
+  }
+
+  /// Reload Firebase Auth state from server and sync [email_verified] to
+  /// Firestore when it is confirmed verified. This is called on every app
+  /// resume so that users who verify their email while the app is backgrounded
+  /// see the status update immediately without having to sign out and back in.
+  /// [signIn()] already handles the sync at login time; this method covers the
+  /// "already authenticated" path where [signIn()] never runs again.
+  Future<void> syncEmailVerification() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      // Reload from Firebase Auth servers to get latest emailVerified state.
+      await user.reload();
+      final fresh = FirebaseAuth.instance.currentUser;
+      if (fresh?.emailVerified != true) return;
+      // Only hit Firestore if the flag isn't already set — avoids redundant writes.
+      final doc = await FirebaseFirestore.instance
+          .collection(Collections.users)
+          .doc(fresh!.uid)
+          .get();
+      if (!doc.exists || doc.data()?['email_verified'] == true) return;
+      await FirebaseFirestore.instance
+          .collection(Collections.users)
+          .doc(fresh.uid)
+          .update({
+        'email_verified': true,
+        'updated_at': Timestamp.now(),
+      });
+    } catch (_) {}
   }
 
   Future<void> changePassword(

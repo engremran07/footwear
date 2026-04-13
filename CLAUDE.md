@@ -1,6 +1,6 @@
 ﻿# ShoesERP AI Coding Rules (CLAUDE.md)
 
-Last updated: 2026-04-07
+Last updated: 2026-04-13
 
 ## Runtime Override (Always First)
 
@@ -171,6 +171,12 @@ Add a pub package that locks a shared transitive dep (e.g. `archive`) to an old 
 **Fix:** Replace or upgrade the blocking package, OR write a direct replacement if no compatible version exists. Do NOT use `dependency_overrides` to force incompatible archive versions — it compiles but breaks at runtime.  
 **This project (history):** `excel 4.0.6` locked `archive ^3.x` which blocked `image` from upgrading past 4.3.0 (which had the violations). Fixed by replacing `excel` with a custom xlsx writer using `archive ^4.0.0` directly.
 
+### Chain 6: StateProvider Lifecycle
+
+`StateProvider` used → Riverpod 3 removed it from main export → compilation failure on upgrade  
+**Fix:** Replace every `StateProvider<T>` with `NotifierProvider<T extends Notifier<S>, S>` plus an explicit `Notifier` subclass with `build()` and a setter method. Write sites: `.notifier).state =` → `.notifier).set(value)`.  
+**This project (history):** `appLocaleProvider` and `lastGoodDashboardStatsProvider` converted in v3.6.0+47. `grep -rn "StateProvider\b" app/lib/` → zero.
+
 ## Band-Aid Loop Reversal Protocol
 
 Trigger this protocol when all are true:
@@ -202,28 +208,84 @@ Never keep ambiguity-driven workaround code without explicit justification.
 | Raw `SnackBar(content: Text(...))` | Unstyled SnackBar | `errorSnackBar()` / `successSnackBar()` |
 | `avoid_double_and_int_checks lint violation` in web build | Transitive dep locked to old `image`/`archive` by another pkg | Find blocking package; replace or upgrade it — see Chain 5 |
 | `flutter build web --release` exits 1 with no Error lines | PowerShell `NativeCommandError` from Wasm dry-run stderr — build IS succeeding | Check `$LASTEXITCODE` explicitly; exit 0 = real success |
+| `StateProvider<T>` in any `.dart` file | Riverpod 3 removed `StateProvider` — instant compile failure on upgrade | Replace with `NotifierProvider<T, S>` + `Notifier` subclass — see Chain 6 |
 
-## Six Non-Negotiable Pre-Commit Checks
+## Twelve Non-Negotiable Pre-Signoff Steps
+
+**All 12 steps are mandatory for every session that touches code. No bypass.**
 
 ```bash
 # 1 — Zero analyze issues
 flutter analyze lib --no-pub
+# Must end: No issues found! (ran in Xs)
 
-# 2 — All tests green
+# 2 — Zero test dir issues
+dart analyze test/
+# Must end: No issues found!
+
+# 3 — All tests green
 flutter test -r expanded
+# Must quote: All N tests passed!
 
-# 3 — No raw collection strings
-grep -rn "\.collection('" app/lib/ | grep -v "Collections\."
+# 4 — No raw collection strings
+grep -rn "\.collection\('" app/lib/ | grep -v "Collections\."
+# Must return zero lines
 
-# 4 — No Firestore writes in screens/widgets
+# 5 — No Firestore writes in screens/widgets
 grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/
+# Must return zero lines
 
-# 5 — No legacy ABI-split APK build commands remain in docs/workflows
-# Mirror CI Gate 3 and confirm release docs/scripts still enforce fat APK only.
+# 6 — No StateProvider (banned Riverpod 3)
+grep -rn "StateProvider\b" app/lib/ --include="*.dart"
+# Must return zero lines
 
-# 6 — Zero markdown lint issues (Problems tab must be empty)
+# 7 — Version sync
+grep -E "^version:|appVersion|buildNumber" app/pubspec.yaml app/lib/core/constants/app_brand.dart
+# pubspec version X.Y.Z+N must match app_brand appVersion=X.Y.Z + buildNumber=N
+
+# 8 — Zero markdown lint issues (Problems tab must be empty)
 markdownlint "**/*.md" --ignore node_modules --ignore app/build
+# Must exit 0 with zero output
+
+# 9 — Firestore rules + indexes deployed (always, not just on change)
+firebase deploy --only firestore:rules,firestore:indexes
+# Must quote: Deploy complete!
+
+# 10 — Web release build (PowerShell — check $LASTEXITCODE, not pipe output)
+$ErrorActionPreference='Continue'; cd app; flutter build web --release; Write-Host "EXIT: $LASTEXITCODE"
+# Must state EXIT: 0
+
+# 11 — Firebase Hosting deployed
+firebase deploy --only hosting
+# Must quote: Deploy complete!
+
+# 12 — APK build + GitHub commit audit + commit + push
+flutter build apk --release
+git log --oneline -5
+git status --short  # confirm no unexpected artifacts
+git add -A && git commit -m "type: summary — vX.Y.Z+N"
+git push
+# Must quote commit hash and push output
 ```
+
+## Anti-Bypass Enforcement Matrix
+
+| Claim made | Required evidence (non-bypassable) |
+| --- | --- |
+| "No analyze issues" | Must quote exact final line: `No issues found! (ran in Xs)` |
+| "Dart analyze test clean" | Must quote: `No issues found!` |
+| "Tests pass" | Must quote: `All N tests passed!` with N count |
+| "APK built" | Must quote file path + size from build output |
+| "Web built" | Must state `EXIT: $LASTEXITCODE` = 0 (PowerShell) |
+| "Firestore rules deployed" | Must show `firebase deploy` `Deploy complete!` output |
+| "Indexes deployed" | Covered by same `firebase deploy --only firestore:rules,firestore:indexes` |
+| "Hosting deployed" | Must show separate `firebase deploy --only hosting` `Deploy complete!` output |
+| "Deps upgraded" | Must show `flutter pub get` lockfile versions |
+| "Version bumped" | Must show both `pubspec.yaml` AND `app_brand.dart` matching values |
+| "Commit pushed" | Must quote commit hash AND `git push` output with branch name |
+| "APK installed" | Must quote `adb install` `Success` output |
+
+An AI agent that provides claims without quoting actual tool output is in violation of AGENTS.md Rule 21 and the claim is invalid. Never accept "I ran the tests and they passed" — always demand the exact output.
 
 ## Admin Auth Pipeline
 
@@ -237,15 +299,19 @@ Never silently swallow `INVALID_ID_TOKEN` — always force refresh or sign out.
 
 ## Pre-Signoff Verification
 
-Run before marking production ready:
+See **Twelve Non-Negotiable Pre-Signoff Steps** above — all 12 steps are
+mandatory. Key checks in brief:
 
 - flutter analyze lib --no-pub
 - flutter test -r expanded
 - flutter build apk --release
-- If web is part of the request: flutter build web --release and deploy hosting from the same versioned source tree
-- Verify current About/version/contact content on both APK and web if those surfaces were part of the release request
+- firebase deploy --only firestore:rules,firestore:indexes → Deploy complete!
+- flutter build web --release → EXIT: 0
+- firebase deploy --only hosting → Deploy complete!
+- git log --oneline -5 + git status --short → no unexpected artifacts
+- git add -A + git commit + git push → quote commit hash + push output
+- If device connected: adb install -r → Success
 - Verify admin and seller startup for `/` and `/inventory`; transient permission-denied UI during stream warm-up is a regression.
-- firebase deploy --only firestore:rules,firestore:indexes
 
 ## Security Baseline
 
@@ -256,6 +322,7 @@ Run before marking production ready:
 
 ## Done In This Baseline
 
+- v3.7.0+48 (audit v14): Dep stack fully upgraded: fl_chart 1.2.0, share_plus 13.0.0 (migrated SharePlus.instance.share(ShareParams(...))), permission_handler 12.0.1, dart_jsonwebtoken 3.4.0, flutter_lints 6.0.0; 30 lint issues fixed (unnecessary_underscores, use_null_aware_elements, prefer_const_constructors, share_plus deprecations); all 4 CI workflows standardized on Flutter 3.41.6; governance hardened (Rules 19–22, Anti-Bypass Enforcement Matrix, Chain 6, Gates 12–15); README.md × 2 fully rewritten; markdown governance skill + instruction + CI gate 15 added; 90 markdown issues fixed to zero; temp artifacts purged; audit score 79/100 → 88/100
 - v3.5.0+43 (audit v13): Governance layer (REGRESSION_REGISTRY.md, SESSION_LOG.md, MASTER_BLUEPRINT.md, CHANGELOG.md, AUDIT_REPORT_FOOTWEAR_ERP.md), CI/CD hardened (Flutter 3.29.2 pinned, timeouts, --coverage, 11 hygiene gates, APK size gate), 15 hardcoded Colors.* eliminated in 6 screens (RR-011), widget_test.dart placeholder replaced (RR-013), Firestore rules emulator test scaffold
 - Firebase Storage fully removed — zero cost architecture
 - Cloud Functions dependency removed — user CRUD via secondary FirebaseApp (no server needed)

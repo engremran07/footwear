@@ -23,11 +23,10 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
   @override
   Widget build(BuildContext context) {
     final productsAsync = ref.watch(productsProvider);
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text(tr('products', ref))),
       body: Column(
         children: [
           AppSearchBar(
@@ -76,8 +75,7 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                                     width: 48,
                                     height: 48,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        _productIcon(cs),
+                                    errorBuilder: (_, _, _) => _productIcon(cs),
                                   ),
                                 )
                               : _productIcon(cs),

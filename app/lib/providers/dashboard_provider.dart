@@ -32,9 +32,18 @@ class DashboardStats {
 /// (e.g. resource-exhausted). This prevents blank-screen regressions.
 /// Exposed (not private) so auth_provider can invalidate it on sign-out
 /// to prevent stale stats from flashing when a new user signs in (SM-01).
-final lastGoodDashboardStatsProvider = StateProvider<DashboardStats?>(
-  (ref) => null,
-);
+final lastGoodDashboardStatsProvider =
+    NotifierProvider<LastGoodDashboardStatsNotifier, DashboardStats?>(
+      LastGoodDashboardStatsNotifier.new,
+    );
+
+class LastGoodDashboardStatsNotifier extends Notifier<DashboardStats?> {
+  @override
+  DashboardStats? build() => null;
+
+  void set(DashboardStats stats) => state = stats;
+}
+
 final _lastGoodDashboardStatsProvider = lastGoodDashboardStatsProvider;
 
 /// Derives dashboard stats reactively from live stream providers.
@@ -53,7 +62,7 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
     return cached != null ? AsyncData(cached) : const AsyncLoading();
   }
 
-  final user = userAsync.valueOrNull;
+  final user = userAsync.value;
   if (user == null) {
     final cached = ref.read(_lastGoodDashboardStatsProvider);
     return cached != null ? AsyncData(cached) : const AsyncLoading();
@@ -85,10 +94,10 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
   // Degrade gracefully: use zero/empty fallback for any errored sub-provider
   // instead of propagating AsyncError and blanking the entire dashboard.
   // A single quota-exhausted stream must never black out all metrics.
-  final routeList = routes.valueOrNull ?? const <RouteModel>[];
-  final shopList = shops.valueOrNull ?? const <ShopModel>[];
-  final productList = products.valueOrNull ?? const <ProductModel>[];
-  final variantList = variants.valueOrNull ?? const <ProductVariantModel>[];
+  final routeList = routes.value ?? const <RouteModel>[];
+  final shopList = shops.value ?? const <ShopModel>[];
+  final productList = products.value ?? const <ProductModel>[];
+  final variantList = variants.value ?? const <ProductVariantModel>[];
 
   final totalStockPairs = variantList.fold<int>(
     0,
@@ -105,7 +114,7 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
 
   // Persist the latest successful computation for use as a fallback.
   Future.microtask(
-    () => ref.read(_lastGoodDashboardStatsProvider.notifier).state = stats,
+    () => ref.read(_lastGoodDashboardStatsProvider.notifier).set(stats),
   );
 
   return AsyncData(stats);

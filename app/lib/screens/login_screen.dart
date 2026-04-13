@@ -393,7 +393,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .toList(),
       selected: {currentLocale},
       onSelectionChanged: (set) {
-        ref.read(appLocaleProvider.notifier).state = set.first;
+        ref.read(appLocaleProvider.notifier).set(set.first);
       },
       showSelectedIcon: false,
       style: ButtonStyle(
@@ -421,7 +421,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ],
       ),
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => Row(
+      error: (_, _) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           const AppOnlineIndicator(isOnline: false),

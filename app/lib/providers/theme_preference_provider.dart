@@ -1,39 +1,52 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _kThemeModeKey = 'app_theme_mode';
 
-class ThemePreferenceNotifier extends Notifier<ThemeMode> {
+/// Supported theme modes for the app.
+enum AppThemeMode { auto, dark, light, highContrast }
+
+class ThemePreferenceNotifier extends Notifier<AppThemeMode> {
+  bool _hydratedFromPrefs = false;
+
   @override
-  ThemeMode build() {
-    _loadSaved();
-    return ThemeMode.system; // default until prefs load
+  AppThemeMode build() {
+    if (!_hydratedFromPrefs) {
+      _hydratedFromPrefs = true;
+      unawaited(_loadSaved());
+    }
+    return AppThemeMode.auto; // default until prefs load
   }
 
   Future<void> _loadSaved() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString(_kThemeModeKey);
-    final mode = switch (saved) {
-      'light' => ThemeMode.light,
-      'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
-    };
+    final mode = _parse(saved);
     if (mode != state) state = mode;
   }
 
-  Future<void> setThemeMode(ThemeMode mode) async {
+  Future<void> setThemeMode(AppThemeMode mode) async {
     state = mode;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kThemeModeKey, switch (mode) {
-      ThemeMode.light => 'light',
-      ThemeMode.dark => 'dark',
-      ThemeMode.system => 'system',
-    });
+    await prefs.setString(_kThemeModeKey, mode.name);
+  }
+
+  static AppThemeMode _parse(String? raw) {
+    return switch (raw) {
+      'auto' => AppThemeMode.auto,
+      'light' => AppThemeMode.light,
+      'dark' => AppThemeMode.dark,
+      'highContrast' => AppThemeMode.highContrast,
+      // Migrate legacy 'system' value to 'auto'
+      'system' => AppThemeMode.auto,
+      _ => AppThemeMode.auto,
+    };
   }
 }
 
 final themePreferenceProvider =
-    NotifierProvider<ThemePreferenceNotifier, ThemeMode>(
+    NotifierProvider<ThemePreferenceNotifier, AppThemeMode>(
       ThemePreferenceNotifier.new,
     );

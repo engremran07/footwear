@@ -56,7 +56,7 @@ final shopTransactionsProvider = StreamProvider.autoDispose
 final allTransactionsProvider =
     StreamProvider.autoDispose<List<TransactionModel>>((ref) {
       // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
-      final user = ref.watch(authUserProvider).valueOrNull;
+      final user = ref.watch(authUserProvider).value;
       if (user == null || !user.isAdmin) return const Stream.empty();
       return FirebaseFirestore.instance
           .collection(Collections.transactions)
@@ -75,7 +75,7 @@ final allTransactionsProvider =
 /// Admins see all transactions; sellers see all transactions on their route.
 final shopsAnalyticsTransactionsProvider =
     StreamProvider.autoDispose<List<TransactionModel>>((ref) {
-      final user = ref.watch(authUserProvider).valueOrNull;
+      final user = ref.watch(authUserProvider).value;
       if (user == null) return Stream.value(const <TransactionModel>[]);
 
       final collection = FirebaseFirestore.instance.collection(
@@ -115,7 +115,7 @@ final shopsAnalyticsTransactionsProvider =
 
 final pendingEditRequestsProvider =
     StreamProvider.autoDispose<List<TransactionModel>>((ref) {
-      final user = ref.watch(authUserProvider).valueOrNull;
+      final user = ref.watch(authUserProvider).value;
       if (user == null || !user.isAdmin) {
         return Stream.value(const <TransactionModel>[]);
       }
@@ -155,10 +155,11 @@ final shopTransactionsExportProvider = FutureProvider.autoDispose
       final normalizedShopId = shopId.trim();
       if (normalizedShopId.isEmpty) return const <TransactionModel>[];
       // shop_id is sole source of truth; no dual query needed.
+      // No orderBy here — results are sorted client-side; omitting it avoids
+      // the composite index requirement for the ascending direction.
       final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)
           .where('shop_id', isEqualTo: normalizedShopId)
-          .orderBy('created_at')
           .get();
 
       return snap.docs
@@ -188,9 +189,9 @@ class TransactionNotifier extends AsyncNotifier<void> {
     batch.update(db.collection(Collections.transactions).doc(txId), {
       'amount': newAmount,
       'type': newType,
-      if (description != null) 'description': description,
-      if (saleType != null) 'sale_type': saleType,
-      if (transactionDate != null) 'created_at': transactionDate,
+      'description': ?description,
+      'sale_type': ?saleType,
+      'created_at': ?transactionDate,
       ...extraTxFields,
       'updated_at': Timestamp.now(),
     });

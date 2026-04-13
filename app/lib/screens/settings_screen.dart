@@ -44,7 +44,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   void _loadSettings() {
     if (_settingsLoaded) return;
-    final s = ref.read(settingsProvider).valueOrNull;
+    final s = ref.read(settingsProvider).value;
     if (s != null) {
       _companyC.value = TextEditingValue(
         text: s.companyName,
@@ -91,12 +91,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
-    final currentUser = ref.watch(authUserProvider).valueOrNull;
+    final currentUser = ref.watch(authUserProvider).value;
     if (currentUser != null && !currentUser.isAdmin) {
-      return Scaffold(
-        appBar: AppBar(title: Text(tr('settings', ref))),
-        body: Center(child: Text(tr('permission_denied', ref))),
-      );
+      return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
     // Only watch allUsersProvider when the current user is confirmed admin.
     // This prevents permission-denied errors from firing for seller accounts.
@@ -117,7 +114,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (leave == true && context.mounted) Navigator.pop(context);
       },
       child: Scaffold(
-        appBar: AppBar(title: Text(tr('settings', ref))),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -450,7 +446,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          final routes = ref.watch(routesProvider).valueOrNull ?? [];
+          final routes = ref.watch(routesProvider).value ?? [];
           final availableRoutes = routes
               .where(
                 (r) =>
@@ -588,7 +584,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showEditUserDialog(UserModel user) {
     final nameC = TextEditingController(text: user.displayName);
     String role = user.isAdmin ? 'admin' : 'seller';
-    final currentUser = ref.read(authUserProvider).valueOrNull;
+    final currentUser = ref.read(authUserProvider).value;
     final isSelf = currentUser?.id == user.id;
     String? selectedRouteId = user.assignedRouteId;
     String? selectedRouteName = user.assignedRouteName;
@@ -598,7 +594,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          final routes = ref.watch(routesProvider).valueOrNull ?? [];
+          final routes = ref.watch(routesProvider).value ?? [];
           final availableRoutes = routes
               .where(
                 (r) =>
@@ -724,7 +720,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               ElevatedButton(
                 onPressed: () async {
-                  final currentUser = ref.read(authUserProvider).valueOrNull;
+                  final currentUser = ref.read(authUserProvider).value;
                   if (currentUser?.isAdmin != true) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
@@ -774,7 +770,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _confirmDeleteUser(UserModel user) async {
-    final me = ref.read(authUserProvider).valueOrNull;
+    final me = ref.read(authUserProvider).value;
     if (me?.isAdmin != true) return;
     if (user.id == me?.id || user.isAdmin) return;
 
@@ -962,7 +958,7 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(settingsProvider).valueOrNull;
+    final settings = ref.watch(settingsProvider).value;
     // Logo bytes come straight from Firestore via the real-time stream.
     // No URL, no CDN, no Firebase Storage needed.
     final savedLogoBytes = settings?.logoBytes;
@@ -1274,11 +1270,11 @@ class _DatabaseFlushSectionState extends ConsumerState<_DatabaseFlushSection> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = ref.watch(authUserProvider).valueOrNull;
+    final currentUser = ref.watch(authUserProvider).value;
     if (currentUser == null || !currentUser.isAdmin) {
       return const SizedBox.shrink();
     }
-    final users = ref.watch(allUsersProvider).valueOrNull ?? [];
+    final users = ref.watch(allUsersProvider).value ?? [];
     final nonAdminUsers = users.where((u) => !u.isAdmin).toList();
 
     return Stack(

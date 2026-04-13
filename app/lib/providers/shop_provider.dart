@@ -29,7 +29,7 @@ import 'auth_provider.dart';
 final shopsProvider = StreamProvider.autoDispose<List<ShopModel>>((ref) {
   // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED
   // during auth transitions when seller credentials are active.
-  final user = ref.watch(authUserProvider).valueOrNull;
+  final user = ref.watch(authUserProvider).value;
   if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.customers)
@@ -61,7 +61,7 @@ final shopsByRouteProvider = StreamProvider.autoDispose
 
 final shopDetailProvider = StreamProvider.autoDispose
     .family<ShopModel?, String>((ref, id) {
-      final user = ref.watch(authUserProvider).valueOrNull;
+      final user = ref.watch(authUserProvider).value;
       if (user == null) return const Stream.empty();
       if (user.isAdmin) {
         return FirebaseFirestore.instance
@@ -93,7 +93,7 @@ final outstandingShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
   ref,
 ) {
   // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
-  final user = ref.watch(authUserProvider).valueOrNull;
+  final user = ref.watch(authUserProvider).value;
   if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.customers)

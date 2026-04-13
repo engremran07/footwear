@@ -78,7 +78,7 @@ class DashboardScreen extends ConsumerWidget {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: pendingEdits.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (_, index) {
                     final tx = pendingEdits[index];
                     return ListTile(
@@ -113,26 +113,22 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     if (user == null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(tr('dashboard', ref))),
-        body: const Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (!user.isAdmin) {
       return _SellerDashboard(user: user);
     }
 
     final stats = ref.watch(dashboardStatsProvider);
-    final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
+    final ppc = ref.watch(settingsProvider).value?.pairsPerCarton ?? 12;
     final routesAsync = ref.watch(routesProvider);
     final shopsAsync = ref.watch(shopsProvider);
     final transactionsAsync = ref.watch(allTransactionsProvider);
     final pendingEditsAsync = ref.watch(pendingEditRequestsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(tr('dashboard', ref))),
       floatingActionButton: _AdminSpeedDial(),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -147,13 +143,13 @@ class DashboardScreen extends ConsumerWidget {
             // the dashboardStatsProvider cache. This ensures immediate consistency
             // after any balance change or DB-level data flush.
             final totalOutstanding =
-                shopsAsync.valueOrNull?.fold<double>(
+                shopsAsync.value?.fold<double>(
                   0.0,
                   (sum, sh) => sum + sh.balance,
                 ) ??
                 0.0;
             final pendingEdits =
-                pendingEditsAsync.valueOrNull ?? const <TransactionModel>[];
+                pendingEditsAsync.value ?? const <TransactionModel>[];
             // Alerts: outstanding > 0 is a warning banner
             final hasOutstandingAlert = totalOutstanding > 0;
             final hasPendingEditRequests = pendingEdits.isNotEmpty;
@@ -351,7 +347,6 @@ class _SellerDashboard extends ConsumerWidget {
     final routeId = user.assignedRouteId;
     if (routeId == null || routeId.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: Text(tr('dashboard', ref))),
         body: Center(child: Text(tr('dashboard_no_route_assigned', ref))),
       );
     }
@@ -363,7 +358,6 @@ class _SellerDashboard extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: Text(tr('dashboard', ref))),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(routeDetailProvider(routeId));
@@ -399,7 +393,7 @@ class _SellerDashboard extends ConsumerWidget {
                       ),
                     ),
               loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
             ),
             const SizedBox(height: 12),
             shopsAsync.when(
@@ -449,7 +443,7 @@ class _SellerDashboard extends ConsumerWidget {
                   ),
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (_, __) => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -512,8 +506,8 @@ class _RouteAnalyticsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final routes = routesAsync.valueOrNull;
-    final shops = shopsAsync.valueOrNull;
+    final routes = routesAsync.value;
+    final shops = shopsAsync.value;
 
     if (routes == null || shops == null) {
       return const SizedBox.shrink();
@@ -569,7 +563,7 @@ class _CashFlowChart extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final txs = transactionsAsync.valueOrNull;
+    final txs = transactionsAsync.value;
     if (txs == null || txs.isEmpty) return const SizedBox.shrink();
 
     // Group transactions by month for last 6 months
@@ -684,7 +678,7 @@ class _CashFlowChart extends ConsumerWidget {
 class _AdminSpeedDial extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     if (user == null || !user.isAdmin) return const SizedBox.shrink();
 
     return Column(

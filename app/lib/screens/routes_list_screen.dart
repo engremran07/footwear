@@ -22,14 +22,13 @@ class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
   @override
   Widget build(BuildContext context) {
     final ref = this.ref;
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     final isAdmin = user?.isAdmin ?? false;
     final routesAsync = isAdmin
         ? ref.watch(routesProvider)
         : ref.watch(routesBySellerProvider(user?.id ?? ''));
 
     return Scaffold(
-      appBar: AppBar(title: Text(tr('routes', ref))),
       body: routesAsync.when(
         data: (routes) {
           if (routes.isEmpty) {

@@ -101,14 +101,14 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   bool get _currentUserIsAdmin {
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     return user?.isAdmin ?? false;
   }
 
   void _trace(String event, [Map<String, Object?> details = const {}]) {
     if (!_enableLifecycleTrace) return;
     final now = DateTime.now();
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     final role = user == null
         ? 'none'
         : (user.isAdmin ? 'admin' : (user.isSeller ? 'seller' : 'other'));
@@ -185,7 +185,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
 
   void _onInactivityTimeout() {
     _trace('timer.timeout');
-    final auth = ref.read(authStateProvider).valueOrNull;
+    final auth = ref.read(authStateProvider).value;
     if (auth != null) {
       _trace('signout.inactivity');
       ref.read(authNotifierProvider.notifier).signOut();
@@ -203,6 +203,9 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
 
   void _onAppResumed() {
     _trace('lifecycle.resume.start');
+    // Sync email verification: user may have clicked the link while backgrounded.
+    // Fire-and-forget — auth_provider handles all error cases internally.
+    ref.read(authNotifierProvider.notifier).syncEmailVerification();
     if (_backgroundedAt != null) {
       final elapsed = DateTime.now().difference(_backgroundedAt!);
       final signOutDelay = _currentUserIsAdmin
@@ -216,7 +219,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
 
       if (elapsed >= signOutDelay) {
         // Away too long → sign out entirely
-        final auth = ref.read(authStateProvider).valueOrNull;
+        final auth = ref.read(authStateProvider).value;
         if (auth != null) {
           _trace('signout.backgroundTimeout');
           ref.read(authNotifierProvider.notifier).signOut();
@@ -249,7 +252,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   /// S-10: admin/manager hard session ceiling.
   void _checkAdminSessionExpiry() {
     if (_sessionStartedAt == null) return;
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     if (user == null || !user.isAdmin) return;
     final elapsed = DateTime.now().difference(_sessionStartedAt!);
     // Hard cutoff
@@ -288,7 +291,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   // ── Heartbeat ─────────────────────────────────────────────────────────────
 
   void _updateLastActive() {
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     if (user != null) {
       final now = DateTime.now();
       if (_lastActiveWriteAt != null &&
@@ -317,8 +320,8 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
 
     // Reset session clock on fresh login / role change
     ref.listen<AsyncValue<UserModel?>>(authUserProvider, (prev, next) {
-      final prevUser = prev?.valueOrNull;
-      final nextUser = next.valueOrNull;
+      final prevUser = prev?.value;
+      final nextUser = next.value;
       if (prevUser?.id != nextUser?.id && nextUser != null) {
         _sessionStartedAt = DateTime.now();
         _lastActiveWriteAt = null;

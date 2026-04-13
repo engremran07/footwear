@@ -177,12 +177,9 @@ class _CreateSaleInvoiceScreenState
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     if (user == null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(tr('create_sale_invoice', ref))),
-        body: const Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final routeId = user.assignedRouteId ?? '';
@@ -223,7 +220,6 @@ class _CreateSaleInvoiceScreenState
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
-          appBar: AppBar(title: Text(tr('create_sale_invoice', ref))),
           body: inventoryAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => mappedErrorState(
@@ -251,7 +247,7 @@ class _CreateSaleInvoiceScreenState
   ) {
     final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
-    final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
+    final ppc = ref.watch(settingsProvider).value?.pairsPerCarton ?? 12;
 
     // Calculate totals from selected items (_selectedQtys = dozens, quantity_available = pairs)
     final selectedEntries = _selectedQtys.entries
@@ -760,9 +756,9 @@ class _CreateSaleInvoiceScreenState
   }
 
   Future<void> _submit(BuildContext context) async {
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     if (user == null) return;
-    final isOnline = ref.read(isOnlineProvider).valueOrNull ?? true;
+    final isOnline = ref.read(isOnlineProvider).value ?? true;
     if (!isOnline) {
       HapticFeedback.vibrate();
       ScaffoldMessenger.of(
@@ -770,7 +766,7 @@ class _CreateSaleInvoiceScreenState
       ).showSnackBar(warningSnackBar(tr('warn_offline', ref)));
       return;
     }
-    final ppc = ref.read(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
+    final ppc = ref.read(settingsProvider).value?.pairsPerCarton ?? 12;
 
     if (_selectedShop == null) {
       HapticFeedback.vibrate();
@@ -820,7 +816,7 @@ class _CreateSaleInvoiceScreenState
 
     // Build line items from selected inventory
     final inventoryList =
-        ref.read(sellerInventoryProvider(user.id)).valueOrNull ?? [];
+        ref.read(sellerInventoryProvider(user.id)).value ?? [];
     final total = _invoiceTotal;
     final items = _buildInvoiceItems(inventoryList, saleAmount, ppc);
     final amountReceived = _amountReceived;

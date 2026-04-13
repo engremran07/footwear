@@ -111,7 +111,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     final shopsAsync = user?.isSeller == true && user?.assignedRouteId != null
         ? ref.watch(shopsByRouteProvider(user!.assignedRouteId!))
         : ref.watch(shopsProvider);
@@ -121,62 +121,66 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         : null;
     final canCreateShop =
         user != null && (user.isAdmin || user.assignedRouteId != null);
-    final scopedStatsShops = shopsAsync.valueOrNull == null
+    final scopedStatsShops = shopsAsync.value == null
         ? null
-        : _scopeShopsByRoute(shopsAsync.valueOrNull!);
+        : _scopeShopsByRoute(shopsAsync.value!);
     final flowByShop =
-        scopedStatsShops == null || transactionsAsync.valueOrNull == null
+        scopedStatsShops == null || transactionsAsync.value == null
         ? null
         : _buildShopFlowStats(
             shops: scopedStatsShops,
-            transactions: transactionsAsync.valueOrNull!,
+            transactions: transactionsAsync.value!,
           );
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(tr('shops', ref)),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.file_download_outlined),
-            tooltip: tr('export_report', ref),
-            onSelected: (value) {
-              final shops = shopsAsync.valueOrNull;
-              if (shops == null || shops.isEmpty) return;
-              final routes = routesAsync?.valueOrNull ?? [];
-              if (value == 'all') {
-                _exportAllShops(shops, routes);
-              } else if (value == 'per_route') {
-                _exportPerRoute(shops, routes);
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'all',
-                child: Row(
-                  children: [
-                    const Icon(Icons.table_chart, size: 20),
-                    const SizedBox(width: 8),
-                    Text(tr('export_all_shops', ref)),
-                  ],
-                ),
-              ),
-              if (user?.isAdmin == true)
-                PopupMenuItem(
-                  value: 'per_route',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.route, size: 20),
-                      const SizedBox(width: 8),
-                      Text(tr('export_per_route', ref)),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
       body: Column(
         children: [
+          // Export action row
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 4, top: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.file_download_outlined),
+                  tooltip: tr('export_report', ref),
+                  onSelected: (value) {
+                    final shops = shopsAsync.value;
+                    if (shops == null || shops.isEmpty) return;
+                    final routes = routesAsync?.value ?? [];
+                    if (value == 'all') {
+                      _exportAllShops(shops, routes);
+                    } else if (value == 'per_route') {
+                      _exportPerRoute(shops, routes);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'all',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.table_chart, size: 20),
+                          const SizedBox(width: 8),
+                          Text(tr('export_all_shops', ref)),
+                        ],
+                      ),
+                    ),
+                    if (user?.isAdmin == true)
+                      PopupMenuItem(
+                        value: 'per_route',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.route, size: 20),
+                            const SizedBox(width: 8),
+                            Text(tr('export_per_route', ref)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           AppSearchBar(
             hintText: tr('search', ref),
             onChanged: (v) => setState(() => _search = _normalizeSearchText(v)),
@@ -230,7 +234,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                 );
               },
               loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
             ),
           // Stats strip — derived from the live shop list
           if (scopedStatsShops != null && flowByShop != null)
@@ -249,8 +253,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                 final scopedFlowByShop = _buildShopFlowStats(
                   shops: scopedShops,
                   transactions:
-                      transactionsAsync.valueOrNull ??
-                      const <TransactionModel>[],
+                      transactionsAsync.value ?? const <TransactionModel>[],
                 );
                 final filtered = scopedShops.where((s) {
                   final flowStats =
@@ -286,7 +289,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
                 // Admin: grouped by route
                 if (user?.isAdmin == true) {
-                  final routes = routesAsync?.valueOrNull ?? [];
+                  final routes = routesAsync?.value ?? [];
                   if (routes.isNotEmpty) {
                     return _AdminGroupedShopsView(
                       shops: filtered,

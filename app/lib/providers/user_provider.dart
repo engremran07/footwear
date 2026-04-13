@@ -11,7 +11,7 @@ import 'auth_provider.dart';
 final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
   // Admin-only list query: guard so non-admin credentials never subscribe,
   // preventing PERMISSION_DENIED during auth transitions.
-  final user = ref.watch(authUserProvider).valueOrNull;
+  final user = ref.watch(authUserProvider).value;
   if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.users)
@@ -27,7 +27,7 @@ final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
 
 final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
   // Admin-only list query: guard to prevent PERMISSION_DENIED for seller creds.
-  final user = ref.watch(authUserProvider).valueOrNull;
+  final user = ref.watch(authUserProvider).value;
   if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.users)
@@ -45,7 +45,7 @@ final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
 final inactiveUsersProvider = StreamProvider.autoDispose<List<UserModel>>((
   ref,
 ) {
-  final user = ref.watch(authUserProvider).valueOrNull;
+  final user = ref.watch(authUserProvider).value;
   if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.users)

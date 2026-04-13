@@ -303,6 +303,7 @@ Status: ✅ Pass
 | Score cap | -4 | P0/P1 deferred risks (RR-001 through RR-004) prevent full score |
 
 **Remaining gap to 100:**
+
 - P0 RSA key: -8 points until resolved
 - P0 float arithmetic: -5 points until resolved
 - P1 session re-auth: -3 points until resolved

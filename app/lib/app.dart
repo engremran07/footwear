@@ -14,12 +14,16 @@ class FootwearErpApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
     final appLocale = ref.watch(appLocaleProvider);
-    final themeMode = ref.watch(themePreferenceProvider);
+    final appThemeMode = ref.watch(themePreferenceProvider);
+    final systemBrightness = MediaQuery.platformBrightnessOf(context);
+    final theme = AppTheme.themeForMode(
+      appThemeMode,
+      appLocale,
+      systemBrightness: systemBrightness,
+    );
     return MaterialApp.router(
       title: AppBrand.appName,
-      theme: AppTheme.lightTheme(appLocale),
-      darkTheme: AppTheme.darkTheme(appLocale),
-      themeMode: themeMode,
+      theme: theme,
       locale: appLocale.locale,
       routerConfig: router,
       debugShowCheckedModeBanner: false,

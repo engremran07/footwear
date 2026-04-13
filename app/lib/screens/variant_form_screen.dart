@@ -54,7 +54,7 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
       return;
     }
 
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     if (user?.isAdmin != true) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -121,11 +121,6 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
-          appBar: AppBar(
-            title: Text(
-              isEdit ? tr('edit_variant', ref) : tr('new_variant', ref),
-            ),
-          ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Form(

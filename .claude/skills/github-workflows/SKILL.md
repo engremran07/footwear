@@ -9,7 +9,7 @@ description: "Use when: creating or updating GitHub Actions workflows for Flutte
 
 | File | Trigger | Purpose |
 |------|---------|---------|
-| `.github/workflows/ci.yml` | push / PR | Analyse + test + 6 hygiene gates |
+| `.github/workflows/ci.yml` | push / PR | Analyse + test + 17 hygiene gates |
 | `.github/workflows/build-apk.yml` | workflow_dispatch | Debug + release fat APK |
 | `.github/workflows/release.yml` | push tag `v*` | Full validate + build + deploy + GitHub Release |
 | `.github/workflows/deploy-web.yml` | push to main | Flutter web build + Firebase Hosting deploy |
@@ -35,7 +35,7 @@ if [ "$CURRENT_CODE" -le "$LAST_CODE" ]; then
 fi
 ```
 
-## 6 Hygiene Gate Grep Patterns
+## 17 Hygiene Gate Grep Patterns
 
 ```bash
 # Gate 1: No raw collection strings
@@ -81,9 +81,44 @@ if grep -rn "buildPdf\|PdfDocument\|pw\.Document" app/lib/ | grep -v "Isolate\.r
   echo "FAIL: PDF generation not offloaded to isolate"
   exit 1
 fi
+
+# Gate 16: Firestore rules and indexes files present and valid
+if [ ! -f "firestore.rules" ] || [ ! -f "firestore.indexes.json" ]; then
+  echo "FAIL: firestore.rules or firestore.indexes.json missing"
+  exit 1
+fi
+python3 -c "import json,sys; json.load(open('firestore.indexes.json'))" || {
+  echo "FAIL: firestore.indexes.json is not valid JSON"; exit 1
+}
+echo "firestore.rules and firestore.indexes.json present and valid"
+
+# Gate 17: No temp/debug artifacts tracked
+FOUND=$(git ls-files | grep -E "auth-users\.json|check_locale\.(ps1|py)|debug\.log|\.flag$" || true)
+if [ -n "$FOUND" ]; then
+  echo "FAIL: temp/debug artifact tracked: $FOUND"; exit 1
+fi
 ```
 
-## firebase_options CI Stub
+## Mandatory Local Pre-Signoff Sequence (non-bypassable)
+
+Before every commit, ALL of the following must succeed and evidence quoted:
+
+| Step | Command | Required evidence |
+| --- | --- | --- |
+| 1 | `flutter analyze lib --no-pub` | `No issues found!` |
+| 2 | `dart analyze test/` | `No issues found!` |
+| 3 | `flutter test -r expanded` | `All N tests passed!` |
+| 4 | Hygiene gates 4a-4f | all zero results |
+| 5 | `markdownlint "**/*.md" ...` | zero output (exit 0) |
+| 6 | `firebase deploy --only firestore:rules,firestore:indexes` | `Deploy complete!` |
+| 7 | `flutter build web --release` | `EXIT: 0` |
+| 8 | `firebase deploy --only hosting` | `Deploy complete!` |
+| 9 | `flutter build apk --release` | file size quoted |
+| 10 | `git log --oneline -5` + `git status --short` | no unexpected artifacts |
+| 11 | `git add -A && git commit && git push` | commit hash + push output |
+| 12 | `adb install -r <apk>` (if connected) | `Success` |
+
+
 When `firebase_options.dart` is gitignored, CI must generate a stub:
 
 ```bash

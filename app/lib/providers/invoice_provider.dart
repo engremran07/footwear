@@ -56,7 +56,7 @@ final allInvoicesProvider = StreamProvider.autoDispose<List<InvoiceModel>>((
 ) {
   // Admin-only: this provider exposes ALL invoices. Non-admins get an empty
   // stream — use roleAwareInvoicesProvider or sellerInvoicesProvider instead.
-  final user = ref.watch(authUserProvider).valueOrNull;
+  final user = ref.watch(authUserProvider).value;
   if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.invoices)
@@ -91,7 +91,7 @@ final sellerInvoicesProvider = StreamProvider.autoDispose
 /// listener and AsyncValue loading/error state is preserved.
 final roleAwareInvoicesProvider =
     Provider.autoDispose<AsyncValue<List<InvoiceModel>>>((ref) {
-      final user = ref.watch(authUserProvider).valueOrNull;
+      final user = ref.watch(authUserProvider).value;
       if (user == null) return const AsyncData(<InvoiceModel>[]);
       if (user.isAdmin) {
         return ref.watch(allInvoicesProvider);
@@ -521,7 +521,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (createdBy.trim().isEmpty) {
       throw ArgumentError('createdBy must not be empty');
     } // Defense-in-depth: enforce admin-only at app level (rules enforce at DB level)
-    final currentUser = ref.read(authUserProvider).valueOrNull;
+    final currentUser = ref.read(authUserProvider).value;
     if (currentUser == null || !currentUser.isAdmin) {
       throw StateError('voidInvoice requires admin privileges');
     }

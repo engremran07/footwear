@@ -120,15 +120,15 @@ class RouterNotifier extends ChangeNotifier {
 
   RouterNotifier(this._ref) {
     _ref.listen<AsyncValue<User?>>(authStateProvider, (prev, next) {
-      final prevUid = prev?.valueOrNull?.uid;
-      final nextUid = next.valueOrNull?.uid;
+      final prevUid = prev?.value?.uid;
+      final nextUid = next.value?.uid;
       if (prevUid != nextUid || prev?.isLoading != next.isLoading) {
         _scheduleNotify();
       }
     });
     _ref.listen<AsyncValue<UserModel?>>(authUserProvider, (prev, next) {
-      final prevUser = prev?.valueOrNull;
-      final nextUser = next.valueOrNull;
+      final prevUser = prev?.value;
+      final nextUser = next.value;
       final authRelevantChanged =
           prevUser?.id != nextUser?.id ||
           prevUser?.role != nextUser?.role ||
@@ -151,7 +151,7 @@ class RouterNotifier extends ChangeNotifier {
   }
 
   String? redirect(BuildContext context, GoRouterState state) {
-    final isLoggedIn = _ref.read(authStateProvider).valueOrNull != null;
+    final isLoggedIn = _ref.read(authStateProvider).value != null;
     final isLoginRoute = state.matchedLocation == '/login';
     final isBootstrapRoute = state.matchedLocation == '/bootstrap-profile';
 
@@ -161,7 +161,7 @@ class RouterNotifier extends ChangeNotifier {
     final appUserState = _ref.read(authUserProvider);
     if (appUserState.isLoading) return null;
 
-    final appUser = appUserState.valueOrNull;
+    final appUser = appUserState.value;
     if (appUser == null) {
       if (!isBootstrapRoute) return '/bootstrap-profile';
       return null;

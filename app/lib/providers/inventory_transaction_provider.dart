@@ -7,7 +7,7 @@ import 'auth_provider.dart';
 /// All inventory transactions (admin â€” transfer history).
 final allInventoryTransactionsProvider =
     StreamProvider.autoDispose<List<InventoryTransactionModel>>((ref) {
-      final user = ref.watch(authUserProvider).valueOrNull;
+      final user = ref.watch(authUserProvider).value;
       if (user == null || !user.isAdmin) return const Stream.empty();
       return FirebaseFirestore.instance
           .collection(Collections.inventoryTransactions)

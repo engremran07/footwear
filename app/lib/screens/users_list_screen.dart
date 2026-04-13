@@ -35,14 +35,11 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = ref.watch(authUserProvider).valueOrNull;
+    final currentUser = ref.watch(authUserProvider).value;
 
     // Admin guard: render access-denied if not admin
     if (currentUser != null && !currentUser.isAdmin) {
-      return Scaffold(
-        appBar: AppBar(title: Text(tr('users', ref))),
-        body: Center(child: Text(tr('permission_denied', ref))),
-      );
+      return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
 
     final usersAsync = _showInactive
@@ -50,7 +47,6 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
         : ref.watch(allUsersProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(tr('users', ref))),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateUserDialog(),
         icon: const Icon(Icons.person_add),
@@ -214,7 +210,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          final routes = ref.watch(routesProvider).valueOrNull ?? [];
+          final routes = ref.watch(routesProvider).value ?? [];
           final availableRoutes = routes
               .where(
                 (r) =>
@@ -368,7 +364,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     final emailC = TextEditingController(text: user.email);
     final passwordC = TextEditingController();
     String role = user.isAdmin ? 'admin' : 'seller';
-    final currentUser = ref.read(authUserProvider).valueOrNull;
+    final currentUser = ref.read(authUserProvider).value;
     final isSelf = currentUser?.id == user.id;
     String? selectedRouteId = user.assignedRouteId;
     String? selectedRouteName = user.assignedRouteName;
@@ -379,7 +375,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          final routes = ref.watch(routesProvider).valueOrNull ?? [];
+          final routes = ref.watch(routesProvider).value ?? [];
           final availableRoutes = routes
               .where(
                 (r) =>
@@ -578,7 +574,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
               ),
               ElevatedButton(
                 onPressed: () async {
-                  final me = ref.read(authUserProvider).valueOrNull;
+                  final me = ref.read(authUserProvider).value;
                   if (me?.isAdmin != true) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
@@ -658,7 +654,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   // ── Reactivate user dialog ────────────────────────────────────────────────
 
   Future<void> _confirmReactivateUser(UserModel user) async {
-    final routes = ref.read(routesProvider).valueOrNull ?? [];
+    final routes = ref.read(routesProvider).value ?? [];
     String? selectedRouteId;
     String? selectedRouteName;
 
@@ -748,7 +744,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   // ── Hard-delete user confirmation ─────────────────────────────────────────
 
   Future<void> _confirmHardDeleteUser(UserModel user) async {
-    final me = ref.read(authUserProvider).valueOrNull;
+    final me = ref.read(authUserProvider).value;
     if (me?.isAdmin != true) return;
 
     final confirmed = await ConfirmDialog.show(
@@ -784,7 +780,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   // ── Delete user confirmation ──────────────────────────────────────────────
 
   Future<void> _confirmDeleteUser(UserModel user) async {
-    final me = ref.read(authUserProvider).valueOrNull;
+    final me = ref.read(authUserProvider).value;
     if (me?.isAdmin != true) return;
     // Cannot delete self or other admins
     if (user.id == me?.id || user.isAdmin) return;

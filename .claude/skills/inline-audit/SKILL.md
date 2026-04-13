@@ -67,9 +67,37 @@ Always use client-side:
 ```
 
 ### 7. Build Hygiene
+
 - Always fat APK: `flutter build apk --release` — NEVER `--split-per-abi`
 - `app/pubspec.yaml` version == `AppBrand.appVersion + '+' + AppBrand.buildNumber`
 - After touching any user-visible feature: bump PATCH+BUILD, rebuild both APK and web
+
+### 8. Mandatory Release Sequence (non-bypassable, every session)
+
+```powershell
+# Step 1 — analyze
+flutter analyze lib --no-pub          # quote "No issues found!"
+dart analyze test/                    # quote "No issues found!"
+flutter test -r expanded              # quote "All N tests passed!"
+# Step 2 — deploy Firestore (ALWAYS, not just on rules change)
+firebase deploy --only firestore:rules,firestore:indexes   # quote "Deploy complete!"
+# Step 3 — web build + hosting deploy
+$ErrorActionPreference='Continue'; flutter build web --release; Write-Host "EXIT: $LASTEXITCODE"
+firebase deploy --only hosting        # quote "Deploy complete!"
+# Step 4 — APK build
+flutter build apk --release           # quote file size
+# Step 5 — commit audit + push
+git log --oneline -5                  # review; no unexpected commits
+git status --short                    # no unexpected artifacts
+git add -A ; git commit -m "type: summary — vX.Y.Z+N"   # quote hash
+git push                              # quote branch + hash
+# Step 6 — device install (if device connected)
+adb devices
+adb -s <device-id> install -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-release.apk"  # quote "Success"
+```
+
+Any step skipped = **incomplete session**. Next agent MUST check `git log`
+before starting new work and complete all missing steps first.
 
 ## Inline Audit Checklist (run mentally on every PR)
 

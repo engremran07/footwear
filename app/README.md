@@ -1,14 +1,14 @@
-﻿# FootWear ERP — Flutter App (v3.4.0)
+﻿# FootWear ERP — Flutter App (v3.7.0+48)
 
-Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record customer transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
+Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
-> **v3.4.0+30** — Autonomous 20-agent CI/CD self-healing system. Seller transaction rules restricted to description+updated_at. Session 7h30m warning dialog. 20-agent audit workflow, hygiene CI gates, 7 skill upgrades.
+> **v3.7.0+48 (audit v14)** — fl_chart 1.2.0, share_plus 13.0.0, permission_handler 12.0.1, dart_jsonwebtoken 3.4.0, flutter_lints 6.0.0 upgraded. 30 lint issues fixed. CI standardised on Flutter 3.41.6. All StateProvider instances replaced (Riverpod 3 ban). Anti-Bypass Enforcement Matrix added.
 
 ---
 
 ## Requirements
 
-- Flutter >=3.5.0 <4.0.0
+- Flutter 3.41.6 (Dart >=3.11.0)
 - Android SDK (API 21+)
 - Java 17
 - Firebase project with Firestore and Auth enabled (no Storage, no Cloud Functions needed)
@@ -23,19 +23,23 @@ flutter analyze lib --no-pub
 flutter run
 ```
 
-Place `google-services.json` in `android/app/` before running (obtain from Firebase Console — file is gitignored).
+Place `google-services.json` in `android/app/` before running (obtain from Firebase Console — gitignored).
 
 ---
 
 ## Build
 
 ```bash
-# Release APK (fat, universal)
+# Release APK (fat, universal — never split-per-abi)
 flutter build apk --release
 # Output: build/app/outputs/flutter-apk/app-release.apk
 
 # Install to connected device
 adb install -r build/app/outputs/flutter-apk/app-release.apk
+
+# Web release
+flutter build web --release
+firebase deploy --only hosting
 ```
 
 ---
@@ -44,16 +48,16 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk
 
 | Concern | Choice |
 | --- | --- |
-| State | Riverpod (`AsyncNotifier`, `StreamProvider`) |
-| Navigation | go_router with role-based redirect guards |
+| State | flutter_riverpod 3.3.1 (`NotifierProvider`, `AsyncNotifierProvider`, `StreamProvider`) — **StateProvider is BANNED** |
+| Navigation | go_router 17.2.0 with role-based redirect guards |
 | Backend | Cloud Firestore (realtime streams) |
-| Auth | Firebase Auth (email/password) |
+| Auth | Firebase Auth (email/password) via secondary `FirebaseApp` for user creation |
 | Design system | AppTokens, AppAnimations, AppSanitizer, AppInputFormatters |
-| Charts | fl_chart (BarChart, LineChart, PieChart) |
+| Charts | fl_chart 1.2.0 (BarChart, LineChart, PieChart) |
 | Exports (PDF) | `pdf` package + `Isolate.run()` — Arabic + Urdu fonts |
-| Exports (Excel) | `excel` package |
-| Print / Share | `printing` + `share_plus` |
-| Image compression | `flutter_image_compress` (base64 logo ≤50KB) |
+| Exports (Excel) | Custom xlsx writer (`excel_export.dart`) using `archive ^4.0.0` |
+| Print / Share | `printing` + share_plus 13.0.0 (`SharePlus.instance.share(ShareParams(...))`) |
+| Image compression | `flutter_image_compress` (base64 logo ≤50 KB) |
 | Animations | `flutter_animate` + `shimmer` |
 
 ### Key directories
@@ -61,20 +65,20 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```text
 lib/
 ├── core/
-│   ├── constants/   # AppBrand, AppCollections
+│   ├── constants/   # AppBrand (version, colours), Collections (Firestore names)
 │   ├── l10n/        # app_locale.dart — EN / AR / UR (372+ keys)
 │   ├── router/      # app_router.dart — all routes + auth guards
 │   ├── theme/       # AppTheme, AppTokens, AppAnimations
 │   └── utils/       # pdf_export (Isolate), excel_export, error_mapper, formatters, sanitizer
 ├── models/          # Firestore data models (fromJson / toJson)
-├── providers/       # Riverpod notifiers — all Firestore writes happen here
-├── screens/         # Full-page UI screens (login, dashboard, 5 lists, 7 forms, 5 details, reports)
-└── widgets/         # 14 shared components (6 upgraded + 8 new) with accessibility tooltips
+├── providers/       # Riverpod notifiers — ALL Firestore writes happen here
+├── screens/         # Full-page UI screens
+└── widgets/         # Shared components with accessibility tooltips
 ```
 
 ---
 
-## Screens
+## Screens & Routes
 
 | Route | Screen | Access |
 | --- | --- | --- |
@@ -82,14 +86,20 @@ lib/
 | `/` | Dashboard | All |
 | `/profile` | Profile | All |
 | `/routes` | Routes list | Admin |
+| `/routes/new` | New route | Admin |
 | `/routes/:id` | Route detail | Admin |
+| `/routes/:id/edit` | Edit route | Admin |
 | `/shops` | Shops list | All |
+| `/shops/new` | New shop | All |
 | `/shops/:id` | Shop detail + ledger | All |
-| `/customers` | Customers list | All |
-| `/customers/:id` | Customer detail + ledger | All |
+| `/shops/:id/edit` | Edit shop | All |
 | `/products` | Products list | Admin |
+| `/products/new` | New product | Admin |
 | `/products/:id` | Product detail + variants | Admin |
-| `/inventory` | Inventory screen | Admin |
+| `/products/:id/edit` | Edit product | Admin |
+| `/products/:id/variants/new` | New variant | Admin |
+| `/products/:id/variants/:vid/edit` | Edit variant | Admin |
+| `/inventory` | Inventory screen | All |
 | `/invoices` | Invoices list | All |
 | `/invoices/:id` | Invoice detail | All |
 | `/reports` | Reports (PDF / Excel) | Admin |
@@ -105,9 +115,39 @@ lib/
 | `manager` | Admin-equivalent (legacy) |
 | `seller` | Assigned route only — read + create transactions |
 
-Seller accounts must be provisioned by admin with assigned route.
+Dashboard and inventory suppress transient permission-denied states during auth/profile stream warm-up. Role-scoped providers stay in loading or cached fallback until access is confirmed.
 
-Dashboard and inventory flows must suppress transient permission-denied states during auth/profile stream warm-up. Admin-only providers should be role-guarded before subscription, and seller/admin startup for `/` and `/inventory` should be verified after related edits.
+---
+
+## State Management Rules
+
+- **Never use `StateProvider`** — Riverpod 3.x removed it. Use `NotifierProvider<T, S>` with an explicit `Notifier` subclass.
+- Every mutable state needs a `build()` method + explicit setter on the notifier.
+- Write sites: `.notifier).state =` → `.notifier).set(value)`.
+- Verify: `grep -rn "StateProvider\b" app/lib/ --include="*.dart"` → must return zero.
+
+---
+
+## Financial Pathways (never mix)
+
+```text
+Pathway 1 — SALE WITH STOCK
+  CreateSaleInvoiceScreen → InvoiceNotifier.createSaleInvoice()
+  Invoice + cash_out tx + optional cash_in tx + seller_inventory deduction (one atomic batch)
+  USE WHEN: new goods delivered to shop, stock deduction required
+
+Pathway 2 — CASH COLLECTION (old debt, no new goods)
+  ShopDetailScreen → TransactionNotifier.create(type: 'cash_in')
+  Cash_in ledger entry ONLY. No invoice. No stock movement.
+  USE WHEN: collecting outstanding balance, no new delivery
+
+VOID / RETURN (admin only)
+  InvoiceNotifier.voidInvoice()
+  Returns stock to inventory; issues one reversal transaction.
+  Cash refund mode adds a second cash_out tx.
+```
+
+`shop.balance` is the sole monetary source of truth. It is updated **only** inside `InvoiceNotifier` or `TransactionNotifier` via atomic Firestore batch writes. Never write `shop.balance` from screens or widgets.
 
 ---
 
@@ -119,50 +159,50 @@ All UI strings live in `lib/core/l10n/app_locale.dart`. Three locales:
 - `ar` — Arabic (RTL) — PDF uses Noto Sans Arabic
 - `ur` — Urdu (RTL) — PDF uses Noto Nastaliq Urdu
 
-Switch locale at runtime via `appLocaleProvider`.
+Locale is controlled by `appLocaleProvider` (a `NotifierProvider`, not `StateProvider`).
 
 ---
 
 ## Firestore Rules & Indexes
-
-Managed at repo root:
 
 ```bash
 # From repo root
 firebase deploy --only firestore:rules,firestore:indexes
 ```
 
+Every `where(A) + orderBy(B)` query pair where `A != B` requires a composite index entry in `firestore.indexes.json`.
+
 ---
 
 ## Pre-Release Checklist
 
 ```bash
-flutter analyze lib --no-pub        # No issues found
-flutter test -r expanded            # All tests pass
-flutter build apk --release         # APK builds cleanly
+# 1 — Zero analyze issues (quote exact final line)
+flutter analyze lib --no-pub
+
+# 2 — All tests green (quote pass count)
+flutter test -r expanded
+
+# 3 — No StateProvider
+grep -rn "StateProvider\b" lib/ --include="*.dart"
+
+# 4 — Version sync (pubspec.yaml + app_brand.dart must match)
+grep -E "^version:|appVersion|buildNumber" pubspec.yaml lib/core/constants/app_brand.dart
+
+# 5 — APK (quote file size)
+flutter build apk --release
+
+# 6 — Web (confirm EXIT: $LASTEXITCODE = 0)
+flutter build web --release
 ```
-
-If the release includes both web and APK:
-
-- keep `pubspec.yaml` version and `AppBrand.versionDisplay` aligned first
-- rebuild web and APK from that same versioned source tree
-- avoid immutable Hosting cache for Flutter web shell files
-- verify user-facing About/version/contact data matches on both surfaces
 
 ---
 
-## v3.0.0 Enterprise Features
+## Version History Highlights
 
-- **Design tokens**: `AppTokens` (spacing s2–s48, radii brSM/brMD/brLG, elevation), `AppAnimations` extension with screenEntry(), listEntry(i), pressable(), successFlash(), errorShake()
-- **14 widgets**: StatusBadge, AppSearchBar, FilterChipBar, ShimmerList, StatStripCard, ConfirmDialog, EmptyState, AppDateRangePicker — all with Semantics/Tooltip
-- **5 enriched list screens**: search bar, filter chips, shimmer placeholders, pull-to-refresh, staggered entry animations, stat summary strips
-- **7 standardized forms**: PopScope dirty-check, AppSanitizer input cleaning, haptic feedback (vibrate on error, mediumImpact on save)
-- **5 enriched detail screens**: fl_chart charts, status badges, grouped card sections
-- **PDF isolate export**: all 4 PDF functions use `Isolate.run()`, font bytes pre-loaded on main isolate, `_s()` sanitizer for all interpolated strings (S-08)
-- **Session guard**: `AppLifecycleListener` replaces deprecated observer, 8h admin hard timeout (S-10)
-- **Base64 logo**: 256×256 + flutter_image_compress + ≤50KB Firestore cap (S-07)
-- **Firestore rules**: `docSizeOk()` <50KB on all creates/updates, `withinWriteRate()` 1s cooldown
-- **Dark mode**: theme-aware colors, no hardcoded Colors.white/grey
-- **RTL**: EdgeInsetsDirectional throughout, no hardcoded left/right
-- **Security**: deny-by-default rules, admin defense-in-depth, provider write guards, `_normalizePath()` in router
-- **Release**: v3.0.0+7, fat APK built, tested Samsung A56 (API 36) + V2247 (API 34)
+- **v3.7.0+48 (2026-04-13):** Dep stack fully upgraded; 30 lint issues fixed; all 4 CI workflows on Flutter 3.41.6; StateProvider banned (Riverpod 3); Anti-Bypass Enforcement Matrix; audit 79→85/100
+- **v3.6.0+47 (2026-04-13):** Riverpod 2→3 migration (flutter_riverpod 3.3.1, go_router 17.2.0); StateProvider converted to NotifierProvider; dead dev deps removed; 0 analyze issues
+- **v3.5.0+43 (2026-04-11):** Governance layer; CI/CD hardened (11 hygiene gates, APK size gate); colour hygiene; auth-flow smoke tests
+- **v3.4.0+30 (2026-04-07):** 20-agent CI/CD self-healing system; seller transaction rules restricted; 7h30m session warning; audit workflow
+- **v3.3.7+28:** Admin 4-way auth pipeline (SA key → RS256 JWT → OAuth2 → Identity Toolkit REST)
+- **v3.0.0+7:** Enterprise upgrade — design system, 14 widgets, 5 list screens, 7 forms, PDF isolate export, session guard, Firestore rules hardening

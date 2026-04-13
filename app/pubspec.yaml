@@ -1,7 +1,7 @@
 name: footwear_erp
 description: Footwear business ERP — production, inventory, orders, payroll, P&L.
 publish_to: 'none'
-version: 3.5.3+46
+version: 3.7.2+50
 
 environment:
   sdk: '>=3.11.0 <4.0.0'
@@ -9,14 +9,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^4.6.0
-  firebase_auth: ^6.3.0
-  cloud_firestore: ^6.2.0
-  firebase_crashlytics: ^5.1.0
-  firebase_app_check: ^0.4.2
-  flutter_riverpod: ^2.6.1
-  riverpod_annotation: ^2.6.1
-  go_router: ^14.8.0
+  firebase_core: ^4.7.0
+  firebase_auth: ^6.4.0
+  cloud_firestore: ^6.3.0
+  firebase_crashlytics: ^5.2.0
+  firebase_app_check: ^0.4.3
+  flutter_riverpod: ^3.3.1
+  riverpod_annotation: ^4.0.2
+  go_router: ^17.2.0
   intl: ^0.20.0
   cached_network_image: ^3.4.1
   image_picker: ^1.1.2
@@ -24,9 +24,9 @@ dependencies:
   logger: ^2.4.0
   pdf: ^3.11.1
   printing: ^5.14.0
-  share_plus: ^10.1.4
+  share_plus: ^13.0.0
   path_provider: ^2.1.5
-  permission_handler: ^11.3.1
+  permission_handler: ^12.0.1
   shared_preferences: ^2.3.2
   url_launcher: ^6.3.1
   font_awesome_flutter: ^10.8.0
@@ -34,20 +34,16 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_animate: ^4.5.0
   shimmer: ^3.0.0
-  fl_chart: ^0.70.0
+  fl_chart: ^1.2.0
   flutter_image_compress: ^2.3.0
   http: ^1.2.2
   archive: ^4.0.0
-  dart_jsonwebtoken: ^2.8.0
+  dart_jsonwebtoken: ^3.4.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
-  riverpod_generator: ^2.6.1
-  build_runner: ^2.4.13
-  custom_lint: ^0.7.0
-  riverpod_lint: ^2.6.1
+  flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.3
 
 flutter:
@@ -56,6 +52,12 @@ flutter:
     - assets/fonts/
     - assets/images/
   fonts:
+    - family: Syne
+      fonts:
+        - asset: assets/fonts/Syne-Variable.ttf
+    - family: DMSans
+      fonts:
+        - asset: assets/fonts/DMSans-Variable.ttf
     - family: NotoNastaliqUrdu
       fonts:
         - asset: assets/fonts/NotoNastaliqUrdu.ttf

@@ -1,6 +1,6 @@
 ﻿# ShoesERP AGENTS Runtime Contract
 
-Last updated: 2026-03-29
+Last updated: 2026-04-13
 
 ## 1) Runtime Truth (Authoritative)
 
@@ -132,6 +132,32 @@ Seller:
   reset `settings/global.last_invoice_number` to `0`. Use `dev_reset.js` in
   the repo root for this.
 
+1. **`StateProvider` is BANNED.** Riverpod 3.x removed `StateProvider` from
+  the main export. All mutable reactive state must use
+  `NotifierProvider<T extends Notifier<S>, S>` with an explicit `Notifier`
+  subclass. Catch-all: `grep -rn "StateProvider" app/lib/` must return zero.
+
+1. **Firestore rules MUST be deployed before signoff.** Any PR or autonomous
+  agent session that changes `firestore.rules` or `firestore.indexes.json`
+  MUST end with `firebase deploy --only firestore:rules,firestore:indexes`.
+  Uncommitted local rule changes that are not deployed are treated as
+  incomplete work and block signoff.
+
+1. **AI agents MUST provide verifiable evidence for every signoff claim.**
+  Acceptable evidence formats:
+   - `flutter analyze lib --no-pub` → must quote exact final line
+   - `flutter test -r expanded` → must quote pass count line
+   - APK build → must quote file size from output
+   - Web build → must state `EXIT: 0`
+  Claims of "tests pass" or "no issues" without quoting the actual tool
+  output are invalid and block signoff. This rule is non-bypassable.
+
+1. **Version sync is atomic.** `app/pubspec.yaml` version field and
+  `app/lib/core/constants/app_brand.dart` `appVersion`/`buildNumber` MUST
+  be updated in the same edit operation. Version drift between these two
+  files is a P0 regression. Verify with:
+  `grep -E "^version:|appVersion|buildNumber" app/pubspec.yaml app/lib/core/constants/app_brand.dart`
+
 ## 5) Known Failure Signatures
 
 1. permission-denied on route create/inventory add
@@ -191,32 +217,158 @@ firebase deploy --only hosting
 
 ## 8) Autonomous Agent Checklist
 
-Before writing code:
+**NON-BYPASSABLE. Every step is mandatory on every signoff. No exceptions.**
+
+### Before writing code
 
 - Read AGENTS.md and CLAUDE.md
 - Validate role/rules/collection alignment
 
-Before finishing:
+### The 14-Step Mandatory Signoff Sequence
 
-- Run flutter analyze lib --no-pub
-- Run flutter test -r expanded
-- Run `$ErrorActionPreference='Continue'; flutter build web --release; Write-Host "EXIT: $LASTEXITCODE"` — confirm LASTEXITCODE=0 AND no `lint violation` lines in output (PowerShell pipe `2>&1` misrepresents exit code; check `$LASTEXITCODE` directly)
-- Run hygiene grep gates (see CI §4 in .github/workflows/ci.yml):
-  1. No raw collection strings: `grep -rn "\.collection('" app/lib/ | grep -v "Collections\."` → zero
-  2. allTransactionsProvider in invalidation list: `grep -q "allTransactionsProvider" app/lib/providers/auth_provider.dart`
-  3. No legacy ABI-split APK build commands remain in release docs or scripts
-  4. No Firestore writes in screens/widgets: `grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/` → zero
-  5. Zero markdown lint issues: `markdownlint "**/*.md" --ignore node_modules --ignore app/build` → zero
-- Manually or logically verify admin and seller access for `/` and `/inventory`
-  after auth/router/provider/rules edits; no transient permission-denied UI is acceptable
-- When release/deploy work is requested, verify `app/pubspec.yaml` and
-  `app/lib/core/constants/app_brand.dart` carry the same release version, then
-  rebuild/deploy/install from that version before commit/push
-- Update deep-dive and READMEs if runtime assumptions changed
-- If rules changed, deploy firestore:rules and firestore:indexes
-- If bug resolution involved multiple candidate fixes, run
-  `.github/instructions/band-aid-loop-reversal.instructions.md` and
-  `.claude/skills/band-aid-loop-reversal/SKILL.md` before commit
+Every session ending with code changes MUST complete ALL 14 steps in order
+and quote the required evidence for each. A session is NOT complete until
+every step has been executed and its evidence recorded in the response.
+
+#### Step 1 — Flutter analyze (zero issues)
+
+```powershell
+cd app; flutter analyze lib --no-pub
+```
+
+Evidence required: quote exact final line `No issues found! (ran in Xs)`
+
+#### Step 2 — Dart analyze test (zero issues)
+
+```powershell
+dart analyze test/
+```
+
+Evidence required: `No issues found!`
+
+#### Step 3 — All tests green
+
+```powershell
+flutter test -r expanded
+```
+
+Evidence required: quote `All N tests passed!` with N count
+
+#### Step 4 — Hygiene grep gates (all must return zero results)
+
+```powershell
+# 4a — No raw collection strings
+grep -rn "\.collection\('" app/lib/ | grep -v "Collections\."
+# 4b — allTransactionsProvider in invalidation list
+grep -q "allTransactionsProvider" app/lib/providers/auth_provider.dart
+# 4c — No Firestore writes in screens/widgets
+grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/
+# 4d — No StateProvider (banned Riverpod 3)
+grep -rn "StateProvider\b" app/lib/ --include="*.dart"
+# 4e — Version sync: pubspec == app_brand
+grep -E "^version:|appVersion|buildNumber" app/pubspec.yaml app/lib/core/constants/app_brand.dart
+# 4f — No temp artifacts in git status
+git status --short | grep -E "auth-users\.json|\.txt$|\.log$|\.flag$|check_locale\."
+```
+
+#### Step 5 — Zero markdown lint issues
+
+```powershell
+markdownlint "**/*.md" --ignore node_modules --ignore app/build
+```
+
+Evidence required: zero output (exit 0)
+
+#### Step 6 — Firestore rules + indexes deploy
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+Evidence required: quote "Deploy complete!" from output.
+This is ALWAYS required, not only when rules changed — it confirms the
+deployed state matches the local file state. Skip only if confirmed already
+deployed in same session and no `.rules` or `indexes.json` files changed.
+
+#### Step 7 — Web release build
+
+```powershell
+$ErrorActionPreference='Continue'
+cd app; flutter build web --release
+Write-Host "EXIT: $LASTEXITCODE"
+```
+
+Evidence required: `EXIT: 0` (check `$LASTEXITCODE` directly; PowerShell
+pipe artefacts do not reflect flutter's real exit code)
+
+#### Step 8 — Firebase Hosting deploy
+
+```bash
+firebase deploy --only hosting
+```
+
+Evidence required: quote "Deploy complete!" from output.
+
+#### Step 9 — APK release build
+
+```powershell
+flutter build apk --release
+```
+
+Evidence required: quote `Built build\app\outputs\flutter-apk\app-release.apk (XXmb)`
+
+#### Step 10 — GitHub commit audit
+
+```powershell
+git log --oneline -5      # review last 5 commits
+git status --short        # confirm only expected files are staged/modified
+git diff --stat HEAD      # confirm scope of changes matches intent
+```
+
+Evidence required: quote `git log --oneline -5` output and confirm
+no unexpected files appear in `git status --short`.
+
+#### Step 11 — Commit with descriptive message
+
+```powershell
+git add -A
+git commit -m "<type>: <summary> — v<version>"
+```
+
+Evidence required: quote commit hash from output.
+Commit message must follow: `type: summary` where type ∈
+{feat, fix, chore, style, refactor, test, docs, ci, release}.
+
+#### Step 12 — Push to remote
+
+```powershell
+git push
+```
+
+Evidence required: quote push output including branch name and commit hash.
+
+#### Step 13 — APK install to device (if device connected)
+
+```powershell
+adb devices   # confirm device is listed
+adb -s <device-id> install -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-release.apk"
+```
+
+Evidence required: `Success` from adb output.
+
+#### Step 14 — Final verification
+
+- Verify admin and seller startup for `/` and `/inventory` after
+  auth/router/provider/rules edits; no transient permission-denied UI acceptable
+- Update AGENTS.md §10 audit status if runtime assumptions changed
+- If bug resolution involved multiple candidate fixes, run band-aid-loop-reversal
+  skill before committing
+
+### Bypass Consequences
+
+Any signoff that skips or omits evidence for any step is an **incomplete
+session**. The next agent session MUST check `git log` to confirm which steps
+were completed, then run all missing steps before starting new work.
 
 ## 9) Runtime Document Hierarchy
 
@@ -228,6 +380,41 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-04-14 audit v15 — v3.7.2+50:
+
+- **Governance hardened (this session):** AGENTS.md §8 rewritten as 14-step mandatory signoff sequence (non-bypassable);
+  CLAUDE.md "Six Non-Negotiable" expanded to "Twelve Non-Negotiable Pre-Signoff Steps"; Anti-Bypass Enforcement
+  Matrix extended with 5 new rows (Dart analyze, Firestore rules deployed, Indexes deployed,
+  Hosting deployed, Commit pushed, APK installed); ci.yml Gates 16–17 added (Firestore
+  files valid, no temp artifacts); deploy-web.yml now deploys Firestore rules/indexes
+  before Hosting; inline-audit SKILL.md §8 release sequence added; github-workflows SKILL.md
+  updated to 17 gates + mandatory pre-signoff table
+- **Email verification sync fixed:** `AuthNotifier.syncEmailVerification()` added;
+  called from `_onAppResumed()` in `session_guard.dart` — catches the case where user
+  verifies while app is backgrounded without requiring re-login
+- **widget_test.dart lint fixed:** `library;` directive added — resolves
+  `dangling_library_doc_comments` that was showing in VS Code Problems tab
+- **Navbar logo streamlined:** App logo removed from `_WhatsAppBar` title area;
+  `_UserAvatar` now renders the app logo image instead of text initials — more
+  AppBar space, brand-consistent avatar
+- **Crashlytics version key fixed:** was hardcoded `'3.5.2+45'`; replaced with
+  `AppBrand.versionDisplay` (inline-audit catch)
+- **Audit score: 88/100 → 90/100**
+
+2026-04-13 audit v14 — v3.7.0+48:
+
+- **Dep stack fully upgraded:** fl_chart 1.2.0 (backward-compat, zero code changes required), share_plus 13.0.0 (migrated to `SharePlus.instance.share(ShareParams(...))` at 4 sites + `download_helper_stub.dart`), permission_handler 12.0.1 (API unchanged), dart_jsonwebtoken 3.4.0 (API unchanged — only UTC DateTime for NumericDate; no code changes), flutter_lints 6.0.0
+- **30 lint issues fixed:** 15 × `unnecessary_underscores` (new flutter_lints 6 rule — `(_, __)` → `(_, _)` across 9 files), 3 × `use_null_aware_elements` in `transaction_provider.dart` (`'key': ?value` syntax), 1 × `prefer_const_constructors` in `reports_screen.dart`, 8 × share_plus deprecations → `SharePlus.instance.share(ShareParams(...))` at 5 files; final: **No issues found!**
+- **Navigation/gesture overhaul:** WhatsApp-style double-back exit implemented in AppShell; all shell-hosted screen AppBars stripped; detail screens converted to inline action rows; back gesture works from all nav destinations
+- **flutter_lints 6 new rules in codebase:** `use_null_aware_elements`, `unnecessary_underscores` — both fully resolved
+- **All 4 CI workflows standardized:** `build-apk.yml` corrected from Flutter 3.29.2 → 3.41.6; all 4 workflows now pin Flutter 3.41.6
+- **CI Gate 15 added:** StateProvider banned — `grep -rn "StateProvider\b" app/lib/ --include="*.dart"` → zero
+- **Markdown governance hardened:** `.markdownlint.json` updated (MD024 siblings_only, MD056 disabled); all 90 existing markdown issues auto-fixed to zero; `.claude/skills/markdown-governance/SKILL.md` created; `.github/instructions/markdown-governance.instructions.md` created; pre-commit checklist Gate 8 now includes temp-artifact check
+- **Temp artifact cleanup:** `auth-users.json`, `check_locale.ps1`, `check_locale.py`, `debug.log` deleted; `.gitignore` updated to cover installer flags (`*.flag`)
+- **Governance hardened:** AGENTS.md Rules 19–22 added; CLAUDE.md Chain 6 + Anti-Bypass Enforcement Matrix + Governance Notes updated; README.md × 2 fully rewritten
+- **APK v3.7.0+48:** installed to CPH2621 (Android 16/API 36) via ADB; web deployed to Firebase Hosting
+- **Audit score: 85/100 → 88/100**
 
 2026-04-11 audit v13 — v3.5.0+43:
 

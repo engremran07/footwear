@@ -10,9 +10,9 @@ on:
         type: choice
         options: [debug, release]
       flutter_version:
-        description: 'Flutter version (e.g. 3.29.x)'
+        description: 'Flutter version (e.g. 3.41.x)'
         required: false
-        default: '3.29.2'
+        default: '3.41.6'
 
 jobs:
   build:

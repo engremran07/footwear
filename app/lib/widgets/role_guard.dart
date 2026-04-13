@@ -17,7 +17,7 @@ class RoleGuard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     if (user == null || !allowed(user)) {
       return fallback ?? const SizedBox.shrink();
     }

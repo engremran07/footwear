@@ -58,7 +58,7 @@ class ShopDetailScreen extends ConsumerStatefulWidget {
 
 class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   void _showEditTransactionDialog(TransactionModel tx) {
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     final isAdmin = user?.isAdmin == true;
 
     // Sellers can edit cash_in/cash_out; update may require admin approval
@@ -355,7 +355,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     final newAmount = double.tryParse(amountC.text.trim());
                     if (newAmount == null || newAmount <= 0) return;
                     try {
-                      final user = ref.read(authUserProvider).valueOrNull;
+                      final user = ref.read(authUserProvider).value;
                       final appliedImmediately = await ref
                           .read(transactionNotifierProvider.notifier)
                           .sellerEditTransaction(
@@ -399,7 +399,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
 
   Future<void> _reviewEditRequest(TransactionModel tx, bool approved) async {
     try {
-      final user = ref.read(authUserProvider).valueOrNull;
+      final user = ref.read(authUserProvider).value;
       await ref
           .read(transactionNotifierProvider.notifier)
           .reviewSellerEditRequest(
@@ -430,7 +430,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     );
     if (confirmed != true) return;
     try {
-      final authUser = ref.read(authUserProvider).valueOrNull;
+      final authUser = ref.read(authUserProvider).value;
       await ref
           .read(transactionNotifierProvider.notifier)
           .deleteTransaction(
@@ -489,10 +489,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     try {
       final locale = ref.read(appLocaleProvider);
       final settings = await ref.read(settingsProvider.future);
-      final user = ref.read(authUserProvider).valueOrNull;
+      final user = ref.read(authUserProvider).value;
       final sorted = await _loadFullTransactions();
       final allUsers = user?.isAdmin == true
-          ? ref.read(allUsersProvider).valueOrNull ?? <UserModel>[]
+          ? ref.read(allUsersProvider).value ?? <UserModel>[]
           : <UserModel>[];
       final entryByMap = <String, String>{
         for (final u in allUsers) u.id: u.displayName,
@@ -639,9 +639,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     if (amount == null || amount <= 0) return;
                     final shop = ref
                         .read(shopDetailProvider(widget.shopId))
-                        .valueOrNull;
+                        .value;
                     if (shop == null) return;
-                    final user = ref.read(authUserProvider).valueOrNull;
+                    final user = ref.read(authUserProvider).value;
                     try {
                       await ref
                           .read(transactionNotifierProvider.notifier)
@@ -684,7 +684,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   Widget build(BuildContext context) {
     final shopAsync = ref.watch(shopDetailProvider(widget.shopId));
     final txAsync = ref.watch(shopTransactionsProvider(widget.shopId));
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     return shopAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
@@ -697,10 +697,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       ),
       data: (shop) {
         if (shop == null) {
-          return Scaffold(
-            appBar: AppBar(),
-            body: Center(child: Text(tr('not_found', ref))),
-          );
+          return Scaffold(body: Center(child: Text(tr('not_found', ref))));
         }
         final isDebt = shop.balance > 0;
         final cs = Theme.of(context).colorScheme;
@@ -715,197 +712,212 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
             (user?.isSeller == true && user?.assignedRouteId == shop.routeId);
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text(shop.name, overflow: TextOverflow.ellipsis),
-            actions: [
-              PopupMenuButton<_ShopAction>(
-                icon: const Icon(Icons.more_vert),
-                onSelected: (action) async {
-                  switch (action) {
-                    case _ShopAction.edit:
-                      context.push('/shops/${shop.id}/edit');
-
-                    case _ShopAction.delete:
-                      final ok = await ConfirmDialog.show(
-                        context,
-                        title: tr('delete', ref),
-                        message: tr('confirm_delete_shop', ref),
-                      );
-                      if (ok != true) return;
-                      try {
-                        await ref
-                            .read(shopNotifierProvider.notifier)
-                            .deactivate(shop.id, shop.routeId);
-                        if (context.mounted) context.go('/shops');
-                      } catch (e) {
-                        if (context.mounted) {
-                          final key = AppErrorMapper.key(e);
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(errorSnackBar(tr(key, ref)));
-                        }
-                      }
-
-                    case _ShopAction.badDebt:
-                      final ok = await ConfirmDialog.show(
-                        context,
-                        title: tr('bad_debt', ref),
-                        message: tr('confirm_bad_debt', ref),
-                      );
-                      if (ok != true) return;
-                      try {
-                        await ref
-                            .read(shopNotifierProvider.notifier)
-                            .markAsBadDebt(shop.id);
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          successSnackBar(tr('success_updated', ref)),
-                        );
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        final key = AppErrorMapper.key(e);
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(errorSnackBar(tr(key, ref)));
-                      }
-
-                    case _ShopAction.pdf:
-                      _generatePdf(shop);
-
-                    case _ShopAction.share:
-                      final sorted = await _loadFullTransactions();
-                      if (!context.mounted) return;
-                      ExportSheet.show(
-                        context,
-                        ref,
-                        title: '${shop.name} - ${tr('transactions', ref)}',
-                        headers: [
-                          tr('date', ref),
-                          tr('type', ref),
-                          tr('amount', ref),
-                          tr('description', ref),
-                        ],
-                        rows: sorted
-                            .map(
-                              (t) => [
-                                AppFormatters.dateTime(t.createdAt),
-                                _transactionTypeLabel(t),
-                                AppFormatters.sar(t.amount),
-                                t.description ?? '',
-                              ],
-                            )
-                            .toList(),
-                        fileName: 'shop_${shop.name}',
-                        pdfBytesBuilder: () async {
-                          final locale = ref.read(appLocaleProvider);
-                          final settings = await ref.read(
-                            settingsProvider.future,
-                          );
-                          final user = ref.read(authUserProvider).valueOrNull;
-                          final allUsers = user?.isAdmin == true
-                              ? ref.read(allUsersProvider).valueOrNull ??
-                                    <UserModel>[]
-                              : <UserModel>[];
-                          final entryByMap = <String, String>{
-                            for (final u in allUsers) u.id: u.displayName,
-                          };
-                          if (user != null) {
-                            entryByMap[user.id] = user.displayName;
-                          }
-                          final logoBytes = settings.logoBytes;
-                          final netTx = sorted.fold<double>(
-                            0.0,
-                            (s, t) => s + t.balanceImpact,
-                          );
-                          return buildPdfLedger(
-                            shopName: shop.name,
-                            companyName: settings.companyName,
-                            generatedBy: user?.displayName ?? '',
-                            openingBalance: shop.balance - netTx,
-                            transactions: sorted,
-                            labels: _labels(),
-                            locale: locale,
-                            showEntryBy: true,
-                            entryByMap: entryByMap,
-                            dateFrom: sorted.isNotEmpty
-                                ? sorted.first.createdAt.toDate()
-                                : null,
-                            dateTo: sorted.isNotEmpty
-                                ? sorted.last.createdAt.toDate()
-                                : null,
-                            currency: settings.currency,
-                            logoBytes: logoBytes,
-                          );
-                        },
-                      );
-                  }
-                },
-                itemBuilder: (ctx) => [
-                  if (canManageShop)
-                    PopupMenuItem(
-                      value: _ShopAction.edit,
-                      child: ListTile(
-                        leading: const Icon(Icons.edit),
-                        title: Text(tr('tooltip_edit_shop', ref)),
-                        contentPadding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  if (user?.isAdmin == true)
-                    PopupMenuItem(
-                      value: _ShopAction.delete,
-                      child: ListTile(
-                        leading: const Icon(
-                          Icons.delete,
-                          color: AppBrand.errorColor,
-                        ),
-                        title: Text(
-                          tr('tooltip_delete_shop', ref),
-                          style: const TextStyle(color: AppBrand.errorColor),
-                        ),
-                        contentPadding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  if (user?.isAdmin == true &&
-                      shop.balance > 0 &&
-                      !shop.badDebt)
-                    PopupMenuItem(
-                      value: _ShopAction.badDebt,
-                      child: ListTile(
-                        leading: const Icon(
-                          Icons.money_off,
-                          color: AppBrand.warningColor,
-                        ),
-                        title: Text(tr('mark_bad_debt', ref)),
-                        contentPadding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  PopupMenuItem(
-                    value: _ShopAction.pdf,
-                    child: ListTile(
-                      leading: const Icon(Icons.picture_as_pdf),
-                      title: Text(tr('tooltip_export_pdf', ref)),
-                      contentPadding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: _ShopAction.share,
-                    child: ListTile(
-                      leading: const Icon(Icons.ios_share),
-                      title: Text(tr('tooltip_export_statement', ref)),
-                      contentPadding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
           body: Column(
             children: [
+              // Shop header: name + actions menu
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 4, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        shop.name,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    PopupMenuButton<_ShopAction>(
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (action) async {
+                        switch (action) {
+                          case _ShopAction.edit:
+                            context.push('/shops/${shop.id}/edit');
+
+                          case _ShopAction.delete:
+                            final ok = await ConfirmDialog.show(
+                              context,
+                              title: tr('delete', ref),
+                              message: tr('confirm_delete_shop', ref),
+                            );
+                            if (ok != true) return;
+                            try {
+                              await ref
+                                  .read(shopNotifierProvider.notifier)
+                                  .deactivate(shop.id, shop.routeId);
+                              if (context.mounted) context.go('/shops');
+                            } catch (e) {
+                              if (context.mounted) {
+                                final key = AppErrorMapper.key(e);
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).showSnackBar(errorSnackBar(tr(key, ref)));
+                              }
+                            }
+
+                          case _ShopAction.badDebt:
+                            final ok = await ConfirmDialog.show(
+                              context,
+                              title: tr('bad_debt', ref),
+                              message: tr('confirm_bad_debt', ref),
+                            );
+                            if (ok != true) return;
+                            try {
+                              await ref
+                                  .read(shopNotifierProvider.notifier)
+                                  .markAsBadDebt(shop.id);
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                successSnackBar(tr('success_updated', ref)),
+                              );
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              final key = AppErrorMapper.key(e);
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(errorSnackBar(tr(key, ref)));
+                            }
+
+                          case _ShopAction.pdf:
+                            _generatePdf(shop);
+
+                          case _ShopAction.share:
+                            final sorted = await _loadFullTransactions();
+                            if (!context.mounted) return;
+                            ExportSheet.show(
+                              context,
+                              ref,
+                              title:
+                                  '${shop.name} - ${tr('transactions', ref)}',
+                              headers: [
+                                tr('date', ref),
+                                tr('type', ref),
+                                tr('amount', ref),
+                                tr('description', ref),
+                              ],
+                              rows: sorted
+                                  .map(
+                                    (t) => [
+                                      AppFormatters.dateTime(t.createdAt),
+                                      _transactionTypeLabel(t),
+                                      AppFormatters.sar(t.amount),
+                                      t.description ?? '',
+                                    ],
+                                  )
+                                  .toList(),
+                              fileName: 'shop_${shop.name}',
+                              pdfBytesBuilder: () async {
+                                final locale = ref.read(appLocaleProvider);
+                                final settings = await ref.read(
+                                  settingsProvider.future,
+                                );
+                                final user = ref.read(authUserProvider).value;
+                                final allUsers = user?.isAdmin == true
+                                    ? ref.read(allUsersProvider).value ??
+                                          <UserModel>[]
+                                    : <UserModel>[];
+                                final entryByMap = <String, String>{
+                                  for (final u in allUsers) u.id: u.displayName,
+                                };
+                                if (user != null) {
+                                  entryByMap[user.id] = user.displayName;
+                                }
+                                final logoBytes = settings.logoBytes;
+                                final netTx = sorted.fold<double>(
+                                  0.0,
+                                  (s, t) => s + t.balanceImpact,
+                                );
+                                return buildPdfLedger(
+                                  shopName: shop.name,
+                                  companyName: settings.companyName,
+                                  generatedBy: user?.displayName ?? '',
+                                  openingBalance: shop.balance - netTx,
+                                  transactions: sorted,
+                                  labels: _labels(),
+                                  locale: locale,
+                                  showEntryBy: true,
+                                  entryByMap: entryByMap,
+                                  dateFrom: sorted.isNotEmpty
+                                      ? sorted.first.createdAt.toDate()
+                                      : null,
+                                  dateTo: sorted.isNotEmpty
+                                      ? sorted.last.createdAt.toDate()
+                                      : null,
+                                  currency: settings.currency,
+                                  logoBytes: logoBytes,
+                                );
+                              },
+                            );
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        if (canManageShop)
+                          PopupMenuItem(
+                            value: _ShopAction.edit,
+                            child: ListTile(
+                              leading: const Icon(Icons.edit),
+                              title: Text(tr('tooltip_edit_shop', ref)),
+                              contentPadding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        if (user?.isAdmin == true)
+                          PopupMenuItem(
+                            value: _ShopAction.delete,
+                            child: ListTile(
+                              leading: const Icon(
+                                Icons.delete,
+                                color: AppBrand.errorColor,
+                              ),
+                              title: Text(
+                                tr('tooltip_delete_shop', ref),
+                                style: const TextStyle(
+                                  color: AppBrand.errorColor,
+                                ),
+                              ),
+                              contentPadding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        if (user?.isAdmin == true &&
+                            shop.balance > 0 &&
+                            !shop.badDebt)
+                          PopupMenuItem(
+                            value: _ShopAction.badDebt,
+                            child: ListTile(
+                              leading: const Icon(
+                                Icons.money_off,
+                                color: AppBrand.warningColor,
+                              ),
+                              title: Text(tr('mark_bad_debt', ref)),
+                              contentPadding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        PopupMenuItem(
+                          value: _ShopAction.pdf,
+                          child: ListTile(
+                            leading: const Icon(Icons.picture_as_pdf),
+                            title: Text(tr('tooltip_export_pdf', ref)),
+                            contentPadding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: _ShopAction.share,
+                          child: ListTile(
+                            leading: const Icon(Icons.ios_share),
+                            title: Text(tr('tooltip_export_statement', ref)),
+                            contentPadding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
               // Shop info card
               Card(
                 margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
@@ -913,7 +925,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
-                      // Compact route + contact bar (name already in AppBar title)
+                      // Route + contact bar
                       Row(
                         children: [
                           Container(
@@ -1389,7 +1401,7 @@ class _TransactionTile extends ConsumerWidget {
         ? AppBrand.warningColor
         : (reducesBalance ? AppBrand.successColor : AppBrand.errorColor);
     final sign = reducesBalance ? '+' : '-';
-    final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
+    final ppc = ref.watch(settingsProvider).value?.pairsPerCarton ?? 12;
     final totalQty = tx.items.fold<int>(0, (acc, item) => acc + item.qty);
 
     return ListTile(

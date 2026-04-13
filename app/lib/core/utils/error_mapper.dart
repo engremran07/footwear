@@ -42,6 +42,7 @@ class AppErrorMapper {
         'cancelled' => 'err_cancelled',
         'deadline-exceeded' => 'err_timeout',
         'unauthenticated' => 'err_unauthenticated',
+        'failed-precondition' => 'err_index_missing',
         _ => 'err_firebase_generic',
       };
     }

@@ -36,7 +36,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
   void _loadExisting() {
     if (_loaded || !isEdit) return;
-    final p = ref.read(productDetailProvider(widget.productId!)).valueOrNull;
+    final p = ref.read(productDetailProvider(widget.productId!)).value;
     if (p != null) {
       _nameC.value = TextEditingValue(
         text: p.name,
@@ -52,7 +52,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       return;
     }
 
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     if (user?.isAdmin != true) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -114,11 +114,6 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
-          appBar: AppBar(
-            title: Text(
-              isEdit ? tr('edit_product', ref) : tr('new_product', ref),
-            ),
-          ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Form(

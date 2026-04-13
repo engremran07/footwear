@@ -134,7 +134,7 @@ class _ShimmerCards extends StatelessWidget {
               childAspectRatio: 1.6,
             ),
             itemCount: count,
-            itemBuilder: (_, __) => Container(
+            itemBuilder: (_, _) => Container(
               decoration: BoxDecoration(
                 color: _placeholderColor(context),
                 borderRadius: AppTokens.brMD,
@@ -220,7 +220,7 @@ class _ShimmerGrid extends StatelessWidget {
               childAspectRatio: 0.75,
             ),
             itemCount: count,
-            itemBuilder: (_, __) => Container(
+            itemBuilder: (_, _) => Container(
               decoration: BoxDecoration(
                 color: _placeholderColor(context),
                 borderRadius: AppTokens.brMD,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:printing/printing.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
@@ -24,46 +23,43 @@ class InvoiceDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final invoiceAsync = ref.watch(invoiceByIdProvider(invoiceId));
-    final isAdmin = ref.watch(authUserProvider).valueOrNull?.isAdmin ?? false;
+    final isAdmin = ref.watch(authUserProvider).value?.isAdmin ?? false;
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(backTo ?? '/invoices'),
-        ),
-        title: Text(tr('invoice_detail', ref)),
-        actions: [
-          if (isAdmin)
-            invoiceAsync.whenOrNull(
-                  data: (inv) {
-                    if (inv == null || inv.status == 'void') return null;
-                    return PopupMenuButton<String>(
-                      onSelected: (action) =>
-                          _handleAction(context, ref, action, inv),
-                      itemBuilder: (_) => [
-                        if (inv.status != InvoiceModel.statusPaid)
-                          PopupMenuItem(
-                            value: 'paid',
-                            child: Text(tr('mark_paid', ref)),
-                          ),
-                        PopupMenuItem(
-                          value: 'void',
-                          child: Text(tr('void', ref)),
-                        ),
-                      ],
-                    );
-                  },
-                ) ??
-                const SizedBox.shrink(),
-        ],
-      ),
       body: invoiceAsync.when(
         data: (inv) {
           if (inv == null) {
             return Center(child: Text(tr('not_found', ref)));
           }
-          return _InvoiceBody(invoice: inv);
+          return Column(
+            children: [
+              if (isAdmin && inv.status != 'void')
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 4, top: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      PopupMenuButton<String>(
+                        onSelected: (action) =>
+                            _handleAction(context, ref, action, inv),
+                        itemBuilder: (_) => [
+                          if (inv.status != InvoiceModel.statusPaid)
+                            PopupMenuItem(
+                              value: 'paid',
+                              child: Text(tr('mark_paid', ref)),
+                            ),
+                          PopupMenuItem(
+                            value: 'void',
+                            child: Text(tr('void', ref)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              Expanded(child: _InvoiceBody(invoice: inv)),
+            ],
+          );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => mappedErrorState(
@@ -138,7 +134,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
               invoiceId: inv.id,
               total: inv.total,
               type: inv.type,
-              createdBy: ref.read(authStateProvider).valueOrNull?.uid ?? '',
+              createdBy: ref.read(authStateProvider).value?.uid ?? '',
               refundMode: refundMode,
             );
       } catch (e) {
@@ -156,7 +152,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
             .markAsPaid(
               invoiceId: inv.id,
               routeId: inv.routeId,
-              createdBy: ref.read(authStateProvider).valueOrNull?.uid ?? '',
+              createdBy: ref.read(authStateProvider).value?.uid ?? '',
             );
       } catch (e) {
         if (context.mounted) {

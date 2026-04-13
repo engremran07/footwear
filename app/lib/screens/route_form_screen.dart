@@ -39,7 +39,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
 
   void _loadExisting() {
     if (_loaded || !isEdit) return;
-    final detail = ref.read(routeDetailProvider(widget.routeId!)).valueOrNull;
+    final detail = ref.read(routeDetailProvider(widget.routeId!)).value;
     if (detail != null) {
       _nameC.value = TextEditingValue(
         text: detail.name,
@@ -59,7 +59,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
     setState(() => _saving = true);
     bool saved = false;
     try {
-      final user = ref.read(authUserProvider).valueOrNull;
+      final user = ref.read(authUserProvider).value;
       final Map<String, dynamic> data = {
         'name': AppSanitizer.name(_nameC.text),
         'assigned_seller_id': _sellerId,
@@ -100,21 +100,18 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       ref.watch(routeDetailProvider(widget.routeId!));
       _loadExisting();
     }
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     final isAdmin = user?.isAdmin ?? false;
 
     if (!isAdmin) {
-      return Scaffold(
-        appBar: AppBar(title: Text(tr('routes', ref))),
-        body: Center(child: Text(tr('permission_denied', ref))),
-      );
+      return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
 
     // BUG-002 FIX-A: use sellersProvider (role == 'seller') so admins never
     // appear in the route seller dropdown — assigning an admin to a route
     // would incorrectly write assigned_route_id to the admin user doc,
     // breaking their god-mode and Firestore rule admin path.
-    final sellers = ref.watch(sellersProvider).valueOrNull ?? [];
+    final sellers = ref.watch(sellersProvider).value ?? [];
 
     return PopScope(
       canPop: !_isDirty,
@@ -132,9 +129,6 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
-          appBar: AppBar(
-            title: Text(isEdit ? tr('edit_route', ref) : tr('new_route', ref)),
-          ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Form(

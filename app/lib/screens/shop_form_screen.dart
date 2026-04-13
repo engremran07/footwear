@@ -51,7 +51,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
 
   void _loadExisting() {
     if (_loaded || !isEdit) return;
-    final shop = ref.read(shopDetailProvider(widget.shopId!)).valueOrNull;
+    final shop = ref.read(shopDetailProvider(widget.shopId!)).value;
     if (shop != null) {
       _nameC.value = TextEditingValue(
         text: shop.name,
@@ -133,12 +133,12 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       ref.watch(shopDetailProvider(widget.shopId!));
       _loadExisting();
     }
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     final routesAsync = user?.isAdmin == true
         ? ref.watch(routesProvider)
         : ref.watch(routesBySellerProvider(user?.id ?? ''));
     final routesLoading = user != null && routesAsync.isLoading;
-    final allRoutes = routesAsync.valueOrNull ?? [];
+    final allRoutes = routesAsync.value ?? [];
     final routes = user?.isAdmin == true
         ? allRoutes
         : allRoutes.where((r) => r.id == user?.assignedRouteId).toList();
@@ -179,9 +179,6 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
-          appBar: AppBar(
-            title: Text(isEdit ? tr('edit_shop', ref) : tr('new_shop', ref)),
-          ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Form(

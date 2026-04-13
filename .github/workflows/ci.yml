@@ -240,3 +240,46 @@ jobs:
             exit 1
           fi
           echo "✅ No context.go() for form routes"
+
+      - name: Gate 15 — No StateProvider (banned in Riverpod 3)
+        run: |
+          FOUND=$(grep -rn "StateProvider\b" app/lib/ --include="*.dart" || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ StateProvider detected — banned in Riverpod 3. Use NotifierProvider<T,S> instead:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✅ No StateProvider in codebase"
+
+      - name: Gate 16 — Firestore rules and indexes files are present and valid
+        run: |
+          if [ ! -f "firestore.rules" ]; then
+            echo "❌ firestore.rules file missing"
+            exit 1
+          fi
+          if [ ! -f "firestore.indexes.json" ]; then
+            echo "❌ firestore.indexes.json file missing"
+            exit 1
+          fi
+          # Validate indexes JSON is parseable
+          python3 -c "import json,sys; json.load(open('firestore.indexes.json'))" || {
+            echo "❌ firestore.indexes.json is not valid JSON"
+            exit 1
+          }
+          # Assert rules file is non-trivial (>10 lines)
+          LINES=$(wc -l < firestore.rules)
+          if [ "$LINES" -lt 10 ]; then
+            echo "❌ firestore.rules appears truncated (${LINES} lines)"
+            exit 1
+          fi
+          echo "✅ Firestore rules (${LINES} lines) and indexes present and valid"
+
+      - name: Gate 17 — No temp or debug artifacts tracked
+        run: |
+          FOUND=$(git ls-files | grep -E "auth-users\.json|check_locale\.(ps1|py)|debug\.log|\.flag$" || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ Temp/debug artifact is tracked by git — remove and add to .gitignore:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✅ No temp artifacts in tracked files"

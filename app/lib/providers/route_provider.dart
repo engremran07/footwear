@@ -8,7 +8,7 @@ import 'auth_provider.dart';
 final routesProvider = StreamProvider.autoDispose<List<RouteModel>>((ref) {
   // Admin-only unfiltered query: guard so non-admin credentials never
   // subscribe, avoiding PERMISSION_DENIED during auth transitions.
-  final user = ref.watch(authUserProvider).valueOrNull;
+  final user = ref.watch(authUserProvider).value;
   if (user == null || !user.isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.routes)
@@ -24,7 +24,7 @@ final routesProvider = StreamProvider.autoDispose<List<RouteModel>>((ref) {
 
 final routeDetailProvider = StreamProvider.autoDispose
     .family<RouteModel?, String>((ref, id) {
-      final user = ref.watch(authUserProvider).valueOrNull;
+      final user = ref.watch(authUserProvider).value;
       if (user == null) return const Stream.empty();
       if (user.isAdmin) {
         return FirebaseFirestore.instance
@@ -52,7 +52,7 @@ final routeDetailProvider = StreamProvider.autoDispose
 
 final routesBySellerProvider = StreamProvider.autoDispose
     .family<List<RouteModel>, String>((ref, sellerId) {
-      final user = ref.watch(authUserProvider).valueOrNull;
+      final user = ref.watch(authUserProvider).value;
       if (user == null) return const Stream.empty();
       if (!user.isAdmin && user.id != sellerId) return const Stream.empty();
       return FirebaseFirestore.instance

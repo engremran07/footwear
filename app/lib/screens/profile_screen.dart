@@ -31,7 +31,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _saveName() async {
-    final me = ref.read(authUserProvider).valueOrNull;
+    final me = ref.read(authUserProvider).value;
     if (me == null) return;
     final name = AppSanitizer.name(_nameC.text);
     if (name.isEmpty || name == me.displayName) return;
@@ -157,7 +157,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = ref.watch(authUserProvider).valueOrNull;
+    final currentUser = ref.watch(authUserProvider).value;
     final locale = ref.watch(appLocaleProvider);
     final currentTheme = ref.watch(themePreferenceProvider);
 
@@ -184,7 +184,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
-          appBar: AppBar(title: Text(tr('profile_title', ref))),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -252,8 +251,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             .toList(),
                         selected: {locale},
                         onSelectionChanged: (s) =>
-                            ref.read(appLocaleProvider.notifier).state =
-                                s.first,
+                            ref.read(appLocaleProvider.notifier).set(s.first),
                       ),
                     ],
                   ),
@@ -271,22 +269,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
-                      SegmentedButton<ThemeMode>(
+                      SegmentedButton<AppThemeMode>(
                         segments: [
                           ButtonSegment(
-                            value: ThemeMode.system,
+                            value: AppThemeMode.auto,
                             icon: const Icon(Icons.brightness_auto, size: 18),
                             label: Text(tr('profile_theme_auto', ref)),
                           ),
                           ButtonSegment(
-                            value: ThemeMode.light,
+                            value: AppThemeMode.light,
                             icon: const Icon(Icons.light_mode, size: 18),
                             label: Text(tr('profile_theme_light', ref)),
                           ),
                           ButtonSegment(
-                            value: ThemeMode.dark,
+                            value: AppThemeMode.dark,
                             icon: const Icon(Icons.dark_mode, size: 18),
                             label: Text(tr('profile_theme_dark', ref)),
+                          ),
+                          ButtonSegment(
+                            value: AppThemeMode.highContrast,
+                            icon: const Icon(Icons.contrast, size: 18),
+                            label: Text(tr('profile_theme_high_contrast', ref)),
                           ),
                         ],
                         selected: {currentTheme},

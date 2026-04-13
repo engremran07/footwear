@@ -13,13 +13,19 @@ Future<void> shareFile({
   // Try to save to temp first (mobile), fall back to in-memory (web)
   final path = await saveTempFile(bytes, fileName);
   if (path != null) {
-    await Share.shareXFiles([
-      XFile(path, mimeType: mimeType, name: fileName),
-    ], text: text);
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(path, mimeType: mimeType, name: fileName)],
+        text: text,
+      ),
+    );
   } else {
-    await Share.shareXFiles([
-      XFile.fromData(bytes, mimeType: mimeType, name: fileName),
-    ], text: text);
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile.fromData(bytes, mimeType: mimeType, name: fileName)],
+        text: text,
+      ),
+    );
   }
 }
 
@@ -62,5 +68,5 @@ Future<bool> openWhatsApp({
 
 /// Share plain text via the OS share sheet.
 Future<void> shareText(String text) async {
-  await Share.share(text);
+  await SharePlus.instance.share(ShareParams(text: text));
 }

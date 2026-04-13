@@ -3,6 +3,7 @@
 /// These tests verify that critical screens can be instantiated
 /// without throwing, and that the GoRouter auth-guard redirect
 /// produces the expected widget tree under mocked auth state.
+library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

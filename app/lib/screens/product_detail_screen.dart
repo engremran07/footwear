@@ -33,8 +33,8 @@ class ProductDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final productAsync = ref.watch(productDetailProvider(productId));
     final variantsAsync = ref.watch(productVariantsProvider(productId));
-    final user = ref.watch(authUserProvider).valueOrNull;
-    final settings = ref.watch(settingsProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
+    final settings = ref.watch(settingsProvider).value;
     final cs = Theme.of(context).colorScheme;
 
     return productAsync.when(
@@ -49,53 +49,59 @@ class ProductDetailScreen extends ConsumerWidget {
       ),
       data: (product) {
         if (product == null) {
-          return Scaffold(
-            appBar: AppBar(),
-            body: Center(child: Text(tr('not_found', ref))),
-          );
+          return Scaffold(body: Center(child: Text(tr('not_found', ref))));
         }
         return Scaffold(
-          appBar: AppBar(
-            title: Text(product.name),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.share),
-                tooltip: 'Share product info',
-                onPressed: () {
-                  final variants = variantsAsync.valueOrNull ?? [];
-                  final ppc = settings?.pairsPerCarton ?? 12;
-                  final totalStock = variants.fold<int>(
-                    0,
-                    (s, v) => s + v.quantityAvailable,
-                  );
-                  final buf = StringBuffer()
-                    ..writeln(product.name)
-                    ..writeln('${tr('category', ref)}: ${product.category}')
-                    ..writeln(
-                      '${tr('total_variants', ref)}: ${variants.length}',
-                    )
-                    ..writeln(
-                      '${tr('stock_pairs', ref)}: ${_stockLabel(totalStock, ppc)}',
-                    );
-                  for (final v in variants) {
-                    buf.writeln(
-                      '  ${v.variantName}: ${_stockLabel(v.quantityAvailable, ppc)}',
-                    );
-                  }
-                  Share.share(buf.toString());
-                  HapticFeedback.lightImpact();
-                },
-              ),
-              if (user?.isAdmin == true)
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  tooltip: 'Edit product',
-                  onPressed: () => context.push('/products/$productId/edit'),
-                ),
-            ],
-          ),
           body: Column(
             children: [
+              // Action row: share + edit
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 4, top: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.share),
+                      tooltip: 'Share product info',
+                      onPressed: () {
+                        final variants = variantsAsync.value ?? [];
+                        final ppc = settings?.pairsPerCarton ?? 12;
+                        final totalStock = variants.fold<int>(
+                          0,
+                          (s, v) => s + v.quantityAvailable,
+                        );
+                        final buf = StringBuffer()
+                          ..writeln(product.name)
+                          ..writeln(
+                            '${tr('category', ref)}: ${product.category}',
+                          )
+                          ..writeln(
+                            '${tr('total_variants', ref)}: ${variants.length}',
+                          )
+                          ..writeln(
+                            '${tr('stock_pairs', ref)}: ${_stockLabel(totalStock, ppc)}',
+                          );
+                        for (final v in variants) {
+                          buf.writeln(
+                            '  ${v.variantName}: ${_stockLabel(v.quantityAvailable, ppc)}',
+                          );
+                        }
+                        SharePlus.instance.share(
+                          ShareParams(text: buf.toString()),
+                        );
+                        HapticFeedback.lightImpact();
+                      },
+                    ),
+                    if (user?.isAdmin == true)
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        tooltip: 'Edit product',
+                        onPressed: () =>
+                            context.push('/products/$productId/edit'),
+                      ),
+                  ],
+                ),
+              ),
               // Product info card
               Card(
                 margin: const EdgeInsets.all(12),
@@ -111,7 +117,7 @@ class ProductDetailScreen extends ConsumerWidget {
                             width: 80,
                             height: 80,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _productAvatar(cs),
+                            errorBuilder: (_, _, _) => _productAvatar(cs),
                           ),
                         )
                       else

@@ -20,8 +20,8 @@ final alertCountsProvider = Provider<AsyncValue<AlertCounts>>((ref) {
     return const AsyncLoading();
   }
 
-  final shops = shopsAsync.valueOrNull ?? const <ShopModel>[];
-  final variants = variantsAsync.valueOrNull ?? const <ProductVariantModel>[];
+  final shops = shopsAsync.value ?? const <ShopModel>[];
+  final variants = variantsAsync.value ?? const <ProductVariantModel>[];
 
   // Shops with outstanding balance > 0 considered "overdue"
   final overdueCount = shops.where((s) => s.balance > 0).length;

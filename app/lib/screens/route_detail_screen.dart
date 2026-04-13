@@ -22,54 +22,13 @@ class RouteDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final routeAsync = ref.watch(routeDetailProvider(routeId));
     final shopsAsync = ref.watch(shopsByRouteProvider(routeId));
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     final isAdmin = user?.isAdmin ?? false;
     final canAddShop =
         isAdmin || (user?.isSeller == true && user?.assignedRouteId == routeId);
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: routeAsync.when(
-          data: (r) => Text(r?.name ?? tr('route', ref)),
-          loading: () => Text(tr('route', ref)),
-          error: (_, __) => Text(tr('route', ref)),
-        ),
-        actions: [
-          if (isAdmin)
-            IconButton(
-              icon: const Icon(Icons.edit),
-              tooltip: tr('tooltip_edit_route', ref),
-              onPressed: () => context.push('/routes/$routeId/edit'),
-            ),
-          if (isAdmin)
-            IconButton(
-              icon: const Icon(Icons.delete, color: AppBrand.errorColor),
-              tooltip: tr('tooltip_delete_route', ref),
-              onPressed: () async {
-                final ok = await ConfirmDialog.show(
-                  context,
-                  title: tr('delete', ref),
-                  message: tr('confirm_delete_route', ref),
-                );
-                if (ok != true) return;
-                try {
-                  await ref
-                      .read(routeNotifierProvider.notifier)
-                      .delete(routeId);
-                  if (context.mounted) context.go('/routes');
-                } catch (e) {
-                  if (context.mounted) {
-                    final key = AppErrorMapper.key(e);
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(errorSnackBar(tr(key, ref)));
-                  }
-                }
-              },
-            ),
-        ],
-      ),
       body: routeAsync.when(
         data: (route) {
           if (route == null) {
@@ -78,6 +37,48 @@ class RouteDetailScreen extends ConsumerWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (isAdmin)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 4, top: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        tooltip: tr('tooltip_edit_route', ref),
+                        onPressed: () => context.push('/routes/$routeId/edit'),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete,
+                          color: AppBrand.errorColor,
+                        ),
+                        tooltip: tr('tooltip_delete_route', ref),
+                        onPressed: () async {
+                          final ok = await ConfirmDialog.show(
+                            context,
+                            title: tr('delete', ref),
+                            message: tr('confirm_delete_route', ref),
+                          );
+                          if (ok != true) return;
+                          try {
+                            await ref
+                                .read(routeNotifierProvider.notifier)
+                                .delete(routeId);
+                            if (context.mounted) context.go('/routes');
+                          } catch (e) {
+                            if (context.mounted) {
+                              final key = AppErrorMapper.key(e);
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(errorSnackBar(tr(key, ref)));
+                            }
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               // Route info card
               Card(
                 margin: const EdgeInsets.all(16),

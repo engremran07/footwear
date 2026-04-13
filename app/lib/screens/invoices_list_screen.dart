@@ -27,11 +27,10 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
   @override
   Widget build(BuildContext context) {
     final invoicesAsync = ref.watch(roleAwareInvoicesProvider);
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text(tr('invoices', ref))),
       floatingActionButton: (user != null && (user.isSeller || user.isAdmin))
           ? FloatingActionButton.extended(
               onPressed: () => context.go('/invoices/new'),
@@ -50,7 +49,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
           // Invoice summary strip
           invoicesAsync
                   .whenData((inv) => _InvoiceStatsStrip(invoices: inv))
-                  .valueOrNull ??
+                  .value ??
               const SizedBox.shrink(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

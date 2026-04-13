@@ -36,9 +36,8 @@ class ReportsScreen extends ConsumerWidget {
     ref.watch(authUserProvider);
     final stats = ref.watch(dashboardStatsProvider);
     final shopsAsync = ref.watch(shopsProvider);
-    final ppc = ref.watch(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
+    final ppc = ref.watch(settingsProvider).value?.pairsPerCarton ?? 12;
     return Scaffold(
-      appBar: AppBar(title: Text(tr('reports', ref))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -47,7 +46,7 @@ class ReportsScreen extends ConsumerWidget {
             data: (s) {
               // Outstanding always from live shops stream — never from stats cache
               final totalOutstanding =
-                  shopsAsync.valueOrNull?.fold<double>(
+                  shopsAsync.value?.fold<double>(
                     0.0,
                     (acc, sh) => acc + sh.balance,
                   ) ??
@@ -141,17 +140,16 @@ class ReportsScreen extends ConsumerWidget {
   }
 
   void _exportShops(BuildContext context, WidgetRef ref) {
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     if (user == null) {
       _showNoData(context, ref);
       return;
     }
     final routeId = user.assignedRouteId ?? '';
     final shops = user.isAdmin
-        ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
+        ? ref.read(shopsProvider).value ?? <ShopModel>[]
         : (routeId.isNotEmpty
-              ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
-                    <ShopModel>[]
+              ? ref.read(shopsByRouteProvider(routeId)).value ?? <ShopModel>[]
               : <ShopModel>[]);
     if (shops.isEmpty) {
       _showNoData(context, ref);
@@ -186,13 +184,13 @@ class ReportsScreen extends ConsumerWidget {
   }
 
   void _exportInventory(BuildContext context, WidgetRef ref, int ppc) {
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     if (user == null) {
       _showNoData(context, ref);
       return;
     }
     final rows = user.isAdmin
-        ? (ref.read(allVariantsProvider).valueOrNull ?? [])
+        ? (ref.read(allVariantsProvider).value ?? [])
               .map(
                 (v) => [
                   v.variantName,
@@ -200,7 +198,7 @@ class ReportsScreen extends ConsumerWidget {
                 ],
               )
               .toList()
-        : (ref.read(sellerInventoryProvider(user.id)).valueOrNull ?? [])
+        : (ref.read(sellerInventoryProvider(user.id)).value ?? [])
               .map(
                 (v) => [
                   v.variantName,
@@ -223,14 +221,14 @@ class ReportsScreen extends ConsumerWidget {
   }
 
   void _exportTransactions(BuildContext context, WidgetRef ref) {
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     if (user == null) {
       _showNoData(context, ref);
       return;
     }
     final txs = user.isAdmin
-        ? ref.read(allTransactionsProvider).valueOrNull ?? []
-        : ref.read(sellerTransactionsProvider(user.id)).valueOrNull ?? [];
+        ? ref.read(allTransactionsProvider).value ?? []
+        : ref.read(sellerTransactionsProvider(user.id)).value ?? [];
     if (txs.isEmpty) {
       _showNoData(context, ref);
       return;
@@ -262,18 +260,16 @@ class ReportsScreen extends ConsumerWidget {
   }
 
   void _exportOutstanding(BuildContext context, WidgetRef ref) {
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     if (user == null) {
       _showNoData(context, ref);
       return;
     }
     final routeId = user.assignedRouteId ?? '';
     final shops = user.isAdmin
-        ? ref.read(outstandingShopsProvider).valueOrNull ?? <ShopModel>[]
+        ? ref.read(outstandingShopsProvider).value ?? <ShopModel>[]
         : (routeId.isNotEmpty
-              ? ref
-                        .read(outstandingShopsByRouteProvider(routeId))
-                        .valueOrNull ??
+              ? ref.read(outstandingShopsByRouteProvider(routeId)).value ??
                     <ShopModel>[]
               : <ShopModel>[]);
     if (shops.isEmpty) {
@@ -305,17 +301,16 @@ class ReportsScreen extends ConsumerWidget {
   }
 
   void _exportBadDebts(BuildContext context, WidgetRef ref) {
-    final user = ref.read(authUserProvider).valueOrNull;
+    final user = ref.read(authUserProvider).value;
     if (user == null) {
       _showNoData(context, ref);
       return;
     }
     final routeId = user.assignedRouteId ?? '';
     final shops = user.isAdmin
-        ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
+        ? ref.read(shopsProvider).value ?? <ShopModel>[]
         : (routeId.isNotEmpty
-              ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
-                    <ShopModel>[]
+              ? ref.read(shopsByRouteProvider(routeId)).value ?? <ShopModel>[]
               : <ShopModel>[]);
     final badDebtShops = shops.where((s) => s.badDebt).toList();
     if (badDebtShops.isEmpty) {
@@ -404,7 +399,7 @@ class _ExportCard extends StatelessWidget {
 class _MonthlyCashFlowChart extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     final txsAsync = user?.isAdmin == true
         ? ref.watch(allTransactionsProvider)
         : ref.watch(sellerTransactionsProvider(user?.id ?? ''));
@@ -412,7 +407,7 @@ class _MonthlyCashFlowChart extends ConsumerWidget {
 
     return txsAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
       data: (txs) {
         if (txs.isEmpty) return const SizedBox.shrink();
 
@@ -540,7 +535,7 @@ class _MonthlyCashFlowChart extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      barTouchData: BarTouchData(enabled: false),
+                      barTouchData: const BarTouchData(enabled: false),
                     ),
                   ),
                 ),
@@ -585,7 +580,7 @@ class _LegendDot extends StatelessWidget {
 class _OutstandingPieChart extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     final shopsAsync = user?.isAdmin == true
         ? ref.watch(shopsProvider)
         : ref.watch(shopsByRouteProvider(user?.assignedRouteId ?? ''));
@@ -593,7 +588,7 @@ class _OutstandingPieChart extends ConsumerWidget {
 
     return shopsAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
       data: (shops) {
         final withDebt = shops.where((s) => s.balance > 0).toList()
           ..sort((a, b) => b.balance.compareTo(a.balance));
@@ -765,13 +760,12 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
     setState(() => _generating = true);
     try {
       final locale = ref.read(appLocaleProvider);
-      final user = ref.read(authUserProvider).valueOrNull;
+      final user = ref.read(authUserProvider).value;
       final routeId = user?.assignedRouteId ?? '';
       final shops = user?.isAdmin == true
-          ? ref.read(shopsProvider).valueOrNull ?? <ShopModel>[]
+          ? ref.read(shopsProvider).value ?? <ShopModel>[]
           : (routeId.isNotEmpty
-                ? ref.read(shopsByRouteProvider(routeId)).valueOrNull ??
-                      <ShopModel>[]
+                ? ref.read(shopsByRouteProvider(routeId)).value ?? <ShopModel>[]
                 : <ShopModel>[]);
       final shop = shops.firstWhere((s) => s.id == _selectedShopId);
 
@@ -781,7 +775,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
 
       final settings = await ref.read(settingsProvider.future);
       final allUsers = user?.isAdmin == true
-          ? ref.read(allUsersProvider).valueOrNull ?? <UserModel>[]
+          ? ref.read(allUsersProvider).value ?? <UserModel>[]
           : <UserModel>[];
       final entryByMap = <String, String>{
         for (final u in allUsers) u.id: u.displayName,
@@ -843,7 +837,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).value;
     final routeId = user?.assignedRouteId ?? '';
     final AsyncValue<List<ShopModel>> shopsAsync = user?.isAdmin == true
         ? ref.watch(shopsProvider)
@@ -963,13 +957,12 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
     setState(() => _generating = true);
     try {
       final locale = ref.read(appLocaleProvider);
-      final users = ref.read(allUsersProvider).valueOrNull ?? [];
+      final users = ref.read(allUsersProvider).value ?? [];
       final seller = users.firstWhere((u) => u.id == _selectedSellerId);
-      final allTxs = ref.read(allTransactionsProvider).valueOrNull ?? [];
+      final allTxs = ref.read(allTransactionsProvider).value ?? [];
       final inventory =
-          ref.read(sellerInventoryProvider(_selectedSellerId!)).valueOrNull ??
-          [];
-      final allShops = ref.read(shopsProvider).valueOrNull ?? <ShopModel>[];
+          ref.read(sellerInventoryProvider(_selectedSellerId!)).value ?? [];
+      final allShops = ref.read(shopsProvider).value ?? <ShopModel>[];
 
       // Build per-customer summary
       final txsBySeller = allTxs
@@ -1064,7 +1057,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
   @override
   Widget build(BuildContext context) {
     final authAsync = ref.watch(authUserProvider);
-    final user = authAsync.valueOrNull;
+    final user = authAsync.value;
     if (user == null || !user.isAdmin) return const SizedBox.shrink();
 
     final usersAsync = ref.watch(allUsersProvider);

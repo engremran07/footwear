@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 import '../core/constants/app_brand.dart';
+import '../core/utils/error_mapper.dart';
 import '../core/utils/excel_export.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/share_helper.dart';
@@ -86,9 +87,10 @@ class _ExportSheetContent extends StatelessWidget {
   bool get _isRtl => _locale == AppLocale.ar || _locale == AppLocale.ur;
 
   Future<Uint8List?> _buildPdfBytes(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
     if (rows.isEmpty) {
-      messenger.showSnackBar(infoSnackBar(tr('no_data', ref)));
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(infoSnackBar(tr('no_data', ref)));
       return null;
     }
     try {
@@ -101,14 +103,15 @@ class _ExportSheetContent extends StatelessWidget {
               subtitle: subtitle,
               locale: _locale,
             );
-    } catch (_) {
-      messenger.showSnackBar(errorSnackBar(tr('err_unknown', ref)));
+    } catch (e) {
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
       return null;
     }
   }
 
   Future<void> _sharePdf(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
     final bytes = await _buildPdfBytes(context);
     if (bytes == null) return;
     try {
@@ -117,13 +120,15 @@ class _ExportSheetContent extends StatelessWidget {
         fileName: '$fileName.pdf',
         mimeType: 'application/pdf',
       );
-    } catch (_) {
-      messenger.showSnackBar(errorSnackBar(tr('err_unknown', ref)));
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
     }
   }
 
   Future<void> _sharePng(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
     final pdfBytes = await _buildPdfBytes(context);
     if (pdfBytes == null) return;
     try {
@@ -134,13 +139,15 @@ class _ExportSheetContent extends StatelessWidget {
         fileName: '$fileName.png',
         mimeType: 'image/png',
       );
-    } catch (_) {
-      messenger.showSnackBar(errorSnackBar(tr('err_unknown', ref)));
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
     }
   }
 
   Future<void> _printPdf(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
     final bytes = await _buildPdfBytes(context);
     if (bytes == null) return;
     try {
@@ -148,8 +155,11 @@ class _ExportSheetContent extends StatelessWidget {
         name: '$fileName.pdf',
         onLayout: (_) async => Uint8List.fromList(bytes),
       );
-    } catch (_) {
-      messenger.showSnackBar(errorSnackBar(tr('err_unknown', ref)));
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
     }
   }
 
@@ -245,14 +255,21 @@ class _ExportSheetContent extends StatelessWidget {
             sublabel: 'XLSX',
             onTap: () async {
               Navigator.pop(context);
-              final excel = await _buildExcelBytes();
-              if (excel == null) return;
-              await shareFile(
-                bytes: Uint8List.fromList(excel),
-                fileName: '$fileName.xlsx',
-                mimeType:
-                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-              );
+              try {
+                final excel = await _buildExcelBytes();
+                if (excel == null) return;
+                await shareFile(
+                  bytes: Uint8List.fromList(excel),
+                  fileName: '$fileName.xlsx',
+                  mimeType:
+                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.maybeOf(
+                  context,
+                )?.showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
+              }
             },
           ),
         ],

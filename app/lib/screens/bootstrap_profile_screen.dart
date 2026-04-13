@@ -14,7 +14,7 @@ class BootstrapProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authUser = ref.watch(authStateProvider).valueOrNull;
+    final authUser = ref.watch(authStateProvider).value;
     final isLoading = ref.watch(bootstrapNotifierProvider).isLoading;
     final email = (authUser?.email ?? '').trim().toLowerCase();
     final canBootstrap = authUser != null && email.isNotEmpty;

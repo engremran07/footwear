@@ -79,9 +79,17 @@ releases/
 *.apk
 *.aab
 
+# VS Code extension temp artifacts
+.github/java-upgrade/
+
 # Dev utility scripts (local only)
 check_locale.ps1
 check_locale.py
+
+# Installer / build flag files
+installer_done.flag
+*.flag
+build_status.txt
 
 # IDE
 .idea/

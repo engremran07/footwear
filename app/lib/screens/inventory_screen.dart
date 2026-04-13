@@ -164,118 +164,124 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   @override
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
-    final currentUser = ref.watch(authUserProvider).valueOrNull;
+    final currentUser = ref.watch(authUserProvider).value;
     if (currentUser == null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(tr('inventory', ref))),
-        body: const Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final isAdmin = currentUser.isAdmin;
     final warehouseVariants = ref.watch(allVariantsProvider);
     final sellerInventoryAsync = ref.watch(
       sellerInventoryProvider(currentUser.id),
     );
-    final ppc = settingsAsync.valueOrNull?.pairsPerCarton ?? 12;
+    final ppc = settingsAsync.value?.pairsPerCarton ?? 12;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(tr('inventory', ref)),
-        actions: [
-          if (isAdmin)
-            IconButton(
-              icon: const Icon(Icons.history),
-              tooltip: tr('transfer_history', ref),
-              onPressed: () => _showTransferHistory(context),
+      body: Column(
+        children: [
+          // Action row: history (admin only) + export (all roles)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 4, top: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (isAdmin)
+                  IconButton(
+                    icon: const Icon(Icons.history),
+                    tooltip: tr('transfer_history', ref),
+                    onPressed: () => _showTransferHistory(context),
+                  ),
+                settingsAsync.when(
+                  data: (settings) => IconButton(
+                    icon: const Icon(Icons.file_download),
+                    tooltip: tr('inventory_export_tooltip', ref),
+                    onPressed: () {
+                      ExportSheet.show(
+                        context,
+                        ref,
+                        title: tr('inventory_report', ref),
+                        headers: [
+                          tr('lbl_variant_name', ref),
+                          tr('lbl_quantity_available', ref),
+                        ],
+                        rows: (isAdmin && _adminTab == 0)
+                            ? warehouseVariants.value
+                                      ?.map(
+                                        (v) => [
+                                          v.variantName,
+                                          AppFormatters.stock(
+                                            v.quantityAvailable,
+                                            settings.pairsPerCarton,
+                                          ),
+                                        ],
+                                      )
+                                      .toList() ??
+                                  []
+                            : sellerInventoryAsync.value
+                                      ?.map(
+                                        (v) => [
+                                          v.variantName,
+                                          AppFormatters.stock(
+                                            v.quantityAvailable,
+                                            settings.pairsPerCarton,
+                                          ),
+                                        ],
+                                      )
+                                      .toList() ??
+                                  [],
+                        fileName: 'inventory_report',
+                      );
+                    },
+                  ),
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
+                ),
+              ],
             ),
-          settingsAsync.when(
-            data: (settings) => IconButton(
-              icon: const Icon(Icons.file_download),
-              tooltip: tr('inventory_export_tooltip', ref),
-              onPressed: () {
-                final useWarehouse = isAdmin && _adminTab == 0;
-                ExportSheet.show(
-                  context,
-                  ref,
-                  title: tr('inventory_report', ref),
-                  headers: [
-                    tr('lbl_variant_name', ref),
-                    tr('lbl_quantity_available', ref),
-                  ],
-                  rows: useWarehouse
-                      ? warehouseVariants.valueOrNull
-                                ?.map(
-                                  (v) => [
-                                    v.variantName,
-                                    AppFormatters.stock(
-                                      v.quantityAvailable,
-                                      settings.pairsPerCarton,
-                                    ),
-                                  ],
-                                )
-                                .toList() ??
-                            []
-                      : sellerInventoryAsync.valueOrNull
-                                ?.map(
-                                  (v) => [
-                                    v.variantName,
-                                    AppFormatters.stock(
-                                      v.quantityAvailable,
-                                      settings.pairsPerCarton,
-                                    ),
-                                  ],
-                                )
-                                .toList() ??
-                            [],
-                  fileName: 'inventory_report',
-                );
-              },
-            ),
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+          ),
+          Expanded(
+            child: isAdmin
+                ? Column(
+                    children: [
+                      // Warehouse / Personal stock toggle
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        child: SegmentedButton<int>(
+                          segments: [
+                            ButtonSegment(
+                              value: 0,
+                              label: Text(tr('warehouse_stock', ref)),
+                              icon: const Icon(Icons.warehouse),
+                            ),
+                            ButtonSegment(
+                              value: 1,
+                              label: Text(tr('seller_stock', ref)),
+                              icon: const Icon(Icons.person),
+                            ),
+                          ],
+                          selected: {_adminTab},
+                          onSelectionChanged: (v) =>
+                              setState(() => _adminTab = v.first),
+                        ),
+                      ),
+                      Expanded(
+                        child: _adminTab == 0
+                            ? _buildWarehouseList(
+                                warehouseVariants,
+                                ppc,
+                                settingsAsync,
+                              )
+                            : _buildSellerList(
+                                sellerInventoryAsync,
+                                currentUser,
+                                ppc,
+                              ),
+                      ),
+                    ],
+                  )
+                : _buildSellerList(sellerInventoryAsync, currentUser, ppc),
           ),
         ],
       ),
-      body: isAdmin
-          ? Column(
-              children: [
-                // Warehouse / Personal stock toggle
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                  child: SegmentedButton<int>(
-                    segments: [
-                      ButtonSegment(
-                        value: 0,
-                        label: Text(tr('warehouse_stock', ref)),
-                        icon: const Icon(Icons.warehouse),
-                      ),
-                      ButtonSegment(
-                        value: 1,
-                        label: Text(tr('seller_stock', ref)),
-                        icon: const Icon(Icons.person),
-                      ),
-                    ],
-                    selected: {_adminTab},
-                    onSelectionChanged: (v) =>
-                        setState(() => _adminTab = v.first),
-                  ),
-                ),
-                Expanded(
-                  child: _adminTab == 0
-                      ? _buildWarehouseList(
-                          warehouseVariants,
-                          ppc,
-                          settingsAsync,
-                        )
-                      : _buildSellerList(
-                          sellerInventoryAsync,
-                          currentUser,
-                          ppc,
-                        ),
-                ),
-              ],
-            )
-          : _buildSellerList(sellerInventoryAsync, currentUser, ppc),
       floatingActionButton: isAdmin
           ? Column(
               mainAxisSize: MainAxisSize.min,
@@ -545,7 +551,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   );
                   return;
                 }
-                final user = ref.read(authUserProvider).valueOrNull;
+                final user = ref.read(authUserProvider).value;
                 try {
                   await ref
                       .read(sellerInventoryNotifierProvider.notifier)
@@ -597,11 +603,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         maxChildSize: 0.95,
         minChildSize: 0.4,
         builder: (ctx, scrollController) {
-          final ppc =
-              ref.read(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
+          final ppc = ref.read(settingsProvider).value?.pairsPerCarton ?? 12;
           return Consumer(
             builder: (ctx, cRef, _) {
-              final user = cRef.watch(authUserProvider).valueOrNull;
+              final user = cRef.watch(authUserProvider).value;
               final historyAsync = user?.isAdmin == true
                   ? cRef.watch(allInventoryTransactionsProvider)
                   : cRef.watch(
@@ -697,7 +702,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         minChildSize: 0.4,
         builder: (ctx, scrollController) {
           final settingsAsync = ref.read(settingsProvider);
-          final ppc = settingsAsync.valueOrNull?.pairsPerCarton ?? 12;
+          final ppc = settingsAsync.value?.pairsPerCarton ?? 12;
           return Consumer(
             builder: (ctx, cRef, _) {
               final variantsAsync = cRef.watch(allVariantsProvider);
@@ -792,7 +797,7 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
     super.dispose();
   }
 
-  int get _ppc => ref.read(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
+  int get _ppc => ref.read(settingsProvider).value?.pairsPerCarton ?? 12;
 
   int get _total {
     final c = int.tryParse(_cartonsC.text) ?? 0;
@@ -837,12 +842,9 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final products = ref.watch(productsProvider).valueOrNull ?? [];
+    final products = ref.watch(productsProvider).value ?? [];
     final variants = _selectedProduct != null
-        ? ref
-                  .watch(productVariantsProvider(_selectedProduct!.id))
-                  .valueOrNull ??
-              []
+        ? ref.watch(productVariantsProvider(_selectedProduct!.id)).value ?? []
         : <ProductVariantModel>[];
     final ppc = _ppc;
 
@@ -992,7 +994,7 @@ class _TransferToSellerDialogState
     super.dispose();
   }
 
-  int get _ppc => ref.read(settingsProvider).valueOrNull?.pairsPerCarton ?? 12;
+  int get _ppc => ref.read(settingsProvider).value?.pairsPerCarton ?? 12;
 
   int get _total {
     final c = int.tryParse(_cartonsC.text) ?? 0;
@@ -1058,15 +1060,12 @@ class _TransferToSellerDialogState
 
   @override
   Widget build(BuildContext context) {
-    final products = ref.watch(productsProvider).valueOrNull ?? [];
+    final products = ref.watch(productsProvider).value ?? [];
     // Use allUsersProvider so admin can also select themselves as a recipient
     // (admin loads stock into their own vehicle, same as a seller).
-    final sellers = ref.watch(allUsersProvider).valueOrNull ?? [];
+    final sellers = ref.watch(allUsersProvider).value ?? [];
     final variants = _selectedProduct != null
-        ? ref
-                  .watch(productVariantsProvider(_selectedProduct!.id))
-                  .valueOrNull ??
-              []
+        ? ref.watch(productVariantsProvider(_selectedProduct!.id)).value ?? []
         : <ProductVariantModel>[];
     final ppc = _ppc;
 

@@ -15,6 +15,7 @@
 ### Work Performed
 
 **Phase 1 — Root cause audit of uncommitted changes:**
+
 - `git status` revealed 30+ modified files, all uncommitted since v3.4.11+42
 - `flutter analyze` found 1 warning: `shop_form_screen.dart:282` `invalid_null_aware_operator`
 - Root: `routesLoading = user != null && ...` → Dart flow-promotes `user` to non-null
@@ -23,12 +24,14 @@
   re-deployed to ensure alignment: DEPLOY_EXIT:0
 
 **Phase 2 — Hygiene gate verification:**
+
 - Raw `.collection('string')` scan → 0 hits (all use `Collections.*`)
 - Hardcoded `Colors.white/grey/red/black` scan → only shimmer_loading.dart (dark-mode ternary pattern, intentional) and app_shell.dart legacy (pre-existing, not regressed)
 - allTransactionsProvider in `_invalidateRoleScopedProviders` → confirmed present
 - Firestore writes in screens/widgets scan → 0 hits
 
 **Phase 3 — Fix + commit:**
+
 - `shop_form_screen.dart:282`: `user?.isAdmin == true` / `user!.isAdmin` → `user.isAdmin` (flow-promoted)
 - All uncommitted work since v3.4.11+42 committed as: `becdebe Release v3.5.2+45`
   39 files changed, 1818 insertions, 173 deletions
@@ -36,11 +39,13 @@
   AUDIT_REPORT_FOOTWEAR_ERP.md, tests/firestore-rules/, .github/baselines/
 
 **Phase 4 — Rebuild + deploy:**
+
 - `flutter build apk --release` → 75.0MB ✅
 - `firebase deploy --only firestore:rules,firestore:indexes` → DEPLOY_EXIT:0 ✅
 - `firebase deploy --only hosting` → DEPLOY_EXIT:0 ✅
 
 ### Firebase Free Tier (Spark Plan) Status
+
 See AGENTS.md §4 and firebase-free-tier SKILL.md for full limits.
 Daily resets: Firestore reads (50k/day), writes (20k/day), deletes (20k/day).
 Monthly resets: Auth (10k operations/month).
@@ -48,6 +53,7 @@ Storage limit: 1 GB total (this app: 0 bytes — no Firebase Storage used).
 Check live usage: Firebase Console → Build → Firestore → Usage tab.
 
 ### Outcomes
+
 - flutter analyze lib --no-pub: **0 issues** ✅
 - flutter test -r compact: **340/340 passed** ✅
 - flutter build apk --release: **✅ app-release.apk 75.0MB**
@@ -66,6 +72,7 @@ Check live usage: Firebase Console → Build → Firestore → Usage tab.
 ### Work Performed
 
 **Phase 1 — Problems Tab Zero-Violation:**
+
 - `README.md` L171: MD040 — added `text` language to admin auth pipeline fenced code block
 - `README.md` L210: MD032 — added blank line before email verified badge list
 - `MASTER_BLUEPRINT.md` L56: MD040 — added `text` language to financial pipeline code block
@@ -74,25 +81,30 @@ Check live usage: Firebase Console → Build → Firestore → Usage tab.
 - Problems tab confirmed: **0 errors** after all fixes
 
 **Phase 2 — FIND-008 Crashlytics Custom Keys:**
+
 - `auth_provider.dart`: added `firebase_crashlytics` import
 - On sign-in success: `setUserIdentifier(uid)` + `setCustomKey('role', normalizedRole)` + `setCustomKey('app_version', '3.5.1+44')` wrapped in `!kIsWeb` guard
 - On sign-out: `setUserIdentifier('')` + `setCustomKey('role', 'signed_out')` to clear identity
 
 **Phase 3 — CI Gate 12 (FIND-002):**
+
 - Added Gate 12 to `.github/workflows/ci.yml` after Gate 11 (markdown lint)
 - Gate 12 greps `app/lib/` for `TODO|FIXME|HACK` and fails if any are not linked to `RR-/PI-` registry entries
 - CI now has 12 hygiene gates total
 
 **Phase 4 — Documentation:**
+
 - `MASTER_BLUEPRINT.md` §2: Added bootstrap admin risk note (one-time window, production delete danger)
 - `MASTER_BLUEPRINT.md` §8: Updated gate count to 12, added gates 10-12 to list
 - `README.md`: Updated version to v3.5.1+44 with patch description
 
 **Phase 5 — Version Bump + Release:**
+
 - `pubspec.yaml`: `3.5.0+43` → `3.5.1+44`
 - `app_brand.dart`: `appVersion='3.5.1'`, `buildNumber='44'`
 
 ### Outcomes
+
 - flutter analyze lib --no-pub: **0 issues** ✅
 - flutter test -r expanded: **340/340 passed** ✅
 - flutter build apk --release: **✅ app-release.apk 75.0MB**
@@ -111,9 +123,11 @@ Check live usage: Firebase Console → Build → Firestore → Usage tab.
 ### Work Performed
 
 **Phase 1 — Hygiene Gate Verification:**
+
 - All 4 hygiene gates passed: raw collection strings=0, Firestore in screens=0, allTransactionsProvider in auth=1
 
 **Phase 2 — Multi-Agent Concurrent Audit (4 specialized agents):**
+
 - Financial integrity agent: 9/10 — WriteBatch, shop.balance atomic, idempotency key, invoice number Firestore transaction, all guards pass. Only gap: cumulative overpayment not guarded (acceptable at Spark tier)
 - Security agent: P1 critical finding — seller transaction rules (approval-disabled path) over-permissioned `amount`, `type`, `sale_type`, `created_at` for sellers — fraudulent amount/type manipulation possible
 - UI/UX agent: 9/10 — zoom drawer custom AnimationController (flutter_zoom_drawer not needed), WhatsApp AppBar (gradient + aurora + breadcrumb), Arctic bottom nav, 21/21 routes present, role guards verified
@@ -121,16 +135,19 @@ Check live usage: Firebase Console → Build → Firestore → Usage tab.
 - Firebase free-tier agent: 10/10 — no firebase_storage, no Cloud Functions, all streams capped (.limit()), base64 logos in Firestore
 
 **Phase 3 — Security Fix RR-015:**
+
 - `firestore.rules` approval-disabled seller write path restricted to `['description','updated_at','updated_by','edit_request_*']`
 - Removed `amount`, `type`, `sale_type`, `created_at` from allowed field set
 - Provider `updateTransactionNote()` was already correctly restricted — rules now match provider intent
 
 **Phase 4 — Document Update:**
+
 - REGRESSION_REGISTRY.md: added RR-015 (P1-FIXED)
 - AUDIT_REPORT_FOOTWEAR_ERP.md: B8 agent finding updated, fix #22 added, security score 74→80, overall 78→79
 - AGENTS.md §10 audit v13: updated with RR-015 fix and correct 15 RR count
 
 ### Outcomes
+
 - flutter analyze lib --no-pub: clean (0 issues)
 - flutter test -r expanded: 338/338 passed
 - flutter build apk --release: ✅ (in progress)
@@ -148,6 +165,7 @@ Check live usage: Firebase Console → Build → Firestore → Usage tab.
 ### Work Performed
 
 **Phase 1 — Exploration (8 parallel Explore subagents):**
+
 - Confirmed 5 governance docs missing from disk (prior session not committed)
 - Identified 15 `Colors.*` instances across 6 screens
 - Confirmed CI Flutter version 3-way drift (ci.yml + release.yml: 3.22.x vs build-apk.yml + deploy-web.yml: 3.29.x)
@@ -156,6 +174,7 @@ Check live usage: Firebase Console → Build → Firestore → Usage tab.
 - Confirmed 19 providers properly invalidated on sign-out
 
 **Phase 2 — Implementation:**
+
 - Created REGRESSION_REGISTRY.md (RR-001 through RR-014 + PI-001 through PI-006)
 - Created SESSION_LOG.md (this file — sessions 001–008)
 - Created MASTER_BLUEPRINT.md (architecture handoff)
@@ -169,6 +188,7 @@ Check live usage: Firebase Console → Build → Firestore → Usage tab.
 - Updated AGENTS.md §10 audit v13 entry + CLAUDE.md "Done In This Baseline"
 
 ### Outcomes
+
 - flutter analyze lib --no-pub: clean
 - flutter test -r expanded: green
 - flutter build apk --release: ✅
