@@ -361,10 +361,7 @@ class AuthNotifier extends AsyncNotifier<void> {
       await FirebaseFirestore.instance
           .collection(Collections.users)
           .doc(fresh.uid)
-          .update({
-        'email_verified': true,
-        'updated_at': Timestamp.now(),
-      });
+          .update({'email_verified': true, 'updated_at': Timestamp.now()});
     } catch (_) {}
   }
 
