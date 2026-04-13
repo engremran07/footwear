@@ -846,12 +846,6 @@ class _DrawerMenuScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Image.asset(
-                            AppBrand.logoAsset,
-                            height: 46,
-                            fit: BoxFit.contain,
-                          ),
-                          const SizedBox(height: 16),
                           Row(
                             children: [
                               Stack(
