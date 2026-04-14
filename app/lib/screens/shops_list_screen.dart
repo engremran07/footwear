@@ -1056,7 +1056,7 @@ class _ShopTile extends ConsumerWidget {
             ),
           ],
         ),
-        onTap: () => context.go('/shops/${shop.id}'),
+        onTap: () => context.push('/shops/${shop.id}'),
       ),
     );
   }

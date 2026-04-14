@@ -195,7 +195,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 style: TextStyle(fontSize: 12),
               ),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.go('/about'),
+              onTap: () => context.push('/about'),
             ),
             const SizedBox(height: 16),
             // ── Danger Zone ──

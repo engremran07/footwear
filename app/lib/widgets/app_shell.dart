@@ -246,12 +246,18 @@ class _AppShellState extends ConsumerState<AppShell>
         _closeDrawer();
         return;
       }
-      final parent = _parentRoute(currentLocation);
-      if (parent != null) {
-        context.go(parent);
+      // 1. If GoRouter has a pushed route on the stack, pop it naturally
+      if (GoRouter.of(context).canPop()) {
+        context.pop();
         return;
       }
-      // At root: require double-back within 2 seconds (F-03)
+      // 2. If on a non-root top-level tab, go to dashboard
+      if (currentLocation != '/' &&
+          navItems.any((e) => e.route == currentLocation)) {
+        context.go('/');
+        return;
+      }
+      // 3. At root '/': require double-back within 2 seconds (F-03)
       final now = DateTime.now();
       if (_lastBackPress != null &&
           now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
@@ -304,11 +310,21 @@ class _AppShellState extends ConsumerState<AppShell>
     final profileLabel = tr('profile', ref);
     final signOutLabel = tr('sign_out', ref);
     final menuLabel = tr('menu', ref);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: onPopInvoked,
-      child: AnimatedBuilder(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness:
+            _isDrawerOpen && !isDark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness:
+            isDark ? Brightness.light : Brightness.dark,
+      ),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: onPopInvoked,
+        child: AnimatedBuilder(
         animation: _drawerAnim,
         builder: (context, _) {
           final progress = _drawerAnim.value;
@@ -379,6 +395,10 @@ class _AppShellState extends ConsumerState<AppShell>
                               _closeDrawer();
                               return;
                             }
+                            if (GoRouter.of(context).canPop()) {
+                              context.pop();
+                              return;
+                            }
                             final parent = _parentRoute(currentLocation);
                             if (parent != null) context.go(parent);
                           },
@@ -423,10 +443,13 @@ class _AppShellState extends ConsumerState<AppShell>
                                 }
                               } else if (vel > 200) {
                                 if (!isTopLevel) {
-                                  final parent = _parentRoute(currentLocation);
-                                  if (parent != null) {
-                                    HapticFeedback.lightImpact();
-                                    context.go(parent);
+                                  HapticFeedback.lightImpact();
+                                  if (GoRouter.of(context).canPop()) {
+                                    context.pop();
+                                  } else {
+                                    final parent =
+                                        _parentRoute(currentLocation);
+                                    if (parent != null) context.go(parent);
                                   }
                                 } else {
                                   _openDrawer();
@@ -452,10 +475,13 @@ class _AppShellState extends ConsumerState<AppShell>
                                 }
                               } else if (vel < -200) {
                                 if (!isTopLevel) {
-                                  final parent = _parentRoute(currentLocation);
-                                  if (parent != null) {
-                                    HapticFeedback.lightImpact();
-                                    context.go(parent);
+                                  HapticFeedback.lightImpact();
+                                  if (GoRouter.of(context).canPop()) {
+                                    context.pop();
+                                  } else {
+                                    final parent =
+                                        _parentRoute(currentLocation);
+                                    if (parent != null) context.go(parent);
                                   }
                                 } else {
                                   _openDrawer();
@@ -490,6 +516,7 @@ class _AppShellState extends ConsumerState<AppShell>
             ],
           );
         },
+      ),
       ),
     );
   }

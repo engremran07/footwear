@@ -157,7 +157,7 @@ class _RouteTile extends ConsumerWidget {
             ],
           ),
         ),
-        onTap: () => context.go('/routes/${route.id}'),
+        onTap: () => context.push('/routes/${route.id}'),
       ),
     );
   }

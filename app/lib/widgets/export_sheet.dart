@@ -4,14 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 import '../core/constants/app_brand.dart';
+import '../core/utils/download_helper.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/excel_export.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/share_helper.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/l10n/app_locale.dart';
+import '../providers/settings_provider.dart';
 
-/// Shows a bottom sheet with export/share options: XLSX, PDF, Share, Print.
+/// Unified export/share bottom sheet — single centralised path for all formats.
+///
+/// All export logic lives HERE. Callers just pass data + open the sheet.
+/// The sheet handles: loading state, error display, auto-close on success.
 ///
 /// Usage:
 /// ```dart
@@ -65,7 +70,9 @@ class ExportSheet {
   }
 }
 
-class _ExportSheetContent extends StatelessWidget {
+// ─── Sheet content — StatefulWidget for loading / error state ─────────────
+
+class _ExportSheetContent extends StatefulWidget {
   final WidgetRef ref;
   final String title;
   final List<String> headers;
@@ -84,71 +91,107 @@ class _ExportSheetContent extends StatelessWidget {
     this.pdfBytesBuilder,
   });
 
+  @override
+  State<_ExportSheetContent> createState() => _ExportSheetContentState();
+}
+
+class _ExportSheetContentState extends State<_ExportSheetContent> {
+  /// Key of the option tile currently processing, null when idle.
+  String? _activeKey;
+
+  WidgetRef get ref => widget.ref;
   AppLocale get _locale => ref.read(appLocaleProvider);
   bool get _isRtl => _locale == AppLocale.ar || _locale == AppLocale.ur;
 
-  Future<Uint8List?> _buildPdfBytes(BuildContext context) async {
-    if (rows.isEmpty) {
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(infoSnackBar(tr('no_data', ref)));
-      return null;
-    }
+  // ── Centralised execute wrapper ───────────────────────────────────────
+  // Runs [action] with loading indicator on the tapped tile.
+  // Pops the sheet on success; shows error IN the still-open sheet on failure.
+  Future<void> _execute(String key, Future<void> Function() action) async {
+    if (_activeKey != null) return; // debounce while busy
+    setState(() => _activeKey = key);
     try {
-      return pdfBytesBuilder != null
-          ? await pdfBytesBuilder!()
-          : await buildPdfTable(
-              title: title,
-              headers: headers,
-              rows: rows,
-              subtitle: subtitle,
-              locale: _locale,
-            );
+      await action();
+      if (mounted) Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
-      return null;
+      if (!mounted) return;
+      setState(() => _activeKey = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        errorSnackBar(tr(AppErrorMapper.key(e), ref)),
+      );
     }
   }
 
-  Future<void> _sharePdf(BuildContext context) async {
-    final bytes = await _buildPdfBytes(context);
-    if (bytes == null) return;
-    try {
-      await shareFile(
-        bytes: bytes,
-        fileName: '$fileName.pdf',
-        mimeType: 'application/pdf',
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
-    }
+  // ── PDF bytes (lazy build) ────────────────────────────────────────────
+  Future<Uint8List> _buildPdfBytes() async {
+    if (widget.rows.isEmpty) throw Exception('no data');
+    if (widget.pdfBytesBuilder != null) return widget.pdfBytesBuilder!();
+    final logoBytes = ref.read(settingsProvider).value?.logoBytes;
+    return buildPdfTable(
+      title: widget.title,
+      headers: widget.headers,
+      rows: widget.rows,
+      subtitle: widget.subtitle,
+      locale: _locale,
+      logoBytes: logoBytes,
+    );
   }
 
-  Future<void> _sharePng(BuildContext context) async {
-    final pdfBytes = await _buildPdfBytes(context);
-    if (pdfBytes == null) return;
-    try {
-      final firstPage = await Printing.raster(pdfBytes, dpi: 200).first;
-      final rawPng = await firstPage.toPng();
-      // Composite onto white canvas so transparent/dark PDF backgrounds
-      // do not appear black when shared to apps like WhatsApp / Gallery.
-      final pngBytes = await _withWhiteBackground(rawPng);
-      await shareFile(
-        bytes: pngBytes,
-        fileName: '$fileName.png',
-        mimeType: 'image/png',
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
-    }
+  // ── Export actions (each runs inside _execute wrapper) ─────────────────
+
+  Future<void> _sharePdf() async {
+    final bytes = await _buildPdfBytes();
+    await shareFile(
+      bytes: bytes,
+      fileName: '${widget.fileName}.pdf',
+      mimeType: 'application/pdf',
+    );
+  }
+
+  Future<void> _sharePng() async {
+    final pdfBytes = await _buildPdfBytes();
+    final firstPage = await Printing.raster(pdfBytes, dpi: 200).first;
+    final rawPng = await firstPage.toPng();
+    final pngBytes = await _withWhiteBackground(rawPng);
+    await shareFile(
+      bytes: pngBytes,
+      fileName: '${widget.fileName}.png',
+      mimeType: 'image/png',
+    );
+  }
+
+  Future<void> _printPdf() async {
+    final bytes = await _buildPdfBytes();
+    await Printing.layoutPdf(
+      name: '${widget.fileName}.pdf',
+      onLayout: (_) async => Uint8List.fromList(bytes),
+    );
+  }
+
+  Future<void> _downloadExcel() async {
+    final bytes = buildStyledExcelBytes(
+      sheetName: widget.title,
+      headers: widget.headers,
+      rows: widget.rows,
+      isRtl: _isRtl,
+    );
+    if (bytes == null) throw Exception('format');
+    await downloadBytes(bytes, '${widget.fileName}.xlsx');
+  }
+
+  Future<void> _shareExcel() async {
+    final bytes = buildStyledExcelBytes(
+      sheetName: widget.title,
+      headers: widget.headers,
+      rows: widget.rows,
+      isRtl: _isRtl,
+    );
+    if (bytes == null) throw Exception('format');
+    await shareFile(
+      bytes: Uint8List.fromList(bytes),
+      fileName: '${widget.fileName}.xlsx',
+      mimeType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
   }
 
   /// Returns a white-background PNG from the given [pngBytes].
@@ -169,21 +212,7 @@ class _ExportSheetContent extends StatelessWidget {
     return data!.buffer.asUint8List();
   }
 
-  Future<void> _printPdf(BuildContext context) async {
-    final bytes = await _buildPdfBytes(context);
-    if (bytes == null) return;
-    try {
-      await Printing.layoutPdf(
-        name: '$fileName.pdf',
-        onLayout: (_) async => Uint8List.fromList(bytes),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
-    }
-  }
+  // ── UI ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -212,29 +241,22 @@ class _ExportSheetContent extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '${rows.length} ${tr('records', ref)}',
+            '${widget.rows.length} ${tr('records', ref)}',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 24),
 
-          // Option tiles
+          // Option tiles — all go through _execute (no premature pop)
           _OptionTile(
             icon: Icons.table_chart_outlined,
             color: AppBrand.successColor,
             label: tr('download_excel', ref),
             sublabel: 'XLSX',
-            onTap: () {
-              Navigator.pop(context);
-              exportToExcel(
-                fileName: fileName,
-                sheetName: title,
-                headers: headers,
-                rows: rows,
-                isRtl: _isRtl,
-              );
-            },
+            busy: _activeKey == 'excel_dl',
+            enabled: _activeKey == null,
+            onTap: () => _execute('excel_dl', _downloadExcel),
           ),
           const SizedBox(height: 8),
           _OptionTile(
@@ -242,10 +264,9 @@ class _ExportSheetContent extends StatelessWidget {
             color: AppBrand.errorColor,
             label: tr('share_pdf', ref),
             sublabel: 'PDF',
-            onTap: () async {
-              Navigator.pop(context);
-              await _sharePdf(context);
-            },
+            busy: _activeKey == 'pdf',
+            enabled: _activeKey == null,
+            onTap: () => _execute('pdf', _sharePdf),
           ),
           const SizedBox(height: 8),
           _OptionTile(
@@ -253,10 +274,9 @@ class _ExportSheetContent extends StatelessWidget {
             color: AppBrand.warningColor,
             label: tr('share_image', ref),
             sublabel: 'PNG',
-            onTap: () async {
-              Navigator.pop(context);
-              await _sharePng(context);
-            },
+            busy: _activeKey == 'png',
+            enabled: _activeKey == null,
+            onTap: () => _execute('png', _sharePng),
           ),
           const SizedBox(height: 8),
           _OptionTile(
@@ -264,10 +284,9 @@ class _ExportSheetContent extends StatelessWidget {
             color: AppBrand.primaryColor,
             label: tr('print_report', ref),
             sublabel: '',
-            onTap: () async {
-              Navigator.pop(context);
-              await _printPdf(context);
-            },
+            busy: _activeKey == 'print',
+            enabled: _activeKey == null,
+            onTap: () => _execute('print', _printPdf),
           ),
           const SizedBox(height: 8),
           _OptionTile(
@@ -275,39 +294,17 @@ class _ExportSheetContent extends StatelessWidget {
             color: AppBrand.adminRoleColor,
             label: tr('share_excel', ref),
             sublabel: 'XLSX',
-            onTap: () async {
-              Navigator.pop(context);
-              try {
-                final excel = await _buildExcelBytes();
-                if (excel == null) return;
-                await shareFile(
-                  bytes: Uint8List.fromList(excel),
-                  fileName: '$fileName.xlsx',
-                  mimeType:
-                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                );
-              } catch (e) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.maybeOf(
-                  context,
-                )?.showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
-              }
-            },
+            busy: _activeKey == 'excel_share',
+            enabled: _activeKey == null,
+            onTap: () => _execute('excel_share', _shareExcel),
           ),
         ],
       ),
     );
   }
-
-  Future<List<int>?> _buildExcelBytes() async {
-    return buildStyledExcelBytes(
-      sheetName: title,
-      headers: headers,
-      rows: rows,
-      isRtl: _isRtl,
-    );
-  }
 }
+
+// ─── Option tile with loading / disabled support ────────────────────────────
 
 class _OptionTile extends StatelessWidget {
   final IconData icon;
@@ -315,6 +312,8 @@ class _OptionTile extends StatelessWidget {
   final String label;
   final String sublabel;
   final VoidCallback onTap;
+  final bool busy;
+  final bool enabled;
 
   const _OptionTile({
     required this.icon,
@@ -322,16 +321,21 @@ class _OptionTile extends StatelessWidget {
     required this.label,
     required this.sublabel,
     required this.onTap,
+    this.busy = false,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final effectiveColor = enabled || busy
+        ? color
+        : color.withValues(alpha: 0.4);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: enabled && !busy ? onTap : null,
         borderRadius: BorderRadius.circular(12),
         child: Ink(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -347,11 +351,20 @@ class _OptionTile extends StatelessWidget {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: theme.brightness == Brightness.dark
-                      ? color.withValues(alpha: 0.22)
-                      : color.withValues(alpha: 0.1),
+                      ? effectiveColor.withValues(alpha: 0.22)
+                      : effectiveColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: color, size: 22),
+                child: busy
+                    ? SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: effectiveColor,
+                        ),
+                      )
+                    : Icon(icon, color: effectiveColor, size: 22),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -370,8 +383,8 @@ class _OptionTile extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: theme.brightness == Brightness.dark
-                        ? color.withValues(alpha: 0.22)
-                        : color.withValues(alpha: 0.1),
+                        ? effectiveColor.withValues(alpha: 0.22)
+                        : effectiveColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -379,15 +392,29 @@ class _OptionTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: color,
+                      color: effectiveColor,
                     ),
                   ),
                 ),
               const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              if (busy)
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                )
+              else
+                Icon(
+                  Icons.chevron_right,
+                  color: enabled
+                      ? theme.colorScheme.onSurfaceVariant
+                      : theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.3,
+                        ),
+                ),
             ],
           ),
         ),

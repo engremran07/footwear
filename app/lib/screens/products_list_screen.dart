@@ -85,7 +85,7 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                           ),
                           subtitle: Text(p.category),
                           trailing: const Icon(Icons.chevron_right, size: 20),
-                          onTap: () => context.go('/products/${p.id}'),
+                          onTap: () => context.push('/products/${p.id}'),
                         ),
                       ).listEntry(i);
                     },

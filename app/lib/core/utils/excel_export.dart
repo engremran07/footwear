@@ -22,42 +22,38 @@ List<int>? buildStyledExcelBytes({
   required List<List<dynamic>> rows,
   bool isRtl = false,
 }) {
-  try {
-    final safe = _safeSheetName(sheetName);
-    final files = {
-      '[Content_Types].xml': _contentTypes(),
-      '_rels/.rels': _rootRels(),
-      'xl/workbook.xml': _workbook(safe),
-      'xl/_rels/workbook.xml.rels': _workbookRels(),
-      'xl/styles.xml': _styles(isRtl),
-      'xl/worksheets/sheet1.xml': _worksheet(headers, rows, isRtl),
-    };
-    final archive = Archive();
-    for (final e in files.entries) {
-      archive.addFile(ArchiveFile.string(e.key, e.value));
-    }
-    return ZipEncoder().encode(archive);
-  } catch (_) {
-    return null;
+  final safe = _safeSheetName(sheetName);
+  final files = {
+    '[Content_Types].xml': _contentTypes(),
+    '_rels/.rels': _rootRels(),
+    'xl/workbook.xml': _workbook(safe),
+    'xl/_rels/workbook.xml.rels': _workbookRels(),
+    'xl/styles.xml': _styles(isRtl),
+    'xl/worksheets/sheet1.xml': _worksheet(headers, rows, isRtl),
+  };
+  final archive = Archive();
+  for (final e in files.entries) {
+    archive.addFile(ArchiveFile.string(e.key, e.value));
   }
+  return ZipEncoder().encode(archive);
 }
 
 /// Builds a styled workbook and triggers a file download / save to device.
-void exportToExcel({
+Future<void> exportToExcel({
   required String fileName,
   required String sheetName,
   required List<String> headers,
   required List<List<dynamic>> rows,
   bool isRtl = false,
-}) {
+}) async {
   final bytes = buildStyledExcelBytes(
     sheetName: sheetName,
     headers: headers,
     rows: rows,
     isRtl: isRtl,
   );
-  if (bytes == null) return;
-  downloadBytes(bytes, '$fileName.xlsx');
+  if (bytes == null) throw Exception('format');
+  await downloadBytes(bytes, '$fileName.xlsx');
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────

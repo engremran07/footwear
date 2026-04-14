@@ -98,7 +98,7 @@ class DashboardScreen extends ConsumerWidget {
                           ? null
                           : () {
                               Navigator.pop(sheetContext);
-                              context.go('/shops/${tx.shopId}');
+                              context.push('/shops/${tx.shopId}');
                             },
                     );
                   },
@@ -545,7 +545,7 @@ class _RouteAnalyticsSection extends ConsumerWidget {
                     fontSize: 13,
                   ),
                 ),
-                onTap: () => context.go('/routes/${row.route.id}'),
+                onTap: () => context.push('/routes/${row.route.id}'),
               ),
             ),
           ],
@@ -695,7 +695,7 @@ class _AdminSpeedDial extends ConsumerWidget {
         FloatingActionButton.small(
           heroTag: 'fab_invoice',
           tooltip: tr('dashboard_new_invoice', ref),
-          onPressed: () => context.go('/invoices/new'),
+          onPressed: () => context.push('/invoices/new'),
           child: const Icon(Icons.receipt_long),
         ),
         const SizedBox(height: AppTokens.s8),

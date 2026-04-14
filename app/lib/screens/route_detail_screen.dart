@@ -271,7 +271,7 @@ class RouteDetailScreen extends ConsumerWidget {
                                     : AppTheme.clearFg(cs),
                               ),
                             ),
-                            onTap: () => context.go('/shops/${shop.id}'),
+                            onTap: () => context.push('/shops/${shop.id}'),
                           ),
                         );
                       },

@@ -33,7 +33,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
     return Scaffold(
       floatingActionButton: (user != null && (user.isSeller || user.isAdmin))
           ? FloatingActionButton.extended(
-              onPressed: () => context.go('/invoices/new'),
+              onPressed: () => context.push('/invoices/new'),
               backgroundColor: AppBrand.primaryColor,
               foregroundColor: AppBrand.onPrimary,
               icon: const Icon(Icons.add),
@@ -170,7 +170,7 @@ class _InvoiceTile extends ConsumerWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        onTap: () => context.go('/invoices/${invoice.id}'),
+        onTap: () => context.push('/invoices/${invoice.id}'),
         leading: CircleAvatar(
           backgroundColor: invoice.isSale
               ? AppTheme.debtBg(cs)

@@ -139,7 +139,7 @@ class ReportsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _exportShops(BuildContext context, WidgetRef ref) async {
+  void _exportShops(BuildContext context, WidgetRef ref) {
     final user = ref.read(authUserProvider).value;
     if (user == null) {
       _showNoData(context, ref);
@@ -176,39 +176,21 @@ class ReportsScreen extends ConsumerWidget {
           ],
         )
         .toList();
-    final locale = ref.read(appLocaleProvider);
-    final logoBytes = ref.read(settingsProvider).value?.logoBytes;
-    try {
-      final bytes = await buildPdfTable(
-        title: title,
-        headers: headers,
-        rows: rows,
-        locale: locale,
-        logoBytes: logoBytes,
-      );
-      if (!context.mounted) return;
-      ExportSheet.show(
-        context,
-        ref,
-        title: title,
-        headers: headers,
-        rows: rows,
-        fileName: 'shops_report',
-        pdfBytesBuilder: () async => bytes,
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
-    }
+    ExportSheet.show(
+      context,
+      ref,
+      title: title,
+      headers: headers,
+      rows: rows,
+      fileName: 'shops_report',
+    );
   }
 
-  Future<void> _exportInventory(
+  void _exportInventory(
     BuildContext context,
     WidgetRef ref,
     int ppc,
-  ) async {
+  ) {
     final user = ref.read(authUserProvider).value;
     if (user == null) {
       _showNoData(context, ref);
@@ -237,35 +219,17 @@ class ReportsScreen extends ConsumerWidget {
     }
     final title = tr('inventory_report', ref);
     final headers = [tr('variant_name', ref), tr('stock_pairs', ref)];
-    final locale = ref.read(appLocaleProvider);
-    final logoBytes = ref.read(settingsProvider).value?.logoBytes;
-    try {
-      final bytes = await buildPdfTable(
-        title: title,
-        headers: headers,
-        rows: rows,
-        locale: locale,
-        logoBytes: logoBytes,
-      );
-      if (!context.mounted) return;
-      ExportSheet.show(
-        context,
-        ref,
-        title: title,
-        headers: headers,
-        rows: rows,
-        fileName: 'inventory_report',
-        pdfBytesBuilder: () async => bytes,
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
-    }
+    ExportSheet.show(
+      context,
+      ref,
+      title: title,
+      headers: headers,
+      rows: rows,
+      fileName: 'inventory_report',
+    );
   }
 
-  Future<void> _exportTransactions(BuildContext context, WidgetRef ref) async {
+  void _exportTransactions(BuildContext context, WidgetRef ref) {
     final user = ref.read(authUserProvider).value;
     if (user == null) {
       _showNoData(context, ref);
@@ -297,35 +261,17 @@ class ReportsScreen extends ConsumerWidget {
           ],
         )
         .toList();
-    final locale = ref.read(appLocaleProvider);
-    final logoBytes = ref.read(settingsProvider).value?.logoBytes;
-    try {
-      final bytes = await buildPdfTable(
-        title: title,
-        headers: headers,
-        rows: rows,
-        locale: locale,
-        logoBytes: logoBytes,
-      );
-      if (!context.mounted) return;
-      ExportSheet.show(
-        context,
-        ref,
-        title: title,
-        headers: headers,
-        rows: rows,
-        fileName: 'transactions_report',
-        pdfBytesBuilder: () async => bytes,
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
-    }
+    ExportSheet.show(
+      context,
+      ref,
+      title: title,
+      headers: headers,
+      rows: rows,
+      fileName: 'transactions_report',
+    );
   }
 
-  Future<void> _exportOutstanding(BuildContext context, WidgetRef ref) async {
+  void _exportOutstanding(BuildContext context, WidgetRef ref) {
     final user = ref.read(authUserProvider).value;
     if (user == null) {
       _showNoData(context, ref);
@@ -359,35 +305,17 @@ class ReportsScreen extends ConsumerWidget {
           ],
         )
         .toList();
-    final locale = ref.read(appLocaleProvider);
-    final logoBytes = ref.read(settingsProvider).value?.logoBytes;
-    try {
-      final bytes = await buildPdfTable(
-        title: title,
-        headers: headers,
-        rows: rows,
-        locale: locale,
-        logoBytes: logoBytes,
-      );
-      if (!context.mounted) return;
-      ExportSheet.show(
-        context,
-        ref,
-        title: title,
-        headers: headers,
-        rows: rows,
-        fileName: 'outstanding_report',
-        pdfBytesBuilder: () async => bytes,
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
-    }
+    ExportSheet.show(
+      context,
+      ref,
+      title: title,
+      headers: headers,
+      rows: rows,
+      fileName: 'outstanding_report',
+    );
   }
 
-  Future<void> _exportBadDebts(BuildContext context, WidgetRef ref) async {
+  void _exportBadDebts(BuildContext context, WidgetRef ref) {
     final user = ref.read(authUserProvider).value;
     if (user == null) {
       _showNoData(context, ref);
@@ -421,32 +349,14 @@ class ReportsScreen extends ConsumerWidget {
           ],
         )
         .toList();
-    final locale = ref.read(appLocaleProvider);
-    final logoBytes = ref.read(settingsProvider).value?.logoBytes;
-    try {
-      final bytes = await buildPdfTable(
-        title: title,
-        headers: headers,
-        rows: rows,
-        locale: locale,
-        logoBytes: logoBytes,
-      );
-      if (!context.mounted) return;
-      ExportSheet.show(
-        context,
-        ref,
-        title: title,
-        headers: headers,
-        rows: rows,
-        fileName: 'bad_debts_report',
-        pdfBytesBuilder: () async => bytes,
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
-    }
+    ExportSheet.show(
+      context,
+      ref,
+      title: title,
+      headers: headers,
+      rows: rows,
+      fileName: 'bad_debts_report',
+    );
   }
 }
 
@@ -477,30 +387,15 @@ class _Row extends StatelessWidget {
   }
 }
 
-class _ExportCard extends StatefulWidget {
+class _ExportCard extends StatelessWidget {
   final IconData icon;
   final String title;
-  final Future<void> Function() onExport;
+  final VoidCallback onExport;
   const _ExportCard({
     required this.icon,
     required this.title,
     required this.onExport,
   });
-  @override
-  State<_ExportCard> createState() => _ExportCardState();
-}
-
-class _ExportCardState extends State<_ExportCard> {
-  bool _loading = false;
-
-  Future<void> _run() async {
-    setState(() => _loading = true);
-    try {
-      await widget.onExport();
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -508,21 +403,15 @@ class _ExportCardState extends State<_ExportCard> {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: Icon(
-          widget.icon,
+          icon,
           color: Theme.of(context).colorScheme.primary,
         ),
         title: Text(
-          widget.title,
+          title,
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-        trailing: _loading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.download),
-        onTap: _loading ? null : _run,
+        trailing: const Icon(Icons.download),
+        onTap: onExport,
       ),
     );
   }
@@ -919,22 +808,9 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       // Reconcile opening balance so the final running balance equals
       // the stored customer.balance regardless of transaction-count limits.
       final netTx = txs.fold<double>(0.0, (s, t) => s + t.balanceImpact);
+      final labels = _labels(ref);
+      final openingBalance = shop.balance - netTx;
 
-      final bytes = await buildPdfLedger(
-        shopName: shop.name,
-        companyName: settings.companyName,
-        generatedBy: user?.displayName ?? '',
-        openingBalance: shop.balance - netTx,
-        transactions: txs,
-        entryByMap: entryByMap,
-        showEntryBy: true,
-        dateFrom: txs.isNotEmpty ? txs.first.createdAt.toDate() : null,
-        dateTo: txs.isNotEmpty ? txs.last.createdAt.toDate() : null,
-        labels: _labels(ref),
-        locale: locale,
-        currency: settings.currency,
-        logoBytes: settings.logoBytes,
-      );
       if (!mounted) return;
       ExportSheet.show(
         context,
@@ -957,7 +833,21 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
             )
             .toList(),
         fileName: 'account_statement_${shop.name.replaceAll(' ', '_')}',
-        pdfBytesBuilder: () async => bytes,
+        pdfBytesBuilder: () => buildPdfLedger(
+          shopName: shop.name,
+          companyName: settings.companyName,
+          generatedBy: user?.displayName ?? '',
+          openingBalance: openingBalance,
+          transactions: txs,
+          entryByMap: entryByMap,
+          showEntryBy: true,
+          dateFrom: txs.isNotEmpty ? txs.first.createdAt.toDate() : null,
+          dateTo: txs.isNotEmpty ? txs.last.createdAt.toDate() : null,
+          labels: labels,
+          locale: locale,
+          currency: settings.currency,
+          logoBytes: settings.logoBytes,
+        ),
       );
     } catch (e) {
       if (mounted) {
@@ -1142,18 +1032,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       final stockRemaining = (stockReceived - stockSold).clamp(0, 999999);
 
       final settings = await ref.read(settingsProvider.future);
-      final bytes = await buildPdfSellerReport(
-        sellerName: seller.displayName,
-        sellerPhone: seller.phone ?? '',
-        routeName: seller.assignedRouteId ?? '',
-        customers: customerMap.values.toList(),
-        stockReceived: stockReceived,
-        stockSold: stockSold,
-        stockRemaining: stockRemaining,
-        labels: _labels(ref),
-        locale: locale,
-        logoBytes: settings.logoBytes,
-      );
+      final labels = _labels(ref);
       if (!mounted) return;
       ExportSheet.show(
         context,
@@ -1176,7 +1055,18 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
             )
             .toList(),
         fileName: 'seller_report_${seller.displayName.replaceAll(' ', '_')}',
-        pdfBytesBuilder: () async => bytes,
+        pdfBytesBuilder: () => buildPdfSellerReport(
+          sellerName: seller.displayName,
+          sellerPhone: seller.phone ?? '',
+          routeName: seller.assignedRouteId ?? '',
+          customers: customerMap.values.toList(),
+          stockReceived: stockReceived,
+          stockSold: stockSold,
+          stockRemaining: stockRemaining,
+          labels: labels,
+          locale: locale,
+          logoBytes: settings.logoBytes,
+        ),
       );
     } catch (e) {
       if (mounted) {

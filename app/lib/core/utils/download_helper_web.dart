@@ -2,7 +2,7 @@ import 'dart:js_interop';
 import 'dart:typed_data';
 import 'package:web/web.dart' as web;
 
-void downloadBytes(List<int> bytes, String fileName) {
+Future<void> downloadBytes(List<int> bytes, String fileName) async {
   final data = Uint8List.fromList(bytes);
   final blob = web.Blob(
     [data.toJS].toJS,
