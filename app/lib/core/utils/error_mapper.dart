@@ -64,6 +64,12 @@ class AppErrorMapper {
     }
     if (msg.contains('timeout')) return 'err_timeout';
     if (msg.contains('format')) return 'err_invalid_data';
+    if (msg.contains('no data') || msg.contains('no records')) {
+      return 'err_export_no_data';
+    }
+    if (msg.contains('pdf') || msg.contains('export failed')) {
+      return 'err_pdf_failed';
+    }
 
     return 'err_unknown';
   }

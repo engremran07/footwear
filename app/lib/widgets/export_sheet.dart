@@ -1,5 +1,5 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
@@ -112,28 +112,34 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
     try {
       await action();
       if (mounted) Navigator.pop(context);
-    } catch (e) {
+    } catch (e, stack) {
       if (!mounted) return;
+      debugPrint('[ExportSheet] $key failed: $e\n$stack');
       setState(() => _activeKey = null);
-      ScaffoldMessenger.of(context).showSnackBar(
-        errorSnackBar(tr(AppErrorMapper.key(e), ref)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
     }
   }
 
   // ── PDF bytes (lazy build) ────────────────────────────────────────────
   Future<Uint8List> _buildPdfBytes() async {
-    if (widget.rows.isEmpty) throw Exception('no data');
+    if (widget.rows.isEmpty) throw Exception('no data to export');
     if (widget.pdfBytesBuilder != null) return widget.pdfBytesBuilder!();
     final logoBytes = ref.read(settingsProvider).value?.logoBytes;
-    return buildPdfTable(
-      title: widget.title,
-      headers: widget.headers,
-      rows: widget.rows,
-      subtitle: widget.subtitle,
-      locale: _locale,
-      logoBytes: logoBytes,
-    );
+    try {
+      return await buildPdfTable(
+        title: widget.title,
+        headers: widget.headers,
+        rows: widget.rows,
+        subtitle: widget.subtitle,
+        locale: _locale,
+        logoBytes: logoBytes,
+      );
+    } catch (e, stack) {
+      debugPrint('[ExportSheet] PDF build failed: $e\n$stack');
+      throw Exception('pdf export failed');
+    }
   }
 
   // ── Export actions (each runs inside _execute wrapper) ─────────────────

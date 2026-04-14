@@ -143,6 +143,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_whatsapp_unavailable': 'Could not open WhatsApp',
     'whatsapp_greeting': 'Hello',
     'err_invalid_data': 'Invalid data format. Please check your input.',
+    'err_export_no_data': 'No data to export. Apply different filters or add records first.',
+    'err_pdf_failed': 'PDF generation failed. Try Excel export instead.',
     'err_unknown': 'Something went wrong. Please try again.',
     'err_function_not_deployed':
         'Feature requires server setup — contact admin.',
@@ -1288,6 +1290,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_whatsapp_unavailable': 'تعذّر فتح واتساب',
     'whatsapp_greeting': 'مرحباً',
     'err_invalid_data': 'تنسيق البيانات غير صحيح. تحقق من المدخلات.',
+    'err_export_no_data': 'لا توجد بيانات للتصدير. جرّب فلاتر مختلفة أو أضف سجلات أولاً.',
+    'err_pdf_failed': 'فشل إنشاء PDF. جرّب تصدير Excel بدلاً من ذلك.',
     'err_unknown': 'حدث خطأ ما. حاول مرة أخرى.',
     'err_function_not_deployed':
         'هذه الميزة تتطلب إعداد الخادم — تواصل مع المسؤول.',
@@ -2421,6 +2425,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_whatsapp_unavailable': 'واٹس ایپ نہیں کھلا',
     'whatsapp_greeting': 'السلام علیکم',
     'err_invalid_data': 'ڈیٹا فارمیٹ غلط ہے۔ اپنی ان پٹ چیک کریں۔',
+    'err_export_no_data': 'ایکسپورٹ کے لیے کوئی ڈیٹا نہیں۔ مختلف فلٹرز آزمائیں یا پہلے ریکارڈز شامل کریں۔',
+    'err_pdf_failed': 'PDF بنانے میں ناکامی۔ اس کی بجائے Excel استعمال کریں۔',
     'err_unknown': 'کچھ غلط ہو گیا۔ دوبارہ کوشش کریں۔',
     'err_function_not_deployed':
         'اس فیچر کے لیے سرور سیٹ اپ درکار ہے — ایڈمن سے رابطہ کریں۔',
