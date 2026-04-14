@@ -1518,3 +1518,771 @@ Future<Uint8List> generateInvoicePdf({
     return pdf.save();
   }); // Isolate.run
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Multi-Shop Ledger  (one PDF, each shop its own section)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A single shop entry for [buildPdfMultiShopLedger].
+class MultiShopLedgerSection {
+  final String shopName;
+
+  /// Human-readable route label, e.g. "1 · North Route".
+  final String routeLabel;
+
+  /// Pre-computed opening balance (= shop.balance − net of [transactions]).
+  final double openingBalance;
+
+  final List<TransactionModel> transactions;
+
+  const MultiShopLedgerSection({
+    required this.shopName,
+    required this.routeLabel,
+    required this.openingBalance,
+    required this.transactions,
+  });
+}
+
+/// Fixed-width table cell used on the cover index page.
+pw.Widget _coverCell(
+  String text,
+  double width,
+  pw.TextDirection dir,
+  pw.Font primaryFont,
+  List<pw.Font> ff, {
+  bool isHeader = false,
+  PdfColor? color,
+  bool isBold = false,
+}) {
+  return pw.Container(
+    width: width,
+    padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+    decoration: pw.BoxDecoration(
+      border: pw.Border(
+        right: pw.BorderSide(
+          color: isHeader ? PdfColors.blue300 : PdfColors.grey300,
+          width: 0.5,
+        ),
+      ),
+    ),
+    child: pw.Text(
+      text,
+      style: pw.TextStyle(
+        fontSize: 8,
+        fontWeight: (isHeader || isBold)
+            ? pw.FontWeight.bold
+            : pw.FontWeight.normal,
+        color: isHeader ? PdfColors.white : (color ?? PdfColors.black),
+        font: primaryFont,
+        fontFallback: ff,
+      ),
+      textDirection: dir,
+      overflow: pw.TextOverflow.clip,
+    ),
+  );
+}
+
+/// Builds a multi-shop CA-grade account-statement PDF.
+///
+/// Structure:
+/// 1. Cover page(s) — company header + grand summary + shop index table.
+/// 2. Shop sections — each shop mirrors the single-shop [buildPdfLedger]
+///    style with a route banner printed whenever the route changes.
+Future<Uint8List> buildPdfMultiShopLedger({
+  required String title,
+  required String subtitle,
+  required String companyName,
+  required String generatedBy,
+  required List<MultiShopLedgerSection> sections,
+  required Map<String, String> labels,
+  AppLocale locale = AppLocale.en,
+  Uint8List? logoBytes,
+  String currency = 'SAR',
+  bool showEntryBy = false,
+  Map<String, String> entryByMap = const {},
+}) async {
+  await _ensureFontBytes();
+  final aB = _arabicFontBytes!, uB = _urduFontBytes!;
+  return Isolate.run(() {
+    final fonts = _fontsFromBytes(aB, uB);
+    final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
+    final primaryFont = locale == AppLocale.ur ? fonts.urdu : fonts.arabic;
+    final ff = locale == AppLocale.ur
+        ? <pw.Font>[fonts.arabic]
+        : <pw.Font>[fonts.urdu];
+    final dir = isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr;
+    final align = isRtl
+        ? pw.CrossAxisAlignment.end
+        : pw.CrossAxisAlignment.start;
+    final currencyStr = locale == AppLocale.ar
+        ? 'ريال'
+        : locale == AppLocale.ur
+        ? 'ریال'
+        : currency;
+
+    pw.TextStyle ts({
+      double size = 9,
+      pw.FontWeight fw = pw.FontWeight.normal,
+      PdfColor color = PdfColors.black,
+    }) => pw.TextStyle(
+      fontSize: size,
+      fontWeight: fw,
+      color: color,
+      font: primaryFont,
+      fontFallback: ff,
+    );
+
+    final pdf = _buildDocument(primaryFont, ff);
+    final now = DateTime.now();
+
+    // ── Ledger column widths (portrait A4 usable ≈ 539 pt) ──────────────────
+    const double dateW = 54;
+    const double entryByW = 68;
+    const double amtW = 72;
+    const double balW = 76;
+    const double usable = 539.0;
+    final double remarkW = showEntryBy
+        ? usable - dateW - entryByW - amtW - amtW - balW
+        : usable - dateW - amtW - amtW - balW;
+    final colWidths = showEntryBy
+        ? [dateW, remarkW, entryByW, amtW, amtW, balW]
+        : [dateW, remarkW, amtW, amtW, balW];
+    final headerLabels = showEntryBy
+        ? [
+            labels['date'] ?? 'Date',
+            labels['description'] ?? 'Remark',
+            labels['entry_by'] ?? 'Entry By',
+            labels['debit'] ?? 'Debit',
+            labels['credit'] ?? 'Credit',
+            labels['running_balance'] ?? 'Balance',
+          ]
+        : [
+            labels['date'] ?? 'Date',
+            labels['description'] ?? 'Remark',
+            labels['debit'] ?? 'Debit',
+            labels['credit'] ?? 'Credit',
+            labels['running_balance'] ?? 'Balance',
+          ];
+    final colCount = colWidths.length;
+
+    // ── Cover table column widths ────────────────────────────────────────────
+    const double cnW = 200.0;
+    const double crW = 120.0;
+    const double caW = 73.0;
+    const double cbW = usable - cnW - crW - caW - caW;
+
+    // ── Pre-compute per-section totals ───────────────────────────────────────
+    final sectionFinals = <double>[];
+    final sectionTotalIn = <double>[];
+    final sectionTotalOut = <double>[];
+    for (final sec in sections) {
+      var bal = sec.openingBalance;
+      var tIn = 0.0;
+      var tOut = 0.0;
+      for (final tx in sec.transactions) {
+        if (tx.isCashOut) {
+          bal += tx.amount;
+          tOut += tx.amount;
+        } else {
+          bal -= tx.amount;
+          tIn += tx.amount;
+        }
+      }
+      sectionFinals.add(bal);
+      sectionTotalIn.add(tIn);
+      sectionTotalOut.add(tOut);
+    }
+    final grandBalance = sectionFinals.fold(0.0, (s, b) => s + b);
+    final totalShops = sections.length;
+
+    // ── Cover page(s) ────────────────────────────────────────────────────────
+    const coverRowsPerPage = 28;
+    final coverPageCount = totalShops == 0
+        ? 1
+        : ((totalShops / coverRowsPerPage).ceil());
+
+    for (var cp = 0; cp < coverPageCount; cp++) {
+      final isFirstCover = cp == 0;
+      final sl = cp * coverRowsPerPage;
+      final sl2 = (sl + coverRowsPerPage).clamp(0, totalShops);
+      final pageRows = sections.sublist(sl, sl2);
+      final pageIdxBase = sl;
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          textDirection: dir,
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: align,
+            children: [
+              if (isFirstCover) ...[
+                pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Row(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        if (logoBytes != null) ...[
+                          pw.Image(
+                            pw.MemoryImage(logoBytes),
+                            height: 36,
+                            fit: pw.BoxFit.contain,
+                          ),
+                          pw.SizedBox(width: 8),
+                        ],
+                        pw.Column(
+                          crossAxisAlignment: align,
+                          children: [
+                            pw.Text(
+                              _s(companyName),
+                              style: ts(size: 16, fw: pw.FontWeight.bold),
+                              textDirection: _cellDir(companyName, dir),
+                            ),
+                            pw.Text(
+                              _s(title),
+                              style: ts(
+                                size: 11,
+                                fw: pw.FontWeight.bold,
+                                color: PdfColors.blue800,
+                              ),
+                              textDirection: dir,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text(
+                          '${labels['report_date'] ?? 'Generated'}: ${_fmtDate(now)}',
+                          style: ts(size: 8, color: PdfColors.grey700),
+                          textDirection: dir,
+                        ),
+                        if (generatedBy.isNotEmpty)
+                          pw.Text(
+                            '${labels['generated_by'] ?? 'By'}: ${_s(generatedBy)}',
+                            style: ts(size: 8, color: PdfColors.grey700),
+                            textDirection: dir,
+                          ),
+                        if (subtitle.isNotEmpty)
+                          pw.Text(
+                            _s(subtitle),
+                            style: ts(size: 8, color: PdfColors.grey500),
+                            textDirection: dir,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.Divider(thickness: 1.5, color: PdfColors.blue800),
+                pw.SizedBox(height: 4),
+                pw.Container(
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.blue100, width: 0.5),
+                    borderRadius: pw.BorderRadius.circular(4),
+                  ),
+                  child: pw.Row(
+                    children: [
+                      _summaryCell(
+                        label: labels['total_entries'] ?? 'Total Shops',
+                        value: '$totalShops',
+                        color: PdfColors.blue800,
+                        primaryFont: primaryFont,
+                        ff: ff,
+                      ),
+                      pw.Container(
+                        width: 0.5,
+                        height: 40,
+                        color: PdfColors.blue100,
+                      ),
+                      _summaryCell(
+                        label: labels['net_payable'] ?? 'Total Outstanding',
+                        value: _fmtAmtC(grandBalance.abs(), currencyStr),
+                        color: grandBalance >= 0
+                            ? PdfColors.red800
+                            : PdfColors.green800,
+                        primaryFont: primaryFont,
+                        ff: ff,
+                        isBold: true,
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 8),
+              ],
+              // Cover index table header
+              pw.Container(
+                decoration: const pw.BoxDecoration(color: PdfColors.blue800),
+                child: pw.Row(
+                  children: [
+                    _coverCell(
+                      labels['name'] ?? 'Shop',
+                      cnW,
+                      dir,
+                      primaryFont,
+                      ff,
+                      isHeader: true,
+                    ),
+                    _coverCell(
+                      labels['route'] ?? 'Route',
+                      crW,
+                      dir,
+                      primaryFont,
+                      ff,
+                      isHeader: true,
+                    ),
+                    _coverCell(
+                      labels['debit'] ?? 'Debit',
+                      caW,
+                      dir,
+                      primaryFont,
+                      ff,
+                      isHeader: true,
+                    ),
+                    _coverCell(
+                      labels['credit'] ?? 'Credit',
+                      caW,
+                      dir,
+                      primaryFont,
+                      ff,
+                      isHeader: true,
+                    ),
+                    _coverCell(
+                      labels['running_balance'] ?? 'Balance',
+                      cbW,
+                      dir,
+                      primaryFont,
+                      ff,
+                      isHeader: true,
+                    ),
+                  ],
+                ),
+              ),
+              // Cover index table rows
+              ...pageRows.asMap().entries.map((e) {
+                final gi = pageIdxBase + e.key;
+                final sec = e.value;
+                final finalBal = sectionFinals[gi];
+                final tIn = sectionTotalIn[gi];
+                final tOut = sectionTotalOut[gi];
+                final bg = e.key % 2 == 0 ? PdfColors.white : PdfColors.grey50;
+                return pw.Container(
+                  decoration: pw.BoxDecoration(
+                    color: bg,
+                    border: const pw.Border(
+                      bottom: pw.BorderSide(
+                        color: PdfColors.grey200,
+                        width: 0.5,
+                      ),
+                    ),
+                  ),
+                  child: pw.Row(
+                    children: [
+                      _coverCell(
+                        _s(sec.shopName),
+                        cnW,
+                        _cellDir(sec.shopName, dir),
+                        primaryFont,
+                        ff,
+                      ),
+                      _coverCell(
+                        _s(sec.routeLabel),
+                        crW,
+                        _cellDir(sec.routeLabel, dir),
+                        primaryFont,
+                        ff,
+                      ),
+                      _coverCell(
+                        _fmtAmtC(tOut, currencyStr),
+                        caW,
+                        _amountDir,
+                        primaryFont,
+                        ff,
+                        color: tOut > 0 ? PdfColors.red800 : null,
+                      ),
+                      _coverCell(
+                        _fmtAmtC(tIn, currencyStr),
+                        caW,
+                        _amountDir,
+                        primaryFont,
+                        ff,
+                        color: tIn > 0 ? PdfColors.green800 : null,
+                      ),
+                      _coverCell(
+                        _fmtAmtC(finalBal, currencyStr),
+                        cbW,
+                        _amountDir,
+                        primaryFont,
+                        ff,
+                        color: finalBal >= 0
+                            ? PdfColors.red800
+                            : PdfColors.green800,
+                        isBold: true,
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              pw.Spacer(),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(
+                  '${labels['page'] ?? 'Page'} ${cp + 1} / $coverPageCount',
+                  style: ts(size: 7, color: PdfColors.grey500),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ── Per-shop section pages ───────────────────────────────────────────────
+    String? lastRouteLabel;
+    for (var si = 0; si < sections.length; si++) {
+      final sec = sections[si];
+      final routeChanged = sec.routeLabel != lastRouteLabel;
+      final finalBal = sectionFinals[si];
+      final tIn = sectionTotalIn[si];
+      final tOut = sectionTotalOut[si];
+
+      // Build ledger rows for this shop
+      var balance = sec.openingBalance;
+      final sortedTx = [...sec.transactions]
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      final entryCount = sortedTx.length;
+      final rows = <_LedgerRow>[];
+
+      if (sec.openingBalance != 0) {
+        rows.add(
+          _LedgerRow(
+            date: '',
+            desc: labels['opening_balance'] ?? 'Opening Balance',
+            entryBy: '',
+            mode: '',
+            cashIn: 0,
+            cashOut: 0,
+            balance: sec.openingBalance,
+          ),
+        );
+      }
+
+      for (final tx in sortedTx) {
+        final date = tx.createdAt.toDate();
+        final rawDesc = tx.description?.isNotEmpty == true
+            ? _s(tx.description!)
+            : (tx.hasItems
+                  ? tx.items.map((i) => _s(i.productName)).join(', ')
+                  : '');
+        final desc = tx.invoiceNumber != null && tx.invoiceNumber!.isNotEmpty
+            ? '[${_s(tx.invoiceNumber!)}] $rawDesc'
+            : rawDesc;
+        final entryBy = showEntryBy
+            ? (entryByMap[tx.createdBy] ?? tx.createdBy)
+            : '';
+        final mode = tx.saleType ?? '';
+        if (tx.isCashOut) {
+          balance += tx.amount;
+          rows.add(
+            _LedgerRow(
+              date: _fmtDate(date),
+              desc: desc,
+              entryBy: entryBy,
+              mode: mode,
+              cashIn: 0,
+              cashOut: tx.amount,
+              balance: balance,
+            ),
+          );
+        } else {
+          balance -= tx.amount;
+          rows.add(
+            _LedgerRow(
+              date: _fmtDate(date),
+              desc: desc,
+              entryBy: entryBy,
+              mode: mode,
+              cashIn: tx.amount,
+              cashOut: 0,
+              balance: balance,
+            ),
+          );
+        }
+      }
+
+      const rowsPerPage = 25;
+      final shopPageCount = rows.isEmpty
+          ? 1
+          : ((rows.length / rowsPerPage).ceil());
+
+      for (var page = 0; page < shopPageCount; page++) {
+        final isFirstPage = page == 0;
+        final isLastPage = page == shopPageCount - 1;
+        final rowStart = page * rowsPerPage;
+        final pageDataRows = rows.skip(rowStart).take(rowsPerPage).toList();
+        final showRouteBanner = isFirstPage && routeChanged;
+        // Capture in local vars for closure safety
+        final capturedRoute = sec.routeLabel;
+        final capturedShop = sec.shopName;
+
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+            textDirection: dir,
+            build: (ctx) => pw.Column(
+              crossAxisAlignment: align,
+              children: [
+                if (isFirstPage) ...[
+                  if (showRouteBanner)
+                    pw.Container(
+                      width: double.infinity,
+                      margin: const pw.EdgeInsets.only(bottom: 6),
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.indigo800,
+                        borderRadius: pw.BorderRadius.circular(4),
+                      ),
+                      child: pw.Text(
+                        _s(capturedRoute),
+                        style: ts(
+                          size: 10,
+                          fw: pw.FontWeight.bold,
+                          color: PdfColors.white,
+                        ),
+                        textDirection: _cellDir(capturedRoute, dir),
+                      ),
+                    ),
+                  pw.Container(
+                    width: double.infinity,
+                    margin: const pw.EdgeInsets.only(bottom: 4),
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.blue50,
+                      border: pw.Border(
+                        left: pw.BorderSide(color: PdfColors.blue800, width: 3),
+                      ),
+                    ),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text(
+                          _s(capturedShop),
+                          style: ts(size: 12, fw: pw.FontWeight.bold),
+                          textDirection: _cellDir(capturedShop, dir),
+                        ),
+                        pw.Text(
+                          '${labels['report_date'] ?? 'Date'}: ${_fmtDate(now)}'
+                          '  |  ${labels['generated_by'] ?? 'By'}: ${_s(generatedBy)}',
+                          style: ts(size: 7, color: PdfColors.grey700),
+                          textDirection: dir,
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.Container(
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(
+                        color: PdfColors.blue100,
+                        width: 0.5,
+                      ),
+                      borderRadius: pw.BorderRadius.circular(4),
+                    ),
+                    child: pw.Row(
+                      children: [
+                        _summaryCell(
+                          label: labels['cash_in'] ?? 'Cash In',
+                          value: _fmtAmtC(tIn, currencyStr),
+                          color: PdfColors.green800,
+                          primaryFont: primaryFont,
+                          ff: ff,
+                        ),
+                        pw.Container(
+                          width: 0.5,
+                          height: 40,
+                          color: PdfColors.blue100,
+                        ),
+                        _summaryCell(
+                          label: labels['cash_out'] ?? 'Cash Out',
+                          value: _fmtAmtC(tOut, currencyStr),
+                          color: PdfColors.red800,
+                          primaryFont: primaryFont,
+                          ff: ff,
+                        ),
+                        pw.Container(
+                          width: 0.5,
+                          height: 40,
+                          color: PdfColors.blue100,
+                        ),
+                        _summaryCell(
+                          label: labels['net_payable'] ?? 'Balance',
+                          value: _fmtAmtC(finalBal.abs(), currencyStr),
+                          color: finalBal >= 0
+                              ? PdfColors.red800
+                              : PdfColors.green800,
+                          primaryFont: primaryFont,
+                          ff: ff,
+                          isBold: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    '${labels['total_entries'] ?? 'Total entries'}: $entryCount',
+                    style: ts(size: 8, color: PdfColors.grey600),
+                    textDirection: dir,
+                  ),
+                  pw.SizedBox(height: 6),
+                  _buildLedgerHeaderRow(
+                    headerLabels,
+                    colWidths,
+                    colCount,
+                    dir,
+                    primaryFont,
+                    ff,
+                  ),
+                ],
+                if (!isFirstPage) ...[
+                  pw.Container(
+                    width: double.infinity,
+                    margin: const pw.EdgeInsets.only(bottom: 4),
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: const pw.BoxDecoration(color: PdfColors.blue50),
+                    child: pw.Text(
+                      '${_s(capturedShop)} (cont.)',
+                      style: ts(size: 9, fw: pw.FontWeight.bold),
+                      textDirection: _cellDir(capturedShop, dir),
+                    ),
+                  ),
+                  _buildLedgerHeaderRow(
+                    headerLabels,
+                    colWidths,
+                    colCount,
+                    dir,
+                    primaryFont,
+                    ff,
+                  ),
+                ],
+                ...pageDataRows.asMap().entries.map((e) {
+                  final bg = e.key % 2 == 0
+                      ? PdfColors.white
+                      : PdfColors.grey50;
+                  return _buildLedgerDataRow(
+                    e.value,
+                    colWidths,
+                    colCount,
+                    bg,
+                    dir,
+                    primaryFont,
+                    ff,
+                    showEntryBy,
+                    currencyStr,
+                  );
+                }),
+                if (isLastPage)
+                  pw.Container(
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.blue50,
+                      border: pw.Border(
+                        left: pw.BorderSide(
+                          color: PdfColors.grey400,
+                          width: 0.5,
+                        ),
+                        right: pw.BorderSide(
+                          color: PdfColors.grey400,
+                          width: 0.5,
+                        ),
+                        bottom: pw.BorderSide(
+                          color: PdfColors.grey400,
+                          width: 0.5,
+                        ),
+                      ),
+                    ),
+                    child: pw.Row(
+                      children: [
+                        pw.Container(
+                          width: colWidths
+                              .take(colCount - 1)
+                              .fold<double>(0, (a, b) => a + b),
+                          padding: const pw.EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 5,
+                          ),
+                          decoration: const pw.BoxDecoration(
+                            border: pw.Border(
+                              right: pw.BorderSide(
+                                color: PdfColors.grey400,
+                                width: 0.5,
+                              ),
+                            ),
+                          ),
+                          child: pw.Text(
+                            labels['net_payable'] ?? 'Final Balance',
+                            style: pw.TextStyle(
+                              fontSize: 9,
+                              fontWeight: pw.FontWeight.bold,
+                              color: PdfColors.blue800,
+                              font: primaryFont,
+                              fontFallback: ff,
+                            ),
+                            textDirection: dir,
+                          ),
+                        ),
+                        pw.Container(
+                          width: colWidths.last,
+                          padding: const pw.EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 5,
+                          ),
+                          child: pw.Text(
+                            _fmtAmtC(finalBal, currencyStr),
+                            style: pw.TextStyle(
+                              fontSize: 9,
+                              fontWeight: pw.FontWeight.bold,
+                              color: finalBal >= 0
+                                  ? PdfColors.red800
+                                  : PdfColors.green800,
+                              font: primaryFont,
+                              fontFallback: ff,
+                            ),
+                            textDirection: _amountDir,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                pw.Spacer(),
+                pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+                pw.Align(
+                  alignment: pw.Alignment.centerRight,
+                  child: pw.Text(
+                    '${_s(capturedShop)} — ${labels['page'] ?? 'Page'} ${page + 1} / $shopPageCount',
+                    style: ts(size: 7, color: PdfColors.grey500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      lastRouteLabel = sec.routeLabel;
+    }
+
+    return pdf.save();
+  }); // Isolate.run
+}

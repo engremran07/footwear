@@ -492,7 +492,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       final user = ref.read(authUserProvider).value;
       final sorted = await _loadFullTransactions();
       final allUsers = user?.isAdmin == true
-          ? ref.read(allUsersProvider).value ?? <UserModel>[]
+          ? await ref.read(allUsersProvider.future)
           : <UserModel>[];
       final entryByMap = <String, String>{
         for (final u in allUsers) u.id: u.displayName,
@@ -714,20 +714,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
         return Scaffold(
           body: Column(
             children: [
-              // Shop header: name + actions menu
+              // Actions menu — shop name is shown in AppBar breadcrumb
               Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 4, 4),
+                padding: const EdgeInsetsDirectional.only(end: 4),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: Text(
-                        shop.name,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
+                    const Spacer(),
                     PopupMenuButton<_ShopAction>(
                       icon: const Icon(Icons.more_vert),
                       onSelected: (action) async {
@@ -814,8 +806,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                 );
                                 final user = ref.read(authUserProvider).value;
                                 final allUsers = user?.isAdmin == true
-                                    ? ref.read(allUsersProvider).value ??
-                                          <UserModel>[]
+                                    ? await ref.read(allUsersProvider.future)
                                     : <UserModel>[];
                                 final entryByMap = <String, String>{
                                   for (final u in allUsers) u.id: u.displayName,
@@ -925,30 +916,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
-                      // Route + contact bar
+                      // Contact bar
                       Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: balanceBgColor,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: balanceColor.withAlpha(80),
-                              ),
-                            ),
-                            child: Text(
-                              '${shop.routeNumber}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: balanceColor,
-                              ),
-                            ),
-                          ),
                           if (shop.phone != null) ...[
                             const SizedBox(width: 8),
                             Icon(
@@ -1069,15 +1039,6 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                           fontWeight: FontWeight.bold,
                                           color: balanceColor,
                                         ),
-                                  ),
-                                  Text(
-                                    shop.balance > 0
-                                        ? tr('outstanding', ref)
-                                        : tr('clear', ref),
-                                    style: TextStyle(
-                                      color: balanceColor,
-                                      fontSize: 11,
-                                    ),
                                   ),
                                 ],
                               ),

@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
@@ -133,7 +134,10 @@ class _ExportSheetContent extends StatelessWidget {
     if (pdfBytes == null) return;
     try {
       final firstPage = await Printing.raster(pdfBytes, dpi: 200).first;
-      final pngBytes = await firstPage.toPng();
+      final rawPng = await firstPage.toPng();
+      // Composite onto white canvas so transparent/dark PDF backgrounds
+      // do not appear black when shared to apps like WhatsApp / Gallery.
+      final pngBytes = await _withWhiteBackground(rawPng);
       await shareFile(
         bytes: pngBytes,
         fileName: '$fileName.png',
@@ -145,6 +149,24 @@ class _ExportSheetContent extends StatelessWidget {
         context,
       )?.showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
     }
+  }
+
+  /// Returns a white-background PNG from the given [pngBytes].
+  Future<Uint8List> _withWhiteBackground(Uint8List pngBytes) async {
+    final codec = await ui.instantiateImageCodec(pngBytes);
+    final frame = await codec.getNextFrame();
+    final src = frame.image;
+    final recorder = ui.PictureRecorder();
+    final canvas = ui.Canvas(
+      recorder,
+      Rect.fromLTWH(0, 0, src.width.toDouble(), src.height.toDouble()),
+    );
+    canvas.drawColor(Colors.white, ui.BlendMode.src);
+    canvas.drawImage(src, Offset.zero, Paint());
+    final picture = recorder.endRecording();
+    final result = await picture.toImage(src.width, src.height);
+    final data = await result.toByteData(format: ui.ImageByteFormat.png);
+    return data!.buffer.asUint8List();
   }
 
   Future<void> _printPdf(BuildContext context) async {

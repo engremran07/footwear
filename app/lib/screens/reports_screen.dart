@@ -775,7 +775,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
 
       final settings = await ref.read(settingsProvider.future);
       final allUsers = user?.isAdmin == true
-          ? ref.read(allUsersProvider).value ?? <UserModel>[]
+          ? await ref.read(allUsersProvider.future)
           : <UserModel>[];
       final entryByMap = <String, String>{
         for (final u in allUsers) u.id: u.displayName,

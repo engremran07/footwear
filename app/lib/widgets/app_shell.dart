@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/network_provider.dart';
+import '../providers/shop_provider.dart';
 import '../models/user_model.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
@@ -1306,17 +1307,34 @@ class _BreadcrumbTitle extends ConsumerWidget {
 
   String _buildCrumb(WidgetRef ref) {
     final segments = location.split('/').where((s) => s.isNotEmpty).toList();
+
+    // For leaf entity detail pages (e.g. /shops/{id}): show only the entity
+    // name — no parent prefix — to maximise AppBar space.
+    if (segments.length == 2 && !_segmentKeys.contains(segments[1])) {
+      final entityName = _lookupEntityName(ref, segments[0], segments[1]);
+      if (entityName != null) return entityName;
+    }
+
     final labels = <String>[];
     for (int i = 0; i < segments.length; i++) {
       final seg = segments[i];
       if (_segmentKeys.contains(seg)) {
         labels.add(tr(seg, ref));
       } else if (i > 0 && _segmentKeys.contains(segments[i - 1])) {
-        // BUG-10: ID segment after a known parent → show 'details' label
-        labels.add(tr('details', ref));
+        // ID segment after a known parent — try to look up entity name.
+        final entityName = _lookupEntityName(ref, segments[i - 1], seg);
+        labels.add(entityName ?? tr('details', ref));
       }
     }
     return labels.isEmpty ? AppBrand.appName : labels.join(' \u203a ');
+  }
+
+  /// Returns the display name for a known entity type, or null if unknown.
+  String? _lookupEntityName(WidgetRef ref, String parent, String id) {
+    if (parent == 'shops') {
+      return ref.watch(shopDetailProvider(id)).value?.name;
+    }
+    return null;
   }
 
   @override

@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:printing/printing.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
+import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/pdf_export.dart';
+import '../core/utils/snack_helper.dart';
 import '../models/route_model.dart';
 import '../models/shop_model.dart';
 import '../models/transaction_model.dart';
+import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
+import '../providers/settings_provider.dart';
 import '../providers/shop_provider.dart';
 import '../providers/transaction_provider.dart';
+import '../providers/user_provider.dart';
 import '../widgets/app_pull_refresh.dart';
 import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
@@ -135,12 +142,18 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     return Scaffold(
       body: Column(
         children: [
-          // Export action row
+          // Export action row + search bar (combined)
           Padding(
-            padding: const EdgeInsetsDirectional.only(end: 4, top: 4),
+            padding: const EdgeInsets.fromLTRB(0, 4, 4, 0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                Expanded(
+                  child: AppSearchBar(
+                    hintText: tr('search', ref),
+                    onChanged: (v) =>
+                        setState(() => _search = _normalizeSearchText(v)),
+                  ),
+                ),
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.file_download_outlined),
                   tooltip: tr('export_report', ref),
@@ -152,6 +165,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                       _exportAllShops(shops, routes);
                     } else if (value == 'per_route') {
                       _exportPerRoute(shops, routes);
+                    } else if (value == 'pdf_ledger') {
+                      _showPdfExportDialog(shops, routes);
                     }
                   },
                   itemBuilder: (_) => [
@@ -176,14 +191,20 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                           ],
                         ),
                       ),
+                    PopupMenuItem(
+                      value: 'pdf_ledger',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.picture_as_pdf, size: 20),
+                          const SizedBox(width: 8),
+                          Text(tr('export_pdf_ledger', ref)),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ],
             ),
-          ),
-          AppSearchBar(
-            hintText: tr('search', ref),
-            onChanged: (v) => setState(() => _search = _normalizeSearchText(v)),
           ),
           // Route filter dropdown — admin only
           if (user?.isAdmin == true && routesAsync != null)
@@ -447,6 +468,226 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       rows: allRows,
       fileName: 'shops_per_route',
     );
+  }
+
+  // ── PDF Ledger export ───────────────────────────────────────────────────
+
+  void _showPdfExportDialog(List<ShopModel> shops, List<RouteModel> routes) {
+    String? selectedRouteId;
+    final sorted = List.of(routes)
+      ..sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text(tr('export_pdf_ledger', ref)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('route', ref), style: Theme.of(ctx).textTheme.bodySmall),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String?>(
+                initialValue: selectedRouteId,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.route, size: 20),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  isDense: true,
+                ),
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(tr('all_routes', ref)),
+                  ),
+                  ...sorted.map(
+                    (r) => DropdownMenuItem<String?>(
+                      value: r.id,
+                      child: Text('${r.routeNumber} · ${r.name}'),
+                    ),
+                  ),
+                ],
+                onChanged: (v) => setState(() => selectedRouteId = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(tr('cancel', ref)),
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.picture_as_pdf, size: 18),
+              label: Text(tr('confirm', ref)),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _generateMultiShopPdf(shops, routes, selectedRouteId);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _generateMultiShopPdf(
+    List<ShopModel> allShops,
+    List<RouteModel> routes,
+    String? routeId,
+  ) async {
+    // Show progress indicator
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16),
+            Expanded(child: Text(tr('generating_report', ref))),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final locale = ref.read(appLocaleProvider);
+      final settings = await ref.read(settingsProvider.future);
+      final user = ref.read(authUserProvider).value;
+
+      // Fetch transactions
+      final List<TransactionModel> txList;
+      if (routeId != null) {
+        txList = await ref.read(
+          routeTransactionsExportProvider(routeId).future,
+        );
+      } else {
+        txList = await ref.read(allTransactionsExportProvider.future);
+      }
+
+      // Build entryByMap
+      final allUsers = user?.isAdmin == true
+          ? await ref.read(allUsersProvider.future)
+          : <UserModel>[];
+      final entryByMap = <String, String>{
+        for (final u in allUsers) u.id: u.displayName,
+      };
+      if (user != null) entryByMap[user.id] = user.displayName;
+
+      // Group transactions by shopId for fast lookup
+      final txByShop = <String, List<TransactionModel>>{};
+      for (final tx in txList) {
+        txByShop.putIfAbsent(tx.shopId, () => []).add(tx);
+      }
+
+      // Filter and sort shops
+      final scopedShops = routeId != null
+          ? allShops.where((s) => s.routeId == routeId).toList()
+          : List.of(allShops);
+
+      final routeMap = {for (final r in routes) r.id: r};
+      final sortedRoutes = List.of(routes)
+        ..sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
+
+      // Build sections: routes in order, shops alphabetically within each route
+      final sections = <MultiShopLedgerSection>[];
+      for (final route in sortedRoutes) {
+        if (routeId != null && route.id != routeId) continue;
+        final routeShops =
+            scopedShops.where((s) => s.routeId == route.id).toList()
+              ..sort((a, b) => a.name.compareTo(b.name));
+        for (final shop in routeShops) {
+          final shopTxs = txByShop[shop.id] ?? [];
+          final netTx = shopTxs.fold<double>(
+            0.0,
+            (s, t) => s + t.balanceImpact,
+          );
+          sections.add(
+            MultiShopLedgerSection(
+              shopName: shop.name,
+              routeLabel: '${route.routeNumber} · ${route.name}',
+              openingBalance: shop.balance - netTx,
+              transactions: shopTxs,
+            ),
+          );
+        }
+      }
+
+      // Include shops with no route match
+      final assignedIds = routeMap.keys.toSet();
+      final unrouted =
+          scopedShops.where((s) => !assignedIds.contains(s.routeId)).toList()
+            ..sort((a, b) => a.name.compareTo(b.name));
+      for (final shop in unrouted) {
+        final shopTxs = txByShop[shop.id] ?? [];
+        final netTx = shopTxs.fold<double>(0.0, (s, t) => s + t.balanceImpact);
+        sections.add(
+          MultiShopLedgerSection(
+            shopName: shop.name,
+            routeLabel: tr('shops_unassigned', ref),
+            openingBalance: shop.balance - netTx,
+            transactions: shopTxs,
+          ),
+        );
+      }
+
+      final routeName = routeId != null
+          ? '${routeMap[routeId]?.routeNumber ?? ''} · ${routeMap[routeId]?.name ?? ''}'
+          : tr('all_routes', ref);
+
+      final labels = {
+        'date': tr('date', ref),
+        'description': tr('description', ref),
+        'debit': tr('debit', ref),
+        'credit': tr('credit', ref),
+        'running_balance': tr('running_balance', ref),
+        'account_statement': tr('account_statement', ref),
+        'opening_balance': tr('opening_balance', ref),
+        'net_payable': tr('net_payable', ref),
+        'page': tr('page', ref),
+        'report_date': tr('report_date', ref),
+        'cash_in': tr('cash_in', ref),
+        'cash_out': tr('cash_out', ref),
+        'total_entries': tr('total_entries', ref),
+        'generated_by': tr('generated_by', ref),
+        'entry_by': tr('entry_by', ref),
+        'name': tr('name', ref),
+        'route': tr('route', ref),
+        'all_routes': tr('all_routes', ref),
+      };
+
+      final bytes = await buildPdfMultiShopLedger(
+        title: routeName,
+        subtitle: tr('export_pdf_ledger', ref),
+        companyName: settings.companyName,
+        generatedBy: user?.displayName ?? '',
+        sections: sections,
+        labels: labels,
+        locale: locale,
+        logoBytes: settings.logoBytes,
+        currency: settings.currency,
+        showEntryBy: user?.isAdmin == true,
+        entryByMap: entryByMap,
+      );
+
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+
+      final safeName = routeName.replaceAll(RegExp(r'[^\w]'), '_');
+      await Printing.sharePdf(bytes: bytes, filename: 'ledger_$safeName.pdf');
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        final key = AppErrorMapper.key(e);
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
+      }
+    }
   }
 }
 

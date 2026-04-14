@@ -168,6 +168,33 @@ final shopTransactionsExportProvider = FutureProvider.autoDispose
           .toList();
     });
 
+/// All transactions for a specific route — used by multi-shop PDF export.
+final routeTransactionsExportProvider = FutureProvider.autoDispose
+    .family<List<TransactionModel>, String>((ref, routeId) async {
+      final normalizedId = routeId.trim();
+      if (normalizedId.isEmpty) return const <TransactionModel>[];
+      final snap = await FirebaseFirestore.instance
+          .collection(Collections.transactions)
+          .where('route_id', isEqualTo: normalizedId)
+          .get();
+      return snap.docs
+          .where((d) => d.data()['deleted'] != true)
+          .map((d) => TransactionModel.fromJson(d.data(), d.id))
+          .toList();
+    });
+
+/// All transactions across all routes — admin-only bulk export.
+final allTransactionsExportProvider =
+    FutureProvider.autoDispose<List<TransactionModel>>((ref) async {
+      final snap = await FirebaseFirestore.instance
+          .collection(Collections.transactions)
+          .get();
+      return snap.docs
+          .where((d) => d.data()['deleted'] != true)
+          .map((d) => TransactionModel.fromJson(d.data(), d.id))
+          .toList();
+    });
+
 class TransactionNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
