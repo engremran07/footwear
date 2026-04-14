@@ -814,12 +814,12 @@ class _DrawerMenuScreen extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final drawerWidth = MediaQuery.of(context).size.width * 0.74;
 
-    return Align(
-      alignment: isRtl ? Alignment.centerRight : Alignment.centerLeft,
-      child: SizedBox(
-        width: drawerWidth,
-        child: Material(
-          color: cs.surface,
+    return Material(
+      color: cs.surface,
+      child: Align(
+        alignment: isRtl ? Alignment.centerRight : Alignment.centerLeft,
+        child: SizedBox(
+          width: drawerWidth,
           child: SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
