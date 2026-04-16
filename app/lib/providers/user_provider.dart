@@ -30,8 +30,10 @@ final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
 /// Fetches ALL users regardless of [active] status so that historical
 /// transactions created by now-deactivated sellers still resolve to a
 /// display name instead of the "—" fallback. Uses a single `.get()` call
-/// (not a stream) to avoid [autoDispose] race conditions in async export code.
-final allUsersExportProvider = FutureProvider.autoDispose<List<UserModel>>((
+/// (not a stream). NOT autoDispose: callers use ref.read(provider.future)
+/// which doesn't subscribe — autoDispose would destroy the provider
+/// mid-Firestore-query → StateError. Callers must ref.invalidate() first.
+final allUsersExportProvider = FutureProvider<List<UserModel>>((
   ref,
 ) async {
   // ref.read (not watch): one-shot export — must NOT rebuild on token refresh.

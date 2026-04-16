@@ -787,6 +787,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
                 : <ShopModel>[]);
       final shop = shops.firstWhere((s) => s.id == _selectedShopId);
 
+      ref.invalidate(shopTransactionsExportProvider(_selectedShopId!));
       final txs = await ref.read(
         shopTransactionsExportProvider(_selectedShopId!).future,
       );
@@ -794,6 +795,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       final settings = await ref.read(settingsProvider.future);
       // allUsersExportProvider: no active filter, one-shot .get() —
       // covers deactivated sellers; avoids autoDispose cached-value race.
+      ref.invalidate(allUsersExportProvider);
       final allUsers = user?.isAdmin == true
           ? await ref.read(allUsersExportProvider.future)
           : <UserModel>[];

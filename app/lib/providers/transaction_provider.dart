@@ -150,7 +150,11 @@ final sellerTransactionsProvider = StreamProvider.autoDispose
           );
     });
 
-final shopTransactionsExportProvider = FutureProvider.autoDispose
+/// One-shot shop transactions for export (PDF/Excel). NOT autoDispose:
+/// callers use ref.read(provider.future) which doesn't subscribe, so
+/// autoDispose would destroy the provider mid-Firestore-query → StateError.
+/// Callers must ref.invalidate() before reading for fresh data.
+final shopTransactionsExportProvider = FutureProvider
     .family<List<TransactionModel>, String>((ref, shopId) async {
       final normalizedShopId = shopId.trim();
       if (normalizedShopId.isEmpty) return const <TransactionModel>[];
@@ -170,13 +174,15 @@ final shopTransactionsExportProvider = FutureProvider.autoDispose
     });
 
 /// All transactions for a specific route — used by multi-shop PDF export.
-final routeTransactionsExportProvider = FutureProvider.autoDispose
+/// NOT autoDispose: callers use ref.read(provider.future) which doesn't
+/// subscribe — autoDispose would destroy the provider mid-query → StateError.
+/// Callers must ref.invalidate() before reading for fresh data.
+final routeTransactionsExportProvider = FutureProvider
     .family<List<TransactionModel>, String>((ref, routeId) async {
       final normalizedId = routeId.trim();
       if (normalizedId.isEmpty) return const <TransactionModel>[];
-      // ref.read (not watch): one-shot export provider — must NOT rebuild when
-      // authUserProvider emits (e.g. token refresh), or Riverpod cancels the
-      // in-flight Firestore query mid-export → StateError → PDF crash.
+      // ref.read (not watch): one-shot export — must NOT rebuild on token
+      // refresh, which would cancel the in-flight Firestore query.
       final user = ref.read(authUserProvider).value;
       if (user == null) return const <TransactionModel>[];
       if (!user.isAdmin) {
@@ -197,9 +203,9 @@ final routeTransactionsExportProvider = FutureProvider.autoDispose
     });
 
 /// All transactions across all routes — admin-only bulk export.
+/// NOT autoDispose: see routeTransactionsExportProvider comment.
 final allTransactionsExportProvider =
-    FutureProvider.autoDispose<List<TransactionModel>>((ref) async {
-      // ref.read (not watch): see routeTransactionsExportProvider comment.
+    FutureProvider<List<TransactionModel>>((ref) async {
       final user = ref.read(authUserProvider).value;
       if (user == null || !user.isAdmin) return const <TransactionModel>[];
       final snap = await FirebaseFirestore.instance

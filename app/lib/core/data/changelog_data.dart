@@ -28,6 +28,20 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.7.14',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📄',
+        text: {
+          AppLocale.en: 'Fixed PDF export crash — export providers no longer self-destruct during Firestore queries.',
+          AppLocale.ar: 'تم إصلاح تعطل تصدير PDF — مزودات التصدير لم تعد تتلف أثناء استعلامات Firestore.',
+          AppLocale.ur: 'PDF ایکسپورٹ کریش درست کی گئی — ایکسپورٹ پرووائیڈرز Firestore کوئریز کے دوران ختم نہیں ہوتے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.7.13',
     date: 'April 2026',
     items: [

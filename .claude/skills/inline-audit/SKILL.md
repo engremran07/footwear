@@ -11,6 +11,20 @@ Every change is also an audit pass. When you open a file to fix one thing, you
 are obligated to scan the file for related violations. Leave the code better
 than you found it — but never over-engineer.
 
+### Full-File-Read Rule (mandatory for bug fixes)
+
+When fixing a bug, **read every related file in its entirety** — not targeted
+line ranges. Adjacent code may contain race conditions, lifecycle hazards,
+duplicated logic, or hidden dependencies invisible from a narrow read window.
+
+Required reading scope for any bug fix:
+
+1. The file containing the symptom (screen/widget) — FULL
+2. Every provider the symptomatic code touches — FULL
+3. Every model used in the data path — FULL
+4. The error mapper if the bug surfaces as a user-facing error — FULL
+5. Any utility/builder called from the code path (e.g. pdf_export) — FULL
+
 ## Mandatory Audit Layers (check every time)
 
 ### 1. Role/Rules Alignment
@@ -172,6 +186,8 @@ before starting new work and complete all missing steps first.
 [ ] No hardcoded English in PDF/Excel labels — trRead() with locale
 [ ] Export name resolution uses allUsersExportProvider (not allUsersProvider)
 [ ] allUsersExportProvider used with await .future (not .value ?? [] cache read)
+[ ] Export providers are NOT autoDispose (one-shot Firestore .get() must survive past first microtask)
+[ ] Every ref.read(exportProvider.future) has ref.invalidate() before it for fresh data
 
 ```
 
@@ -238,6 +254,8 @@ final names = NameResolver(
 
 | "—" dash for ALL Entry By cells | `allUsersProvider` used in export: active-only filter + `.value??[]` cache miss | Use `allUsersExportProvider` with `await .future` in all export paths |
 
+| "PDF generation failed" (StateError mid-query) | `FutureProvider.autoDispose` + `ref.read(.future)` = autoDispose lifecycle race: `ref.read()` doesn't subscribe, provider self-destructs mid-Firestore `.get()` | Remove `.autoDispose` from one-shot export providers; callers `ref.invalidate()` before `ref.read()` for fresh data |
+
 | Entry By blank for old/historical tx | Seller deactivated after tx; `where('active',isEqualTo:true)` excluded them | `allUsersExportProvider` has no active filter — covers all historical users |
 
 | Fat APK not installed, wrong ABI file | build used `--split-per-abi` | Always `flutter build apk --release` |
@@ -270,10 +288,16 @@ Rules accept 'admin' only → app writes 'Admin' (capitalized) → every admin w
 Provider adds `where(A) + orderBy(B)` → no composite index → list empty with no UI error  
 **Fix:** Add index to `firestore.indexes.json` → deploy with `firebase deploy --only firestore:indexes`
 
+### Chain 5: autoDispose Export Provider Race
+
+`FutureProvider.autoDispose` + `ref.read(.future)` in screen → ref.read doesn't subscribe →
+autoDispose schedules disposal on next microtask → provider destroyed mid-Firestore-query → `StateError`
+**Fix:** Export providers must NOT be autoDispose. Callers invalidate before reading for fresh data.
+**Pattern:** `ref.invalidate(provider); final data = await ref.read(provider.future);`
+
 ## Hygiene Grep Gate (run before any commit)
 
 ```bash
-
 # 1. No raw collection strings
 
 grep -rn "\.collection('" app/lib/ | grep -v "Collections\."

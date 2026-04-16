@@ -464,6 +464,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   }
 
   Future<List<TransactionModel>> _loadFullTransactions() async {
+    // Invalidate to ensure fresh data — provider is NOT autoDispose.
+    ref.invalidate(shopTransactionsExportProvider(widget.shopId));
     final txs = await ref.read(
       shopTransactionsExportProvider(widget.shopId).future,
     );
@@ -726,6 +728,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               final settings = ref.read(settingsProvider).value;
                               // allUsersExportProvider: no active filter,
                               // one-shot .get() — covers deactivated sellers.
+                              ref.invalidate(allUsersExportProvider);
                               final allUsers = isAdmin
                                   ? await ref.read(
                                       allUsersExportProvider.future,

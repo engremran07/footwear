@@ -547,11 +547,17 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     );
   }
 
+  bool _generatingPdf = false;
+
   Future<void> _generateMultiShopPdf(
     List<ShopModel> allShops,
     List<RouteModel> routes,
     String? routeId,
   ) async {
+    if (_generatingPdf) return;
+    _generatingPdf = true;
+    var progressDismissed = false;
+
     // Show progress indicator
     showDialog<void>(
       context: context,
@@ -572,18 +578,22 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       final settings = await ref.read(settingsProvider.future);
       final user = ref.read(authUserProvider).value;
 
-      // Fetch transactions
+      // Invalidate export providers to ensure fresh data, then read.
+      // These are NOT autoDispose — they persist until invalidated.
       final List<TransactionModel> txList;
       if (routeId != null) {
+        ref.invalidate(routeTransactionsExportProvider(routeId));
         txList = await ref.read(
           routeTransactionsExportProvider(routeId).future,
         );
       } else {
+        ref.invalidate(allTransactionsExportProvider);
         txList = await ref.read(allTransactionsExportProvider.future);
       }
 
-      // Build entryByMap — use allUsersExportProvider (no active filter,
-      // one-shot .get()) so deactivated sellers' transactions still resolve.
+      // Build entryByMap — allUsersExportProvider includes deactivated
+      // sellers so historical transactions still resolve to display names.
+      ref.invalidate(allUsersExportProvider);
       final allUsers = user?.isAdmin == true
           ? await ref.read(allUsersExportProvider.future)
           : <UserModel>[];
@@ -689,7 +699,10 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         entryByMap: names.map,
       );
 
-      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        progressDismissed = true;
+      }
 
       await Printing.sharePdf(
         bytes: bytes,
@@ -697,10 +710,14 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       );
     } catch (e) {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
+        if (!progressDismissed) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
         final key = AppErrorMapper.key(e);
         ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
+    } finally {
+      _generatingPdf = false;
     }
   }
 }
