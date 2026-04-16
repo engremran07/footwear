@@ -110,6 +110,7 @@ Future<Uint8List> buildPdfTable({
   String? subtitle,
   AppLocale locale = AppLocale.en,
   Uint8List? logoBytes,
+  String? pageLabel,
 }) async {
   await _ensureFontBytes();
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
@@ -224,7 +225,9 @@ Future<Uint8List> buildPdfTable({
                     ? pw.Alignment.centerLeft
                     : pw.Alignment.centerRight,
                 child: pw.Text(
-                  'Page ${page + 1} of $pageCount',
+                  (pageLabel ?? 'Page %1 of %2')
+                      .replaceAll('%1', '${page + 1}')
+                      .replaceAll('%2', '$pageCount'),
                   style: const pw.TextStyle(
                     fontSize: 8,
                     color: PdfColors.grey600,
@@ -357,7 +360,7 @@ Future<Uint8List> buildPdfLedger({
           : rawDesc;
       final mode = tx.saleType ?? '';
       final entryBy = showEntryBy
-          ? (entryByMap[tx.createdBy] ?? tx.createdBy)
+          ? (entryByMap[tx.createdBy] ?? '—')
           : '';
 
       if (tx.isCashOut) {
@@ -2014,7 +2017,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
             ? '[${_s(tx.invoiceNumber!)}] $rawDesc'
             : rawDesc;
         final entryBy = showEntryBy
-            ? (entryByMap[tx.createdBy] ?? tx.createdBy)
+            ? (entryByMap[tx.createdBy] ?? '—')
             : '';
         final mode = tx.saleType ?? '';
         if (tx.isCashOut) {

@@ -1189,6 +1189,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'approve_seller_edit': 'Approve Seller Edit',
     'reject_seller_edit': 'Reject Seller Edit',
 
+    // ── Export / Report extras ──
+    'page_x_of_y': 'Page %1 of %2',
+    'others': 'Others',
+    'excel_generated': 'Generated',
+    'unknown_user': 'Unknown',
+
     // ── What's New / Changelog ──
     'whats_new': "What's New",
     'whats_new_subtitle': "Here's what changed in this update",
@@ -2327,6 +2333,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'flush_select_user': 'اختر المستخدم للمسح',
     'approve_seller_edit': 'الموافقة على تعديل البائع',
     'reject_seller_edit': 'رفض تعديل البائع',
+
+    // ── Export / Report extras ──
+    'page_x_of_y': 'صفحة %1 من %2',
+    'others': 'أخرى',
+    'excel_generated': 'تم الإنشاء',
+    'unknown_user': 'غير معروف',
 
     // ── What's New / Changelog ──
     'whats_new': 'الجديد',
@@ -3482,6 +3494,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'flush_select_user': 'صاف کرنے کے لیے صارف منتخب کریں',
     'approve_seller_edit': 'سیلر ترمیم منظور کریں',
     'reject_seller_edit': 'سیلر ترمیم مسترد کریں',
+
+    // ── Export / Report extras ──
+    'page_x_of_y': 'صفحہ %1 از %2',
+    'others': 'دیگر',
+    'excel_generated': 'بنایا گیا',
+    'unknown_user': 'نامعلوم',
 
     // ── What's New / Changelog ──
     'whats_new': 'نئی خصوصیات',

@@ -158,6 +158,14 @@ Seller:
   files is a P0 regression. Verify with:
   `grep -E "^version:|appVersion|buildNumber" app/pubspec.yaml app/lib/core/constants/app_brand.dart`
 
+1. **All export/report user-name resolution MUST use `NameResolver`.**
+  `app/lib/core/utils/name_resolver.dart` is the single source of truth for
+  resolving Firestore UIDs to display names in PDFs, Excel, and images.
+  Never build ad-hoc `entryByMap` maps. Never fall back to a raw UID string.
+  Fallback must always be a localized `unknown_user` label or `'—'`.
+  Export string literals (page footers, column headers, timestamps) must
+  use `trRead()` with the current locale — no hardcoded English.
+
 ## 5) Known Failure Signatures
 
 1. permission-denied on route create/inventory add

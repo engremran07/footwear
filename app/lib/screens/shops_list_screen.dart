@@ -6,6 +6,7 @@ import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/name_resolver.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/snack_helper.dart';
@@ -585,10 +586,11 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       final allUsers = user?.isAdmin == true
           ? await ref.read(allUsersProvider.future)
           : <UserModel>[];
-      final entryByMap = <String, String>{
-        for (final u in allUsers) u.id: u.displayName,
-      };
-      if (user != null) entryByMap[user.id] = user.displayName;
+      final names = NameResolver(
+        users: allUsers,
+        extra: {if (user != null) user.id: user.displayName},
+        unknownLabel: trRead('unknown_user', locale),
+      );
 
       // Group transactions by shopId for fast lookup
       final txByShop = <String, List<TransactionModel>>{};
@@ -683,7 +685,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         logoBytes: settings.logoBytes,
         currency: settings.currency,
         showEntryBy: user?.isAdmin == true,
-        entryByMap: entryByMap,
+        entryByMap: names.map,
       );
 
       if (mounted) Navigator.of(context, rootNavigator: true).pop();

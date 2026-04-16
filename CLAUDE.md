@@ -51,6 +51,9 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 17. If a bug was addressed by multiple candidate fixes, and QA/user confirms the
     real culprit, you MUST run the Band-Aid Loop Reversal protocol: keep root-cause
     and mandatory guards, rollback non-culprit mitigations, and record final reasoning.
+18. All export/report name resolution MUST use `NameResolver` (`name_resolver.dart`).
+    Never build ad-hoc uid→name maps. Never fall back to a raw UID string.
+    Use `trRead()` with locale for all export string literals — no hardcoded English.
 
 ## Financial Pathways (never mix these)
 

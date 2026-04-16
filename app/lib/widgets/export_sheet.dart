@@ -135,6 +135,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
         subtitle: widget.subtitle,
         locale: _locale,
         logoBytes: logoBytes,
+        pageLabel: trRead('page_x_of_y', _locale),
       );
     } catch (e, stack) {
       debugPrint('[ExportSheet] PDF build failed: $e\n$stack');
@@ -179,6 +180,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
       headers: widget.headers,
       rows: widget.rows,
       isRtl: _isRtl,
+      generatedLabel: trRead('excel_generated', _locale),
     );
     if (bytes == null) throw Exception('format');
     await downloadBytes(bytes, '${widget.fileName}.xlsx');
@@ -190,6 +192,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
       headers: widget.headers,
       rows: widget.rows,
       isRtl: _isRtl,
+      generatedLabel: trRead('excel_generated', _locale),
     );
     if (bytes == null) throw Exception('format');
     await shareFile(

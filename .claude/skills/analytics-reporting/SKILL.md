@@ -40,7 +40,7 @@ ExportSheet.show(
   context, ref,
   title: tr('shops_report', ref),
   headers: ['Name', 'Route', 'Phone', 'Balance'],
-  rows: shops.map((s) => [s.name, 'R${s.routeNumber}', s.phone, s.balance]).toList(),
+  rows: shops.map((s) => [s.name, s.routeNumber, s.phone, s.balance]).toList(),
   fileName: 'shops_report',
   subtitle: 'Route 5 — Generated ${DateTime.now()}',
   pdfBytesBuilder: () => buildPdfTable(...), // optional custom PDF
@@ -66,7 +66,7 @@ DropdownButton<String?>(
     DropdownMenuItem(value: null, child: Text(tr('all_routes', ref))),
     ...routes.map((r) => DropdownMenuItem(
       value: r.id,
-      child: Text('R${r.routeNumber} · ${r.name}'),
+      child: Text('${r.routeNumber} · ${r.name}'),
     )),
   ],
   onChanged: (v) => setState(() => _selectedRouteId = v),
@@ -82,10 +82,49 @@ DropdownButton<String?>(
 - `route_report` — "Route Report"
 - `generating_report` — "Generating report..."
 
+## Name Resolution (Single Source of Truth)
+
+All export paths MUST use `NameResolver` from
+`app/lib/core/utils/name_resolver.dart` to resolve user UIDs to display names.
+Never build ad-hoc `entryByMap` maps. Never fall back to a raw Firestore UID.
+
+```dart
+import '../core/utils/name_resolver.dart';
+
+final names = NameResolver(
+  users: allUsers,
+  extra: {if (user != null) user.id: user.displayName},
+  unknownLabel: trRead('unknown_user', locale),
+);
+
+// Pass to PDF/Excel builders:
+entryByMap: names.map,
+```
+
+`ExportContext` (`app/lib/core/utils/export_context.dart`) carries the
+`NameResolver`, locale, company branding, and pre-resolved labels as a single
+object. Use it when building new export paths.
+
+## Export I18n Keys
+
+All string literals in export output (PDF, Excel, images) MUST use localized
+keys from `app_locale.dart`. Key export-specific keys:
+
+| Key | EN | AR | UR |
+| --- | --- | --- | --- |
+| `page_x_of_y` | Page %1 of %2 | صفحة %1 من %2 | صفحہ %1 از %2 |
+| `others` | Others | أخرى | دیگر |
+| `excel_generated` | Generated | تم الإنشاء | بنایا گیا |
+| `unknown_user` | Unknown | غير معروف | نامعلوم |
+
 ## Rules
+
 1. All exports use `ExportSheet.show()` — no direct PDF generation in screens
 2. PDF generation MUST run on `Isolate.run()` — never on main thread
 3. Sanitize all user text with `_s()` before PDF interpolation
 4. All data reads through providers — no direct Firestore in screens
 5. Role-aware: admin sees all, seller sees own route only
 6. Export file names: `{report_type}_{route_name}_{date}.xlsx`
+7. Never show raw Firestore UIDs in any export — use `NameResolver.resolve()`
+8. Never hardcode English strings in PDF/Excel output — use `trRead()` with locale
+9. Route labels use `'${route.routeNumber} · ${route.name}'` — no `'R'` prefix

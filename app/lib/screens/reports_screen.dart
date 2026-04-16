@@ -5,6 +5,7 @@ import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/name_resolver.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/snack_helper.dart';
@@ -14,6 +15,7 @@ import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
 import '../providers/product_provider.dart';
+import '../providers/route_provider.dart';
 import '../providers/seller_inventory_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/shop_provider.dart';
@@ -168,7 +170,7 @@ class ReportsScreen extends ConsumerWidget {
         .map(
           (s) => [
             s.name,
-            'R${s.routeNumber}',
+            '${s.routeNumber}',
             s.phone ?? '',
             s.area ?? '',
             s.city ?? '',
@@ -299,7 +301,7 @@ class ReportsScreen extends ConsumerWidget {
         .map(
           (s) => [
             s.name,
-            'R${s.routeNumber}',
+            '${s.routeNumber}',
             s.phone ?? '',
             AppFormatters.sar(s.balance),
           ],
@@ -714,7 +716,7 @@ class _OutstandingPieChart extends ConsumerWidget {
                                   : top[i].name,
                             ),
                           if (othersTotal > 0)
-                            _LegendDot(color: colors.last, label: 'Others'),
+                            _LegendDot(color: colors.last, label: tr('others', ref)),
                         ],
                       ),
                     ],
@@ -802,10 +804,11 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       final allUsers = user?.isAdmin == true
           ? (ref.read(allUsersProvider).value ?? <UserModel>[])
           : <UserModel>[];
-      final entryByMap = <String, String>{
-        for (final u in allUsers) u.id: u.displayName,
-      };
-      if (user != null) entryByMap[user.id] = user.displayName;
+      final names = NameResolver(
+        users: allUsers,
+        extra: {if (user != null) user.id: user.displayName},
+        unknownLabel: trRead('unknown_user', locale),
+      );
 
       // Reconcile opening balance so the final running balance equals
       // the stored customer.balance regardless of transaction-count limits.
@@ -841,7 +844,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
           generatedBy: user?.displayName ?? '',
           openingBalance: openingBalance,
           transactions: txs,
-          entryByMap: entryByMap,
+          entryByMap: names.map,
           showEntryBy: true,
           dateFrom: txs.isNotEmpty ? txs.first.createdAt.toDate() : null,
           dateTo: txs.isNotEmpty ? txs.last.createdAt.toDate() : null,
@@ -1057,18 +1060,28 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
             )
             .toList(),
         fileName: 'seller_report_${seller.displayName.replaceAll(' ', '_')}',
-        pdfBytesBuilder: () => buildPdfSellerReport(
-          sellerName: seller.displayName,
-          sellerPhone: seller.phone ?? '',
-          routeName: seller.assignedRouteId ?? '',
-          customers: customerMap.values.toList(),
-          stockReceived: stockReceived,
-          stockSold: stockSold,
-          stockRemaining: stockRemaining,
-          labels: labels,
-          locale: locale,
-          logoBytes: settings.logoBytes,
-        ),
+        pdfBytesBuilder: () {
+          // Resolve route UID → display name so PDF never shows raw IDs
+          final routes = ref.read(routesProvider).value ?? [];
+          final routeMatch = routes.where(
+            (r) => r.id == seller.assignedRouteId,
+          );
+          final routeDisplayName = routeMatch.isNotEmpty
+              ? '${routeMatch.first.routeNumber} · ${routeMatch.first.name}'
+              : '';
+          return buildPdfSellerReport(
+            sellerName: seller.displayName,
+            sellerPhone: seller.phone ?? '',
+            routeName: routeDisplayName,
+            customers: customerMap.values.toList(),
+            stockReceived: stockReceived,
+            stockSold: stockSold,
+            stockRemaining: stockRemaining,
+            labels: labels,
+            locale: locale,
+            logoBytes: settings.logoBytes,
+          );
+        },
       );
     } catch (e) {
       if (mounted) {

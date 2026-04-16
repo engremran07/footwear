@@ -25,6 +25,7 @@ List<int>? buildStyledExcelBytes({
   required List<String> headers,
   required List<List<dynamic>> rows,
   bool isRtl = false,
+  String generatedLabel = 'Generated',
 }) {
   final safe = _safeSheetName(sheetName);
   // Calculate auto-fit column widths from headers + data
@@ -47,6 +48,7 @@ List<int>? buildStyledExcelBytes({
       rows,
       colWidths,
       isRtl,
+      generatedLabel,
     ),
   };
   final archive = Archive();
@@ -251,6 +253,7 @@ String _worksheet(
   List<List<dynamic>> rows,
   List<double> colWidths,
   bool isRtl,
+  String generatedLabel,
 ) {
   final colCount = headers.length;
   // Data starts at row 4 (title=1, subtitle=2, blank spacer=3, header=4, data=5+)
@@ -298,7 +301,7 @@ String _worksheet(
   // Row 2: Subtitle (merged)
   buf.write('<row r="$subtitleRow" ht="18" customHeight="1">');
   buf.write(
-    '<c r="A$subtitleRow" t="inlineStr" s="5"><is><t>Generated: ${_xmlEscape(subtitle)}</t></is></c>',
+    '<c r="A$subtitleRow" t="inlineStr" s="5"><is><t>$generatedLabel: ${_xmlEscape(subtitle)}</t></is></c>',
   );
   buf.write('</row>');
 
