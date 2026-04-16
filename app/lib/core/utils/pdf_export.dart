@@ -27,12 +27,16 @@ Future<void> _ensureFontBytes() async {
   _fontBytesLoader = loader;
   try {
     final ad = await rootBundle.load('assets/fonts/NotoSansArabic.ttf');
-    _arabicFontBytes = ad.buffer.asUint8List(
-      ad.offsetInBytes,
-      ad.lengthInBytes,
+    // Uint8List.fromList creates a copy with its own buffer (offset 0),
+    // ensuring ByteData.view(bytes.buffer) in _fontsFromBytes works correctly
+    // even when rootBundle returns a ByteData with non-zero offsetInBytes.
+    _arabicFontBytes = Uint8List.fromList(
+      ad.buffer.asUint8List(ad.offsetInBytes, ad.lengthInBytes),
     );
     final ud = await rootBundle.load('assets/fonts/NotoNastaliqUrdu.ttf');
-    _urduFontBytes = ud.buffer.asUint8List(ud.offsetInBytes, ud.lengthInBytes);
+    _urduFontBytes = Uint8List.fromList(
+      ud.buffer.asUint8List(ud.offsetInBytes, ud.lengthInBytes),
+    );
     loader.complete();
   } catch (error, stackTrace) {
     loader.completeError(error, stackTrace);
@@ -48,8 +52,16 @@ Future<void> _ensureFontBytes() async {
   Uint8List urduBytes,
 ) {
   return (
-    arabic: pw.Font.ttf(ByteData.view(arabicBytes.buffer)),
-    urdu: pw.Font.ttf(ByteData.view(urduBytes.buffer)),
+    arabic: pw.Font.ttf(ByteData.view(
+      arabicBytes.buffer,
+      arabicBytes.offsetInBytes,
+      arabicBytes.lengthInBytes,
+    )),
+    urdu: pw.Font.ttf(ByteData.view(
+      urduBytes.buffer,
+      urduBytes.offsetInBytes,
+      urduBytes.lengthInBytes,
+    )),
   );
 }
 
@@ -359,9 +371,7 @@ Future<Uint8List> buildPdfLedger({
           ? '[${_s(tx.invoiceNumber!)}] $rawDesc'
           : rawDesc;
       final mode = tx.saleType ?? '';
-      final entryBy = showEntryBy
-          ? (entryByMap[tx.createdBy] ?? '—')
-          : '';
+      final entryBy = showEntryBy ? (entryByMap[tx.createdBy] ?? '—') : '';
 
       if (tx.isCashOut) {
         balance += tx.amount;
@@ -2016,9 +2026,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
         final desc = tx.invoiceNumber != null && tx.invoiceNumber!.isNotEmpty
             ? '[${_s(tx.invoiceNumber!)}] $rawDesc'
             : rawDesc;
-        final entryBy = showEntryBy
-            ? (entryByMap[tx.createdBy] ?? '—')
-            : '';
+        final entryBy = showEntryBy ? (entryByMap[tx.createdBy] ?? '—') : '';
         final mode = tx.saleType ?? '';
         if (tx.isCashOut) {
           balance += tx.amount;

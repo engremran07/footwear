@@ -17,10 +17,7 @@ class NameResolver {
     required List<UserModel> users,
     Map<String, String> extra = const {},
     this.unknownLabel = '—',
-  }) : _cache = {
-         for (final u in users) u.id: u.displayName,
-         ...extra,
-       };
+  }) : _cache = {for (final u in users) u.id: u.displayName, ...extra};
 
   /// Resolves [uid] to a display name. Returns [unknownLabel] for unknown IDs.
   String resolve(String uid) => _cache[uid] ?? unknownLabel;

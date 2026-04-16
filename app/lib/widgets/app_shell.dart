@@ -327,208 +327,214 @@ class _AppShellState extends ConsumerState<AppShell>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness:
-            _isDrawerOpen && !isDark ? Brightness.dark : Brightness.light,
+        statusBarIconBrightness: _isDrawerOpen && !isDark
+            ? Brightness.dark
+            : Brightness.light,
         systemNavigationBarColor: Colors.transparent,
-        systemNavigationBarIconBrightness:
-            isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarIconBrightness: isDark
+            ? Brightness.light
+            : Brightness.dark,
       ),
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: onPopInvoked,
         child: AnimatedBuilder(
-        animation: _drawerAnim,
-        builder: (context, _) {
-          final progress = _drawerAnim.value;
-          final dx = isRtl ? -(progress * slideWidth) : progress * slideWidth;
-          final scale = 1.0 - 0.08 * progress;
-          final radius = 22.0 * progress;
-          final shadowAlpha = (64 * progress).round().clamp(0, 64);
+          animation: _drawerAnim,
+          builder: (context, _) {
+            final progress = _drawerAnim.value;
+            final dx = isRtl ? -(progress * slideWidth) : progress * slideWidth;
+            final scale = 1.0 - 0.08 * progress;
+            final radius = 22.0 * progress;
+            final shadowAlpha = (64 * progress).round().clamp(0, 64);
 
-          return Stack(
-            children: [
-              // Drawer background
-              Positioned.fill(
-                child: _DrawerMenuScreen(
-                  user: user,
-                  navItems: navItems,
-                  currentLocation: currentLocation,
-                  isOnline: isOnline,
-                  isRtl: isRtl,
-                  profileLabel: profileLabel,
-                  signOutLabel: signOutLabel,
-                  onNavigate: (route) {
-                    _closeDrawer();
-                    context.go(route);
-                  },
-                  onProfile: () {
-                    _closeDrawer();
-                    context.go('/profile');
-                  },
-                  onSignOut: () =>
-                      ref.read(authNotifierProvider.notifier).signOut(),
+            return Stack(
+              children: [
+                // Drawer background
+                Positioned.fill(
+                  child: _DrawerMenuScreen(
+                    user: user,
+                    navItems: navItems,
+                    currentLocation: currentLocation,
+                    isOnline: isOnline,
+                    isRtl: isRtl,
+                    profileLabel: profileLabel,
+                    signOutLabel: signOutLabel,
+                    onNavigate: (route) {
+                      _closeDrawer();
+                      context.go(route);
+                    },
+                    onProfile: () {
+                      _closeDrawer();
+                      context.go('/profile');
+                    },
+                    onSignOut: () =>
+                        ref.read(authNotifierProvider.notifier).signOut(),
+                  ),
                 ),
-              ),
 
-              // Main content with zoom transform (scale from edge, then slide)
-              Transform.translate(
-                offset: Offset(dx, 0),
-                child: Transform.scale(
-                  scale: scale,
-                  alignment: isRtl
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(radius),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF000000).withAlpha(shadowAlpha),
-                          blurRadius: 28,
-                          spreadRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(radius),
-                      child: Scaffold(
-                        appBar: _WhatsAppBar(
-                          user: user,
-                          currentLocation: currentLocation,
-                          isOnline: isOnline,
-                          menuLabel: menuLabel,
-                          drawerAnim: _drawerAnim,
-                          isTopLevel: primaryItems.any(
-                            (e) => e.route == currentLocation,
+                // Main content with zoom transform (scale from edge, then slide)
+                Transform.translate(
+                  offset: Offset(dx, 0),
+                  child: Transform.scale(
+                    scale: scale,
+                    alignment: isRtl
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(radius),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFF000000,
+                            ).withAlpha(shadowAlpha),
+                            blurRadius: 28,
+                            spreadRadius: 4,
                           ),
-                          onMenuTap: _toggleDrawer,
-                          onBack: () {
-                            if (_isDrawerOpen) {
-                              _closeDrawer();
-                              return;
-                            }
-                            if (GoRouter.of(context).canPop()) {
-                              context.pop();
-                              return;
-                            }
-                            final parent = _parentRoute(currentLocation);
-                            if (parent != null) context.go(parent);
-                          },
-                          onProfileTap: () {
-                            if (_isDrawerOpen) _closeDrawer();
-                            context.go('/profile');
-                          },
-                        ),
-                        body: GestureDetector(
-                          onTap: _isDrawerOpen ? _closeDrawer : null,
-                          onHorizontalDragEnd: (d) {
-                            final vel = d.primaryVelocity ?? 0;
-                            if (_isDrawerOpen) {
-                              // Only close when drawer already open
-                              if (!isRtl && vel < -200) _closeDrawer();
-                              if (isRtl && vel > 200) _closeDrawer();
-                              return;
-                            }
-                            // Only allow tab swipe on top-level nav routes
-                            final isTopLevel = primaryItems.any(
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(radius),
+                        child: Scaffold(
+                          appBar: _WhatsAppBar(
+                            user: user,
+                            currentLocation: currentLocation,
+                            isOnline: isOnline,
+                            menuLabel: menuLabel,
+                            drawerAnim: _drawerAnim,
+                            isTopLevel: primaryItems.any(
                               (e) => e.route == currentLocation,
-                            );
-                            final absVel = vel.abs();
-                            // Drawer closed: tab-swipe (high vel) OR drawer-open (low vel)
-                            if (!isRtl) {
-                              if (absVel >= 400 &&
-                                  isTopLevel &&
-                                  primaryItems.length > 1) {
-                                final idx = primaryItems.indexWhere(
-                                  (e) => e.route == currentLocation,
-                                );
-                                if (vel < 0 &&
-                                    idx >= 0 &&
-                                    idx < primaryItems.length - 1) {
-                                  // Forward swipe (left) → next tab
-                                  HapticFeedback.selectionClick();
-                                  context.go(primaryItems[idx + 1].route);
-                                } else if (vel > 0 && idx > 0) {
-                                  // Backward swipe (right) → previous tab
-                                  HapticFeedback.selectionClick();
-                                  context.go(primaryItems[idx - 1].route);
-                                }
-                              } else if (vel > 200) {
-                                if (!isTopLevel) {
-                                  HapticFeedback.lightImpact();
-                                  if (GoRouter.of(context).canPop()) {
-                                    context.pop();
-                                  } else {
-                                    final parent =
-                                        _parentRoute(currentLocation);
-                                    if (parent != null) context.go(parent);
-                                  }
-                                } else {
-                                  _openDrawer();
-                                }
+                            ),
+                            onMenuTap: _toggleDrawer,
+                            onBack: () {
+                              if (_isDrawerOpen) {
+                                _closeDrawer();
+                                return;
                               }
-                            } else {
-                              if (absVel >= 400 &&
-                                  isTopLevel &&
-                                  primaryItems.length > 1) {
-                                final idx = primaryItems.indexWhere(
-                                  (e) => e.route == currentLocation,
-                                );
-                                if (vel > 0 &&
-                                    idx >= 0 &&
-                                    idx < primaryItems.length - 1) {
-                                  // RTL forward swipe (right) → next tab
-                                  HapticFeedback.selectionClick();
-                                  context.go(primaryItems[idx + 1].route);
-                                } else if (vel < 0 && idx > 0) {
-                                  // RTL backward swipe (left) → previous tab
-                                  HapticFeedback.selectionClick();
-                                  context.go(primaryItems[idx - 1].route);
-                                }
-                              } else if (vel < -200) {
-                                if (!isTopLevel) {
-                                  HapticFeedback.lightImpact();
-                                  if (GoRouter.of(context).canPop()) {
-                                    context.pop();
-                                  } else {
-                                    final parent =
-                                        _parentRoute(currentLocation);
-                                    if (parent != null) context.go(parent);
-                                  }
-                                } else {
-                                  _openDrawer();
-                                }
+                              if (GoRouter.of(context).canPop()) {
+                                context.pop();
+                                return;
                               }
-                            }
-                          },
-                          behavior: HitTestBehavior.translucent,
-                          child: AbsorbPointer(
-                            absorbing: _isDrawerOpen,
-                            child: widget.child,
+                              final parent = _parentRoute(currentLocation);
+                              if (parent != null) context.go(parent);
+                            },
+                            onProfileTap: () {
+                              if (_isDrawerOpen) _closeDrawer();
+                              context.go('/profile');
+                            },
                           ),
+                          body: GestureDetector(
+                            onTap: _isDrawerOpen ? _closeDrawer : null,
+                            onHorizontalDragEnd: (d) {
+                              final vel = d.primaryVelocity ?? 0;
+                              if (_isDrawerOpen) {
+                                // Only close when drawer already open
+                                if (!isRtl && vel < -200) _closeDrawer();
+                                if (isRtl && vel > 200) _closeDrawer();
+                                return;
+                              }
+                              // Only allow tab swipe on top-level nav routes
+                              final isTopLevel = primaryItems.any(
+                                (e) => e.route == currentLocation,
+                              );
+                              final absVel = vel.abs();
+                              // Drawer closed: tab-swipe (high vel) OR drawer-open (low vel)
+                              if (!isRtl) {
+                                if (absVel >= 400 &&
+                                    isTopLevel &&
+                                    primaryItems.length > 1) {
+                                  final idx = primaryItems.indexWhere(
+                                    (e) => e.route == currentLocation,
+                                  );
+                                  if (vel < 0 &&
+                                      idx >= 0 &&
+                                      idx < primaryItems.length - 1) {
+                                    // Forward swipe (left) → next tab
+                                    HapticFeedback.selectionClick();
+                                    context.go(primaryItems[idx + 1].route);
+                                  } else if (vel > 0 && idx > 0) {
+                                    // Backward swipe (right) → previous tab
+                                    HapticFeedback.selectionClick();
+                                    context.go(primaryItems[idx - 1].route);
+                                  }
+                                } else if (vel > 200) {
+                                  if (!isTopLevel) {
+                                    HapticFeedback.lightImpact();
+                                    if (GoRouter.of(context).canPop()) {
+                                      context.pop();
+                                    } else {
+                                      final parent = _parentRoute(
+                                        currentLocation,
+                                      );
+                                      if (parent != null) context.go(parent);
+                                    }
+                                  } else {
+                                    _openDrawer();
+                                  }
+                                }
+                              } else {
+                                if (absVel >= 400 &&
+                                    isTopLevel &&
+                                    primaryItems.length > 1) {
+                                  final idx = primaryItems.indexWhere(
+                                    (e) => e.route == currentLocation,
+                                  );
+                                  if (vel > 0 &&
+                                      idx >= 0 &&
+                                      idx < primaryItems.length - 1) {
+                                    // RTL forward swipe (right) → next tab
+                                    HapticFeedback.selectionClick();
+                                    context.go(primaryItems[idx + 1].route);
+                                  } else if (vel < 0 && idx > 0) {
+                                    // RTL backward swipe (left) → previous tab
+                                    HapticFeedback.selectionClick();
+                                    context.go(primaryItems[idx - 1].route);
+                                  }
+                                } else if (vel < -200) {
+                                  if (!isTopLevel) {
+                                    HapticFeedback.lightImpact();
+                                    if (GoRouter.of(context).canPop()) {
+                                      context.pop();
+                                    } else {
+                                      final parent = _parentRoute(
+                                        currentLocation,
+                                      );
+                                      if (parent != null) context.go(parent);
+                                    }
+                                  } else {
+                                    _openDrawer();
+                                  }
+                                }
+                              }
+                            },
+                            behavior: HitTestBehavior.translucent,
+                            child: AbsorbPointer(
+                              absorbing: _isDrawerOpen,
+                              child: widget.child,
+                            ),
+                          ),
+                          bottomNavigationBar: primaryItems.isEmpty
+                              ? null
+                              : _ArcticBottomNav(
+                                  items: primaryItems,
+                                  currentLocation: currentLocation,
+                                  onTap: (route) {
+                                    HapticFeedback.selectionClick();
+                                    if (_isDrawerOpen) _closeDrawer();
+                                    context.go(route);
+                                  },
+                                  onLongPress: (item) =>
+                                      _onNavLongPress(context, item),
+                                ),
                         ),
-                        bottomNavigationBar: primaryItems.isEmpty
-                            ? null
-                            : _ArcticBottomNav(
-                                items: primaryItems,
-                                currentLocation: currentLocation,
-                                onTap: (route) {
-                                  HapticFeedback.selectionClick();
-                                  if (_isDrawerOpen) _closeDrawer();
-                                  context.go(route);
-                                },
-                                onLongPress: (item) =>
-                                    _onNavLongPress(context, item),
-                              ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
-      ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

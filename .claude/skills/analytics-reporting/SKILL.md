@@ -35,6 +35,7 @@ Provider (StreamProvider) → Screen (ConsumerStatefulWidget) → ExportSheet.sh
 - Share — via `SharePlus`
 
 ## ExportSheet API
+
 ```dart
 ExportSheet.show(
   context, ref,
@@ -43,9 +44,59 @@ ExportSheet.show(
   rows: shops.map((s) => [s.name, s.routeNumber, s.phone, s.balance]).toList(),
   fileName: 'shops_report',
   subtitle: 'Route 5 — Generated ${DateTime.now()}',
-  pdfBytesBuilder: () => buildPdfTable(...), // optional custom PDF
+  pdfBytesBuilder: () => buildPdfTable(...), // REQUIRED for ledger data — see rule 10
 );
 ```
+
+### pdfBytesBuilder Requirement
+
+`ExportSheet.show()` accepts an optional `pdfBytesBuilder` callback. When
+omitted, the sheet falls back to `buildPdfTable()` which renders a simple
+header+rows flat table. **This fallback is ONLY acceptable for simple flat
+tables** (inventory list, shops list, product catalog).
+
+For any export that contains:
+
+- Running balances
+- Debit/credit columns
+- Entry By column
+- Date-grouped rows
+- Summary/totals row
+
+…the caller MUST supply a `pdfBytesBuilder` that calls the appropriate
+specialized builder:
+
+| Data type | Builder function |
+| --- | --- |
+| Single shop ledger / account statement | `buildPdfLedger()` |
+| Multi-shop ledger (route-level) | `buildPdfMultiShopLedger()` |
+| Seller performance report | `buildPdfSellerReport()` |
+| Invoice document | `generateInvoicePdf()` |
+| Simple flat table | `buildPdfTable()` (default fallback OK) |
+
+### ExportSheet.show() Call Site Audit
+
+Every `ExportSheet.show()` call in the codebase must be audited against the
+table above. Grep gate:
+
+```bash
+grep -rn "ExportSheet.show(" app/lib/ --include="*.dart"
+```
+
+Known call sites and their pdfBytesBuilder status:
+
+| File | Export | pdfBytesBuilder |
+| --- | --- | --- |
+| `shop_detail_screen.dart` | Account statement | ✅ `buildPdfLedger` |
+| `reports_screen.dart` | Account statement | ✅ `buildPdfLedger` |
+| `reports_screen.dart` | Seller report | ✅ `buildPdfSellerReport` |
+| `shops_list_screen.dart` | Shops list | ❌ flat table OK |
+| `shops_list_screen.dart` | Multi-shop ledger | ✅ `buildPdfMultiShopLedger` |
+| `reports_screen.dart` | Shops list | ❌ flat table OK |
+| `reports_screen.dart` | Product catalog | ❌ flat table OK |
+| `reports_screen.dart` | Inventory report | ❌ flat table OK |
+| `reports_screen.dart` | Routes list | ❌ flat table OK |
+| `inventory_screen.dart` | Inventory list | ❌ flat table OK |
 
 ## Per-Route Report Pattern
 ```dart
@@ -128,3 +179,12 @@ keys from `app_locale.dart`. Key export-specific keys:
 7. Never show raw Firestore UIDs in any export — use `NameResolver.resolve()`
 8. Never hardcode English strings in PDF/Excel output — use `trRead()` with locale
 9. Route labels use `'${route.routeNumber} · ${route.name}'` — no `'R'` prefix
+10. Every `ExportSheet.show()` call with ledger/statement/report data MUST provide
+    `pdfBytesBuilder`. The generic `buildPdfTable()` fallback is ONLY for simple flat
+    tables. Omitting `pdfBytesBuilder` on ledger data causes "PDF generation failed"
+    errors or produces unusable flat-table output instead of a formatted ledger.
+11. `changelog_data.dart` MUST be updated on every version bump with trilingual
+    (EN/AR/UR) entries. The `whats_new_sheet.dart` auto-displays the latest changelog
+    on first launch after update.
+12. Task continuity: when user adds new export/report work mid-session, merge into
+    existing todo list. Never discard prior pending export tasks.

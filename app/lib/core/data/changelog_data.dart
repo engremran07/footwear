@@ -29,6 +29,90 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.7.9',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📄',
+        text: {
+          AppLocale.en: 'Shop account-statement PDF export now works from '
+              'every shop — fixed "failed to export" error.',
+          AppLocale.ar: 'تصدير كشف حساب المتجر بصيغة PDF يعمل الآن من كل '
+              'متجر — تم إصلاح خطأ "فشل التصدير".',
+          AppLocale.ur: 'دکان کا اکاؤنٹ اسٹیٹمنٹ PDF ایکسپورٹ اب ہر دکان '
+              'سے کام کرتا ہے — "ایکسپورٹ ناکام" خطا ٹھیک ہو گئی۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📋',
+        text: {
+          AppLocale.en: 'Export governance — all reports now consistently '
+              'show proper ledger format with names and balances.',
+          AppLocale.ar: 'حوكمة التصدير — جميع التقارير تعرض الآن تنسيق '
+              'دفتر أستاذ متسق مع الأسماء والأرصدة.',
+          AppLocale.ur: 'ایکسپورٹ گورننس — تمام رپورٹیں اب مستقل لیجر '
+              'فارمیٹ میں نام اور بیلنس دکھاتی ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.7.8',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '👤',
+        text: {
+          AppLocale.en: 'Reports now show seller names instead of internal '
+              'codes — all exports use proper name resolution.',
+          AppLocale.ar: 'التقارير تعرض الآن أسماء البائعين بدلاً من الرموز '
+              'الداخلية — جميع التصديرات تستخدم حل الأسماء الصحيح.',
+          AppLocale.ur: 'رپورٹیں اب اندرونی کوڈز کی بجائے سیلر کے نام '
+              'دکھاتی ہیں — تمام ایکسپورٹس صحیح نام استعمال کرتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🌍',
+        text: {
+          AppLocale.en: 'PDF exports now fully support Arabic, Urdu, and '
+              'English labels — no more English-only headers.',
+          AppLocale.ar: 'تصدير PDF يدعم الآن العربية والأردية والإنجليزية '
+              'بالكامل — لا مزيد من العناوين الإنجليزية فقط.',
+          AppLocale.ur: 'PDF ایکسپورٹس اب عربی، اردو اور انگریزی لیبلز '
+              'کی مکمل حمایت کرتے ہیں — صرف انگریزی ہیڈرز نہیں رہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.7.7',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '⚡',
+        text: {
+          AppLocale.en: 'Faster app startup — optimized provider '
+              'initialization and reduced cold-start time.',
+          AppLocale.ar: 'بدء تشغيل أسرع — تحسين تهيئة المزودات وتقليل '
+              'وقت البدء البارد.',
+          AppLocale.ur: 'تیز ایپ سٹارٹ اپ — پرووائیڈر شروعات کو بہتر '
+              'بنایا اور کولڈ سٹارٹ ٹائم کم کیا۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📊',
+        text: {
+          AppLocale.en: 'Shop ledger PDF export from shop detail screen '
+              'now generates proper account statement.',
+          AppLocale.ar: 'تصدير دفتر أستاذ المتجر بصيغة PDF من شاشة تفاصيل '
+              'المتجر ينشئ الآن كشف حساب صحيح.',
+          AppLocale.ur: 'شاپ ڈیٹیل اسکرین سے دکان لیجر PDF ایکسپورٹ اب '
+              'صحیح اکاؤنٹ اسٹیٹمنٹ بناتا ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.7.6',
     date: 'April 2026',
     items: [

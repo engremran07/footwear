@@ -166,6 +166,30 @@ Seller:
   Export string literals (page footers, column headers, timestamps) must
   use `trRead()` with the current locale — no hardcoded English.
 
+1. **Every `ExportSheet.show()` call MUST provide `pdfBytesBuilder`** when the
+  data is a ledger, account statement, or seller report. The generic
+  `buildPdfTable()` fallback is only acceptable for simple flat tables
+  (inventory list, shops list). If the export contains running balances,
+  debit/credit columns, or an Entry By column, the caller MUST supply a
+  custom `pdfBytesBuilder` that calls the appropriate builder
+  (`buildPdfLedger`, `buildPdfSellerReport`, `buildPdfMultiShopLedger`).
+  Grep gate: every `ExportSheet.show(` call site must be auditable.
+
+1. **`changelog_data.dart` MUST be updated on every version bump.** When
+  `app/pubspec.yaml` version is bumped, a corresponding entry MUST be added
+  to `app/lib/core/data/changelog_data.dart` with trilingual
+  (EN/AR/UR) descriptions. The `whats_new_sheet.dart` auto-displays the
+  latest changelog on first launch after update. Skipping this means users
+  see stale "What's New" content. Verify:
+  `grep -c "ChangelogVersion" app/lib/core/data/changelog_data.dart`
+
+1. **Task continuity is mandatory.** When a user adds new work mid-session,
+  the agent MUST merge new tasks into the existing todo list — never discard,
+  replace, or forget previous tasks. Review conversation history and session
+  memory before creating a new todo list. Incomplete tasks from prior prompts
+  carry forward automatically. If a prior task is no longer relevant, mark it
+  explicitly as "dropped — reason: ..." rather than silently removing it.
+
 ## 5) Known Failure Signatures
 
 1. permission-denied on route create/inventory add
@@ -401,6 +425,16 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-04-17 audit v18 — v3.7.9+57:
+
+- **PDF font shaping fix (Arabic/Urdu):** Root cause — `ByteData.view(bytes.buffer)` in `_fontsFromBytes()` ignored `offsetInBytes`, corrupting font data when `rootBundle.load()` returns non-zero offset; fix: `Uint8List.fromList()` copy during loading + defense-in-depth offset params in `_fontsFromBytes`; Arabic/Urdu letter joining (GSUB tables) now parsed correctly
+- **Shop detail PDF ledger export fixed:** Root cause — `ExportSheet.show()` in `shop_detail_screen.dart` had no `pdfBytesBuilder`; generic `buildPdfTable()` fallback failed → "PDF generation failed. Try Excel export instead."; fix: wired `buildPdfLedger()` with NameResolver, opening balance, 16-key labels map, locale-aware currency
+- **Export governance established:** New AGENTS.md rules 23-25 (pdfBytesBuilder mandate, changelog_data.dart on every version bump, task continuity mandatory); CLAUDE.md Hard Rules 19-21 added; 3 new Vibe-Coded Debt Signal rows; analytics-reporting SKILL.md expanded with pdfBytesBuilder requirement table + call site audit; inline-audit SKILL.md checklist expanded (4 new items) + 3 new failure signatures; `.github/instructions/export-governance.instructions.md` created
+- **Changelog backfilled:** v3.7.7, v3.7.8, v3.7.9 entries added to `changelog_data.dart` — total 6 version entries, all trilingual EN/AR/UR
+- **ExportSheet.show() audit:** All 11 call sites verified — 3 ledger/report exports correctly pass `pdfBytesBuilder`, 8 flat table exports correctly use default generic fallback
+- **All 396 tests passing**, zero analyze issues, web + APK built, hosting + Firestore deployed
+- **Audit score: 91/100 → 93/100**
 
 2026-04-16 audit v17 — v3.7.6+54:
 

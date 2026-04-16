@@ -9,12 +9,16 @@ import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/name_resolver.dart';
+import '../core/utils/pdf_export.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/transaction_model.dart';
+import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/shop_provider.dart';
 import '../providers/transaction_provider.dart';
+import '../providers/user_provider.dart';
 
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
@@ -716,11 +720,39 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             try {
                               final sorted = await _loadFullTransactions();
                               if (!context.mounted) return;
+                              final locale = ref.read(appLocaleProvider);
+                              final authUser = ref.read(authUserProvider).value;
+                              final isAdmin = authUser?.isAdmin == true;
+                              final settings = ref.read(settingsProvider).value;
+                              final allUsers = isAdmin
+                                  ? (ref.read(allUsersProvider).value ?? <UserModel>[])
+                                  : <UserModel>[];
+                              final names = NameResolver(
+                                users: allUsers,
+                                extra: {if (authUser != null) authUser.id: authUser.displayName},
+                                unknownLabel: trRead('unknown_user', locale),
+                              );
+                              // Reconcile opening balance so running balance
+                              // equals the stored shop.balance.
+                              final netTx = sorted.fold<double>(
+                                0.0, (s, t) => s + t.balanceImpact);
+                              final openingBalance = shop.balance - netTx;
+                              final labels = <String, String>{
+                                for (final k in const [
+                                  'date', 'description', 'debit', 'credit',
+                                  'running_balance', 'account_statement',
+                                  'opening_balance', 'net_payable', 'cash_in',
+                                  'cash_out', 'total_entries', 'page',
+                                  'report_date', 'generated_by', 'entry_by',
+                                  'duration',
+                                ])
+                                  k: tr(k, ref),
+                              };
                               ExportSheet.show(
                                 context,
                                 ref,
                                 title:
-                                    '${shop.name} - ${tr('transactions', ref)}',
+                                    '${shop.name} - ${tr('account_statement', ref)}',
                                 headers: [
                                   tr('date', ref),
                                   tr('type', ref),
@@ -737,7 +769,26 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                       ],
                                     )
                                     .toList(),
-                                fileName: 'shop_${shop.name}',
+                                fileName: 'account_statement_${shop.name.replaceAll(' ', '_')}',
+                                pdfBytesBuilder: () => buildPdfLedger(
+                                  shopName: shop.name,
+                                  companyName: settings?.companyName ?? '',
+                                  generatedBy: authUser?.displayName ?? '',
+                                  openingBalance: openingBalance,
+                                  transactions: sorted,
+                                  entryByMap: names.map,
+                                  showEntryBy: isAdmin,
+                                  dateFrom: sorted.isNotEmpty
+                                      ? sorted.first.createdAt.toDate()
+                                      : null,
+                                  dateTo: sorted.isNotEmpty
+                                      ? sorted.last.createdAt.toDate()
+                                      : null,
+                                  labels: labels,
+                                  locale: locale,
+                                  currency: settings?.currency ?? 'SAR',
+                                  logoBytes: settings?.logoBytes,
+                                ),
                               );
                             } catch (e) {
                               if (!context.mounted) return;

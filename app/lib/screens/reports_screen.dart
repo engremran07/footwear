@@ -188,11 +188,7 @@ class ReportsScreen extends ConsumerWidget {
     );
   }
 
-  void _exportInventory(
-    BuildContext context,
-    WidgetRef ref,
-    int ppc,
-  ) {
+  void _exportInventory(BuildContext context, WidgetRef ref, int ppc) {
     final user = ref.read(authUserProvider).value;
     if (user == null) {
       _showNoData(context, ref);
@@ -404,14 +400,8 @@ class _ExportCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(
-          icon,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
+        leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         trailing: const Icon(Icons.download),
         onTap: onExport,
       ),
@@ -716,7 +706,10 @@ class _OutstandingPieChart extends ConsumerWidget {
                                   : top[i].name,
                             ),
                           if (othersTotal > 0)
-                            _LegendDot(color: colors.last, label: tr('others', ref)),
+                            _LegendDot(
+                              color: colors.last,
+                              label: tr('others', ref),
+                            ),
                         ],
                       ),
                     ],

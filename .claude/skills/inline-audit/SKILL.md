@@ -106,7 +106,7 @@ before starting new work and complete all missing steps first.
 
 ## Inline Audit Checklist (run mentally on every PR)
 
-```
+```text
 [ ] Collections constants used everywhere (no raw strings)
 [ ] Inventory audit logs go to inventory_transactions, not transactions
 [ ] No isValidTransactionType violation (only: cash_out, cash_in, return, payment, write_off)
@@ -117,6 +117,10 @@ before starting new work and complete all missing steps first.
 [ ] version bumped in pubspec.yaml AND app_brand.dart
 [ ] Every transaction/invoice write also updates shop.balance atomically in same batch
 [ ] No screen/widget writes directly to transactions, invoices, or shop.balance
+[ ] Every ExportSheet.show() with ledger data passes pdfBytesBuilder (not generic fallback)
+[ ] changelog_data.dart updated with trilingual entry on every version bump
+[ ] No raw UID strings in any export output — NameResolver used everywhere
+[ ] No hardcoded English in PDF/Excel labels — trRead() with locale
 ```
 
 ## Known Failure Signatures (inline audit catches these)
@@ -128,6 +132,9 @@ before starting new work and complete all missing steps first.
 | Old tx invisible in customer detail | `where(deleted==false)` excludes field-missing docs | Client-side `!=true` filter |
 | Admin sees no items in invoice screen | admin inventory async hardcoded to empty | `ref.watch(sellerInventoryProvider(user.id))` for all |
 | Invoice created with no items | `user.isSeller &&` guard bypassed for admin | Remove role guard; check `deductions.isEmpty` for all |
+| "PDF generation failed" on export | `ExportSheet.show()` missing `pdfBytesBuilder` for ledger data | Pass `pdfBytesBuilder: () => buildPdfLedger(...)` with full params |
+| Stale "What's New" after update | `changelog_data.dart` not updated on version bump | Add trilingual `ChangelogVersion` entry for every version |
+| Raw UID instead of name in PDF | Ad-hoc uid→name map or missing NameResolver | Use `NameResolver` from `name_resolver.dart`; never fall back to raw UID |
 | Fat APK not installed, wrong ABI file | build used `--split-per-abi` | Always `flutter build apk --release` |
 | Stale balance after dev flush | transactions deleted via console/CLI without updating shop.balance | Run `node dev_reset.js` from repo root after any manual flush |
 | `avoid_double_and_int_checks` in `flutter build web` | Transitive dep (image 4.3.0) locked by another pkg (excel) to old archive | Upgrade or replace blocking package; see Chain 5 in CLAUDE.md |

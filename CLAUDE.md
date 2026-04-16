@@ -54,6 +54,23 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 18. All export/report name resolution MUST use `NameResolver` (`name_resolver.dart`).
     Never build ad-hoc uid→name maps. Never fall back to a raw UID string.
     Use `trRead()` with locale for all export string literals — no hardcoded English.
+19. Every `ExportSheet.show()` call MUST provide `pdfBytesBuilder` when the data is a
+    ledger, account statement, or seller report. The generic `buildPdfTable()` fallback
+    is only acceptable for simple flat tables (inventory list, shops list). If the export
+    contains running balances, debit/credit columns, or an Entry By column, the caller
+    MUST supply a custom `pdfBytesBuilder` that calls the appropriate builder
+    (`buildPdfLedger`, `buildPdfSellerReport`, `buildPdfMultiShopLedger`).
+20. `changelog_data.dart` MUST be updated on every version bump. When `app/pubspec.yaml`
+    version is bumped, a corresponding entry MUST be added to
+    `app/lib/core/data/changelog_data.dart` with trilingual (EN/AR/UR) descriptions.
+    The `whats_new_sheet.dart` auto-displays the latest changelog on first launch after
+    update. Skipping this means users see stale "What's New" content.
+21. Task continuity is mandatory. When a user adds new work mid-session, the agent MUST
+    merge new tasks into the existing todo list — never discard, replace, or forget
+    previous tasks. Review conversation history and session memory before creating a new
+    todo list. Incomplete tasks from prior prompts carry forward automatically. If a prior
+    task is no longer relevant, mark it explicitly as "dropped — reason: ..." rather than
+    silently removing it.
 
 ## Financial Pathways (never mix these)
 
@@ -212,6 +229,9 @@ Never keep ambiguity-driven workaround code without explicit justification.
 | `avoid_double_and_int_checks lint violation` in web build | Transitive dep locked to old `image`/`archive` by another pkg | Find blocking package; replace or upgrade it — see Chain 5 |
 | `flutter build web --release` exits 1 with no Error lines | PowerShell `NativeCommandError` from Wasm dry-run stderr — build IS succeeding | Check `$LASTEXITCODE` explicitly; exit 0 = real success |
 | `StateProvider<T>` in any `.dart` file | Riverpod 3 removed `StateProvider` — instant compile failure on upgrade | Replace with `NotifierProvider<T, S>` + `Notifier` subclass — see Chain 6 |
+| `ExportSheet.show(` without `pdfBytesBuilder` on ledger data | PDF export fails or produces flat table instead of ledger | Always pass `pdfBytesBuilder: () => buildPdfLedger(...)` for ledger exports |
+| `labels['key'] ?? 'English Fallback'` in PDF builders | Hardcoded English bypasses i18n | Use `trRead()` with locale; `??` fallback must be `'—'` or localized key |
+| Missing `ChangelogVersion` entry after version bump | Users see stale "What's New" content | Add trilingual entry to `changelog_data.dart` on every version bump |
 
 ## Fifteen Non-Negotiable Pre-Signoff Steps
 

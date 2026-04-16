@@ -20,9 +20,9 @@ final networkStatusProvider = StreamProvider.autoDispose<bool>((ref) {
   var lastStatus = true;
 
   Future<bool> probe() async {
-    final result = await InternetAddress.lookup(probeHost).timeout(
-      probeTimeout,
-    );
+    final result = await InternetAddress.lookup(
+      probeHost,
+    ).timeout(probeTimeout);
     return result.isNotEmpty && result.first.rawAddress.isNotEmpty;
   }
 
