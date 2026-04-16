@@ -320,7 +320,7 @@ git status --short | grep -E "auth-users\.json|\.txt$|\.log$|\.flag$|check_local
 #### Step 6 — Zero markdown lint issues
 
 ```powershell
-markdownlint "**/*.md" --ignore node_modules --ignore app/build --ignore functions/node_modules
+markdownlint "**/*.md" ".claude/**/*.md" ".github/**/*.md" --ignore node_modules --ignore app/build --ignore functions/node_modules
 ```
 
 Evidence required: zero output (exit 0)

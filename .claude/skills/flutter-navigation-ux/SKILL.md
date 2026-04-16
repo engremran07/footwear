@@ -6,17 +6,25 @@ description: "Use when: implementing zoom drawer navigation, WhatsApp-style bott
 # Skill: Flutter Navigation UX — Zoom Drawer + WhatsApp Style
 
 ## Architecture Decision
+
 - **Mobile (< 720px)**: WhatsApp-style bottom NavigationBar (max 5 items) + Zoom Drawer for overflow items
+
 - **Tablet (≥ 720px)**: Material 3 NavigationRail (as currently implemented)
+
 - **Desktop (≥ 1024px)**: Extended NavigationRail
 
 ## Zoom Drawer Pattern (flutter_zoom_drawer)
+
 ```yaml
+
 # pubspec.yaml addition
+
 flutter_zoom_drawer: ^3.2.0  # or compatible latest
+
 ```
 
 ```dart
+
 // ZoomDrawer wraps the entire AppShell — drawer slides open from left
 // with a perspective zoom effect (3D-feel scale + translate)
 class AppShell extends ConsumerStatefulWidget {
@@ -45,27 +53,39 @@ Widget build(BuildContext context) {
     closeCurve: Curves.bounceIn,
   );
 }
+
 ```
 
 ## WhatsApp-Style Bottom Navigation (5 items max for sellers, 4 for admin)
 
 ### Seller Bottom Nav Items (5 max)
+
 1. Dashboard (home icon)
+
 2. Shops (storefront)
+
 3. Invoices (receipt_long)
+
 4. Inventory (inventory_2)
+
 5. Profile (person)
 
 ### Admin Bottom Nav Items (4 primary)
+
 1. Dashboard
+
 2. Routes
+
 3. Reports
+
 4. Settings
 
 All other items accessible via Zoom Drawer.
 
 ## Bottom Nav Implementation
+
 ```dart
+
 NavigationBar(
   selectedIndex: _selectedIndex(navItems, currentLocation),
   onDestinationSelected: (i) => context.go(navItems[i].route),
@@ -79,16 +99,23 @@ NavigationBar(
     tooltip: item.label,
   )).toList(),
 )
+
 ```
 
 ## App Bar — WhatsApp Style
+
 Key features:
+
 - Company logo + "FootWear" brand name on left
+
 - Drawer hamburger on left (opens ZoomDrawer)
+
 - Action icons on right: search, notifications, profile avatar
+
 - Online indicator dot on avatar
 
 ```dart
+
 AppBar(
   leading: IconButton(
     icon: const Icon(Icons.menu),
@@ -105,10 +132,13 @@ AppBar(
     _ProfileAvatar(user: user, isOnline: isOnline),
   ],
 )
+
 ```
 
 ## Drawer Menu Screen
+
 ```dart
+
 class _DrawerMenuScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return SafeArea(
@@ -137,15 +167,19 @@ class _DrawerMenuScreen extends ConsumerWidget {
     );
   }
 }
+
 ```
 
 ## go_router Integration
+
 ZoomDrawer does NOT interfere with go_router — the `mainScreen` contains the `widget.child` which go_router already provides.
 
 Key constraint: `ZoomDrawerController.toggle` must only be called on main screen scaffold (not inside child routes).
 
 ## Role-Based Nav Items
+
 ```dart
+
 List<NavItem> _filteredItems(UserModel? user) {
   if (user == null) return [];
   if (user.isAdmin) return _adminNavItems;   // all items
@@ -156,11 +190,15 @@ List<NavItem> _filteredItems(UserModel? user) {
 // Drawer shows ALL role-filtered items (unlimited)
 List<NavItem> get _bottomNavItems => _filteredItems.take(5).toList();
 List<NavItem> get _drawerNavItems => _filteredItems;
+
 ```
 
 ## Animation — Tab Switch Transition
+
 Use `AnimatedSwitcher` or `PageTransitionsTheme` for smooth tab switches in bottom nav:
+
 ```dart
+
 // In AppShell: animate child transitions
 AnimatedSwitcher(
   duration: AppTokens.durNormal,
@@ -176,16 +214,24 @@ AnimatedSwitcher(
   ),
   child: KeyedSubtree(key: ValueKey(currentLocation), child: widget.child),
 )
+
 ```
 
 ## Common Pitfalls
+
 - ZoomDrawer `menuScreen` must NOT use `Scaffold` with its own AppBar — the drawer is the outer wrapper
+
 - `ZoomDrawer.of(context)` may be null if called outside ZoomDrawer tree — always null-check
+
 - `context.go()` for bottom nav tabs (replaces stack); `context.push()` for detail pages
+
 - Back button must close drawer first if open, then navigate up
 
 ## Dependency to Add
+
 ```yaml
+
 dependencies:
   flutter_zoom_drawer: ^3.2.0
+
 ```

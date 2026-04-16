@@ -10,9 +10,13 @@ You are the **Orchestrator** for a comprehensive 20-agent parallel audit of the 
 ## Audit Context
 
 This is a Flutter ERP for route-based shoe distribution.
+
 - **Roles:** admin, seller (manager = admin-equivalent)
+
 - **Collections:** users, products, product_variants, seller_inventory, inventory_transactions, routes, shops (Firestore: 'customers'), transactions, invoices, settings
+
 - **Tech:** Flutter + Riverpod + Firestore + Firebase Auth (Spark free tier, zero Cloud Functions)
+
 - **Key constraints:** Fat APK only, no Firebase Storage, admin = seller + admin
 
 ## Agent Roster (launch ALL concurrently)
@@ -37,7 +41,7 @@ Check: 3-pathway integrity (sale/cash/void), atomic batch writes, amountReceived
 
 **Agent 5 — Auth & Session Security**
 Audit: `app/lib/core/services/admin_identity_service.dart`, `app/lib/core/services/session_guard.dart`, `app/lib/providers/auth_provider.dart`
-Check: 3-step VERIFY_EMAIL flow, credential caching, cloud-platform scope, session expiry warning, _invalidateRoleScopedProviders completeness
+Check: 3-step VERIFY_EMAIL flow, credential caching, cloud-platform scope, session expiry warning, `_invalidateRoleScopedProviders` completeness
 
 **Agent 6 — OWASP Mobile Security**
 Audit: All screen files, `firestore.rules`, `app/lib/core/services/`
@@ -103,9 +107,13 @@ After all 19 agents report: synthesize findings into severity-ranked register (P
 After all agents complete, produce:
 
 1. **Closure Matrix** (table: Issue ID | Domain | Severity | Status | Fix File | Effort)
+
 2. **Top 10 by Severity** (P0 first, then P1)
+
 3. **Already-Fixed Verification** (confirm P0-01, P0-02, P0-03 from prior audit are resolved)
+
 4. **New Findings** (anything not in prior register)
+
 5. **Recommended Action Order** (parallel-safe groups)
 
 ## Output Format

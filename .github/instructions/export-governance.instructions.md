@@ -14,11 +14,17 @@ product catalog, routes list).
 Builder selection:
 
 | Data type | Builder |
+
 | --- | --- |
+
 | Single shop ledger / account statement | `buildPdfLedger()` |
+
 | Multi-shop ledger (route-level) | `buildPdfMultiShopLedger()` |
+
 | Seller performance report | `buildPdfSellerReport()` |
+
 | Invoice document | `generateInvoicePdf()` |
+
 | Simple flat table | `buildPdfTable()` (default OK) |
 
 ## NameResolver Mandate
@@ -44,12 +50,17 @@ first launch after update.
 ## Grep Gates
 
 ```bash
+
 # All ExportSheet.show() calls — audit each for pdfBytesBuilder
+
 grep -rn "ExportSheet.show(" app/lib/ --include="*.dart"
 
 # No raw UID fallback in exports
+
 grep -rn "?? entry\[" app/lib/core/utils/pdf_export.dart
 
 # NameResolver used in all export screens
+
 grep -rn "NameResolver" app/lib/screens/ --include="*.dart"
+
 ```

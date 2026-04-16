@@ -6,13 +6,17 @@ description: "Use when: adding routes, fixing navigation guards, breadcrumb issu
 # Skill: Navigation & Routing
 
 ## Domain
+
 go_router navigation for Flutter ShoesERP with role-based redirect guards.
 
 ## Key File
+
 - `app/lib/core/router/app_router.dart` — single source of route truth
 
 ## Canonical Routes
-```
+
+```text
+
 /login         → LoginScreen
 /              → DashboardScreen  (shell route)
 /routes        → RouteListScreen
@@ -35,24 +39,34 @@ go_router navigation for Flutter ShoesERP with role-based redirect guards.
 /inventory     → InventoryScreen
 /reports       → ReportsScreen
 /settings      → SettingsScreen
+
 ```
 
 ## Shell + Breadcrumb
+
 - `AppShell` wraps all authenticated routes with bottom nav + AppBar
+
 - `_BreadcrumbTitle` computes title from current route name segments
+
 - NavigationBar items: Dashboard, Routes, Customers/Shops, Products, Reports
 
 ## Role Guard Pattern
+
 ```dart
+
 redirect: (context, state) {
   final user = ref.read(authUserProvider).valueOrNull;
   if (user == null) return '/login';
   if (adminOnlyPaths.contains(state.matchedLocation) && !user.isAdmin) return '/';
   return null;
 }
+
 ```
 
 ## Common Pitfalls
+
 - Use `context.go()` for bottom-nav tabs (replace stack); `context.push()` for detail pages
+
 - `GoRouter.of(context).pop()` only works if there is a page to pop — use `canPop()` guard
+
 - Shell routes do NOT support `context.pop()` back to login — use `context.go('/login')` on sign-out

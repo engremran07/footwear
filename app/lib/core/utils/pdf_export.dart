@@ -1,12 +1,20 @@
 import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../l10n/app_locale.dart';
 import '../../models/transaction_model.dart';
 import '../../models/invoice_model.dart';
+
+/// Runs [computation] in an isolate on native platforms,
+/// or inline on web (which doesn't support Isolate.run).
+Future<R> _pdfCompute<R>(FutureOr<R> Function() computation) {
+  if (kIsWeb) return Future.value(computation());
+  return Isolate.run(computation);
+}
 
 /// Pre-loaded font bytes — loaded once on main isolate from rootBundle,
 /// then sent into compute isolates as raw [Uint8List].
@@ -52,16 +60,20 @@ Future<void> _ensureFontBytes() async {
   Uint8List urduBytes,
 ) {
   return (
-    arabic: pw.Font.ttf(ByteData.view(
-      arabicBytes.buffer,
-      arabicBytes.offsetInBytes,
-      arabicBytes.lengthInBytes,
-    )),
-    urdu: pw.Font.ttf(ByteData.view(
-      urduBytes.buffer,
-      urduBytes.offsetInBytes,
-      urduBytes.lengthInBytes,
-    )),
+    arabic: pw.Font.ttf(
+      ByteData.view(
+        arabicBytes.buffer,
+        arabicBytes.offsetInBytes,
+        arabicBytes.lengthInBytes,
+      ),
+    ),
+    urdu: pw.Font.ttf(
+      ByteData.view(
+        urduBytes.buffer,
+        urduBytes.offsetInBytes,
+        urduBytes.lengthInBytes,
+      ),
+    ),
   );
 }
 
@@ -126,7 +138,7 @@ Future<Uint8List> buildPdfTable({
 }) async {
   await _ensureFontBytes();
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
-  return Isolate.run(() {
+  return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
     final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
     final primaryFont = locale == AppLocale.ur ? fonts.urdu : fonts.arabic;
@@ -226,9 +238,7 @@ Future<Uint8List> buildPdfTable({
                 ),
                 cellAlignments: {
                   for (var i = 0; i < headers.length; i++)
-                    i: isRtl
-                        ? pw.Alignment.centerRight
-                        : pw.Alignment.centerLeft,
+                    i: pw.Alignment.center,
                 },
               ),
               pw.Spacer(),
@@ -306,7 +316,7 @@ Future<Uint8List> buildPdfLedger({
   ]);
   await _ensureFontBytes();
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
-  return Isolate.run(() {
+  return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
     final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
     final primaryFont = locale == AppLocale.ur ? fonts.urdu : fonts.arabic;
@@ -825,6 +835,7 @@ pw.Widget _buildLedgerHeaderRow(
               font: primaryFont,
               fontFallback: ff,
             ),
+            textAlign: pw.TextAlign.center,
             textDirection: _cellDir(labels[i], dir),
           ),
         );
@@ -894,6 +905,7 @@ pw.Widget _buildLedgerDataRow(
               font: primaryFont,
               fontFallback: ff,
             ),
+            textAlign: pw.TextAlign.center,
             textDirection: i >= cashOutIdx
                 ? _amountDir
                 : _cellDir(cells[i], dir),
@@ -909,12 +921,12 @@ pw.Widget _buildLedgerDataRow(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// A single customer row inside the seller report.
-class SellerReportCustomer {
+class SellerReportShop {
   final String name;
   final int totalPairsSold;
   final double totalRevenue;
   final double outstandingBalance;
-  const SellerReportCustomer({
+  const SellerReportShop({
     required this.name,
     required this.totalPairsSold,
     required this.totalRevenue,
@@ -925,13 +937,13 @@ class SellerReportCustomer {
 /// Builds a seller summary report PDF.
 ///
 /// [sellerName], [sellerPhone], [routeName] describe the seller.
-/// [customers] is the list of summarised customer rows.
+/// [shops] is the list of summarised shop rows.
 /// [stockReceived], [stockSold], [stockRemaining] are in pairs.
 Future<Uint8List> buildPdfSellerReport({
   required String sellerName,
   required String sellerPhone,
   required String routeName,
-  required List<SellerReportCustomer> customers,
+  required List<SellerReportShop> shops,
   required int stockReceived,
   required int stockSold,
   required int stockRemaining,
@@ -943,7 +955,7 @@ Future<Uint8List> buildPdfSellerReport({
 }) async {
   await _ensureFontBytes();
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
-  return Isolate.run(() {
+  return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
     final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
 
@@ -966,7 +978,7 @@ Future<Uint8List> buildPdfSellerReport({
     double totalRevenue = 0;
     double totalOutstanding = 0;
     int totalPairs = 0;
-    for (final c in customers) {
+    for (final c in shops) {
       totalRevenue += c.totalRevenue;
       totalOutstanding += c.outstandingBalance;
       totalPairs += c.totalPairsSold;
@@ -1111,19 +1123,19 @@ Future<Uint8List> buildPdfSellerReport({
 
           // ── Customer Table ──
           pw.Text(
-            labels['customers'] ?? 'Customers',
+            labels['shops'] ?? 'Shops',
             style: ts(size: 11, fw: pw.FontWeight.bold),
             textDirection: dir,
           ),
           pw.SizedBox(height: 4),
           pw.TableHelper.fromTextArray(
             headers: [
-              labels['customer'] ?? 'Customer',
+              labels['shop'] ?? 'Shop',
               labels['stock_sold'] ?? 'Sold (Pairs)',
               labels['revenue'] ?? 'Revenue',
               labels['outstanding'] ?? 'Outstanding',
             ],
-            data: customers
+            data: shops
                 .map(
                   (c) => [
                     _s(c.name),
@@ -1155,6 +1167,7 @@ Future<Uint8List> buildPdfSellerReport({
             cellHeight: 22,
             headerDirection: dir,
             border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+            cellAlignment: pw.Alignment.center,
           ),
           pw.SizedBox(height: 8),
 
@@ -1259,7 +1272,7 @@ Future<Uint8List> generateInvoicePdf({
   final lblSubtotal = trRead('subtotal', locale);
   final lblDiscount = trRead('discount', locale);
   final lblNotes = trRead('notes', locale);
-  return Isolate.run(() {
+  return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
     final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
     final primaryFont = locale == AppLocale.ur ? fonts.urdu : fonts.arabic;
@@ -1386,7 +1399,7 @@ Future<Uint8List> generateInvoicePdf({
                 crossAxisAlignment: align,
                 children: [
                   pw.Text(
-                    'Customer: ${_s(invoice.shopName)}',
+                    'Shop: ${_s(invoice.shopName)}',
                     style: ts(size: 10, fw: pw.FontWeight.bold),
                     textDirection: _cellDir(invoice.shopName, dir),
                   ),
@@ -1439,6 +1452,7 @@ Future<Uint8List> generateInvoicePdf({
                                     font: primaryFont,
                                     fontFallback: ff,
                                   ),
+                                  textAlign: pw.TextAlign.center,
                                   textDirection: dir,
                                 ),
                               ),
@@ -1474,6 +1488,7 @@ Future<Uint8List> generateInvoicePdf({
                                   font: primaryFont,
                                   fontFallback: ff,
                                 ),
+                                textAlign: pw.TextAlign.center,
                                 textDirection: _cellDir(c, dir),
                               ),
                             ),
@@ -1648,7 +1663,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
 }) async {
   await _ensureFontBytes();
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
-  return Isolate.run(() {
+  return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
     final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
     final primaryFont = locale == AppLocale.ur ? fonts.urdu : fonts.arabic;

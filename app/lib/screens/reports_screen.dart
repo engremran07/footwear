@@ -990,17 +990,17 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       final txsBySeller = allTxs
           .where((t) => t.createdBy == _selectedSellerId)
           .toList();
-      final customerMap = <String, SellerReportCustomer>{};
+      final shopMap = <String, SellerReportShop>{};
       for (final tx in txsBySeller) {
         final cid = tx.shopId;
         if (cid.isEmpty) continue;
         final cname = tx.shopName.isNotEmpty
             ? tx.shopName
             : allShops.where((s) => s.id == cid).firstOrNull?.name ?? '';
-        final existing = customerMap[cid];
+        final existing = shopMap[cid];
         final pairsSold = tx.items.fold<int>(0, (acc, item) => acc + item.qty);
         final revenue = tx.isCashOut ? tx.amount : 0.0;
-        customerMap[cid] = SellerReportCustomer(
+        shopMap[cid] = SellerReportShop(
           name: cname,
           totalPairsSold: (existing?.totalPairsSold ?? 0) + pairsSold,
           totalRevenue: (existing?.totalRevenue ?? 0) + revenue,
@@ -1008,10 +1008,10 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
         );
       }
       // Add outstanding balance from shops collection
-      for (final entry in customerMap.entries) {
+      for (final entry in shopMap.entries) {
         final match = allShops.where((s) => s.id == entry.key);
         if (match.isNotEmpty) {
-          customerMap[entry.key] = SellerReportCustomer(
+          shopMap[entry.key] = SellerReportShop(
             name: entry.value.name,
             totalPairsSold: entry.value.totalPairsSold,
             totalRevenue: entry.value.totalRevenue,
@@ -1042,7 +1042,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
           tr('revenue', ref),
           tr('outstanding', ref),
         ],
-        rows: customerMap.values
+        rows: shopMap.values
             .map(
               (c) => [
                 c.name,
@@ -1066,7 +1066,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
             sellerName: seller.displayName,
             sellerPhone: seller.phone ?? '',
             routeName: routeDisplayName,
-            customers: customerMap.values.toList(),
+            shops: shopMap.values.toList(),
             stockReceived: stockReceived,
             stockSold: stockSold,
             stockRemaining: stockRemaining,

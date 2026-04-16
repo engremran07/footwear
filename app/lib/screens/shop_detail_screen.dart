@@ -725,25 +725,41 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               final isAdmin = authUser?.isAdmin == true;
                               final settings = ref.read(settingsProvider).value;
                               final allUsers = isAdmin
-                                  ? (ref.read(allUsersProvider).value ?? <UserModel>[])
+                                  ? (ref.read(allUsersProvider).value ??
+                                        <UserModel>[])
                                   : <UserModel>[];
                               final names = NameResolver(
                                 users: allUsers,
-                                extra: {if (authUser != null) authUser.id: authUser.displayName},
+                                extra: {
+                                  if (authUser != null)
+                                    authUser.id: authUser.displayName,
+                                },
                                 unknownLabel: trRead('unknown_user', locale),
                               );
                               // Reconcile opening balance so running balance
                               // equals the stored shop.balance.
                               final netTx = sorted.fold<double>(
-                                0.0, (s, t) => s + t.balanceImpact);
+                                0.0,
+                                (s, t) => s + t.balanceImpact,
+                              );
                               final openingBalance = shop.balance - netTx;
                               final labels = <String, String>{
                                 for (final k in const [
-                                  'date', 'description', 'debit', 'credit',
-                                  'running_balance', 'account_statement',
-                                  'opening_balance', 'net_payable', 'cash_in',
-                                  'cash_out', 'total_entries', 'page',
-                                  'report_date', 'generated_by', 'entry_by',
+                                  'date',
+                                  'description',
+                                  'debit',
+                                  'credit',
+                                  'running_balance',
+                                  'account_statement',
+                                  'opening_balance',
+                                  'net_payable',
+                                  'cash_in',
+                                  'cash_out',
+                                  'total_entries',
+                                  'page',
+                                  'report_date',
+                                  'generated_by',
+                                  'entry_by',
                                   'duration',
                                 ])
                                   k: tr(k, ref),
@@ -769,7 +785,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                       ],
                                     )
                                     .toList(),
-                                fileName: 'account_statement_${shop.name.replaceAll(' ', '_')}',
+                                fileName:
+                                    'account_statement_${shop.name.replaceAll(' ', '_')}',
                                 pdfBytesBuilder: () => buildPdfLedger(
                                   shopName: shop.name,
                                   companyName: settings?.companyName ?? '',

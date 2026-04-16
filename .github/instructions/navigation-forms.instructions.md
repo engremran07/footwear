@@ -22,6 +22,7 @@ The user sees an error SnackBar even though the Firestore write succeeded.
 ### Correct pattern
 
 ```dart
+
 // ✅ CORRECT — form screens (create / edit)
 context.push('/routes/new');
 context.push('/routes/$id/edit');
@@ -39,14 +40,19 @@ context.go('/shops');
 context.go('/products');
 context.go('/inventory');
 context.go('/profile');
+
 ```
 
 ### Rule of thumb
 
 | Destination type | Method |
+
 |---|---|
+
 | Top-level shell tab (bottom nav / drawer) | `context.go()` |
+
 | Form screen (create / edit) | `context.push()` |
+
 | Detail screen reached from a list | `context.push()` |
 
 ## Rule: `context.pop()` OUTSIDE the try-catch in form `_save()` methods
@@ -55,6 +61,7 @@ All form `_save()` methods must use the `saved` flag pattern so that a
 navigation exception cannot produce a false error SnackBar:
 
 ```dart
+
 Future<void> _save() async {
   // ...validate...
   setState(() => _saving = true);
@@ -80,11 +87,13 @@ Future<void> _save() async {
     context.pop();
   }
 }
+
 ```
 
 **Anti-pattern** — DO NOT put `context.pop()` inside `try`:
 
 ```dart
+
 // ❌ WRONG — pop inside try-catch
 try {
   await provider.save();
@@ -95,6 +104,7 @@ try {
 } catch (e) {
   showSnackBar(error); // fires even after successful save!
 }
+
 ```
 
 ## Callers: app_shell.dart FAB
@@ -104,10 +114,12 @@ The FAB bottom sheet in `app_shell.dart` uses `action.route` from the
 `context.go()`, because all FAB routes are form screens:
 
 ```dart
+
 onTap: () {
   Navigator.pop(ctx);
   context.push(action.route); // ← push, not go
 },
+
 ```
 
 ## Enforcement
@@ -115,8 +127,11 @@ onTap: () {
 Add to the inline audit pass whenever touching any screen that opens a form:
 
 ```bash
+
 # No context.go() for form routes
+
 grep -rn "context\.go.*/(new|edit)" app/lib/ | grep -v "// ok"
+
 ```
 
 Expected output: zero matches.

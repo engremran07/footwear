@@ -267,7 +267,7 @@ grep -rn "StateProvider\b" app/lib/ --include="*.dart"
 # Must return zero lines
 
 # 8 — Zero markdown lint issues (Problems tab must be empty)
-markdownlint "**/*.md" --ignore node_modules --ignore app/build --ignore functions/node_modules
+markdownlint "**/*.md" ".claude/**/*.md" ".github/**/*.md" --ignore node_modules --ignore app/build --ignore functions/node_modules
 # Must exit 0 with zero output
 
 # 9 — Web release build (PowerShell — check $LASTEXITCODE, not pipe output)

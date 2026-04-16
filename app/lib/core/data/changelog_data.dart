@@ -7,8 +7,7 @@ class ChangelogItem {
 
   const ChangelogItem({required this.emoji, required this.text});
 
-  String textFor(AppLocale locale) =>
-      text[locale] ?? text[AppLocale.en] ?? '';
+  String textFor(AppLocale locale) => text[locale] ?? text[AppLocale.en] ?? '';
 }
 
 /// One release version shown in the "What's New" sheet.
@@ -29,28 +28,68 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.7.10',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🏪',
+        text: {
+          AppLocale.en:
+              'All "Customer" labels renamed to "Shop" throughout '
+              'reports, PDFs, and exports for consistency.',
+          AppLocale.ar:
+              'تم تغيير جميع تسميات "العميل" إلى "المتجر" في '
+              'التقارير وملفات PDF وعمليات التصدير.',
+          AppLocale.ur:
+              'تمام "گاہک" لیبلز کو "دکان" میں تبدیل کر دیا گیا '
+              'رپورٹس، PDFs اور ایکسپورٹس میں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '✅',
+        text: {
+          AppLocale.en:
+              'Documentation and governance files updated — '
+              'zero markdown lint issues across all project files.',
+          AppLocale.ar:
+              'تحديث ملفات التوثيق والحوكمة — '
+              'صفر مشاكل في تدقيق Markdown عبر جميع الملفات.',
+          AppLocale.ur:
+              'دستاویزات اور گورننس فائلیں اپ ڈیٹ ہوئیں — '
+              'تمام پراجیکٹ فائلوں میں صفر مارک ڈاؤن مسائل۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.7.9',
     date: 'April 2026',
     items: [
       ChangelogItem(
         emoji: '📄',
         text: {
-          AppLocale.en: 'Shop account-statement PDF export now works from '
+          AppLocale.en:
+              'Shop account-statement PDF export now works from '
               'every shop — fixed "failed to export" error.',
-          AppLocale.ar: 'تصدير كشف حساب المتجر بصيغة PDF يعمل الآن من كل '
+          AppLocale.ar:
+              'تصدير كشف حساب المتجر بصيغة PDF يعمل الآن من كل '
               'متجر — تم إصلاح خطأ "فشل التصدير".',
-          AppLocale.ur: 'دکان کا اکاؤنٹ اسٹیٹمنٹ PDF ایکسپورٹ اب ہر دکان '
+          AppLocale.ur:
+              'دکان کا اکاؤنٹ اسٹیٹمنٹ PDF ایکسپورٹ اب ہر دکان '
               'سے کام کرتا ہے — "ایکسپورٹ ناکام" خطا ٹھیک ہو گئی۔',
         },
       ),
       ChangelogItem(
         emoji: '📋',
         text: {
-          AppLocale.en: 'Export governance — all reports now consistently '
+          AppLocale.en:
+              'Export governance — all reports now consistently '
               'show proper ledger format with names and balances.',
-          AppLocale.ar: 'حوكمة التصدير — جميع التقارير تعرض الآن تنسيق '
+          AppLocale.ar:
+              'حوكمة التصدير — جميع التقارير تعرض الآن تنسيق '
               'دفتر أستاذ متسق مع الأسماء والأرصدة.',
-          AppLocale.ur: 'ایکسپورٹ گورننس — تمام رپورٹیں اب مستقل لیجر '
+          AppLocale.ur:
+              'ایکسپورٹ گورننس — تمام رپورٹیں اب مستقل لیجر '
               'فارمیٹ میں نام اور بیلنس دکھاتی ہیں۔',
         },
       ),
@@ -63,22 +102,28 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '👤',
         text: {
-          AppLocale.en: 'Reports now show seller names instead of internal '
+          AppLocale.en:
+              'Reports now show seller names instead of internal '
               'codes — all exports use proper name resolution.',
-          AppLocale.ar: 'التقارير تعرض الآن أسماء البائعين بدلاً من الرموز '
+          AppLocale.ar:
+              'التقارير تعرض الآن أسماء البائعين بدلاً من الرموز '
               'الداخلية — جميع التصديرات تستخدم حل الأسماء الصحيح.',
-          AppLocale.ur: 'رپورٹیں اب اندرونی کوڈز کی بجائے سیلر کے نام '
+          AppLocale.ur:
+              'رپورٹیں اب اندرونی کوڈز کی بجائے سیلر کے نام '
               'دکھاتی ہیں — تمام ایکسپورٹس صحیح نام استعمال کرتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🌍',
         text: {
-          AppLocale.en: 'PDF exports now fully support Arabic, Urdu, and '
+          AppLocale.en:
+              'PDF exports now fully support Arabic, Urdu, and '
               'English labels — no more English-only headers.',
-          AppLocale.ar: 'تصدير PDF يدعم الآن العربية والأردية والإنجليزية '
+          AppLocale.ar:
+              'تصدير PDF يدعم الآن العربية والأردية والإنجليزية '
               'بالكامل — لا مزيد من العناوين الإنجليزية فقط.',
-          AppLocale.ur: 'PDF ایکسپورٹس اب عربی، اردو اور انگریزی لیبلز '
+          AppLocale.ur:
+              'PDF ایکسپورٹس اب عربی، اردو اور انگریزی لیبلز '
               'کی مکمل حمایت کرتے ہیں — صرف انگریزی ہیڈرز نہیں رہے۔',
         },
       ),
@@ -91,22 +136,28 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '⚡',
         text: {
-          AppLocale.en: 'Faster app startup — optimized provider '
+          AppLocale.en:
+              'Faster app startup — optimized provider '
               'initialization and reduced cold-start time.',
-          AppLocale.ar: 'بدء تشغيل أسرع — تحسين تهيئة المزودات وتقليل '
+          AppLocale.ar:
+              'بدء تشغيل أسرع — تحسين تهيئة المزودات وتقليل '
               'وقت البدء البارد.',
-          AppLocale.ur: 'تیز ایپ سٹارٹ اپ — پرووائیڈر شروعات کو بہتر '
+          AppLocale.ur:
+              'تیز ایپ سٹارٹ اپ — پرووائیڈر شروعات کو بہتر '
               'بنایا اور کولڈ سٹارٹ ٹائم کم کیا۔',
         },
       ),
       ChangelogItem(
         emoji: '📊',
         text: {
-          AppLocale.en: 'Shop ledger PDF export from shop detail screen '
+          AppLocale.en:
+              'Shop ledger PDF export from shop detail screen '
               'now generates proper account statement.',
-          AppLocale.ar: 'تصدير دفتر أستاذ المتجر بصيغة PDF من شاشة تفاصيل '
+          AppLocale.ar:
+              'تصدير دفتر أستاذ المتجر بصيغة PDF من شاشة تفاصيل '
               'المتجر ينشئ الآن كشف حساب صحيح.',
-          AppLocale.ur: 'شاپ ڈیٹیل اسکرین سے دکان لیجر PDF ایکسپورٹ اب '
+          AppLocale.ur:
+              'شاپ ڈیٹیل اسکرین سے دکان لیجر PDF ایکسپورٹ اب '
               'صحیح اکاؤنٹ اسٹیٹمنٹ بناتا ہے۔',
         },
       ),
@@ -119,22 +170,28 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📄',
         text: {
-          AppLocale.en: 'Shop account-statement PDF now works reliably for '
+          AppLocale.en:
+              'Shop account-statement PDF now works reliably for '
               'all users — fixed the "something went wrong" error.',
-          AppLocale.ar: 'كشف حساب المتجر بصيغة PDF يعمل الآن بشكل موثوق لجميع '
+          AppLocale.ar:
+              'كشف حساب المتجر بصيغة PDF يعمل الآن بشكل موثوق لجميع '
               'المستخدمين — تم إصلاح خطأ "حدث خطأ ما".',
-          AppLocale.ur: 'دکان کا اکاؤنٹ اسٹیٹمنٹ PDF اب سب کے لیے درست '
+          AppLocale.ur:
+              'دکان کا اکاؤنٹ اسٹیٹمنٹ PDF اب سب کے لیے درست '
               'کام کرتا ہے — "کچھ غلط ہو گیا" والی خطا ٹھیک کر دی گئی۔',
         },
       ),
       ChangelogItem(
         emoji: '📊',
         text: {
-          AppLocale.en: 'Multi-shop route ledger PDF works for both admin '
+          AppLocale.en:
+              'Multi-shop route ledger PDF works for both admin '
               'and sellers — each seller only sees their own route.',
-          AppLocale.ar: 'كشف حساب المسار متعدد المتاجر يعمل للمدير والبائعين — '
+          AppLocale.ar:
+              'كشف حساب المسار متعدد المتاجر يعمل للمدير والبائعين — '
               'كل بائع يرى مساره فقط.',
-          AppLocale.ur: 'ملٹی شاپ روٹ لیجر PDF ایڈمن اور سیلرز دونوں کے '
+          AppLocale.ur:
+              'ملٹی شاپ روٹ لیجر PDF ایڈمن اور سیلرز دونوں کے '
               'لیے کام کرتا ہے — ہر سیلر صرف اپنا روٹ دیکھتا ہے۔',
         },
       ),
@@ -144,9 +201,11 @@ const List<ChangelogEntry> kChangelog = [
           AppLocale.en:
               'New "What\'s New" screen — app now tells you what changed '
               'every time it updates.',
-          AppLocale.ar: 'شاشة "الجديد" الجديدة — يخبرك التطبيق الآن بما '
+          AppLocale.ar:
+              'شاشة "الجديد" الجديدة — يخبرك التطبيق الآن بما '
               'تغيّر في كل تحديث.',
-          AppLocale.ur: 'نئی "نئی خصوصیات" اسکرین — اب ایپ ہر اپڈیٹ میں '
+          AppLocale.ur:
+              'نئی "نئی خصوصیات" اسکرین — اب ایپ ہر اپڈیٹ میں '
               'نئی تبدیلیاں بتاتی ہے۔',
         },
       ),
@@ -159,7 +218,8 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🛡️',
         text: {
-          AppLocale.en: 'Stability improvements — better error messages when '
+          AppLocale.en:
+              'Stability improvements — better error messages when '
               'something goes wrong.',
           AppLocale.ar: 'تحسينات الاستقرار — رسائل خطأ أوضح عند حدوث مشاكل.',
           AppLocale.ur: 'استحکام میں بہتری — کچھ غلط ہونے پر واضح پیغامات۔',
@@ -168,11 +228,14 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '⚡',
         text: {
-          AppLocale.en: 'Faster data export — transaction exports now load '
+          AppLocale.en:
+              'Faster data export — transaction exports now load '
               'up to 2,000 records.',
-          AppLocale.ar: 'تصدير بيانات أسرع — تصدير المعاملات يدعم الآن '
+          AppLocale.ar:
+              'تصدير بيانات أسرع — تصدير المعاملات يدعم الآن '
               'حتى 2000 سجل.',
-          AppLocale.ur: 'تیز ڈیٹا ایکسپورٹ — ٹرانزیکشن ایکسپورٹ اب '
+          AppLocale.ur:
+              'تیز ڈیٹا ایکسپورٹ — ٹرانزیکشن ایکسپورٹ اب '
               '2,000 ریکارڈ تک لوڈ کرتا ہے۔',
         },
       ),
@@ -193,20 +256,24 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔄',
         text: {
-          AppLocale.en: 'Upgraded libraries for better performance and '
+          AppLocale.en:
+              'Upgraded libraries for better performance and '
               'compatibility with the latest devices.',
           AppLocale.ar: 'مكتبات محدّثة لأداء أفضل وتوافق مع أحدث الأجهزة.',
-          AppLocale.ur: 'بہتر کارکردگی اور نئے آلات کے ساتھ مطابقت کے لیے '
+          AppLocale.ur:
+              'بہتر کارکردگی اور نئے آلات کے ساتھ مطابقت کے لیے '
               'لائبریریاں اپ گریڈ کی گئیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🔙',
         text: {
-          AppLocale.en: 'WhatsApp-style back navigation — swipe from any '
+          AppLocale.en:
+              'WhatsApp-style back navigation — swipe from any '
               'screen to go back.',
           AppLocale.ar: 'تنقل خلفي بأسلوب واتساب — اسحب من أي شاشة للعودة.',
-          AppLocale.ur: 'واٹس ایپ طرز کی پیچھے نیویگیشن — کسی بھی اسکرین '
+          AppLocale.ur:
+              'واٹس ایپ طرز کی پیچھے نیویگیشن — کسی بھی اسکرین '
               'سے سوائپ کر کے واپس جائیں۔',
         },
       ),

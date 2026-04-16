@@ -202,7 +202,7 @@ jobs:
       - name: Gate 11 — Zero markdown lint issues
         run: |
           npm install -g markdownlint-cli@0.43.0 --silent
-          FOUND=$(markdownlint "**/*.md" --ignore node_modules --ignore app/build --ignore functions/node_modules 2>&1 || true)
+          FOUND=$(markdownlint "**/*.md" ".claude/**/*.md" ".github/**/*.md" --ignore node_modules --ignore app/build --ignore functions/node_modules 2>&1 || true)
           if [ -n "$FOUND" ]; then
             echo "❌ Markdown lint errors detected — zero problems tolerance:"
             echo "$FOUND"

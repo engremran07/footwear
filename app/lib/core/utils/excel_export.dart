@@ -173,8 +173,10 @@ String _workbookRels() =>
 //  6 = data text ALT band (borders, light blue bg)
 //  7 = data number ALT band (borders, light blue bg, right, 2-decimal)
 String _styles(bool isRtl) {
-  final headerAlign = isRtl ? 'right' : 'center';
-  final dataAlign = isRtl ? 'right' : 'left';
+  // All cell text is centre-aligned for a clean, professional look.
+  // Numbers still use right-align (styles 3, 7) for readability.
+  const headerAlign = 'center';
+  const dataAlign = 'center';
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
       '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
       // ── numFmts: custom 2-decimal number format ──
