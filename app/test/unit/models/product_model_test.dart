@@ -48,5 +48,47 @@ void main() {
       expect(restored.name, original.name);
       expect(restored.category, original.category);
     });
+
+    test('copyWith preserves untouched fields and can clear imageUrl', () {
+      final ts = Timestamp.fromMillisecondsSinceEpoch(1000);
+      final original = ProductModel(
+        id: 'p1',
+        name: 'Sandal',
+        category: 'sandals',
+        imageUrl: 'https://example.com/img.jpg',
+        active: true,
+        createdAt: ts,
+        updatedAt: ts,
+      );
+
+      final updated = original.copyWith(name: 'Runner', clearImageUrl: true);
+      expect(updated.id, original.id);
+      expect(updated.name, 'Runner');
+      expect(updated.imageUrl, isNull);
+      expect(updated.category, original.category);
+    });
+
+    test('equality is based on id', () {
+      final ts = Timestamp.fromMillisecondsSinceEpoch(1000);
+      final left = ProductModel(
+        id: 'p1',
+        name: 'A',
+        category: 'x',
+        active: true,
+        createdAt: ts,
+        updatedAt: ts,
+      );
+      final right = ProductModel(
+        id: 'p1',
+        name: 'B',
+        category: 'y',
+        active: false,
+        createdAt: ts,
+        updatedAt: ts,
+      );
+
+      expect(left, right);
+      expect(left.hashCode, right.hashCode);
+    });
   });
 }

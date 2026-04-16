@@ -12,11 +12,15 @@ on:
         default: true
         type: boolean
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     name: Release Validation
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     outputs:
       version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.version.outputs.build_number }}
@@ -60,7 +64,7 @@ jobs:
           echo "✅ versionCode monotonic: $CURRENT_BUILD"
 
   build:
-    name: Build APK + Web
+    name: Build Web + APK
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -110,7 +114,10 @@ jobs:
         run: cd app && flutter analyze lib --no-pub
 
       - name: flutter test
-        run: cd app && flutter test -r compact
+        run: cd app && flutter test -r expanded
+
+      - name: Build web
+        run: cd app && flutter build web --release
 
       - name: Build release APK (fat)
         run: cd app && flutter build apk --release
@@ -125,9 +132,6 @@ jobs:
             exit 1
           fi
           echo "✅ APK size within acceptable range"
-
-      - name: Build web
-        run: cd app && flutter build web --release
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -160,11 +164,6 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: Deploy Firestore rules and indexes
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
-        run: firebase deploy --project shoeserp-clean-20260327 --only firestore:rules,firestore:indexes --non-interactive
-
       - name: Deploy Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
@@ -172,6 +171,11 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SHOESERP }}
           projectId: shoeserp-clean-20260327
           channelId: live
+
+      - name: Deploy Firestore rules and indexes
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
+        run: firebase deploy --project shoeserp-clean-20260327 --only firestore:rules,firestore:indexes --non-interactive
 
   release:
     name: Create GitHub Release
@@ -188,6 +192,14 @@ jobs:
         with:
           name: apk-release-${{ needs.validate.outputs.version }}
           path: ./artifacts/
+
+      - name: Verify APK artifact exists
+        run: |
+          if [ ! -f ./artifacts/app-release.apk ]; then
+            echo "❌ Missing APK artifact at ./artifacts/app-release.apk"
+            exit 1
+          fi
+          echo "✅ APK artifact present"
 
       - name: Generate changelog
         id: changelog

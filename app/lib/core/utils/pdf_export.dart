@@ -84,6 +84,22 @@ pw.TextDirection _cellDir(String text, pw.TextDirection fallback) =>
 
 const pw.TextDirection _amountDir = pw.TextDirection.ltr;
 
+void _requireLabelKeys(
+  Map<String, String> labels,
+  Iterable<String> requiredKeys,
+) {
+  final missing = requiredKeys
+      .where((key) => (labels[key] ?? '').trim().isEmpty)
+      .toList();
+  if (missing.isNotEmpty) {
+    throw ArgumentError.value(
+      labels,
+      'labels',
+      'Missing required PDF labels: ${missing.join(', ')}',
+    );
+  }
+}
+
 /// Builds a PDF document from tabular data and returns bytes.
 /// When [locale] is Arabic or Urdu, loads the appropriate font and
 /// renders all text RTL.
@@ -257,6 +273,22 @@ Future<Uint8List> buildPdfLedger({
   String currency = 'SAR',
   Uint8List? logoBytes,
 }) async {
+  _requireLabelKeys(labels, const <String>[
+    'account_statement',
+    'report_date',
+    'generated_by',
+    'date',
+    'description',
+    'debit',
+    'credit',
+    'running_balance',
+    'cash_in',
+    'cash_out',
+    'net_payable',
+    'total_entries',
+    'page',
+    'opening_balance',
+  ]);
   await _ensureFontBytes();
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
   return Isolate.run(() {

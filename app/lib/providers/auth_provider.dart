@@ -27,7 +27,7 @@ final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
   return FirebaseAuth.instance;
 });
 
-final authStateProvider = StreamProvider<User?>((ref) {
+final authStateProvider = StreamProvider.autoDispose<User?>((ref) {
   return ref.watch(firebaseAuthProvider).authStateChanges();
 });
 
@@ -35,7 +35,7 @@ final authStateProvider = StreamProvider<User?>((ref) {
 /// an account (3-way sync Path 3). On each token refresh the Firebase SDK
 /// returns a FirebaseAuthException(code: 'user-disabled') if the account has
 /// been disabled server-side, which we map to a forced sign-out.
-final authTokenGuardProvider = StreamProvider<void>((ref) async* {
+final authTokenGuardProvider = StreamProvider.autoDispose<void>((ref) async* {
   await for (final user in FirebaseAuth.instance.idTokenChanges()) {
     if (user == null) continue;
     try {
@@ -49,7 +49,7 @@ final authTokenGuardProvider = StreamProvider<void>((ref) async* {
   }
 });
 
-final authUserProvider = StreamProvider<UserModel?>((ref) {
+final authUserProvider = StreamProvider.autoDispose<UserModel?>((ref) {
   final authState = ref.watch(authStateProvider);
   return authState.when(
     data: (user) {
@@ -129,6 +129,7 @@ class AuthNotifier extends AsyncNotifier<void> {
     ref.invalidate(allUsersProvider);
     ref.invalidate(inactiveUsersProvider);
     ref.invalidate(adminAllSellerInventoryProvider);
+    ref.invalidate(sellerInventoryProvider);  // invalidate all family instances (S7 defense-in-depth)
     ref.invalidate(allInventoryTransactionsProvider);
     ref.invalidate(outstandingShopsProvider);
   }

@@ -76,6 +76,18 @@ void main() {
       expect(missing, isEmpty, reason: 'UR missing keys: $missing');
     });
 
+    test('AR does not contain dead keys absent from EN', () {
+      final enSet = enKeys.toSet();
+      final extras = arKeys.where((k) => !enSet.contains(k)).toList();
+      expect(extras, isEmpty, reason: 'AR has dead keys: $extras');
+    });
+
+    test('UR does not contain dead keys absent from EN', () {
+      final enSet = enKeys.toSet();
+      final extras = urKeys.where((k) => !enSet.contains(k)).toList();
+      expect(extras, isEmpty, reason: 'UR has dead keys: $extras');
+    });
+
     test('login reset hint exists in all locales', () {
       expect(enKeys, contains('login_reset_email_hint'));
       expect(arKeys, contains('login_reset_email_hint'));

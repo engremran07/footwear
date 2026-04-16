@@ -1,7 +1,7 @@
 name: footwear_erp
 description: Footwear business ERP — production, inventory, orders, payroll, P&L.
 publish_to: 'none'
-version: 3.7.5+53
+version: 3.7.6+54
 
 environment:
   sdk: '>=3.11.0 <4.0.0'

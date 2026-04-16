@@ -256,6 +256,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
 
           // Option tiles — all go through _execute (no premature pop)
           _OptionTile(
+            key: const ValueKey('export_excel_download'),
             icon: Icons.table_chart_outlined,
             color: AppBrand.successColor,
             label: tr('download_excel', ref),
@@ -266,6 +267,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
           ),
           const SizedBox(height: 8),
           _OptionTile(
+            key: const ValueKey('export_share_pdf'),
             icon: Icons.picture_as_pdf_outlined,
             color: AppBrand.errorColor,
             label: tr('share_pdf', ref),
@@ -276,6 +278,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
           ),
           const SizedBox(height: 8),
           _OptionTile(
+            key: const ValueKey('export_share_png'),
             icon: Icons.image_outlined,
             color: AppBrand.warningColor,
             label: tr('share_image', ref),
@@ -286,6 +289,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
           ),
           const SizedBox(height: 8),
           _OptionTile(
+            key: const ValueKey('export_print_pdf'),
             icon: Icons.print_outlined,
             color: AppBrand.primaryColor,
             label: tr('print_report', ref),
@@ -296,6 +300,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
           ),
           const SizedBox(height: 8),
           _OptionTile(
+            key: const ValueKey('export_share_excel'),
             icon: Icons.share_outlined,
             color: AppBrand.adminRoleColor,
             label: tr('share_excel', ref),
@@ -322,6 +327,7 @@ class _OptionTile extends StatelessWidget {
   final bool enabled;
 
   const _OptionTile({
+    super.key,
     required this.icon,
     required this.color,
     required this.label,

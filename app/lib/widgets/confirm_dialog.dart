@@ -71,9 +71,14 @@ class _ConfirmDialogState extends State<ConfirmDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final material = MaterialLocalizations.of(context);
     final effectiveColor =
         widget.confirmColor ??
         (widget.isDestructive ? theme.colorScheme.error : null);
+    final effectiveCancelLabel =
+        widget.cancelLabel == 'Cancel' ? material.cancelButtonLabel : widget.cancelLabel;
+    final effectiveConfirmLabel =
+        widget.confirmLabel == 'Confirm' ? material.okButtonLabel : widget.confirmLabel;
 
     return AlertDialog(
       title: Text(widget.title),
@@ -81,7 +86,7 @@ class _ConfirmDialogState extends State<ConfirmDialog> {
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.pop(context, false),
-          child: Text(widget.cancelLabel),
+          child: Text(effectiveCancelLabel),
         ),
         FilledButton(
           style: effectiveColor != null
@@ -94,7 +99,7 @@ class _ConfirmDialogState extends State<ConfirmDialog> {
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Text(widget.confirmLabel),
+              : Text(effectiveConfirmLabel),
         ),
       ],
     );

@@ -152,7 +152,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ],
       ),
-    );
+    ).whenComplete(() {
+      currentPassC.dispose();
+      newPassC.dispose();
+      confirmPassC.dispose();
+      newPassFn.dispose();
+      confirmPassFn.dispose();
+    });
   }
 
   @override

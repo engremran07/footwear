@@ -70,6 +70,10 @@ class AppErrorMapper {
     if (msg.contains('pdf') || msg.contains('export failed')) {
       return 'err_pdf_failed';
     }
+    // StateError / stream disposal before first emission (autoDispose race)
+    if (msg.contains('bad state') || msg.contains('no element')) {
+      return 'err_pdf_failed';
+    }
 
     return 'err_unknown';
   }

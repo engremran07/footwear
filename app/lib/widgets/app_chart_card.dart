@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design/app_tokens.dart';
+import '../core/l10n/app_locale.dart';
 import 'empty_state.dart';
 
 /// Wrapper card for fl_chart widgets with a header, optional legend, and
 /// empty-state fallback when [isEmpty] is true.
-class AppChartCard extends StatelessWidget {
+class AppChartCard extends ConsumerWidget {
   final String title;
   final String? subtitle;
   final Widget chart;
@@ -25,8 +27,11 @@ class AppChartCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final effectiveEmptyMessage = emptyMessage == 'No data available'
+        ? tr('no_data_available', ref)
+        : emptyMessage;
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: AppTokens.brMD),
@@ -60,7 +65,7 @@ class AppChartCard extends StatelessWidget {
               child: isEmpty
                   ? EmptyState(
                       icon: Icons.bar_chart_rounded,
-                      message: emptyMessage,
+                      message: effectiveEmptyMessage,
                     )
                   : chart,
             ),

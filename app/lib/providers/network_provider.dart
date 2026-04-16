@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// - Single DNS probes can flap on mobile networks and falsely report offline.
 /// - We keep the app optimistic (`true`) until repeated probe failures occur.
 /// - We only switch to offline after consecutive failures to reduce jitter.
-final networkStatusProvider = StreamProvider<bool>((ref) {
+final networkStatusProvider = StreamProvider.autoDispose<bool>((ref) {
   final controller = StreamController<bool>();
   const probeHosts = <String>[
     'firestore.googleapis.com',

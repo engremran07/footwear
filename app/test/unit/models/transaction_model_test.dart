@@ -47,6 +47,15 @@ void main() {
       expect(restored.qty, original.qty);
       expect(restored.unitPrice, original.unitPrice);
     });
+
+    test('copyWith overrides selected fields only', () {
+      final original = TransactionItem.fromJson(itemJson);
+      final updated = original.copyWith(qty: 12, subtotal: 1200.0);
+      expect(updated.variantId, original.variantId);
+      expect(updated.qty, 12);
+      expect(updated.subtotal, 1200.0);
+      expect(updated.unitPrice, original.unitPrice);
+    });
   });
 
   group('TransactionModel.fromJson', () {
@@ -118,6 +127,27 @@ void main() {
       expect(m.isReturn, isTrue);
     });
 
+    test('payment and write-off helpers map to reducing balance flows', () {
+      final payment = TransactionModel.fromJson({
+        'type': TransactionModel.typePayment,
+        'amount': 200.0,
+        'created_at': ts,
+      }, 't3a');
+      final writeOff = TransactionModel.fromJson({
+        'type': TransactionModel.typeWriteOff,
+        'amount': 500.0,
+        'created_at': ts,
+      }, 't3b');
+
+      expect(payment.isPayment, isTrue);
+      expect(payment.reducesBalance, isTrue);
+      expect(payment.balanceImpact, -200.0);
+
+      expect(writeOff.isWriteOff, isTrue);
+      expect(writeOff.reducesBalance, isTrue);
+      expect(writeOff.balanceImpact, 0);
+    });
+
     test('hasItems is false for empty items', () {
       final m = TransactionModel.fromJson({'created_at': ts}, 't4');
       expect(m.hasItems, isFalse);
@@ -182,6 +212,18 @@ void main() {
       expect(TransactionModel.typeCashIn, 'cash_in');
       expect(TransactionModel.typeCashOut, 'cash_out');
       expect(TransactionModel.typeReturn, 'return');
+      expect(TransactionModel.typePayment, 'payment');
+      expect(TransactionModel.typeWriteOff, 'write_off');
+    });
+
+    test('balanceImpact throws on unknown transaction type', () {
+      final model = TransactionModel.fromJson({
+        'type': 'mystery',
+        'amount': 100.0,
+        'created_at': ts,
+      }, 'bad');
+
+      expect(() => model.balanceImpact, throwsStateError);
     });
   });
 }

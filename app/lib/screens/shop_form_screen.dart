@@ -79,7 +79,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       HapticFeedback.vibrate();
       return;
     }
-    if (_routeId == null) {
+    if (_routeId == null || _routeId!.trim().isEmpty) {
       HapticFeedback.vibrate();
       ScaffoldMessenger.of(
         context,

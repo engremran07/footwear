@@ -20,7 +20,28 @@ class SettingsModel {
     this.requireAdminApprovalForSellerTransactionEdits = false,
     this.logoBase64,
     required this.updatedAt,
-  });
+  }) : assert(pairsPerCarton > 0, 'pairsPerCarton must be greater than 0');
+
+  SettingsModel copyWith({
+    String? companyName,
+    String? currency,
+    int? pairsPerCarton,
+    bool? requireAdminApprovalForSellerTransactionEdits,
+    String? logoBase64,
+    bool clearLogoBase64 = false,
+    Timestamp? updatedAt,
+  }) {
+    return SettingsModel(
+      companyName: companyName ?? this.companyName,
+      currency: currency ?? this.currency,
+      pairsPerCarton: pairsPerCarton ?? this.pairsPerCarton,
+      requireAdminApprovalForSellerTransactionEdits:
+          requireAdminApprovalForSellerTransactionEdits ??
+          this.requireAdminApprovalForSellerTransactionEdits,
+      logoBase64: clearLogoBase64 ? null : (logoBase64 ?? this.logoBase64),
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 
   /// Decoded logo bytes ready for Image.memory() and PDF generation.
   /// Returns null when no logo has been uploaded or if the base64 is corrupt.
@@ -56,4 +77,26 @@ class SettingsModel {
     'logo_base64': logoBase64,
     'updated_at': updatedAt,
   };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SettingsModel &&
+          other.companyName == companyName &&
+          other.currency == currency &&
+          other.pairsPerCarton == pairsPerCarton &&
+          other.requireAdminApprovalForSellerTransactionEdits ==
+              requireAdminApprovalForSellerTransactionEdits &&
+          other.logoBase64 == logoBase64 &&
+          other.updatedAt == updatedAt);
+
+  @override
+  int get hashCode => Object.hash(
+    companyName,
+    currency,
+    pairsPerCarton,
+    requireAdminApprovalForSellerTransactionEdits,
+    logoBase64,
+    updatedAt,
+  );
 }

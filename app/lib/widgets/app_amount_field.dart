@@ -24,6 +24,7 @@ class AppAmountField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      key: ValueKey('amount_${label}_$currencyPrefix'),
       controller: controller,
       readOnly: readOnly,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),

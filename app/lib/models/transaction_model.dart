@@ -42,6 +42,28 @@ class TransactionItem {
     required this.subtotal,
   });
 
+  TransactionItem copyWith({
+    String? variantId,
+    String? sku,
+    String? productName,
+    String? size,
+    String? color,
+    int? qty,
+    double? unitPrice,
+    double? subtotal,
+  }) {
+    return TransactionItem(
+      variantId: variantId ?? this.variantId,
+      sku: sku ?? this.sku,
+      productName: productName ?? this.productName,
+      size: size ?? this.size,
+      color: color ?? this.color,
+      qty: qty ?? this.qty,
+      unitPrice: unitPrice ?? this.unitPrice,
+      subtotal: subtotal ?? this.subtotal,
+    );
+  }
+
   factory TransactionItem.fromJson(Map<String, dynamic> json) {
     return TransactionItem(
       variantId: json['variant_id'] as String? ?? '',
@@ -76,6 +98,8 @@ class TransactionModel {
   static const String typeCashIn = 'cash_in';
   static const String typeCashOut = 'cash_out';
   static const String typeReturn = 'return';
+  static const String typePayment = 'payment';
+  static const String typeWriteOff = 'write_off';
   final String? saleType; // cash | credit
   final double amount;
   final String? description;
@@ -132,14 +156,16 @@ class TransactionModel {
   bool get isCashIn => type == 'cash_in';
   bool get isCashOut => type == 'cash_out';
   bool get isReturn => type == 'return';
-  bool get isPayment => type == 'payment';
-  bool get isWriteOff => type == 'write_off';
+  bool get isPayment => type == typePayment;
+  bool get isWriteOff => type == typeWriteOff;
   bool get reducesBalance => isCashIn || isReturn || isPayment || isWriteOff;
   double get balanceImpact => switch (type) {
     typeCashOut => amount,
-    typeCashIn || typeReturn || 'payment' => -amount,
-    'write_off' => 0,
-    _ => 0,
+    typeCashIn || typeReturn || typePayment => -amount,
+    typeWriteOff => 0,
+    _ => throw StateError(
+      'Unknown transaction type "$type" for balance calculation',
+    ),
   };
   bool get hasItems => items.isNotEmpty;
 

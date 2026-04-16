@@ -7,6 +7,7 @@ import '../core/utils/share_helper.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/snack_helper.dart';
+import '../widgets/whats_new_sheet.dart';
 
 /// About screen — single source of truth for version / build info.
 /// Reads from [AppBrand] which is synced by bump_version.dart on every release.
@@ -84,6 +85,13 @@ class AboutScreen extends ConsumerWidget {
             icon: Icons.cloud_outlined,
             label: tr('platform', ref),
             value: 'Firebase Spark — Firestore + Auth',
+          ),
+          _InfoTile(
+            icon: Icons.new_releases_outlined,
+            label: tr('whats_new', ref),
+            value: tr('whats_new_subtitle', ref),
+            trailingIcon: Icons.chevron_right,
+            onTap: () => WhatsNewSheet.show(context, ref),
           ),
 
           const SizedBox(height: 16),

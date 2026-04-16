@@ -20,17 +20,23 @@ version: MAJOR.MINOR.PATCH+BUILD
 
 ## Release Build Command
 ```bash
-# ── CANONICAL BUILD (always use fat APK) ──────────────────────────────────
-# Fat APK — single universal file, direct sideload to any device.
+# ── CANONICAL RELEASE ORDER ────────────────────────────────────────────────
 cd app
+grep -E "^version:|appVersion|buildNumber" pubspec.yaml lib/core/constants/app_brand.dart
+
+# Web first, because Hosting is part of the shared release surface.
+flutter build web --release
+firebase deploy --only hosting
+
+# Fat APK — single universal file, direct sideload to any device.
 flutter build apk --release
 
 # Output location:
 # build/app/outputs/flutter-apk/app-release.apk
 
-# ── Web ───────────────────────────────────────────────────────────────────
-flutter build web --release
-firebase deploy --only hosting
+# Firestore rules/indexes complete the release before commit/push.
+cd ..
+firebase deploy --only firestore:rules,firestore:indexes
 
 # ── NEVER use --split-per-abi — project standard is fat APK only ──────────
 # (split-per-abi is for Play Store; this app is sideloaded)
@@ -182,15 +188,26 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.x'
+          flutter-version: '3.41.6'
       - name: Install dependencies
         run: cd app && flutter pub get
+      - name: Validate version sync
+        run: |
+          PUBSPEC_VER=$(grep '^version:' app/pubspec.yaml | sed 's/version: //' | tr -d '[:space:]')
+          BRAND_VER=$(grep 'static const String appVersion' app/lib/core/constants/app_brand.dart | sed "s/.*'\(.*\)';/\1/" | tr -d '[:space:]')
+          BRAND_BUILD=$(grep 'static const String buildNumber' app/lib/core/constants/app_brand.dart | sed "s/.*'\(.*\)';/\1/" | tr -d '[:space:]')
+          if [ "$PUBSPEC_VER" != "${BRAND_VER}+${BRAND_BUILD}" ]; then
+            echo "❌ Version mismatch: pubspec=$PUBSPEC_VER app_brand=${BRAND_VER}+${BRAND_BUILD}"
+            exit 1
+          fi
       - name: Analyze
         run: cd app && flutter analyze lib --no-pub
       - name: Test
         run: cd app && flutter test -r expanded
+      - name: Build web
+        run: cd app && flutter build web --release
       - name: Build APK
-        run: cd app && flutter build apk --release --split-per-abi
+        run: cd app && flutter build apk --release
 ```
 
 ## Minimum SDK Targets

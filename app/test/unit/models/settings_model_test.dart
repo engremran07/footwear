@@ -47,5 +47,52 @@ void main() {
       expect(restored.currency, original.currency);
       expect(restored.pairsPerCarton, original.pairsPerCarton);
     });
+
+    test('copyWith can update and clear optional logo field', () {
+      final ts = Timestamp.fromMillisecondsSinceEpoch(1000);
+      final original = SettingsModel(
+        companyName: 'My Shop',
+        currency: 'PKR',
+        pairsPerCarton: 12,
+        logoBase64: 'aGVsbG8=',
+        updatedAt: ts,
+      );
+
+      final updated = original.copyWith(currency: 'SAR', clearLogoBase64: true);
+      expect(updated.companyName, original.companyName);
+      expect(updated.currency, 'SAR');
+      expect(updated.logoBase64, isNull);
+    });
+
+    test('equality includes business fields', () {
+      final ts = Timestamp.fromMillisecondsSinceEpoch(1000);
+      final left = SettingsModel(
+        companyName: 'My Shop',
+        currency: 'PKR',
+        pairsPerCarton: 12,
+        updatedAt: ts,
+      );
+      final right = SettingsModel(
+        companyName: 'My Shop',
+        currency: 'PKR',
+        pairsPerCarton: 12,
+        updatedAt: ts,
+      );
+
+      expect(left, right);
+      expect(left.hashCode, right.hashCode);
+    });
+
+    test('asserts when pairsPerCarton is not positive', () {
+      expect(
+        () => SettingsModel(
+          companyName: 'Broken',
+          currency: 'PKR',
+          pairsPerCarton: 0,
+          updatedAt: Timestamp.fromMillisecondsSinceEpoch(0),
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
   });
 }

@@ -35,12 +35,16 @@ class AppSectionHeader extends StatelessWidget {
             ),
           ),
           if (actionLabel != null && onAction != null)
-            TextButton.icon(
-              onPressed: onAction,
-              icon: actionIcon != null
-                  ? Icon(actionIcon, size: AppTokens.iconSizeSM)
-                  : null,
-              label: Text(actionLabel!),
+            Semantics(
+              button: true,
+              label: actionLabel,
+              child: TextButton.icon(
+                onPressed: onAction,
+                icon: actionIcon != null
+                    ? Icon(actionIcon, size: AppTokens.iconSizeSM)
+                    : null,
+                label: Text(actionLabel!),
+              ),
             ),
         ],
       ),

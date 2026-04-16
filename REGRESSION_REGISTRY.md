@@ -1,7 +1,7 @@
 # ShoesERP Regression Registry
 
 **Maintained by:** Autonomous AI agent system (88-agent governance pack v2.0)  
-**Last updated:** 2026-04-11 — Audit v13 / v3.5.0+43  
+**Last updated:** 2026-04-15 — Post-audit hardening / v3.7.5+53  
 **Purpose:** Single source of truth for known regressions, deferred risks, and process improvements.
 
 ---
@@ -21,7 +21,7 @@
 | RR-009 | P2-FIXED | Role casing drift | App wrote `'Admin'` (uppercase), rules checked `'admin'` (lowercase) → all admin writes failed silently on new installs. | Fixed v3.0.0 — `isAdminRole()` regex + `role.trim().toLowerCase()` on write | v1.0.0 |
 | RR-010 | P2-FIXED | ABI-split APK in CI | Release workflow used `--split-per-abi` producing 3 split APKs; canonical requirement is fat APK only. | Fixed v3.3.0 — `flutter build apk --release` (fat) mandated throughout | v2.0.0 |
 | RR-011 | P2-FIXED | Hardcoded `Colors.*` in 6 screens | `Colors.white`, `Colors.grey`, `Colors.red`, `Colors.black54` used in production screens — dark mode breakage risk. | Fixed v3.5.0 — replaced with AppBrand/cs constants throughout | v3.0.0 |
-| RR-012 | P2-FIXED | CI Flutter version drift | `ci.yml` and `release.yml` used Flutter `3.22.x` while `build-apk.yml` and `deploy-web.yml` used `3.29.x`. Three-way divergence. | Fixed v3.5.0 — all 4 workflows pinned to `3.29.2` | v3.0.0 |
+| RR-012 | P2-FIXED | CI Flutter version drift | `ci.yml` and `release.yml` used Flutter `3.22.x` while `build-apk.yml` and `deploy-web.yml` used `3.29.x`. Three-way divergence. | Fixed and later re-standardised — all 4 workflows now pin Flutter `3.41.6` | v3.0.0 |
 | RR-013 | P3-FIXED | Widget test placeholder | `app/test/widget_test.dart` contained a marketing `MaterialApp` smoke test with no real screen coverage. | Fixed v3.5.0 — replaced with auth flow smoke test + GoRouter guard | v1.0.0 |
 | RR-014 | P3-FIXED | CI missing coverage + timeouts | Test job had no `--coverage` flag; all 3 CI jobs had no `timeout-minutes`; hanging builds possible. | Fixed v3.5.0 — coverage enabled, 20/30/10 minute timeouts added | v3.0.0 |
 | RR-015 | P1-FIXED | Firestore rules: seller transaction over-permission | When approval toggle OFF, sellers could update `amount` and `type` on own transactions — allows fraudulent amount manipulation and cash_in/cash_out type flip. `updateTransactionNote()` provider was already restricted; rules were behind. | Fixed v3.5.0.1 — removed `amount`, `type`, `sale_type`, `created_at` from allowed field set; seller approval-disabled path now restricted to `description`, `updated_at`, `updated_by`, `edit_request_*` only. | v3.0.0 |

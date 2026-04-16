@@ -210,62 +210,72 @@ Never keep ambiguity-driven workaround code without explicit justification.
 | `flutter build web --release` exits 1 with no Error lines | PowerShell `NativeCommandError` from Wasm dry-run stderr — build IS succeeding | Check `$LASTEXITCODE` explicitly; exit 0 = real success |
 | `StateProvider<T>` in any `.dart` file | Riverpod 3 removed `StateProvider` — instant compile failure on upgrade | Replace with `NotifierProvider<T, S>` + `Notifier` subclass — see Chain 6 |
 
-## Twelve Non-Negotiable Pre-Signoff Steps
+## Fifteen Non-Negotiable Pre-Signoff Steps
 
-**All 12 steps are mandatory for every session that touches code. No bypass.**
+**All 15 steps are mandatory for every session that touches code. No bypass.**
 
 ```bash
-# 1 — Zero analyze issues
+# 1 — Version bump + sync
+Select-String -Path "app\pubspec.yaml","app\lib\core\constants\app_brand.dart" -Pattern '^version:|appVersion|buildNumber'
+# If this session is producing release artifacts, bump PATCH+BUILD before continuing.
+
+# 2 — Zero analyze issues
 flutter analyze lib --no-pub
 # Must end: No issues found! (ran in Xs)
 
-# 2 — Zero test dir issues
+# 3 — Zero test dir issues
 dart analyze test/
 # Must end: No issues found!
 
-# 3 — All tests green
+# 4 — All tests green
 flutter test -r expanded
 # Must quote: All N tests passed!
 
-# 4 — No raw collection strings
+# 5 — No raw collection strings
 grep -rn "\.collection\('" app/lib/ | grep -v "Collections\."
 # Must return zero lines
 
-# 5 — No Firestore writes in screens/widgets
+# 6 — No Firestore writes in screens/widgets
 grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/
 # Must return zero lines
 
-# 6 — No StateProvider (banned Riverpod 3)
+# 7 — No StateProvider (banned Riverpod 3)
 grep -rn "StateProvider\b" app/lib/ --include="*.dart"
 # Must return zero lines
 
-# 7 — Version sync
-grep -E "^version:|appVersion|buildNumber" app/pubspec.yaml app/lib/core/constants/app_brand.dart
-# pubspec version X.Y.Z+N must match app_brand appVersion=X.Y.Z + buildNumber=N
-
 # 8 — Zero markdown lint issues (Problems tab must be empty)
-markdownlint "**/*.md" --ignore node_modules --ignore app/build
+markdownlint "**/*.md" --ignore node_modules --ignore app/build --ignore functions/node_modules
 # Must exit 0 with zero output
 
-# 9 — Firestore rules + indexes deployed (always, not just on change)
-firebase deploy --only firestore:rules,firestore:indexes
-# Must quote: Deploy complete!
-
-# 10 — Web release build (PowerShell — check $LASTEXITCODE, not pipe output)
+# 9 — Web release build (PowerShell — check $LASTEXITCODE, not pipe output)
 $ErrorActionPreference='Continue'; cd app; flutter build web --release; Write-Host "EXIT: $LASTEXITCODE"
 # Must state EXIT: 0
 
-# 11 — Firebase Hosting deployed
+# 10 — Firebase Hosting deployed
 firebase deploy --only hosting
 # Must quote: Deploy complete!
 
-# 12 — APK build + GitHub commit audit + commit + push
+# 11 — APK build
 flutter build apk --release
+
+# 12 — Firestore rules + indexes deployed (always, not just on change)
+firebase deploy --only firestore:rules,firestore:indexes
+# Must quote: Deploy complete!
+
+# 13 — GitHub local audit
 git log --oneline -5
-git status --short  # confirm no unexpected artifacts
+git status --short
+git diff --stat HEAD
+# confirm no unexpected artifacts
+
+# 14 — Commit + push
 git add -A && git commit -m "type: summary — vX.Y.Z+N"
 git push
 # Must quote commit hash and push output
+
+# 15 — APK install + final smoke verification
+adb devices
+adb -s <device-id> install -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-release.apk"
 ```
 
 ## Anti-Bypass Enforcement Matrix
@@ -299,16 +309,18 @@ Never silently swallow `INVALID_ID_TOKEN` — always force refresh or sign out.
 
 ## Pre-Signoff Verification
 
-See **Twelve Non-Negotiable Pre-Signoff Steps** above — all 12 steps are
+See **Fifteen Non-Negotiable Pre-Signoff Steps** above — all 15 steps are
 mandatory. Key checks in brief:
 
+- version bump/sync quoted from `app/pubspec.yaml` and `app/lib/core/constants/app_brand.dart`
 - flutter analyze lib --no-pub
+- dart analyze test/
 - flutter test -r expanded
-- flutter build apk --release
-- firebase deploy --only firestore:rules,firestore:indexes → Deploy complete!
 - flutter build web --release → EXIT: 0
 - firebase deploy --only hosting → Deploy complete!
-- git log --oneline -5 + git status --short → no unexpected artifacts
+- flutter build apk --release
+- firebase deploy --only firestore:rules,firestore:indexes → Deploy complete!
+- git log --oneline -5 + git status --short + git diff --stat HEAD → no unexpected artifacts
 - git add -A + git commit + git push → quote commit hash + push output
 - If device connected: adb install -r → Success
 - Verify admin and seller startup for `/` and `/inventory`; transient permission-denied UI during stream warm-up is a regression.
@@ -322,6 +334,7 @@ mandatory. Key checks in brief:
 
 ## Done In This Baseline
 
+- v3.7.5+53 (audit v16): Post-audit hardening sweep completed — route/shop form identity guards tightened; auth and network stream providers moved to `autoDispose`; transaction export queries capped at 2000 docs; remaining inventory dialog disposal fixed; shimmer placeholders switched to theme-derived surfaces; offline indicator now uses semantic error color; manual APK, CI, and release workflows aligned on Flutter 3.41.6 with expanded test reporting; Firebase Hosting immutable cache now includes `.wasm`; regression tests expanded for model `copyWith`, equality, settings assertions, and transaction ledger edge cases
 - v3.7.0+48 (audit v14): Dep stack fully upgraded: fl_chart 1.2.0, share_plus 13.0.0 (migrated SharePlus.instance.share(ShareParams(...))), permission_handler 12.0.1, dart_jsonwebtoken 3.4.0, flutter_lints 6.0.0; 30 lint issues fixed (unnecessary_underscores, use_null_aware_elements, prefer_const_constructors, share_plus deprecations); all 4 CI workflows standardized on Flutter 3.41.6; governance hardened (Rules 19–22, Anti-Bypass Enforcement Matrix, Chain 6, Gates 12–15); README.md × 2 fully rewritten; markdown governance skill + instruction + CI gate 15 added; 90 markdown issues fixed to zero; temp artifacts purged; audit score 79/100 → 88/100
 - v3.5.0+43 (audit v13): Governance layer (REGRESSION_REGISTRY.md, SESSION_LOG.md, MASTER_BLUEPRINT.md, CHANGELOG.md, AUDIT_REPORT_FOOTWEAR_ERP.md), CI/CD hardened (Flutter 3.29.2 pinned, timeouts, --coverage, 11 hygiene gates, APK size gate), 15 hardcoded Colors.* eliminated in 6 screens (RR-011), widget_test.dart placeholder replaced (RR-013), Firestore rules emulator test scaffold
 - Firebase Storage fully removed — zero cost architecture

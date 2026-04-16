@@ -1,8 +1,8 @@
-﻿# FootWear ERP — v3.7.0+48
+﻿# FootWear ERP — v3.7.5+53
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
-> **v3.7.0+48 (audit v14)** — Dep stack fully upgraded: fl_chart 1.2.0, share_plus 13.0.0, permission_handler 12.0.1, dart_jsonwebtoken 3.4.0, flutter_lints 6.0.0. 30 lint issues fixed. All 4 CI workflows standardised on Flutter 3.41.6. Governance hardened: Rules 19–22 (StateProvider ban, rules-deploy mandate, AI evidence requirement, version sync atomicity), Anti-Bypass Enforcement Matrix, Breakage Chain 6. Audit score 79 → 85/100.
+> **v3.7.5+53 (2026-04-15)** — Current baseline includes the post-audit hardening pass: provider admin guards, invoice and rules validation tightening, export query caps, model `copyWith`/equality cleanup, theme-safe shimmer, and workflow normalization on Flutter 3.41.6 with expanded test reporting.
 
 ---
 
@@ -116,6 +116,10 @@ flutter build web --release
 firebase deploy --only hosting
 ```
 
+Canonical release order: sync or bump the version first, then build web,
+deploy Hosting, build the fat APK, deploy Firestore rules/indexes, review the
+local git delta, and only then commit/push.
+
 ---
 
 ## Backend Deployment
@@ -199,14 +203,17 @@ grep -rn "StateProvider\b" app/lib/ --include="*.dart"
 
 ## Production Signoff Checklist
 
-1. `flutter analyze lib --no-pub` → quote exact final line
-2. `flutter test -r expanded` → quote pass count
-3. Atomic version bump: `app/pubspec.yaml` and `app/lib/core/constants/app_brand.dart` in same edit
-4. `flutter build apk --release` → quote APK file size
-5. `flutter build web --release` → confirm `EXIT: $LASTEXITCODE` = 0
-6. `firebase deploy --only firestore:rules,firestore:indexes` if rules/indexes changed
-7. `firebase deploy --only hosting` after web build
-8. `adb install -r app-release.apk` to install to device
+1. Atomic version bump or explicit version-sync verification: `app/pubspec.yaml` and `app/lib/core/constants/app_brand.dart` must match before release artifacts are built.
+2. `flutter analyze lib --no-pub` → quote exact final line.
+3. `dart analyze test/` → quote `No issues found!`.
+4. `flutter test -r expanded` → quote pass count.
+5. `flutter build web --release` → confirm `EXIT: $LASTEXITCODE` = 0.
+6. `firebase deploy --only hosting` after the web build.
+7. `flutter build apk --release` → quote APK file size.
+8. `firebase deploy --only firestore:rules,firestore:indexes` on every signoff, before commit/push is considered complete.
+9. `git log --oneline -5`, `git status --short`, and `git diff --stat HEAD` → confirm only expected local changes remain.
+10. `git add -A`, `git commit -m "type: summary — vX.Y.Z+N"`, and `git push` → quote commit hash and push output.
+11. `adb install -r app-release.apk` to install to a connected device when Android delivery is part of the request.
 
 ---
 

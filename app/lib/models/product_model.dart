@@ -19,6 +19,27 @@ class ProductModel {
     required this.updatedAt,
   });
 
+  ProductModel copyWith({
+    String? id,
+    String? name,
+    String? category,
+    String? imageUrl,
+    bool clearImageUrl = false,
+    bool? active,
+    Timestamp? createdAt,
+    Timestamp? updatedAt,
+  }) {
+    return ProductModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
+      active: active ?? this.active,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   factory ProductModel.fromJson(Map<String, dynamic> json, String docId) {
     return ProductModel(
       id: docId,
@@ -39,4 +60,11 @@ class ProductModel {
     'created_at': createdAt,
     'updated_at': updatedAt,
   };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || (other is ProductModel && other.id == id);
+
+  @override
+  int get hashCode => id.hashCode;
 }

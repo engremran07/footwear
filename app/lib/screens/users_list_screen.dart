@@ -315,9 +315,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                           selectedRouteId!.trim().isEmpty)) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(
-                          content: Text(tr('msg_seller_needs_route', ref)),
-                        ),
+                        warningSnackBar(tr('msg_seller_needs_route', ref)),
                       );
                     }
                     return;
@@ -354,7 +352,11 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      emailC.dispose();
+      passC.dispose();
+      nameC.dispose();
+    });
   }
 
   // ── Edit user dialog ─────────────────────────────────────────────────────
@@ -648,7 +650,11 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      nameC.dispose();
+      emailC.dispose();
+      passwordC.dispose();
+    });
   }
 
   // ── Reactivate user dialog ────────────────────────────────────────────────

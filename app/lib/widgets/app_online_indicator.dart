@@ -10,6 +10,7 @@ class AppOnlineIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Semantics(
       label: isOnline ? 'Online' : 'Offline',
       child: Container(
@@ -17,9 +18,9 @@ class AppOnlineIndicator extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isOnline ? AppBrand.successColor : AppBrand.stockColor,
+          color: isOnline ? AppBrand.successColor : colorScheme.error,
           border: Border.all(
-            color: Theme.of(context).colorScheme.surface,
+            color: colorScheme.surface,
             width: 1.5,
           ),
         ),

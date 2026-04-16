@@ -33,6 +33,35 @@ class InventoryTransactionModel {
     required this.createdAt,
   });
 
+  InventoryTransactionModel copyWith({
+    String? id,
+    String? type,
+    String? sellerId,
+    String? sellerName,
+    String? variantId,
+    String? variantName,
+    String? productId,
+    int? quantity,
+    String? notes,
+    bool clearNotes = false,
+    String? createdBy,
+    Timestamp? createdAt,
+  }) {
+    return InventoryTransactionModel(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      sellerId: sellerId ?? this.sellerId,
+      sellerName: sellerName ?? this.sellerName,
+      variantId: variantId ?? this.variantId,
+      variantName: variantName ?? this.variantName,
+      productId: productId ?? this.productId,
+      quantity: quantity ?? this.quantity,
+      notes: clearNotes ? null : (notes ?? this.notes),
+      createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   factory InventoryTransactionModel.fromJson(
     Map<String, dynamic> json,
     String docId,
@@ -64,4 +93,12 @@ class InventoryTransactionModel {
     'created_by': createdBy,
     'created_at': createdAt,
   };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is InventoryTransactionModel && other.id == id);
+
+  @override
+  int get hashCode => id.hashCode;
 }

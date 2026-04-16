@@ -65,7 +65,7 @@ jobs:
         run: cd app && flutter pub get
 
       - name: flutter test
-        run: cd app && flutter test -r compact --coverage
+        run: cd app && flutter test -r expanded --coverage
 
   hygiene:
     name: Code Hygiene Gates

@@ -24,6 +24,7 @@ class EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Center(
+      key: ValueKey('empty_state_$message'),
       child: Padding(
         padding: const EdgeInsets.all(AppTokens.s32),
         child: Column(

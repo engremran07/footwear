@@ -797,8 +797,10 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       );
 
       final settings = await ref.read(settingsProvider.future);
+      // Safe read: use cached .value to avoid autoDispose StateError on
+      // StreamProvider.autoDispose.future before first Firestore emission.
       final allUsers = user?.isAdmin == true
-          ? await ref.read(allUsersProvider.future)
+          ? (ref.read(allUsersProvider).value ?? <UserModel>[])
           : <UserModel>[];
       final entryByMap = <String, String>{
         for (final u in allUsers) u.id: u.displayName,

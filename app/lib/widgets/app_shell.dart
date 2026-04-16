@@ -10,6 +10,8 @@ import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/services/permissions_service.dart';
 import '../core/utils/snack_helper.dart';
+import '../providers/changelog_provider.dart';
+import 'whats_new_sheet.dart';
 
 // ─── App Shell ───────────────────────────────────────────────────────────────
 
@@ -54,6 +56,7 @@ class _AppShellState extends ConsumerState<AppShell>
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PermissionsService.requestOnFirstRun();
+      _checkAndShowChangelog();
     });
   }
 
@@ -61,6 +64,14 @@ class _AppShellState extends ConsumerState<AppShell>
   void dispose() {
     _drawerCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkAndShowChangelog() async {
+    final seen = await ref.read(changelogSeenVersionProvider.future);
+    if (!mounted) return;
+    if (seen != AppBrand.appVersion) {
+      await WhatsNewSheet.show(context, ref);
+    }
   }
 
   void _openDrawer() {

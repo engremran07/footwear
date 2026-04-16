@@ -1,7 +1,7 @@
 # ShoesERP Master Blueprint
 
-**Version:** v3.5.1+44  
-**Last updated:** 2026-04-11 — Audit v13  
+**Version:** v3.7.5+53  
+**Last updated:** 2026-04-15 — Post-audit hardening pass  
 **Purpose:** Architecture handoff document — living reference for structure, conventions, and runtime contracts.
 
 ---
@@ -12,9 +12,9 @@ ShoesERP is a route/seller distribution ERP for a footwear distribution business
 
 **Tier:** Firebase Spark (free). No Cloud Functions, no Firebase Storage.  
 **Platforms:** Android (fat APK) + Web (Firebase Hosting)  
-**State management:** Riverpod 2.x (StreamProvider.autoDispose, AsyncNotifier)  
+**State management:** Riverpod 3.x (`NotifierProvider`, `AsyncNotifier`, `StreamProvider.autoDispose`)  
 **Navigation:** GoRouter (21 routes, auth guard)  
-**Auth:** Fire base Auth (email+password) + secondary FirebaseApp for safe user creation
+**Auth:** Firebase Auth (email+password) + secondary FirebaseApp for safe user creation
 
 ---
 
@@ -176,9 +176,9 @@ Defined in `app/lib/core/router/app_router.dart`. Auth guard redirects unauthent
 
 | Field | Current | File |
 |-------|---------|------|
-| `appVersion` | `3.5.2` | `app/lib/core/constants/app_brand.dart` |
-| `buildNumber` | `45` | `app/lib/core/constants/app_brand.dart` |
-| `version` | `3.5.2+45` | `app/pubspec.yaml` |
+| `appVersion` | `3.7.5` | `app/lib/core/constants/app_brand.dart` |
+| `buildNumber` | `53` | `app/lib/core/constants/app_brand.dart` |
+| `version` | `3.7.5+53` | `app/pubspec.yaml` |
 
 Both files **must stay in sync** before every release. Bump both together.
 

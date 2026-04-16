@@ -206,13 +206,20 @@ Flutter:
 
 ```bash
 cd app
+grep -E "^version:|appVersion|buildNumber" pubspec.yaml lib/core/constants/app_brand.dart
 flutter pub get
 flutter analyze lib --no-pub
-# Fat APK (canonical — always fat, never ABI-split)
-flutter build apk --release
-# Web
+dart analyze test/
+flutter test -r expanded
 flutter build web --release
 firebase deploy --only hosting
+# Fat APK (canonical — always fat, never ABI-split)
+flutter build apk --release
+cd ..
+firebase deploy --only firestore:rules,firestore:indexes
+git log --oneline -5
+git status --short
+git diff --stat HEAD
 ```
 
 ## 8) Autonomous Agent Checklist
@@ -224,13 +231,22 @@ firebase deploy --only hosting
 - Read AGENTS.md and CLAUDE.md
 - Validate role/rules/collection alignment
 
-### The 14-Step Mandatory Signoff Sequence
+### The 15-Step Mandatory Signoff Sequence
 
-Every session ending with code changes MUST complete ALL 14 steps in order
+Every session ending with code changes MUST complete ALL 15 steps in order
 and quote the required evidence for each. A session is NOT complete until
 every step has been executed and its evidence recorded in the response.
 
-#### Step 1 — Flutter analyze (zero issues)
+#### Step 1 — Version bump + sync
+
+```powershell
+Select-String -Path "app\pubspec.yaml","app\lib\core\constants\app_brand.dart" -Pattern '^version:|appVersion|buildNumber'
+```
+
+Evidence required: quote the matching version/build lines and confirm the
+intended release version/build is synchronized before any artifact is built.
+
+#### Step 2 — Flutter analyze (zero issues)
 
 ```powershell
 cd app; flutter analyze lib --no-pub
@@ -238,7 +254,7 @@ cd app; flutter analyze lib --no-pub
 
 Evidence required: quote exact final line `No issues found! (ran in Xs)`
 
-#### Step 2 — Dart analyze test (zero issues)
+#### Step 3 — Dart analyze test (zero issues)
 
 ```powershell
 dart analyze test/
@@ -246,7 +262,7 @@ dart analyze test/
 
 Evidence required: `No issues found!`
 
-#### Step 3 — All tests green
+#### Step 4 — All tests green
 
 ```powershell
 flutter test -r expanded
@@ -254,41 +270,28 @@ flutter test -r expanded
 
 Evidence required: quote `All N tests passed!` with N count
 
-#### Step 4 — Hygiene grep gates (all must return zero results)
+#### Step 5 — Hygiene grep gates (all must return zero results)
 
 ```powershell
-# 4a — No raw collection strings
+# 5a — No raw collection strings
 grep -rn "\.collection\('" app/lib/ | grep -v "Collections\."
-# 4b — allTransactionsProvider in invalidation list
+# 5b — allTransactionsProvider in invalidation list
 grep -q "allTransactionsProvider" app/lib/providers/auth_provider.dart
-# 4c — No Firestore writes in screens/widgets
+# 5c — No Firestore writes in screens/widgets
 grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/
-# 4d — No StateProvider (banned Riverpod 3)
+# 5d — No StateProvider (banned Riverpod 3)
 grep -rn "StateProvider\b" app/lib/ --include="*.dart"
-# 4e — Version sync: pubspec == app_brand
-grep -E "^version:|appVersion|buildNumber" app/pubspec.yaml app/lib/core/constants/app_brand.dart
-# 4f — No temp artifacts in git status
+# 5e — No temp artifacts in git status
 git status --short | grep -E "auth-users\.json|\.txt$|\.log$|\.flag$|check_locale\."
 ```
 
-#### Step 5 — Zero markdown lint issues
+#### Step 6 — Zero markdown lint issues
 
 ```powershell
-markdownlint "**/*.md" --ignore node_modules --ignore app/build
+markdownlint "**/*.md" --ignore node_modules --ignore app/build --ignore functions/node_modules
 ```
 
 Evidence required: zero output (exit 0)
-
-#### Step 6 — Firestore rules + indexes deploy
-
-```bash
-firebase deploy --only firestore:rules,firestore:indexes
-```
-
-Evidence required: quote "Deploy complete!" from output.
-This is ALWAYS required, not only when rules changed — it confirms the
-deployed state matches the local file state. Skip only if confirmed already
-deployed in same session and no `.rules` or `indexes.json` files changed.
 
 #### Step 7 — Web release build
 
@@ -317,7 +320,17 @@ flutter build apk --release
 
 Evidence required: quote `Built build\app\outputs\flutter-apk\app-release.apk (XXmb)`
 
-#### Step 10 — GitHub commit audit
+#### Step 10 — Firestore rules + indexes deploy
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+Evidence required: quote "Deploy complete!" from output.
+This is ALWAYS required, not only when rules changed — it confirms the
+deployed state matches the local file state before commit/push.
+
+#### Step 11 — GitHub local audit
 
 ```powershell
 git log --oneline -5      # review last 5 commits
@@ -326,9 +339,9 @@ git diff --stat HEAD      # confirm scope of changes matches intent
 ```
 
 Evidence required: quote `git log --oneline -5` output and confirm
-no unexpected files appear in `git status --short`.
+no unexpected files appear in `git status --short` or `git diff --stat HEAD`.
 
-#### Step 11 — Commit with descriptive message
+#### Step 12 — Commit with descriptive message
 
 ```powershell
 git add -A
@@ -339,7 +352,7 @@ Evidence required: quote commit hash from output.
 Commit message must follow: `type: summary` where type ∈
 {feat, fix, chore, style, refactor, test, docs, ci, release}.
 
-#### Step 12 — Push to remote
+#### Step 13 — Push to remote
 
 ```powershell
 git push
@@ -347,7 +360,7 @@ git push
 
 Evidence required: quote push output including branch name and commit hash.
 
-#### Step 13 — APK install to device (if device connected)
+#### Step 14 — APK install to device (if device connected)
 
 ```powershell
 adb devices   # confirm device is listed
@@ -356,7 +369,7 @@ adb -s <device-id> install -r "D:\Footwear\app\build\app\outputs\flutter-apk\app
 
 Evidence required: `Success` from adb output.
 
-#### Step 14 — Final verification
+#### Step 15 — Final verification
 
 - Verify admin and seller startup for `/` and `/inventory` after
   auth/router/provider/rules edits; no transient permission-denied UI acceptable
@@ -380,6 +393,13 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-04-15 audit v16 — v3.7.5+53:
+
+- **Post-audit hardening sweep completed (this session):** route/shop form create guards tightened; auth and network stream providers now use `autoDispose`; transaction export queries capped at `2000` docs; inventory return dialog controller disposal fixed; shimmer placeholders now use theme-derived surface colors; offline indicator uses semantic error color
+- **Model + widget resilience improved:** `ProductModel`, `RouteModel`, `SettingsModel`, `SellerInventoryModel`, and `InventoryTransactionModel` now expose `copyWith` / equality semantics where required; `TransactionModel` gained explicit `payment` / `write_off` constants and throws on unknown balance-impact types; export tiles, empty states, filter chips, stat cards, and amount field gained stable keys
+- **Regression coverage expanded:** unit tests added for new model `copyWith` behavior, equality semantics, settings assertions, and transaction ledger edge cases (`payment`, `write_off`, unknown type)
+- **Workflow drift corrected:** manual APK, CI, and release workflows aligned on Flutter `3.41.6` with expanded test reporting; release validation timeout increased; Firebase Hosting immutable cache rules now include `.wasm`
 
 2026-04-14 audit v15 — v3.7.2+50:
 

@@ -1188,6 +1188,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'flush_select_user': 'Select user to flush',
     'approve_seller_edit': 'Approve Seller Edit',
     'reject_seller_edit': 'Reject Seller Edit',
+
+    // ── What's New / Changelog ──
+    'whats_new': "What's New",
+    'whats_new_subtitle': "Here's what changed in this update",
+    'got_it': 'Got It',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2322,6 +2327,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'flush_select_user': 'اختر المستخدم للمسح',
     'approve_seller_edit': 'الموافقة على تعديل البائع',
     'reject_seller_edit': 'رفض تعديل البائع',
+
+    // ── What's New / Changelog ──
+    'whats_new': 'الجديد',
+    'whats_new_subtitle': 'إليك ما تغيّر في هذا التحديث',
+    'got_it': 'حسناً',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -3472,5 +3482,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'flush_select_user': 'صاف کرنے کے لیے صارف منتخب کریں',
     'approve_seller_edit': 'سیلر ترمیم منظور کریں',
     'reject_seller_edit': 'سیلر ترمیم مسترد کریں',
+
+    // ── What's New / Changelog ──
+    'whats_new': 'نئی خصوصیات',
+    'whats_new_subtitle': 'اس اپڈیٹ میں کیا تبدیل ہوا',
+    'got_it': 'سمجھ گیا',
   },
 };

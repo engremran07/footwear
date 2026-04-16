@@ -155,6 +155,28 @@ void main() {
         equals('err_unknown'),
       );
     });
+
+    // Regression: autoDispose StreamProvider race — disposed before first emission
+    test('StateError "Bad state: No element" → err_pdf_failed', () {
+      expect(
+        AppErrorMapper.key(StateError('Bad state: No element')),
+        equals('err_pdf_failed'),
+      );
+    });
+
+    test('StateError lowercase "bad state" → err_pdf_failed', () {
+      expect(
+        AppErrorMapper.key(StateError('bad state: stream was disposed')),
+        equals('err_pdf_failed'),
+      );
+    });
+
+    test('Exception with "no element" message → err_pdf_failed', () {
+      expect(
+        AppErrorMapper.key(Exception('Iterable contained no element')),
+        equals('err_pdf_failed'),
+      );
+    });
   });
 
   group('AppErrorMapper.isPermissionOrAuthError', () {

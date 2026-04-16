@@ -132,6 +132,55 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
   }
 
+  Future<void> _validateSellerInventoryDeductions({
+    required FirebaseFirestore db,
+    required Map<String, int> sellerInventoryDeductions,
+    required String sellerId,
+  }) async {
+    final normalizedSellerId = sellerId.trim();
+    for (final entry in sellerInventoryDeductions.entries) {
+      final inventoryDocId = entry.key.trim();
+      final requestedQty = entry.value;
+      if (requestedQty <= 0) continue;
+      if (inventoryDocId.isEmpty) {
+        throw ArgumentError(
+          'sellerInventoryDeductions contains an empty document id',
+        );
+      }
+
+      final inventorySnap = await db
+          .collection(Collections.sellerInventory)
+          .doc(inventoryDocId)
+          .get();
+      if (!inventorySnap.exists) {
+        throw ArgumentError(
+          'Seller inventory document not found: $inventoryDocId',
+        );
+      }
+
+      final inventoryData = inventorySnap.data()!;
+      final availableQty =
+          (inventoryData['quantity_available'] as num?)?.toInt() ?? 0;
+      if (availableQty < requestedQty) {
+        throw ArgumentError(
+          'Insufficient seller inventory for $inventoryDocId: '
+          'requested $requestedQty, available $availableQty',
+        );
+      }
+
+      if (normalizedSellerId.isNotEmpty) {
+        final ownerSellerId =
+            (inventoryData['seller_id'] as String? ?? '').trim();
+        if (ownerSellerId != normalizedSellerId) {
+          throw ArgumentError(
+            'Seller inventory document $inventoryDocId does not belong '
+            'to seller $normalizedSellerId',
+          );
+        }
+      }
+    }
+  }
+
   /// Generates the next invoice number: INV-YYYY-NNNN.
   ///
   /// Uses a Firestore transaction on settings/global.last_invoice_number so
@@ -184,6 +233,18 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
     if (shopId.trim().isEmpty) {
       throw ArgumentError('shopId must not be empty');
+    }
+    if (routeId.trim().isEmpty) {
+      throw ArgumentError('routeId must not be empty');
+    }
+    if (items.isEmpty) {
+      throw ArgumentError('At least one item is required');
+    }
+    if (subtotal <= 0) {
+      throw ArgumentError('subtotal must be greater than 0');
+    }
+    if (total <= 0) {
+      throw ArgumentError('total must be greater than 0');
     }
     if (discount < 0 || discount > subtotal) {
       throw ArgumentError('discount must be between 0 and subtotal');
@@ -255,6 +316,12 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             .id; // return existing instead of creating duplicate
       }
     }
+
+    await _validateSellerInventoryDeductions(
+      db: db,
+      sellerInventoryDeductions: sellerInventoryDeductions,
+      sellerId: sellerId,
+    );
 
     // Derive sale type and invoice status from payment
     final String saleType;
@@ -344,7 +411,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     // e.g. sale 5000, received 8000 â†’ balance âˆ’3000 (pays off old debt)
     if (shopId.isNotEmpty) {
       final balanceDelta = total - amountReceived;
-      batch.update(db.collection(Collections.customers).doc(shopId), {
+      batch.update(db.collection(Collections.shops).doc(shopId), {
         'balance': FieldValue.increment(balanceDelta),
         'updated_at':
             FieldValue.serverTimestamp(), // server time avoids withinWriteRate skew
@@ -389,13 +456,29 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (shopId.trim().isEmpty) {
       throw ArgumentError('shopId must not be empty');
     }
+    if (routeId.trim().isEmpty) {
+      throw ArgumentError('routeId must not be empty');
+    }
+    if (items.isEmpty) {
+      throw ArgumentError('At least one item is required');
+    }
+    if (subtotal <= 0) {
+      throw ArgumentError('subtotal must be greater than 0');
+    }
+    if (total <= 0) {
+      throw ArgumentError('total must be greater than 0');
+    }
+    final normalizedLinkedInvoiceId = linkedInvoiceId?.trim();
+    if (normalizedLinkedInvoiceId == null || normalizedLinkedInvoiceId.isEmpty) {
+      throw ArgumentError('linkedInvoiceId must not be empty');
+    }
 
     final db = FirebaseFirestore.instance;
     // I-12: 30-day time-lock on credit note creation
-    if (linkedInvoiceId != null && linkedInvoiceId.isNotEmpty) {
+    if (normalizedLinkedInvoiceId.isNotEmpty) {
       final origSnap = await db
           .collection(Collections.invoices)
-          .doc(linkedInvoiceId)
+          .doc(normalizedLinkedInvoiceId)
           .get();
       if (origSnap.exists) {
         final origStatus = origSnap.data()?['status'] as String? ?? '';
@@ -456,7 +539,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'sale_type': 'return',
       'status': InvoiceModel.statusIssued,
       'notes': notes,
-      'linked_invoice_id': linkedInvoiceId,
+      'linked_invoice_id': normalizedLinkedInvoiceId,
       'created_by': normalizedCreatedBy,
       'created_at': now,
       'updated_at': now,
@@ -482,7 +565,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
 
     // Return reduces shop balance
     if (shopId.isNotEmpty) {
-      batch.update(db.collection(Collections.customers).doc(shopId), {
+      batch.update(db.collection(Collections.shops).doc(shopId), {
         'balance': FieldValue.increment(-total),
         'updated_at': FieldValue.serverTimestamp(),
       });
@@ -508,6 +591,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
   }
 
   /// Voids an invoice â€” admin only, reverses balance impact.
+  ///
+  /// Original invoice-linked transactions remain visible for auditability.
+  /// We append explicit reversal entries so transaction-derived ledgers stay
+  /// aligned with `shop.balance` after a void.
   Future<void> voidInvoice({
     required String invoiceId,
     required double total,
@@ -559,19 +646,12 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final outstandingAmount =
         (data['outstanding_amount'] as num?)?.toDouble() ??
         (docTotal - amountReceived);
+    final docType = data['type'] as String? ?? type;
     final invoiceNumber = data['invoice_number'] as String? ?? '';
     final routeId = data['route_id'] as String? ?? '';
     final shopId = data['shop_id'] as String? ?? '';
     final shopName = data['shop_name'] as String? ?? '';
     final rawItems = (data['items'] as List<dynamic>?) ?? const [];
-    final linkedTransactions = await db
-        .collection(Collections.transactions)
-        .where('invoice_id', isEqualTo: invoiceId)
-        .get();
-    // Filter client-side: old docs may not have deleted field
-    final activeTxDocs = linkedTransactions.docs
-        .where((d) => d.data()['deleted'] != true)
-        .toList();
 
     final batch = db.batch();
 
@@ -588,7 +668,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'shop_name': txShopName,
         'route_id': routeId,
         'type': txType,
-        'sale_type': type == InvoiceModel.typeSale ? 'credit' : 'return',
+        'sale_type': docType == InvoiceModel.typeSale ? 'credit' : 'return',
         'amount': amount,
         'description': description,
         'items': items,
@@ -601,20 +681,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
 
     // Invoice status already set to void atomically in the transaction above.
-    for (final tx in activeTxDocs) {
-      batch.update(tx.reference, {
-        'deleted': true,
-        'deleted_at': now,
-        'deleted_by': createdBy.trim(),
-        'deleted_reason': 'invoice_voided',
-        'updated_at': now,
-      });
-    }
+    // Keep original transactions intact and add reversal entries below.
 
     if (shopId.isNotEmpty) {
-      // BUG-04: Read type from Firestore document, not caller parameter.
-      // Prevents wrong-type reversal math if caller passes incorrect type.
-      final docType = data['type'] as String? ?? type;
       final reversalDelta = switch (docType) {
         InvoiceModel.typeSale =>
           refundMode == VoidRefundMode.creditBalance
@@ -623,7 +692,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         _ => docTotal,
       };
 
-      batch.update(db.collection(Collections.customers).doc(shopId), {
+      batch.update(db.collection(Collections.shops).doc(shopId), {
         'balance': FieldValue.increment(reversalDelta),
         'updated_at': now,
       });
@@ -644,7 +713,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         _restoreWarehouseStock(batch, db, rawItems, now);
       }
 
-      if (type == InvoiceModel.typeSale) {
+      if (docType == InvoiceModel.typeSale) {
         // Write ONE reversal transaction (the live-ledger reversal entry).
         // The soft-deleted originals above already form the complete audit trail.
         final reversalAmount = refundMode == VoidRefundMode.creditBalance
@@ -738,9 +807,22 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       final invoiceTotal = (invData['total'] as num?)?.toDouble() ?? 0.0;
       final invAmountReceived =
           (invData['amount_received'] as num?)?.toDouble() ?? 0.0;
-      final outstanding =
-          (invData['outstanding_amount'] as num?)?.toDouble() ??
-          (invoiceTotal - invAmountReceived).clamp(0.0, double.infinity);
+      final storedOutstanding =
+          (invData['outstanding_amount'] as num?)?.toDouble();
+      if (storedOutstanding != null && storedOutstanding < 0) {
+        throw StateError(
+          'Invoice $invoiceId has a negative outstanding_amount '
+          '($storedOutstanding)',
+        );
+      }
+      final computedOutstanding = invoiceTotal - invAmountReceived;
+      if (storedOutstanding == null && computedOutstanding < 0) {
+        throw StateError(
+          'Invoice $invoiceId is overpaid: total $invoiceTotal, '
+          'received $invAmountReceived',
+        );
+      }
+      final outstanding = storedOutstanding ?? computedOutstanding;
       final invoiceNumber = invData['invoice_number'] as String? ?? '';
       final shopId = invData['shop_id'] as String? ?? '';
       final shopName = invData['shop_name'] as String? ?? '';
@@ -777,7 +859,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
 
         // Decrement customer balance
         if (shopId.isNotEmpty) {
-          txn.update(db.collection(Collections.customers).doc(shopId), {
+          txn.update(db.collection(Collections.shops).doc(shopId), {
             'balance': FieldValue.increment(-outstanding),
             'updated_at': now,
           });

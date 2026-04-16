@@ -70,6 +70,36 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     return 'seller';
   }
 
+  Future<bool> _isCurrentUserAdmin() async {
+    final cachedUser = ref.read(authUserProvider).value;
+    if (cachedUser != null) return cachedUser.isAdmin;
+
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) return false;
+
+    final profileSnap = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(authUser.uid)
+        .get();
+    if (!profileSnap.exists) return false;
+
+    final role =
+        (profileSnap.data()?['role'] as String? ?? '').trim().toLowerCase();
+    return role == 'admin' || role == 'manager';
+  }
+
+  Future<String> _requireAdminUid() async {
+    final authUser = FirebaseAuth.instance.currentUser;
+    final adminUid = authUser?.uid.trim() ?? '';
+    if (adminUid.isEmpty) {
+      throw StateError('No authenticated user found');
+    }
+    if (!await _isCurrentUserAdmin()) {
+      throw StateError('Admin privileges required');
+    }
+    return adminUid;
+  }
+
   Future<void> createUser({
     required String email,
     required String password,
@@ -79,6 +109,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     String? assignedRouteId,
     String? assignedRouteName,
   }) async {
+    final adminUid = await _requireAdminUid();
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final normalizedRole = _normalizeRole(role);
@@ -134,7 +165,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
               ? assignedRouteName
               : null,
           'active': true,
-          'created_by': FirebaseAuth.instance.currentUser!.uid, // RU-04
+          'created_by': adminUid,
           'created_at': now,
           'updated_at': now,
         });
@@ -164,39 +195,83 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     Map<String, dynamic> data, {
     String? previousRouteId,
   }) async {
+    final trimmedUid = uid.trim();
+    if (trimmedUid.isEmpty) {
+      throw ArgumentError('uid must not be empty');
+    }
+
+    final actingUid = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
+    if (actingUid.isEmpty) {
+      throw StateError('No authenticated user found');
+    }
+
+    final isAdmin = await _isCurrentUserAdmin();
     final db = FirebaseFirestore.instance;
     final updateData = <String, dynamic>{...data};
     if (updateData['role'] is String) {
       updateData['role'] = _normalizeRole(updateData['role'] as String);
     }
 
-    final updatedRole = updateData['role'] as String?;
+    final hasRoleUpdate = updateData.containsKey('role');
+    final hasRouteIdUpdate = updateData.containsKey('assigned_route_id');
+    final hasRouteNameUpdate = updateData.containsKey('assigned_route_name');
+    final updatedRole = hasRoleUpdate ? updateData['role'] as String? : null;
     final normalizedPreviousRouteId = (previousRouteId ?? '').trim();
-    final newRouteId = (updateData['assigned_route_id'] as String?)?.trim();
+    final newRouteId = hasRouteIdUpdate
+        ? (updateData['assigned_route_id'] as String?)?.trim()
+        : null;
     final displayName = (updateData['display_name'] as String?)?.trim();
 
-    if (updatedRole == 'seller' && (newRouteId == null || newRouteId.isEmpty)) {
-      throw ArgumentError('Seller accounts require an assigned route.');
-    }
-
-    // Non-seller users must not retain a route assignment.
-    if (updatedRole != null && updatedRole != 'seller') {
-      updateData['assigned_route_id'] = null;
-      updateData['assigned_route_name'] = null;
+    if (!isAdmin) {
+      const allowedSelfKeys = {'display_name'};
+      if (actingUid != trimmedUid) {
+        throw StateError('Only admins can update other users');
+      }
+      final disallowedKeys = updateData.keys
+          .where((key) => !allowedSelfKeys.contains(key))
+          .toList();
+      if (disallowedKeys.isNotEmpty) {
+        throw StateError(
+          'Only admins can update role, route, or account status',
+        );
+      }
+      updateData.remove('assigned_route_id');
+      updateData.remove('assigned_route_name');
+      updateData.remove('role');
     } else {
-      updateData['assigned_route_id'] = newRouteId;
+      if (updatedRole == 'seller' && (newRouteId == null || newRouteId.isEmpty)) {
+        throw ArgumentError('Seller accounts require an assigned route.');
+      }
+
+      // Non-seller users must not retain a route assignment.
+      if (updatedRole != null && updatedRole != 'seller') {
+        updateData['assigned_route_id'] = null;
+        updateData['assigned_route_name'] = null;
+      } else {
+        if (hasRouteIdUpdate) {
+          updateData['assigned_route_id'] =
+              (newRouteId == null || newRouteId.isEmpty) ? null : newRouteId;
+        } else {
+          updateData.remove('assigned_route_id');
+        }
+        if (!hasRouteNameUpdate) {
+          updateData.remove('assigned_route_name');
+        }
+      }
     }
 
     // DI-02: use a single WriteBatch for atomicity — user doc + route docs.
     final batch = db.batch();
     final now = Timestamp.now();
 
-    batch.update(db.collection(Collections.users).doc(uid), {
+    batch.update(db.collection(Collections.users).doc(trimmedUid), {
       ...updateData,
       'updated_at': now,
     });
 
-    if (normalizedPreviousRouteId.isNotEmpty &&
+    if (isAdmin &&
+        hasRouteIdUpdate &&
+        normalizedPreviousRouteId.isNotEmpty &&
         normalizedPreviousRouteId != newRouteId) {
       batch.update(
         db.collection(Collections.routes).doc(normalizedPreviousRouteId),
@@ -208,9 +283,14 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       );
     }
 
-    if (newRouteId != null && newRouteId.isNotEmpty && displayName != null) {
+    if (isAdmin &&
+        hasRouteIdUpdate &&
+        newRouteId != null &&
+        newRouteId.isNotEmpty &&
+        displayName != null &&
+        displayName.isNotEmpty) {
       batch.update(db.collection(Collections.routes).doc(newRouteId), {
-        'assigned_seller_id': uid,
+        'assigned_seller_id': trimmedUid,
         'assigned_seller_name': displayName,
         'updated_at': now,
       });
@@ -220,15 +300,21 @@ class UserManagementNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> toggleActive(String uid, bool active) async {
+    await _requireAdminUid();
+    final trimmedUid = uid.trim();
+    if (trimmedUid.isEmpty) {
+      throw ArgumentError('uid must not be empty');
+    }
     await FirebaseFirestore.instance
         .collection(Collections.users)
-        .doc(uid)
+        .doc(trimmedUid)
         .update({'active': active, 'updated_at': Timestamp.now()});
   }
 
   /// Soft-delete: deactivate user + clear route assignments.
   /// Auth account is orphaned but cannot access anything (rules check active).
   Future<void> deleteUser(String uid) async {
+    await _requireAdminUid();
     final trimmedUid = uid.trim();
     if (trimmedUid.isEmpty) {
       throw ArgumentError('uid must not be empty');
@@ -265,6 +351,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
   /// Send a password-reset email to the seller.
   /// Email is immutable after creation; password can only be reset via email.
   Future<void> sendPasswordResetForSeller({required String email}) async {
+    await _requireAdminUid();
     final trimmedEmail = email.trim().toLowerCase();
     if (trimmedEmail.isEmpty) return;
     await FirebaseAuth.instance.sendPasswordResetEmail(email: trimmedEmail);
@@ -278,6 +365,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     required String routeName,
     required String displayName,
   }) async {
+    await _requireAdminUid();
     final trimmedUid = uid.trim();
     if (trimmedUid.isEmpty) throw ArgumentError('uid must not be empty');
 
@@ -314,9 +402,10 @@ class UserManagementNotifier extends AsyncNotifier<void> {
   ///
   /// Guard: only inactive users can be hard-deleted; admin cannot delete self.
   Future<void> hardDeleteUser(String uid, String currentAdminUid) async {
+    final adminUid = await _requireAdminUid();
     final trimmedUid = uid.trim();
     if (trimmedUid.isEmpty) throw ArgumentError('uid must not be empty');
-    if (trimmedUid == currentAdminUid.trim()) {
+    if (trimmedUid == adminUid || trimmedUid == currentAdminUid.trim()) {
       throw ArgumentError('Admin cannot delete their own account.');
     }
 
@@ -415,6 +504,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     String? newPassword,
     bool? emailVerified,
   }) async {
+    await _requireAdminUid();
     final trimmedEmail = newEmail?.trim().toLowerCase();
     final trimmedPassword = newPassword?.trim();
 
@@ -465,6 +555,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
   /// Admin-only: Send email verification to any user.
   /// Requires both [uid] and [email] — see AdminIdentityService for 3-step flow.
   Future<void> adminSendVerificationEmail(String uid, String email) async {
+    await _requireAdminUid();
     try {
       await AdminIdentityService.instance.sendVerificationEmail(
         uid,

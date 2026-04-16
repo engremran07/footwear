@@ -64,7 +64,7 @@
         ]
       },
       {
-        "source": "**/*.@(css|svg|png|jpg|jpeg|gif|ico|woff2|woff)",
+        "source": "**/*.@(css|svg|png|jpg|jpeg|gif|ico|woff2|woff|wasm)",
         "headers": [
           { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
         ]

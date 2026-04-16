@@ -9,10 +9,6 @@ on:
         default: 'release'
         type: choice
         options: [debug, release]
-      flutter_version:
-        description: 'Flutter version (e.g. 3.41.x)'
-        required: false
-        default: '3.41.6'
 
 jobs:
   build:
@@ -27,7 +23,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ github.event.inputs.flutter_version }}
+          flutter-version: '3.41.6'
           channel: stable
           cache: true
 
@@ -83,6 +79,18 @@ jobs:
           fi
           echo "✅ versionCode monotonic check passed"
 
+      - name: Validate version sync
+        run: |
+          PUBSPEC_VER=$(grep '^version:' app/pubspec.yaml | sed 's/version: //' | tr -d '[:space:]')
+          BRAND_VER=$(grep 'static const String appVersion' app/lib/core/constants/app_brand.dart | sed "s/.*'\(.*\)';/\1/" | tr -d '[:space:]')
+          BRAND_BUILD=$(grep 'static const String buildNumber' app/lib/core/constants/app_brand.dart | sed "s/.*'\(.*\)';/\1/" | tr -d '[:space:]')
+          BRAND_COMBINED="${BRAND_VER}+${BRAND_BUILD}"
+          if [ "$PUBSPEC_VER" != "$BRAND_COMBINED" ]; then
+            echo "❌ Version mismatch: pubspec=$PUBSPEC_VER app_brand=$BRAND_COMBINED"
+            exit 1
+          fi
+          echo "✅ Version in sync: $PUBSPEC_VER"
+
       - name: flutter pub get
         run: cd app && flutter pub get
 
@@ -90,7 +98,7 @@ jobs:
         run: cd app && flutter analyze lib --no-pub
 
       - name: flutter test
-        run: cd app && flutter test -r compact
+        run: cd app && flutter test -r expanded
 
       - name: Build debug APK
         if: github.event.inputs.build_type == 'debug'

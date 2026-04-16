@@ -75,23 +75,28 @@ Always use client-side:
 ### 8. Mandatory Release Sequence (non-bypassable, every session)
 
 ```powershell
-# Step 1 — analyze
+# Step 1 — version bump + sync
+Select-String -Path "app\pubspec.yaml","app\lib\core\constants\app_brand.dart" -Pattern '^version:|appVersion|buildNumber'
+# If this session is producing release artifacts, bump PATCH+BUILD before continuing.
+
+# Step 2 — analyze
 flutter analyze lib --no-pub          # quote "No issues found!"
 dart analyze test/                    # quote "No issues found!"
 flutter test -r expanded              # quote "All N tests passed!"
-# Step 2 — deploy Firestore (ALWAYS, not just on rules change)
-firebase deploy --only firestore:rules,firestore:indexes   # quote "Deploy complete!"
 # Step 3 — web build + hosting deploy
 $ErrorActionPreference='Continue'; flutter build web --release; Write-Host "EXIT: $LASTEXITCODE"
 firebase deploy --only hosting        # quote "Deploy complete!"
 # Step 4 — APK build
 flutter build apk --release           # quote file size
-# Step 5 — commit audit + push
+# Step 5 — deploy Firestore (ALWAYS, not just on rules change)
+firebase deploy --only firestore:rules,firestore:indexes   # quote "Deploy complete!"
+# Step 6 — commit audit + push
 git log --oneline -5                  # review; no unexpected commits
 git status --short                    # no unexpected artifacts
+git diff --stat HEAD                  # scope matches intent
 git add -A ; git commit -m "type: summary — vX.Y.Z+N"   # quote hash
 git push                              # quote branch + hash
-# Step 6 — device install (if device connected)
+# Step 7 — device install (if device connected)
 adb devices
 adb -s <device-id> install -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-release.apk"  # quote "Success"
 ```

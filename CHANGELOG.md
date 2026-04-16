@@ -7,6 +7,28 @@ Most recent first.
 
 ---
 
+## [3.7.5+53] — 2026-04-15 — Audit backlog implementation sweep
+
+### Changed
+
+- Auth and network stream providers now use `autoDispose` to reduce stale listeners while preserving the same public provider contracts.
+- Export queries for shop, route, and global transaction exports are capped to `2000` documents per run to avoid unbounded bulk reads.
+- Manual APK, CI, and release workflows are aligned on Flutter `3.41.6` with expanded Flutter test reporting; release validation timeout increased to 15 minutes.
+- Firebase Hosting immutable cache rules now include `.wasm` assets.
+
+### Fixed
+
+- Route creation now rejects empty `created_by` values instead of silently writing invalid audit data.
+- Shop creation now rejects null-or-blank route selections consistently.
+- Inventory return dialog controller cleanup now happens reliably after the dialog closes.
+- Shimmer placeholders no longer rely on hardcoded greys and now track the active theme.
+- Offline indicator now uses the semantic error color instead of the stock color.
+
+### Tests
+
+- Added regression coverage for new model `copyWith` and equality behavior.
+- Added ledger coverage for `payment` and `write_off` transaction types plus unknown-type failure behavior.
+
 ## [3.7.0+48] — 2026-04-13 — Audit v14: Navigation Overhaul + Governance Hardening
 
 ### Added

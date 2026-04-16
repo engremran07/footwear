@@ -23,6 +23,10 @@ import 'unit/core/formatters_test.dart' as formatters;
 import 'unit/core/l10n_test.dart' as l10n;
 import 'unit/core/sanitizer_test.dart' as sanitizer;
 import 'unit/core/error_mapper_test.dart' as error_mapper;
+import 'unit/core/changelog_data_test.dart' as changelog_data;
+import 'unit/core/share_helper_test.dart' as share_helper;
+import 'unit/core/excel_export_test.dart' as excel_export;
+import 'unit/core/pdf_export_test.dart' as pdf_export;
 import 'unit/models/seller_inventory_model_test.dart' as seller_inventory_model;
 import 'unit/models/invoice_model_extended_test.dart' as invoice_model_extended;
 import 'unit/business_logic/void_invoice_balance_test.dart'
@@ -31,6 +35,13 @@ import 'unit/business_logic/create_sale_invoice_guard_test.dart'
     as create_sale_invoice_guard;
 import 'unit/business_logic/mark_paid_outstanding_test.dart'
     as mark_paid_outstanding;
+import 'unit/providers/settings_provider_test.dart' as settings_provider;
+import 'unit/providers/transaction_provider_test.dart' as transaction_provider;
+import 'unit/providers/changelog_provider_test.dart' as changelog_provider;
+import 'widget/confirm_dialog_test.dart' as confirm_dialog_widget;
+import 'widget/stat_card_test.dart' as stat_card_widget;
+import 'widget/empty_state_test.dart' as empty_state_widget;
+import 'widget/app_online_indicator_test.dart' as app_online_indicator_widget;
 
 void main() {
   user_model.main();
@@ -52,9 +63,20 @@ void main() {
   void_invoice_balance.main();
   create_sale_invoice_guard.main();
   mark_paid_outstanding.main();
+    settings_provider.main();
+    transaction_provider.main();
+    changelog_provider.main();
   validators.main();
   formatters.main();
   l10n.main();
   sanitizer.main();
   error_mapper.main();
+  changelog_data.main();
+    share_helper.main();
+    excel_export.main();
+    pdf_export.main();
+    confirm_dialog_widget.main();
+    stat_card_widget.main();
+    empty_state_widget.main();
+    app_online_indicator_widget.main();
 }

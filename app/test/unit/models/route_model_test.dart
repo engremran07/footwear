@@ -71,5 +71,32 @@ void main() {
       expect(json.containsKey('active'), isTrue);
       expect(json.containsKey('assigned_seller_id'), isTrue);
     });
+
+    test('copyWith can update and clear nullable fields', () {
+      final original = RouteModel.fromJson(baseJson, 'r1');
+      final updated = original.copyWith(
+        name: 'South Route',
+        clearArea: true,
+        clearAssignedSellerId: true,
+        clearAssignedSellerName: true,
+      );
+
+      expect(updated.name, 'South Route');
+      expect(updated.area, isNull);
+      expect(updated.assignedSellerId, isNull);
+      expect(updated.assignedSellerName, isNull);
+      expect(updated.routeNumber, original.routeNumber);
+    });
+
+    test('equality is based on id', () {
+      final left = RouteModel.fromJson(baseJson, 'r1');
+      final right = RouteModel.fromJson(
+        Map<String, dynamic>.from(baseJson)..['name'] = 'Changed',
+        'r1',
+      );
+
+      expect(left, right);
+      expect(left.hashCode, right.hashCode);
+    });
   });
 }

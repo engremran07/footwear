@@ -104,5 +104,24 @@ void main() {
       final m = SellerInventoryModel.fromJson(json, 'si1');
       expect(m.toJson()['quantity_available'], 99);
     });
+
+    test('copyWith updates selected fields', () {
+      final original = SellerInventoryModel.fromJson(baseJson, 'si1');
+      final updated = original.copyWith(quantityAvailable: 48, active: false);
+      expect(updated.quantityAvailable, 48);
+      expect(updated.active, isFalse);
+      expect(updated.variantId, original.variantId);
+    });
+
+    test('equality is based on id', () {
+      final left = SellerInventoryModel.fromJson(baseJson, 'si1');
+      final right = SellerInventoryModel.fromJson(
+        Map<String, dynamic>.from(baseJson)..['quantity_available'] = 999,
+        'si1',
+      );
+
+      expect(left, right);
+      expect(left.hashCode, right.hashCode);
+    });
   });
 }

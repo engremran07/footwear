@@ -76,6 +76,26 @@ void main() {
       final m = InventoryTransactionModel.fromJson(baseJson, 'it1');
       expect(m.toJson().containsKey('id'), isFalse);
     });
+
+    test('copyWith can update and clear notes', () {
+      final original = InventoryTransactionModel.fromJson(baseJson, 'it1');
+      final updated = original.copyWith(quantity: 24, clearNotes: true);
+
+      expect(updated.quantity, 24);
+      expect(updated.notes, isNull);
+      expect(updated.variantId, original.variantId);
+    });
+
+    test('equality is based on id', () {
+      final left = InventoryTransactionModel.fromJson(baseJson, 'it1');
+      final right = InventoryTransactionModel.fromJson(
+        Map<String, dynamic>.from(baseJson)..['quantity'] = 999,
+        'it1',
+      );
+
+      expect(left, right);
+      expect(left.hashCode, right.hashCode);
+    });
   });
 
   group('type constants', () {

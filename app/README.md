@@ -1,8 +1,8 @@
-﻿# FootWear ERP — Flutter App (v3.7.0+48)
+﻿# FootWear ERP — Flutter App (v3.7.5+53)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
-> **v3.7.0+48 (audit v14)** — fl_chart 1.2.0, share_plus 13.0.0, permission_handler 12.0.1, dart_jsonwebtoken 3.4.0, flutter_lints 6.0.0 upgraded. 30 lint issues fixed. CI standardised on Flutter 3.41.6. All StateProvider instances replaced (Riverpod 3 ban). Anti-Bypass Enforcement Matrix added.
+> **v3.7.5+53 (2026-04-15)** — Current app baseline includes the post-audit hardening pass: stricter provider guards, tighter invoice and Firestore validation, export query caps, model utility cleanup, theme-safe loading widgets, and workflow normalization on Flutter 3.41.6 with expanded test reporting.
 
 ---
 
@@ -30,16 +30,22 @@ Place `google-services.json` in `android/app/` before running (obtain from Fireb
 ## Build
 
 ```bash
-# Release APK (fat, universal — never split-per-abi)
-flutter build apk --release
-# Output: build/app/outputs/flutter-apk/app-release.apk
-
-# Install to connected device
-adb install -r build/app/outputs/flutter-apk/app-release.apk
+# Sync or bump the release version first.
+grep -E "^version:|appVersion|buildNumber" pubspec.yaml lib/core/constants/app_brand.dart
 
 # Web release
 flutter build web --release
 firebase deploy --only hosting
+
+# Release APK (fat, universal — never split-per-abi)
+flutter build apk --release
+# Output: build/app/outputs/flutter-apk/app-release.apk
+
+# From the repo root, deploy Firestore rules/indexes before commit/push completes.
+# firebase deploy --only firestore:rules,firestore:indexes
+
+# Install to connected device
+adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 
 ---
@@ -177,23 +183,29 @@ Every `where(A) + orderBy(B)` query pair where `A != B` requires a composite ind
 ## Pre-Release Checklist
 
 ```bash
-# 1 — Zero analyze issues (quote exact final line)
-flutter analyze lib --no-pub
-
-# 2 — All tests green (quote pass count)
-flutter test -r expanded
-
-# 3 — No StateProvider
-grep -rn "StateProvider\b" lib/ --include="*.dart"
-
-# 4 — Version sync (pubspec.yaml + app_brand.dart must match)
+# 1 — Version sync / bump
 grep -E "^version:|appVersion|buildNumber" pubspec.yaml lib/core/constants/app_brand.dart
 
-# 5 — APK (quote file size)
+# 2 — Zero analyze issues (quote exact final line)
+flutter analyze lib --no-pub
+
+# 3 — All tests green (quote pass count)
+flutter test -r expanded
+
+# 4 — No StateProvider
+grep -rn "StateProvider\b" lib/ --include="*.dart"
+
+# 5 — Web (confirm EXIT: $LASTEXITCODE = 0)
+flutter build web --release
+
+# 6 — Hosting deploy
+firebase deploy --only hosting
+
+# 7 — APK (quote file size)
 flutter build apk --release
 
-# 6 — Web (confirm EXIT: $LASTEXITCODE = 0)
-flutter build web --release
+# 8 — Firestore deploy (run from repo root)
+# firebase deploy --only firestore:rules,firestore:indexes
 ```
 
 ---

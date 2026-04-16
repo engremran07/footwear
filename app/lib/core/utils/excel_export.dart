@@ -83,10 +83,11 @@ String _safeSheetName(String raw) {
 }
 
 String _safeExcelText(String raw) {
-  if (raw.isEmpty) return raw;
+  final normalized = raw.trim();
+  if (normalized.isEmpty) return normalized;
   const dangerousPrefixes = ['=', '+', '-', '@'];
-  if (dangerousPrefixes.contains(raw[0])) return "'$raw";
-  return raw;
+  if (dangerousPrefixes.contains(normalized[0])) return "'$normalized";
+  return normalized;
 }
 
 String _xmlEscape(String s) => s

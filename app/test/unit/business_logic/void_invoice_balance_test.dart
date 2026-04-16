@@ -33,6 +33,20 @@ bool _writeCashRefundTx({
   required double amountReceived,
 }) => refundMode == VoidRefundMode.cashRefund && amountReceived > 0;
 
+double _visibleLedgerImpactAfterVoid({
+  required double total,
+  required double amountReceived,
+  required VoidRefundMode refundMode,
+}) {
+  final originalVisibleImpact = total - amountReceived;
+  final reversalReturnImpact = -total;
+  final cashRefundImpact =
+      refundMode == VoidRefundMode.cashRefund && amountReceived > 0
+      ? amountReceived
+      : 0.0;
+  return originalVisibleImpact + reversalReturnImpact + cashRefundImpact;
+}
+
 // ── tests ────────────────────────────────────────────────────────────────────
 
 void main() {
@@ -59,8 +73,6 @@ void main() {
       expect(delta, equals(-5000.0));
     });
 
-    // TEST-009: after FC-02 fix only 1 active tx written for creditBalance
-    // (return tx). Verified by transaction count = reversalAmount > 0 → 1 tx.
     test('reversalAmount for creditBalance equals total', () {
       const total = 5000.0;
       const reversalAmount =
@@ -68,6 +80,15 @@ void main() {
           ? total
           : 3000.0;
       expect(reversalAmount, equals(5000.0));
+    });
+
+    test('preserved originals plus reversal leave customer credit only', () {
+      final impact = _visibleLedgerImpactAfterVoid(
+        total: 5000,
+        amountReceived: 2000,
+        refundMode: VoidRefundMode.creditBalance,
+      );
+      expect(impact, equals(-2000.0));
     });
   });
 
@@ -104,13 +125,20 @@ void main() {
       expect(shouldWrite, isTrue);
     });
 
-    // TEST-010: after FC-02 fix, cashRefund writes at most 2 active txs
-    // (1 return reversal + 1 cash_out refund, when amountReceived > 0)
     test('cashRefund reversalAmount equals outstandingAmount', () {
       const outstandingAmount = 3000.0;
       // reversalAmount in provider: refundMode != creditBalance → outstandingAmount
       const reversalAmount = outstandingAmount;
       expect(reversalAmount, equals(3000.0));
+    });
+
+    test('preserved originals plus reversal and refund return to zero', () {
+      final impact = _visibleLedgerImpactAfterVoid(
+        total: 5000,
+        amountReceived: 2000,
+        refundMode: VoidRefundMode.cashRefund,
+      );
+      expect(impact, equals(0.0));
     });
   });
 

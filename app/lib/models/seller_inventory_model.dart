@@ -25,6 +25,32 @@ class SellerInventoryModel {
     required this.updatedAt,
   });
 
+  SellerInventoryModel copyWith({
+    String? id,
+    String? sellerId,
+    String? sellerName,
+    String? productId,
+    String? variantId,
+    String? variantName,
+    int? quantityAvailable,
+    bool? active,
+    Timestamp? createdAt,
+    Timestamp? updatedAt,
+  }) {
+    return SellerInventoryModel(
+      id: id ?? this.id,
+      sellerId: sellerId ?? this.sellerId,
+      sellerName: sellerName ?? this.sellerName,
+      productId: productId ?? this.productId,
+      variantId: variantId ?? this.variantId,
+      variantName: variantName ?? this.variantName,
+      quantityAvailable: quantityAvailable ?? this.quantityAvailable,
+      active: active ?? this.active,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   factory SellerInventoryModel.fromJson(
     Map<String, dynamic> json,
     String docId,
@@ -54,4 +80,12 @@ class SellerInventoryModel {
     'created_at': createdAt,
     'updated_at': updatedAt,
   };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SellerInventoryModel && other.id == id);
+
+  @override
+  int get hashCode => id.hashCode;
 }

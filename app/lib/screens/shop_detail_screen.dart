@@ -57,6 +57,9 @@ class ShopDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
+  // Guard against double-tap / concurrent PDF generation.
+  bool _generatingPdf = false;
+
   void _showEditTransactionDialog(TransactionModel tx) {
     final user = ref.read(authUserProvider).value;
     final isAdmin = user?.isAdmin == true;
@@ -221,7 +224,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      amountC.dispose();
+      descC.dispose();
+    });
   }
 
   /// Seller edit flow for cash_in/cash_out transactions.
@@ -394,7 +400,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      amountC.dispose();
+      descC.dispose();
+    });
   }
 
   Future<void> _reviewEditRequest(TransactionModel tx, bool approved) async {
@@ -486,14 +495,20 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   }
 
   Future<void> _generatePdf(ShopModel shop) async {
+    if (_generatingPdf) return;
+    setState(() => _generatingPdf = true);
     try {
       final locale = ref.read(appLocaleProvider);
       final settings = await ref.read(settingsProvider.future);
       final user = ref.read(authUserProvider).value;
+      final isAdmin = user?.isAdmin == true;
       final sorted = await _loadFullTransactions();
-      final allUsers = user?.isAdmin == true
-          ? await ref.read(allUsersProvider.future)
+      // Safe read: use cached .value to avoid autoDispose StateError on
+      // StreamProvider.autoDispose.future before first Firestore emission.
+      final allUsers = isAdmin
+          ? (ref.read(allUsersProvider).value ?? <UserModel>[])
           : <UserModel>[];
+      if (!mounted) return;
       final entryByMap = <String, String>{
         for (final u in allUsers) u.id: u.displayName,
       };
@@ -510,13 +525,14 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
         transactions: sorted,
         labels: _labels(),
         locale: locale,
-        showEntryBy: true,
+        showEntryBy: isAdmin,
         entryByMap: entryByMap,
         dateFrom: sorted.isNotEmpty ? sorted.first.createdAt.toDate() : null,
         dateTo: sorted.isNotEmpty ? sorted.last.createdAt.toDate() : null,
         currency: settings.currency,
         logoBytes: logoBytes,
       );
+      if (!mounted) return;
       await Printing.sharePdf(
         bytes: bytes,
         filename: 'statement_${shop.name.replaceAll(' ', '_')}.pdf',
@@ -526,6 +542,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
         final key = AppErrorMapper.key(e);
         ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
+    } finally {
+      if (mounted) setState(() => _generatingPdf = false);
     }
   }
 
@@ -677,7 +695,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      amountC.dispose();
+      descC.dispose();
+    });
   }
 
   @override
@@ -775,51 +796,55 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             _generatePdf(shop);
 
                           case _ShopAction.share:
-                            final sorted = await _loadFullTransactions();
-                            if (!context.mounted) return;
-                            ExportSheet.show(
-                              context,
-                              ref,
-                              title:
-                                  '${shop.name} - ${tr('transactions', ref)}',
-                              headers: [
-                                tr('date', ref),
-                                tr('type', ref),
-                                tr('amount', ref),
-                                tr('description', ref),
-                              ],
-                              rows: sorted
-                                  .map(
-                                    (t) => [
-                                      AppFormatters.dateTime(t.createdAt),
-                                      _transactionTypeLabel(t),
-                                      AppFormatters.sar(t.amount),
-                                      t.description ?? '',
-                                    ],
-                                  )
-                                  .toList(),
-                              fileName: 'shop_${shop.name}',
-                              pdfBytesBuilder: () async {
-                                final locale = ref.read(appLocaleProvider);
-                                final settings = await ref.read(
-                                  settingsProvider.future,
-                                );
-                                final user = ref.read(authUserProvider).value;
-                                final allUsers = user?.isAdmin == true
-                                    ? await ref.read(allUsersProvider.future)
-                                    : <UserModel>[];
-                                final entryByMap = <String, String>{
-                                  for (final u in allUsers) u.id: u.displayName,
-                                };
-                                if (user != null) {
-                                  entryByMap[user.id] = user.displayName;
-                                }
-                                final logoBytes = settings.logoBytes;
-                                final netTx = sorted.fold<double>(
-                                  0.0,
-                                  (s, t) => s + t.balanceImpact,
-                                );
-                                return buildPdfLedger(
+                            try {
+                              final sorted = await _loadFullTransactions();
+                              if (!context.mounted) return;
+                              final user = ref.read(authUserProvider).value;
+                              final isAdmin = user?.isAdmin == true;
+                              // Pre-load all async data so pdfBytesBuilder
+                              // is pure-sync capture (no autoDispose race).
+                              final settings = await ref.read(
+                                settingsProvider.future,
+                              );
+                              final allUsers = isAdmin
+                                  ? (ref.read(allUsersProvider).value ??
+                                        <UserModel>[])
+                                  : <UserModel>[];
+                              final locale = ref.read(appLocaleProvider);
+                              final netTx = sorted.fold<double>(
+                                0.0,
+                                (s, t) => s + t.balanceImpact,
+                              );
+                              final entryByMap = <String, String>{
+                                for (final u in allUsers) u.id: u.displayName,
+                              };
+                              if (user != null) {
+                                entryByMap[user.id] = user.displayName;
+                              }
+                              if (!context.mounted) return;
+                              ExportSheet.show(
+                                context,
+                                ref,
+                                title:
+                                    '${shop.name} - ${tr('transactions', ref)}',
+                                headers: [
+                                  tr('date', ref),
+                                  tr('type', ref),
+                                  tr('amount', ref),
+                                  tr('description', ref),
+                                ],
+                                rows: sorted
+                                    .map(
+                                      (t) => [
+                                        AppFormatters.dateTime(t.createdAt),
+                                        _transactionTypeLabel(t),
+                                        AppFormatters.sar(t.amount),
+                                        t.description ?? '',
+                                      ],
+                                    )
+                                    .toList(),
+                                fileName: 'shop_${shop.name}',
+                                pdfBytesBuilder: () => buildPdfLedger(
                                   shopName: shop.name,
                                   companyName: settings.companyName,
                                   generatedBy: user?.displayName ?? '',
@@ -827,7 +852,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                   transactions: sorted,
                                   labels: _labels(),
                                   locale: locale,
-                                  showEntryBy: true,
+                                  showEntryBy: isAdmin,
                                   entryByMap: entryByMap,
                                   dateFrom: sorted.isNotEmpty
                                       ? sorted.first.createdAt.toDate()
@@ -836,10 +861,16 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                       ? sorted.last.createdAt.toDate()
                                       : null,
                                   currency: settings.currency,
-                                  logoBytes: logoBytes,
-                                );
-                              },
-                            );
+                                  logoBytes: settings.logoBytes,
+                                ),
+                              );
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              final key = AppErrorMapper.key(e);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                errorSnackBar(tr(key, ref)),
+                              );
+                            }
                         }
                       },
                       itemBuilder: (ctx) => [

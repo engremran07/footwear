@@ -60,6 +60,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
     bool saved = false;
     try {
       final user = ref.read(authUserProvider).value;
+      final createdBy = user?.id.trim() ?? '';
       final Map<String, dynamic> data = {
         'name': AppSanitizer.name(_nameC.text),
         'assigned_seller_id': _sellerId,
@@ -70,7 +71,10 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
             .read(routeNotifierProvider.notifier)
             .updateRoute(widget.routeId!, data);
       } else {
-        data['created_by'] = user?.id ?? '';
+        if (createdBy.isEmpty) {
+          throw StateError('createdBy must not be empty');
+        }
+        data['created_by'] = createdBy;
         await ref.read(routeNotifierProvider.notifier).create(data);
       }
       saved = true;

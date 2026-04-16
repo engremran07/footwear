@@ -3,13 +3,21 @@ import 'package:shimmer/shimmer.dart';
 import '../core/design/app_tokens.dart';
 
 /// Returns a theme-aware placeholder color for shimmer shapes.
-/// Light mode: white (classic shimmer look). Dark mode: dark grey.
+/// Light mode: surface container. Dark mode: elevated surface container.
 Color _placeholderColor(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark
-    ? Colors
-          .grey
-          .shade800 // shimmer
-    : Colors.white; // shimmer
+  Theme.of(context).brightness == Brightness.dark
+  ? Theme.of(context).colorScheme.surfaceContainerHighest
+  : Theme.of(context).colorScheme.surfaceContainerHigh;
+
+Color _shimmerBaseColor(BuildContext context) =>
+  Theme.of(context).brightness == Brightness.dark
+  ? Theme.of(context).colorScheme.surfaceContainerHighest
+  : Theme.of(context).colorScheme.surfaceContainer;
+
+Color _shimmerHighlightColor(BuildContext context) =>
+  Theme.of(context).brightness == Brightness.dark
+  ? Theme.of(context).colorScheme.surfaceContainerHigh
+  : Theme.of(context).colorScheme.surfaceBright;
 
 /// A shimmer placeholder widget for loading states.
 /// Uses the shimmer package for smooth, consistent loading animations.
@@ -34,13 +42,8 @@ class ShimmerLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseColor = isDark
-        ? Colors.grey.shade800
-        : Colors.grey.shade300; // shimmer
-    final highlightColor = isDark
-        ? Colors.grey.shade700
-        : Colors.grey.shade100; // shimmer
+    final baseColor = _shimmerBaseColor(context);
+    final highlightColor = _shimmerHighlightColor(context);
 
     return Semantics(
       label: 'Loading data, please wait',
@@ -112,17 +115,12 @@ class _ShimmerCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Semantics(
       label: 'Loading statistics',
       child: ExcludeSemantics(
         child: Shimmer.fromColors(
-          baseColor: isDark
-              ? Colors.grey.shade800
-              : Colors.grey.shade300, // shimmer
-          highlightColor: isDark
-              ? Colors.grey.shade700
-              : Colors.grey.shade100, // shimmer
+          baseColor: _shimmerBaseColor(context),
+          highlightColor: _shimmerHighlightColor(context),
           child: GridView.builder(
             physics: const NeverScrollableScrollPhysics(),
             shrinkWrap: true,
@@ -152,17 +150,12 @@ class _ShimmerDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Semantics(
       label: 'Loading details',
       child: ExcludeSemantics(
         child: Shimmer.fromColors(
-          baseColor: isDark
-              ? Colors.grey.shade800
-              : Colors.grey.shade300, // shimmer
-          highlightColor: isDark
-              ? Colors.grey.shade700
-              : Colors.grey.shade100, // shimmer
+          baseColor: _shimmerBaseColor(context),
+          highlightColor: _shimmerHighlightColor(context),
           child: Padding(
             padding: const EdgeInsets.all(AppTokens.s16),
             child: Column(
@@ -198,17 +191,12 @@ class _ShimmerGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Semantics(
       label: 'Loading items',
       child: ExcludeSemantics(
         child: Shimmer.fromColors(
-          baseColor: isDark
-              ? Colors.grey.shade800
-              : Colors.grey.shade300, // shimmer
-          highlightColor: isDark
-              ? Colors.grey.shade700
-              : Colors.grey.shade100, // shimmer
+          baseColor: _shimmerBaseColor(context),
+          highlightColor: _shimmerHighlightColor(context),
           child: GridView.builder(
             physics: const NeverScrollableScrollPhysics(),
             shrinkWrap: true,

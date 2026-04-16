@@ -30,6 +30,7 @@ class AppFilterChipBar extends StatelessWidget {
             Padding(
               padding: const EdgeInsetsDirectional.only(end: AppTokens.s8),
               child: FilterChip(
+                key: ValueKey('filter_all_$allLabel'),
                 label: Text(allLabel),
                 selected: selected == null,
                 onSelected: (_) => onSelected(null),
@@ -39,6 +40,7 @@ class AppFilterChipBar extends StatelessWidget {
             (label) => Padding(
               padding: const EdgeInsetsDirectional.only(end: AppTokens.s8),
               child: FilterChip(
+                key: ValueKey('filter_$label'),
                 label: Text(label),
                 selected: selected == label,
                 onSelected: (sel) => onSelected(sel ? label : null),

@@ -31,6 +31,47 @@ class RouteModel {
     required this.updatedAt,
   });
 
+  RouteModel copyWith({
+    String? id,
+    int? routeNumber,
+    String? name,
+    String? area,
+    bool clearArea = false,
+    String? city,
+    bool clearCity = false,
+    String? description,
+    bool clearDescription = false,
+    int? totalShops,
+    String? assignedSellerId,
+    bool clearAssignedSellerId = false,
+    String? assignedSellerName,
+    bool clearAssignedSellerName = false,
+    bool? active,
+    String? createdBy,
+    Timestamp? createdAt,
+    Timestamp? updatedAt,
+  }) {
+    return RouteModel(
+      id: id ?? this.id,
+      routeNumber: routeNumber ?? this.routeNumber,
+      name: name ?? this.name,
+      area: clearArea ? null : (area ?? this.area),
+      city: clearCity ? null : (city ?? this.city),
+      description: clearDescription ? null : (description ?? this.description),
+      totalShops: totalShops ?? this.totalShops,
+      assignedSellerId: clearAssignedSellerId
+          ? null
+          : (assignedSellerId ?? this.assignedSellerId),
+      assignedSellerName: clearAssignedSellerName
+          ? null
+          : (assignedSellerName ?? this.assignedSellerName),
+      active: active ?? this.active,
+      createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   factory RouteModel.fromJson(Map<String, dynamic> json, String docId) {
     return RouteModel(
       id: docId,
@@ -63,4 +104,11 @@ class RouteModel {
     'created_at': createdAt,
     'updated_at': updatedAt,
   };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || (other is RouteModel && other.id == id);
+
+  @override
+  int get hashCode => id.hashCode;
 }

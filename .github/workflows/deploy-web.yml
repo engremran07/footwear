@@ -31,6 +31,18 @@ jobs:
       - name: flutter pub get
         run: cd app && flutter pub get
 
+      - name: Validate version sync
+        run: |
+          PUBSPEC_VER=$(grep '^version:' app/pubspec.yaml | sed 's/version: //' | tr -d '[:space:]')
+          BRAND_VER=$(grep 'static const String appVersion' app/lib/core/constants/app_brand.dart | sed "s/.*'\(.*\)';/\1/" | tr -d '[:space:]')
+          BRAND_BUILD=$(grep 'static const String buildNumber' app/lib/core/constants/app_brand.dart | sed "s/.*'\(.*\)';/\1/" | tr -d '[:space:]')
+          BRAND_COMBINED="${BRAND_VER}+${BRAND_BUILD}"
+          if [ "$PUBSPEC_VER" != "$BRAND_COMBINED" ]; then
+            echo "❌ Version mismatch: pubspec=$PUBSPEC_VER app_brand=$BRAND_COMBINED"
+            exit 1
+          fi
+          echo "✅ Version in sync: $PUBSPEC_VER"
+
       - name: flutter analyze
         run: cd app && flutter analyze lib --no-pub
 
@@ -40,14 +52,6 @@ jobs:
       - name: Build web release
         run: cd app && flutter build web --release
 
-      - name: Deploy Firestore rules and indexes
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
-        run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_SHOESERP }}' > "${{ runner.temp }}/firebase-sa.json"
-          npm install -g firebase-tools
-          firebase deploy --project shoeserp-clean-20260327 --only firestore:rules,firestore:indexes --non-interactive
-
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
@@ -56,3 +60,11 @@ jobs:
           projectId: shoeserp-clean-20260327
           channelId: live
           entryPoint: '.'
+
+      - name: Deploy Firestore rules and indexes
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_SHOESERP }}' > "${{ runner.temp }}/firebase-sa.json"
+          npm install -g firebase-tools
+          firebase deploy --project shoeserp-clean-20260327 --only firestore:rules,firestore:indexes --non-interactive

@@ -80,3 +80,7 @@
 
 # Keep app model classes for Firestore data binding
 -keep class footwear.pk.com.** { *; }
+
+# Riverpod, archive, and image are Dart-only packages.
+# No additional JVM keep rules are required, but this note is intentional so
+# future audits do not assume the omission is accidental.

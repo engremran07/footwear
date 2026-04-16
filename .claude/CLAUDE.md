@@ -53,7 +53,7 @@ whenever fixing any issue. Catch and fix culprits found while reading touched fi
 - Markdown governance: load `.claude/skills/markdown-governance/SKILL.md` before creating any `.md` file.
 - CI Gates 15-17 active: StateProvider banned; Firestore files valid; no temp artifacts.
 - `.gitignore` covers all temp artifacts: logs, debug files, installer flags, dev scripts.
-- AGENTS.md §8 is now the 14-step mandatory signoff sequence. All 14 steps non-bypassable.
+- AGENTS.md §8 is now the 15-step mandatory signoff sequence. All 15 steps non-bypassable.
 - `firebase deploy --only firestore:rules,firestore:indexes` is MANDATORY on every signoff — not just on rules change.
 - Web build + hosting deploy is MANDATORY on every signoff.
 - GitHub commit audit (git log + git status) is MANDATORY before every commit.
@@ -64,12 +64,13 @@ See AGENTS.md §10 for latest audit findings.
 
 ## Verification Mirror
 
+- Select-String -Path "app\pubspec.yaml","app\lib\core\constants\app_brand.dart" -Pattern '^version:|appVersion|buildNumber'
 - flutter analyze lib --no-pub
 - dart analyze test/
 - flutter test -r expanded
-- firebase deploy --only firestore:rules,firestore:indexes
 - flutter build web --release ; firebase deploy --only hosting
 - flutter build apk --release
-- git log --oneline -5 ; git status --short
+- firebase deploy --only firestore:rules,firestore:indexes
+- git log --oneline -5 ; git status --short ; git diff --stat HEAD
 - git add -A ; git commit ; git push
 - adb install -r (if device connected)

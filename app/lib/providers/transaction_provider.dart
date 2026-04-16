@@ -160,6 +160,7 @@ final shopTransactionsExportProvider = FutureProvider.autoDispose
       final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)
           .where('shop_id', isEqualTo: normalizedShopId)
+          .limit(2000)
           .get();
 
       return snap.docs
@@ -173,9 +174,18 @@ final routeTransactionsExportProvider = FutureProvider.autoDispose
     .family<List<TransactionModel>, String>((ref, routeId) async {
       final normalizedId = routeId.trim();
       if (normalizedId.isEmpty) return const <TransactionModel>[];
+      final user = ref.watch(authUserProvider).value;
+      if (user == null) return const <TransactionModel>[];
+      if (!user.isAdmin) {
+        final assignedRouteId = (user.assignedRouteId ?? '').trim();
+        if (!user.isSeller || assignedRouteId != normalizedId) {
+          return const <TransactionModel>[];
+        }
+      }
       final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)
           .where('route_id', isEqualTo: normalizedId)
+          .limit(2000)
           .get();
       return snap.docs
           .where((d) => d.data()['deleted'] != true)
@@ -186,8 +196,11 @@ final routeTransactionsExportProvider = FutureProvider.autoDispose
 /// All transactions across all routes — admin-only bulk export.
 final allTransactionsExportProvider =
     FutureProvider.autoDispose<List<TransactionModel>>((ref) async {
+    final user = ref.watch(authUserProvider).value;
+    if (user == null || !user.isAdmin) return const <TransactionModel>[];
       final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)
+          .limit(2000)
           .get();
       return snap.docs
           .where((d) => d.data()['deleted'] != true)

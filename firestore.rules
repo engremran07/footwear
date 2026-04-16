@@ -124,6 +124,14 @@ service cloud.firestore {
          type == 'payment' || type == 'write_off');
     }
 
+    function isValidInventoryTransactionType(type) {
+      return type is string &&
+        (type == 'transfer_out' ||
+         type == 'return_to_warehouse' ||
+         type == 'return_from_shop' ||
+         type == 'stock_adjustment');
+    }
+
     // Validates role values to prevent arbitrary role strings being stored
     function isValidRole(role) {
       return role is string &&
@@ -209,6 +217,8 @@ service cloud.firestore {
       allow create: if (isAdmin() ||
         (
           isSeller() &&
+          request.resource.data.name is string &&
+          request.resource.data.name != '' &&
           request.resource.data.route_id is string &&
           request.resource.data.route_id != '' &&
           isSellerForRoute(request.resource.data.route_id)
@@ -338,7 +348,11 @@ service cloud.firestore {
           isSeller() &&
           request.resource.data.seller_id == request.auth.uid &&
           request.resource.data.created_by == request.auth.uid
-        )) && docSizeOk();
+        ))
+        && isValidInventoryTransactionType(request.resource.data.type)
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity > 0
+        && docSizeOk();
       allow update, delete: if isAdmin();
     }
 
@@ -383,6 +397,11 @@ service cloud.firestore {
         && request.resource.data.total is number
         && request.resource.data.subtotal is number
         && request.resource.data.discount is number
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0
+        && request.resource.data.subtotal >= 0
+        && request.resource.data.discount >= 0
+        && request.resource.data.total > 0
         && request.resource.data.amount_received is number
         && request.resource.data.amount_received >= 0
         && request.resource.data.amount_received <= request.resource.data.total + 0.01

@@ -105,18 +105,19 @@ Before every commit, ALL of the following must succeed and evidence quoted:
 
 | Step | Command | Required evidence |
 | --- | --- | --- |
-| 1 | `flutter analyze lib --no-pub` | `No issues found!` |
-| 2 | `dart analyze test/` | `No issues found!` |
-| 3 | `flutter test -r expanded` | `All N tests passed!` |
-| 4 | Hygiene gates 4a-4f | all zero results |
-| 5 | `markdownlint "**/*.md" ...` | zero output (exit 0) |
-| 6 | `firebase deploy --only firestore:rules,firestore:indexes` | `Deploy complete!` |
+| 1 | `Select-String -Path "app\pubspec.yaml","app\lib\core\constants\app_brand.dart" -Pattern '^version:|appVersion|buildNumber'` | matching version/build lines quoted before artifact build |
+| 2 | `flutter analyze lib --no-pub` | `No issues found!` |
+| 3 | `dart analyze test/` | `No issues found!` |
+| 4 | `flutter test -r expanded` | `All N tests passed!` |
+| 5 | Hygiene gates 5a-5e | all zero results |
+| 6 | `markdownlint "**/*.md" --ignore node_modules --ignore "app/build" --ignore "functions/node_modules"` | zero output (exit 0) |
 | 7 | `flutter build web --release` | `EXIT: 0` |
 | 8 | `firebase deploy --only hosting` | `Deploy complete!` |
 | 9 | `flutter build apk --release` | file size quoted |
-| 10 | `git log --oneline -5` + `git status --short` | no unexpected artifacts |
-| 11 | `git add -A && git commit && git push` | commit hash + push output |
-| 12 | `adb install -r <apk>` (if connected) | `Success` |
+| 10 | `firebase deploy --only firestore:rules,firestore:indexes` | `Deploy complete!` |
+| 11 | `git log --oneline -5` + `git status --short` + `git diff --stat HEAD` | no unexpected artifacts |
+| 12 | `git add -A && git commit && git push` | commit hash + push output |
+| 13 | `adb install -r <apk>` (if connected) | `Success` |
 
 
 When `firebase_options.dart` is gitignored, CI must generate a stub:
