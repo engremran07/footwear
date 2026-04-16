@@ -1,6 +1,6 @@
 ﻿# ShoesERP AGENTS Runtime Contract
 
-Last updated: 2026-04-13
+Last updated: 2026-04-16
 
 ## 1) Runtime Truth (Authoritative)
 
@@ -393,6 +393,18 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-04-16 audit v17 — v3.7.6+54:
+
+- **WhatsApp-style changelog sheet shipped:** `whats_new_sheet.dart` — DraggableScrollableSheet (90% height), emoji bullets, trilingual EN/AR/UR, RTL-aware; auto-shown once per version via `app_shell.dart` postFrameCallback; accessible from About screen via "What's New" tile; `changelog_data.dart` with 3 version entries; `changelog_provider.dart` SharedPreferences-backed version tracking
+- **PDF "Something went wrong" fixed:** Root cause — `allUsersProvider` autoDispose race → `StateError('Bad state: No element')`; fixed in `error_mapper.dart` (bad state → `err_pdf_failed`), `shop_detail_screen.dart` (`.value ?? []`, `_generatingPdf` guard, role-aware `showEntryBy: isAdmin`), `reports_screen.dart` (same `.value ?? []` fix)
+- **80-agent audit completed:** Financial 100/100 PERFECT, Security 92/100, Code Quality 95/100, CI/CD 85/100, Firebase 88/100, L10n 85/100, Testing 65→75/100 (post-fix), Navigation 88/100
+- **Security fix S7:** `sellerInventoryProvider` family added to `_invalidateRoleScopedProviders()` in `auth_provider.dart` — prevents seller-session data leak on signout (defense-in-depth)
+- **Test coverage expanded:** `changelog_data_test.dart` (7 tests), `changelog_provider_test.dart` (6 tests), `error_mapper_test.dart` + 3 StateError/bad-state cases; total **396 tests all passing**
+- **Import path bug fixed:** `whats_new_sheet.dart` had wrong `../constants/` paths (missing `core/`); corrected to `../core/constants/`, `../core/data/`, `../core/l10n/`, `../providers/`
+- **Lint fixes:** `unnecessary_underscores` in errorBuilder lambda, `no_leading_underscores_for_local_identifiers` in `_tr()` local map — analyze clean
+- **Deferred to v3.7.7:** L2 hardcoded tooltips (users_list_screen, about_screen, login_screen); N5 deep link intent filter in AndroidManifest; integration tests for auth/invoice/dashboard flows
+- **Audit score: 90/100 → 91/100**
 
 2026-04-15 audit v16 — v3.7.5+53:
 
