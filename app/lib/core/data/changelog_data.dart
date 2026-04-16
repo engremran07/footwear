@@ -28,6 +28,40 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.7.11',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '👤',
+        text: {
+          AppLocale.en:
+              '"Entry By" column in exports now correctly shows '
+              'seller names — including for inactive and past sellers.',
+          AppLocale.ar:
+              'عمود "أدخل بواسطة" في التصديرات يُظهر الآن أسماء '
+              'البائعين بشكل صحيح — بما فيهم البائعون غير النشطين.',
+          AppLocale.ur:
+              'ایکسپورٹس میں "داخل کردہ" کالم اب درست سیلر نام '
+              'دکھاتا ہے — غیر فعال اور سابق سیلرز سمیت۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📁',
+        text: {
+          AppLocale.en:
+              'Exported files now have clear, dated names: '
+              'type_subject_YYYY-MM-DD for easy filing.',
+          AppLocale.ar:
+              'الملفات المُصدَّرة لها الآن أسماء واضحة ومؤرخة: '
+              'النوع_الموضوع_YYYY-MM-DD لسهولة الأرشفة.',
+          AppLocale.ur:
+              'ایکسپورٹ فائلوں کے نام اب واضح اور تاریخ کے ساتھ '
+              'ہیں: قسم_موضوع_YYYY-MM-DD آسان فائلنگ کے لیے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.7.10',
     date: 'April 2026',
     items: [

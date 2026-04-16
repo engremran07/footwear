@@ -424,7 +424,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       title: tr('export_all_shops', ref),
       headers: headers,
       rows: rows,
-      fileName: 'all_shops',
+      fileName: AppFormatters.exportFileName('shops_all'),
     );
   }
 
@@ -476,7 +476,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       title: tr('route_report', ref),
       headers: headers,
       rows: allRows,
-      fileName: 'shops_per_route',
+      fileName: AppFormatters.exportFileName('shops_per_route'),
     );
   }
 
@@ -582,9 +582,10 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         txList = await ref.read(allTransactionsExportProvider.future);
       }
 
-      // Build entryByMap
+      // Build entryByMap — use allUsersExportProvider (no active filter,
+      // one-shot .get()) so deactivated sellers' transactions still resolve.
       final allUsers = user?.isAdmin == true
-          ? await ref.read(allUsersProvider.future)
+          ? await ref.read(allUsersExportProvider.future)
           : <UserModel>[];
       final names = NameResolver(
         users: allUsers,
@@ -690,8 +691,10 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
 
-      final safeName = routeName.replaceAll(RegExp(r'[^\w]'), '_');
-      await Printing.sharePdf(bytes: bytes, filename: 'ledger_$safeName.pdf');
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: '${AppFormatters.exportFileName('ledger', routeName)}.pdf',
+      );
     } catch (e) {
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();

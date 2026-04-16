@@ -25,6 +25,24 @@ final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
       );
 });
 
+/// Admin-only one-shot user fetch for export name resolution.
+///
+/// Fetches ALL users regardless of [active] status so that historical
+/// transactions created by now-deactivated sellers still resolve to a
+/// display name instead of the "—" fallback. Uses a single `.get()` call
+/// (not a stream) to avoid [autoDispose] race conditions in async export code.
+final allUsersExportProvider = FutureProvider.autoDispose<List<UserModel>>((
+  ref,
+) async {
+  final user = ref.watch(authUserProvider).value;
+  if (user == null || !user.isAdmin) return const <UserModel>[];
+  final snap = await FirebaseFirestore.instance
+      .collection(Collections.users)
+      .limit(200) // higher than UI limit; covers large teams
+      .get();
+  return snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList();
+});
+
 final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
   // Admin-only list query: guard to prevent PERMISSION_DENIED for seller creds.
   final user = ref.watch(authUserProvider).value;

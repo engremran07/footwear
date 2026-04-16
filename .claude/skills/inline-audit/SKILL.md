@@ -170,8 +170,49 @@ before starting new work and complete all missing steps first.
 [ ] changelog_data.dart updated with trilingual entry on every version bump
 [ ] No raw UID strings in any export output — NameResolver used everywhere
 [ ] No hardcoded English in PDF/Excel labels — trRead() with locale
+[ ] Export name resolution uses allUsersExportProvider (not allUsersProvider)
+[ ] allUsersExportProvider used with await .future (not .value ?? [] cache read)
 
 ```
+
+### Export Name Resolution — Strict Rules (non-bypassable)
+
+**BANNED patterns in any export/PDF/Excel code path:**
+
+```dart
+// ❌ BANNED — filters out deactivated users; historical tx show "—"
+ref.read(allUsersProvider).value ?? <UserModel>[]
+
+// ❌ BANNED — same stream provider, same active-only filter
+await ref.read(allUsersProvider.future)
+
+// ❌ BANNED — builds map without NameResolver
+final entryByMap = {for (final u in users) u.id: u.displayName};
+```
+
+**REQUIRED pattern:**
+
+```dart
+// ✅ REQUIRED — includes deactivated users, one-shot .get(), no race condition
+final allUsers = isAdmin
+    ? await ref.read(allUsersExportProvider.future)
+    : <UserModel>[];
+final names = NameResolver(
+  users: allUsers,
+  extra: {if (user != null) user.id: user.displayName},
+  unknownLabel: trRead('unknown_user', locale),
+);
+// then pass: entryByMap: names.map
+```
+
+**Why `allUsersProvider` is wrong for exports:**
+
+| Issue | Consequence |
+| --- | --- |
+| `where('active', isEqualTo: true)` | Deactivated sellers' tx all show "—" |
+| `limit(100)` | Large teams silently truncated |
+| Returns `Stream.empty()` if auth guard fires | `.future` hangs or resolves empty |
+| `.value ?? []` pattern | Empty if provider not cached by UI |
 
 ## Known Failure Signatures (inline audit catches these)
 
@@ -194,6 +235,10 @@ before starting new work and complete all missing steps first.
 | Stale "What's New" after update | `changelog_data.dart` not updated on version bump | Add trilingual `ChangelogVersion` entry for every version |
 
 | Raw UID instead of name in PDF | Ad-hoc uid→name map or missing NameResolver | Use `NameResolver` from `name_resolver.dart`; never fall back to raw UID |
+
+| "—" dash for ALL Entry By cells | `allUsersProvider` used in export: active-only filter + `.value??[]` cache miss | Use `allUsersExportProvider` with `await .future` in all export paths |
+
+| Entry By blank for old/historical tx | Seller deactivated after tx; `where('active',isEqualTo:true)` excluded them | `allUsersExportProvider` has no active filter — covers all historical users |
 
 | Fat APK not installed, wrong ABI file | build used `--split-per-abi` | Always `flutter build apk --release` |
 

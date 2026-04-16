@@ -66,6 +66,27 @@ class AppFormatters {
     return '$dozenLabel $remaining pairs';
   }
 
+  /// Generates a standardized export filename base (no extension).
+  /// Format: `{type}_{subject}_{YYYY-MM-DD}`
+  /// [ExportSheet] appends `.pdf` / `.xlsx` / `.png` automatically.
+  /// Callers using `Printing.sharePdf()` directly must append `.pdf`.
+  static String exportFileName(String type, [String? subject]) {
+    final now = DateTime.now();
+    final date =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final safeType = type.trim().toLowerCase().replaceAll(
+      RegExp(r'[^\w]'),
+      '_',
+    );
+    if (subject == null || subject.trim().isEmpty) return '${safeType}_$date';
+    final safeSubj = subject
+        .trim()
+        .replaceAll(RegExp(r'[^\w\u0600-\u06FF]'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+    return '${safeType}_${safeSubj}_$date';
+  }
+
   static List<String> last12Periods() {
     final now = DateTime.now();
     return List.generate(12, (i) {

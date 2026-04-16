@@ -1,7 +1,7 @@
 # ShoesERP Regression Registry
 
 **Maintained by:** Autonomous AI agent system (88-agent governance pack v2.0)  
-**Last updated:** 2026-04-15 — Post-audit hardening / v3.7.5+53  
+**Last updated:** 2026-04-17 — Entry By name resolution fix / v3.7.11+59  
 **Purpose:** Single source of truth for known regressions, deferred risks, and process improvements.
 
 ---
@@ -25,6 +25,7 @@
 | RR-013 | P3-FIXED | Widget test placeholder | `app/test/widget_test.dart` contained a marketing `MaterialApp` smoke test with no real screen coverage. | Fixed v3.5.0 — replaced with auth flow smoke test + GoRouter guard | v1.0.0 |
 | RR-014 | P3-FIXED | CI missing coverage + timeouts | Test job had no `--coverage` flag; all 3 CI jobs had no `timeout-minutes`; hanging builds possible. | Fixed v3.5.0 — coverage enabled, 20/30/10 minute timeouts added | v3.0.0 |
 | RR-015 | P1-FIXED | Firestore rules: seller transaction over-permission | When approval toggle OFF, sellers could update `amount` and `type` on own transactions — allows fraudulent amount manipulation and cash_in/cash_out type flip. `updateTransactionNote()` provider was already restricted; rules were behind. | Fixed v3.5.0.1 — removed `amount`, `type`, `sale_type`, `created_at` from allowed field set; seller approval-disabled path now restricted to `description`, `updated_at`, `updated_by`, `edit_request_*` only. | v3.0.0 |
+| RR-016 | P1-FIXED | Export "Entry By" name resolution | Entry By column showed "—" for all transactions in PDF/Excel exports. Two sub-causes: (1) `allUsersProvider` has `where('active', isEqualTo: true)` filter — deactivated sellers' historical transactions could never resolve to a name; (2) `ref.read(allUsersProvider).value ?? []` cache-miss pattern — if the `StreamProvider.autoDispose` hadn't emitted yet, the entire entryByMap was empty. | Fixed v3.7.11 — new `allUsersExportProvider` (`FutureProvider.autoDispose`, no active filter, one-shot `.get()`, limit 200) used in all 3 export paths (shops_list_screen, shop_detail_screen, reports_screen). | v3.7.9 |
 
 ---
 

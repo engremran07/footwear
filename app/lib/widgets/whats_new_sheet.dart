@@ -12,8 +12,14 @@ import '../providers/changelog_provider.dart';
 class WhatsNewSheet {
   WhatsNewSheet._();
 
-  /// Show the sheet, mark the current version as seen on dismiss.
+  /// Show the sheet and immediately persist the current version as seen.
+  ///
+  /// Persisting before the modal opens means any dismiss gesture (swipe-down,
+  /// tap-outside, or the Got-It button) all prevent the sheet from reappearing
+  /// on the next launch — best-practice UX pattern for "new release" notices.
   static Future<void> show(BuildContext context, WidgetRef ref) async {
+    await markChangelogSeen(AppBrand.appVersion);
+    if (!context.mounted) return;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -148,10 +154,7 @@ class _WhatsNewContent extends ConsumerWidget {
               width: double.infinity,
               height: 48,
               child: FilledButton(
-                onPressed: () async {
-                  Navigator.of(context).pop();
-                  await markChangelogSeen(AppBrand.appVersion);
-                },
+                onPressed: () => Navigator.of(context).pop(),
                 child: Text(
                   t('got_it'),
                   style: const TextStyle(

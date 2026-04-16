@@ -228,7 +228,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                       )
                                       .toList() ??
                                   [],
-                        fileName: 'inventory_report',
+                        fileName: AppFormatters.exportFileName(
+                          'inventory_report',
+                        ),
                       );
                     },
                   ),

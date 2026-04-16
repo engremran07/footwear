@@ -184,7 +184,7 @@ class ReportsScreen extends ConsumerWidget {
       title: title,
       headers: headers,
       rows: rows,
-      fileName: 'shops_report',
+      fileName: AppFormatters.exportFileName('shops_report'),
     );
   }
 
@@ -223,7 +223,7 @@ class ReportsScreen extends ConsumerWidget {
       title: title,
       headers: headers,
       rows: rows,
-      fileName: 'inventory_report',
+      fileName: AppFormatters.exportFileName('inventory_report'),
     );
   }
 
@@ -265,7 +265,7 @@ class ReportsScreen extends ConsumerWidget {
       title: title,
       headers: headers,
       rows: rows,
-      fileName: 'transactions_report',
+      fileName: AppFormatters.exportFileName('transactions_report'),
     );
   }
 
@@ -309,7 +309,7 @@ class ReportsScreen extends ConsumerWidget {
       title: title,
       headers: headers,
       rows: rows,
-      fileName: 'outstanding_report',
+      fileName: AppFormatters.exportFileName('outstanding_report'),
     );
   }
 
@@ -353,7 +353,7 @@ class ReportsScreen extends ConsumerWidget {
       title: title,
       headers: headers,
       rows: rows,
-      fileName: 'bad_debts_report',
+      fileName: AppFormatters.exportFileName('bad_debts_report'),
     );
   }
 }
@@ -792,10 +792,10 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       );
 
       final settings = await ref.read(settingsProvider.future);
-      // Safe read: use cached .value to avoid autoDispose StateError on
-      // StreamProvider.autoDispose.future before first Firestore emission.
+      // allUsersExportProvider: no active filter, one-shot .get() —
+      // covers deactivated sellers; avoids autoDispose cached-value race.
       final allUsers = user?.isAdmin == true
-          ? (ref.read(allUsersProvider).value ?? <UserModel>[])
+          ? await ref.read(allUsersExportProvider.future)
           : <UserModel>[];
       final names = NameResolver(
         users: allUsers,
@@ -830,7 +830,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
               ],
             )
             .toList(),
-        fileName: 'account_statement_${shop.name.replaceAll(' ', '_')}',
+        fileName: AppFormatters.exportFileName('ledger', shop.name),
         pdfBytesBuilder: () => buildPdfLedger(
           shopName: shop.name,
           companyName: settings.companyName,
@@ -1052,7 +1052,10 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
               ],
             )
             .toList(),
-        fileName: 'seller_report_${seller.displayName.replaceAll(' ', '_')}',
+        fileName: AppFormatters.exportFileName(
+          'seller_report',
+          seller.displayName,
+        ),
         pdfBytesBuilder: () {
           // Resolve route UID → display name so PDF never shows raw IDs
           final routes = ref.read(routesProvider).value ?? [];

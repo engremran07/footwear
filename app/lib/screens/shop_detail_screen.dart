@@ -724,9 +724,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               final authUser = ref.read(authUserProvider).value;
                               final isAdmin = authUser?.isAdmin == true;
                               final settings = ref.read(settingsProvider).value;
+                              // allUsersExportProvider: no active filter,
+                              // one-shot .get() — covers deactivated sellers.
                               final allUsers = isAdmin
-                                  ? (ref.read(allUsersProvider).value ??
-                                        <UserModel>[])
+                                  ? await ref.read(
+                                      allUsersExportProvider.future,
+                                    )
                                   : <UserModel>[];
                               final names = NameResolver(
                                 users: allUsers,
@@ -736,6 +739,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                 },
                                 unknownLabel: trRead('unknown_user', locale),
                               );
+                              if (!context.mounted) return;
                               // Reconcile opening balance so running balance
                               // equals the stored shop.balance.
                               final netTx = sorted.fold<double>(
@@ -786,7 +790,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                     )
                                     .toList(),
                                 fileName:
-                                    'account_statement_${shop.name.replaceAll(' ', '_')}',
+                                    AppFormatters.exportFileName('ledger', shop.name),
                                 pdfBytesBuilder: () => buildPdfLedger(
                                   shopName: shop.name,
                                   companyName: settings?.companyName ?? '',
