@@ -34,7 +34,8 @@ final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
 final allUsersExportProvider = FutureProvider.autoDispose<List<UserModel>>((
   ref,
 ) async {
-  final user = ref.watch(authUserProvider).value;
+  // ref.read (not watch): one-shot export — must NOT rebuild on token refresh.
+  final user = ref.read(authUserProvider).value;
   if (user == null || !user.isAdmin) return const <UserModel>[];
   final snap = await FirebaseFirestore.instance
       .collection(Collections.users)

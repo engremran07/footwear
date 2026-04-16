@@ -174,7 +174,10 @@ final routeTransactionsExportProvider = FutureProvider.autoDispose
     .family<List<TransactionModel>, String>((ref, routeId) async {
       final normalizedId = routeId.trim();
       if (normalizedId.isEmpty) return const <TransactionModel>[];
-      final user = ref.watch(authUserProvider).value;
+      // ref.read (not watch): one-shot export provider — must NOT rebuild when
+      // authUserProvider emits (e.g. token refresh), or Riverpod cancels the
+      // in-flight Firestore query mid-export → StateError → PDF crash.
+      final user = ref.read(authUserProvider).value;
       if (user == null) return const <TransactionModel>[];
       if (!user.isAdmin) {
         final assignedRouteId = (user.assignedRouteId ?? '').trim();
@@ -196,7 +199,8 @@ final routeTransactionsExportProvider = FutureProvider.autoDispose
 /// All transactions across all routes — admin-only bulk export.
 final allTransactionsExportProvider =
     FutureProvider.autoDispose<List<TransactionModel>>((ref) async {
-      final user = ref.watch(authUserProvider).value;
+      // ref.read (not watch): see routeTransactionsExportProvider comment.
+      final user = ref.read(authUserProvider).value;
       if (user == null || !user.isAdmin) return const <TransactionModel>[];
       final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)

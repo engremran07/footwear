@@ -28,15 +28,32 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.7.13',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📄',
+        text: {
+          AppLocale.en: 'Fixed PDF ledger export (all-shops / per-route) — was crashing during Firebase token refresh mid-export.',
+          AppLocale.ar: 'تم إصلاح تصدير PDF للدفتر (جميع المتاجر / لكل خط) — كان يتعطل أثناء تجديد دخول Firebase.',
+          AppLocale.ur: 'PDF لیجر ایکسپورٹ درست کی گئی — Firebase ٹوکن ریفریش کے دوران کریش ہوتا تھا۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.7.12',
     date: 'April 2026',
     items: [
       ChangelogItem(
         emoji: '🔒',
         text: {
-          AppLocale.en: 'Session lock overlay no longer appears on the login screen when left unattended.',
-          AppLocale.ar: 'لم تعد شاشة قفل الجلسة تظهر على شاشة تسجيل الدخول عند عدم النشاط.',
-          AppLocale.ur: 'لاگن سکرین پر بیکار وقت سیشن لاک والی اسکرین اب ظاھر نہیں ہوگی۔',
+          AppLocale.en:
+              'Session lock overlay no longer appears on the login screen when left unattended.',
+          AppLocale.ar:
+              'لم تعد شاشة قفل الجلسة تظهر على شاشة تسجيل الدخول عند عدم النشاط.',
+          AppLocale.ur:
+              'لاگن سکرین پر بیکار وقت سیشن لاک والی اسکرین اب ظاھر نہیں ہوگی۔',
         },
       ),
     ],

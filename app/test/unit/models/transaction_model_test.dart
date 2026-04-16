@@ -216,15 +216,18 @@ void main() {
       expect(TransactionModel.typeWriteOff, 'write_off');
     });
 
-    test('balanceImpact returns 0 for unknown transaction type (never crash export)', () {
-      final model = TransactionModel.fromJson({
-        'type': 'mystery',
-        'amount': 100.0,
-        'created_at': ts,
-      }, 'bad');
+    test(
+      'balanceImpact returns 0 for unknown transaction type (never crash export)',
+      () {
+        final model = TransactionModel.fromJson({
+          'type': 'mystery',
+          'amount': 100.0,
+          'created_at': ts,
+        }, 'bad');
 
-      // Unknown legacy Firestore type must NOT throw — it would crash PDF export.
-      expect(model.balanceImpact, 0.0);
-    });
+        // Unknown legacy Firestore type must NOT throw — it would crash PDF export.
+        expect(model.balanceImpact, 0.0);
+      },
+    );
   });
 }
