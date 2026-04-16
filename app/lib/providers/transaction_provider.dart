@@ -196,8 +196,8 @@ final routeTransactionsExportProvider = FutureProvider.autoDispose
 /// All transactions across all routes — admin-only bulk export.
 final allTransactionsExportProvider =
     FutureProvider.autoDispose<List<TransactionModel>>((ref) async {
-    final user = ref.watch(authUserProvider).value;
-    if (user == null || !user.isAdmin) return const <TransactionModel>[];
+      final user = ref.watch(authUserProvider).value;
+      if (user == null || !user.isAdmin) return const <TransactionModel>[];
       final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)
           .limit(2000)

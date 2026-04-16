@@ -129,7 +129,9 @@ class AuthNotifier extends AsyncNotifier<void> {
     ref.invalidate(allUsersProvider);
     ref.invalidate(inactiveUsersProvider);
     ref.invalidate(adminAllSellerInventoryProvider);
-    ref.invalidate(sellerInventoryProvider);  // invalidate all family instances (S7 defense-in-depth)
+    ref.invalidate(
+      sellerInventoryProvider,
+    ); // invalidate all family instances (S7 defense-in-depth)
     ref.invalidate(allInventoryTransactionsProvider);
     ref.invalidate(outstandingShopsProvider);
   }

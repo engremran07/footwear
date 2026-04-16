@@ -45,9 +45,9 @@ void main() {
       await container.read(authUserProvider.future);
 
       expect(
-        () => container
-            .read(settingsNotifierProvider.notifier)
-            .save({'company_name': 'Blocked'}),
+        () => container.read(settingsNotifierProvider.notifier).save({
+          'company_name': 'Blocked',
+        }),
         throwsA(
           isA<StateError>().having(
             (error) => error.message,
@@ -68,7 +68,7 @@ void main() {
       expect(
         () => container
             .read(settingsNotifierProvider.notifier)
-          .uploadLogo(Uint8List.fromList(const [1, 2, 3])),
+            .uploadLogo(Uint8List.fromList(const [1, 2, 3])),
         throwsA(isA<StateError>()),
       );
     });

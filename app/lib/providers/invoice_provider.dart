@@ -169,8 +169,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       }
 
       if (normalizedSellerId.isNotEmpty) {
-        final ownerSellerId =
-            (inventoryData['seller_id'] as String? ?? '').trim();
+        final ownerSellerId = (inventoryData['seller_id'] as String? ?? '')
+            .trim();
         if (ownerSellerId != normalizedSellerId) {
           throw ArgumentError(
             'Seller inventory document $inventoryDocId does not belong '
@@ -469,7 +469,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       throw ArgumentError('total must be greater than 0');
     }
     final normalizedLinkedInvoiceId = linkedInvoiceId?.trim();
-    if (normalizedLinkedInvoiceId == null || normalizedLinkedInvoiceId.isEmpty) {
+    if (normalizedLinkedInvoiceId == null ||
+        normalizedLinkedInvoiceId.isEmpty) {
       throw ArgumentError('linkedInvoiceId must not be empty');
     }
 
@@ -807,8 +808,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       final invoiceTotal = (invData['total'] as num?)?.toDouble() ?? 0.0;
       final invAmountReceived =
           (invData['amount_received'] as num?)?.toDouble() ?? 0.0;
-      final storedOutstanding =
-          (invData['outstanding_amount'] as num?)?.toDouble();
+      final storedOutstanding = (invData['outstanding_amount'] as num?)
+          ?.toDouble();
       if (storedOutstanding != null && storedOutstanding < 0) {
         throw StateError(
           'Invoice $invoiceId has a negative outstanding_amount '

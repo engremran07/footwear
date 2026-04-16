@@ -64,7 +64,7 @@ class StatCard extends StatelessWidget {
       );
     }
 
-        return Semantics(
+    return Semantics(
           key: ValueKey('stat_${title}_$staggerIndex'),
           label: '$title: $value',
           child: Card(

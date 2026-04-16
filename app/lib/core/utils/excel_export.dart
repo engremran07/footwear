@@ -111,10 +111,7 @@ String _colRef(int col) {
 /// Auto-fit column widths based on header + data content lengths.
 /// Width is in Excel character units (roughly 1 char = 1 unit).
 /// Minimum 8, maximum 50.
-List<double> _autoFitWidths(
-  List<String> headers,
-  List<List<dynamic>> rows,
-) {
+List<double> _autoFitWidths(List<String> headers, List<List<dynamic>> rows) {
   final widths = List<double>.filled(headers.length, 8.0);
   for (var col = 0; col < headers.length; col++) {
     var maxLen = headers[col].length;
@@ -272,10 +269,10 @@ String _worksheet(
     )
     // ── Sheet views: freeze panes below header, RTL support ──
     ..write('<sheetViews>')
+    ..write('<sheetView workbookViewId="0"${isRtl ? ' rightToLeft="1"' : ''}>')
     ..write(
-      '<sheetView workbookViewId="0"${isRtl ? ' rightToLeft="1"' : ''}>',
+      '<pane ySplit="$headerRow" topLeftCell="A$dataStartRow" activePane="bottomLeft" state="frozen"/>',
     )
-    ..write('<pane ySplit="$headerRow" topLeftCell="A$dataStartRow" activePane="bottomLeft" state="frozen"/>')
     ..write('</sheetView>')
     ..write('</sheetViews>')
     // ── Column widths ──

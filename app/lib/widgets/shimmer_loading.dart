@@ -5,19 +5,19 @@ import '../core/design/app_tokens.dart';
 /// Returns a theme-aware placeholder color for shimmer shapes.
 /// Light mode: surface container. Dark mode: elevated surface container.
 Color _placeholderColor(BuildContext context) =>
-  Theme.of(context).brightness == Brightness.dark
-  ? Theme.of(context).colorScheme.surfaceContainerHighest
-  : Theme.of(context).colorScheme.surfaceContainerHigh;
+    Theme.of(context).brightness == Brightness.dark
+    ? Theme.of(context).colorScheme.surfaceContainerHighest
+    : Theme.of(context).colorScheme.surfaceContainerHigh;
 
 Color _shimmerBaseColor(BuildContext context) =>
-  Theme.of(context).brightness == Brightness.dark
-  ? Theme.of(context).colorScheme.surfaceContainerHighest
-  : Theme.of(context).colorScheme.surfaceContainer;
+    Theme.of(context).brightness == Brightness.dark
+    ? Theme.of(context).colorScheme.surfaceContainerHighest
+    : Theme.of(context).colorScheme.surfaceContainer;
 
 Color _shimmerHighlightColor(BuildContext context) =>
-  Theme.of(context).brightness == Brightness.dark
-  ? Theme.of(context).colorScheme.surfaceContainerHigh
-  : Theme.of(context).colorScheme.surfaceBright;
+    Theme.of(context).brightness == Brightness.dark
+    ? Theme.of(context).colorScheme.surfaceContainerHigh
+    : Theme.of(context).colorScheme.surfaceBright;
 
 /// A shimmer placeholder widget for loading states.
 /// Uses the shimmer package for smooth, consistent loading animations.

@@ -30,10 +30,8 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // S-01: Crashlytics — collect in release only
-    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
-      !kDebugMode,
-    );
+    // S-01: Crashlytics — collect in release only (non-blocking)
+    FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
     PlatformDispatcher.instance.onError = (error, stack) {
       FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
@@ -67,17 +65,29 @@ void main() async {
     final rememberMe = prefs.getBool(rememberMePrefKey) ?? true;
     if (!rememberMe && FirebaseAuth.instance.currentUser != null) {
       await FirebaseAuth.instance.signOut();
-    } else if (rememberMe && FirebaseAuth.instance.currentUser != null) {
-      try {
-        await FirebaseAuth.instance.currentUser!.getIdToken(true);
-      } catch (e, stack) {
-        // S-01: Log token refresh failure to Crashlytics before sign-out
-        FirebaseCrashlytics.instance.recordError(e, stack);
-        await FirebaseAuth.instance.signOut();
-      }
     }
+    // Defer token refresh to after first frame to avoid blocking startup.
   } catch (e) {
     debugPrint('Firebase init failed: $e');
   }
+
   runApp(const ProviderScope(child: FootwearErpApp()));
+
+  // Post-first-frame: refresh token if user is remembered.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _deferredTokenRefresh();
+  });
+}
+
+Future<void> _deferredTokenRefresh() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberMe = prefs.getBool(rememberMePrefKey) ?? true;
+    if (rememberMe && FirebaseAuth.instance.currentUser != null) {
+      await FirebaseAuth.instance.currentUser!.getIdToken(true);
+    }
+  } catch (e, stack) {
+    FirebaseCrashlytics.instance.recordError(e, stack);
+    await FirebaseAuth.instance.signOut();
+  }
 }

@@ -26,9 +26,8 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
-          builder: (context) => const Scaffold(
-            body: AppOnlineIndicator(isOnline: false),
-          ),
+          builder: (context) =>
+              const Scaffold(body: AppOnlineIndicator(isOnline: false)),
         ),
       ),
     );

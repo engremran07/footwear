@@ -19,10 +19,7 @@ class AppOnlineIndicator extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: isOnline ? AppBrand.successColor : colorScheme.error,
-          border: Border.all(
-            color: colorScheme.surface,
-            width: 1.5,
-          ),
+          border: Border.all(color: colorScheme.surface, width: 1.5),
         ),
       ),
     );

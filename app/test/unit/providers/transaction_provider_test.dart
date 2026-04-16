@@ -37,32 +37,38 @@ void main() {
   }
 
   group('Transaction export guard providers', () {
-    test('shopTransactionsExportProvider returns empty for blank shop id', () async {
-      final container = containerWithUser(seller);
-      addTearDown(container.dispose);
-      final authSub = keepAuthAlive(container);
-      addTearDown(authSub.close);
+    test(
+      'shopTransactionsExportProvider returns empty for blank shop id',
+      () async {
+        final container = containerWithUser(seller);
+        addTearDown(container.dispose);
+        final authSub = keepAuthAlive(container);
+        addTearDown(authSub.close);
 
-      final result = await container.read(
-        shopTransactionsExportProvider('   ').future,
-      );
+        final result = await container.read(
+          shopTransactionsExportProvider('   ').future,
+        );
 
-      expect(result, isEmpty);
-    });
+        expect(result, isEmpty);
+      },
+    );
 
-    test('routeTransactionsExportProvider returns empty for seller outside assigned route', () async {
-      final container = containerWithUser(seller);
-      addTearDown(container.dispose);
-      final authSub = keepAuthAlive(container);
-      addTearDown(authSub.close);
-      await container.read(authUserProvider.future);
+    test(
+      'routeTransactionsExportProvider returns empty for seller outside assigned route',
+      () async {
+        final container = containerWithUser(seller);
+        addTearDown(container.dispose);
+        final authSub = keepAuthAlive(container);
+        addTearDown(authSub.close);
+        await container.read(authUserProvider.future);
 
-      final result = await container.read(
-        routeTransactionsExportProvider('route-2').future,
-      );
+        final result = await container.read(
+          routeTransactionsExportProvider('route-2').future,
+        );
 
-      expect(result, isEmpty);
-    });
+        expect(result, isEmpty);
+      },
+    );
 
     test('allTransactionsExportProvider returns empty for seller', () async {
       final container = containerWithUser(seller);

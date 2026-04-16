@@ -52,8 +52,9 @@ class SettingsNotifier extends AsyncNotifier<void> {
       throw StateError('Authenticated user profile not found');
     }
 
-    final role =
-        (profileSnap.data()?['role'] as String? ?? '').trim().toLowerCase();
+    final role = (profileSnap.data()?['role'] as String? ?? '')
+        .trim()
+        .toLowerCase();
     if (role != 'admin' && role != 'manager') {
       throw StateError('Admin privileges required');
     }

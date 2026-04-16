@@ -12,20 +12,9 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
 
-    <!-- ─── Notifications (Firebase Messaging + flutter_local_notifications) ─── -->
+    <!-- ─── Notifications ─── -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-
-    <!-- Exact alarm scheduling for flutter_local_notifications on Android 12+ -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
-        android:minSdkVersion="31" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM"
-        android:minSdkVersion="33" />
-
-    <!-- Foreground service for persistent notification delivery -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <application
         android:label="FOOTWEAR"
         android:name="${applicationName}"

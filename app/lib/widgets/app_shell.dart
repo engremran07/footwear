@@ -56,7 +56,8 @@ class _AppShellState extends ConsumerState<AppShell>
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PermissionsService.requestOnFirstRun();
-      _checkAndShowChangelog();
+      // Defer changelog check to avoid blocking initial frame rendering.
+      Future.delayed(const Duration(seconds: 1), _checkAndShowChangelog);
     });
   }
 

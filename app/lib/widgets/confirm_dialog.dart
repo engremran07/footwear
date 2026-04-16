@@ -75,10 +75,12 @@ class _ConfirmDialogState extends State<ConfirmDialog> {
     final effectiveColor =
         widget.confirmColor ??
         (widget.isDestructive ? theme.colorScheme.error : null);
-    final effectiveCancelLabel =
-        widget.cancelLabel == 'Cancel' ? material.cancelButtonLabel : widget.cancelLabel;
-    final effectiveConfirmLabel =
-        widget.confirmLabel == 'Confirm' ? material.okButtonLabel : widget.confirmLabel;
+    final effectiveCancelLabel = widget.cancelLabel == 'Cancel'
+        ? material.cancelButtonLabel
+        : widget.cancelLabel;
+    final effectiveConfirmLabel = widget.confirmLabel == 'Confirm'
+        ? material.okButtonLabel
+        : widget.confirmLabel;
 
     return AlertDialog(
       title: Text(widget.title),

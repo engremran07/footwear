@@ -83,19 +83,28 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     return buffer.toString();
   }
 
+  // Cache normalized haystack per shop ID to avoid re-computing on every
+  // keystroke for every shop in the list.
+  final Map<String, String> _haystackCache = {};
+
+  String _shopHaystack(ShopModel s) {
+    return _haystackCache.putIfAbsent(s.id, () {
+      return [
+        s.name,
+        s.phone ?? '',
+        s.area ?? '',
+        s.city ?? '',
+        s.address ?? '',
+        s.contactName ?? '',
+        'r${s.routeNumber}',
+        '${s.routeNumber}',
+      ].map(_normalizeSearchText).join(' ');
+    });
+  }
+
   bool _matchesSearch(ShopModel s, String q) {
     if (q.isEmpty) return true;
-    final haystack = [
-      s.name,
-      s.phone ?? '',
-      s.area ?? '',
-      s.city ?? '',
-      s.address ?? '',
-      s.contactName ?? '',
-      'r${s.routeNumber}',
-      '${s.routeNumber}',
-    ].map(_normalizeSearchText).join(' ');
-    return haystack.contains(q);
+    return _shopHaystack(s).contains(q);
   }
 
   List<ShopModel> _scopeShopsByRoute(List<ShopModel> shops) {

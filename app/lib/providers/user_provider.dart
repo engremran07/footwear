@@ -83,8 +83,9 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         .get();
     if (!profileSnap.exists) return false;
 
-    final role =
-        (profileSnap.data()?['role'] as String? ?? '').trim().toLowerCase();
+    final role = (profileSnap.data()?['role'] as String? ?? '')
+        .trim()
+        .toLowerCase();
     return role == 'admin' || role == 'manager';
   }
 
@@ -239,7 +240,8 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       updateData.remove('assigned_route_name');
       updateData.remove('role');
     } else {
-      if (updatedRole == 'seller' && (newRouteId == null || newRouteId.isEmpty)) {
+      if (updatedRole == 'seller' &&
+          (newRouteId == null || newRouteId.isEmpty)) {
         throw ArgumentError('Seller accounts require an assigned route.');
       }
 

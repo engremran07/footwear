@@ -59,17 +59,25 @@ class AppTheme {
   static const Color hcPending = Color(0xFFFFD600);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  //  THEME FACTORY
+  //  THEME FACTORY (with memoization)
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // Cache key: (mode index, locale code, systemBrightness index)
+  static (int, String, int)? _lastThemeKey;
+  static ThemeData? _cachedTheme;
+
   /// Returns the correct theme for the current mode + locale.
+  /// Memoized — only rebuilds ThemeData when inputs change.
   static ThemeData themeForMode(
     AppThemeMode mode,
     AppLocale locale, {
     Brightness systemBrightness = Brightness.dark,
   }) {
     final loc = locale.locale.languageCode;
-    return switch (mode) {
+    final key = (mode.index, loc, systemBrightness.index);
+    if (key == _lastThemeKey && _cachedTheme != null) return _cachedTheme!;
+    _lastThemeKey = key;
+    _cachedTheme = switch (mode) {
       AppThemeMode.auto =>
         systemBrightness == Brightness.light
             ? lightThemeForLocale(loc)
@@ -78,6 +86,7 @@ class AppTheme {
       AppThemeMode.light => lightThemeForLocale(loc),
       AppThemeMode.highContrast => highContrastThemeForLocale(loc),
     };
+    return _cachedTheme!;
   }
 
   /// Returns the effective [Brightness] for the given mode, used by

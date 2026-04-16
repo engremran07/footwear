@@ -10,21 +10,16 @@ import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/snack_helper.dart';
-import '../models/shop_model.dart';
 import '../models/transaction_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/shop_provider.dart';
 import '../providers/transaction_provider.dart';
-import '../providers/user_provider.dart';
 
-import '../models/user_model.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
 import '../widgets/export_sheet.dart';
-import 'package:printing/printing.dart';
-import '../core/utils/pdf_export.dart';
 
 // =============================================================================
 // ShopDetailScreen — live ledger view for a single retail shop.
@@ -47,7 +42,7 @@ import '../core/utils/pdf_export.dart';
 //           → ShopNotifier.markAsBadDebt() → zeros balance, flags shop.
 // =============================================================================
 
-enum _ShopAction { edit, delete, badDebt, pdf, share }
+enum _ShopAction { edit, delete, badDebt, export, share }
 
 class ShopDetailScreen extends ConsumerStatefulWidget {
   final String shopId;
@@ -57,9 +52,6 @@ class ShopDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
-  // Guard against double-tap / concurrent PDF generation.
-  bool _generatingPdf = false;
-
   void _showEditTransactionDialog(TransactionModel tx) {
     final user = ref.read(authUserProvider).value;
     final isAdmin = user?.isAdmin == true;
@@ -457,26 +449,6 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     }
   }
 
-  Map<String, String> _labels() => {
-    'date': tr('date', ref),
-    'description': tr('description', ref),
-    'debit': tr('debit', ref),
-    'credit': tr('credit', ref),
-    'running_balance': tr('running_balance', ref),
-    'account_statement': tr('account_statement', ref),
-    'opening_balance': tr('opening_balance', ref),
-    'net_payable': tr('net_payable', ref),
-    'page': tr('page', ref),
-    'report_date': tr('report_date', ref),
-    'cash_in': tr('cash_in', ref),
-    'cash_out': tr('cash_out', ref),
-    'total_entries': tr('total_entries', ref),
-    'generated_by': tr('generated_by', ref),
-    'duration': tr('duration', ref),
-    'entry_by': tr('entry_by', ref),
-    'mode': tr('mode', ref),
-  };
-
   String _transactionTypeLabel(TransactionModel tx) {
     return switch (tx.type) {
       TransactionModel.typeCashIn => tr('cash_in', ref),
@@ -492,59 +464,6 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       shopTransactionsExportProvider(widget.shopId).future,
     );
     return [...txs]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-  }
-
-  Future<void> _generatePdf(ShopModel shop) async {
-    if (_generatingPdf) return;
-    setState(() => _generatingPdf = true);
-    try {
-      final locale = ref.read(appLocaleProvider);
-      final settings = await ref.read(settingsProvider.future);
-      final user = ref.read(authUserProvider).value;
-      final isAdmin = user?.isAdmin == true;
-      final sorted = await _loadFullTransactions();
-      // Safe read: use cached .value to avoid autoDispose StateError on
-      // StreamProvider.autoDispose.future before first Firestore emission.
-      final allUsers = isAdmin
-          ? (ref.read(allUsersProvider).value ?? <UserModel>[])
-          : <UserModel>[];
-      if (!mounted) return;
-      final entryByMap = <String, String>{
-        for (final u in allUsers) u.id: u.displayName,
-      };
-      if (user != null) entryByMap[user.id] = user.displayName;
-      final logoBytes = settings.logoBytes;
-      // Reconcile opening balance: stored balance minus the net of the
-      // displayed transactions, so the final running balance equals shop.balance.
-      final netTx = sorted.fold<double>(0.0, (s, t) => s + t.balanceImpact);
-      final bytes = await buildPdfLedger(
-        shopName: shop.name,
-        companyName: settings.companyName,
-        generatedBy: user?.displayName ?? '',
-        openingBalance: shop.balance - netTx,
-        transactions: sorted,
-        labels: _labels(),
-        locale: locale,
-        showEntryBy: isAdmin,
-        entryByMap: entryByMap,
-        dateFrom: sorted.isNotEmpty ? sorted.first.createdAt.toDate() : null,
-        dateTo: sorted.isNotEmpty ? sorted.last.createdAt.toDate() : null,
-        currency: settings.currency,
-        logoBytes: logoBytes,
-      );
-      if (!mounted) return;
-      await Printing.sharePdf(
-        bytes: bytes,
-        filename: 'statement_${shop.name.replaceAll(' ', '_')}.pdf',
-      );
-    } catch (e) {
-      if (mounted) {
-        final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
-      }
-    } finally {
-      if (mounted) setState(() => _generatingPdf = false);
-    }
   }
 
   void _showQuickCash(String type) {
@@ -792,35 +711,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               ).showSnackBar(errorSnackBar(tr(key, ref)));
                             }
 
-                          case _ShopAction.pdf:
-                            _generatePdf(shop);
-
+                          case _ShopAction.export:
                           case _ShopAction.share:
                             try {
                               final sorted = await _loadFullTransactions();
-                              if (!context.mounted) return;
-                              final user = ref.read(authUserProvider).value;
-                              final isAdmin = user?.isAdmin == true;
-                              // Pre-load all async data so pdfBytesBuilder
-                              // is pure-sync capture (no autoDispose race).
-                              final settings = await ref.read(
-                                settingsProvider.future,
-                              );
-                              final allUsers = isAdmin
-                                  ? (ref.read(allUsersProvider).value ??
-                                        <UserModel>[])
-                                  : <UserModel>[];
-                              final locale = ref.read(appLocaleProvider);
-                              final netTx = sorted.fold<double>(
-                                0.0,
-                                (s, t) => s + t.balanceImpact,
-                              );
-                              final entryByMap = <String, String>{
-                                for (final u in allUsers) u.id: u.displayName,
-                              };
-                              if (user != null) {
-                                entryByMap[user.id] = user.displayName;
-                              }
                               if (!context.mounted) return;
                               ExportSheet.show(
                                 context,
@@ -844,32 +738,13 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                     )
                                     .toList(),
                                 fileName: 'shop_${shop.name}',
-                                pdfBytesBuilder: () => buildPdfLedger(
-                                  shopName: shop.name,
-                                  companyName: settings.companyName,
-                                  generatedBy: user?.displayName ?? '',
-                                  openingBalance: shop.balance - netTx,
-                                  transactions: sorted,
-                                  labels: _labels(),
-                                  locale: locale,
-                                  showEntryBy: isAdmin,
-                                  entryByMap: entryByMap,
-                                  dateFrom: sorted.isNotEmpty
-                                      ? sorted.first.createdAt.toDate()
-                                      : null,
-                                  dateTo: sorted.isNotEmpty
-                                      ? sorted.last.createdAt.toDate()
-                                      : null,
-                                  currency: settings.currency,
-                                  logoBytes: settings.logoBytes,
-                                ),
                               );
                             } catch (e) {
                               if (!context.mounted) return;
                               final key = AppErrorMapper.key(e);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                errorSnackBar(tr(key, ref)),
-                              );
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(errorSnackBar(tr(key, ref)));
                             }
                         }
                       },
@@ -918,19 +793,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             ),
                           ),
                         PopupMenuItem(
-                          value: _ShopAction.pdf,
+                          value: _ShopAction.export,
                           child: ListTile(
-                            leading: const Icon(Icons.picture_as_pdf),
-                            title: Text(tr('tooltip_export_pdf', ref)),
-                            contentPadding: EdgeInsets.zero,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: _ShopAction.share,
-                          child: ListTile(
-                            leading: const Icon(Icons.ios_share),
-                            title: Text(tr('tooltip_export_statement', ref)),
+                            leading: const Icon(Icons.table_chart_outlined),
+                            title: Text(tr('export_share', ref)),
                             contentPadding: EdgeInsets.zero,
                             visualDensity: VisualDensity.compact,
                           ),

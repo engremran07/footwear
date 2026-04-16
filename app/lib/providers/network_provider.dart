@@ -10,34 +10,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// - We only switch to offline after consecutive failures to reduce jitter.
 final networkStatusProvider = StreamProvider.autoDispose<bool>((ref) {
   final controller = StreamController<bool>();
-  const probeHosts = <String>[
-    'firestore.googleapis.com',
-    'google.com',
-    'one.one.one.one',
-  ];
-  const probeTimeout = Duration(seconds: 4);
-  const pollInterval = Duration(seconds: 12);
+  const probeHost = 'firestore.googleapis.com';
+  const probeTimeout = Duration(seconds: 2);
+  const pollInterval = Duration(seconds: 30);
+  const startupDelay = Duration(seconds: 2);
   const offlineFailureThreshold = 3;
 
   var failureCount = 0;
   var lastStatus = true;
 
-  Future<bool> probeHost(String host) async {
-    final result = await InternetAddress.lookup(host).timeout(probeTimeout);
+  Future<bool> probe() async {
+    final result = await InternetAddress.lookup(probeHost).timeout(
+      probeTimeout,
+    );
     return result.isNotEmpty && result.first.rawAddress.isNotEmpty;
   }
 
   Future<void> check() async {
     var reachable = false;
-    for (final host in probeHosts) {
-      try {
-        if (await probeHost(host)) {
-          reachable = true;
-          break;
-        }
-      } catch (_) {
-        // Continue to next fallback host.
-      }
+    try {
+      reachable = await probe();
+    } catch (_) {
+      // probe failed
     }
 
     if (reachable) {
@@ -60,11 +54,17 @@ final networkStatusProvider = StreamProvider.autoDispose<bool>((ref) {
 
   // Optimistic initial state: avoids false offline badge during startup warm-up.
   controller.add(true);
-  check();
-  final timer = Timer.periodic(pollInterval, (_) => check());
+
+  // Defer first probe to avoid blocking app startup.
+  Timer? timer;
+  final startTimer = Timer(startupDelay, () {
+    check();
+    timer = Timer.periodic(pollInterval, (_) => check());
+  });
 
   ref.onDispose(() {
-    timer.cancel();
+    startTimer.cancel();
+    timer?.cancel();
     controller.close();
   });
 
