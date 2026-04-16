@@ -1740,13 +1740,14 @@ Future<Uint8List> buildPdfMultiShopLedger({
       var tIn = 0.0;
       var tOut = 0.0;
       for (final tx in sec.transactions) {
-        if (tx.isCashOut) {
-          bal += tx.amount;
-          tOut += tx.amount;
-        } else {
-          bal -= tx.amount;
-          tIn += tx.amount;
+        final impact = tx.balanceImpact; // 0 for unknown types — safe
+        bal += impact;
+        if (impact > 0) {
+          tOut += impact; // positive impact = cash_out = debit (shop owes more)
+        } else if (impact < 0) {
+          tIn -= impact; // negative impact = cash_in/return/payment = credit
         }
+        // write_off (impact == 0) and unknown types: excluded from In/Out totals
       }
       sectionFinals.add(bal);
       sectionTotalIn.add(tIn);
@@ -2043,8 +2044,10 @@ Future<Uint8List> buildPdfMultiShopLedger({
             : rawDesc;
         final entryBy = showEntryBy ? (entryByMap[tx.createdBy] ?? '—') : '';
         final mode = tx.saleType ?? '';
-        if (tx.isCashOut) {
-          balance += tx.amount;
+        final impact = tx.balanceImpact; // 0 for unknown types — safe
+        balance += impact;
+        if (impact >= 0) {
+          // cash_out or unknown (impact >= 0): debit column
           rows.add(
             _LedgerRow(
               date: _fmtDate(date),
@@ -2052,19 +2055,19 @@ Future<Uint8List> buildPdfMultiShopLedger({
               entryBy: entryBy,
               mode: mode,
               cashIn: 0,
-              cashOut: tx.amount,
+              cashOut: impact,
               balance: balance,
             ),
           );
         } else {
-          balance -= tx.amount;
+          // cash_in / return / payment (impact < 0): credit column
           rows.add(
             _LedgerRow(
               date: _fmtDate(date),
               desc: desc,
               entryBy: entryBy,
               mode: mode,
-              cashIn: tx.amount,
+              cashIn: -impact,
               cashOut: 0,
               balance: balance,
             ),

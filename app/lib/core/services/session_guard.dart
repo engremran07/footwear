@@ -227,8 +227,11 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
           return;
         }
       } else if (elapsed >= widget.lockShowDelay) {
-        // Away long enough → show lock overlay; keep session alive
-        if (mounted) {
+        // Away long enough → show lock overlay; keep session alive.
+        // Only lock when a user is actually signed in — prevents the lock
+        // overlay from appearing on the login screen when left unattended.
+        final auth = ref.read(authStateProvider).value;
+        if (auth != null && mounted) {
           setState(() => _isLocked = true);
           _trace('lock.shown.onResume');
         }
@@ -329,6 +332,12 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
         _isLocked = false;
         _trace('auth.userChanged', {'userId': nextUser.id});
         _maybeStartInactivityTimer();
+      }
+      // Clear lock overlay on sign-out so it doesn't bleed onto the login screen.
+      if (nextUser == null && _isLocked) {
+        _isLocked = false;
+        _inactivityTimer?.cancel();
+        _trace('lock.cleared.signout');
       }
       // Force logout if user's active flag cleared remotely
       if (nextUser != null && !nextUser.active) {

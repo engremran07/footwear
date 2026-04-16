@@ -28,6 +28,20 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.7.12',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔒',
+        text: {
+          AppLocale.en: 'Session lock overlay no longer appears on the login screen when left unattended.',
+          AppLocale.ar: 'لم تعد شاشة قفل الجلسة تظهر على شاشة تسجيل الدخول عند عدم النشاط.',
+          AppLocale.ur: 'لاگن سکرین پر بیکار وقت سیشن لاک والی اسکرین اب ظاھر نہیں ہوگی۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.7.11',
     date: 'April 2026',
     items: [

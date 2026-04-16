@@ -163,9 +163,10 @@ class TransactionModel {
     typeCashOut => amount,
     typeCashIn || typeReturn || typePayment => -amount,
     typeWriteOff => 0,
-    _ => throw StateError(
-      'Unknown transaction type "$type" for balance calculation',
-    ),
+    // Unknown legacy type from Firestore — treat as zero impact.
+    // Do NOT throw here: balanceImpact is called in folding over all
+    // transactions for PDF export; a throw crashes the entire export.
+    _ => 0,
   };
   bool get hasItems => items.isNotEmpty;
 
