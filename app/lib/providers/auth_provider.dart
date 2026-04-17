@@ -134,6 +134,10 @@ class AuthNotifier extends AsyncNotifier<void> {
     ); // invalidate all family instances (S7 defense-in-depth)
     ref.invalidate(allInventoryTransactionsProvider);
     ref.invalidate(outstandingShopsProvider);
+    // Export providers: admin-only, must be flushed on sign-out so a seller
+    // session cannot access cached data from a prior admin session.
+    ref.invalidate(sellerTransactionsExportProvider);
+    ref.invalidate(sellerInventoryExportProvider);
   }
 
   Future<void> signIn(

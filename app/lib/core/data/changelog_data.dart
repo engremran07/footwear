@@ -28,6 +28,28 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.7.15',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📊',
+        text: {
+          AppLocale.en: 'Seller report PDF now loads fresh data reliably — no more "PDF generation failed" on first tap.',
+          AppLocale.ar: 'تقرير البائع PDF يحمّل البيانات الحديثة بموثوقية — لا مزيد من رسالة "فشل إنشاء PDF" عند أول ضغطة.',
+          AppLocale.ur: 'سیلر رپورٹ PDF اب قابل اعتماد طریقے سے تازہ ڈیٹا لوڈ کرتی ہے — پہلی ٹیپ پر "PDF ناکام" کی خطا نہیں آئے گی۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📄',
+        text: {
+          AppLocale.en: 'Shop account-statement PDF now always reads latest company settings before generating.',
+          AppLocale.ar: 'تقرير حساب المتجر يقرأ الآن أحدث إعدادات الشركة قبل الإنشاء.',
+          AppLocale.ur: 'دکان اکاؤنٹ سٹیٹمنٹ PDF بنانے سے پہلے کمپنی کی تازہ ترین ترتیبات پڑھتا ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.7.14',
     date: 'April 2026',
     items: [

@@ -81,5 +81,38 @@ void main() {
 
       expect(result, isEmpty);
     });
+
+    test(
+      'sellerTransactionsExportProvider returns empty for seller (non-admin)',
+      () async {
+        final container = containerWithUser(seller);
+        addTearDown(container.dispose);
+        final authSub = keepAuthAlive(container);
+        addTearDown(authSub.close);
+        await container.read(authUserProvider.future);
+
+        final result = await container.read(
+          sellerTransactionsExportProvider('seller-1').future,
+        );
+
+        expect(result, isEmpty);
+      },
+    );
+
+    test(
+      'sellerTransactionsExportProvider returns empty for blank seller id',
+      () async {
+        final container = containerWithUser(seller);
+        addTearDown(container.dispose);
+        final authSub = keepAuthAlive(container);
+        addTearDown(authSub.close);
+
+        final result = await container.read(
+          sellerTransactionsExportProvider('').future,
+        );
+
+        expect(result, isEmpty);
+      },
+    );
   });
 }

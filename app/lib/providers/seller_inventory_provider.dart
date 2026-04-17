@@ -49,6 +49,25 @@ final adminAllSellerInventoryProvider =
           );
     });
 
+/// One-shot active seller inventory for export (seller report PDF/Excel).
+/// NOT autoDispose: callers use ref.read(provider.future); no listener →
+/// autoDispose would destroy the provider mid-query → StateError.
+/// Callers must ref.invalidate() before reading to ensure fresh data.
+final sellerInventoryExportProvider = FutureProvider
+    .family<List<SellerInventoryModel>, String>((ref, sellerId) async {
+      if (sellerId.trim().isEmpty) return const <SellerInventoryModel>[];
+      final user = ref.read(authUserProvider).value;
+      if (user == null || !user.isAdmin) return const <SellerInventoryModel>[];
+      final snap = await FirebaseFirestore.instance
+          .collection(Collections.sellerInventory)
+          .where('seller_id', isEqualTo: sellerId.trim())
+          .where('active', isEqualTo: true)
+          .get();
+      return snap.docs
+          .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
+          .toList();
+    });
+
 class SellerInventoryNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}

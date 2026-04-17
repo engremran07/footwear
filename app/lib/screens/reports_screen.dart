@@ -981,19 +981,33 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
     setState(() => _generating = true);
     try {
       final locale = ref.read(appLocaleProvider);
-      final users = ref.read(allUsersProvider).value ?? [];
-      final seller = users.firstWhere((u) => u.id == _selectedSellerId);
-      final allTxs = ref.read(allTransactionsProvider).value ?? [];
-      final inventory =
-          ref.read(sellerInventoryProvider(_selectedSellerId!)).value ?? [];
+
+      // Use export providers (one-shot .get()) so data is always fresh and
+      // complete, regardless of whether stream providers are currently active.
+      ref.invalidate(allUsersExportProvider);
+      final users = await ref.read(allUsersExportProvider.future);
+      final seller = users.firstWhere(
+        (u) => u.id == _selectedSellerId,
+        orElse: () => throw StateError('Seller not found: $_selectedSellerId'),
+      );
+
+      ref.invalidate(sellerTransactionsExportProvider(_selectedSellerId!));
+      final allTxs = await ref.read(
+        sellerTransactionsExportProvider(_selectedSellerId!).future,
+      );
+
+      ref.invalidate(sellerInventoryExportProvider(_selectedSellerId!));
+      final inventory = await ref.read(
+        sellerInventoryExportProvider(_selectedSellerId!).future,
+      );
+
+      // Shops are already loaded for the admin UI — safe to read from cache.
       final allShops = ref.read(shopsProvider).value ?? <ShopModel>[];
 
-      // Build per-customer summary
-      final txsBySeller = allTxs
-          .where((t) => t.createdBy == _selectedSellerId)
-          .toList();
+      // Build per-customer summary.
+      // allTxs is already filtered to this seller by sellerTransactionsExportProvider.
       final shopMap = <String, SellerReportShop>{};
-      for (final tx in txsBySeller) {
+      for (final tx in allTxs) {
         final cid = tx.shopId;
         if (cid.isEmpty) continue;
         final cname = tx.shopName.isNotEmpty
@@ -1026,7 +1040,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
         0,
         (s, i) => s + i.quantityAvailable,
       );
-      final stockSold = txsBySeller
+      final stockSold = allTxs
           .expand((t) => t.items)
           .fold<int>(0, (s, item) => s + item.qty);
       final stockRemaining = (stockReceived - stockSold).clamp(0, 999999);

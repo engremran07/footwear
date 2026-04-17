@@ -725,7 +725,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               final locale = ref.read(appLocaleProvider);
                               final authUser = ref.read(authUserProvider).value;
                               final isAdmin = authUser?.isAdmin == true;
-                              final settings = ref.read(settingsProvider).value;
+                              final settings = await ref.read(
+                                settingsProvider.future,
+                              );
                               // allUsersExportProvider: no active filter,
                               // one-shot .get() — covers deactivated sellers.
                               ref.invalidate(allUsersExportProvider);
@@ -796,7 +798,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                     AppFormatters.exportFileName('ledger', shop.name),
                                 pdfBytesBuilder: () => buildPdfLedger(
                                   shopName: shop.name,
-                                  companyName: settings?.companyName ?? '',
+                                  companyName: settings.companyName,
                                   generatedBy: authUser?.displayName ?? '',
                                   openingBalance: openingBalance,
                                   transactions: sorted,
@@ -810,8 +812,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                       : null,
                                   labels: labels,
                                   locale: locale,
-                                  currency: settings?.currency ?? 'SAR',
-                                  logoBytes: settings?.logoBytes,
+                                  currency: settings.currency,
+                                  logoBytes: settings.logoBytes,
                                 ),
                               );
                             } catch (e) {

@@ -218,6 +218,27 @@ final allTransactionsExportProvider =
           .toList();
     });
 
+/// One-shot transactions for a specific seller — used by seller report PDF.
+/// NOT autoDispose: callers use ref.read(provider.future) which doesn't
+/// subscribe — autoDispose would destroy the provider mid-query → StateError.
+/// Callers must ref.invalidate() before reading to ensure fresh data.
+final sellerTransactionsExportProvider = FutureProvider
+    .family<List<TransactionModel>, String>((ref, sellerId) async {
+      final normalizedId = sellerId.trim();
+      if (normalizedId.isEmpty) return const <TransactionModel>[];
+      final user = ref.read(authUserProvider).value;
+      if (user == null || !user.isAdmin) return const <TransactionModel>[];
+      final snap = await FirebaseFirestore.instance
+          .collection(Collections.transactions)
+          .where('created_by', isEqualTo: normalizedId)
+          .limit(2000)
+          .get();
+      return snap.docs
+          .where((d) => d.data()['deleted'] != true)
+          .map((d) => TransactionModel.fromJson(d.data(), d.id))
+          .toList();
+    });
+
 class TransactionNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
