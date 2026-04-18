@@ -33,9 +33,7 @@ final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
 /// (not a stream). NOT autoDispose: callers use ref.read(provider.future)
 /// which doesn't subscribe — autoDispose would destroy the provider
 /// mid-Firestore-query → StateError. Callers must ref.invalidate() first.
-final allUsersExportProvider = FutureProvider<List<UserModel>>((
-  ref,
-) async {
+final allUsersExportProvider = FutureProvider<List<UserModel>>((ref) async {
   // Use .future to await the first auth emission instead of reading a
   // potentially-null .value while the StreamProvider is still loading.
   final user = await ref.read(authUserProvider.future);

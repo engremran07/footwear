@@ -214,6 +214,58 @@ class ShopNotifier extends AsyncNotifier<void> {
     await batch.commit();
   }
 
+  /// Admin-only: recovers a bad-debt shop, restoring its written-off balance.
+  Future<void> recoverBadDebt(String shopId) async {
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) throw StateError('Not authenticated');
+    final me = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(authUser.uid)
+        .get();
+    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
+    if (role != 'admin' && role != 'manager') {
+      throw StateError('Only admin can recover bad debt');
+    }
+
+    final db = FirebaseFirestore.instance;
+    final shopDoc = await db
+        .collection(Collections.customers)
+        .doc(shopId)
+        .get();
+    final isBadDebt = shopDoc.data()?['bad_debt'] as bool? ?? false;
+    if (!isBadDebt) throw StateError('Shop is not marked as bad debt');
+    final amount =
+        (shopDoc.data()?['bad_debt_amount'] as num?)?.toDouble() ?? 0;
+
+    final batch = db.batch();
+
+    // Restore shop: un-flag bad debt, restore balance
+    batch.update(db.collection(Collections.customers).doc(shopId), {
+      'bad_debt': false,
+      'bad_debt_amount': 0,
+      'bad_debt_date': null,
+      'balance': amount,
+      'updated_at': Timestamp.now(),
+    });
+
+    // Create recovery transaction to record the reversal
+    final txRef = db.collection(Collections.transactions).doc();
+    batch.set(txRef, {
+      'type': 'cash_out',
+      'shop_id': shopId,
+      'shop_name': shopDoc.data()?['name'] ?? '',
+      'route_id': shopDoc.data()?['route_id'] ?? '',
+      'amount': amount,
+      'description': 'Bad debt recovered — balance restored',
+      'items': <Map<String, dynamic>>[],
+      'created_by': authUser.uid,
+      'created_at': Timestamp.now(),
+      'deleted': false,
+    });
+
+    await batch.commit();
+  }
+
   Future<void> deactivate(String id, String routeId) async {
     final authUser = FirebaseAuth.instance.currentUser;
     if (authUser == null) {

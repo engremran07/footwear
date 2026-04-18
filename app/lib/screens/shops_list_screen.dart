@@ -424,7 +424,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       title: tr('export_all_shops', ref),
       headers: headers,
       rows: rows,
-      fileName: AppFormatters.exportFileName('shops_all'),
+      fileName: AppFormatters.exportFileName(ExportNames.shopsAll),
     );
   }
 
@@ -476,7 +476,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       title: tr('route_report', ref),
       headers: headers,
       rows: allRows,
-      fileName: AppFormatters.exportFileName('shops_per_route'),
+      fileName: AppFormatters.exportFileName(ExportNames.shopsPerRoute),
     );
   }
 
@@ -725,7 +725,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         title: routeName,
         headers: excelHeaders,
         rows: excelRows,
-        fileName: AppFormatters.exportFileName('ledger', routeName),
+        fileName: AppFormatters.exportFileName(ExportNames.ledger, routeName),
         subtitle: tr('export_pdf_ledger', ref),
         pdfBytesBuilder: () => buildPdfMultiShopLedger(
           title: routeName,
@@ -743,7 +743,11 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       );
     } catch (e, st) {
       debugPrint('MultiShopPdf export error: $e\n$st');
-      FirebaseCrashlytics.instance.recordError(e, st, reason: 'multi-shop PDF export');
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        st,
+        reason: 'multi-shop PDF export',
+      );
       if (mounted) {
         if (!progressDismissed) {
           Navigator.of(context, rootNavigator: true).pop();

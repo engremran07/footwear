@@ -46,7 +46,7 @@ import '../widgets/export_sheet.dart';
 //           → ShopNotifier.markAsBadDebt() → zeros balance, flags shop.
 // =============================================================================
 
-enum _ShopAction { edit, delete, badDebt, export, share }
+enum _ShopAction { edit, delete, badDebt, recoverDebt, export, share }
 
 class ShopDetailScreen extends ConsumerStatefulWidget {
   final String shopId;
@@ -717,13 +717,38 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               ).showSnackBar(errorSnackBar(tr(key, ref)));
                             }
 
+                          case _ShopAction.recoverDebt:
+                            final ok = await ConfirmDialog.show(
+                              context,
+                              title: tr('recover_bad_debt', ref),
+                              message: tr('confirm_recover_bad_debt', ref),
+                            );
+                            if (ok != true) return;
+                            try {
+                              await ref
+                                  .read(shopNotifierProvider.notifier)
+                                  .recoverBadDebt(shop.id);
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                successSnackBar(tr('success_updated', ref)),
+                              );
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              final key = AppErrorMapper.key(e);
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(errorSnackBar(tr(key, ref)));
+                            }
+
                           case _ShopAction.export:
                           case _ShopAction.share:
                             try {
                               final sorted = await _loadFullTransactions();
                               if (!context.mounted) return;
                               final locale = ref.read(appLocaleProvider);
-                              final authUser = await ref.read(authUserProvider.future);
+                              final authUser = await ref.read(
+                                authUserProvider.future,
+                              );
                               final isAdmin = authUser?.isAdmin == true;
                               final settings = await ref.read(
                                 settingsProvider.future,
@@ -795,7 +820,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                     )
                                     .toList(),
                                 fileName: AppFormatters.exportFileName(
-                                  'ledger',
+                                  ExportNames.ledger,
                                   shop.name,
                                 ),
                                 pdfBytesBuilder: () => buildPdfLedger(
@@ -867,6 +892,19 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                 color: AppBrand.warningColor,
                               ),
                               title: Text(tr('mark_bad_debt', ref)),
+                              contentPadding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        if (user?.isAdmin == true && shop.badDebt)
+                          PopupMenuItem(
+                            value: _ShopAction.recoverDebt,
+                            child: ListTile(
+                              leading: const Icon(
+                                Icons.undo,
+                                color: AppBrand.successColor,
+                              ),
+                              title: Text(tr('recover_bad_debt', ref)),
                               contentPadding: EdgeInsets.zero,
                               visualDensity: VisualDensity.compact,
                             ),

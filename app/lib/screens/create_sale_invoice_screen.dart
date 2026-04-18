@@ -789,7 +789,9 @@ class _CreateSaleInvoiceScreenState
     // Invoices are exclusively for stock sales — at least one item is required for all roles
     if (deductions.isEmpty) {
       HapticFeedback.vibrate();
-      messenger.showSnackBar(warningSnackBar(tr('select_at_least_one_item', ref)));
+      messenger.showSnackBar(
+        warningSnackBar(tr('select_at_least_one_item', ref)),
+      );
       return;
     }
 

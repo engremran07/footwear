@@ -1,6 +1,21 @@
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Canonical export file‐name types — use these with
+/// [AppFormatters.exportFileName] instead of raw string literals.
+abstract final class ExportNames {
+  static const invoice = 'invoice';
+  static const ledger = 'ledger';
+  static const sellerReport = 'seller_report';
+  static const inventoryReport = 'inventory_report';
+  static const shopsAll = 'shops_all';
+  static const shopsPerRoute = 'shops_per_route';
+  static const shopsReport = 'shops_report';
+  static const transactionsReport = 'transactions_report';
+  static const outstandingReport = 'outstanding_report';
+  static const badDebtsReport = 'bad_debts_report';
+}
+
 class AppFormatters {
   AppFormatters._();
 

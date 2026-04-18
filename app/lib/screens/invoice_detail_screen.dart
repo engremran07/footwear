@@ -165,11 +165,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
     }
   }
 
-  void _showExportSheet(
-    BuildContext context,
-    WidgetRef ref,
-    InvoiceModel inv,
-  ) {
+  void _showExportSheet(BuildContext context, WidgetRef ref, InvoiceModel inv) {
     final locale = ref.read(appLocaleProvider);
     final headers = [
       trRead('item_number', locale),
@@ -198,7 +194,10 @@ class InvoiceDetailScreen extends ConsumerWidget {
       title: inv.invoiceNumber,
       headers: headers,
       rows: rows,
-      fileName: inv.invoiceNumber,
+      fileName: AppFormatters.exportFileName(
+        ExportNames.invoice,
+        inv.invoiceNumber,
+      ),
       subtitle: '${trRead('shop', locale)}: ${inv.shopName}',
       pdfBytesBuilder: () async {
         final settings = await ref.read(settingsProvider.future);

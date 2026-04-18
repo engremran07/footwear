@@ -28,6 +28,45 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.7.19',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📁',
+        text: {
+          AppLocale.en:
+              'Export file names are now clean and consistent — every PDF, Excel, and image export uses a clear name like "ledger_shop-name_2026-04-18" instead of random codes.',
+          AppLocale.ar:
+              'أسماء ملفات التصدير أصبحت واضحة ومتسقة — كل PDF وExcel وصورة تستخدم اسمًا واضحًا مثل "ledger_shop-name_2026-04-18" بدلاً من رموز عشوائية.',
+          AppLocale.ur:
+              'ایکسپورٹ فائل نام اب صاف اور یکساں ہیں — ہر PDF، Excel، اور تصویر "ledger_shop-name_2026-04-18" جیسا واضح نام استعمال کرتی ہے، نہ کہ بے ترتیب کوڈ۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🗂️',
+        text: {
+          AppLocale.en:
+              'Multi-shop ledger PDF: route names now appear as section headers on the cover page, making it easy to jump to the right route at a glance.',
+          AppLocale.ar:
+              'PDF كشف حساب متعدد المتاجر: تظهر الآن أسماء المسارات كعناوين أقسام في صفحة الغلاف، مما يسهّل الوصول إلى المسار الصحيح بنظرة واحدة.',
+          AppLocale.ur:
+              'ملٹی شاپ لیجر PDF: روٹ کے نام اب کور پیج پر سیکشن ہیڈرز کے طور پر ظاہر ہوتے ہیں، جس سے صحیح روٹ تک ایک نظر میں پہنچنا آسان ہوتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📐',
+        text: {
+          AppLocale.en:
+              'PDF layout improvements: stock summary cards and table cells are now properly centered for a cleaner, more professional look.',
+          AppLocale.ar:
+              'تحسينات تخطيط PDF: بطاقات ملخص المخزون وخلايا الجداول مركزة الآن بشكل صحيح لمظهر أنظف وأكثر احترافية.',
+          AppLocale.ur:
+              'PDF لے آؤٹ بہتری: اسٹاک سمری کارڈز اور ٹیبل سیلز اب صحیح طریقے سے سینٹر کیے گئے ہیں تاکہ ایک صاف اور زیادہ پیشہ ورانہ شکل ملے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.7.18',
     date: 'April 2026',
     items: [
@@ -95,10 +134,8 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧹',
         text: {
-          AppLocale.en:
-              'Removed unused code for a leaner, faster app.',
-          AppLocale.ar:
-              'إزالة الأكواد غير المستخدمة لتطبيق أسرع وأخف.',
+          AppLocale.en: 'Removed unused code for a leaner, faster app.',
+          AppLocale.ar: 'إزالة الأكواد غير المستخدمة لتطبيق أسرع وأخف.',
           AppLocale.ur:
               'غیر استعمال شدہ کوڈ ہٹایا گیا تاکہ ایپ ہلکی اور تیز ہو۔',
         },

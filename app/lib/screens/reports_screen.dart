@@ -185,11 +185,15 @@ class ReportsScreen extends ConsumerWidget {
       title: title,
       headers: headers,
       rows: rows,
-      fileName: AppFormatters.exportFileName('shops_report'),
+      fileName: AppFormatters.exportFileName(ExportNames.shopsReport),
     );
   }
 
-  Future<void> _exportInventory(BuildContext context, WidgetRef ref, int ppc) async {
+  Future<void> _exportInventory(
+    BuildContext context,
+    WidgetRef ref,
+    int ppc,
+  ) async {
     final user = await ref.read(authUserProvider.future);
     if (!context.mounted) return;
     if (user == null) {
@@ -225,7 +229,7 @@ class ReportsScreen extends ConsumerWidget {
       title: title,
       headers: headers,
       rows: rows,
-      fileName: AppFormatters.exportFileName('inventory_report'),
+      fileName: AppFormatters.exportFileName(ExportNames.inventoryReport),
     );
   }
 
@@ -268,7 +272,7 @@ class ReportsScreen extends ConsumerWidget {
       title: title,
       headers: headers,
       rows: rows,
-      fileName: AppFormatters.exportFileName('transactions_report'),
+      fileName: AppFormatters.exportFileName(ExportNames.transactionsReport),
     );
   }
 
@@ -313,7 +317,7 @@ class ReportsScreen extends ConsumerWidget {
       title: title,
       headers: headers,
       rows: rows,
-      fileName: AppFormatters.exportFileName('outstanding_report'),
+      fileName: AppFormatters.exportFileName(ExportNames.outstandingReport),
     );
   }
 
@@ -358,7 +362,7 @@ class ReportsScreen extends ConsumerWidget {
       title: title,
       headers: headers,
       rows: rows,
-      fileName: AppFormatters.exportFileName('bad_debts_report'),
+      fileName: AppFormatters.exportFileName(ExportNames.badDebtsReport),
     );
   }
 }
@@ -839,7 +843,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
               ],
             )
             .toList(),
-        fileName: AppFormatters.exportFileName('ledger', shop.name),
+        fileName: AppFormatters.exportFileName(ExportNames.ledger, shop.name),
         pdfBytesBuilder: () => buildPdfLedger(
           shopName: shop.name,
           companyName: settings.companyName,
@@ -1077,7 +1081,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
             )
             .toList(),
         fileName: AppFormatters.exportFileName(
-          'seller_report',
+          ExportNames.sellerReport,
           seller.displayName,
         ),
         pdfBytesBuilder: () {

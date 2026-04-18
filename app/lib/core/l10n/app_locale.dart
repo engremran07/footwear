@@ -256,8 +256,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'linked_invoice': 'Linked Invoice',
     'bad_debt': 'Bad Debt',
     'mark_bad_debt': 'Mark as Bad Debt',
+    'recover_bad_debt': 'Recover Bad Debt',
     'confirm_bad_debt':
         'Mark this customer as bad debt? Their outstanding balance will be written off.',
+    'confirm_recover_bad_debt':
+        'Recover this bad debt? The written-off balance will be restored.',
     'bad_debt_amount': 'Bad Debt Amount',
     'bad_debts_report': 'Bad Debts Report',
     'transfer_history': 'Transfer History',
@@ -1415,7 +1418,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'linked_invoice': 'الفاتورة المرجعية',
     'bad_debt': 'ديون معدومة',
     'mark_bad_debt': 'تعيين كدين معدوم',
+    'recover_bad_debt': 'استرداد الدين المعدوم',
     'confirm_bad_debt': 'تعيين هذا العميل كدين معدوم؟ سيتم شطب رصيده المستحق.',
+    'confirm_recover_bad_debt':
+        'استرداد هذا الدين المعدوم؟ سيتم استعادة الرصيد المشطوب.',
     'bad_debt_amount': 'مبلغ الدين المعدوم',
     'bad_debts_report': 'تقرير الديون المعدومة',
     'transfer_history': 'سجل التحويلات',
@@ -2568,8 +2574,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'linked_invoice': 'مرجع رسید',
     'bad_debt': 'ناقابل وصول قرض',
     'mark_bad_debt': 'ناقابل وصول قرض نشان زد کریں',
+    'recover_bad_debt': 'ناقابل وصول قرض واپس کریں',
     'confirm_bad_debt':
         'اس گاہک کو ناقابل وصول قرض نشان زد کریں؟ بقایا رقم شطب ہو جائے گی۔',
+    'confirm_recover_bad_debt':
+        'یہ ناقابل وصول قرض واپس کریں؟ شطب شدہ رقم بحال ہو جائے گی۔',
     'bad_debt_amount': 'ناقابل وصول قرض کی رقم',
     'bad_debts_report': 'ناقابل وصول قرض رپورٹ',
     'transfer_history': 'منتقلی تاریخ',

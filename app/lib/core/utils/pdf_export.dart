@@ -124,6 +124,68 @@ void _requireLabelKeys(
   }
 }
 
+/// Centralised locale → font/direction/currency configuration for all PDF
+/// builders. Eliminates the previously 5× duplicated inline computation.
+///
+/// **Font policy:** NotoSansArabic is PRIMARY for ALL locales (including Urdu).
+/// NotoNastaliqUrdu is kept as fallback only. The pdf package's TrueType
+/// renderer cannot handle Nastaliq's complex GSUB/GPOS shaping tables —
+/// using it as primary causes boxes and scattered characters.
+class _PdfLocaleConfig {
+  final bool isRtl;
+  final pw.TextDirection dir;
+  final pw.CrossAxisAlignment align;
+  final pw.Font primaryFont;
+  final List<pw.Font> ff;
+  final String currencyStr;
+
+  _PdfLocaleConfig._({
+    required this.isRtl,
+    required this.dir,
+    required this.align,
+    required this.primaryFont,
+    required this.ff,
+    required this.currencyStr,
+  });
+
+  factory _PdfLocaleConfig({
+    required ({pw.Font arabic, pw.Font urdu}) fonts,
+    required AppLocale locale,
+    String currency = 'SAR',
+  }) {
+    final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
+    return _PdfLocaleConfig._(
+      isRtl: isRtl,
+      dir: isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+      align: isRtl ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
+      // NotoSansArabic covers full Arabic-script Unicode (including Urdu
+      // characters) in Naskh style. Always primary for PDF rendering.
+      primaryFont: fonts.arabic,
+      ff: <pw.Font>[fonts.urdu],
+      currencyStr: locale == AppLocale.ar
+          ? 'ريال'
+          : locale == AppLocale.ur
+          ? 'ریال'
+          : currency,
+    );
+  }
+
+  /// Shared text-style builder.
+  pw.TextStyle ts({
+    double size = 9,
+    pw.FontWeight fw = pw.FontWeight.normal,
+    PdfColor color = PdfColors.black,
+  }) => pw.TextStyle(
+    fontSize: size,
+    fontWeight: fw,
+    color: color,
+    font: primaryFont,
+    fontFallback: ff,
+  );
+
+  pw.Document buildDocument() => _buildDocument(primaryFont, ff);
+}
+
 /// Builds a PDF document from tabular data and returns bytes.
 /// When [locale] is Arabic or Urdu, loads the appropriate font and
 /// renders all text RTL.
@@ -140,32 +202,15 @@ Future<Uint8List> buildPdfTable({
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
   return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
-    final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
-    final primaryFont = locale == AppLocale.ur ? fonts.urdu : fonts.arabic;
-    final fontFallback = locale == AppLocale.ur
-        ? <pw.Font>[fonts.arabic]
-        : <pw.Font>[fonts.urdu];
+    final lc = _PdfLocaleConfig(fonts: fonts, locale: locale);
+    final fontFallback = lc.ff;
+    final dir = lc.dir;
+    final isRtl = lc.isRtl;
+    final pdf = lc.buildDocument();
 
-    final pdf = _buildDocument(primaryFont, fontFallback);
-    final dir = isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr;
-
-    final headerStyle = pw.TextStyle(
-      fontWeight: pw.FontWeight.bold,
-      fontSize: 9,
-      font: primaryFont,
-      fontFallback: fontFallback,
-    );
-    final cellStyle = pw.TextStyle(
-      fontSize: 8,
-      font: primaryFont,
-      fontFallback: fontFallback,
-    );
-    final titleStyle = pw.TextStyle(
-      fontSize: 16,
-      fontWeight: pw.FontWeight.bold,
-      font: primaryFont,
-      fontFallback: fontFallback,
-    );
+    final headerStyle = lc.ts(size: 9, fw: pw.FontWeight.bold);
+    final cellStyle = lc.ts(size: 8);
+    final titleStyle = lc.ts(size: 16, fw: pw.FontWeight.bold);
 
     const rowsPerPage = 30;
     final pageCount = (rows.length / rowsPerPage).ceil().clamp(1, 999);
@@ -216,7 +261,16 @@ Future<Uint8List> buildPdfTable({
               ],
               pw.TableHelper.fromTextArray(
                 context: context,
-                headers: headers,
+                headers: headers
+                    .map(
+                      (h) => pw.Text(
+                        h,
+                        style: headerStyle,
+                        textDirection: _cellDir(h, dir),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                    )
+                    .toList(),
                 data: pageRows
                     .map(
                       (row) => row.map((c) => _s(c?.toString() ?? '')).toList(),
@@ -240,6 +294,15 @@ Future<Uint8List> buildPdfTable({
                 cellAlignments: {
                   for (var i = 0; i < headers.length; i++)
                     i: pw.Alignment.center,
+                },
+                cellBuilder: (colIdx, data, rowNum) {
+                  final text = data?.toString() ?? '';
+                  return pw.Text(
+                    text,
+                    style: cellStyle,
+                    textDirection: _cellDir(text, dir),
+                    textAlign: pw.TextAlign.center,
+                  );
                 },
               ),
               pw.Spacer(),
@@ -319,34 +382,21 @@ Future<Uint8List> buildPdfLedger({
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
   return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
-    final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
-    final primaryFont = locale == AppLocale.ur ? fonts.urdu : fonts.arabic;
-    final ff = locale == AppLocale.ur
-        ? <pw.Font>[fonts.arabic]
-        : <pw.Font>[fonts.urdu];
-
-    final dir = isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr;
-    final align = isRtl
-        ? pw.CrossAxisAlignment.end
-        : pw.CrossAxisAlignment.start;
-    final currencyStr = locale == AppLocale.ar
-        ? 'ريال'
-        : locale == AppLocale.ur
-        ? 'ریال'
-        : currency;
-
-    // ── helpers ──
+    final lc = _PdfLocaleConfig(
+      fonts: fonts,
+      locale: locale,
+      currency: currency,
+    );
+    final dir = lc.dir;
+    final align = lc.align;
+    final primaryFont = lc.primaryFont;
+    final ff = lc.ff;
+    final currencyStr = lc.currencyStr;
     pw.TextStyle ts({
       double size = 9,
       pw.FontWeight fw = pw.FontWeight.normal,
       PdfColor color = PdfColors.black,
-    }) => pw.TextStyle(
-      fontSize: size,
-      fontWeight: fw,
-      color: color,
-      font: primaryFont,
-      fontFallback: ff,
-    );
+    }) => lc.ts(size: size, fw: fw, color: color);
 
     // ── build ledger rows ──
     double balance = openingBalance;
@@ -958,23 +1008,16 @@ Future<Uint8List> buildPdfSellerReport({
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
   return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
-    final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
-
-    final dir = isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr;
-
+    final lc = _PdfLocaleConfig(fonts: fonts, locale: locale);
+    final isRtl = lc.isRtl;
+    final dir = lc.dir;
+    final primaryFont = lc.primaryFont;
+    final ff = lc.ff;
     pw.TextStyle ts({
       double size = 9,
       pw.FontWeight fw = pw.FontWeight.normal,
       PdfColor color = PdfColors.black,
-    }) => pw.TextStyle(
-      fontSize: size,
-      fontWeight: fw,
-      color: color,
-      font: locale == AppLocale.ur ? fonts.urdu : fonts.arabic,
-      fontFallback: locale == AppLocale.ur
-          ? <pw.Font>[fonts.arabic]
-          : <pw.Font>[fonts.urdu],
-    );
+    }) => lc.ts(size: size, fw: fw, color: color);
 
     double totalRevenue = 0;
     double totalOutstanding = 0;
@@ -985,10 +1028,7 @@ Future<Uint8List> buildPdfSellerReport({
       totalPairs += c.totalPairsSold;
     }
 
-    final pdf = _buildDocument(
-      locale == AppLocale.ur ? fonts.urdu : fonts.arabic,
-      locale == AppLocale.ur ? <pw.Font>[fonts.arabic] : <pw.Font>[fonts.urdu],
-    );
+    final pdf = lc.buildDocument();
 
     pdf.addPage(
       pw.MultiPage(
@@ -1017,9 +1057,9 @@ Future<Uint8List> buildPdfSellerReport({
                         : pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(
-                        _s(companyName), // ISSUE-015: was hardcoded 'FOOTWEAR'
+                        _s(companyName),
                         style: ts(size: 18, fw: pw.FontWeight.bold),
-                        textDirection: dir,
+                        textDirection: _cellDir(companyName, dir),
                       ),
                       pw.Text(
                         labels['seller_report'] ?? 'Seller Report',
@@ -1061,7 +1101,7 @@ Future<Uint8List> buildPdfSellerReport({
                     pw.Text(
                       '${labels['seller'] ?? 'Seller'}: ${_s(sellerName)}',
                       style: ts(size: 10, fw: pw.FontWeight.bold),
-                      textDirection: dir,
+                      textDirection: _cellDir(sellerName, dir),
                     ),
                     pw.Text(
                       _s(sellerPhone),
@@ -1073,7 +1113,7 @@ Future<Uint8List> buildPdfSellerReport({
                 pw.Text(
                   '${labels['route'] ?? 'Route'}: ${_s(routeName)}',
                   style: ts(size: 10, fw: pw.FontWeight.bold),
-                  textDirection: dir,
+                  textDirection: _cellDir(routeName, dir),
                 ),
               ],
             ),
@@ -1093,30 +1133,24 @@ Future<Uint8List> buildPdfSellerReport({
                 labels['stock_received'] ?? 'Received',
                 stockReceived.toString(),
                 PdfColors.blue50,
-                primaryFont: locale == AppLocale.ur ? fonts.urdu : fonts.arabic,
-                ff: locale == AppLocale.ur
-                    ? <pw.Font>[fonts.arabic]
-                    : <pw.Font>[fonts.urdu],
+                primaryFont: primaryFont,
+                ff: ff,
               ),
               pw.SizedBox(width: 8),
               _stockCard(
                 labels['stock_sold'] ?? 'Sold',
                 stockSold.toString(),
                 PdfColors.orange50,
-                primaryFont: locale == AppLocale.ur ? fonts.urdu : fonts.arabic,
-                ff: locale == AppLocale.ur
-                    ? <pw.Font>[fonts.arabic]
-                    : <pw.Font>[fonts.urdu],
+                primaryFont: primaryFont,
+                ff: ff,
               ),
               pw.SizedBox(width: 8),
               _stockCard(
                 labels['stock_remaining'] ?? 'Remaining',
                 stockRemaining.toString(),
                 PdfColors.green50,
-                primaryFont: locale == AppLocale.ur ? fonts.urdu : fonts.arabic,
-                ff: locale == AppLocale.ur
-                    ? <pw.Font>[fonts.arabic]
-                    : <pw.Font>[fonts.urdu],
+                primaryFont: primaryFont,
+                ff: ff,
               ),
             ],
           ),
@@ -1130,12 +1164,26 @@ Future<Uint8List> buildPdfSellerReport({
           ),
           pw.SizedBox(height: 4),
           pw.TableHelper.fromTextArray(
-            headers: [
-              labels['shop'] ?? 'Shop',
-              labels['stock_sold'] ?? 'Sold (Pairs)',
-              labels['revenue'] ?? 'Revenue',
-              labels['outstanding'] ?? 'Outstanding',
-            ],
+            headers:
+                [
+                      labels['shop'] ?? 'Shop',
+                      labels['stock_sold'] ?? 'Sold (Pairs)',
+                      labels['revenue'] ?? 'Revenue',
+                      labels['outstanding'] ?? 'Outstanding',
+                    ]
+                    .map(
+                      (h) => pw.Text(
+                        h,
+                        style: lc.ts(
+                          size: 8,
+                          fw: pw.FontWeight.bold,
+                          color: PdfColors.white,
+                        ),
+                        textDirection: _cellDir(h, dir),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                    )
+                    .toList(),
             data: shops
                 .map(
                   (c) => [
@@ -1146,22 +1194,12 @@ Future<Uint8List> buildPdfSellerReport({
                   ],
                 )
                 .toList(),
-            headerStyle: pw.TextStyle(
-              fontSize: 8,
-              fontWeight: pw.FontWeight.bold,
+            headerStyle: lc.ts(
+              size: 8,
+              fw: pw.FontWeight.bold,
               color: PdfColors.white,
-              font: locale == AppLocale.ur ? fonts.urdu : fonts.arabic,
-              fontFallback: locale == AppLocale.ur
-                  ? <pw.Font>[fonts.arabic]
-                  : <pw.Font>[fonts.urdu],
             ),
-            cellStyle: pw.TextStyle(
-              fontSize: 8,
-              font: locale == AppLocale.ur ? fonts.urdu : fonts.arabic,
-              fontFallback: locale == AppLocale.ur
-                  ? <pw.Font>[fonts.arabic]
-                  : <pw.Font>[fonts.urdu],
-            ),
+            cellStyle: lc.ts(size: 8),
             headerDecoration: const pw.BoxDecoration(color: PdfColors.blue800),
             rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey50),
@@ -1169,7 +1207,18 @@ Future<Uint8List> buildPdfSellerReport({
             headerDirection: dir,
             tableDirection: dir,
             border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
-            cellAlignment: pw.Alignment.center,
+            cellAlignments: {
+              for (var i = 0; i < 4; i++) i: pw.Alignment.center,
+            },
+            cellBuilder: (colIdx, data, rowNum) {
+              final text = data?.toString() ?? '';
+              return pw.Text(
+                text,
+                style: lc.ts(size: 8),
+                textDirection: colIdx >= 1 ? _amountDir : _cellDir(text, dir),
+                textAlign: pw.TextAlign.center,
+              );
+            },
           ),
           pw.SizedBox(height: 8),
 
@@ -1232,6 +1281,7 @@ pw.Widget _stockCard(
         border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
       ),
       child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
           pw.Text(
             value,
@@ -1241,6 +1291,7 @@ pw.Widget _stockCard(
               font: primaryFont,
               fontFallback: ff,
             ),
+            textAlign: pw.TextAlign.center,
           ),
           pw.Text(
             label,
@@ -1250,6 +1301,7 @@ pw.Widget _stockCard(
               font: primaryFont,
               fontFallback: ff,
             ),
+            textAlign: pw.TextAlign.center,
           ),
         ],
       ),
@@ -1288,34 +1340,17 @@ Future<Uint8List> generateInvoicePdf({
   final lblVoid = trRead('void', locale);
   return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
-    final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
-    final primaryFont = locale == AppLocale.ur ? fonts.urdu : fonts.arabic;
-    final ff = locale == AppLocale.ur
-        ? <pw.Font>[fonts.arabic]
-        : <pw.Font>[fonts.urdu];
-
-    final dir = isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr;
-    final align = isRtl
-        ? pw.CrossAxisAlignment.end
-        : pw.CrossAxisAlignment.start;
-
+    final lc = _PdfLocaleConfig(fonts: fonts, locale: locale, currency: '﷼');
+    final dir = lc.dir;
+    final align = lc.align;
+    final primaryFont = lc.primaryFont;
+    final ff = lc.ff;
     pw.TextStyle ts({
       double size = 9,
       pw.FontWeight fw = pw.FontWeight.normal,
       PdfColor color = PdfColors.black,
-    }) => pw.TextStyle(
-      fontSize: size,
-      fontWeight: fw,
-      color: color,
-      font: primaryFont,
-      fontFallback: ff,
-    );
-
-    final currencyLabel = locale == AppLocale.ar
-        ? 'ريال'
-        : locale == AppLocale.ur
-        ? 'ریال'
-        : '﷼';
+    }) => lc.ts(size: size, fw: fw, color: color);
+    final currencyLabel = lc.currencyStr;
 
     final date = invoice.createdAt.toDate();
     final dateStr = _fmtDate(date);
@@ -1444,7 +1479,14 @@ Future<Uint8List> generateInvoicePdf({
                       color: PdfColors.blue800,
                     ),
                     children:
-                        [lblItem, lblSize, lblColor, lblQty, lblUnitPrice, lblTotal]
+                        [
+                              lblItem,
+                              lblSize,
+                              lblColor,
+                              lblQty,
+                              lblUnitPrice,
+                              lblTotal,
+                            ]
                             .map(
                               (h) => pw.Padding(
                                 padding: const pw.EdgeInsets.symmetric(
@@ -1518,8 +1560,16 @@ Future<Uint8List> generateInvoicePdf({
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text(lblSubtotal, style: ts(size: 9)),
-                        pw.Text(_fmtAmt(invoice.subtotal), style: ts(size: 9)),
+                        pw.Text(
+                          lblSubtotal,
+                          style: ts(size: 9),
+                          textDirection: dir,
+                        ),
+                        pw.Text(
+                          _fmtAmt(invoice.subtotal),
+                          style: ts(size: 9),
+                          textDirection: _amountDir,
+                        ),
                       ],
                     ),
                     if (invoice.discount > 0) ...[
@@ -1530,10 +1580,12 @@ Future<Uint8List> generateInvoicePdf({
                           pw.Text(
                             lblDiscount,
                             style: ts(size: 9, color: PdfColors.green700),
+                            textDirection: dir,
                           ),
                           pw.Text(
                             '-${_fmtAmt(invoice.discount)}',
                             style: ts(size: 9, color: PdfColors.green700),
+                            textDirection: _amountDir,
                           ),
                         ],
                       ),
@@ -1545,10 +1597,12 @@ Future<Uint8List> generateInvoicePdf({
                         pw.Text(
                           '$lblTotal $currencyLabel',
                           style: ts(size: 11, fw: pw.FontWeight.bold),
+                          textDirection: dir,
                         ),
                         pw.Text(
                           _fmtAmt(invoice.total),
                           style: ts(size: 11, fw: pw.FontWeight.bold),
+                          textDirection: _amountDir,
                         ),
                       ],
                     ),
@@ -1644,6 +1698,7 @@ pw.Widget _coverCell(
         font: primaryFont,
         fontFallback: ff,
       ),
+      textAlign: pw.TextAlign.center,
       textDirection: dir,
       overflow: pw.TextOverflow.clip,
     ),
@@ -1673,34 +1728,23 @@ Future<Uint8List> buildPdfMultiShopLedger({
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
   return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
-    final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
-    final primaryFont = locale == AppLocale.ur ? fonts.urdu : fonts.arabic;
-    final ff = locale == AppLocale.ur
-        ? <pw.Font>[fonts.arabic]
-        : <pw.Font>[fonts.urdu];
-    final dir = isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr;
-    final align = isRtl
-        ? pw.CrossAxisAlignment.end
-        : pw.CrossAxisAlignment.start;
-    final currencyStr = locale == AppLocale.ar
-        ? 'ريال'
-        : locale == AppLocale.ur
-        ? 'ریال'
-        : currency;
-
+    final lc = _PdfLocaleConfig(
+      fonts: fonts,
+      locale: locale,
+      currency: currency,
+    );
+    final dir = lc.dir;
+    final align = lc.align;
+    final primaryFont = lc.primaryFont;
+    final ff = lc.ff;
+    final currencyStr = lc.currencyStr;
     pw.TextStyle ts({
       double size = 9,
       pw.FontWeight fw = pw.FontWeight.normal,
       PdfColor color = PdfColors.black,
-    }) => pw.TextStyle(
-      fontSize: size,
-      fontWeight: fw,
-      color: color,
-      font: primaryFont,
-      fontFallback: ff,
-    );
+    }) => lc.ts(size: size, fw: fw, color: color);
 
-    final pdf = _buildDocument(primaryFont, ff);
+    final pdf = lc.buildDocument();
     final now = DateTime.now();
 
     // ── Ledger column widths (portrait A4 usable ≈ 539 pt) ──────────────────
@@ -1930,71 +1974,116 @@ Future<Uint8List> buildPdfMultiShopLedger({
                   ],
                 ),
               ),
-              // Cover index table rows
-              ...pageRows.asMap().entries.map((e) {
-                final gi = pageIdxBase + e.key;
-                final sec = e.value;
-                final finalBal = sectionFinals[gi];
-                final tIn = sectionTotalIn[gi];
-                final tOut = sectionTotalOut[gi];
-                final bg = e.key % 2 == 0 ? PdfColors.white : PdfColors.grey50;
-                return pw.Container(
-                  decoration: pw.BoxDecoration(
-                    color: bg,
-                    border: const pw.Border(
-                      bottom: pw.BorderSide(
-                        color: PdfColors.grey200,
-                        width: 0.5,
+              // Cover index table rows — with route separator rows
+              ...() {
+                final widgets = <pw.Widget>[];
+                String? lastCoverRoute;
+                for (var ei = 0; ei < pageRows.length; ei++) {
+                  final gi = pageIdxBase + ei;
+                  final sec = pageRows[ei];
+                  final finalBal = sectionFinals[gi];
+                  final tIn = sectionTotalIn[gi];
+                  final tOut = sectionTotalOut[gi];
+                  final bg = ei % 2 == 0 ? PdfColors.white : PdfColors.grey50;
+                  // Insert route separator when route changes
+                  if (sec.routeLabel.trim().isNotEmpty &&
+                      sec.routeLabel != lastCoverRoute) {
+                    lastCoverRoute = sec.routeLabel;
+                    widgets.add(
+                      pw.Container(
+                        width: double.infinity,
+                        padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: const pw.BoxDecoration(
+                          color: PdfColors.indigo50,
+                          border: pw.Border(
+                            left: pw.BorderSide(
+                              color: PdfColors.indigo800,
+                              width: 3,
+                            ),
+                            bottom: pw.BorderSide(
+                              color: PdfColors.indigo200,
+                              width: 0.5,
+                            ),
+                          ),
+                        ),
+                        child: pw.Text(
+                          _s(sec.routeLabel),
+                          style: pw.TextStyle(
+                            fontSize: 8,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.indigo800,
+                            font: primaryFont,
+                            fontFallback: ff,
+                          ),
+                          textDirection: _cellDir(sec.routeLabel, dir),
+                        ),
+                      ),
+                    );
+                  }
+                  widgets.add(
+                    pw.Container(
+                      decoration: pw.BoxDecoration(
+                        color: bg,
+                        border: const pw.Border(
+                          bottom: pw.BorderSide(
+                            color: PdfColors.grey200,
+                            width: 0.5,
+                          ),
+                        ),
+                      ),
+                      child: pw.Row(
+                        children: [
+                          _coverCell(
+                            _s(sec.shopName),
+                            cnW,
+                            _cellDir(sec.shopName, dir),
+                            primaryFont,
+                            ff,
+                          ),
+                          _coverCell(
+                            _s(sec.routeLabel),
+                            crW,
+                            _cellDir(sec.routeLabel, dir),
+                            primaryFont,
+                            ff,
+                          ),
+                          _coverCell(
+                            _fmtAmtC(tOut, currencyStr),
+                            caW,
+                            _amountDir,
+                            primaryFont,
+                            ff,
+                            color: tOut > 0 ? PdfColors.red800 : null,
+                          ),
+                          _coverCell(
+                            _fmtAmtC(tIn, currencyStr),
+                            caW,
+                            _amountDir,
+                            primaryFont,
+                            ff,
+                            color: tIn > 0 ? PdfColors.green800 : null,
+                          ),
+                          _coverCell(
+                            _fmtAmtC(finalBal, currencyStr),
+                            cbW,
+                            _amountDir,
+                            primaryFont,
+                            ff,
+                            color: finalBal >= 0
+                                ? PdfColors.red800
+                                : PdfColors.green800,
+                            isBold: true,
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  child: pw.Row(
-                    children: [
-                      _coverCell(
-                        _s(sec.shopName),
-                        cnW,
-                        _cellDir(sec.shopName, dir),
-                        primaryFont,
-                        ff,
-                      ),
-                      _coverCell(
-                        _s(sec.routeLabel),
-                        crW,
-                        _cellDir(sec.routeLabel, dir),
-                        primaryFont,
-                        ff,
-                      ),
-                      _coverCell(
-                        _fmtAmtC(tOut, currencyStr),
-                        caW,
-                        _amountDir,
-                        primaryFont,
-                        ff,
-                        color: tOut > 0 ? PdfColors.red800 : null,
-                      ),
-                      _coverCell(
-                        _fmtAmtC(tIn, currencyStr),
-                        caW,
-                        _amountDir,
-                        primaryFont,
-                        ff,
-                        color: tIn > 0 ? PdfColors.green800 : null,
-                      ),
-                      _coverCell(
-                        _fmtAmtC(finalBal, currencyStr),
-                        cbW,
-                        _amountDir,
-                        primaryFont,
-                        ff,
-                        color: finalBal >= 0
-                            ? PdfColors.red800
-                            : PdfColors.green800,
-                        isBold: true,
-                      ),
-                    ],
-                  ),
-                );
-              }),
+                  );
+                }
+                return widgets;
+              }(),
               pw.Spacer(),
               pw.Divider(thickness: 0.5, color: PdfColors.grey400),
               pw.Align(
@@ -2011,10 +2100,8 @@ Future<Uint8List> buildPdfMultiShopLedger({
     }
 
     // ── Per-shop section pages ───────────────────────────────────────────────
-    String? lastRouteLabel;
     for (var si = 0; si < sections.length; si++) {
       final sec = sections[si];
-      final routeChanged = sec.routeLabel != lastRouteLabel;
       final finalBal = sectionFinals[si];
       final tIn = sectionTotalIn[si];
       final tOut = sectionTotalOut[si];
@@ -2093,7 +2180,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
         final isLastPage = page == shopPageCount - 1;
         final rowStart = page * rowsPerPage;
         final pageDataRows = rows.skip(rowStart).take(rowsPerPage).toList();
-        final showRouteBanner = isFirstPage && routeChanged;
+        final showRouteBanner = isFirstPage && sec.routeLabel.trim().isNotEmpty;
         // Capture in local vars for closure safety
         final capturedRoute = sec.routeLabel;
         final capturedShop = sec.shopName;
@@ -2348,8 +2435,6 @@ Future<Uint8List> buildPdfMultiShopLedger({
           ),
         );
       }
-
-      lastRouteLabel = sec.routeLabel;
     }
 
     return pdf.save();

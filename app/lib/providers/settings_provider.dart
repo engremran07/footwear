@@ -7,7 +7,7 @@ import '../core/constants/collections.dart';
 import '../models/settings_model.dart';
 import 'auth_provider.dart';
 
-final settingsProvider = StreamProvider.autoDispose<SettingsModel>((ref) {
+final settingsProvider = StreamProvider<SettingsModel>((ref) {
   return FirebaseFirestore.instance
       .collection(Collections.settings)
       .doc('global')
