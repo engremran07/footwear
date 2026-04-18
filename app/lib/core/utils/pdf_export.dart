@@ -1274,6 +1274,18 @@ Future<Uint8List> generateInvoicePdf({
   final lblSubtotal = trRead('subtotal', locale);
   final lblDiscount = trRead('discount', locale);
   final lblNotes = trRead('notes', locale);
+  final lblInvoiceTitle = trRead('invoice_title', locale);
+  final lblCreditNote = trRead('credit_note', locale);
+  final lblDate = trRead('date', locale);
+  final lblShop = trRead('shop', locale);
+  final lblItem = trRead('item_number', locale);
+  final lblSize = trRead('size', locale);
+  final lblColor = trRead('color', locale);
+  final lblQty = trRead('qty', locale);
+  final lblUnitPrice = trRead('unit_price', locale);
+  final lblTotal = trRead('total', locale);
+  final lblReference = trRead('reference', locale);
+  final lblVoid = trRead('void', locale);
   return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
     final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
@@ -1308,7 +1320,7 @@ Future<Uint8List> generateInvoicePdf({
     final date = invoice.createdAt.toDate();
     final dateStr = _fmtDate(date);
     final isCreditNote = invoice.type != InvoiceModel.typeSale;
-    final docTitle = isCreditNote ? 'CREDIT NOTE' : 'INVOICE';
+    final docTitle = isCreditNote ? lblCreditNote : lblInvoiceTitle;
 
     final pdf = _buildDocument(primaryFont, ff);
 
@@ -1368,13 +1380,13 @@ Future<Uint8List> generateInvoicePdf({
                       textDirection: dir,
                     ),
                     pw.Text(
-                      'Date: $dateStr',
+                      '$lblDate: $dateStr',
                       style: ts(size: 9, color: PdfColors.grey700),
                       textDirection: dir,
                     ),
                     if (invoice.status == 'void')
                       pw.Text(
-                        'VOID',
+                        lblVoid.toUpperCase(),
                         style: ts(
                           size: 14,
                           fw: pw.FontWeight.bold,
@@ -1401,16 +1413,10 @@ Future<Uint8List> generateInvoicePdf({
                 crossAxisAlignment: align,
                 children: [
                   pw.Text(
-                    'Shop: ${_s(invoice.shopName)}',
+                    '$lblShop: ${_s(invoice.shopName)}',
                     style: ts(size: 10, fw: pw.FontWeight.bold),
                     textDirection: _cellDir(invoice.shopName, dir),
                   ),
-                  if (invoice.shopName.isNotEmpty)
-                    pw.Text(
-                      'Shop: ${_s(invoice.shopName)}',
-                      style: ts(size: 9),
-                      textDirection: _cellDir(invoice.shopName, dir),
-                    ),
                 ],
               ),
             ),
@@ -1438,7 +1444,7 @@ Future<Uint8List> generateInvoicePdf({
                       color: PdfColors.blue800,
                     ),
                     children:
-                        ['Item', 'Size', 'Color', 'Qty', 'Unit Price', 'Total']
+                        [lblItem, lblSize, lblColor, lblQty, lblUnitPrice, lblTotal]
                             .map(
                               (h) => pw.Padding(
                                 padding: const pw.EdgeInsets.symmetric(
@@ -1537,7 +1543,7 @@ Future<Uint8List> generateInvoicePdf({
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
                         pw.Text(
-                          'Total $currencyLabel',
+                          '$lblTotal $currencyLabel',
                           style: ts(size: 11, fw: pw.FontWeight.bold),
                         ),
                         pw.Text(
@@ -1561,7 +1567,7 @@ Future<Uint8List> generateInvoicePdf({
             if (invoice.linkedInvoiceId != null &&
                 invoice.linkedInvoiceId!.isNotEmpty) ...[
               pw.Text(
-                'Reference: ${_s(invoice.linkedInvoiceId!)}', // ISSUE-036
+                '$lblReference: ${_s(invoice.linkedInvoiceId!)}', // ISSUE-036
                 style: ts(size: 8, color: PdfColors.grey600),
               ),
             ],

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/share_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/settings_provider.dart';
@@ -86,9 +86,7 @@ class ProductDetailScreen extends ConsumerWidget {
                             '  ${v.variantName}: ${_stockLabel(v.quantityAvailable, ppc)}',
                           );
                         }
-                        SharePlus.instance.share(
-                          ShareParams(text: buf.toString()),
-                        );
+                        shareText(buf.toString());
                         HapticFeedback.lightImpact();
                       },
                     ),

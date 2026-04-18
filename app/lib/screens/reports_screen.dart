@@ -819,6 +819,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
 
       if (!context.mounted) return;
       ExportSheet.show(
+        // ignore: use_build_context_synchronously
         context,
         ref,
         title: '${shop.name} - ${tr('account_statement', ref)}',
@@ -1055,6 +1056,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       final labels = _labels(ref);
       if (!context.mounted) return;
       ExportSheet.show(
+        // ignore: use_build_context_synchronously
         context,
         ref,
         title: '${seller.displayName} - ${tr('seller_report', ref)}',

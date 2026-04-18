@@ -28,6 +28,56 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.7.18',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📄',
+        text: {
+          AppLocale.en:
+              'PDF sharing fixed: multi-shop ledger and invoice PDF exports now use a more reliable sharing method that works on all Android versions.',
+          AppLocale.ar:
+              'إصلاح مشاركة PDF: تصدير كشف حساب المتاجر والفواتير يستخدم الآن طريقة مشاركة أكثر موثوقية تعمل على جميع إصدارات أندرويد.',
+          AppLocale.ur:
+              'PDF شیئرنگ ٹھیک: ملٹی شاپ لیجر اور انوائس PDF ایکسپورٹ اب ایک زیادہ قابل اعتماد شیئرنگ طریقہ استعمال کرتے ہیں جو تمام اینڈرائیڈ ورژنز پر کام کرتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔍',
+        text: {
+          AppLocale.en:
+              'Better error diagnostics: PDF export errors are now logged to Crashlytics for faster troubleshooting.',
+          AppLocale.ar:
+              'تشخيص أفضل للأخطاء: أخطاء تصدير PDF تُسجَّل الآن في Crashlytics لتسريع استكشاف الأخطاء.',
+          AppLocale.ur:
+              'بہتر ایرر تشخیص: PDF ایکسپورٹ ایررز اب Crashlytics میں لاگ ہوتے ہیں تاکہ مسائل تیزی سے حل ہوں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🖨️',
+        text: {
+          AppLocale.en:
+              'Unified export pipeline: invoices and multi-shop ledgers now offer Excel, PDF, PNG, and Print options from a single export sheet.',
+          AppLocale.ar:
+              'خط تصدير موحّد: الفواتير وكشوف حسابات المتاجر تقدم الآن خيارات Excel وPDF وPNG والطباعة من ورقة تصدير واحدة.',
+          AppLocale.ur:
+              'متحد ایکسپورٹ پائپ لائن: انوائسز اور ملٹی شاپ لیجرز اب ایک ایکسپورٹ شیٹ سے Excel، PDF، PNG، اور پرنٹ کے آپشنز پیش کرتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🌍',
+        text: {
+          AppLocale.en:
+              'Invoice PDF fully localized: all labels now display in your chosen language (Arabic, Urdu, or English).',
+          AppLocale.ar:
+              'فاتورة PDF مترجمة بالكامل: جميع التسميات تظهر الآن بلغتك المختارة (العربية، الأردية، أو الإنجليزية).',
+          AppLocale.ur:
+              'انوائس PDF مکمل طور پر مقامی: تمام لیبلز اب آپ کی منتخب زبان (عربی، اردو، یا انگریزی) میں ظاہر ہوتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.7.17',
     date: 'April 2026',
     items: [

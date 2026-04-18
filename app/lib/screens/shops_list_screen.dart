@@ -1,7 +1,7 @@
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:printing/printing.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
@@ -687,31 +687,63 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         'all_routes': tr('all_routes', ref),
       };
 
-      final bytes = await buildPdfMultiShopLedger(
-        title: routeName,
-        subtitle: tr('export_pdf_ledger', ref),
-        companyName: settings.companyName,
-        generatedBy: user?.displayName ?? '',
-        sections: sections,
-        labels: labels,
-        locale: locale,
-        logoBytes: settings.logoBytes,
-        currency: settings.currency,
-        showEntryBy: user?.isAdmin == true,
-        entryByMap: names.map,
-      );
+      // Flatten transactions into rows for Excel export
+      final excelHeaders = [
+        labels['name']!,
+        labels['route']!,
+        labels['date']!,
+        labels['description']!,
+        labels['debit']!,
+        labels['credit']!,
+      ];
+      final excelRows = <List<String>>[];
+      for (final section in sections) {
+        for (final tx in section.transactions) {
+          final isDebit = tx.balanceImpact > 0;
+          excelRows.add([
+            section.shopName,
+            section.routeLabel,
+            AppFormatters.dateOnly(tx.createdAt.toDate()),
+            tx.description ?? '',
+            isDebit ? tx.amount.toStringAsFixed(2) : '',
+            !isDebit ? tx.amount.toStringAsFixed(2) : '',
+          ]);
+        }
+      }
 
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
         progressDismissed = true;
       }
 
-      await Printing.sharePdf(
-        bytes: bytes,
-        filename: '${AppFormatters.exportFileName('ledger', routeName)}.pdf',
+      if (!mounted) return;
+
+      // Show ExportSheet with all export options
+      ExportSheet.show(
+        context,
+        ref,
+        title: routeName,
+        headers: excelHeaders,
+        rows: excelRows,
+        fileName: AppFormatters.exportFileName('ledger', routeName),
+        subtitle: tr('export_pdf_ledger', ref),
+        pdfBytesBuilder: () => buildPdfMultiShopLedger(
+          title: routeName,
+          subtitle: tr('export_pdf_ledger', ref),
+          companyName: settings.companyName,
+          generatedBy: user?.displayName ?? '',
+          sections: sections,
+          labels: labels,
+          locale: locale,
+          logoBytes: settings.logoBytes,
+          currency: settings.currency,
+          showEntryBy: user?.isAdmin == true,
+          entryByMap: names.map,
+        ),
       );
     } catch (e, st) {
       debugPrint('MultiShopPdf export error: $e\n$st');
+      FirebaseCrashlytics.instance.recordError(e, st, reason: 'multi-shop PDF export');
       if (mounted) {
         if (!progressDismissed) {
           Navigator.of(context, rootNavigator: true).pop();

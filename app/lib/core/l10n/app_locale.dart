@@ -951,6 +951,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'route_has_shops':
         'Cannot delete: route has active shops. Move or deactivate shops first.',
     'invoice_ref': 'Invoice',
+    'invoice_title': 'INVOICE',
+    'unit_price': 'Unit Price',
     'warehouse_stock': 'Warehouse Stock',
     'seller_stock': 'Seller Stock',
 
@@ -2100,6 +2102,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'route_has_shops':
         'لا يمكن الحذف: المنطقة تحتوي على محلات نشطة. انقل أو عطّل المحلات أولاً.',
     'invoice_ref': 'فاتورة',
+    'invoice_title': 'فاتورة',
+    'unit_price': 'سعر الوحدة',
     'warehouse_stock': 'مخزون المستودع',
     'seller_stock': 'مخزون البائع',
 
@@ -3258,6 +3262,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'route_has_shops':
         'حذف نہیں ہو سکتا: علاقے پر فعال دکانیں ہیں۔ پہلے دکانیں منتقل یا غیر فعال کریں۔',
     'invoice_ref': 'رسید',
+    'invoice_title': 'رسید',
+    'unit_price': 'فی اکائی قیمت',
     'warehouse_stock': 'گودام کا ذخیرہ',
     'seller_stock': 'بائع کا ذخیرہ',
 

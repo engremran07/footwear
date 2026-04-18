@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:printing/printing.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
@@ -13,6 +12,7 @@ import '../providers/invoice_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/error_state.dart';
+import '../widgets/export_sheet.dart';
 
 class InvoiceDetailScreen extends ConsumerWidget {
   final String invoiceId;
@@ -72,7 +72,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
         data: (inv) {
           if (inv == null) return null;
           return FloatingActionButton(
-            onPressed: () => _exportPdf(context, ref, inv),
+            onPressed: () => _showExportSheet(context, ref, inv),
             tooltip: tr('share_pdf', ref),
             child: const Icon(Icons.picture_as_pdf),
           );
@@ -165,31 +165,52 @@ class InvoiceDetailScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _exportPdf(
+  void _showExportSheet(
     BuildContext context,
     WidgetRef ref,
     InvoiceModel inv,
-  ) async {
-    try {
-      final locale = ref.read(appLocaleProvider);
-      final settings = await ref.read(settingsProvider.future);
-      final bytes = await generateInvoicePdf(
-        invoice: inv,
-        companyName: settings.companyName,
-        currency: settings.currency,
-        locale: locale,
-        logoBytes: settings.logoBytes,
-      );
-      await Printing.sharePdf(
-        bytes: bytes,
-        filename: '${inv.invoiceNumber}.pdf',
-      );
-    } catch (e) {
-      if (context.mounted) {
-        final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
-      }
-    }
+  ) {
+    final locale = ref.read(appLocaleProvider);
+    final headers = [
+      trRead('item_number', locale),
+      trRead('size', locale),
+      trRead('color', locale),
+      trRead('qty', locale),
+      trRead('unit_price', locale),
+      trRead('total', locale),
+    ];
+    final rows = inv.items
+        .map(
+          (it) => [
+            it.productName,
+            it.size,
+            it.color,
+            it.qty.toString(),
+            it.unitPrice.toStringAsFixed(2),
+            it.subtotal.toStringAsFixed(2),
+          ],
+        )
+        .toList();
+
+    ExportSheet.show(
+      context,
+      ref,
+      title: inv.invoiceNumber,
+      headers: headers,
+      rows: rows,
+      fileName: inv.invoiceNumber,
+      subtitle: '${trRead('shop', locale)}: ${inv.shopName}',
+      pdfBytesBuilder: () async {
+        final settings = await ref.read(settingsProvider.future);
+        return generateInvoicePdf(
+          invoice: inv,
+          companyName: settings.companyName,
+          currency: settings.currency,
+          locale: locale,
+          logoBytes: settings.logoBytes,
+        );
+      },
+    );
   }
 }
 

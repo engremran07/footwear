@@ -756,24 +756,22 @@ class _CreateSaleInvoiceScreenState
   }
 
   Future<void> _submit(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
     final user = await ref.read(authUserProvider.future);
     if (!mounted) return;
     if (user == null) return;
     final isOnline = ref.read(isOnlineProvider).value ?? true;
     if (!isOnline) {
       HapticFeedback.vibrate();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(warningSnackBar(tr('warn_offline', ref)));
+      messenger.showSnackBar(warningSnackBar(tr('warn_offline', ref)));
       return;
     }
     final ppc = ref.read(settingsProvider).value?.pairsPerCarton ?? 12;
 
     if (_selectedShop == null) {
       HapticFeedback.vibrate();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(warningSnackBar(tr('select_shop', ref)));
+      messenger.showSnackBar(warningSnackBar(tr('select_shop', ref)));
       return;
     }
 
@@ -791,27 +789,21 @@ class _CreateSaleInvoiceScreenState
     // Invoices are exclusively for stock sales — at least one item is required for all roles
     if (deductions.isEmpty) {
       HapticFeedback.vibrate();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(warningSnackBar(tr('select_at_least_one_item', ref)));
+      messenger.showSnackBar(warningSnackBar(tr('select_at_least_one_item', ref)));
       return;
     }
 
     final saleAmount = _saleAmount;
     if (saleAmount <= 0) {
       HapticFeedback.vibrate();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(warningSnackBar(tr('sale_amount_required', ref)));
+      messenger.showSnackBar(warningSnackBar(tr('sale_amount_required', ref)));
       return;
     }
 
     final discount = _discountAmount;
     if (discount < 0 || discount > saleAmount) {
       HapticFeedback.vibrate();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(warningSnackBar(tr('discount', ref)));
+      messenger.showSnackBar(warningSnackBar(tr('discount', ref)));
       return;
     }
 
@@ -829,8 +821,6 @@ class _CreateSaleInvoiceScreenState
     }
 
     setState(() => _submitting = true);
-    final messenger = ScaffoldMessenger.of(context);
-    final router = GoRouter.of(context);
 
     try {
       final invoiceId = await ref
