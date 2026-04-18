@@ -576,7 +576,9 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     try {
       final locale = ref.read(appLocaleProvider);
       final settings = await ref.read(settingsProvider.future);
-      final user = ref.read(authUserProvider).value;
+      // Use .future to await first auth emission instead of reading a
+      // potentially-null .value while the StreamProvider is still loading.
+      final user = await ref.read(authUserProvider.future);
 
       // Invalidate export providers to ensure fresh data, then read.
       // These are NOT autoDispose — they persist until invalidated.
@@ -708,7 +710,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         bytes: bytes,
         filename: '${AppFormatters.exportFileName('ledger', routeName)}.pdf',
       );
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('MultiShopPdf export error: $e\n$st');
       if (mounted) {
         if (!progressDismissed) {
           Navigator.of(context, rootNavigator: true).pop();

@@ -36,8 +36,9 @@ final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
 final allUsersExportProvider = FutureProvider<List<UserModel>>((
   ref,
 ) async {
-  // ref.read (not watch): one-shot export — must NOT rebuild on token refresh.
-  final user = ref.read(authUserProvider).value;
+  // Use .future to await the first auth emission instead of reading a
+  // potentially-null .value while the StreamProvider is still loading.
+  final user = await ref.read(authUserProvider.future);
   if (user == null || !user.isAdmin) return const <UserModel>[];
   final snap = await FirebaseFirestore.instance
       .collection(Collections.users)

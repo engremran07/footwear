@@ -54,7 +54,7 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
       return;
     }
 
-    final user = ref.read(authUserProvider).value;
+    final user = await ref.read(authUserProvider.future);
     if (user?.isAdmin != true) {
       if (mounted) {
         ScaffoldMessenger.of(

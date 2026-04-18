@@ -7,6 +7,34 @@ Most recent first.
 
 ---
 
+## [3.7.17+65] — 2026-04-17 — Async auth safety sweep + dead code cleanup
+
+### Fixed
+
+- **21 `.value`→`.future` async-safety fixes across 9 screen files** — all `ref.read(authUserProvider).value` calls in async/export contexts replaced with `await ref.read(authUserProvider.future)` to prevent null user during stream warm-up. Screens fixed: reports, shop detail, users list, inventory, create sale invoice, product form, variant form, route form, profile.
+- **3 `.value`→`.future` fixes in 2 provider files** (done in prior sub-session) — `transaction_provider.dart` route/all transaction export providers, `shops_list_screen.dart` multi-shop PDF export.
+
+### Removed
+
+- **Dead code `app_message.dart`** — 0 imports, fully superseded by `snack_helper.dart`.
+
+### Governance
+
+- AGENTS.md Rule 25 (Vibe Debugging Discipline) + Known Failure Signature #4 (export/PDF null user)
+- CLAUDE.md Vibe Debugging Anti-Patterns table + `.value` debt signal
+- New skill: `vibe-debugging-discipline` (SKILL.md + GitHub instruction)
+
+## [3.7.16+64] — 2025-07-15 — PDF text rendering and crash hardening
+
+### Fixed
+
+- **Arabic/Urdu text scattered in PDF and PNG exports** — `pw.TableHelper.fromTextArray` was missing `tableDirection: dir` on both `buildPdfTable` (all generic reports) and `buildPdfSellerReport` (seller report). Without this, data cells defaulted to LTR causing Arabic/Urdu characters to render as isolated (unjoined) glyphs. Both calls now pass `tableDirection: dir`.
+- **PDF crash still occurring despite prior fix** — `pdfBytesBuilder` calls in `ExportSheet._buildPdfBytes()` were not wrapped in try/catch. Any exception from `buildPdfSellerReport` or `buildPdfLedger` propagated raw. Now wrapped with proper catch → rethrown as `'pdf export failed'` so `AppErrorMapper` maps it consistently and the actual error is logged via `debugPrint`.
+- **Auth guard in export providers could return empty on stream cold-start** — All three export providers (`allUsersExportProvider`, `sellerTransactionsExportProvider`, `sellerInventoryExportProvider`) used `ref.read(authUserProvider).value` which is `null` while the autoDispose stream is loading. Changed to `await ref.read(authUserProvider.future)` so the guard waits for the first auth emission before proceeding.
+- **Seller report PDF showing hardcoded company name** — `buildPdfSellerReport` was called without `companyName:` parameter, falling back to the default `'FOOTWEAR'`. Now passes `settings.companyName` so the PDF header reflects the configured company name.
+
+---
+
 ## [3.7.5+53] — 2026-04-15 — Audit backlog implementation sweep
 
 ### Changed

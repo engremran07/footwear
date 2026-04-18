@@ -52,7 +52,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       return;
     }
 
-    final user = ref.read(authUserProvider).value;
+    final user = await ref.read(authUserProvider.future);
     if (user?.isAdmin != true) {
       if (mounted) {
         ScaffoldMessenger.of(

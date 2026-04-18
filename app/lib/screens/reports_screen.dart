@@ -1,4 +1,4 @@
-import 'package:fl_chart/fl_chart.dart';
+﻿import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design/app_animations.dart';
@@ -46,7 +46,7 @@ class ReportsScreen extends ConsumerWidget {
           // Summary card
           stats.when(
             data: (s) {
-              // Outstanding always from live shops stream — never from stats cache
+              // Outstanding always from live shops stream â€” never from stats cache
               final totalOutstanding =
                   shopsAsync.value?.fold<double>(
                     0.0,
@@ -141,8 +141,9 @@ class ReportsScreen extends ConsumerWidget {
     );
   }
 
-  void _exportShops(BuildContext context, WidgetRef ref) {
-    final user = ref.read(authUserProvider).value;
+  Future<void> _exportShops(BuildContext context, WidgetRef ref) async {
+    final user = await ref.read(authUserProvider.future);
+    if (!context.mounted) return;
     if (user == null) {
       _showNoData(context, ref);
       return;
@@ -188,8 +189,9 @@ class ReportsScreen extends ConsumerWidget {
     );
   }
 
-  void _exportInventory(BuildContext context, WidgetRef ref, int ppc) {
-    final user = ref.read(authUserProvider).value;
+  Future<void> _exportInventory(BuildContext context, WidgetRef ref, int ppc) async {
+    final user = await ref.read(authUserProvider.future);
+    if (!context.mounted) return;
     if (user == null) {
       _showNoData(context, ref);
       return;
@@ -227,8 +229,9 @@ class ReportsScreen extends ConsumerWidget {
     );
   }
 
-  void _exportTransactions(BuildContext context, WidgetRef ref) {
-    final user = ref.read(authUserProvider).value;
+  Future<void> _exportTransactions(BuildContext context, WidgetRef ref) async {
+    final user = await ref.read(authUserProvider.future);
+    if (!context.mounted) return;
     if (user == null) {
       _showNoData(context, ref);
       return;
@@ -269,8 +272,9 @@ class ReportsScreen extends ConsumerWidget {
     );
   }
 
-  void _exportOutstanding(BuildContext context, WidgetRef ref) {
-    final user = ref.read(authUserProvider).value;
+  Future<void> _exportOutstanding(BuildContext context, WidgetRef ref) async {
+    final user = await ref.read(authUserProvider.future);
+    if (!context.mounted) return;
     if (user == null) {
       _showNoData(context, ref);
       return;
@@ -313,8 +317,9 @@ class ReportsScreen extends ConsumerWidget {
     );
   }
 
-  void _exportBadDebts(BuildContext context, WidgetRef ref) {
-    final user = ref.read(authUserProvider).value;
+  Future<void> _exportBadDebts(BuildContext context, WidgetRef ref) async {
+    final user = await ref.read(authUserProvider.future);
+    if (!context.mounted) return;
     if (user == null) {
       _showNoData(context, ref);
       return;
@@ -409,7 +414,7 @@ class _ExportCard extends StatelessWidget {
   }
 }
 
-// ─── Monthly Cash Flow Chart ─────────────────────────────────────────────────
+// â”€â”€â”€ Monthly Cash Flow Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _MonthlyCashFlowChart extends ConsumerWidget {
   @override
@@ -590,7 +595,7 @@ class _LegendDot extends StatelessWidget {
   }
 }
 
-// ─── Outstanding Distribution Pie Chart ──────────────────────────────────────
+// â”€â”€â”€ Outstanding Distribution Pie Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _OutstandingPieChart extends ConsumerWidget {
   @override
@@ -702,7 +707,7 @@ class _OutstandingPieChart extends ConsumerWidget {
                             _LegendDot(
                               color: colors[i % colors.length],
                               label: top[i].name.length > 12
-                                  ? '${top[i].name.substring(0, 12)}…'
+                                  ? '${top[i].name.substring(0, 12)}â€¦'
                                   : top[i].name,
                             ),
                           if (othersTotal > 0)
@@ -724,7 +729,7 @@ class _OutstandingPieChart extends ConsumerWidget {
   }
 }
 
-// ─── Account Statement Card ────────────────────────────────────────────────
+// â”€â”€â”€ Account Statement Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _AccountStatementCard extends ConsumerStatefulWidget {
   const _AccountStatementCard();
   @override
@@ -778,7 +783,8 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
     setState(() => _generating = true);
     try {
       final locale = ref.read(appLocaleProvider);
-      final user = ref.read(authUserProvider).value;
+      final user = await ref.read(authUserProvider.future);
+      if (!context.mounted) return;
       final routeId = user?.assignedRouteId ?? '';
       final shops = user?.isAdmin == true
           ? ref.read(shopsProvider).value ?? <ShopModel>[]
@@ -793,7 +799,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       );
 
       final settings = await ref.read(settingsProvider.future);
-      // allUsersExportProvider: no active filter, one-shot .get() —
+      // allUsersExportProvider: no active filter, one-shot .get() â€”
       // covers deactivated sellers; avoids autoDispose cached-value race.
       ref.invalidate(allUsersExportProvider);
       final allUsers = user?.isAdmin == true
@@ -811,7 +817,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       final labels = _labels(ref);
       final openingBalance = shop.balance - netTx;
 
-      if (!mounted) return;
+      if (!context.mounted) return;
       ExportSheet.show(
         context,
         ref,
@@ -944,7 +950,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
   }
 }
 
-// ─── Seller Report Card (admin only) ─────────────────────────────────────────
+// â”€â”€â”€ Seller Report Card (admin only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _SellerReportCard extends ConsumerStatefulWidget {
   const _SellerReportCard();
   @override
@@ -1001,7 +1007,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
         sellerInventoryExportProvider(_selectedSellerId!).future,
       );
 
-      // Shops are already loaded for the admin UI — safe to read from cache.
+      // Shops are already loaded for the admin UI â€” safe to read from cache.
       final allShops = ref.read(shopsProvider).value ?? <ShopModel>[];
 
       // Build per-customer summary.
@@ -1047,7 +1053,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
 
       final settings = await ref.read(settingsProvider.future);
       final labels = _labels(ref);
-      if (!mounted) return;
+      if (!context.mounted) return;
       ExportSheet.show(
         context,
         ref,
@@ -1073,13 +1079,13 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
           seller.displayName,
         ),
         pdfBytesBuilder: () {
-          // Resolve route UID → display name so PDF never shows raw IDs
+          // Resolve route UID â†’ display name so PDF never shows raw IDs
           final routes = ref.read(routesProvider).value ?? [];
           final routeMatch = routes.where(
             (r) => r.id == seller.assignedRouteId,
           );
           final routeDisplayName = routeMatch.isNotEmpty
-              ? '${routeMatch.first.routeNumber} · ${routeMatch.first.name}'
+              ? '${routeMatch.first.routeNumber} Â· ${routeMatch.first.name}'
               : '';
           return buildPdfSellerReport(
             sellerName: seller.displayName,
@@ -1092,6 +1098,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
             labels: labels,
             locale: locale,
             logoBytes: settings.logoBytes,
+            companyName: settings.companyName,
           );
         },
       );

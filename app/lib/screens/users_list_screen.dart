@@ -576,7 +576,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
               ),
               ElevatedButton(
                 onPressed: () async {
-                  final me = ref.read(authUserProvider).value;
+                  final me = await ref.read(authUserProvider.future);
                   if (me?.isAdmin != true) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
@@ -750,7 +750,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   // ── Hard-delete user confirmation ─────────────────────────────────────────
 
   Future<void> _confirmHardDeleteUser(UserModel user) async {
-    final me = ref.read(authUserProvider).value;
+    final me = await ref.read(authUserProvider.future);
+    if (!mounted) return;
     if (me?.isAdmin != true) return;
 
     final confirmed = await ConfirmDialog.show(
@@ -786,7 +787,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   // ── Delete user confirmation ──────────────────────────────────────────────
 
   Future<void> _confirmDeleteUser(UserModel user) async {
-    final me = ref.read(authUserProvider).value;
+    final me = await ref.read(authUserProvider.future);
+    if (!mounted) return;
     if (me?.isAdmin != true) return;
     // Cannot delete self or other admins
     if (user.id == me?.id || user.isAdmin) return;

@@ -229,6 +229,7 @@ Future<Uint8List> buildPdfTable({
                 ),
                 cellHeight: 22,
                 headerDirection: dir,
+                tableDirection: dir,
                 border: pw.TableBorder.all(
                   color: PdfColors.grey400,
                   width: 0.5,
@@ -1166,6 +1167,7 @@ Future<Uint8List> buildPdfSellerReport({
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey50),
             cellHeight: 22,
             headerDirection: dir,
+            tableDirection: dir,
             border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
             cellAlignment: pw.Alignment.center,
           ),

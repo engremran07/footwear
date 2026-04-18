@@ -154,8 +154,8 @@ final sellerTransactionsProvider = StreamProvider.autoDispose
 /// callers use ref.read(provider.future) which doesn't subscribe, so
 /// autoDispose would destroy the provider mid-Firestore-query → StateError.
 /// Callers must ref.invalidate() before reading for fresh data.
-final shopTransactionsExportProvider = FutureProvider
-    .family<List<TransactionModel>, String>((ref, shopId) async {
+final shopTransactionsExportProvider =
+    FutureProvider.family<List<TransactionModel>, String>((ref, shopId) async {
       final normalizedShopId = shopId.trim();
       if (normalizedShopId.isEmpty) return const <TransactionModel>[];
       // shop_id is sole source of truth; no dual query needed.
@@ -177,13 +177,13 @@ final shopTransactionsExportProvider = FutureProvider
 /// NOT autoDispose: callers use ref.read(provider.future) which doesn't
 /// subscribe — autoDispose would destroy the provider mid-query → StateError.
 /// Callers must ref.invalidate() before reading for fresh data.
-final routeTransactionsExportProvider = FutureProvider
-    .family<List<TransactionModel>, String>((ref, routeId) async {
+final routeTransactionsExportProvider =
+    FutureProvider.family<List<TransactionModel>, String>((ref, routeId) async {
       final normalizedId = routeId.trim();
       if (normalizedId.isEmpty) return const <TransactionModel>[];
-      // ref.read (not watch): one-shot export — must NOT rebuild on token
-      // refresh, which would cancel the in-flight Firestore query.
-      final user = ref.read(authUserProvider).value;
+      // Use .future to await first auth emission instead of reading a
+      // potentially-null .value while the StreamProvider is still loading.
+      final user = await ref.read(authUserProvider.future);
       if (user == null) return const <TransactionModel>[];
       if (!user.isAdmin) {
         final assignedRouteId = (user.assignedRouteId ?? '').trim();
@@ -204,29 +204,35 @@ final routeTransactionsExportProvider = FutureProvider
 
 /// All transactions across all routes — admin-only bulk export.
 /// NOT autoDispose: see routeTransactionsExportProvider comment.
-final allTransactionsExportProvider =
-    FutureProvider<List<TransactionModel>>((ref) async {
-      final user = ref.read(authUserProvider).value;
-      if (user == null || !user.isAdmin) return const <TransactionModel>[];
-      final snap = await FirebaseFirestore.instance
-          .collection(Collections.transactions)
-          .limit(2000)
-          .get();
-      return snap.docs
-          .where((d) => d.data()['deleted'] != true)
-          .map((d) => TransactionModel.fromJson(d.data(), d.id))
-          .toList();
-    });
+final allTransactionsExportProvider = FutureProvider<List<TransactionModel>>((
+  ref,
+) async {
+  // Use .future to await first auth emission instead of reading a
+  // potentially-null .value while the StreamProvider is still loading.
+  final user = await ref.read(authUserProvider.future);
+  if (user == null || !user.isAdmin) return const <TransactionModel>[];
+  final snap = await FirebaseFirestore.instance
+      .collection(Collections.transactions)
+      .limit(2000)
+      .get();
+  return snap.docs
+      .where((d) => d.data()['deleted'] != true)
+      .map((d) => TransactionModel.fromJson(d.data(), d.id))
+      .toList();
+});
 
 /// One-shot transactions for a specific seller — used by seller report PDF.
 /// NOT autoDispose: callers use ref.read(provider.future) which doesn't
 /// subscribe — autoDispose would destroy the provider mid-query → StateError.
 /// Callers must ref.invalidate() before reading to ensure fresh data.
-final sellerTransactionsExportProvider = FutureProvider
-    .family<List<TransactionModel>, String>((ref, sellerId) async {
+final sellerTransactionsExportProvider =
+    FutureProvider.family<List<TransactionModel>, String>((
+      ref,
+      sellerId,
+    ) async {
       final normalizedId = sellerId.trim();
       if (normalizedId.isEmpty) return const <TransactionModel>[];
-      final user = ref.read(authUserProvider).value;
+      final user = await ref.read(authUserProvider.future);
       if (user == null || !user.isAdmin) return const <TransactionModel>[];
       final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)

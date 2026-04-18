@@ -756,7 +756,8 @@ class _CreateSaleInvoiceScreenState
   }
 
   Future<void> _submit(BuildContext context) async {
-    final user = ref.read(authUserProvider).value;
+    final user = await ref.read(authUserProvider.future);
+    if (!mounted) return;
     if (user == null) return;
     final isOnline = ref.read(isOnlineProvider).value ?? true;
     if (!isOnline) {

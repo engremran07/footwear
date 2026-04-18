@@ -31,7 +31,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _saveName() async {
-    final me = ref.read(authUserProvider).value;
+    final me = await ref.read(authUserProvider.future);
     if (me == null) return;
     final name = AppSanitizer.name(_nameC.text);
     if (name.isEmpty || name == me.displayName) return;

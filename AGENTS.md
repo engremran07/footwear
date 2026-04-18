@@ -190,6 +190,15 @@ Seller:
   carry forward automatically. If a prior task is no longer relevant, mark it
   explicitly as "dropped — reason: ..." rather than silently removing it.
 
+1. **Vibe Debugging Discipline is mandatory for all bug fixes.** Before
+  writing any fix code, the agent MUST: (a) read the FULL execution path
+  from screen → provider → Firestore/builder, (b) grep ALL instances of the
+  bug pattern before fixing any single one, (c) trace the exact call stack
+  to the root cause — not the error message. The 5 banned anti-patterns are:
+  Whack-a-Mole Debugging, Symptom Chasing, Regression Spiral, Vibe Debt,
+  Confidence Theater. Load `.claude/skills/vibe-debugging-discipline/SKILL.md`
+  before any bug fix session.
+
 ## 5) Known Failure Signatures
 
 1. permission-denied on route create/inventory add
@@ -209,6 +218,13 @@ Seller:
 
 - Common cause:
   - missing composite index
+
+1. export/PDF generates empty data or crashes
+
+- Common causes:
+  - `ref.read(authUserProvider).value` in async/provider context → null during loading
+  - Fix: use `await ref.read(authUserProvider.future)` in ALL export providers and screen export methods
+  - Grep gate: `grep -rn "ref\.read(authUserProvider)\.value" app/lib/providers/` must return zero in export contexts
 
 ## 6) Mandatory Triage Order
 

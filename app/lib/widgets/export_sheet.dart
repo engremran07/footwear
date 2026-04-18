@@ -124,8 +124,17 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
 
   // ── PDF bytes (lazy build) ────────────────────────────────────────────
   Future<Uint8List> _buildPdfBytes() async {
-    if (widget.rows.isEmpty) throw Exception('no data to export');
-    if (widget.pdfBytesBuilder != null) return widget.pdfBytesBuilder!();
+    if (widget.rows.isEmpty && widget.pdfBytesBuilder == null) {
+      throw Exception('no data to export');
+    }
+    if (widget.pdfBytesBuilder != null) {
+      try {
+        return await widget.pdfBytesBuilder!();
+      } catch (e, stack) {
+        debugPrint('[ExportSheet] custom PDF build failed: $e\n$stack');
+        throw Exception('pdf export failed');
+      }
+    }
     final logoBytes = ref.read(settingsProvider).value?.logoBytes;
     try {
       return await buildPdfTable(

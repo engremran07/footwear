@@ -357,7 +357,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     final newAmount = double.tryParse(amountC.text.trim());
                     if (newAmount == null || newAmount <= 0) return;
                     try {
-                      final user = ref.read(authUserProvider).value;
+                      final user = await ref.read(authUserProvider.future);
                       final appliedImmediately = await ref
                           .read(transactionNotifierProvider.notifier)
                           .sellerEditTransaction(
@@ -404,7 +404,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
 
   Future<void> _reviewEditRequest(TransactionModel tx, bool approved) async {
     try {
-      final user = ref.read(authUserProvider).value;
+      final user = await ref.read(authUserProvider.future);
       await ref
           .read(transactionNotifierProvider.notifier)
           .reviewSellerEditRequest(
@@ -435,7 +435,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     );
     if (confirmed != true) return;
     try {
-      final authUser = ref.read(authUserProvider).value;
+      final authUser = await ref.read(authUserProvider.future);
       await ref
           .read(transactionNotifierProvider.notifier)
           .deleteTransaction(
@@ -584,7 +584,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         .read(shopDetailProvider(widget.shopId))
                         .value;
                     if (shop == null) return;
-                    final user = ref.read(authUserProvider).value;
+                    final user = await ref.read(authUserProvider.future);
                     try {
                       await ref
                           .read(transactionNotifierProvider.notifier)
@@ -723,7 +723,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               final sorted = await _loadFullTransactions();
                               if (!context.mounted) return;
                               final locale = ref.read(appLocaleProvider);
-                              final authUser = ref.read(authUserProvider).value;
+                              final authUser = await ref.read(authUserProvider.future);
                               final isAdmin = authUser?.isAdmin == true;
                               final settings = await ref.read(
                                 settingsProvider.future,
@@ -794,8 +794,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                       ],
                                     )
                                     .toList(),
-                                fileName:
-                                    AppFormatters.exportFileName('ledger', shop.name),
+                                fileName: AppFormatters.exportFileName(
+                                  'ledger',
+                                  shop.name,
+                                ),
                                 pdfBytesBuilder: () => buildPdfLedger(
                                   shopName: shop.name,
                                   companyName: settings.companyName,

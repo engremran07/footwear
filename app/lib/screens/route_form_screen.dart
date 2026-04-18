@@ -59,7 +59,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
     setState(() => _saving = true);
     bool saved = false;
     try {
-      final user = ref.read(authUserProvider).value;
+      final user = await ref.read(authUserProvider.future);
       final createdBy = user?.id.trim() ?? '';
       final Map<String, dynamic> data = {
         'name': AppSanitizer.name(_nameC.text),

@@ -28,23 +28,57 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.7.17',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🛡️',
+        text: {
+          AppLocale.en:
+              'Export & save reliability: all screens now wait for your user data to fully load before exporting or saving — no more blank reports or silent failures.',
+          AppLocale.ar:
+              'موثوقية التصدير والحفظ: جميع الشاشات تنتظر الآن تحميل بيانات المستخدم بالكامل قبل التصدير أو الحفظ — لا مزيد من التقارير الفارغة أو الأخطاء الصامتة.',
+          AppLocale.ur:
+              'ایکسپورٹ اور محفوظ کرنے کی قابل اعتمادی: تمام اسکرینز اب ایکسپورٹ یا محفوظ کرنے سے پہلے آپ کے صارف ڈیٹا کے مکمل لوڈ ہونے کا انتظار کرتی ہیں — مزید خالی رپورٹس یا خاموش ناکامیاں نہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧹',
+        text: {
+          AppLocale.en:
+              'Removed unused code for a leaner, faster app.',
+          AppLocale.ar:
+              'إزالة الأكواد غير المستخدمة لتطبيق أسرع وأخف.',
+          AppLocale.ur:
+              'غیر استعمال شدہ کوڈ ہٹایا گیا تاکہ ایپ ہلکی اور تیز ہو۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.7.15',
     date: 'April 2026',
     items: [
       ChangelogItem(
         emoji: '📊',
         text: {
-          AppLocale.en: 'Seller report PDF now loads fresh data reliably — no more "PDF generation failed" on first tap.',
-          AppLocale.ar: 'تقرير البائع PDF يحمّل البيانات الحديثة بموثوقية — لا مزيد من رسالة "فشل إنشاء PDF" عند أول ضغطة.',
-          AppLocale.ur: 'سیلر رپورٹ PDF اب قابل اعتماد طریقے سے تازہ ڈیٹا لوڈ کرتی ہے — پہلی ٹیپ پر "PDF ناکام" کی خطا نہیں آئے گی۔',
+          AppLocale.en:
+              'Seller report PDF now loads fresh data reliably — no more "PDF generation failed" on first tap.',
+          AppLocale.ar:
+              'تقرير البائع PDF يحمّل البيانات الحديثة بموثوقية — لا مزيد من رسالة "فشل إنشاء PDF" عند أول ضغطة.',
+          AppLocale.ur:
+              'سیلر رپورٹ PDF اب قابل اعتماد طریقے سے تازہ ڈیٹا لوڈ کرتی ہے — پہلی ٹیپ پر "PDF ناکام" کی خطا نہیں آئے گی۔',
         },
       ),
       ChangelogItem(
         emoji: '📄',
         text: {
-          AppLocale.en: 'Shop account-statement PDF now always reads latest company settings before generating.',
-          AppLocale.ar: 'تقرير حساب المتجر يقرأ الآن أحدث إعدادات الشركة قبل الإنشاء.',
-          AppLocale.ur: 'دکان اکاؤنٹ سٹیٹمنٹ PDF بنانے سے پہلے کمپنی کی تازہ ترین ترتیبات پڑھتا ہے۔',
+          AppLocale.en:
+              'Shop account-statement PDF now always reads latest company settings before generating.',
+          AppLocale.ar:
+              'تقرير حساب المتجر يقرأ الآن أحدث إعدادات الشركة قبل الإنشاء.',
+          AppLocale.ur:
+              'دکان اکاؤنٹ سٹیٹمنٹ PDF بنانے سے پہلے کمپنی کی تازہ ترین ترتیبات پڑھتا ہے۔',
         },
       ),
     ],
@@ -56,9 +90,12 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📄',
         text: {
-          AppLocale.en: 'Fixed PDF export crash — export providers no longer self-destruct during Firestore queries.',
-          AppLocale.ar: 'تم إصلاح تعطل تصدير PDF — مزودات التصدير لم تعد تتلف أثناء استعلامات Firestore.',
-          AppLocale.ur: 'PDF ایکسپورٹ کریش درست کی گئی — ایکسپورٹ پرووائیڈرز Firestore کوئریز کے دوران ختم نہیں ہوتے۔',
+          AppLocale.en:
+              'Fixed PDF export crash — export providers no longer self-destruct during Firestore queries.',
+          AppLocale.ar:
+              'تم إصلاح تعطل تصدير PDF — مزودات التصدير لم تعد تتلف أثناء استعلامات Firestore.',
+          AppLocale.ur:
+              'PDF ایکسپورٹ کریش درست کی گئی — ایکسپورٹ پرووائیڈرز Firestore کوئریز کے دوران ختم نہیں ہوتے۔',
         },
       ),
     ],
@@ -70,9 +107,12 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📄',
         text: {
-          AppLocale.en: 'Fixed PDF ledger export (all-shops / per-route) — was crashing during Firebase token refresh mid-export.',
-          AppLocale.ar: 'تم إصلاح تصدير PDF للدفتر (جميع المتاجر / لكل خط) — كان يتعطل أثناء تجديد دخول Firebase.',
-          AppLocale.ur: 'PDF لیجر ایکسپورٹ درست کی گئی — Firebase ٹوکن ریفریش کے دوران کریش ہوتا تھا۔',
+          AppLocale.en:
+              'Fixed PDF ledger export (all-shops / per-route) — was crashing during Firebase token refresh mid-export.',
+          AppLocale.ar:
+              'تم إصلاح تصدير PDF للدفتر (جميع المتاجر / لكل خط) — كان يتعطل أثناء تجديد دخول Firebase.',
+          AppLocale.ur:
+              'PDF لیجر ایکسپورٹ درست کی گئی — Firebase ٹوکن ریفریش کے دوران کریش ہوتا تھا۔',
         },
       ),
     ],

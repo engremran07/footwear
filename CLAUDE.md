@@ -232,6 +232,17 @@ Never keep ambiguity-driven workaround code without explicit justification.
 | `ExportSheet.show(` without `pdfBytesBuilder` on ledger data | PDF export fails or produces flat table instead of ledger | Always pass `pdfBytesBuilder: () => buildPdfLedger(...)` for ledger exports |
 | `labels['key'] ?? 'English Fallback'` in PDF builders | Hardcoded English bypasses i18n | Use `trRead()` with locale; `??` fallback must be `'—'` or localized key |
 | Missing `ChangelogVersion` entry after version bump | Users see stale "What's New" content | Add trilingual entry to `changelog_data.dart` on every version bump |
+| `ref.read(authUserProvider).value` in async/export context | Null during stream loading → empty data or crash | `await ref.read(authUserProvider.future)` in all async/provider contexts |
+
+## Vibe Debugging Anti-Patterns (Mandatory Awareness)
+
+| Anti-Pattern | Definition | Prevention |
+| --- | --- | --- |
+| Whack-a-Mole Debugging | Each "fix" makes a new problem pop up elsewhere | Grep ALL instances of a bug pattern before fixing any single one |
+| Symptom Chasing | AI fixes the error message, not the root cause | Trace full call stack before writing any fix code |
+| Regression Spiral | 20 commits of increasing complexity for a 5-line fix | If diff > 50 lines for one bug, stop and re-evaluate |
+| Vibe Debt | Accumulated complexity from AI-generated code nobody understands | Understand every line you write; never copy-paste without tracing |
+| Confidence Theater | "Fixed!" with evidence (tests pass) but bug untouched | Claim requires exact code-path trace, not just "tests pass" |
 
 ## Fifteen Non-Negotiable Pre-Signoff Steps
 

@@ -553,7 +553,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   );
                   return;
                 }
-                final user = ref.read(authUserProvider).value;
+                final user = await ref.read(authUserProvider.future);
                 try {
                   await ref
                       .read(sellerInventoryNotifierProvider.notifier)
