@@ -1,6 +1,6 @@
 ﻿# ShoesERP AGENTS Runtime Contract
 
-Last updated: 2026-04-16
+Last updated: 2026-04-18
 
 ## 1) Runtime Truth (Authoritative)
 
@@ -441,6 +441,16 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-04-18 audit v19 — v3.8.5+74:
+
+- **L10n hardcoded string sweep:** Added 4 missing L10n keys (`lbl_out`, `no_data_available`, `share_product`, `open_source_sub`) to all 3 locale maps (EN/AR/UR); fixed 4 hardcoded strings in `product_detail_screen.dart` (share tooltip, In Stock label, Out label, quantity subtitle) and 1 in `about_screen.dart` (open source subtitle); `app_chart_card.dart` already referenced `no_data_available` key which was missing — now resolved
+- **Firestore security hardening:** Products create/update rule now validates `image_url` must start with `https://` when set and is a non-empty string (null/absent/empty allowed); transaction seller-update rules now validate `edit_request_new_amount > 0` in both approval-required and direct-edit blocks — prevents sellers submitting zero or negative edit amounts
+- **PNG codec safety:** `_withWhiteBackground()` in `export_sheet.dart` now wrapped in try-catch with `debugPrint` and rethrows `Exception('pdf_export_failed')` — prevents raw codec crashes surfacing as unhandled exceptions
+- **Phase 2 provider safety:** Confirmed `alertCountsProvider` already invalidated in `_invalidateRoleScopedProviders()`; `productsProvider` is `autoDispose` (self-cancels); auth bootstrap direct write to `settings/global` documented as acceptable exception (bootstrap path, not screen/widget)
+- **Changelog v3.8.5 entry added:** Trilingual EN/AR/UR, 2 bullet points (L10n + security)
+- **All 398 tests passing**, `No issues found!` (flutter + dart analyze), web EXIT: 0, APK 75.1MB, hosting + Firestore deployed, commit `180858b` pushed to main
+- **Audit score: 93/100 → 94/100**
 
 2026-04-17 audit v18 — v3.7.9+57:
 
