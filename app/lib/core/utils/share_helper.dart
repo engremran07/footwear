@@ -3,8 +3,32 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'file_saver.dart';
 
-String normalizeWhatsAppPhone(String phone) =>
-    phone.replaceAll(RegExp(r'[^0-9]'), '');
+/// Normalizes a raw phone string to an international WhatsApp number
+/// (digits only, no leading +).
+///
+/// Rules applied in order:
+///  1. Strip all non-digit characters.
+///  2. Strip a leading `00` (international dialling prefix).
+///  3. Pakistan local: `03xxxxxxxx` → `923xxxxxxxx`
+///  4. Saudi local:   `05xxxxxxxx` → `9665xxxxxxxx`
+///  5. Everything else is left as-is (assumed already international).
+String normalizeWhatsAppPhone(String phone) {
+  // Step 1 — digits only
+  var digits = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+  // Remove leading '+' if present — we work in pure digits after this
+  if (digits.startsWith('+')) digits = digits.substring(1);
+  // Step 2 — strip leading international prefix 00
+  if (digits.startsWith('00')) digits = digits.substring(2);
+  // Step 3 — Pakistan local (03xx...)
+  if (RegExp(r'^03\d{9}$').hasMatch(digits)) {
+    return '92${digits.substring(1)}'; // 03x → 923x
+  }
+  // Step 4 — Saudi local (05xx...)
+  if (RegExp(r'^05\d{8}$').hasMatch(digits)) {
+    return '966${digits.substring(1)}'; // 05x → 9665x
+  }
+  return digits;
+}
 
 bool isValidWhatsAppPhone(String phone) {
   final normalizedPhone = normalizeWhatsAppPhone(phone);

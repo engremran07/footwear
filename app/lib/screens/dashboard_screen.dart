@@ -1,4 +1,3 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,7 +19,6 @@ import '../models/route_model.dart';
 import '../models/shop_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
-import '../widgets/app_chart_card.dart';
 import '../widgets/app_section_header.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/stat_card.dart';
@@ -91,7 +89,7 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                       subtitle: Text(
                         '${AppFormatters.dateTime(tx.createdAt)} • '
-                        '${AppFormatters.sar(tx.amount)}',
+                        '${AppFormatters.currency(tx.amount)}',
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: tx.shopId.isEmpty
@@ -125,7 +123,6 @@ class DashboardScreen extends ConsumerWidget {
     final ppc = ref.watch(settingsProvider).value?.pairsPerCarton ?? 12;
     final routesAsync = ref.watch(routesProvider);
     final shopsAsync = ref.watch(shopsProvider);
-    final transactionsAsync = ref.watch(allTransactionsProvider);
     final pendingEditsAsync = ref.watch(pendingEditRequestsProvider);
 
     return Scaffold(
@@ -185,10 +182,10 @@ class DashboardScreen extends ConsumerWidget {
                             color: AppBrand.warningColor,
                           ),
                           title: Text(
-                            tr('dashboard_outstanding_alert', ref).replaceAll(
-                              '%s',
-                              AppFormatters.sar(totalOutstanding),
-                            ),
+                            tr(
+                              'dashboard_outstanding_alert',
+                              ref,
+                            ).replaceAll('%s', _formatOutstandingByCurrency(s)),
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           subtitle: Text(tr('dashboard_pending_dues', ref)),
@@ -276,7 +273,7 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     StatCard(
                       title: tr('outstanding_balance', ref),
-                      value: AppFormatters.sar(totalOutstanding),
+                      value: _formatOutstandingByCurrency(s),
                       icon: Icons.account_balance_wallet,
                       color: totalOutstanding > 0
                           ? AppBrand.errorColor
@@ -322,11 +319,6 @@ class DashboardScreen extends ConsumerWidget {
                   routesAsync: routesAsync,
                   shopsAsync: shopsAsync,
                 ),
-
-                const SizedBox(height: AppTokens.s16),
-
-                // Cash flow chart
-                _CashFlowChart(transactionsAsync: transactionsAsync),
               ],
             ).screenEntry();
           },
@@ -428,7 +420,12 @@ class _SellerDashboard extends ConsumerWidget {
                       ),
                       StatCard(
                         title: tr('dashboard_outstanding', ref),
-                        value: AppFormatters.sar(outstanding),
+                        value: AppFormatters.currency(
+                          outstanding,
+                          ref.watch(
+                            routeCurrencyProvider(routeIds.firstOrNull ?? ''),
+                          ),
+                        ),
                         icon: Icons.account_balance_wallet,
                         color: outstanding > 0
                             ? AppBrand.errorColor
@@ -541,7 +538,7 @@ class _RouteAnalyticsSection extends ConsumerWidget {
                 title: Text(row.route.name),
                 subtitle: Text('${row.totalShops} ${tr('shops', ref)}'),
                 trailing: Text(
-                  AppFormatters.sar(row.outstanding),
+                  AppFormatters.currency(row.outstanding, row.route.currency),
                   style: TextStyle(
                     color: row.outstanding > 0
                         ? AppBrand.errorColor
@@ -560,122 +557,15 @@ class _RouteAnalyticsSection extends ConsumerWidget {
   }
 }
 
-// ─── Cash Flow Chart ─────────────────────────────────────────────────────────
-
-class _CashFlowChart extends ConsumerWidget {
-  final AsyncValue<List<TransactionModel>> transactionsAsync;
-  const _CashFlowChart({required this.transactionsAsync});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final txs = transactionsAsync.value;
-    if (txs == null || txs.isEmpty) return const SizedBox.shrink();
-
-    // Group transactions by month for last 6 months
-    final now = DateTime.now();
-    final months = <String>[];
-    final cashInByMonth = <String, double>{};
-    final cashOutByMonth = <String, double>{};
-
-    for (int i = 5; i >= 0; i--) {
-      final d = DateTime(now.year, now.month - i, 1);
-      final key = '${d.year}-${d.month.toString().padLeft(2, '0')}';
-      months.add(key);
-      cashInByMonth[key] = 0;
-      cashOutByMonth[key] = 0;
-    }
-
-    for (final tx in txs) {
-      final ts = tx.createdAt.toDate();
-      final key = '${ts.year}-${ts.month.toString().padLeft(2, '0')}';
-      if (tx.type == 'cash_in') {
-        cashInByMonth[key] = (cashInByMonth[key] ?? 0) + tx.amount;
-      } else if (tx.type == 'cash_out') {
-        cashOutByMonth[key] = (cashOutByMonth[key] ?? 0) + tx.amount;
-      }
-    }
-
-    final spots1 = <FlSpot>[];
-    final spots2 = <FlSpot>[];
-    for (int i = 0; i < months.length; i++) {
-      spots1.add(FlSpot(i.toDouble(), cashInByMonth[months[i]]!));
-      spots2.add(FlSpot(i.toDouble(), cashOutByMonth[months[i]]!));
-    }
-
-    final monthLabels = months.map((m) => m.substring(5)).toList(); // MM only
-
-    return AppChartCard(
-      title: tr('dashboard_cash_flow', ref),
-      subtitle: tr('dashboard_last_6_months', ref),
-      isEmpty: spots1.every((s) => s.y == 0) && spots2.every((s) => s.y == 0),
-      legend: [
-        ChartLegendItem(
-          color: AppBrand.successColor,
-          label: tr('dashboard_cash_in_legend', ref),
-        ),
-        ChartLegendItem(
-          color: AppBrand.errorColor,
-          label: tr('dashboard_cash_out_legend', ref),
-        ),
-      ],
-      chart: LineChart(
-        LineChartData(
-          gridData: const FlGridData(show: false),
-          titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, _) {
-                  final idx = value.toInt();
-                  if (idx < 0 || idx >= monthLabels.length) {
-                    return const SizedBox.shrink();
-                  }
-                  return Text(
-                    monthLabels[idx],
-                    style: const TextStyle(fontSize: 10),
-                  );
-                },
-              ),
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          lineBarsData: [
-            LineChartBarData(
-              spots: spots1,
-              isCurved: true,
-              color: AppBrand.successColor,
-              barWidth: 2.5,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                color: AppBrand.successColor.withAlpha(25),
-              ),
-            ),
-            LineChartBarData(
-              spots: spots2,
-              isCurved: true,
-              color: AppBrand.errorColor,
-              barWidth: 2.5,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                color: AppBrand.errorColor.withAlpha(25),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+/// Formats the per-currency outstanding totals into a compact string,
+/// e.g. "﷼ 3,000 / Rs 15,000". Falls back to "﷼ 0" if no entries.
+String _formatOutstandingByCurrency(DashboardStats s) {
+  final parts = s.currencyStats.entries
+      .where((e) => e.value.outstanding != 0)
+      .map((e) => AppFormatters.currency(e.value.outstanding, e.key))
+      .toList();
+  if (parts.isEmpty) return AppFormatters.currency(0);
+  return parts.join(' / ');
 }
 
 // ─── Admin Speed Dial FAB ────────────────────────────────────────────────────

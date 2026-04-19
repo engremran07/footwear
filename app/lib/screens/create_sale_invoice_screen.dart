@@ -19,6 +19,7 @@ import '../providers/invoice_provider.dart';
 import '../providers/network_provider.dart';
 import '../providers/seller_inventory_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/route_provider.dart';
 import '../providers/shop_provider.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/error_state.dart';
@@ -248,6 +249,13 @@ class _CreateSaleInvoiceScreenState
     final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
     final ppc = ref.watch(settingsProvider).value?.pairsPerCarton ?? 12;
+    // Resolve currency from the selected shop's route. Defaults to SAR.
+    final routeIdForCurrency = _selectedShop != null
+        ? (_selectedShop!.routeId.isNotEmpty
+              ? _selectedShop!.routeId
+              : (user.assignedRouteIds.firstOrNull ?? ''))
+        : '';
+    final currency = ref.watch(routeCurrencyProvider(routeIdForCurrency));
 
     // Calculate totals from selected items (_selectedQtys = dozens, quantity_available = pairs)
     final selectedEntries = _selectedQtys.entries
@@ -316,7 +324,7 @@ class _CreateSaleInvoiceScreenState
                 if (_selectedShop != null) ...[
                   const SizedBox(height: 4),
                   Text(
-                    '${tr('previous_balance', ref)}: ${AppFormatters.currency(_previousBalance)}',
+                    '${tr('previous_balance', ref)}: ${AppFormatters.currency(_previousBalance, currency)}',
                     style: ts.bodySmall?.copyWith(
                       color: _previousBalance > 0
                           ? AppBrand.errorColor
@@ -543,7 +551,8 @@ class _CreateSaleInvoiceScreenState
                 const SizedBox(height: 16),
 
                 // ── Payment Summary Card ──
-                if (_selectedShop != null) _buildPaymentSummary(cs, ts),
+                if (_selectedShop != null)
+                  _buildPaymentSummary(cs, ts, currency),
 
                 const SizedBox(height: 12),
 
@@ -633,7 +642,7 @@ class _CreateSaleInvoiceScreenState
   }
 
   /// Payment summary card showing balance breakdown.
-  Widget _buildPaymentSummary(ColorScheme cs, TextTheme ts) {
+  Widget _buildPaymentSummary(ColorScheme cs, TextTheme ts, String currency) {
     final prevBal = _previousBalance;
     final sale = _invoiceTotal;
     final totalDue = _totalOutstanding;
@@ -653,21 +662,21 @@ class _CreateSaleInvoiceScreenState
             const Divider(height: 16),
             _summaryRow(
               tr('previous_balance', ref),
-              AppFormatters.currency(prevBal),
+              AppFormatters.currency(prevBal, currency),
               ts,
               color: prevBal > 0 ? AppBrand.errorColor : null,
             ),
             const SizedBox(height: 4),
             _summaryRow(
               tr('current_sale', ref),
-              AppFormatters.currency(sale),
+              AppFormatters.currency(sale, currency),
               ts,
             ),
             if (_discountAmount > 0) ...[
               const SizedBox(height: 4),
               _summaryRow(
                 tr('discount', ref),
-                '- ${AppFormatters.currency(_discountAmount)}',
+                '- ${AppFormatters.currency(_discountAmount, currency)}',
                 ts,
                 color: AppBrand.successColor,
               ),
@@ -675,21 +684,21 @@ class _CreateSaleInvoiceScreenState
             const Divider(height: 12),
             _summaryRow(
               tr('total_outstanding', ref),
-              AppFormatters.currency(totalDue),
+              AppFormatters.currency(totalDue, currency),
               ts,
               bold: true,
             ),
             const SizedBox(height: 4),
             _summaryRow(
               tr('amount_received', ref),
-              '- ${AppFormatters.currency(received)}',
+              '- ${AppFormatters.currency(received, currency)}',
               ts,
               color: received > 0 ? AppBrand.successColor : null,
             ),
             const Divider(height: 12),
             _summaryRow(
               tr('new_balance', ref),
-              AppFormatters.currency(newBal),
+              AppFormatters.currency(newBal, currency),
               ts,
               bold: true,
               color: newBal > 0 ? AppBrand.errorColor : AppBrand.successColor,
@@ -843,6 +852,13 @@ class _CreateSaleInvoiceScreenState
                 ? null
                 : AppSanitizer.text(_notesC.text, maxLength: 300),
             createdBy: user.id,
+            currency: ref.read(
+              routeCurrencyProvider(
+                _selectedShop!.routeId.isNotEmpty
+                    ? _selectedShop!.routeId
+                    : (user.assignedRouteIds.firstOrNull ?? ''),
+              ),
+            ),
             sellerInventoryDeductions: deductions,
             idempotencyKey: _pendingInvoiceIdempotencyKey,
           );

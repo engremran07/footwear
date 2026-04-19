@@ -194,7 +194,7 @@ class _InvoiceTile extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              AppFormatters.sar(invoice.total),
+              AppFormatters.currency(invoice.total, invoice.currency),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: invoice.isSale ? cs.error : cs.primary,
@@ -246,7 +246,7 @@ class _InvoiceStatsStrip extends ConsumerWidget {
           _IStat(
             icon: Icons.receipt_long,
             label: tr('stats_total', ref),
-            value: AppFormatters.sar(totalSales),
+            value: AppFormatters.compact(totalSales),
             color: cs.primary,
           ),
           Container(
@@ -257,7 +257,7 @@ class _InvoiceStatsStrip extends ConsumerWidget {
           _IStat(
             icon: Icons.check_circle,
             label: tr('paid', ref),
-            value: AppFormatters.sar(paidAmount),
+            value: AppFormatters.compact(paidAmount),
             color: AppTheme.clearFg(cs),
           ),
           Container(
@@ -268,7 +268,7 @@ class _InvoiceStatsStrip extends ConsumerWidget {
           _IStat(
             icon: Icons.pending,
             label: tr('pending', ref),
-            value: AppFormatters.sar(outstanding),
+            value: AppFormatters.compact(outstanding),
             color: outstanding > 0 ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
           ),
         ],

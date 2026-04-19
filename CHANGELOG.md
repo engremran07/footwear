@@ -7,7 +7,33 @@ Most recent first.
 
 ---
 
-## [3.7.17+65] — 2026-04-17 — Async auth safety sweep + dead code cleanup
+## [3.8.0+69] — 2026-04-18 — Multi-currency exhaustive audit
+
+### Fixed
+
+- **Zero hardcoded `.sar()` calls remain** — all `AppFormatters.sar()` sites across every screen replaced with `AppFormatters.currency(amount, currency)` (per-route) or `AppFormatters.compact(amount)` (cross-route aggregates). Files patched: `dashboard_screen.dart`, `reports_screen.dart`, `shop_detail_screen.dart`, `shops_list_screen.dart`, `invoice_detail_screen.dart`, `invoices_list_screen.dart`, `create_sale_invoice_screen.dart`.
+- **PDF invoice currency** — `generateInvoicePdf()` no longer hardcodes `'﷼'`; the `currency` parameter is honoured and call sites pass `inv.currency` directly.
+- **`create_sale_invoice_screen.dart` currency scope** — currency resolution moved from `build()` into `_buildBody()` so both the body and `_buildPaymentSummary()` can access it correctly (eliminated 6 undefined-identifier errors + 1 leading-underscore lint).
+
+### Removed
+
+- **`_MonthlyCashFlowChart`** from `reports_screen.dart` (already done, noted here for release).
+- **`_BalanceTrendChart`** from `shop_detail_screen.dart` (already done).
+- **`_CashFlowChart`** from `dashboard_screen.dart` (already done).
+- **Unused `app_chart_card.dart` import** from `dashboard_screen.dart`.
+
+### Added
+
+- **`WhatsAppIconButton` widget** (`lib/widgets/whatsapp_button.dart`) — compact icon button that opens WhatsApp chat; hidden when phone is null/blank/invalid; uses `normalizeWhatsAppPhone()` for auto-formatting.
+- **`normalizeWhatsAppPhone()` enhanced** — now converts Pakistan local (`03xxxxxxxx` → `923xxxxxxxx`) and Saudi local (`05xxxxxxxx` → `9665xxxxxxxx`) in addition to stripping non-digits.
+- **WhatsApp CTAs on shop cards** — `shop_detail_screen.dart` and `route_detail_screen.dart` display `WhatsAppIconButton` next to shop phone numbers.
+
+### Governance
+
+- 0 `flutter analyze` issues (exit 0).
+- 398/398 unit + widget tests pass.
+
+## [3.7.20+68] — 2026-04-18 — Async-safety hardening
 
 ### Fixed
 

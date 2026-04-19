@@ -9,6 +9,7 @@ import '../core/utils/name_resolver.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/snack_helper.dart';
+import '../models/route_model.dart';
 import '../models/shop_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
@@ -37,7 +38,6 @@ class ReportsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(authUserProvider);
     final stats = ref.watch(dashboardStatsProvider);
-    final shopsAsync = ref.watch(shopsProvider);
     final ppc = ref.watch(settingsProvider).value?.pairsPerCarton ?? 12;
     return Scaffold(
       body: ListView(
@@ -46,13 +46,6 @@ class ReportsScreen extends ConsumerWidget {
           // Summary card
           stats.when(
             data: (s) {
-              // Outstanding always from live shops stream â€” never from stats cache
-              final totalOutstanding =
-                  shopsAsync.value?.fold<double>(
-                    0.0,
-                    (acc, sh) => acc + sh.balance,
-                  ) ??
-                  0.0;
               return Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -75,7 +68,20 @@ class ReportsScreen extends ConsumerWidget {
                       ),
                       _Row(
                         label: tr('outstanding_balance', ref),
-                        value: AppFormatters.sar(totalOutstanding),
+                        value: () {
+                          final parts = s.currencyStats.entries
+                              .where((e) => e.value.outstanding != 0)
+                              .map(
+                                (e) => AppFormatters.currency(
+                                  e.value.outstanding,
+                                  e.key,
+                                ),
+                              )
+                              .toList();
+                          return parts.isEmpty
+                              ? AppFormatters.currency(0)
+                              : parts.join(' / ');
+                        }(),
                       ),
                       _Row(
                         label: tr('total_products', ref),
@@ -101,9 +107,6 @@ class ReportsScreen extends ConsumerWidget {
               onRetry: () => ref.invalidate(dashboardStatsProvider),
             ),
           ),
-          const SizedBox(height: 16),
-          // Monthly Cash Flow Chart
-          _MonthlyCashFlowChart(),
           const SizedBox(height: 16),
           // Outstanding Distribution Chart
           _OutstandingPieChart(),
@@ -166,6 +169,10 @@ class ReportsScreen extends ConsumerWidget {
       tr('city', ref),
       tr('balance', ref),
     ];
+    final routeCurrencyMap = <String, String>{
+      for (final r in ref.read(routesProvider).value ?? <RouteModel>[])
+        r.id: r.currency,
+    };
     final rows = shops
         .map(
           (s) => [
@@ -174,7 +181,10 @@ class ReportsScreen extends ConsumerWidget {
             s.phone ?? '',
             s.area ?? '',
             s.city ?? '',
-            AppFormatters.sar(s.balance),
+            AppFormatters.currency(
+              s.balance,
+              routeCurrencyMap[s.routeId] ?? 'SAR',
+            ),
           ],
         )
         .toList();
@@ -260,7 +270,7 @@ class ReportsScreen extends ConsumerWidget {
             AppFormatters.dateTime(t.createdAt),
             t.shopName,
             t.type == 'cash_in' ? tr('cash_in', ref) : tr('cash_out', ref),
-            AppFormatters.sar(t.amount),
+            AppFormatters.currency(t.amount),
             t.description ?? '',
           ],
         )
@@ -285,7 +295,11 @@ class ReportsScreen extends ConsumerWidget {
     final shops = user.isAdmin
         ? ref.read(outstandingShopsProvider).value ?? <ShopModel>[]
         : (user.assignedRouteIds.isNotEmpty
-              ? ref.read(sellerAllShopsProvider).value?.where((s) => s.balance > 0).toList() ??
+              ? ref
+                        .read(sellerAllShopsProvider)
+                        .value
+                        ?.where((s) => s.balance > 0)
+                        .toList() ??
                     <ShopModel>[]
               : <ShopModel>[]);
     if (shops.isEmpty) {
@@ -299,13 +313,20 @@ class ReportsScreen extends ConsumerWidget {
       tr('phone', ref),
       tr('balance', ref),
     ];
+    final routeCurrencyMap2 = <String, String>{
+      for (final r in ref.read(routesProvider).value ?? <RouteModel>[])
+        r.id: r.currency,
+    };
     final rows = shops
         .map(
           (s) => [
             s.name,
             '${s.routeNumber}',
             s.phone ?? '',
-            AppFormatters.sar(s.balance),
+            AppFormatters.currency(
+              s.balance,
+              routeCurrencyMap2[s.routeId] ?? 'SAR',
+            ),
           ],
         )
         .toList();
@@ -343,12 +364,19 @@ class ReportsScreen extends ConsumerWidget {
       tr('bad_debt_amount', ref),
       tr('date', ref),
     ];
+    final routeCurrencyMap3 = <String, String>{
+      for (final r in ref.read(routesProvider).value ?? <RouteModel>[])
+        r.id: r.currency,
+    };
     final rows = badDebtShops
         .map(
           (s) => [
             s.name,
             s.phone ?? '',
-            AppFormatters.sar(s.badDebtAmount),
+            AppFormatters.currency(
+              s.badDebtAmount,
+              routeCurrencyMap3[s.routeId] ?? 'SAR',
+            ),
             s.badDebtDate != null ? AppFormatters.dateTime(s.badDebtDate!) : '',
           ],
         )
@@ -411,160 +439,6 @@ class _ExportCard extends StatelessWidget {
         trailing: const Icon(Icons.download),
         onTap: onExport,
       ),
-    );
-  }
-}
-
-// â”€â”€â”€ Monthly Cash Flow Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-class _MonthlyCashFlowChart extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authUserProvider).value;
-    final txsAsync = user?.isAdmin == true
-        ? ref.watch(allTransactionsProvider)
-        : ref.watch(sellerTransactionsProvider(user?.id ?? ''));
-    final cs = Theme.of(context).colorScheme;
-
-    return txsAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
-      data: (txs) {
-        if (txs.isEmpty) return const SizedBox.shrink();
-
-        // Aggregate by month
-        final cashIn = <String, double>{};
-        final cashOut = <String, double>{};
-        for (final tx in txs) {
-          final dt = tx.createdAt.toDate();
-          final key = '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
-          if (tx.type == 'cash_in') {
-            cashIn[key] = (cashIn[key] ?? 0) + tx.amount;
-          } else {
-            cashOut[key] = (cashOut[key] ?? 0) + tx.amount;
-          }
-        }
-
-        // Take last 6 months
-        final periods = AppFormatters.last12Periods().reversed
-            .take(6)
-            .toList()
-            .reversed
-            .toList();
-        final displayPeriods = periods
-            .where((p) => (cashIn[p] ?? 0) > 0 || (cashOut[p] ?? 0) > 0)
-            .toList();
-        if (displayPeriods.isEmpty) return const SizedBox.shrink();
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tr('cash_flow', ref),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    _LegendDot(
-                      color: AppTheme.clearFg(cs),
-                      label: tr('cash_in', ref),
-                    ),
-                    const SizedBox(width: 12),
-                    _LegendDot(
-                      color: AppTheme.debtFg(cs),
-                      label: tr('cash_out', ref),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 180,
-                  child: BarChart(
-                    BarChartData(
-                      barGroups: List.generate(displayPeriods.length, (i) {
-                        final p = displayPeriods[i];
-                        return BarChartGroupData(
-                          x: i,
-                          barRods: [
-                            BarChartRodData(
-                              toY: cashIn[p] ?? 0,
-                              color: AppTheme.clearFg(cs),
-                              width: 10,
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(4),
-                              ),
-                            ),
-                            BarChartRodData(
-                              toY: cashOut[p] ?? 0,
-                              color: AppTheme.debtFg(cs),
-                              width: 10,
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(4),
-                              ),
-                            ),
-                          ],
-                        );
-                      }),
-                      gridData: const FlGridData(show: false),
-                      borderData: FlBorderData(show: false),
-                      titlesData: FlTitlesData(
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 48,
-                            getTitlesWidget: (v, _) => Text(
-                              AppFormatters.compact(v),
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ),
-                        rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 20,
-                            getTitlesWidget: (v, _) {
-                              final idx = v.toInt();
-                              if (idx < 0 || idx >= displayPeriods.length) {
-                                return const SizedBox.shrink();
-                              }
-                              return Text(
-                                AppFormatters.period(
-                                  displayPeriods[idx],
-                                ).substring(0, 3),
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: cs.onSurfaceVariant,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      barTouchData: const BarTouchData(enabled: false),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }
@@ -635,7 +509,7 @@ class _OutstandingPieChart extends ConsumerWidget {
           sections.add(
             PieChartSectionData(
               value: top[i].balance,
-              title: AppFormatters.sar(top[i].balance),
+              title: AppFormatters.compact(top[i].balance),
               color: colors[i % colors.length],
               radius: 50,
               titleStyle: TextStyle(
@@ -656,7 +530,7 @@ class _OutstandingPieChart extends ConsumerWidget {
           sections.add(
             PieChartSectionData(
               value: othersTotal,
-              title: AppFormatters.sar(othersTotal),
+              title: AppFormatters.compact(othersTotal),
               color: colors.last,
               radius: 50,
               titleStyle: TextStyle(
@@ -816,6 +690,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       final netTx = txs.fold<double>(0.0, (s, t) => s + t.balanceImpact);
       final labels = _labels(ref);
       final openingBalance = shop.balance - netTx;
+      final acctCurrency = ref.read(routeCurrencyProvider(shop.routeId));
 
       if (!context.mounted) return;
       ExportSheet.show(
@@ -834,7 +709,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
               (t) => [
                 AppFormatters.dateTime(t.createdAt),
                 _transactionTypeLabel(t),
-                AppFormatters.sar(t.amount),
+                AppFormatters.currency(t.amount, acctCurrency),
                 t.description ?? '',
               ],
             )
@@ -1053,6 +928,9 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
 
       final settings = await ref.read(settingsProvider.future);
       final labels = _labels(ref);
+      final sellerRouteCurrency = seller.assignedRouteIds.isNotEmpty
+          ? ref.read(routeCurrencyProvider(seller.assignedRouteIds.first))
+          : 'SAR';
       if (!context.mounted) return;
       ExportSheet.show(
         // ignore: use_build_context_synchronously
@@ -1070,8 +948,11 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
               (c) => [
                 c.name,
                 c.totalPairsSold,
-                AppFormatters.sar(c.totalRevenue),
-                AppFormatters.sar(c.outstandingBalance),
+                AppFormatters.currency(c.totalRevenue, sellerRouteCurrency),
+                AppFormatters.currency(
+                  c.outstandingBalance,
+                  sellerRouteCurrency,
+                ),
               ],
             )
             .toList(),
@@ -1081,7 +962,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
         ),
         pdfBytesBuilder: () {
           // Resolve route UID â†’ display name so PDF never shows raw IDs
-          final routes = ref.read(routesProvider).value ?? [];
+          final routes = ref.read(routesProvider).value ?? <RouteModel>[];
           final routeMatch = routes.where(
             (r) => seller.assignedRouteIds.contains(r.id),
           );

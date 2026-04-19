@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +15,7 @@ import '../models/transaction_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/route_provider.dart';
 import '../providers/shop_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/user_provider.dart';
@@ -24,6 +24,7 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
 import '../widgets/export_sheet.dart';
+import '../widgets/whatsapp_button.dart';
 
 // =============================================================================
 // ShopDetailScreen — live ledger view for a single retail shop.
@@ -653,6 +654,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
         final balanceBgColor = isDebt
             ? AppTheme.debtBg(cs)
             : AppTheme.clearBg(cs);
+        final currency = ref.watch(routeCurrencyProvider(shop.routeId));
         final canManageShop =
             user?.isAdmin == true ||
             (user?.isSeller == true &&
@@ -815,7 +817,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                       (t) => [
                                         AppFormatters.dateTime(t.createdAt),
                                         _transactionTypeLabel(t),
-                                        AppFormatters.sar(t.amount),
+                                        AppFormatters.currency(
+                                          t.amount,
+                                          ref.read(
+                                            routeCurrencyProvider(shop.routeId),
+                                          ),
+                                        ),
                                         t.description ?? '',
                                       ],
                                     )
@@ -946,6 +953,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               shop.phone!,
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
+                            WhatsAppIconButton(phone: shop.phone, iconSize: 18),
                           ],
                           if (shop.area != null || shop.city != null) ...[
                             const Spacer(),
@@ -999,7 +1007,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                                 (s, t) => s + t.amount,
                                               );
                                           return Text(
-                                            AppFormatters.sar(totalIn),
+                                            AppFormatters.currency(
+                                              totalIn,
+                                              currency,
+                                            ),
                                             style: Theme.of(context)
                                                 .textTheme
                                                 .titleSmall
@@ -1046,7 +1057,10 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    AppFormatters.sar(shop.balance.abs()),
+                                    AppFormatters.currency(
+                                      shop.balance.abs(),
+                                      currency,
+                                    ),
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleSmall
@@ -1105,21 +1119,6 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               },
                             ) ??
                             const SizedBox.shrink(),
-                      // Balance trend mini chart
-                      txAsync.whenOrNull(
-                            data: (txs) {
-                              final activeTxs = txs
-                                  .where((t) => !t.deleted)
-                                  .toList();
-                              if (activeTxs.length < 2) {
-                                return const SizedBox.shrink();
-                              }
-                              return _BalanceTrendChart(
-                                transactions: activeTxs,
-                              );
-                            },
-                          ) ??
-                          const SizedBox.shrink(),
                       // Bad debt banner
                       if (shop.badDebt) ...[
                         const SizedBox(height: 12),
@@ -1152,7 +1151,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                       ),
                                     ),
                                     Text(
-                                      '${tr('bad_debt_amount', ref)}: ${AppFormatters.sar(shop.badDebtAmount)}',
+                                      '${tr('bad_debt_amount', ref)}: ${AppFormatters.currency(shop.badDebtAmount, currency)}',
                                       style: Theme.of(
                                         context,
                                       ).textTheme.bodySmall,
@@ -1397,7 +1396,8 @@ class _TransactionTile extends ConsumerWidget {
         ),
       ),
       title: Text(
-        '$sign ${AppFormatters.sar(tx.amount)}',
+        '$sign ${AppFormatters.currency(tx.amount, ref.watch(routeCurrencyProvider(tx.routeId)))}',
+
         style: TextStyle(
           fontWeight: FontWeight.bold,
           color: color,
@@ -1442,7 +1442,7 @@ class _TransactionTile extends ConsumerWidget {
           // Running balance (CreditBook-style)
           if (runningBalance != null)
             Text(
-              '${tr('running_balance', ref)}: ${AppFormatters.sar(runningBalance!)}',
+              '${tr('running_balance', ref)}: ${AppFormatters.currency(runningBalance!, ref.watch(routeCurrencyProvider(tx.routeId)))}',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
@@ -1537,141 +1537,8 @@ class _TxListItem {
   const _TxListItem({this.monthHeader, this.tx, this.runningBalance});
 }
 
-// ─── Balance Trend Mini Chart ─────────────────────────────────────────────────
-
-class _BalanceTrendChart extends StatelessWidget {
-  final List<TransactionModel> transactions;
-  const _BalanceTrendChart({required this.transactions});
-
-  String _shortMonth(int m) {
-    const names = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return m >= 1 && m <= 12 ? names[m - 1] : '';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final sorted = [...transactions]
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-
-    if (sorted.length < 2) return const SizedBox.shrink();
-
-    // Aggregate monthly balances
-    final monthlyBalance = <String, double>{};
-    double running = 0;
-    for (final tx in sorted) {
-      running += tx.isCashOut ? tx.amount : -tx.amount;
-      final dt = tx.createdAt.toDate();
-      final key = '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
-      monthlyBalance[key] = running;
-    }
-
-    final entries = monthlyBalance.entries.toList();
-    final display = entries.length > 6
-        ? entries.sublist(entries.length - 6)
-        : entries;
-
-    if (display.length < 2) return const SizedBox.shrink();
-
-    final cs = Theme.of(context).colorScheme;
-    final spots = <FlSpot>[];
-    for (var i = 0; i < display.length; i++) {
-      spots.add(FlSpot(i.toDouble(), display[i].value));
-    }
-
-    final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
-    final minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Balance Trend',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 4),
-          SizedBox(
-            height: 80,
-            child: LineChart(
-              LineChartData(
-                gridData: const FlGridData(show: false),
-                titlesData: FlTitlesData(
-                  leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 16,
-                      getTitlesWidget: (value, _) {
-                        final idx = value.toInt();
-                        if (idx < 0 || idx >= display.length) {
-                          return const SizedBox.shrink();
-                        }
-                        final parts = display[idx].key.split('-');
-                        return Text(
-                          _shortMonth(int.tryParse(parts[1]) ?? 1),
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                minX: 0,
-                maxX: (display.length - 1).toDouble(),
-                minY: minY < 0 ? minY : 0,
-                maxY: maxY > 0 ? maxY * 1.1 : 100,
-                lineTouchData: const LineTouchData(enabled: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    color: cs.primary,
-                    barWidth: 2,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: cs.primary.withAlpha(30),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ─── Return Sheet ─────────────────────────────────────────────────────────────
-
+//
 // _ReturnSheet removed — use void-invoice or Cash In/Out with description for adjustments.
+//
+// _BalanceTrendChart removed — chart replaced per audit v18.

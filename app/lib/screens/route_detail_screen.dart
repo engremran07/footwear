@@ -13,6 +13,7 @@ import '../providers/shop_provider.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
+import '../widgets/whatsapp_button.dart';
 
 class RouteDetailScreen extends ConsumerWidget {
   final String routeId;
@@ -25,7 +26,9 @@ class RouteDetailScreen extends ConsumerWidget {
     final user = ref.watch(authUserProvider).value;
     final isAdmin = user?.isAdmin ?? false;
     final canAddShop =
-        isAdmin || (user?.isSeller == true && user?.assignedRouteIds.contains(routeId) == true);
+        isAdmin ||
+        (user?.isSeller == true &&
+            user?.assignedRouteIds.contains(routeId) == true);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -186,7 +189,10 @@ class RouteDetailScreen extends ConsumerWidget {
                             _RStat(
                               icon: Icons.warning_amber,
                               label: tr('outstanding', ref),
-                              value: AppFormatters.currency(totalOutstanding, route.currency),
+                              value: AppFormatters.currency(
+                                totalOutstanding,
+                                route.currency,
+                              ),
                               color: totalOutstanding > 0
                                   ? AppTheme.debtFg(cs)
                                   : AppTheme.clearFg(cs),
@@ -257,13 +263,29 @@ class RouteDetailScreen extends ConsumerWidget {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            subtitle: Text(
-                              shop.phone ?? '',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            subtitle: Row(
+                              children: [
+                                if (shop.phone != null)
+                                  Expanded(
+                                    child: Text(
+                                      shop.phone!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  )
+                                else
+                                  const Expanded(child: SizedBox.shrink()),
+                                WhatsAppIconButton(
+                                  phone: shop.phone,
+                                  iconSize: 18,
+                                ),
+                              ],
                             ),
                             trailing: Text(
-                              AppFormatters.currency(shop.balance, route.currency),
+                              AppFormatters.currency(
+                                shop.balance,
+                                route.currency,
+                              ),
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: hasDebt

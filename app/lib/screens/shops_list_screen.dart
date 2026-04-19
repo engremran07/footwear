@@ -861,7 +861,7 @@ class _ShopStatsStrip extends ConsumerWidget {
             child: _FilterStatCard(
               icon: Icons.arrow_circle_down,
               label: tr('i_got', ref),
-              value: AppFormatters.sar(totalGot),
+              value: AppFormatters.compact(totalGot),
               color: AppTheme.clearFg(cs),
               selected: selected == _ShopQuickFilter.iGot,
               onTap: () => onSelected(_ShopQuickFilter.iGot),
@@ -876,7 +876,7 @@ class _ShopStatsStrip extends ConsumerWidget {
             child: _FilterStatCard(
               icon: Icons.arrow_circle_up,
               label: tr('i_gave', ref),
-              value: AppFormatters.sar(totalGave),
+              value: AppFormatters.compact(totalGave),
               color: AppTheme.debtFg(cs),
               selected: selected == _ShopQuickFilter.iGave,
               onTap: () => onSelected(_ShopQuickFilter.iGave),
@@ -891,7 +891,7 @@ class _ShopStatsStrip extends ConsumerWidget {
             child: _FilterStatCard(
               icon: Icons.schedule,
               label: tr('i_will_get', ref),
-              value: AppFormatters.sar(totalWillGet),
+              value: AppFormatters.compact(totalWillGet),
               color: totalWillGet >= 0
                   ? AppTheme.warningFg(cs)
                   : AppTheme.debtFg(cs),
@@ -1112,7 +1112,10 @@ class _ShopTile extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              AppFormatters.sar(trailingAmount),
+              AppFormatters.currency(
+                trailingAmount,
+                ref.watch(routeCurrencyProvider(shop.routeId)),
+              ),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
@@ -1267,7 +1270,10 @@ class _AdminGroupedShopsViewState
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              AppFormatters.sar(routeOutstanding),
+                              AppFormatters.currency(
+                                routeOutstanding,
+                                r?.currency ?? 'SAR',
+                              ),
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,

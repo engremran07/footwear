@@ -51,6 +51,17 @@ final routeDetailProvider = StreamProvider.autoDispose
           });
     });
 
+/// Resolves the currency symbol for a given route ID.
+/// Watches [routeDetailProvider] so it stays live and updates reactively.
+/// Falls back to 'SAR' while the route is loading or when routeId is empty.
+final routeCurrencyProvider = Provider.autoDispose.family<String, String>((
+  ref,
+  routeId,
+) {
+  if (routeId.isEmpty) return 'SAR';
+  return ref.watch(routeDetailProvider(routeId)).value?.currency ?? 'SAR';
+});
+
 final routesBySellerProvider = StreamProvider.autoDispose
     .family<List<RouteModel>, String>((ref, sellerId) {
       final user = ref.watch(authUserProvider).value;
@@ -140,12 +151,14 @@ class RouteNotifier extends AsyncNotifier<void> {
     final routeRef = db.collection(Collections.routes).doc();
     final routeName = data['name'] as String? ?? '';
     final currency = data['currency'] as String? ?? 'SAR';
-    final sellerIds = (data['assigned_seller_ids'] as List<dynamic>?)
+    final sellerIds =
+        (data['assigned_seller_ids'] as List<dynamic>?)
             ?.cast<String>()
             .where((s) => s.trim().isNotEmpty)
             .toList() ??
         const <String>[];
-    final sellerNames = (data['assigned_seller_names'] as List<dynamic>?)
+    final sellerNames =
+        (data['assigned_seller_names'] as List<dynamic>?)
             ?.cast<String>()
             .toList() ??
         const <String>[];
@@ -200,7 +213,8 @@ class RouteNotifier extends AsyncNotifier<void> {
           data['name'] as String? ??
           currentRoute.data()?['name'] as String? ??
           '';
-      final currency = data['currency'] as String? ??
+      final currency =
+          data['currency'] as String? ??
           currentRoute.data()?['currency'] as String? ??
           'SAR';
 
@@ -212,12 +226,14 @@ class RouteNotifier extends AsyncNotifier<void> {
           : <String>{};
 
       // New seller IDs from form data.
-      final newSellerIds = (data['assigned_seller_ids'] as List<dynamic>?)
+      final newSellerIds =
+          (data['assigned_seller_ids'] as List<dynamic>?)
               ?.cast<String>()
               .where((s) => s.trim().isNotEmpty)
               .toSet() ??
           <String>{};
-      final newSellerNames = (data['assigned_seller_names'] as List<dynamic>?)
+      final newSellerNames =
+          (data['assigned_seller_names'] as List<dynamic>?)
               ?.cast<String>()
               .toList() ??
           const <String>[];

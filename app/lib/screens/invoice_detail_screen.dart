@@ -96,8 +96,8 @@ class InvoiceDetailScreen extends ConsumerWidget {
             title: Text(tr('void', ref)),
             content: Text(
               '${tr('confirm_void_invoice', ref)}\n\n'
-              '${tr('amount_received', ref)}: ${AppFormatters.sar(inv.amountReceived)}\n'
-              '${tr('outstanding_amount', ref)}: ${AppFormatters.sar(inv.outstandingAmount)}',
+              '${tr('amount_received', ref)}: ${AppFormatters.currency(inv.amountReceived, inv.currency)}\n'
+              '${tr('outstanding_amount', ref)}: ${AppFormatters.currency(inv.outstandingAmount, inv.currency)}',
             ),
             actions: [
               TextButton(
@@ -204,7 +204,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
         return generateInvoicePdf(
           invoice: inv,
           companyName: settings.companyName,
-          currency: settings.currency,
+          currency: inv.currency,
           locale: locale,
           logoBytes: settings.logoBytes,
         );
@@ -357,7 +357,10 @@ class _InvoiceBody extends ConsumerWidget {
                           ),
                           Expanded(
                             child: Text(
-                              AppFormatters.sar(item.subtotal),
+                              AppFormatters.currency(
+                                item.subtotal,
+                                invoice.currency,
+                              ),
                               textAlign: TextAlign.end,
                             ),
                           ),
@@ -379,31 +382,44 @@ class _InvoiceBody extends ConsumerWidget {
               children: [
                 _TotalRow(
                   label: tr('subtotal', ref),
-                  value: AppFormatters.sar(invoice.subtotal),
+                  value: AppFormatters.currency(
+                    invoice.subtotal,
+                    invoice.currency,
+                  ),
                 ),
                 if (invoice.discount > 0)
                   _TotalRow(
                     label: tr('discount', ref),
-                    value: '-${AppFormatters.sar(invoice.discount)}',
+                    value:
+                        '-${AppFormatters.currency(invoice.discount, invoice.currency)}',
                     color: cs.primary,
                   ),
                 const Divider(),
                 _TotalRow(
                   label: tr('total', ref),
-                  value: AppFormatters.sar(invoice.total),
+                  value: AppFormatters.currency(
+                    invoice.total,
+                    invoice.currency,
+                  ),
                   bold: true,
                   color: invoice.isSale ? cs.error : cs.primary,
                 ),
                 if (invoice.amountReceived > 0)
                   _TotalRow(
                     label: tr('amount_received', ref),
-                    value: AppFormatters.sar(invoice.amountReceived),
+                    value: AppFormatters.currency(
+                      invoice.amountReceived,
+                      invoice.currency,
+                    ),
                     color: cs.primary,
                   ),
                 if (invoice.outstandingAmount > 0)
                   _TotalRow(
                     label: tr('outstanding_amount', ref),
-                    value: AppFormatters.sar(invoice.outstandingAmount),
+                    value: AppFormatters.currency(
+                      invoice.outstandingAmount,
+                      invoice.currency,
+                    ),
                     bold: true,
                     color: cs.error,
                   ),

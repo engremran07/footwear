@@ -1340,7 +1340,11 @@ Future<Uint8List> generateInvoicePdf({
   final lblVoid = trRead('void', locale);
   return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
-    final lc = _PdfLocaleConfig(fonts: fonts, locale: locale, currency: '﷼');
+    final lc = _PdfLocaleConfig(
+      fonts: fonts,
+      locale: locale,
+      currency: currency,
+    );
     final dir = lc.dir;
     final align = lc.align;
     final primaryFont = lc.primaryFont;

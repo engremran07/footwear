@@ -28,6 +28,84 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.8.0',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '💱',
+        text: {
+          AppLocale.en:
+              'Multi-currency support: amounts now display in the correct currency (SAR or PKR) based on each route — no more mixed symbols.',
+          AppLocale.ar:
+              'دعم العملات المتعددة: تعرض المبالغ الآن العملة الصحيحة (ريال أو روبية) بناءً على كل مسار — لا مزيد من رموز مختلطة.',
+          AppLocale.ur:
+              'ملٹی کرنسی سپورٹ: رقومات اب ہر روٹ کے مطابق درست کرنسی (SAR یا PKR) میں دکھائی جاتی ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '💬',
+        text: {
+          AppLocale.en:
+              'WhatsApp quick-connect: tap the WhatsApp button on any shop to open a chat instantly.',
+          AppLocale.ar:
+              'اتصال سريع عبر واتساب: اضغط على زر واتساب في أي متجر لفتح محادثة فوراً.',
+          AppLocale.ur:
+              'واٹس ایپ کوئیک کنیکٹ: کسی بھی شاپ پر واٹس ایپ بٹن دبائیں اور فوری چیٹ کھولیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧹',
+        text: {
+          AppLocale.en:
+              'Cleaner charts: removed unused cash-flow and balance trend graphs to speed up screen loading.',
+          AppLocale.ar:
+              'رسوم بيانية أنظف: تمت إزالة الرسوم البيانية غير المستخدمة لتحسين سرعة تحميل الشاشات.',
+          AppLocale.ur:
+              'صاف چارٹس: غیر ضروری کیش فلو اور بیلنس ٹرینڈ گرافس ہٹا دیے — اسکرین لوڈنگ تیز ہو گئی۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.8.0',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '💱',
+        text: {
+          AppLocale.en:
+              'Multi-currency support: amounts now display in the correct currency (SAR or PKR) based on each route — no more mixed symbols.',
+          AppLocale.ar:
+              'دعم العملات المتعددة: تعرض المبالغ الآن العملة الصحيحة (ريال أو روبية) بناءً على كل مسار — لا مزيد من رموز مختلطة.',
+          AppLocale.ur:
+              'ملٹی کرنسی سپورٹ: رقومات اب ہر روٹ کے مطابق درست کرنسی (SAR یا PKR) میں دکھائی جاتی ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '💬',
+        text: {
+          AppLocale.en:
+              'WhatsApp quick-connect: tap the WhatsApp button on any shop to open a chat instantly.',
+          AppLocale.ar:
+              'اتصال سريع عبر واتساب: اضغط على زر واتساب في أي متجر لفتح محادثة فوراً.',
+          AppLocale.ur:
+              'واٹس ایپ کوئیک کنیکٹ: کسی بھی شاپ پر واٹس ایپ بٹن دبائیں اور فوری چیٹ کھولیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧹',
+        text: {
+          AppLocale.en:
+              'Cleaner charts: removed unused cash-flow and balance trend graphs to speed up screen loading.',
+          AppLocale.ar:
+              'رسوم بيانية أنظف: تمت إزالة الرسوم البيانية غير المستخدمة لتحسين سرعة تحميل الشاشات.',
+          AppLocale.ur:
+              'صاف چارٹس: غیر ضروری کیش فلو اور بیلنس ٹرینڈ گرافس ہٹا دیے — اسکرین لوڈنگ تیز ہو گئی۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.7.20',
     date: 'April 2026',
     items: [

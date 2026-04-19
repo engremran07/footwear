@@ -82,35 +82,39 @@ final sellerAllShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
       );
 });
 
-final shopDetailProvider = StreamProvider.autoDispose
-    .family<ShopModel?, String>((ref, id) {
-      final user = ref.watch(authUserProvider).value;
-      if (user == null) return const Stream.empty();
-      if (user.isAdmin) {
-        return FirebaseFirestore.instance
-            .collection(Collections.customers)
-            .doc(id)
-            .snapshots()
-            .map(
-              (doc) =>
-                  doc.exists ? ShopModel.fromJson(doc.data()!, doc.id) : null,
-            );
-      }
-      if (!user.isSeller || user.assignedRouteIds.isEmpty) {
-        return const Stream.empty();
-      }
+final shopDetailProvider = StreamProvider.autoDispose.family<ShopModel?, String>(
+  (ref, id) {
+    final user = ref.watch(authUserProvider).value;
+    if (user == null) return const Stream.empty();
+    if (user.isAdmin) {
       return FirebaseFirestore.instance
           .collection(Collections.customers)
-          .where(FieldPath.documentId, isEqualTo: id)
-          .where('route_id', whereIn: user.assignedRouteIds)
-          .limit(1)
+          .doc(id)
           .snapshots()
-          .map((snap) {
-            if (snap.docs.isEmpty) return null;
-            final doc = snap.docs.first;
-            return ShopModel.fromJson(doc.data(), doc.id);
-          });
-    });
+          .map(
+            (doc) =>
+                doc.exists ? ShopModel.fromJson(doc.data()!, doc.id) : null,
+          );
+    }
+    if (!user.isSeller || user.assignedRouteIds.isEmpty) {
+      return const Stream.empty();
+    }
+    // Direct doc read — Firestore rules enforce route membership.
+    // A collection query with whereIn caused an auth loading race that
+    // produced "Details" in the breadcrumb instead of the shop name.
+    return FirebaseFirestore.instance
+        .collection(Collections.customers)
+        .doc(id)
+        .snapshots()
+        .map((doc) {
+          if (!doc.exists) return null;
+          final shop = ShopModel.fromJson(doc.data()!, doc.id);
+          // Client-side guard: hide shops outside the seller's assigned routes.
+          if (!user.assignedRouteIds.contains(shop.routeId)) return null;
+          return shop;
+        });
+  },
+);
 
 final outstandingShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
   ref,

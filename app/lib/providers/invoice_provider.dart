@@ -223,6 +223,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     double amountReceived = 0,
     String? notes,
     required String createdBy,
+    String currency = 'SAR',
     Map<String, int> sellerInventoryDeductions = const {},
     String?
     idempotencyKey, // optional: pass a stable UUID to prevent duplicates on retry
@@ -358,6 +359,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'total': total,
       'amount_received': amountReceived,
       'outstanding_amount': total - amountReceived,
+      'currency': currency,
       'sale_type': saleType,
       'status': invoiceStatus,
       'notes': notes,
