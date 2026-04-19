@@ -344,6 +344,7 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
       'logo_base64': null,
       'logo_url': null,
       'require_admin_approval_for_seller_transaction_edits': false,
+      'show_arabic_column_names_in_english_reports': false,
       'updated_at': Timestamp.now(),
     });
     return FlushResult(deletedCount: 0, resetCount: 1, operation: 'settings');

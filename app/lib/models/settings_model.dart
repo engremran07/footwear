@@ -7,6 +7,7 @@ class SettingsModel {
   final String currency;
   final int pairsPerCarton;
   final bool requireAdminApprovalForSellerTransactionEdits;
+  final bool showArabicColumnNamesInEnglishReports;
 
   /// Base64-encoded PNG/JPEG logo, stored directly in Firestore.
   /// Use [logoBytes] to get the decoded bytes for Image.memory() or PDF.
@@ -18,6 +19,7 @@ class SettingsModel {
     required this.currency,
     required this.pairsPerCarton,
     this.requireAdminApprovalForSellerTransactionEdits = false,
+    this.showArabicColumnNamesInEnglishReports = false,
     this.logoBase64,
     required this.updatedAt,
   }) : assert(pairsPerCarton > 0, 'pairsPerCarton must be greater than 0');
@@ -27,6 +29,7 @@ class SettingsModel {
     String? currency,
     int? pairsPerCarton,
     bool? requireAdminApprovalForSellerTransactionEdits,
+    bool? showArabicColumnNamesInEnglishReports,
     String? logoBase64,
     bool clearLogoBase64 = false,
     Timestamp? updatedAt,
@@ -38,6 +41,9 @@ class SettingsModel {
       requireAdminApprovalForSellerTransactionEdits:
           requireAdminApprovalForSellerTransactionEdits ??
           this.requireAdminApprovalForSellerTransactionEdits,
+      showArabicColumnNamesInEnglishReports:
+          showArabicColumnNamesInEnglishReports ??
+          this.showArabicColumnNamesInEnglishReports,
       logoBase64: clearLogoBase64 ? null : (logoBase64 ?? this.logoBase64),
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -63,6 +69,8 @@ class SettingsModel {
           json['require_admin_approval_for_seller_transaction_edits']
               as bool? ??
           false,
+      showArabicColumnNamesInEnglishReports:
+          json['show_arabic_column_names_in_english_reports'] as bool? ?? false,
       logoBase64: json['logo_base64'] as String?,
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
     );
@@ -74,6 +82,8 @@ class SettingsModel {
     'pairs_per_carton': pairsPerCarton,
     'require_admin_approval_for_seller_transaction_edits':
         requireAdminApprovalForSellerTransactionEdits,
+    'show_arabic_column_names_in_english_reports':
+        showArabicColumnNamesInEnglishReports,
     'logo_base64': logoBase64,
     'updated_at': updatedAt,
   };
@@ -87,6 +97,8 @@ class SettingsModel {
           other.pairsPerCarton == pairsPerCarton &&
           other.requireAdminApprovalForSellerTransactionEdits ==
               requireAdminApprovalForSellerTransactionEdits &&
+          other.showArabicColumnNamesInEnglishReports ==
+              showArabicColumnNamesInEnglishReports &&
           other.logoBase64 == logoBase64 &&
           other.updatedAt == updatedAt);
 
@@ -96,6 +108,7 @@ class SettingsModel {
     currency,
     pairsPerCarton,
     requireAdminApprovalForSellerTransactionEdits,
+    showArabicColumnNamesInEnglishReports,
     logoBase64,
     updatedAt,
   );

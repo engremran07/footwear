@@ -10,6 +10,7 @@ import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/name_resolver.dart';
 import '../core/utils/pdf_export.dart';
+import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
@@ -780,27 +781,32 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                 (s, t) => s + t.balanceImpact,
                               );
                               final openingBalance = shop.balance - netTx;
-                              final labels = <String, String>{
-                                for (final k in const [
-                                  'date',
-                                  'description',
-                                  'debit',
-                                  'credit',
-                                  'running_balance',
-                                  'account_statement',
-                                  'opening_balance',
-                                  'net_payable',
-                                  'cash_in',
-                                  'cash_out',
-                                  'total_entries',
-                                  'page',
-                                  'report_date',
-                                  'generated_by',
-                                  'entry_by',
-                                  'duration',
-                                ])
-                                  k: tr(k, ref),
-                              };
+                              final labels = applyArabicColumnNamesToLabels(
+                                <String, String>{
+                                  for (final k in const [
+                                    'date',
+                                    'description',
+                                    'debit',
+                                    'credit',
+                                    'running_balance',
+                                    'account_statement',
+                                    'opening_balance',
+                                    'net_payable',
+                                    'cash_in',
+                                    'cash_out',
+                                    'total_entries',
+                                    'page',
+                                    'report_date',
+                                    'generated_by',
+                                    'entry_by',
+                                    'duration',
+                                  ])
+                                    k: tr(k, ref),
+                                },
+                                locale: locale,
+                                enabled: settings
+                                    .showArabicColumnNamesInEnglishReports,
+                              );
                               ExportSheet.show(
                                 context,
                                 ref,

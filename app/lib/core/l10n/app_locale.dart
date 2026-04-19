@@ -166,6 +166,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'Require admin approval for seller transaction edits',
     'require_approval_subtitle':
         'ON: seller edits are pending until approved. OFF: seller edits are auto-approved.',
+    'report_columns_arabic_title':
+        'Show Arabic column names in English reports',
+    'report_columns_arabic_subtitle':
+        'Applies to Date, Description, Entry By, Credit, Debit, and Balance in PDF/Excel/Image exports.',
     // ── Seller Sell-Stock ──
     'sell_stock': 'Sell Stock',
     'no_stock_available': 'No stock available',
@@ -1381,6 +1385,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'require_approval_title': 'طلب موافقة المسؤول على تعديلات البائع للمعاملات',
     'require_approval_subtitle':
         'تشغيل: تعديلات البائع تبقى معلقة حتى الموافقة. إيقاف: تُعتمد تلقائياً.',
+    'report_columns_arabic_title':
+        'إظهار أسماء الأعمدة العربية في التقارير الإنجليزية',
+    'report_columns_arabic_subtitle':
+        'ينطبق على التاريخ والتفاصيل وبواسطة وفاتورة وواصل والباقي في تصدير PDF وExcel والصور.',
     // ── بيع المخزون ──
     'sell_stock': 'بيع المخزون',
     'no_stock_available': 'لا يوجد مخزون متاح',
@@ -2589,6 +2597,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'سیلر ٹرانزیکشن ترامیم کے لیے ایڈمن منظوری لازمی کریں',
     'require_approval_subtitle':
         'آن: سیلر ترامیم منظوری تک زیر التوا رہیں گی۔ آف: خودکار منظوری ہو گی۔',
+    'report_columns_arabic_title': 'انگریزی رپورٹس میں عربی کالم نام دکھائیں',
+    'report_columns_arabic_subtitle':
+        'PDF/Excel/تصویر ایکسپورٹس میں Date, Description, Entry By, Credit, Debit اور Balance پر لاگو ہوتا ہے۔',
     // ── اسٹاک فروخت ──
     'sell_stock': 'اسٹاک بیچیں',
     'no_stock_available': 'کوئی اسٹاک دستیاب نہیں',

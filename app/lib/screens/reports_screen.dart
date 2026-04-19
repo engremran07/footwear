@@ -8,6 +8,7 @@ import '../core/utils/error_mapper.dart';
 import '../core/utils/name_resolver.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
+import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/route_model.dart';
 import '../models/shop_model.dart';
@@ -660,7 +661,11 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       // Reconcile opening balance so the final running balance equals
       // the stored customer.balance regardless of transaction-count limits.
       final netTx = txs.fold<double>(0.0, (s, t) => s + t.balanceImpact);
-      final labels = _labels(ref);
+      final labels = applyArabicColumnNamesToLabels(
+        _labels(ref),
+        locale: locale,
+        enabled: settings.showArabicColumnNamesInEnglishReports,
+      );
       final openingBalance = shop.balance - netTx;
       final acctCurrency = ref.read(routeCurrencyProvider(shop.routeId));
 
@@ -899,7 +904,11 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       final stockRemaining = (stockReceived - stockSold).clamp(0, 999999);
 
       final settings = await ref.read(settingsProvider.future);
-      final labels = _labels(ref);
+      final labels = applyArabicColumnNamesToLabels(
+        _labels(ref),
+        locale: locale,
+        enabled: settings.showArabicColumnNamesInEnglishReports,
+      );
       final sellerRouteCurrency = seller.assignedRouteIds.isNotEmpty
           ? ref.read(routeCurrencyProvider(seller.assignedRouteIds.first))
           : 'SAR';

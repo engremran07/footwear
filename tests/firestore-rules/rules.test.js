@@ -77,6 +77,7 @@ async function seedSettings(data = {}) {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await ctx.firestore().collection('settings').doc('global').set({
       require_admin_approval_for_seller_transaction_edits: false,
+      show_arabic_column_names_in_english_reports: false,
       last_invoice_number: 0,
       ...data,
     });

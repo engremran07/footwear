@@ -10,6 +10,7 @@ import '../core/utils/error_mapper.dart';
 import '../core/utils/name_resolver.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
+import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/route_model.dart';
 import '../models/shop_model.dart';
@@ -166,7 +167,9 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     final transactionsAsync = ref.watch(shopsAnalyticsTransactionsProvider);
     final routesAsync = user?.isAdmin == true
         ? ref.watch(routesProvider)
-        : null;
+        : (isSeller && sellerRouteIds.isNotEmpty
+              ? ref.watch(routesBySellerProvider(user!.id))
+              : null);
     final canCreateShop =
         user != null && (user.isAdmin || sellerRouteIds.isNotEmpty);
 
@@ -295,8 +298,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
               ],
             ),
           ),
-          // Route filter dropdown — admin only
-          if (user?.isAdmin == true && routesAsync != null)
+          // Route filter dropdown — admin and multi-route sellers
+          if (routesAsync != null)
             routesAsync.when(
               data: (routes) {
                 if (routes.length <= 1) return const SizedBox.shrink();
@@ -400,17 +403,18 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   );
                 }
 
-                // Admin: grouped by route
-                if (user?.isAdmin == true) {
-                  final routes = routesAsync?.value ?? [];
-                  if (routes.isNotEmpty) {
-                    return _AdminGroupedShopsView(
-                      shops: filtered,
-                      routes: routes,
-                      selectedFilter: _filter,
-                      flowByShop: scopedFlowByShop,
-                    );
-                  }
+                // Group by route for admin and sellers with multiple routes.
+                final routes = routesAsync?.value ?? [];
+                final shouldGroupByRoute =
+                    user?.isAdmin == true || routes.length > 1;
+                if (shouldGroupByRoute && routes.isNotEmpty) {
+                  return _AdminGroupedShopsView(
+                    shops: filtered,
+                    routes: routes,
+                    selectedFilter: _filter,
+                    flowByShop: scopedFlowByShop,
+                    showAssignedSellerNames: user?.isAdmin == true,
+                  );
                 }
 
                 // Detect duplicate shop names within the current list
@@ -744,26 +748,30 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
           ? '${routeMap[routeId]?.routeNumber ?? ''} · ${routeMap[routeId]?.name ?? ''}'
           : tr('all_routes', ref);
 
-      final labels = {
-        'date': tr('date', ref),
-        'description': tr('description', ref),
-        'debit': tr('debit', ref),
-        'credit': tr('credit', ref),
-        'running_balance': tr('running_balance', ref),
-        'account_statement': tr('account_statement', ref),
-        'opening_balance': tr('opening_balance', ref),
-        'net_payable': tr('net_payable', ref),
-        'page': tr('page', ref),
-        'report_date': tr('report_date', ref),
-        'cash_in': tr('cash_in', ref),
-        'cash_out': tr('cash_out', ref),
-        'total_entries': tr('total_entries', ref),
-        'generated_by': tr('generated_by', ref),
-        'entry_by': tr('entry_by', ref),
-        'name': tr('name', ref),
-        'route': tr('route', ref),
-        'all_routes': tr('all_routes', ref),
-      };
+      final labels = applyArabicColumnNamesToLabels(
+        {
+          'date': tr('date', ref),
+          'description': tr('description', ref),
+          'debit': tr('debit', ref),
+          'credit': tr('credit', ref),
+          'running_balance': tr('running_balance', ref),
+          'account_statement': tr('account_statement', ref),
+          'opening_balance': tr('opening_balance', ref),
+          'net_payable': tr('net_payable', ref),
+          'page': tr('page', ref),
+          'report_date': tr('report_date', ref),
+          'cash_in': tr('cash_in', ref),
+          'cash_out': tr('cash_out', ref),
+          'total_entries': tr('total_entries', ref),
+          'generated_by': tr('generated_by', ref),
+          'entry_by': tr('entry_by', ref),
+          'name': tr('name', ref),
+          'route': tr('route', ref),
+          'all_routes': tr('all_routes', ref),
+        },
+        locale: locale,
+        enabled: settings.showArabicColumnNamesInEnglishReports,
+      );
 
       // Flatten transactions into rows for Excel export
       final excelHeaders = [
@@ -1230,11 +1238,13 @@ class _AdminGroupedShopsView extends ConsumerStatefulWidget {
   final List<RouteModel> routes;
   final _ShopQuickFilter selectedFilter;
   final Map<String, _ShopFlowStats> flowByShop;
+  final bool showAssignedSellerNames;
   const _AdminGroupedShopsView({
     required this.shops,
     required this.routes,
     required this.selectedFilter,
     required this.flowByShop,
+    this.showAssignedSellerNames = true,
   });
 
   @override
@@ -1333,7 +1343,8 @@ class _AdminGroupedShopsViewState
                       ),
                     ),
                   ),
-                  if (r?.assignedSellerNames.isNotEmpty ?? false)
+                  if (widget.showAssignedSellerNames &&
+                      (r?.assignedSellerNames.isNotEmpty ?? false))
                     Text(
                       r!.assignedSellerNames.join(', '),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(

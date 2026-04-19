@@ -28,6 +28,45 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.8.3',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Reports now support a centralized bilingual column naming mode for English exports (Date, Description, Entry By, Credit, Debit, Balance).',
+          AppLocale.ar:
+              'التقارير تدعم الآن وضعًا مركزيًا لأسماء الأعمدة الثنائية في التصدير الإنجليزي (التاريخ، التفاصيل، بواسطة، فاتورة، واصل، الباقي).',
+          AppLocale.ur:
+              'رپورٹس میں اب انگریزی ایکسپورٹس کے لیے مرکزی بائی لنگول کالم نام موڈ شامل ہے (Date, Description, Entry By, Credit, Debit, Balance).',
+        },
+      ),
+      ChangelogItem(
+        emoji: '⚙️',
+        text: {
+          AppLocale.en:
+              'Admin Settings now includes a toggle to enable or disable Arabic column names in English PDF, Excel, and image report outputs.',
+          AppLocale.ar:
+              'تتضمن إعدادات المشرف الآن مفتاحًا لتفعيل أو تعطيل أسماء الأعمدة العربية داخل تقارير PDF وExcel والصور باللغة الإنجليزية.',
+          AppLocale.ur:
+              'ایڈمن سیٹنگز میں اب ایک ٹوگل شامل ہے جس سے انگریزی PDF، Excel اور امیج رپورٹس میں عربی کالم نام آن یا آف کیے جا سکتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔗',
+        text: {
+          AppLocale.en:
+              'Export naming behavior is now unified through one shared report-column utility, ensuring consistent output across all report screens.',
+          AppLocale.ar:
+              'سلوك تسمية الأعمدة في التصدير أصبح موحّدًا عبر أداة مشتركة واحدة لضمان الاتساق عبر جميع شاشات التقارير.',
+          AppLocale.ur:
+              'ایکسپورٹ کالم نامنگ اب ایک مشترکہ یوٹیلٹی کے ذریعے یکساں ہو گئی ہے، جس سے تمام رپورٹ اسکرینز میں آؤٹ پٹ مستقل رہتا ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.8.2',
     date: 'April 2026',
     items: [

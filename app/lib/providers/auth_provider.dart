@@ -88,6 +88,7 @@ class AuthNotifier extends AsyncNotifier<void> {
             'currency': 'SAR',
             'pairs_per_carton': 12,
             'require_admin_approval_for_seller_transaction_edits': false,
+            'show_arabic_column_names_in_english_reports': false,
             'updated_at': Timestamp.now(),
           }, SetOptions(merge: true));
     } catch (e) {

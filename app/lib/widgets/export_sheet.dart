@@ -8,6 +8,7 @@ import '../core/utils/download_helper.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/excel_export.dart';
 import '../core/utils/pdf_export.dart';
+import '../core/utils/report_column_naming.dart';
 import '../core/utils/share_helper.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/l10n/app_locale.dart';
@@ -103,6 +104,20 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
   AppLocale get _locale => ref.read(appLocaleProvider);
   bool get _isRtl => _locale == AppLocale.ar || _locale == AppLocale.ur;
 
+  List<String> _resolvedHeaders() {
+    final showArabic =
+        ref
+            .read(settingsProvider)
+            .value
+            ?.showArabicColumnNamesInEnglishReports ??
+        false;
+    return applyArabicColumnNamesToHeaders(
+      widget.headers,
+      locale: _locale,
+      enabled: showArabic,
+    );
+  }
+
   // ── Centralised execute wrapper ───────────────────────────────────────
   // Runs [action] with loading indicator on the tapped tile.
   // Pops the sheet on success; shows error IN the still-open sheet on failure.
@@ -124,6 +139,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
 
   // ── PDF bytes (lazy build) ────────────────────────────────────────────
   Future<Uint8List> _buildPdfBytes() async {
+    final headers = _resolvedHeaders();
     if (widget.rows.isEmpty && widget.pdfBytesBuilder == null) {
       throw Exception('no data to export');
     }
@@ -139,7 +155,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
     try {
       return await buildPdfTable(
         title: widget.title,
-        headers: widget.headers,
+        headers: headers,
         rows: widget.rows,
         subtitle: widget.subtitle,
         locale: _locale,
@@ -184,9 +200,10 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
   }
 
   Future<void> _downloadExcel() async {
+    final headers = _resolvedHeaders();
     final bytes = buildStyledExcelBytes(
       sheetName: widget.title,
-      headers: widget.headers,
+      headers: headers,
       rows: widget.rows,
       isRtl: _isRtl,
       generatedLabel: trRead('excel_generated', _locale),
@@ -196,9 +213,10 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
   }
 
   Future<void> _shareExcel() async {
+    final headers = _resolvedHeaders();
     final bytes = buildStyledExcelBytes(
       sheetName: widget.title,
-      headers: widget.headers,
+      headers: headers,
       rows: widget.rows,
       isRtl: _isRtl,
       generatedLabel: trRead('excel_generated', _locale),

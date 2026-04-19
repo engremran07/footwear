@@ -9,6 +9,7 @@ void main() {
       'company_name': 'Test Co',
       'currency': 'SAR',
       'pairs_per_carton': 12,
+      'show_arabic_column_names_in_english_reports': true,
       'logo_base64': 'aGVsbG8=', // base64('hello')
       'updated_at': ts,
     };
@@ -18,6 +19,7 @@ void main() {
       expect(m.companyName, 'Test Co');
       expect(m.currency, 'SAR');
       expect(m.pairsPerCarton, 12);
+      expect(m.showArabicColumnNamesInEnglishReports, isTrue);
       expect(m.logoBase64, 'aGVsbG8=');
       expect(m.logoBytes, isNotNull);
     });
@@ -27,6 +29,7 @@ void main() {
       expect(m.companyName, 'My Business');
       expect(m.currency, 'SAR');
       expect(m.pairsPerCarton, 12);
+      expect(m.showArabicColumnNamesInEnglishReports, isFalse);
       expect(m.logoBase64, isNull);
       expect(m.logoBytes, isNull);
     });
@@ -39,6 +42,7 @@ void main() {
         companyName: 'My Shop',
         currency: 'PKR',
         pairsPerCarton: 20,
+        showArabicColumnNamesInEnglishReports: true,
         updatedAt: ts,
       );
       final json = original.toJson();
@@ -46,6 +50,10 @@ void main() {
       expect(restored.companyName, original.companyName);
       expect(restored.currency, original.currency);
       expect(restored.pairsPerCarton, original.pairsPerCarton);
+      expect(
+        restored.showArabicColumnNamesInEnglishReports,
+        original.showArabicColumnNamesInEnglishReports,
+      );
     });
 
     test('copyWith can update and clear optional logo field', () {
