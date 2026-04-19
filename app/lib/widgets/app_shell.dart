@@ -329,6 +329,7 @@ class _AppShellState extends ConsumerState<AppShell>
     final profileLabel = tr('profile', ref);
     final signOutLabel = tr('sign_out', ref);
     final menuLabel = tr('menu', ref);
+    final backLabel = tr('back', ref);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -408,6 +409,7 @@ class _AppShellState extends ConsumerState<AppShell>
                             currentLocation: currentLocation,
                             isOnline: isOnline,
                             menuLabel: menuLabel,
+                            backLabel: backLabel,
                             drawerAnim: _drawerAnim,
                             isTopLevel: primaryItems.any(
                               (e) => e.route == currentLocation,
@@ -554,6 +556,7 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String currentLocation;
   final bool isOnline;
   final String menuLabel;
+  final String backLabel;
   final Animation<double> drawerAnim;
   final VoidCallback onMenuTap;
   final VoidCallback onProfileTap;
@@ -565,6 +568,7 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.currentLocation,
     required this.isOnline,
     required this.menuLabel,
+    required this.backLabel,
     required this.drawerAnim,
     required this.onMenuTap,
     required this.onProfileTap,
@@ -615,7 +619,7 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
             )
           : IconButton(
               icon: const Icon(Icons.arrow_back_ios_new),
-              tooltip: 'Back',
+              tooltip: backLabel,
               onPressed: onBack,
             ),
       title: _BreadcrumbTitle(location: currentLocation, isOnline: isOnline),

@@ -408,14 +408,21 @@ git push
 
 Evidence required: quote push output including branch name and commit hash.
 
-#### Step 14 — APK install to device (if device connected)
+#### Step 14 — APK install to device (NON-BYPASSABLE if device connected)
+
+> **HARD RULE:** Run `adb devices` after every release build. If ANY device is
+> listed (not just the header line), you MUST install the APK. Skipping this
+> step when a device is connected is a **blocked signoff** — the session is
+> considered incomplete regardless of all other evidence.
 
 ```powershell
-adb devices   # confirm device is listed
+adb devices   # if any device listed below header, MUST proceed with install
 adb -s <device-id> install -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-release.apk"
 ```
 
-Evidence required: `Success` from adb output.
+Evidence required: quote `Success` from adb output, OR quote exact `adb devices`
+output showing only the header (`List of devices attached`) with no devices — in
+which case document as "No device connected — install skipped".
 
 #### Step 15 — Final verification
 
