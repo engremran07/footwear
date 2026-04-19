@@ -26,7 +26,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _companyC = TextEditingController();
   final _ppcC = TextEditingController();
   bool _requireAdminApprovalForSellerTransactionEdits = false;
-  bool _showArabicColumnNamesInEnglishReports = false;
   bool _settingsLoaded = false;
   bool _isDirty = false;
 
@@ -52,8 +51,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
       _requireAdminApprovalForSellerTransactionEdits =
           s.requireAdminApprovalForSellerTransactionEdits;
-      _showArabicColumnNamesInEnglishReports =
-          s.showArabicColumnNamesInEnglishReports;
       _settingsLoaded = true;
     }
   }
@@ -65,8 +62,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         'pairs_per_carton': int.tryParse(_ppcC.text.trim()) ?? 12,
         'require_admin_approval_for_seller_transaction_edits':
             _requireAdminApprovalForSellerTransactionEdits,
-        'show_arabic_column_names_in_english_reports':
-            _showArabicColumnNamesInEnglishReports,
       });
       if (mounted) {
         setState(() => _isDirty = false);
@@ -153,18 +148,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       },
                       title: Text(tr('require_approval_title', ref)),
                       subtitle: Text(tr('require_approval_subtitle', ref)),
-                    ),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      value: _showArabicColumnNamesInEnglishReports,
-                      onChanged: (value) {
-                        setState(() {
-                          _showArabicColumnNamesInEnglishReports = value;
-                          _isDirty = true;
-                        });
-                      },
-                      title: Text(tr('report_columns_arabic_title', ref)),
-                      subtitle: Text(tr('report_columns_arabic_subtitle', ref)),
                     ),
                     const SizedBox(height: 16),
                     SizedBox(

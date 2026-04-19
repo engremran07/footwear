@@ -781,8 +781,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                 (s, t) => s + t.balanceImpact,
                               );
                               final openingBalance = shop.balance - netTx;
-                              final labels = applyArabicColumnNamesToLabels(
-                                <String, String>{
+                              final labels = trilingualLabels(<String, String>{
                                   for (final k in const [
                                     'date',
                                     'description',
@@ -802,21 +801,17 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                     'duration',
                                   ])
                                     k: tr(k, ref),
-                                },
-                                locale: locale,
-                                enabled: settings
-                                    .showArabicColumnNamesInEnglishReports,
-                              );
+                                });
                               ExportSheet.show(
                                 context,
                                 ref,
                                 title:
                                     '${shop.name} - ${tr('account_statement', ref)}',
                                 headers: [
-                                  tr('date', ref),
-                                  tr('type', ref),
-                                  tr('amount', ref),
-                                  tr('description', ref),
+                                  triCol('date'),
+                                  triCol('type'),
+                                  triCol('amount'),
+                                  triCol('description'),
                                 ],
                                 rows: sorted
                                     .map(

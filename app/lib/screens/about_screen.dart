@@ -180,7 +180,7 @@ class AboutScreen extends ConsumerWidget {
             leading: const Icon(Icons.article_outlined),
             title: Text(tr('open_source_licenses', ref)),
             subtitle: Text(
-              'Open source packages, app version, support contacts, and legal notice.',
+              tr('open_source_sub', ref),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: cs.onSurfaceVariant,
               ),

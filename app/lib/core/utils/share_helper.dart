@@ -54,7 +54,13 @@ Future<void> shareFile({
   }
 
   fileToShare ??= XFile.fromData(bytes, mimeType: mimeType, name: fileName);
-  await SharePlus.instance.share(ShareParams(files: [fileToShare], text: text));
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [fileToShare],
+      text: text,
+      fileNameOverrides: [fileName],
+    ),
+  );
 }
 
 /// Opens WhatsApp with a pre-filled message.

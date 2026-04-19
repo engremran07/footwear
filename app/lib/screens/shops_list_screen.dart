@@ -428,6 +428,12 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                     .map((e) => e.key)
                     .toSet();
 
+                // Pre-compute currency per routeId to avoid N per-tile
+                // provider subscriptions (prevents re-subscription flicker).
+                final currencyByRoute = <String, String>{
+                  for (final r in routes) r.id: r.currency,
+                };
+
                 return AppPullRefresh(
                   onRefresh: () async {
                     if (isSeller && sellerRouteIds.isNotEmpty) {
@@ -447,6 +453,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                       flowStats:
                           scopedFlowByShop[filtered[i].id] ??
                           const _ShopFlowStats(),
+                      currency: currencyByRoute[filtered[i].routeId] ?? 'SAR',
                       hasDuplicate: duplicateNames.contains(
                         filtered[i].name.toLowerCase(),
                       ),
@@ -484,11 +491,11 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
   void _exportAllShops(List<ShopModel> shops, List<RouteModel> routes) {
     final routeMap = {for (final r in routes) r.id: r};
     final headers = [
-      tr('name', ref),
-      tr('route', ref),
-      tr('phone', ref),
-      tr('area', ref),
-      tr('balance', ref),
+      triCol('name'),
+      triCol('route'),
+      triCol('phone'),
+      triCol('area'),
+      triCol('balance'),
     ];
     final rows = shops.map((s) {
       final r = routeMap[s.routeId];
@@ -522,10 +529,10 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     }
 
     final headers = [
-      tr('name', ref),
-      tr('phone', ref),
-      tr('area', ref),
-      tr('balance', ref),
+      triCol('name'),
+      triCol('phone'),
+      triCol('area'),
+      triCol('balance'),
     ];
 
     // Build combined rows with route section headers
@@ -748,8 +755,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
           ? '${routeMap[routeId]?.routeNumber ?? ''} · ${routeMap[routeId]?.name ?? ''}'
           : tr('all_routes', ref);
 
-      final labels = applyArabicColumnNamesToLabels(
-        {
+      final labels = trilingualLabels({
           'date': tr('date', ref),
           'description': tr('description', ref),
           'debit': tr('debit', ref),
@@ -768,19 +774,16 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
           'name': tr('name', ref),
           'route': tr('route', ref),
           'all_routes': tr('all_routes', ref),
-        },
-        locale: locale,
-        enabled: settings.showArabicColumnNamesInEnglishReports,
-      );
+        });
 
       // Flatten transactions into rows for Excel export
       final excelHeaders = [
-        labels['name']!,
-        labels['route']!,
-        labels['date']!,
-        labels['description']!,
-        labels['debit']!,
-        labels['credit']!,
+        triCol('name'),
+        triCol('route'),
+        triCol('date'),
+        triCol('description'),
+        triCol('debit'),
+        triCol('credit'),
       ];
       final excelRows = <List<String>>[];
       for (final section in sections) {
@@ -1094,10 +1097,12 @@ class _ShopTile extends ConsumerWidget {
   final _ShopQuickFilter selectedFilter;
   final _ShopFlowStats flowStats;
   final bool hasDuplicate;
+  final String currency;
   const _ShopTile({
     required this.shop,
     required this.selectedFilter,
     required this.flowStats,
+    required this.currency,
     this.hasDuplicate = false,
   });
 
@@ -1209,7 +1214,7 @@ class _ShopTile extends ConsumerWidget {
                 Text(
                   AppFormatters.currency(
                     trailingAmount,
-                    ref.watch(routeCurrencyProvider(shop.routeId)),
+                    currency,
                   ),
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -1419,6 +1424,7 @@ class _AdminGroupedShopsViewState
           shop: shop,
           selectedFilter: widget.selectedFilter,
           flowStats: widget.flowByShop[shop.id] ?? const _ShopFlowStats(),
+          currency: section.route?.currency ?? 'SAR',
           hasDuplicate: (sectionNames[shop.name.toLowerCase()] ?? 0) > 1,
         );
       },

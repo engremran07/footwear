@@ -8,7 +8,6 @@ import '../core/utils/download_helper.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/excel_export.dart';
 import '../core/utils/pdf_export.dart';
-import '../core/utils/report_column_naming.dart';
 import '../core/utils/share_helper.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/l10n/app_locale.dart';
@@ -105,17 +104,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
   bool get _isRtl => _locale == AppLocale.ar || _locale == AppLocale.ur;
 
   List<String> _resolvedHeaders() {
-    final showArabic =
-        ref
-            .read(settingsProvider)
-            .value
-            ?.showArabicColumnNamesInEnglishReports ??
-        false;
-    return applyArabicColumnNamesToHeaders(
-      widget.headers,
-      locale: _locale,
-      enabled: showArabic,
-    );
+    return widget.headers;
   }
 
   // ── Centralised execute wrapper ───────────────────────────────────────
@@ -232,20 +221,25 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
 
   /// Returns a white-background PNG from the given [pngBytes].
   Future<Uint8List> _withWhiteBackground(Uint8List pngBytes) async {
-    final codec = await ui.instantiateImageCodec(pngBytes);
-    final frame = await codec.getNextFrame();
-    final src = frame.image;
-    final recorder = ui.PictureRecorder();
-    final canvas = ui.Canvas(
-      recorder,
-      Rect.fromLTWH(0, 0, src.width.toDouble(), src.height.toDouble()),
-    );
-    canvas.drawColor(Colors.white, ui.BlendMode.src);
-    canvas.drawImage(src, Offset.zero, Paint());
-    final picture = recorder.endRecording();
-    final result = await picture.toImage(src.width, src.height);
-    final data = await result.toByteData(format: ui.ImageByteFormat.png);
-    return data!.buffer.asUint8List();
+    try {
+      final codec = await ui.instantiateImageCodec(pngBytes);
+      final frame = await codec.getNextFrame();
+      final src = frame.image;
+      final recorder = ui.PictureRecorder();
+      final canvas = ui.Canvas(
+        recorder,
+        Rect.fromLTWH(0, 0, src.width.toDouble(), src.height.toDouble()),
+      );
+      canvas.drawColor(Colors.white, ui.BlendMode.src);
+      canvas.drawImage(src, Offset.zero, Paint());
+      final picture = recorder.endRecording();
+      final result = await picture.toImage(src.width, src.height);
+      final data = await result.toByteData(format: ui.ImageByteFormat.png);
+      return data!.buffer.asUint8List();
+    } catch (e, stack) {
+      debugPrint('[ExportSheet] PNG codec error: $e\n$stack');
+      throw Exception('pdf_export_failed');
+    }
   }
 
   // ── UI ─────────────────────────────────────────────────────────────────

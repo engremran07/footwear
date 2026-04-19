@@ -163,12 +163,12 @@ class ReportsScreen extends ConsumerWidget {
     }
     final title = tr('shops_report', ref);
     final headers = [
-      tr('name', ref),
-      tr('route', ref),
-      tr('phone', ref),
-      tr('area', ref),
+      triCol('name'),
+      triCol('route'),
+      triCol('phone'),
+      triCol('area'),
       tr('city', ref),
-      tr('balance', ref),
+      triCol('balance'),
     ];
     final routeCurrencyMap = <String, String>{
       for (final r in ref.read(routesProvider).value ?? <RouteModel>[])
@@ -232,7 +232,7 @@ class ReportsScreen extends ConsumerWidget {
       return;
     }
     final title = tr('inventory_report', ref);
-    final headers = [tr('variant_name', ref), tr('stock_pairs', ref)];
+    final headers = [triCol('variant_name'), triCol('stock_pairs')];
     ExportSheet.show(
       context,
       ref,
@@ -259,11 +259,11 @@ class ReportsScreen extends ConsumerWidget {
     }
     final title = tr('transactions_report', ref);
     final headers = [
-      tr('date', ref),
-      tr('shop_name', ref),
-      tr('type', ref),
-      tr('amount', ref),
-      tr('description', ref),
+      triCol('date'),
+      triCol('shop_name'),
+      triCol('type'),
+      triCol('amount'),
+      triCol('description'),
     ];
     final rows = txs
         .map(
@@ -309,10 +309,10 @@ class ReportsScreen extends ConsumerWidget {
     }
     final title = tr('outstanding_report', ref);
     final headers = [
-      tr('name', ref),
-      tr('route', ref),
-      tr('phone', ref),
-      tr('balance', ref),
+      triCol('name'),
+      triCol('route'),
+      triCol('phone'),
+      triCol('balance'),
     ];
     final routeCurrencyMap2 = <String, String>{
       for (final r in ref.read(routesProvider).value ?? <RouteModel>[])
@@ -360,10 +360,10 @@ class ReportsScreen extends ConsumerWidget {
     }
     final title = tr('bad_debts_report', ref);
     final headers = [
-      tr('name', ref),
-      tr('phone', ref),
-      tr('bad_debt_amount', ref),
-      tr('date', ref),
+      triCol('name'),
+      triCol('phone'),
+      triCol('bad_debt_amount'),
+      triCol('date'),
     ];
     final routeCurrencyMap3 = <String, String>{
       for (final r in ref.read(routesProvider).value ?? <RouteModel>[])
@@ -623,7 +623,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       'generated_by',
       'duration',
     ];
-    return {for (final k in keys) k: tr(k, ref)};
+    return trilingualLabels({for (final k in keys) k: tr(k, ref)});
   }
 
   Future<void> _generate() async {
@@ -661,11 +661,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       // Reconcile opening balance so the final running balance equals
       // the stored customer.balance regardless of transaction-count limits.
       final netTx = txs.fold<double>(0.0, (s, t) => s + t.balanceImpact);
-      final labels = applyArabicColumnNamesToLabels(
-        _labels(ref),
-        locale: locale,
-        enabled: settings.showArabicColumnNamesInEnglishReports,
-      );
+      final labels = _labels(ref);
       final openingBalance = shop.balance - netTx;
       final acctCurrency = ref.read(routeCurrencyProvider(shop.routeId));
 
@@ -676,10 +672,10 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
         ref,
         title: '${shop.name} - ${tr('account_statement', ref)}',
         headers: [
-          tr('date', ref),
-          tr('type', ref),
-          tr('amount', ref),
-          tr('description', ref),
+          triCol('date'),
+          triCol('type'),
+          triCol('amount'),
+          triCol('description'),
         ],
         rows: txs
             .map(
@@ -831,7 +827,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       'report_date',
       'page',
     ];
-    return {for (final k in keys) k: tr(k, ref)};
+    return trilingualLabels({for (final k in keys) k: tr(k, ref)});
   }
 
   Future<void> _generate() async {
@@ -904,11 +900,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       final stockRemaining = (stockReceived - stockSold).clamp(0, 999999);
 
       final settings = await ref.read(settingsProvider.future);
-      final labels = applyArabicColumnNamesToLabels(
-        _labels(ref),
-        locale: locale,
-        enabled: settings.showArabicColumnNamesInEnglishReports,
-      );
+      final labels = _labels(ref);
       final sellerRouteCurrency = seller.assignedRouteIds.isNotEmpty
           ? ref.read(routeCurrencyProvider(seller.assignedRouteIds.first))
           : 'SAR';
@@ -919,10 +911,10 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
         ref,
         title: '${seller.displayName} - ${tr('seller_report', ref)}',
         headers: [
-          tr('shop', ref),
-          tr('stock_sold', ref),
-          tr('revenue', ref),
-          tr('outstanding', ref),
+          triCol('shop'),
+          triCol('stock_sold'),
+          triCol('revenue'),
+          triCol('outstanding'),
         ],
         rows: shopMap.values
             .map(

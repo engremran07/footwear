@@ -180,7 +180,11 @@ service cloud.firestore {
     // --- products -----------------------------------------------------------
     match /products/{productId} {
       allow read: if isActiveUser();
-      allow create, update: if isAdmin() && docSizeOk();
+      allow create, update: if isAdmin() && docSizeOk()
+        && (!('image_url' in request.resource.data)
+          || !(request.resource.data.image_url is string)
+          || request.resource.data.image_url == ''
+          || request.resource.data.image_url.matches('https://.*'));
       allow delete: if isAdmin();
     }
 
@@ -293,7 +297,10 @@ service cloud.firestore {
                 'edit_request_new_created_at'
               ]) &&
               request.resource.data.edit_request_pending == true &&
-              request.resource.data.edit_request_status == 'pending'
+              request.resource.data.edit_request_status == 'pending' &&
+              (!('edit_request_new_amount' in request.resource.data) ||
+                (request.resource.data.edit_request_new_amount is number &&
+                  request.resource.data.edit_request_new_amount > 0))
             ) ||
             (
               !requiresSellerTransactionEditApproval() &&
@@ -311,7 +318,10 @@ service cloud.firestore {
                 'edit_request_new_description',
                 'edit_request_new_sale_type',
                 'edit_request_new_created_at'
-              ])
+              ]) &&
+              (!('edit_request_new_amount' in request.resource.data) ||
+                (request.resource.data.edit_request_new_amount is number &&
+                  request.resource.data.edit_request_new_amount > 0))
             )
           )
         );

@@ -323,10 +323,11 @@ class _SellerDashboard extends ConsumerWidget {
       sellerInventoryTotalPairsProvider(user.id),
     );
 
-    // Unified loading gate: show shimmer until routes AND shops both settle.
-    // Prevents route cards rendering with zero shop data (causing flicker) and
-    // prevents independent-section spinners popping in at different times.
-    if (routesAsync.isLoading || shopsAsync.isLoading) {
+    // Stale-while-revalidate gate: shimmer only on cold start (no data yet).
+    // Once data has loaded at least once, keep showing stale data during
+    // provider re-subscriptions to prevent shimmer flash on auth stream
+    // emissions (hasValue stays true even while isLoading is true on reload).
+    if (!routesAsync.hasValue || !shopsAsync.hasValue) {
       return Scaffold(
         body: RefreshIndicator(
           onRefresh: () async {
@@ -356,9 +357,9 @@ class _SellerDashboard extends ConsumerWidget {
       );
     }
 
-    // All data is ready — extract synchronously (no nested .when()).
-    final routes = routesAsync.value ?? const <RouteModel>[];
-    final shops = shopsAsync.value ?? const <ShopModel>[];
+    // All data is ready (hasValue == true) — extract synchronously.
+    final routes = routesAsync.requireValue;
+    final shops = shopsAsync.requireValue;
     // Inventory: use .value if loaded, 0 while still loading — stat grid
     // renders immediately without a nested spinner.
     final pairs = inventoryPairsAsync.value ?? 0;

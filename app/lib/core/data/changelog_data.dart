@@ -28,6 +28,34 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.8.5',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🌐',
+        text: {
+          AppLocale.en:
+              'Product details screen — labels (In Stock, Out, Quantity) now display correctly in Arabic and Urdu.',
+          AppLocale.ar:
+              'شاشة تفاصيل المنتج — التسميات (في المخزون، نافد، الكمية) تظهر الآن بشكل صحيح بالعربية والأردية.',
+          AppLocale.ur:
+              'پروڈکٹ تفصیلات اسکرین — لیبلز (اسٹاک میں، خالی، مقدار) اب عربی اور اردو میں درست ظاہر ہوتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔒',
+        text: {
+          AppLocale.en:
+              'Security improvements: product image links are now validated, and transaction edit requests are checked for valid amounts.',
+          AppLocale.ar:
+              'تحسينات الأمان: روابط صور المنتج تُتحقق منها الآن، وطلبات تعديل المعاملات تُفحص للتأكد من صحة المبالغ.',
+          AppLocale.ur:
+              'سیکیورٹی بہتریاں: پروڈکٹ امیج لنکس کی اب توثیق کی جاتی ہے، اور ٹرانزیکشن ترمیم کی درخواستوں میں رقم کی جانچ ہوتی ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.8.4',
     date: 'April 2026',
     items: [

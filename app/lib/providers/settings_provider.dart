@@ -19,7 +19,6 @@ final settingsProvider = StreamProvider<SettingsModel>((ref) {
             currency: 'SAR',
             pairsPerCarton: 12,
             requireAdminApprovalForSellerTransactionEdits: false,
-            showArabicColumnNamesInEnglishReports: false,
             updatedAt: Timestamp.now(),
           );
         }

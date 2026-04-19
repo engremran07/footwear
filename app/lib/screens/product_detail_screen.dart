@@ -62,7 +62,7 @@ class ProductDetailScreen extends ConsumerWidget {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.share),
-                      tooltip: 'Share product info',
+                      tooltip: tr('share_product', ref),
                       onPressed: () {
                         final variants = variantsAsync.value ?? [];
                         final ppc = settings?.pairsPerCarton ?? 12;
@@ -173,14 +173,14 @@ class ProductDetailScreen extends ConsumerWidget {
                             ),
                             _PStatChip(
                               icon: Icons.check_circle,
-                              label: 'In Stock',
+                              label: tr('lbl_in_stock', ref),
                               value: '$inStock',
                               color: AppTheme.clearFg(cs),
                             ),
                             if (outOfStock > 0)
                               _PStatChip(
                                 icon: Icons.cancel,
-                                label: 'Out',
+                                label: tr('lbl_out', ref),
                                 value: '$outOfStock',
                                 color: AppTheme.debtFg(cs),
                               ),
@@ -249,7 +249,7 @@ class ProductDetailScreen extends ConsumerWidget {
                               ),
                             ),
                             subtitle: Text(
-                              'Quantity: ${AppFormatters.number(v.quantityAvailable)} pairs',
+                              '${tr('qty', ref)}: ${AppFormatters.number(v.quantityAvailable)} ${tr('pairs', ref)}',
                             ),
                             trailing: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 130),

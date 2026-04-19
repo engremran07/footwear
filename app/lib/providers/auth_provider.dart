@@ -9,6 +9,7 @@ import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
 import '../core/services/admin_identity_service.dart';
 import '../models/user_model.dart';
+import 'alert_provider.dart';
 import 'dashboard_provider.dart';
 import 'inventory_transaction_provider.dart';
 import 'invoice_provider.dart';
@@ -88,7 +89,6 @@ class AuthNotifier extends AsyncNotifier<void> {
             'currency': 'SAR',
             'pairs_per_carton': 12,
             'require_admin_approval_for_seller_transaction_edits': false,
-            'show_arabic_column_names_in_english_reports': false,
             'updated_at': Timestamp.now(),
           }, SetOptions(merge: true));
     } catch (e) {
@@ -142,6 +142,7 @@ class AuthNotifier extends AsyncNotifier<void> {
     // session cannot access cached data from a prior admin session.
     ref.invalidate(sellerTransactionsExportProvider);
     ref.invalidate(sellerInventoryExportProvider);
+    ref.invalidate(alertCountsProvider);
   }
 
   Future<void> signIn(

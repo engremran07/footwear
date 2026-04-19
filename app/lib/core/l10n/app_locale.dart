@@ -166,10 +166,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'Require admin approval for seller transaction edits',
     'require_approval_subtitle':
         'ON: seller edits are pending until approved. OFF: seller edits are auto-approved.',
-    'report_columns_arabic_title':
-        'Show Arabic column names in English reports',
-    'report_columns_arabic_subtitle':
-        'Applies to Date, Description, Entry By, Credit, Debit, and Balance in PDF/Excel/Image exports.',
     // ── Seller Sell-Stock ──
     'sell_stock': 'Sell Stock',
     'no_stock_available': 'No stock available',
@@ -1011,6 +1007,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'lbl_transferring': 'Transferring: %s',
     'msg_exceeds_stock': 'Exceeds available stock (%s)',
     'lbl_in_stock': 'in stock',
+    'lbl_out': 'Out',
+    'no_data_available': 'No data available',
+    'share_product': 'Share product info',
+    'open_source_sub': 'Open source packages, licenses, and legal notice.',
     'lbl_transfer': 'Transfer',
 
     // ── Settings Screen ──
@@ -1385,10 +1385,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'require_approval_title': 'طلب موافقة المسؤول على تعديلات البائع للمعاملات',
     'require_approval_subtitle':
         'تشغيل: تعديلات البائع تبقى معلقة حتى الموافقة. إيقاف: تُعتمد تلقائياً.',
-    'report_columns_arabic_title':
-        'إظهار أسماء الأعمدة العربية في التقارير الإنجليزية',
-    'report_columns_arabic_subtitle':
-        'ينطبق على التاريخ والتفاصيل وبواسطة وفاتورة وواصل والباقي في تصدير PDF وExcel والصور.',
     // ── بيع المخزون ──
     'sell_stock': 'بيع المخزون',
     'no_stock_available': 'لا يوجد مخزون متاح',
@@ -1404,8 +1400,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── كشف الحساب ──
     'account_statement': 'كشف حساب',
     'running_balance': 'الرصيد',
-    'debit': 'مدين',
-    'credit': 'دائن',
+    'debit': 'فاتورة',
+    'credit': 'واصل',
     'opening_balance': 'الرصيد الافتتاحي',
     'final_balance': 'الرصيد النهائي',
     'net_payable': 'صافي المستحق',
@@ -2222,6 +2218,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'lbl_transferring': 'جارٍ التحويل: %s',
     'msg_exceeds_stock': 'يتجاوز المخزون المتاح (%s)',
     'lbl_in_stock': 'في المخزون',
+    'lbl_out': 'نافد',
+    'no_data_available': 'لا توجد بيانات',
+    'share_product': 'مشاركة معلومات المنتج',
+    'open_source_sub': 'حزم مفتوحة المصدر والتراخيص والإشعار القانوني.',
     'lbl_transfer': 'تحويل',
 
     // ── Settings Screen ──
@@ -2597,9 +2597,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'سیلر ٹرانزیکشن ترامیم کے لیے ایڈمن منظوری لازمی کریں',
     'require_approval_subtitle':
         'آن: سیلر ترامیم منظوری تک زیر التوا رہیں گی۔ آف: خودکار منظوری ہو گی۔',
-    'report_columns_arabic_title': 'انگریزی رپورٹس میں عربی کالم نام دکھائیں',
-    'report_columns_arabic_subtitle':
-        'PDF/Excel/تصویر ایکسپورٹس میں Date, Description, Entry By, Credit, Debit اور Balance پر لاگو ہوتا ہے۔',
     // ── اسٹاک فروخت ──
     'sell_stock': 'اسٹاک بیچیں',
     'no_stock_available': 'کوئی اسٹاک دستیاب نہیں',
@@ -2615,8 +2612,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── کھاتہ بیان ──
     'account_statement': 'کھاتہ بیان',
     'running_balance': 'بقایا',
-    'debit': 'واجبات',
-    'credit': 'جمع',
+    'debit': 'فاتورة',
+    'credit': 'واصل',
     'opening_balance': 'ابتدائی بیلنس',
     'final_balance': 'آخری بیلنس',
     'net_payable': 'خالص واجب الادا',
@@ -3440,6 +3437,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'lbl_transferring': 'منتقل ہو رہا ہے: %s',
     'msg_exceeds_stock': 'دستیاب اسٹاک سے زیادہ (%s)',
     'lbl_in_stock': 'اسٹاک میں',
+    'lbl_out': 'خالی',
+    'no_data_available': 'کوئی ڈیٹا نہیں',
+    'share_product': 'پروڈکٹ کی معلومات شیئر کریں',
+    'open_source_sub': 'اوپن سورس پیکیجز، لائسنس اور قانونی نوٹس۔',
     'lbl_transfer': 'منتقل کریں',
 
     // ── Settings Screen ──
