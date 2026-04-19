@@ -127,16 +127,15 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     required String displayName,
     required String role,
     String? phone,
-    String? assignedRouteId,
-    String? assignedRouteName,
+    List<String> assignedRouteIds = const [],
+    List<String> assignedRouteNames = const [],
   }) async {
     final adminUid = await _requireAdminUid();
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final normalizedRole = _normalizeRole(role);
-      final routeId = assignedRouteId?.trim() ?? '';
-      if (normalizedRole == 'seller' && routeId.isEmpty) {
-        throw ArgumentError('Seller accounts require an assigned route.');
+      if (normalizedRole == 'seller' && assignedRouteIds.isEmpty) {
+        throw ArgumentError('Seller accounts require at least one assigned route.');
       }
 
       final trimmedEmail = email.trim().toLowerCase();
@@ -181,22 +180,24 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'email': trimmedEmail,
           'display_name': trimmedName,
           'role': normalizedRole,
-          'assigned_route_id': normalizedRole == 'seller' ? routeId : null,
-          'assigned_route_name': normalizedRole == 'seller'
-              ? assignedRouteName
-              : null,
+          'assigned_route_ids': normalizedRole == 'seller' ? assignedRouteIds : [],
+          'assigned_route_names': normalizedRole == 'seller' ? assignedRouteNames : [],
           'active': true,
           'created_by': adminUid,
           'created_at': now,
           'updated_at': now,
         });
 
-        if (normalizedRole == 'seller' && routeId.isNotEmpty) {
-          batch.update(db.collection(Collections.routes).doc(routeId), {
-            'assigned_seller_id': newUid,
-            'assigned_seller_name': trimmedName,
-            'updated_at': now,
-          });
+        // Add this seller to each assigned route
+        if (normalizedRole == 'seller') {
+          for (final routeId in assignedRouteIds) {
+            if (routeId.trim().isEmpty) continue;
+            batch.update(db.collection(Collections.routes).doc(routeId), {
+              'assigned_seller_ids': FieldValue.arrayUnion([newUid]),
+              'assigned_seller_names': FieldValue.arrayUnion([trimmedName]),
+              'updated_at': now,
+            });
+          }
         }
 
         await batch.commit();
@@ -214,7 +215,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
   Future<void> updateUser(
     String uid,
     Map<String, dynamic> data, {
-    String? previousRouteId,
+    List<String> previousRouteIds = const [],
   }) async {
     final trimmedUid = uid.trim();
     if (trimmedUid.isEmpty) {
@@ -234,13 +235,11 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     }
 
     final hasRoleUpdate = updateData.containsKey('role');
-    final hasRouteIdUpdate = updateData.containsKey('assigned_route_id');
-    final hasRouteNameUpdate = updateData.containsKey('assigned_route_name');
+    final hasRouteIdsUpdate = updateData.containsKey('assigned_route_ids');
     final updatedRole = hasRoleUpdate ? updateData['role'] as String? : null;
-    final normalizedPreviousRouteId = (previousRouteId ?? '').trim();
-    final newRouteId = hasRouteIdUpdate
-        ? (updateData['assigned_route_id'] as String?)?.trim()
-        : null;
+    final newRouteIds = hasRouteIdsUpdate
+        ? List<String>.from(updateData['assigned_route_ids'] as List? ?? [])
+        : <String>[];
     final displayName = (updateData['display_name'] as String?)?.trim();
 
     if (!isAdmin) {
@@ -256,29 +255,18 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'Only admins can update role, route, or account status',
         );
       }
-      updateData.remove('assigned_route_id');
-      updateData.remove('assigned_route_name');
+      updateData.remove('assigned_route_ids');
+      updateData.remove('assigned_route_names');
       updateData.remove('role');
     } else {
-      if (updatedRole == 'seller' &&
-          (newRouteId == null || newRouteId.isEmpty)) {
-        throw ArgumentError('Seller accounts require an assigned route.');
+      if (updatedRole == 'seller' && newRouteIds.isEmpty && hasRouteIdsUpdate) {
+        throw ArgumentError('Seller accounts require at least one assigned route.');
       }
 
       // Non-seller users must not retain a route assignment.
       if (updatedRole != null && updatedRole != 'seller') {
-        updateData['assigned_route_id'] = null;
-        updateData['assigned_route_name'] = null;
-      } else {
-        if (hasRouteIdUpdate) {
-          updateData['assigned_route_id'] =
-              (newRouteId == null || newRouteId.isEmpty) ? null : newRouteId;
-        } else {
-          updateData.remove('assigned_route_id');
-        }
-        if (!hasRouteNameUpdate) {
-          updateData.remove('assigned_route_name');
-        }
+        updateData['assigned_route_ids'] = [];
+        updateData['assigned_route_names'] = [];
       }
     }
 
@@ -291,31 +279,37 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       'updated_at': now,
     });
 
-    if (isAdmin &&
-        hasRouteIdUpdate &&
-        normalizedPreviousRouteId.isNotEmpty &&
-        normalizedPreviousRouteId != newRouteId) {
-      batch.update(
-        db.collection(Collections.routes).doc(normalizedPreviousRouteId),
-        {
-          'assigned_seller_id': null,
-          'assigned_seller_name': null,
-          'updated_at': now,
-        },
-      );
-    }
+    if (isAdmin && hasRouteIdsUpdate) {
+      // Diff: removed routes
+      final removedRouteIds = previousRouteIds
+          .where((id) => id.isNotEmpty && !newRouteIds.contains(id))
+          .toList();
+      for (final routeId in removedRouteIds) {
+        batch.update(
+          db.collection(Collections.routes).doc(routeId),
+          {
+            'assigned_seller_ids': FieldValue.arrayRemove([trimmedUid]),
+            'assigned_seller_names': FieldValue.arrayRemove(
+              displayName != null ? [displayName] : [],
+            ),
+            'updated_at': now,
+          },
+        );
+      }
 
-    if (isAdmin &&
-        hasRouteIdUpdate &&
-        newRouteId != null &&
-        newRouteId.isNotEmpty &&
-        displayName != null &&
-        displayName.isNotEmpty) {
-      batch.update(db.collection(Collections.routes).doc(newRouteId), {
-        'assigned_seller_id': trimmedUid,
-        'assigned_seller_name': displayName,
-        'updated_at': now,
-      });
+      // Diff: added routes
+      final addedRouteIds = newRouteIds
+          .where((id) => id.isNotEmpty && !previousRouteIds.contains(id))
+          .toList();
+      for (final routeId in addedRouteIds) {
+        batch.update(db.collection(Collections.routes).doc(routeId), {
+          'assigned_seller_ids': FieldValue.arrayUnion([trimmedUid]),
+          'assigned_seller_names': FieldValue.arrayUnion(
+            displayName != null ? [displayName] : [],
+          ),
+          'updated_at': now,
+        });
+      }
     }
 
     await batch.commit();
@@ -345,18 +339,24 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     final db = FirebaseFirestore.instance;
     final now = Timestamp.now();
 
-    // Clear any route assignments for this seller
+    // Read user doc to get display_name for arrayRemove
+    final userDoc = await db.collection(Collections.users).doc(trimmedUid).get();
+    final userName = (userDoc.data()?['display_name'] as String?) ?? '';
+
+    // Clear seller from all assigned routes (array + legacy scalar)
     final routeSnap = await db
         .collection(Collections.routes)
-        .where('assigned_seller_id', isEqualTo: trimmedUid)
+        .where('assigned_seller_ids', arrayContains: trimmedUid)
         .limit(20)
         .get();
 
     final batch = db.batch();
     for (final routeDoc in routeSnap.docs) {
       batch.update(routeDoc.reference, {
-        'assigned_seller_id': null,
-        'assigned_seller_name': null,
+        'assigned_seller_ids': FieldValue.arrayRemove([trimmedUid]),
+        'assigned_seller_names': FieldValue.arrayRemove(
+          userName.isNotEmpty ? [userName] : [],
+        ),
         'updated_at': now,
       });
     }
@@ -364,6 +364,8 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     // Deactivate the user (soft-delete)
     batch.update(db.collection(Collections.users).doc(trimmedUid), {
       'active': false,
+      'assigned_route_ids': [],
+      'assigned_route_names': [],
       'updated_at': now,
     });
 
@@ -379,12 +381,12 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     await FirebaseAuth.instance.sendPasswordResetEmail(email: trimmedEmail);
   }
 
-  /// Reactivates a soft-deleted user and re-assigns them to a route atomically.
-  /// DI-06: deleteUser() clears route; must re-assign on reactivation.
+  /// Reactivates a soft-deleted user and re-assigns them to routes atomically.
+  /// DI-06: deleteUser() clears routes; must re-assign on reactivation.
   Future<void> reactivateUser({
     required String uid,
-    required String routeId,
-    required String routeName,
+    required List<String> routeIds,
+    required List<String> routeNames,
     required String displayName,
   }) async {
     await _requireAdminUid();
@@ -394,20 +396,22 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     final db = FirebaseFirestore.instance;
     final batch = db.batch();
     final now = Timestamp.now();
+    final trimmedName = displayName.trim();
 
     batch.update(db.collection(Collections.users).doc(trimmedUid), {
       'active': true,
-      'assigned_route_id': routeId.trim().isNotEmpty ? routeId.trim() : null,
-      'assigned_route_name': routeId.trim().isNotEmpty
-          ? routeName.trim()
-          : null,
+      'assigned_route_ids': routeIds,
+      'assigned_route_names': routeNames,
       'updated_at': now,
     });
 
-    if (routeId.trim().isNotEmpty) {
+    for (final routeId in routeIds) {
+      if (routeId.trim().isEmpty) continue;
       batch.update(db.collection(Collections.routes).doc(routeId.trim()), {
-        'assigned_seller_id': trimmedUid,
-        'assigned_seller_name': displayName.trim(),
+        'assigned_seller_ids': FieldValue.arrayUnion([trimmedUid]),
+        'assigned_seller_names': FieldValue.arrayUnion(
+          trimmedName.isNotEmpty ? [trimmedName] : [],
+        ),
         'updated_at': now,
       });
     }

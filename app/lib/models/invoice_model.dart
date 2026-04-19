@@ -53,6 +53,7 @@ class InvoiceModel {
   final String? linkedInvoiceId; // for credit notes referencing original
   final String? idempotencyKey;
   final Map<String, int> sellerInventoryDeductions;
+  final String currency; // SAR | PKR
   final String createdBy;
   final Timestamp createdAt;
   final Timestamp updatedAt;
@@ -78,6 +79,7 @@ class InvoiceModel {
     this.linkedInvoiceId,
     this.idempotencyKey,
     this.sellerInventoryDeductions = const {},
+    this.currency = 'SAR',
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
@@ -131,6 +133,7 @@ class InvoiceModel {
         for (final entry in rawDeductions.entries)
           entry.key: (entry.value as num?)?.toInt() ?? 0,
       },
+      currency: json['currency'] as String? ?? 'SAR',
       createdBy: json['created_by'] as String? ?? '',
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
@@ -158,6 +161,7 @@ class InvoiceModel {
     if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
     if (sellerInventoryDeductions.isNotEmpty)
       'seller_inventory_deductions': sellerInventoryDeductions,
+    'currency': currency,
     'created_by': createdBy,
     'created_at': createdAt,
     'updated_at': updatedAt,

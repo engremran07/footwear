@@ -206,15 +206,15 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
 
     deleted += await _deleteCollection(Collections.routes);
 
-    // Clear assigned_route_id on all users
+    // Clear assigned route arrays on all users
     final users = await _db.collection(Collections.users).get();
     for (var i = 0; i < users.docs.length; i += 400) {
       final batch = _db.batch();
       final end = (i + 400 > users.docs.length) ? users.docs.length : i + 400;
       for (var j = i; j < end; j++) {
         batch.update(users.docs[j].reference, {
-          'assigned_route_id': null,
-          'assigned_route_name': null,
+          'assigned_route_ids': [],
+          'assigned_route_names': [],
           'updated_at': Timestamp.now(),
         });
       }

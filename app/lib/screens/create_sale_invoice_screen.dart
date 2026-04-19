@@ -182,11 +182,11 @@ class _CreateSaleInvoiceScreenState
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final routeId = user.assignedRouteId ?? '';
+    final routeIds = user.assignedRouteIds;
     final shopsAsync = user.isAdmin
         ? ref.watch(shopsProvider)
-        : (routeId.isNotEmpty
-              ? ref.watch(shopsByRouteProvider(routeId))
+        : (routeIds.isNotEmpty
+              ? ref.watch(sellerAllShopsProvider)
               : const AsyncData<List<ShopModel>>([]));
     // Both admin and seller use their own seller_inventory (vehicle stock).
     // Admin loads stock from warehouse to their own seller_inventory via the
@@ -279,11 +279,10 @@ class _CreateSaleInvoiceScreenState
                     error: e,
                     ref: ref,
                     onRetry: () {
-                      final assignedRouteId = user.assignedRouteId ?? '';
                       if (user.isAdmin) {
                         ref.invalidate(shopsProvider);
-                      } else if (assignedRouteId.isNotEmpty) {
-                        ref.invalidate(shopsByRouteProvider(assignedRouteId));
+                      } else if (user.assignedRouteIds.isNotEmpty) {
+                        ref.invalidate(sellerAllShopsProvider);
                       }
                     },
                   ),
@@ -832,7 +831,7 @@ class _CreateSaleInvoiceScreenState
             shopName: _selectedShop!.name,
             routeId: _selectedShop!.routeId.isNotEmpty
                 ? _selectedShop!.routeId
-                : (user.assignedRouteId ?? ''),
+                : (user.assignedRouteIds.firstOrNull ?? ''),
             sellerId: user.id,
             sellerName: user.displayName,
             items: items,

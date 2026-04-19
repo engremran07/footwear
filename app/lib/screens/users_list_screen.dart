@@ -139,8 +139,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       _search.isEmpty ||
                       u.displayName.toLowerCase().contains(_search) ||
                       u.email.toLowerCase().contains(_search) ||
-                      (u.assignedRouteName?.toLowerCase().contains(_search) ??
-                          false);
+                      u.assignedRouteNames.any(
+                        (n) => n.toLowerCase().contains(_search),
+                      );
                   final matchesRole =
                       _roleFilter == null ||
                       (_roleFilter == 'admin' ? u.isAdmin : u.isSeller);
@@ -203,20 +204,14 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     final passC = TextEditingController();
     final nameC = TextEditingController();
     String role = 'seller';
-    String? selectedRouteId;
-    String? selectedRouteName;
+    final selectedRouteIds = <String>[];
+    final selectedRouteNames = <String>[];
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
           final routes = ref.watch(routesProvider).value ?? [];
-          final availableRoutes = routes
-              .where(
-                (r) =>
-                    r.assignedSellerId == null || r.assignedSellerId!.isEmpty,
-              )
-              .toList();
           return AlertDialog(
             title: Text(tr('new_user', ref)),
             content: SingleChildScrollView(
@@ -258,33 +253,41 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     onChanged: (v) => setS(() {
                       role = v ?? 'seller';
                       if (role != 'seller') {
-                        selectedRouteId = null;
-                        selectedRouteName = null;
+                        selectedRouteIds.clear();
+                        selectedRouteNames.clear();
                       }
                     }),
                   ),
                   if (role == 'seller') ...[
                     const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedRouteId,
-                      decoration: InputDecoration(
-                        labelText: tr('assigned_route', ref),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        tr('assigned_routes', ref),
+                        style: Theme.of(ctx).textTheme.bodySmall,
                       ),
-                      items: availableRoutes
-                          .map(
-                            (r) => DropdownMenuItem(
-                              value: r.id,
-                              child: Text(r.name),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) => setS(() {
-                        selectedRouteId = v;
-                        selectedRouteName = routes
-                            .where((r) => r.id == v)
-                            .map((r) => r.name)
-                            .firstOrNull;
-                      }),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: routes.map((r) {
+                        final selected = selectedRouteIds.contains(r.id);
+                        return FilterChip(
+                          label: Text(r.name),
+                          selected: selected,
+                          onSelected: (_) => setS(() {
+                            if (selected) {
+                              final idx = selectedRouteIds.indexOf(r.id);
+                              selectedRouteIds.removeAt(idx);
+                              selectedRouteNames.removeAt(idx);
+                            } else {
+                              selectedRouteIds.add(r.id);
+                              selectedRouteNames.add(r.name);
+                            }
+                          }),
+                        );
+                      }).toList(),
                     ),
                   ],
                 ],
@@ -310,9 +313,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     }
                     return;
                   }
-                  if (role == 'seller' &&
-                      (selectedRouteId == null ||
-                          selectedRouteId!.trim().isEmpty)) {
+                  if (role == 'seller' && selectedRouteIds.isEmpty) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         warningSnackBar(tr('msg_seller_needs_route', ref)),
@@ -328,8 +329,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                           password: passC.text.trim(),
                           displayName: nameC.text.trim(),
                           role: role,
-                          assignedRouteId: selectedRouteId,
-                          assignedRouteName: selectedRouteName,
+                          assignedRouteIds: selectedRouteIds,
+                          assignedRouteNames: selectedRouteNames,
                         );
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (mounted) {
@@ -368,9 +369,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     String role = user.isAdmin ? 'admin' : 'seller';
     final currentUser = ref.read(authUserProvider).value;
     final isSelf = currentUser?.id == user.id;
-    String? selectedRouteId = user.assignedRouteId;
-    String? selectedRouteName = user.assignedRouteName;
-    final oldRouteId = user.assignedRouteId;
+    final selectedRouteIds = List<String>.from(user.assignedRouteIds);
+    final selectedRouteNames = List<String>.from(user.assignedRouteNames);
+    final oldRouteIds = List<String>.from(user.assignedRouteIds);
     bool obscurePassword = true;
 
     showDialog(
@@ -378,15 +379,6 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
           final routes = ref.watch(routesProvider).value ?? [];
-          final availableRoutes = routes
-              .where(
-                (r) =>
-                    r.id == selectedRouteId ||
-                    r.assignedSellerId == null ||
-                    r.assignedSellerId!.isEmpty ||
-                    r.assignedSellerId == user.id,
-              )
-              .toList();
           return AlertDialog(
             title: Text(tr('edit_user', ref)),
             content: SingleChildScrollView(
@@ -537,33 +529,41 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       onChanged: (v) => setS(() {
                         role = v ?? 'seller';
                         if (role != 'seller') {
-                          selectedRouteId = null;
-                          selectedRouteName = null;
+                          selectedRouteIds.clear();
+                          selectedRouteNames.clear();
                         }
                       }),
                     ),
                   if (role == 'seller') ...[
                     const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedRouteId,
-                      decoration: InputDecoration(
-                        labelText: tr('assigned_route', ref),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        tr('assigned_routes', ref),
+                        style: Theme.of(ctx).textTheme.bodySmall,
                       ),
-                      items: availableRoutes
-                          .map(
-                            (r) => DropdownMenuItem(
-                              value: r.id,
-                              child: Text(r.name),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) => setS(() {
-                        selectedRouteId = v;
-                        selectedRouteName = routes
-                            .where((r) => r.id == v)
-                            .map((r) => r.name)
-                            .firstOrNull;
-                      }),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: routes.map((r) {
+                        final selected = selectedRouteIds.contains(r.id);
+                        return FilterChip(
+                          label: Text(r.name),
+                          selected: selected,
+                          onSelected: (_) => setS(() {
+                            if (selected) {
+                              final idx = selectedRouteIds.indexOf(r.id);
+                              selectedRouteIds.removeAt(idx);
+                              selectedRouteNames.removeAt(idx);
+                            } else {
+                              selectedRouteIds.add(r.id);
+                              selectedRouteNames.add(r.name);
+                            }
+                          }),
+                        );
+                      }).toList(),
                     ),
                   ],
                 ],
@@ -586,9 +586,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     return;
                   }
                   if (nameC.text.trim().isEmpty) return;
-                  if (role == 'seller' &&
-                      (selectedRouteId == null ||
-                          selectedRouteId!.trim().isEmpty)) {
+                  if (role == 'seller' && selectedRouteIds.isEmpty) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         warningSnackBar(tr('msg_seller_needs_route', ref)),
@@ -622,13 +620,13 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         newPassword: passwordSet ? passwordC.text.trim() : null,
                       );
                     }
-                    // ── Step 2: Firestore profile (name / role / route) ───
+                    // ── Step 2: Firestore profile (name / role / routes) ──
                     await notifier.updateUser(user.id, {
                       'display_name': nameC.text.trim(),
                       'role': isSelf ? 'admin' : role,
-                      'assigned_route_id': selectedRouteId,
-                      'assigned_route_name': selectedRouteName,
-                    }, previousRouteId: oldRouteId);
+                      'assigned_route_ids': selectedRouteIds,
+                      'assigned_route_names': selectedRouteNames,
+                    }, previousRouteIds: oldRouteIds);
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -661,19 +659,13 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
   Future<void> _confirmReactivateUser(UserModel user) async {
     final routes = ref.read(routesProvider).value ?? [];
-    String? selectedRouteId;
-    String? selectedRouteName;
+    final selectedRouteIds = <String>[];
+    final selectedRouteNames = <String>[];
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          final freeRoutes = routes
-              .where(
-                (r) =>
-                    r.assignedSellerId == null || r.assignedSellerId!.isEmpty,
-              )
-              .toList();
           return AlertDialog(
             title: Text(tr('reactivate', ref)),
             content: Column(
@@ -686,27 +678,37 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                   ).replaceAll('%s', user.displayName),
                 ),
                 const SizedBox(height: 12),
-                if (user.isSeller)
-                  DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: tr('assigned_route', ref),
+                if (user.isSeller) ...[
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      tr('assigned_routes', ref),
+                      style: Theme.of(ctx).textTheme.bodySmall,
                     ),
-                    items: freeRoutes
-                        .map(
-                          (r) => DropdownMenuItem(
-                            value: r.id,
-                            child: Text(r.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setS(() {
-                      selectedRouteId = v;
-                      selectedRouteName = routes
-                          .where((r) => r.id == v)
-                          .map((r) => r.name)
-                          .firstOrNull;
-                    }),
                   ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: routes.map((r) {
+                      final selected = selectedRouteIds.contains(r.id);
+                      return FilterChip(
+                        label: Text(r.name),
+                        selected: selected,
+                        onSelected: (_) => setS(() {
+                          if (selected) {
+                            final idx = selectedRouteIds.indexOf(r.id);
+                            selectedRouteIds.removeAt(idx);
+                            selectedRouteNames.removeAt(idx);
+                          } else {
+                            selectedRouteIds.add(r.id);
+                            selectedRouteNames.add(r.name);
+                          }
+                        }),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
             ),
             actions: [
@@ -730,8 +732,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
           .read(userManagementNotifierProvider.notifier)
           .reactivateUser(
             uid: user.id,
-            routeId: selectedRouteId ?? '',
-            routeName: selectedRouteName ?? '',
+            routeIds: selectedRouteIds,
+            routeNames: selectedRouteNames,
             displayName: user.displayName,
           );
       if (mounted) {
@@ -988,11 +990,11 @@ class _UserTile extends ConsumerWidget {
                     ),
                   ),
                 ),
-                if (user.isSeller && user.assignedRouteName != null) ...[
+                if (user.isSeller && user.assignedRouteNames.isNotEmpty) ...[
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
-                      '• ${user.assignedRouteName}',
+                      '• ${user.assignedRouteNames.join(', ')}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall,

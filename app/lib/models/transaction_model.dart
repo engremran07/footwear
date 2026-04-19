@@ -102,6 +102,7 @@ class TransactionModel {
   static const String typeWriteOff = 'write_off';
   final String? saleType; // cash | credit
   final double amount;
+  final String currency; // SAR | PKR
   final String? description;
   final List<TransactionItem> items;
   final String? invoiceId;
@@ -131,6 +132,7 @@ class TransactionModel {
     required this.type,
     this.saleType,
     required this.amount,
+    this.currency = 'SAR',
     this.description,
     this.items = const [],
     this.invoiceId,
@@ -182,6 +184,7 @@ class TransactionModel {
       type: json['type'] as String? ?? 'cash_out',
       saleType: json['sale_type'] as String?,
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      currency: json['currency'] as String? ?? 'SAR',
       description: json['description'] as String?,
       items:
           rawItems
@@ -219,6 +222,7 @@ class TransactionModel {
     'type': type,
     'sale_type': saleType,
     'amount': amount,
+    'currency': currency,
     'description': description,
     'items': items.map((e) => e.toJson()).toList(),
     if (invoiceId != null) 'invoice_id': invoiceId,

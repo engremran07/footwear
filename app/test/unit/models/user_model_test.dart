@@ -93,11 +93,11 @@ void main() {
 
     test('copies with assigned route fields', () {
       final copy = base.copyWith(
-        assignedRouteId: 'route-1',
-        assignedRouteName: 'North Route',
+        assignedRouteIds: ['route-1'],
+        assignedRouteNames: ['North Route'],
       );
-      expect(copy.assignedRouteId, 'route-1');
-      expect(copy.assignedRouteName, 'North Route');
+      expect(copy.assignedRouteIds, ['route-1']);
+      expect(copy.assignedRouteNames, ['North Route']);
       expect(copy.role, base.role);
     });
 
@@ -124,13 +124,13 @@ void main() {
         'display_name': 'Seller',
         'role': 'seller',
         'active': true,
-        'assigned_route_id': 'route-abc',
-        'assigned_route_name': 'Route A',
+        'assigned_route_ids': ['route-abc'],
+        'assigned_route_names': ['Route A'],
         'created_at': ts,
         'updated_at': ts,
       }, 'seller-uid');
-      expect(m.assignedRouteId, 'route-abc');
-      expect(m.assignedRouteName, 'Route A');
+      expect(m.assignedRouteIds, ['route-abc']);
+      expect(m.assignedRouteNames, ['Route A']);
       expect(m.isSeller, isTrue);
     });
 
@@ -143,8 +143,8 @@ void main() {
         'created_at': ts,
         'updated_at': ts,
       }, 'admin-uid');
-      expect(m.assignedRouteId, isNull);
-      expect(m.assignedRouteName, isNull);
+      expect(m.assignedRouteIds, isEmpty);
+      expect(m.assignedRouteNames, isEmpty);
     });
 
     test('phone field parses from json', () {

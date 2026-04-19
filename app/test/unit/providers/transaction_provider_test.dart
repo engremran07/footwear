@@ -12,7 +12,7 @@ void main() {
     email: 'seller@example.com',
     displayName: 'Seller',
     role: UserRole.seller,
-    assignedRouteId: 'route-1',
+    assignedRouteIds: ['route-1'],
     active: true,
     createdAt: ts,
     updatedAt: ts,

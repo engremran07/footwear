@@ -141,18 +141,18 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     final allRoutes = routesAsync.value ?? [];
     final routes = user?.isAdmin == true
         ? allRoutes
-        : allRoutes.where((r) => r.id == user?.assignedRouteId).toList();
+        : allRoutes.where((r) => user?.assignedRouteIds.contains(r.id) ?? false).toList();
 
-    // Seller: set route directly from user profile without waiting for routes to load.
+    // Seller: auto-assign first route from profile when creating a new shop.
     // Guard with !isEdit so edit-mode shops keep their stored route_id.
     if (!_routeAutoAssigned &&
         _routeId == null &&
         !isEdit &&
         user?.isSeller == true &&
-        user?.assignedRouteId != null) {
+        (user?.assignedRouteIds.isNotEmpty ?? false)) {
       _routeAutoAssigned = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _routeId = user!.assignedRouteId);
+        if (mounted) setState(() => _routeId = user!.assignedRouteIds.first);
       });
     }
     // Sync routeNumber once route list loads (works for both admin and seller).

@@ -25,7 +25,7 @@ class RouteDetailScreen extends ConsumerWidget {
     final user = ref.watch(authUserProvider).value;
     final isAdmin = user?.isAdmin ?? false;
     final canAddShop =
-        isAdmin || (user?.isSeller == true && user?.assignedRouteId == routeId);
+        isAdmin || (user?.isSeller == true && user?.assignedRouteIds.contains(routeId) == true);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -127,7 +127,7 @@ class RouteDetailScreen extends ConsumerWidget {
                           ),
                         ],
                       ),
-                      if (route.assignedSellerName != null) ...[
+                      if (route.assignedSellerNames.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -135,8 +135,8 @@ class RouteDetailScreen extends ConsumerWidget {
                             const SizedBox(width: 8),
                             Flexible(
                               child: Text(
-                                '${tr('assigned_seller', ref)}: ${route.assignedSellerName}',
-                                maxLines: 1,
+                                '${tr('assigned_sellers', ref)}: ${route.assignedSellerNames.join(', ')}',
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -186,7 +186,7 @@ class RouteDetailScreen extends ConsumerWidget {
                             _RStat(
                               icon: Icons.warning_amber,
                               label: tr('outstanding', ref),
-                              value: AppFormatters.sar(totalOutstanding),
+                              value: AppFormatters.currency(totalOutstanding, route.currency),
                               color: totalOutstanding > 0
                                   ? AppTheme.debtFg(cs)
                                   : AppTheme.clearFg(cs),
@@ -263,7 +263,7 @@ class RouteDetailScreen extends ConsumerWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                             trailing: Text(
-                              AppFormatters.sar(shop.balance),
+                              AppFormatters.currency(shop.balance, route.currency),
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: hasDebt

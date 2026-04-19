@@ -110,22 +110,49 @@ class _RouteTile extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              [
-                if (route.area != null) route.area,
-                '${route.totalShops} ${tr('shops', ref)}',
-              ].join(' · '),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    [
+                      if (route.area != null) route.area,
+                      '${route.totalShops} ${tr('shops', ref)}',
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: route.currency == 'PKR'
+                        ? cs.tertiaryContainer
+                        : cs.secondaryContainer,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    route.currency,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: route.currency == 'PKR'
+                          ? cs.onTertiaryContainer
+                          : cs.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            if (route.assignedSellerName != null)
+            if (route.assignedSellerNames.isNotEmpty)
               Row(
                 children: [
                   Icon(Icons.person, size: 12, color: cs.primary),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      route.assignedSellerName!,
+                      route.assignedSellerNames.join(', '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12, color: cs.primary),

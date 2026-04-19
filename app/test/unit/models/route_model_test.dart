@@ -11,8 +11,8 @@ void main() {
     'city': 'Jeddah',
     'description': 'Covers northern district',
     'total_shops': 12,
-    'assigned_seller_id': 'seller1',
-    'assigned_seller_name': 'Ali Khan',
+    'assigned_seller_ids': ['seller1'],
+    'assigned_seller_names': ['Ali Khan'],
     'active': true,
     'created_by': 'admin1',
     'created_at': ts,
@@ -29,8 +29,8 @@ void main() {
       expect(m.city, 'Jeddah');
       expect(m.description, 'Covers northern district');
       expect(m.totalShops, 12);
-      expect(m.assignedSellerId, 'seller1');
-      expect(m.assignedSellerName, 'Ali Khan');
+      expect(m.assignedSellerIds, ['seller1']);
+      expect(m.assignedSellerNames, ['Ali Khan']);
       expect(m.active, isTrue);
       expect(m.createdBy, 'admin1');
     });
@@ -43,8 +43,8 @@ void main() {
       expect(m.city, isNull);
       expect(m.description, isNull);
       expect(m.totalShops, 0);
-      expect(m.assignedSellerId, isNull);
-      expect(m.assignedSellerName, isNull);
+      expect(m.assignedSellerIds, isEmpty);
+      expect(m.assignedSellerNames, isEmpty);
       expect(m.active, isTrue);
     });
   });
@@ -59,8 +59,8 @@ void main() {
       expect(restored.area, original.area);
       expect(restored.city, original.city);
       expect(restored.totalShops, original.totalShops);
-      expect(restored.assignedSellerId, original.assignedSellerId);
-      expect(restored.assignedSellerName, original.assignedSellerName);
+      expect(restored.assignedSellerIds, original.assignedSellerIds);
+      expect(restored.assignedSellerNames, original.assignedSellerNames);
     });
 
     test('includes all keys', () {
@@ -69,7 +69,7 @@ void main() {
       expect(json.containsKey('route_number'), isTrue);
       expect(json.containsKey('name'), isTrue);
       expect(json.containsKey('active'), isTrue);
-      expect(json.containsKey('assigned_seller_id'), isTrue);
+      expect(json.containsKey('assigned_seller_ids'), isTrue);
     });
 
     test('copyWith can update and clear nullable fields', () {
@@ -77,14 +77,14 @@ void main() {
       final updated = original.copyWith(
         name: 'South Route',
         clearArea: true,
-        clearAssignedSellerId: true,
-        clearAssignedSellerName: true,
+        clearAssignedSellerIds: true,
+        clearAssignedSellerNames: true,
       );
 
       expect(updated.name, 'South Route');
       expect(updated.area, isNull);
-      expect(updated.assignedSellerId, isNull);
-      expect(updated.assignedSellerName, isNull);
+      expect(updated.assignedSellerIds, isEmpty);
+      expect(updated.assignedSellerNames, isEmpty);
       expect(updated.routeNumber, original.routeNumber);
     });
 

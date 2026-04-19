@@ -344,15 +344,14 @@ class _SellerDashboard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final routeId = user.assignedRouteId;
-    if (routeId == null || routeId.isEmpty) {
+    final routeIds = user.assignedRouteIds;
+    if (routeIds.isEmpty) {
       return Scaffold(
         body: Center(child: Text(tr('dashboard_no_route_assigned', ref))),
       );
     }
 
-    final routeAsync = ref.watch(routeDetailProvider(routeId));
-    final shopsAsync = ref.watch(shopsByRouteProvider(routeId));
+    final shopsAsync = ref.watch(sellerAllShopsProvider);
     final inventoryPairsAsync = ref.watch(
       sellerInventoryTotalPairsProvider(user.id),
     );
@@ -360,10 +359,12 @@ class _SellerDashboard extends ConsumerWidget {
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(routeDetailProvider(routeId));
-          ref.invalidate(shopsByRouteProvider(routeId));
+          ref.invalidate(sellerAllShopsProvider);
           ref.invalidate(sellerInventoryProvider(user.id));
           ref.invalidate(sellerInventoryTotalPairsProvider(user.id));
+          for (final rid in routeIds) {
+            ref.invalidate(routeDetailProvider(rid));
+          }
         },
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -377,24 +378,28 @@ class _SellerDashboard extends ConsumerWidget {
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
-            routeAsync.when(
-              data: (route) => route == null
-                  ? const SizedBox.shrink()
-                  : Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.route),
-                        title: Text(route.name),
-                        subtitle: Text(
-                          tr(
-                            'dashboard_route_number',
-                            ref,
-                          ).replaceAll('%s', '${route.routeNumber}'),
+            // Show a card for each assigned route
+            ...routeIds.map((rid) {
+              final routeAsync = ref.watch(routeDetailProvider(rid));
+              return routeAsync.when(
+                data: (route) => route == null
+                    ? const SizedBox.shrink()
+                    : Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.route),
+                          title: Text(route.name),
+                          subtitle: Text(
+                            tr(
+                              'dashboard_route_number',
+                              ref,
+                            ).replaceAll('%s', '${route.routeNumber}'),
+                          ),
                         ),
                       ),
-                    ),
-              loading: () => const SizedBox.shrink(),
-              error: (_, _) => const SizedBox.shrink(),
-            ),
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+              );
+            }),
             const SizedBox(height: 12),
             shopsAsync.when(
               data: (shops) {

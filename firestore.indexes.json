@@ -59,15 +59,6 @@
       ]
     },
     {
-      "collectionGroup": "routes",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "assigned_seller_id", "order": "ASCENDING" },
-        { "fieldPath": "active", "order": "ASCENDING" },
-        { "fieldPath": "route_number", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "customers",
       "queryScope": "COLLECTION",
       "fields": [

@@ -59,6 +59,29 @@ final shopsByRouteProvider = StreamProvider.autoDispose
           );
     });
 
+/// Seller multi-route: merges shops from all assigned routes into one list.
+final sellerAllShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
+  ref,
+) {
+  final user = ref.watch(authUserProvider).value;
+  if (user == null || !user.isSeller || user.assignedRouteIds.isEmpty) {
+    return const Stream.empty();
+  }
+  final routeIds = user.assignedRouteIds;
+  // Firestore whereIn supports up to 30 values — ample for route count.
+  return FirebaseFirestore.instance
+      .collection(Collections.customers)
+      .where('route_id', whereIn: routeIds)
+      .where('active', isEqualTo: true)
+      .orderBy('name')
+      .limit(500)
+      .snapshots()
+      .map(
+        (snap) =>
+            snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList(),
+      );
+});
+
 final shopDetailProvider = StreamProvider.autoDispose
     .family<ShopModel?, String>((ref, id) {
       final user = ref.watch(authUserProvider).value;
@@ -73,13 +96,13 @@ final shopDetailProvider = StreamProvider.autoDispose
                   doc.exists ? ShopModel.fromJson(doc.data()!, doc.id) : null,
             );
       }
-      if (!user.isSeller || user.assignedRouteId == null) {
+      if (!user.isSeller || user.assignedRouteIds.isEmpty) {
         return const Stream.empty();
       }
       return FirebaseFirestore.instance
           .collection(Collections.customers)
           .where(FieldPath.documentId, isEqualTo: id)
-          .where('route_id', isEqualTo: user.assignedRouteId)
+          .where('route_id', whereIn: user.assignedRouteIds)
           .limit(1)
           .snapshots()
           .map((snap) {

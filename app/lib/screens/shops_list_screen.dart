@@ -129,15 +129,19 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).value;
-    final shopsAsync = user?.isSeller == true && user?.assignedRouteId != null
-        ? ref.watch(shopsByRouteProvider(user!.assignedRouteId!))
+    final isSeller = user?.isSeller == true;
+    final sellerRouteIds = user?.assignedRouteIds ?? [];
+
+    // Seller sees shops from ALL assigned routes; admin sees all shops.
+    final shopsAsync = isSeller && sellerRouteIds.isNotEmpty
+        ? ref.watch(sellerAllShopsProvider)
         : ref.watch(shopsProvider);
     final transactionsAsync = ref.watch(shopsAnalyticsTransactionsProvider);
     final routesAsync = user?.isAdmin == true
         ? ref.watch(routesProvider)
         : null;
     final canCreateShop =
-        user != null && (user.isAdmin || user.assignedRouteId != null);
+        user != null && (user.isAdmin || sellerRouteIds.isNotEmpty);
     final scopedStatsShops = shopsAsync.value == null
         ? null
         : _scopeShopsByRoute(shopsAsync.value!);
@@ -344,11 +348,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
                 return AppPullRefresh(
                   onRefresh: () async {
-                    if (user?.isSeller == true &&
-                        user?.assignedRouteId != null) {
-                      ref.invalidate(
-                        shopsByRouteProvider(user!.assignedRouteId!),
-                      );
+                    if (isSeller && sellerRouteIds.isNotEmpty) {
+                      ref.invalidate(sellerAllShopsProvider);
                     } else {
                       ref.invalidate(shopsProvider);
                     }
@@ -375,10 +376,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                 error: e,
                 ref: ref,
                 onRetry: () {
-                  if (user?.isSeller == true && user?.assignedRouteId != null) {
-                    ref.invalidate(
-                      shopsByRouteProvider(user!.assignedRouteId!),
-                    );
+                  if (isSeller && sellerRouteIds.isNotEmpty) {
+                    ref.invalidate(sellerAllShopsProvider);
                   } else {
                     ref.invalidate(shopsProvider);
                   }
@@ -1241,9 +1240,9 @@ class _AdminGroupedShopsViewState
                       ),
                     ),
                   ),
-                  if (r?.assignedSellerName != null)
+                  if (r?.assignedSellerNames.isNotEmpty ?? false)
                     Text(
-                      r!.assignedSellerName!,
+                      r!.assignedSellerNames.join(', '),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),

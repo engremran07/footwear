@@ -28,8 +28,11 @@ class UserModel {
   final String displayName;
   final UserRole role;
   final String? phone;
-  final String? assignedRouteId;
-  final String? assignedRouteName;
+
+  /// Multi-route assignment (many-to-many). Each seller can serve multiple routes.
+  final List<String> assignedRouteIds;
+  final List<String> assignedRouteNames;
+
   final bool active;
   final bool emailVerified;
   final Timestamp createdAt;
@@ -41,8 +44,8 @@ class UserModel {
     required this.displayName,
     required this.role,
     this.phone,
-    this.assignedRouteId,
-    this.assignedRouteName,
+    this.assignedRouteIds = const [],
+    this.assignedRouteNames = const [],
     required this.active,
     this.emailVerified = false,
     required this.createdAt,
@@ -60,14 +63,20 @@ class UserModel {
   bool get canHaveSellerInventory => true;
 
   factory UserModel.fromJson(Map<String, dynamic> json, String docId) {
+    final rawRouteIds = json['assigned_route_ids'] as List<dynamic>?;
+    final rawRouteNames = json['assigned_route_names'] as List<dynamic>?;
+
+    final routeIds = rawRouteIds?.cast<String>().toList() ?? const <String>[];
+    final routeNames = rawRouteNames?.cast<String>().toList() ?? const <String>[];
+
     return UserModel(
       id: docId,
       email: json['email'] as String? ?? '',
       displayName: json['display_name'] as String? ?? '',
       role: _roleFromString(json['role'] as String? ?? 'seller'),
       phone: json['phone'] as String?,
-      assignedRouteId: json['assigned_route_id'] as String?,
-      assignedRouteName: json['assigned_route_name'] as String?,
+      assignedRouteIds: routeIds,
+      assignedRouteNames: routeNames,
       active: json['active'] as bool? ?? true,
       emailVerified: json['email_verified'] as bool? ?? false,
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
@@ -80,8 +89,8 @@ class UserModel {
     'display_name': displayName,
     'role': _roleToString(role),
     'phone': phone,
-    'assigned_route_id': assignedRouteId,
-    'assigned_route_name': assignedRouteName,
+    'assigned_route_ids': assignedRouteIds,
+    'assigned_route_names': assignedRouteNames,
     'active': active,
     'email_verified': emailVerified,
     'created_at': createdAt,
@@ -94,8 +103,8 @@ class UserModel {
     String? displayName,
     UserRole? role,
     String? phone,
-    String? assignedRouteId,
-    String? assignedRouteName,
+    List<String>? assignedRouteIds,
+    List<String>? assignedRouteNames,
     bool? active,
     bool? emailVerified,
     Timestamp? createdAt,
@@ -107,8 +116,8 @@ class UserModel {
       displayName: displayName ?? this.displayName,
       role: role ?? this.role,
       phone: phone ?? this.phone,
-      assignedRouteId: assignedRouteId ?? this.assignedRouteId,
-      assignedRouteName: assignedRouteName ?? this.assignedRouteName,
+      assignedRouteIds: assignedRouteIds ?? this.assignedRouteIds,
+      assignedRouteNames: assignedRouteNames ?? this.assignedRouteNames,
       active: active ?? this.active,
       emailVerified: emailVerified ?? this.emailVerified,
       createdAt: createdAt ?? this.createdAt,

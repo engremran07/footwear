@@ -37,16 +37,17 @@ final routeDetailProvider = StreamProvider.autoDispose
             );
       }
       if (!user.isSeller) return const Stream.empty();
+      // Multi-seller: read doc by ID, verify membership client-side.
       return FirebaseFirestore.instance
           .collection(Collections.routes)
-          .where(FieldPath.documentId, isEqualTo: id)
-          .where('assigned_seller_id', isEqualTo: user.id)
-          .limit(1)
+          .doc(id)
           .snapshots()
-          .map((snap) {
-            if (snap.docs.isEmpty) return null;
-            final doc = snap.docs.first;
-            return RouteModel.fromJson(doc.data(), doc.id);
+          .map((doc) {
+            if (!doc.exists) return null;
+            final route = RouteModel.fromJson(doc.data()!, doc.id);
+            // Check both new array and legacy scalar for un-migrated docs.
+            if (route.assignedSellerIds.contains(user.id)) return route;
+            return null;
           });
     });
 
@@ -57,7 +58,7 @@ final routesBySellerProvider = StreamProvider.autoDispose
       if (!user.isAdmin && user.id != sellerId) return const Stream.empty();
       return FirebaseFirestore.instance
           .collection(Collections.routes)
-          .where('assigned_seller_id', isEqualTo: sellerId)
+          .where('assigned_seller_ids', arrayContains: sellerId)
           .where('active', isEqualTo: true)
           .orderBy('route_number')
           .limit(100)
@@ -137,50 +138,37 @@ class RouteNotifier extends AsyncNotifier<void> {
   Future<void> create(Map<String, dynamic> data) async {
     final db = FirebaseFirestore.instance;
     final routeRef = db.collection(Collections.routes).doc();
-    final assignedSellerId =
-        (data['assigned_seller_id'] as String?)?.trim().isNotEmpty == true
-        ? (data['assigned_seller_id'] as String).trim()
-        : null;
     final routeName = data['name'] as String? ?? '';
-    final assignedSellerName =
-        (data['assigned_seller_name'] as String?)?.trim().isNotEmpty == true
-        ? (data['assigned_seller_name'] as String).trim()
-        : null;
+    final currency = data['currency'] as String? ?? 'SAR';
+    final sellerIds = (data['assigned_seller_ids'] as List<dynamic>?)
+            ?.cast<String>()
+            .where((s) => s.trim().isNotEmpty)
+            .toList() ??
+        const <String>[];
+    final sellerNames = (data['assigned_seller_names'] as List<dynamic>?)
+            ?.cast<String>()
+            .toList() ??
+        const <String>[];
     final routeNumber = ((data['route_number'] as int?) ?? 0) > 0
         ? (data['route_number'] as int)
         : await _nextRouteNumber(db);
 
     await db.runTransaction<void>((txn) async {
-      DocumentReference<Map<String, dynamic>>? sellerRef;
-      DocumentReference<Map<String, dynamic>>? previousRouteRef;
-      DocumentSnapshot<Map<String, dynamic>>? previousRouteSnap;
-
-      if (assignedSellerId != null) {
-        sellerRef = db.collection(Collections.users).doc(assignedSellerId);
-        final sellerSnap = await txn.get(sellerRef);
-        if (!sellerSnap.exists) {
-          throw StateError('Seller not found');
-        }
-
-        final previousRouteId =
-            (sellerSnap.data()?['assigned_route_id'] as String?)?.trim();
-        if (previousRouteId != null &&
-            previousRouteId.isNotEmpty &&
-            previousRouteId != routeRef.id) {
-          previousRouteRef = db
-              .collection(Collections.routes)
-              .doc(previousRouteId);
-          previousRouteSnap = await txn.get(previousRouteRef);
-        }
+      // Verify all sellers exist.
+      final sellerRefs = <DocumentReference<Map<String, dynamic>>>[];
+      for (final sid in sellerIds) {
+        final ref = db.collection(Collections.users).doc(sid);
+        final snap = await txn.get(ref);
+        if (!snap.exists) throw StateError('Seller not found');
+        sellerRefs.add(ref);
       }
 
       final now = Timestamp.now();
       txn.set(routeRef, {
         ...data,
-        'assigned_seller_id': assignedSellerId,
-        'assigned_seller_name': assignedSellerId == null
-            ? null
-            : assignedSellerName,
+        'assigned_seller_ids': sellerIds,
+        'assigned_seller_names': sellerNames,
+        'currency': currency,
         'route_number': routeNumber,
         'total_shops': 0,
         'active': true,
@@ -188,18 +176,11 @@ class RouteNotifier extends AsyncNotifier<void> {
         'updated_at': now,
       });
 
-      if (previousRouteRef != null && previousRouteSnap?.exists == true) {
-        txn.update(previousRouteRef, {
-          'assigned_seller_id': null,
-          'assigned_seller_name': null,
-          'updated_at': now,
-        });
-      }
-
-      if (sellerRef != null) {
-        txn.update(sellerRef, {
-          'assigned_route_id': routeRef.id,
-          'assigned_route_name': routeName,
+      // Add this route to each seller's assigned_route_ids array.
+      for (var i = 0; i < sellerRefs.length; i++) {
+        txn.update(sellerRefs[i], {
+          'assigned_route_ids': FieldValue.arrayUnion([routeRef.id]),
+          'assigned_route_names': FieldValue.arrayUnion([routeName]),
           'updated_at': now,
         });
       }
@@ -215,74 +196,65 @@ class RouteNotifier extends AsyncNotifier<void> {
         throw StateError('Route not found');
       }
 
-      final oldSellerId =
-          (currentRoute.data()?['assigned_seller_id'] as String?)?.trim();
-      final newSellerId =
-          (data['assigned_seller_id'] as String?)?.trim().isNotEmpty == true
-          ? (data['assigned_seller_id'] as String).trim()
-          : null;
       final routeName =
           data['name'] as String? ??
           currentRoute.data()?['name'] as String? ??
           '';
-      final assignedSellerName =
-          (data['assigned_seller_name'] as String?)?.trim().isNotEmpty == true
-          ? (data['assigned_seller_name'] as String).trim()
-          : null;
+      final currency = data['currency'] as String? ??
+          currentRoute.data()?['currency'] as String? ??
+          'SAR';
 
-      DocumentReference<Map<String, dynamic>>? newSellerRef;
-      DocumentReference<Map<String, dynamic>>? previousRouteRef;
-      DocumentSnapshot<Map<String, dynamic>>? previousRouteSnap;
+      // Old seller IDs from current route doc.
+      final oldRaw =
+          currentRoute.data()?['assigned_seller_ids'] as List<dynamic>?;
+      final oldSellerIds = oldRaw != null
+          ? oldRaw.cast<String>().toSet()
+          : <String>{};
 
-      if (newSellerId != null) {
-        newSellerRef = db.collection(Collections.users).doc(newSellerId);
-        final newSellerSnap = await txn.get(newSellerRef);
-        if (!newSellerSnap.exists) {
-          throw StateError('Seller not found');
-        }
+      // New seller IDs from form data.
+      final newSellerIds = (data['assigned_seller_ids'] as List<dynamic>?)
+              ?.cast<String>()
+              .where((s) => s.trim().isNotEmpty)
+              .toSet() ??
+          <String>{};
+      final newSellerNames = (data['assigned_seller_names'] as List<dynamic>?)
+              ?.cast<String>()
+              .toList() ??
+          const <String>[];
 
-        final previousRouteId =
-            (newSellerSnap.data()?['assigned_route_id'] as String?)?.trim();
-        if (previousRouteId != null &&
-            previousRouteId.isNotEmpty &&
-            previousRouteId != id) {
-          previousRouteRef = db
-              .collection(Collections.routes)
-              .doc(previousRouteId);
-          previousRouteSnap = await txn.get(previousRouteRef);
-        }
+      final removed = oldSellerIds.difference(newSellerIds);
+      final added = newSellerIds.difference(oldSellerIds);
+
+      // Verify all new sellers exist.
+      for (final sid in added) {
+        final ref = db.collection(Collections.users).doc(sid);
+        final snap = await txn.get(ref);
+        if (!snap.exists) throw StateError('Seller not found');
       }
 
       final now = Timestamp.now();
       txn.update(routeRef, {
         ...data,
-        'assigned_seller_id': newSellerId,
-        'assigned_seller_name': newSellerId == null ? null : assignedSellerName,
+        'assigned_seller_ids': newSellerIds.toList(),
+        'assigned_seller_names': newSellerNames,
+        'currency': currency,
         'updated_at': now,
       });
 
-      if (oldSellerId != null &&
-          oldSellerId.isNotEmpty &&
-          oldSellerId != newSellerId) {
-        txn.update(db.collection(Collections.users).doc(oldSellerId), {
-          'assigned_route_id': null,
-          'assigned_route_name': null,
+      // Remove this route from removed sellers.
+      for (final sid in removed) {
+        txn.update(db.collection(Collections.users).doc(sid), {
+          'assigned_route_ids': FieldValue.arrayRemove([id]),
+          'assigned_route_names': FieldValue.arrayRemove([routeName]),
           'updated_at': now,
         });
       }
 
-      if (previousRouteRef != null && previousRouteSnap?.exists == true) {
-        txn.update(previousRouteRef, {
-          'assigned_seller_id': null,
-          'assigned_seller_name': null,
-          'updated_at': now,
-        });
-      }
-
-      if (newSellerRef != null) {
-        txn.update(newSellerRef, {
-          'assigned_route_id': id,
-          'assigned_route_name': routeName,
+      // Add this route to newly added sellers.
+      for (final sid in added) {
+        txn.update(db.collection(Collections.users).doc(sid), {
+          'assigned_route_ids': FieldValue.arrayUnion([id]),
+          'assigned_route_names': FieldValue.arrayUnion([routeName]),
           'updated_at': now,
         });
       }
@@ -301,10 +273,11 @@ class RouteNotifier extends AsyncNotifier<void> {
       throw StateError('Only admin can delete routes');
     }
 
-    // Check for assigned seller
+    // Check for assigned sellers
     final routeDoc = await db.collection(Collections.routes).doc(id).get();
-    final assignedSellerId = routeDoc.data()?['assigned_seller_id'] as String?;
-    if (assignedSellerId != null && assignedSellerId.isNotEmpty) {
+    final assignedSellerIds =
+        routeDoc.data()?['assigned_seller_ids'] as List<dynamic>?;
+    if (assignedSellerIds != null && assignedSellerIds.isNotEmpty) {
       throw StateError('route_has_seller');
     }
 

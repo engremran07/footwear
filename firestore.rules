@@ -29,8 +29,8 @@ service cloud.firestore {
       return role is string && role.matches('(?i)^\\s*seller\\s*$');
     }
 
-    function assignedRouteId() {
-      return userDoc().data.assigned_route_id;
+    function assignedRouteIds() {
+      return userDoc().data.assigned_route_ids;
     }
 
     function isAdmin() {
@@ -74,7 +74,7 @@ service cloud.firestore {
     }
 
     function isSellerForRoute(routeId) {
-      return isSeller() && assignedRouteId() != null && assignedRouteId() == routeId;
+      return isSeller() && routeId in assignedRouteIds();
     }
 
     // Returns the route_id for a shop/customer document.
@@ -88,7 +88,7 @@ service cloud.firestore {
       return isSeller() &&
         shopId is string &&
         shopId != '' &&
-        shopRouteId(shopId) == assignedRouteId();
+        shopRouteId(shopId) in assignedRouteIds();
     }
 
     // True when a transaction doc belongs to the seller's assigned route.
@@ -157,8 +157,8 @@ service cloud.firestore {
           (
             request.resource.data.role != 'seller' ||
             (
-              request.resource.data.assigned_route_id is string &&
-              request.resource.data.assigned_route_id != ''
+              request.resource.data.assigned_route_ids is list &&
+              request.resource.data.assigned_route_ids.size() > 0
             )
           )
         )) && docSizeOk();

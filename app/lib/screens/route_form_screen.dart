@@ -23,8 +23,9 @@ class RouteFormScreen extends ConsumerStatefulWidget {
 class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameC = TextEditingController();
-  String? _sellerId;
-  String? _sellerName;
+  final List<String> _selectedSellerIds = [];
+  final List<String> _selectedSellerNames = [];
+  String _currency = 'SAR';
   bool _loaded = false;
   bool _saving = false;
   bool _isDirty = false;
@@ -45,8 +46,13 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
         text: detail.name,
         selection: TextSelection.collapsed(offset: detail.name.length),
       );
-      _sellerId = detail.assignedSellerId;
-      _sellerName = detail.assignedSellerName;
+      _selectedSellerIds
+        ..clear()
+        ..addAll(detail.assignedSellerIds);
+      _selectedSellerNames
+        ..clear()
+        ..addAll(detail.assignedSellerNames);
+      _currency = detail.currency;
       _loaded = true;
     }
   }
@@ -63,8 +69,9 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       final createdBy = user?.id.trim() ?? '';
       final Map<String, dynamic> data = {
         'name': AppSanitizer.name(_nameC.text),
-        'assigned_seller_id': _sellerId,
-        'assigned_seller_name': _sellerName,
+        'assigned_seller_ids': List<String>.from(_selectedSellerIds),
+        'assigned_seller_names': List<String>.from(_selectedSellerNames),
+        'currency': _currency,
       };
       if (isEdit) {
         await ref
@@ -86,8 +93,6 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-    // context.pop() is OUTSIDE the try-catch so a navigation exception
-    // cannot trigger the error SnackBar after a successful save.
     if (saved && mounted) {
       HapticFeedback.mediumImpact();
       _isDirty = false;
@@ -96,6 +101,20 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       context.pop();
     }
+  }
+
+  void _toggleSeller(String id, String name) {
+    setState(() {
+      final idx = _selectedSellerIds.indexOf(id);
+      if (idx >= 0) {
+        _selectedSellerIds.removeAt(idx);
+        _selectedSellerNames.removeAt(idx);
+      } else {
+        _selectedSellerIds.add(id);
+        _selectedSellerNames.add(name);
+      }
+      _isDirty = true;
+    });
   }
 
   @override
@@ -111,11 +130,8 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
 
-    // BUG-002 FIX-A: use sellersProvider (role == 'seller') so admins never
-    // appear in the route seller dropdown — assigning an admin to a route
-    // would incorrectly write assigned_route_id to the admin user doc,
-    // breaking their god-mode and Firestore rule admin path.
     final sellers = ref.watch(sellersProvider).value ?? [];
+    final cs = Theme.of(context).colorScheme;
 
     return PopScope(
       canPop: !_isDirty,
@@ -141,6 +157,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
                 if (!_isDirty) setState(() => _isDirty = true);
               },
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextFormField(
                     controller: _nameC,
@@ -154,33 +171,47 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
                     inputFormatters: [AppInputFormatters.maxLength(200)],
                   ),
                   const SizedBox(height: 16),
+                  // Currency selector
                   DropdownButtonFormField<String>(
-                    initialValue: _sellerId,
+                    initialValue: _currency,
                     decoration: InputDecoration(
-                      labelText: tr('assigned_seller', ref),
+                      labelText: tr('currency', ref),
                     ),
-                    items: [
-                      DropdownMenuItem<String>(
-                        value: null,
-                        child: Text(tr('none', ref)),
-                      ),
-                      ...sellers.map(
-                        (s) => DropdownMenuItem(
-                          value: s.id,
-                          child: Text(s.displayName),
-                        ),
-                      ),
+                    items: const [
+                      DropdownMenuItem(value: 'SAR', child: Text('SAR (﷼)')),
+                      DropdownMenuItem(value: 'PKR', child: Text('PKR (Rs)')),
                     ],
                     onChanged: (v) {
-                      setState(() {
-                        _sellerId = v;
-                        _sellerName = sellers
-                            .where((s) => s.id == v)
-                            .map((s) => s.displayName)
-                            .firstOrNull;
-                      });
+                      if (v != null) setState(() => _currency = v);
+                      _isDirty = true;
                     },
                   ),
+                  const SizedBox(height: 16),
+                  // Multi-seller selection chips
+                  Text(
+                    tr('assigned_sellers', ref),
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  if (sellers.isEmpty)
+                    Text(
+                      tr('no_sellers', ref),
+                      style: TextStyle(color: cs.outline),
+                    )
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: sellers.map((s) {
+                        final selected = _selectedSellerIds.contains(s.id);
+                        return FilterChip(
+                          label: Text(s.displayName),
+                          selected: selected,
+                          onSelected: (_) =>
+                              _toggleSeller(s.id, s.displayName),
+                        );
+                      }).toList(),
+                    ),
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,

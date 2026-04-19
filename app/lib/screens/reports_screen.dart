@@ -148,11 +148,10 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final routeId = user.assignedRouteId ?? '';
     final shops = user.isAdmin
         ? ref.read(shopsProvider).value ?? <ShopModel>[]
-        : (routeId.isNotEmpty
-              ? ref.read(shopsByRouteProvider(routeId)).value ?? <ShopModel>[]
+        : (user.assignedRouteIds.isNotEmpty
+              ? ref.read(sellerAllShopsProvider).value ?? <ShopModel>[]
               : <ShopModel>[]);
     if (shops.isEmpty) {
       _showNoData(context, ref);
@@ -283,11 +282,10 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final routeId = user.assignedRouteId ?? '';
     final shops = user.isAdmin
         ? ref.read(outstandingShopsProvider).value ?? <ShopModel>[]
-        : (routeId.isNotEmpty
-              ? ref.read(outstandingShopsByRouteProvider(routeId)).value ??
+        : (user.assignedRouteIds.isNotEmpty
+              ? ref.read(sellerAllShopsProvider).value?.where((s) => s.balance > 0).toList() ??
                     <ShopModel>[]
               : <ShopModel>[]);
     if (shops.isEmpty) {
@@ -328,11 +326,10 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final routeId = user.assignedRouteId ?? '';
     final shops = user.isAdmin
         ? ref.read(shopsProvider).value ?? <ShopModel>[]
-        : (routeId.isNotEmpty
-              ? ref.read(shopsByRouteProvider(routeId)).value ?? <ShopModel>[]
+        : (user.assignedRouteIds.isNotEmpty
+              ? ref.read(sellerAllShopsProvider).value ?? <ShopModel>[]
               : <ShopModel>[]);
     final badDebtShops = shops.where((s) => s.badDebt).toList();
     if (badDebtShops.isEmpty) {
@@ -607,7 +604,7 @@ class _OutstandingPieChart extends ConsumerWidget {
     final user = ref.watch(authUserProvider).value;
     final shopsAsync = user?.isAdmin == true
         ? ref.watch(shopsProvider)
-        : ref.watch(shopsByRouteProvider(user?.assignedRouteId ?? ''));
+        : ref.watch(sellerAllShopsProvider);
     final cs = Theme.of(context).colorScheme;
 
     return shopsAsync.when(
@@ -789,11 +786,10 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       final locale = ref.read(appLocaleProvider);
       final user = await ref.read(authUserProvider.future);
       if (!context.mounted) return;
-      final routeId = user?.assignedRouteId ?? '';
       final shops = user?.isAdmin == true
           ? ref.read(shopsProvider).value ?? <ShopModel>[]
-          : (routeId.isNotEmpty
-                ? ref.read(shopsByRouteProvider(routeId)).value ?? <ShopModel>[]
+          : (user?.assignedRouteIds.isNotEmpty == true
+                ? ref.read(sellerAllShopsProvider).value ?? <ShopModel>[]
                 : <ShopModel>[]);
       final shop = shops.firstWhere((s) => s.id == _selectedShopId);
 
@@ -873,11 +869,10 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).value;
-    final routeId = user?.assignedRouteId ?? '';
     final AsyncValue<List<ShopModel>> shopsAsync = user?.isAdmin == true
         ? ref.watch(shopsProvider)
-        : (routeId.isNotEmpty
-              ? ref.watch(shopsByRouteProvider(routeId))
+        : (user?.assignedRouteIds.isNotEmpty == true
+              ? ref.watch(sellerAllShopsProvider)
               : const AsyncData(<ShopModel>[]));
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -911,8 +906,8 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
                 onRetry: () {
                   if (user?.isAdmin == true) {
                     ref.invalidate(shopsProvider);
-                  } else if (routeId.isNotEmpty) {
-                    ref.invalidate(shopsByRouteProvider(routeId));
+                  } else if (user?.assignedRouteIds.isNotEmpty == true) {
+                    ref.invalidate(sellerAllShopsProvider);
                   }
                 },
               ),
@@ -1088,7 +1083,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
           // Resolve route UID â†’ display name so PDF never shows raw IDs
           final routes = ref.read(routesProvider).value ?? [];
           final routeMatch = routes.where(
-            (r) => r.id == seller.assignedRouteId,
+            (r) => seller.assignedRouteIds.contains(r.id),
           );
           final routeDisplayName = routeMatch.isNotEmpty
               ? '${routeMatch.first.routeNumber} Â· ${routeMatch.first.name}'

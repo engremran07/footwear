@@ -20,6 +20,7 @@ class AppFormatters {
   AppFormatters._();
 
   static final _sar = NumberFormat.currency(symbol: '﷼ ', decimalDigits: 2);
+  static final _pkr = NumberFormat.currency(symbol: 'Rs ', decimalDigits: 2);
   static final _num = NumberFormat('#,##0.##');
   static final _date = DateFormat('dd MMM yyyy');
   static final _dateTime = DateFormat('dd MMM yyyy, HH:mm');
@@ -28,8 +29,14 @@ class AppFormatters {
   static final _dateOnly = DateFormat('dd MMM yyyy');
 
   static String sar(double amount) => _sar.format(amount);
+  static String pkr(double amount) => _pkr.format(amount);
+
+  /// Format amount using the given currency code ('SAR' or 'PKR').
   static String currency(double amount, [String symbol = 'SAR']) =>
-      _sar.format(amount);
+      switch (symbol.toUpperCase()) {
+        'PKR' => _pkr.format(amount),
+        _ => _sar.format(amount),
+      };
   static String number(num value) => _num.format(value);
 
   static String date(Timestamp? ts) =>

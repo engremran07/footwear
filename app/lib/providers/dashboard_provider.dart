@@ -10,6 +10,21 @@ import 'product_provider.dart';
 import 'route_provider.dart';
 import 'shop_provider.dart';
 
+/// Per-currency aggregated stats for dashboard conditional widgets.
+class CurrencyStats {
+  final String currency;
+  final int routeCount;
+  final int shopCount;
+  final double outstanding;
+
+  const CurrencyStats({
+    required this.currency,
+    this.routeCount = 0,
+    this.shopCount = 0,
+    this.outstanding = 0,
+  });
+}
+
 /// Dashboard stats computed reactively from live Firestore stream providers.
 class DashboardStats {
   final int totalRoutes;
@@ -18,12 +33,16 @@ class DashboardStats {
   final int totalVariants;
   final int totalStockPairs;
 
+  /// Per-currency breakdown (e.g. {'SAR': CurrencyStats(...), 'PKR': ...}).
+  final Map<String, CurrencyStats> currencyStats;
+
   const DashboardStats({
     this.totalRoutes = 0,
     this.totalShops = 0,
     this.totalProducts = 0,
     this.totalVariants = 0,
     this.totalStockPairs = 0,
+    this.currencyStats = const {},
   });
 }
 
@@ -75,10 +94,27 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
     shops = ref.watch(shopsProvider);
   } else {
     routes = ref.watch(routesBySellerProvider(user.id));
-    final routeId = user.assignedRouteId ?? '';
-    shops = routeId.isNotEmpty
-        ? ref.watch(shopsByRouteProvider(routeId))
-        : const AsyncData([]);
+    // Seller multi-route: watch shops across all assigned routes.
+    final routeIds = user.assignedRouteIds;
+    if (routeIds.isEmpty) {
+      shops = const AsyncData([]);
+    } else if (routeIds.length == 1) {
+      shops = ref.watch(shopsByRouteProvider(routeIds.first));
+    } else {
+      // Merge shops from all assigned routes.
+      final shopLists = routeIds
+          .map((rid) => ref.watch(shopsByRouteProvider(rid)))
+          .toList();
+      if (shopLists.any((s) => s is AsyncLoading)) {
+        shops = const AsyncLoading();
+      } else {
+        final merged = <ShopModel>[];
+        for (final sl in shopLists) {
+          merged.addAll(sl.value ?? const []);
+        }
+        shops = AsyncData(merged);
+      }
+    }
   }
   final products = ref.watch(productsProvider);
   final variants = ref.watch(allVariantsProvider);
@@ -104,12 +140,43 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
     (s, v) => s + v.quantityAvailable,
   );
 
+  // Build per-currency breakdown from routes + shops.
+  final routeCurrencyMap = <String, String>{};
+  final currencyRouteCount = <String, int>{};
+  for (final route in routeList) {
+    routeCurrencyMap[route.id] = route.currency;
+    currencyRouteCount[route.currency] =
+        (currencyRouteCount[route.currency] ?? 0) + 1;
+  }
+  final currencyShopCount = <String, int>{};
+  final currencyOutstanding = <String, double>{};
+  for (final shop in shopList) {
+    final cur = routeCurrencyMap[shop.routeId] ?? 'SAR';
+    currencyShopCount[cur] = (currencyShopCount[cur] ?? 0) + 1;
+    currencyOutstanding[cur] =
+        (currencyOutstanding[cur] ?? 0) + shop.balance;
+  }
+  final allCurrencies = {
+    ...currencyRouteCount.keys,
+    ...currencyShopCount.keys,
+  };
+  final cStats = <String, CurrencyStats>{};
+  for (final c in allCurrencies) {
+    cStats[c] = CurrencyStats(
+      currency: c,
+      routeCount: currencyRouteCount[c] ?? 0,
+      shopCount: currencyShopCount[c] ?? 0,
+      outstanding: currencyOutstanding[c] ?? 0,
+    );
+  }
+
   final stats = DashboardStats(
     totalRoutes: routeList.length,
     totalShops: shopList.length,
     totalProducts: productList.length,
     totalVariants: variantList.length,
     totalStockPairs: totalStockPairs,
+    currencyStats: cStats,
   );
 
   // Persist the latest successful computation for use as a fallback.

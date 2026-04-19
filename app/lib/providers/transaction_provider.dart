@@ -95,13 +95,13 @@ final shopsAnalyticsTransactionsProvider =
             );
       }
 
-      final routeId = (user.assignedRouteId ?? '').trim();
-      if (!user.isSeller || routeId.isEmpty) {
+      final routeIds = user.assignedRouteIds;
+      if (!user.isSeller || routeIds.isEmpty) {
         return Stream.value(const <TransactionModel>[]);
       }
 
       return collection
-          .where('route_id', isEqualTo: routeId)
+          .where('route_id', whereIn: routeIds)
           .orderBy('created_at', descending: true)
           .limit(_shopsAnalyticsTransactionsLimit)
           .snapshots()
@@ -186,8 +186,7 @@ final routeTransactionsExportProvider =
       final user = await ref.read(authUserProvider.future);
       if (user == null) return const <TransactionModel>[];
       if (!user.isAdmin) {
-        final assignedRouteId = (user.assignedRouteId ?? '').trim();
-        if (!user.isSeller || assignedRouteId != normalizedId) {
+        if (!user.isSeller || !user.assignedRouteIds.contains(normalizedId)) {
           return const <TransactionModel>[];
         }
       }

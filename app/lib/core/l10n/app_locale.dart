@@ -491,6 +491,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'no_location_pinned': 'No location pinned — edit to add coordinates',
     'assigned_seller': 'Assigned Seller',
     'assigned_route': 'Assigned Route',
+    'assigned_routes': 'Assigned Routes',
+    'assigned_sellers': 'Assigned Sellers',
+    'no_sellers': 'No Sellers',
     'edit_assign_seller': 'Edit this shop to assign a seller',
     'copy_link_navigate':
         'Copy the link above and open in browser to navigate.',
@@ -1652,6 +1655,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'no_location_pinned': 'لا يوجد موقع مثبت — عدّل لإضافة الإحداثيات',
     'assigned_seller': 'البائع المعيّن',
     'assigned_route': 'المسار المعيّن',
+    'assigned_routes': 'المسارات المعيّنة',
+    'assigned_sellers': 'البائعون المعيّنون',
+    'no_sellers': 'لا يوجد بائعون',
     'edit_assign_seller': 'عدّل هذا المحل لتعيين بائع',
     'copy_link_navigate': 'انسخ الرابط أعلاه وافتحه في المتصفح للتنقل.',
 
@@ -2809,6 +2815,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'no_location_pinned': 'کوئی مقام پن نہیں — ترمیم کر کے کوآرڈینیٹ شامل کریں',
     'assigned_seller': 'مقرر شدہ سیلر',
     'assigned_route': 'مقرر شدہ روٹ',
+    'assigned_routes': 'مقرر شدہ روٹس',
+    'assigned_sellers': 'مقرر شدہ سیلرز',
+    'no_sellers': 'کوئی سیلرز نہیں',
     'edit_assign_seller': 'سیلر مقرر کرنے کے لیے اس دکان میں ترمیم کریں',
     'copy_link_navigate': 'اوپر والا لنک کاپی کریں اور براؤزر میں کھولیں۔',
 

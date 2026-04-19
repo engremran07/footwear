@@ -28,6 +28,45 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.7.20',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔀',
+        text: {
+          AppLocale.en:
+              'Multi-route seller assignment: sellers can now be assigned to multiple routes simultaneously.',
+          AppLocale.ar:
+              'تعيين البائعين لعدة مسارات: يمكن الآن تعيين البائعين لعدة مسارات في نفس الوقت.',
+          AppLocale.ur:
+              'ملٹی روٹ سیلر اسائنمنٹ: سیلرز کو اب ایک ساتھ کئی روٹس پر تعینات کیا جا سکتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧹',
+        text: {
+          AppLocale.en:
+              'Legacy single-route code removed — the app now uses arrays everywhere for route and seller assignments, improving reliability.',
+          AppLocale.ar:
+              'تم إزالة رمز المسار الواحد القديم — يستخدم التطبيق الآن المصفوفات في كل مكان لتعيينات المسارات والبائعين.',
+          AppLocale.ur:
+              'پرانا سنگل روٹ کوڈ ہٹا دیا گیا — ایپ اب ہر جگہ arrays استعمال کرتی ہے، جو مزید قابل اعتماد ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔒',
+        text: {
+          AppLocale.en:
+              'Firestore security rules updated for multi-route access control.',
+          AppLocale.ar:
+              'تم تحديث قواعد أمان Firestore للتحكم في الوصول متعدد المسارات.',
+          AppLocale.ur:
+              'ملٹی روٹ رسائی کنٹرول کے لیے Firestore سیکیورٹی رولز اپ ڈیٹ کیے گئے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.7.19',
     date: 'April 2026',
     items: [

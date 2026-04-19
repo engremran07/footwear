@@ -593,7 +593,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             shopName: shop.name,
                             routeId: shop.routeId.isNotEmpty
                                 ? shop.routeId
-                                : (user?.assignedRouteId ?? ''),
+                                : (user?.assignedRouteIds.firstOrNull ?? ''),
                             type: type,
                             saleType: saleType,
                             amount: amount,
@@ -655,7 +655,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
             : AppTheme.clearBg(cs);
         final canManageShop =
             user?.isAdmin == true ||
-            (user?.isSeller == true && user?.assignedRouteId == shop.routeId);
+            (user?.isSeller == true &&
+                (user?.assignedRouteIds.contains(shop.routeId) ?? false));
 
         return Scaffold(
           body: Column(
