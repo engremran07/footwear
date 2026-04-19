@@ -28,6 +28,8 @@ import '../../screens/create_sale_invoice_screen.dart';
 import '../../screens/bootstrap_profile_screen.dart';
 import '../../screens/about_screen.dart';
 import '../../screens/users_list_screen.dart';
+import '../../screens/database_flush_screen.dart';
+import '../../screens/database_backup_screen.dart';
 import '../../widgets/app_shell.dart';
 import '../l10n/app_locale.dart';
 
@@ -234,7 +236,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Shops
           GoRoute(
             path: '/shops',
-            pageBuilder: (_, s) => _fadePage(const ShopsListScreen(), s),
+            pageBuilder: (_, s) => _fadePage(
+              ShopsListScreen(
+                filterCurrency: s.uri.queryParameters['currency'],
+              ),
+              s,
+            ),
           ),
           GoRoute(
             path: '/shops/new',
@@ -348,6 +355,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/settings',
             pageBuilder: (_, s) => _fadePage(const SettingsScreen(), s),
+            routes: [
+              GoRoute(
+                path: 'flush',
+                pageBuilder: (_, s) =>
+                    _fadePage(const DatabaseFlushScreen(), s),
+              ),
+              GoRoute(
+                path: 'backup',
+                pageBuilder: (_, s) =>
+                    _fadePage(const DatabaseBackupScreen(), s),
+              ),
+            ],
           ),
         ],
       ),

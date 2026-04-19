@@ -11,6 +11,7 @@ import '../core/l10n/app_locale.dart';
 import '../core/services/permissions_service.dart';
 import '../core/utils/snack_helper.dart';
 import '../providers/changelog_provider.dart';
+import '../providers/database_backup_provider.dart';
 import 'whats_new_sheet.dart';
 
 // ─── App Shell ───────────────────────────────────────────────────────────────
@@ -58,6 +59,7 @@ class _AppShellState extends ConsumerState<AppShell>
       PermissionsService.requestOnFirstRun();
       // Defer changelog check to avoid blocking initial frame rendering.
       Future.delayed(const Duration(seconds: 1), _checkAndShowChangelog);
+      Future.delayed(const Duration(seconds: 6), _checkAutoBackup);
     });
   }
 
@@ -65,6 +67,11 @@ class _AppShellState extends ConsumerState<AppShell>
   void dispose() {
     _drawerCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkAutoBackup() async {
+    if (!mounted) return;
+    await ref.read(databaseBackupProvider.notifier).checkAndAutoBackup();
   }
 
   Future<void> _checkAndShowChangelog() async {

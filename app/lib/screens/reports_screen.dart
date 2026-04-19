@@ -1,6 +1,6 @@
-﻿import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
@@ -108,8 +108,8 @@ class ReportsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          // Outstanding Distribution Chart
-          _OutstandingPieChart(),
+          // Outstanding Top Debtors
+          _OutstandingTopDebtors(),
           const SizedBox(height: 16),
           // Export sections
           _ExportCard(
@@ -443,43 +443,15 @@ class _ExportCard extends StatelessWidget {
   }
 }
 
-class _LegendDot extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _LegendDot({required this.color, required this.label});
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-}
+// ─── Outstanding Top Debtors Ranked List ────────────────────────────────────
 
-// â”€â”€â”€ Outstanding Distribution Pie Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-class _OutstandingPieChart extends ConsumerWidget {
+class _OutstandingTopDebtors extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authUserProvider).value;
     final shopsAsync = user?.isAdmin == true
         ? ref.watch(shopsProvider)
         : ref.watch(sellerAllShopsProvider);
-    final cs = Theme.of(context).colorScheme;
 
     return shopsAsync.when(
       loading: () => const SizedBox.shrink(),
@@ -489,112 +461,111 @@ class _OutstandingPieChart extends ConsumerWidget {
           ..sort((a, b) => b.balance.compareTo(a.balance));
         if (withDebt.isEmpty) return const SizedBox.shrink();
 
-        // Group: top 5 + "others"
-        final top = withDebt.take(5).toList();
-        final othersTotal = withDebt
-            .skip(5)
-            .fold<double>(0, (s, sh) => s + sh.balance);
-
-        final colors = [
-          cs.primary,
-          cs.secondary,
-          cs.tertiary,
-          AppTheme.warningFg(cs),
-          AppTheme.clearFg(cs),
-          cs.onSurfaceVariant,
-        ];
-
-        final sections = <PieChartSectionData>[];
-        for (var i = 0; i < top.length; i++) {
-          sections.add(
-            PieChartSectionData(
-              value: top[i].balance,
-              title: AppFormatters.compact(top[i].balance),
-              color: colors[i % colors.length],
-              radius: 50,
-              titleStyle: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color:
-                    ThemeData.estimateBrightnessForColor(
-                          colors[i % colors.length],
-                        ) ==
-                        Brightness.dark
-                    ? cs.surface
-                    : cs.onSurface,
-              ),
-            ),
-          );
-        }
-        if (othersTotal > 0) {
-          sections.add(
-            PieChartSectionData(
-              value: othersTotal,
-              title: AppFormatters.compact(othersTotal),
-              color: colors.last,
-              radius: 50,
-              titleStyle: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color:
-                    ThemeData.estimateBrightnessForColor(colors.last) ==
-                        Brightness.dark
-                    ? cs.surface
-                    : cs.onSurface,
-              ),
-            ),
-          );
-        }
+        final top = withDebt.take(10).toList();
+        final maxBalance = top.first.balance;
+        final cs = Theme.of(context).colorScheme;
 
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  tr('outstanding_report', ref),
+                  tr('top_outstanding', ref),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  height: 160,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: PieChart(
-                          PieChartData(
-                            sections: sections,
-                            sectionsSpace: 2,
-                            centerSpaceRadius: 24,
-                          ),
+                ...top.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final shop = entry.value;
+                  final ratio = maxBalance > 0
+                      ? shop.balance / maxBalance
+                      : 0.0;
+                  return Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => context.push('/shops/${shop.id}'),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 22,
+                                  height: 22,
+                                  decoration: BoxDecoration(
+                                    color: cs.primaryContainer,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '${i + 1}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: cs.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    shop.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  AppFormatters.currency(
+                                    shop.balance,
+                                    ref.watch(
+                                      routeCurrencyProvider(shop.routeId),
+                                    ),
+                                  ),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.debtFg(cs),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.chevron_right,
+                                  size: 18,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: ratio,
+                                minHeight: 5,
+                                backgroundColor: cs.surfaceContainerHighest,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppTheme.debtFg(cs).withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (var i = 0; i < top.length; i++)
-                            _LegendDot(
-                              color: colors[i % colors.length],
-                              label: top[i].name.length > 12
-                                  ? '${top[i].name.substring(0, 12)}â€¦'
-                                  : top[i].name,
-                            ),
-                          if (othersTotal > 0)
-                            _LegendDot(
-                              color: colors.last,
-                              label: tr('others', ref),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                }),
               ],
             ),
           ),
@@ -604,6 +575,7 @@ class _OutstandingPieChart extends ConsumerWidget {
   }
 }
 
+// ─── Account Statement Card ────────────────────────────────────────────────
 // â”€â”€â”€ Account Statement Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _AccountStatementCard extends ConsumerStatefulWidget {
   const _AccountStatementCard();

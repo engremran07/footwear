@@ -7,6 +7,28 @@ Most recent first.
 
 ---
 
+## [3.8.2+71] — 2026-04-19 — Backup hardening + deprecation cleanup
+
+### Added
+
+- Dedicated admin backup and restore workflow with timestamp tracking for last successful backup and restore.
+- Safe restore guardrails with admin-only restore pathways and explicit restore controls.
+- Device delivery completed: latest release APK installed successfully on connected device `671f700b`.
+
+### Changed
+
+- Settings screen now routes admin users to dedicated backup and danger-zone screens instead of inline sections.
+- Dependency upgrades finalized in app surface: `go_router` 17.2.1 and `font_awesome_flutter` 11.0.0.
+
+### Fixed
+
+- Removed deprecated API usage from app code paths; analyzer now reports zero deprecation warnings.
+- Cleaned duplicate `3.8.0` entry in in-app changelog data.
+
+### Audit
+
+- Non-app repository deprecation audit completed: no deprecated API usage found in source scripts/docs; matches in `functions/package-lock.json` are third-party npm metadata warnings.
+
 ## [3.8.0+69] — 2026-04-18 — Multi-currency exhaustive audit
 
 ### Fixed

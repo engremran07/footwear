@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -167,34 +168,10 @@ class DashboardScreen extends ConsumerWidget {
 
                 // Alerts banner
                 if (hasOutstandingAlert)
-                  Card(
-                        color: AppBrand.warningColor.withAlpha(25),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: AppTokens.brMD,
-                          side: BorderSide(
-                            color: AppBrand.warningColor.withAlpha(76),
-                          ),
-                        ),
-                        child: ListTile(
-                          leading: const Icon(
-                            Icons.warning_amber_rounded,
-                            color: AppBrand.warningColor,
-                          ),
-                          title: Text(
-                            tr(
-                              'dashboard_outstanding_alert',
-                              ref,
-                            ).replaceAll('%s', _formatOutstandingByCurrency(s)),
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text(tr('dashboard_pending_dues', ref)),
-                          trailing: TextButton(
-                            // NOTE: no /customers route — shops are the customers
-                            onPressed: () => context.go('/shops'),
-                            child: Text(tr('lbl_view', ref)),
-                          ),
-                        ),
+                  _OutstandingAlertCard(
+                        currencyStats: s.currencyStats,
+                        // NOTE: no /customers route — shops are the customers
+                        onViewCurrency: (c) => context.go('/shops?currency=$c'),
                       )
                       .animate()
                       .fadeIn(duration: AppTokens.durNormal)
@@ -271,13 +248,10 @@ class DashboardScreen extends ConsumerWidget {
                       staggerIndex: 1,
                       onTap: () => context.go('/shops'),
                     ),
-                    StatCard(
+                    _OutstandingStatCard(
                       title: tr('outstanding_balance', ref),
-                      value: _formatOutstandingByCurrency(s),
-                      icon: Icons.account_balance_wallet,
-                      color: totalOutstanding > 0
-                          ? AppBrand.errorColor
-                          : AppBrand.successColor,
+                      currencyStats: s.currencyStats,
+                      totalOutstanding: totalOutstanding,
                       staggerIndex: 2,
                       onTap: () => context.go('/shops'),
                     ),
@@ -557,15 +531,207 @@ class _RouteAnalyticsSection extends ConsumerWidget {
   }
 }
 
-/// Formats the per-currency outstanding totals into a compact string,
-/// e.g. "﷼ 3,000 / Rs 15,000". Falls back to "﷼ 0" if no entries.
-String _formatOutstandingByCurrency(DashboardStats s) {
-  final parts = s.currencyStats.entries
-      .where((e) => e.value.outstanding != 0)
-      .map((e) => AppFormatters.currency(e.value.outstanding, e.key))
-      .toList();
-  if (parts.isEmpty) return AppFormatters.currency(0);
-  return parts.join(' / ');
+// ─── Outstanding Alert Banner (per-currency with View buttons) ──────────────
+
+class _OutstandingAlertCard extends ConsumerWidget {
+  final Map<String, CurrencyStats> currencyStats;
+  final void Function(String currency) onViewCurrency;
+
+  const _OutstandingAlertCard({
+    required this.currencyStats,
+    required this.onViewCurrency,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entries = currencyStats.entries
+        .where((e) => e.value.outstanding > 0)
+        .toList();
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      color: AppBrand.warningColor.withAlpha(25),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppTokens.brMD,
+        side: BorderSide(color: AppBrand.warningColor.withAlpha(76)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: AppBrand.warningColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  tr('outstanding_balance', ref),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              tr('dashboard_pending_dues', ref),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...entries.map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        AppFormatters.currency(e.value.outstanding, e.key),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppBrand.errorColor,
+                        ),
+                      ),
+                    ),
+                    FilledButton.tonal(
+                      onPressed: () => onViewCurrency(e.key),
+                      child: Text(tr('lbl_view', ref)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Outstanding Stat Card (multi-currency stacked) ───────────────────────────
+
+class _OutstandingStatCard extends ConsumerWidget {
+  final String title;
+  final Map<String, CurrencyStats> currencyStats;
+  final double totalOutstanding;
+  final int staggerIndex;
+  final VoidCallback onTap;
+
+  const _OutstandingStatCard({
+    required this.title,
+    required this.currencyStats,
+    required this.totalOutstanding,
+    required this.staggerIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final cardColor = totalOutstanding > 0
+        ? AppBrand.errorColor
+        : AppBrand.successColor;
+    final entries = currencyStats.entries.toList();
+    final semanticLabel = entries.isEmpty
+        ? AppFormatters.currency(0)
+        : entries
+              .map((e) => AppFormatters.currency(e.value.outstanding, e.key))
+              .join(', ');
+
+    return Semantics(
+          key: ValueKey('stat_outstanding_$staggerIndex'),
+          label: '$title: $semanticLabel',
+          child: Card(
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                onTap();
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(AppTokens.s12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: cardColor.withValues(alpha: 0.12),
+                            borderRadius: AppTokens.brSM,
+                          ),
+                          child: Icon(
+                            Icons.account_balance_wallet,
+                            color: cardColor,
+                            size: AppTokens.iconSizeSM,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    if (entries.isEmpty)
+                      Text(
+                        AppFormatters.currency(0),
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: cardColor,
+                        ),
+                      )
+                    else
+                      ...entries.map(
+                        (e) => FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(
+                            AppFormatters.currency(e.value.outstanding, e.key),
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: cardColor,
+                              fontSize: entries.length == 1 ? null : 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        )
+        .animate()
+        .fadeIn(
+          duration: AppTokens.durNormal,
+          delay: Duration(milliseconds: 60 * staggerIndex),
+          curve: AppTokens.curveEnter,
+        )
+        .slideY(
+          begin: 0.1,
+          end: 0,
+          duration: AppTokens.durNormal,
+          delay: Duration(milliseconds: 60 * staggerIndex),
+          curve: AppTokens.curveEnter,
+        );
+  }
 }
 
 // ─── Admin Speed Dial FAB ────────────────────────────────────────────────────

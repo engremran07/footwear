@@ -28,40 +28,77 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
-    version: '3.8.0',
+    version: '3.8.2',
     date: 'April 2026',
     items: [
       ChangelogItem(
-        emoji: '💱',
+        emoji: '🛡️',
         text: {
           AppLocale.en:
-              'Multi-currency support: amounts now display in the correct currency (SAR or PKR) based on each route — no more mixed symbols.',
+              'New fool-proof backup and restore flow with admin-only restore protection and recorded backup/restore timestamps.',
           AppLocale.ar:
-              'دعم العملات المتعددة: تعرض المبالغ الآن العملة الصحيحة (ريال أو روبية) بناءً على كل مسار — لا مزيد من رموز مختلطة.',
+              'تدفق نسخ احتياطي واستعادة جديد وآمن مع حماية الاستعادة للمشرف فقط وتسجيل وقت آخر نسخة احتياطية وآخر استعادة.',
           AppLocale.ur:
-              'ملٹی کرنسی سپورٹ: رقومات اب ہر روٹ کے مطابق درست کرنسی (SAR یا PKR) میں دکھائی جاتی ہیں۔',
+              'نیا محفوظ بیک اپ اور ریسٹور فلو: ریسٹور صرف ایڈمن کے لیے، اور آخری بیک اپ اور آخری ریسٹور کے وقت باقاعدہ ریکارڈ ہوتے ہیں۔',
         },
       ),
       ChangelogItem(
-        emoji: '💬',
+        emoji: '📱',
         text: {
           AppLocale.en:
-              'WhatsApp quick-connect: tap the WhatsApp button on any shop to open a chat instantly.',
+              'Settings now opens dedicated Backup and Danger Zone screens for clearer, safer admin operations.',
           AppLocale.ar:
-              'اتصال سريع عبر واتساب: اضغط على زر واتساب في أي متجر لفتح محادثة فوراً.',
+              'الإعدادات تفتح الآن شاشات مخصصة للنسخ الاحتياطي ومنطقة الخطر لتكون عمليات المشرف أوضح وأكثر أمانًا.',
           AppLocale.ur:
-              'واٹس ایپ کوئیک کنیکٹ: کسی بھی شاپ پر واٹس ایپ بٹن دبائیں اور فوری چیٹ کھولیں۔',
+              'سیٹنگز میں اب بیک اپ اور ڈینجر زون کی الگ اسکرینز ہیں تاکہ ایڈمن آپریشنز زیادہ واضح اور محفوظ رہیں۔',
         },
       ),
       ChangelogItem(
-        emoji: '🧹',
+        emoji: '🔧',
         text: {
           AppLocale.en:
-              'Cleaner charts: removed unused cash-flow and balance trend graphs to speed up screen loading.',
+              'Dependency cleanup: direct packages are up-to-date and deprecated API usage has been removed from app code.',
           AppLocale.ar:
-              'رسوم بيانية أنظف: تمت إزالة الرسوم البيانية غير المستخدمة لتحسين سرعة تحميل الشاشات.',
+              'تنظيف الاعتماديات: الحزم المباشرة أصبحت محدثة وتمت إزالة استخدامات الـ API المتقادمة من كود التطبيق.',
           AppLocale.ur:
-              'صاف چارٹس: غیر ضروری کیش فلو اور بیلنس ٹرینڈ گرافس ہٹا دیے — اسکرین لوڈنگ تیز ہو گئی۔',
+              'ڈپینڈنسی کلین اپ: ڈائریکٹ پیکجز اپ ٹو ڈیٹ ہیں اور ایپ کوڈ سے deprecated API استعمالات ختم کر دی گئی ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.8.1',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📋',
+        text: {
+          AppLocale.en:
+              'Shops list: WhatsApp button now appears on every shop tile for quick contact.',
+          AppLocale.ar:
+              'قائمة المتاجر: زر واتساب يظهر الآن على كل بطاقة متجر للتواصل السريع.',
+          AppLocale.ur:
+              'شاپس لسٹ: اب ہر شاپ ٹائل پر واٹس ایپ بٹن دکھائی دیتا ہے — فوری رابطے کے لیے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📊',
+        text: {
+          AppLocale.en:
+              'Reports: replaced the pie chart with a ranked top-10 debtors list — easier to see who owes the most.',
+          AppLocale.ar:
+              'التقارير: تم استبدال الرسم البياني الدائري بقائمة أفضل 10 مدينين — أسهل لمعرفة من يدين بالأكثر.',
+          AppLocale.ur:
+              'رپورٹس: پائی چارٹ کو ٹاپ 10 مقروضین کی رینکڈ لسٹ سے بدل دیا — دیکھیں کون سب سے زیادہ باقی ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔧',
+        text: {
+          AppLocale.en:
+              'Fixed: the Add Shop button no longer overlaps the shop list.',
+          AppLocale.ar: 'إصلاح: زر إضافة متجر لم يعد يتداخل مع قائمة المتاجر.',
+          AppLocale.ur: 'درستگی: ایڈ شاپ بٹن اب شاپ لسٹ کے اوپر نہیں آتا۔',
         },
       ),
     ],

@@ -13,6 +13,93 @@ import '../providers/theme_preference_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/confirm_dialog.dart';
 
+class _ThemeOption {
+  final AppThemeMode mode;
+  final IconData icon;
+  final String label;
+
+  const _ThemeOption({
+    required this.mode,
+    required this.icon,
+    required this.label,
+  });
+}
+
+class _ThemeModeCard extends StatelessWidget {
+  final _ThemeOption option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ThemeModeCard({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: selected
+                ? cs.primaryContainer.withValues(alpha: 0.65)
+                : cs.surfaceContainerHighest.withValues(alpha: 0.5),
+            border: Border.all(
+              color: selected ? cs.primary : cs.outlineVariant,
+              width: selected ? 1.4 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                option.icon,
+                size: 18,
+                color: selected ? cs.primary : cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  option.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                    color: selected ? cs.onPrimaryContainer : cs.onSurface,
+                  ),
+                ),
+              ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 150),
+                child: selected
+                    ? Icon(
+                        Icons.check_circle,
+                        key: const ValueKey('selected'),
+                        size: 18,
+                        color: cs.primary,
+                      )
+                    : const SizedBox(
+                        key: ValueKey('not-selected'),
+                        width: 18,
+                        height: 18,
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
@@ -166,6 +253,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final currentUser = ref.watch(authUserProvider).value;
     final locale = ref.watch(appLocaleProvider);
     final currentTheme = ref.watch(themePreferenceProvider);
+    final themeOptions = [
+      _ThemeOption(
+        mode: AppThemeMode.auto,
+        icon: Icons.brightness_auto,
+        label: tr('profile_theme_auto', ref),
+      ),
+      _ThemeOption(
+        mode: AppThemeMode.light,
+        icon: Icons.light_mode,
+        label: tr('profile_theme_light', ref),
+      ),
+      _ThemeOption(
+        mode: AppThemeMode.dark,
+        icon: Icons.dark_mode,
+        label: tr('profile_theme_dark', ref),
+      ),
+      _ThemeOption(
+        mode: AppThemeMode.highContrast,
+        icon: Icons.contrast,
+        label: tr('profile_theme_high_contrast', ref),
+      ),
+    ];
 
     if (currentUser != null && _nameC.text.isEmpty) {
       _nameC.value = TextEditingValue(
@@ -275,33 +384,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
-                      SegmentedButton<AppThemeMode>(
-                        segments: [
-                          ButtonSegment(
-                            value: AppThemeMode.auto,
-                            icon: const Icon(Icons.brightness_auto, size: 18),
-                            label: Text(tr('profile_theme_auto', ref)),
-                          ),
-                          ButtonSegment(
-                            value: AppThemeMode.light,
-                            icon: const Icon(Icons.light_mode, size: 18),
-                            label: Text(tr('profile_theme_light', ref)),
-                          ),
-                          ButtonSegment(
-                            value: AppThemeMode.dark,
-                            icon: const Icon(Icons.dark_mode, size: 18),
-                            label: Text(tr('profile_theme_dark', ref)),
-                          ),
-                          ButtonSegment(
-                            value: AppThemeMode.highContrast,
-                            icon: const Icon(Icons.contrast, size: 18),
-                            label: Text(tr('profile_theme_high_contrast', ref)),
-                          ),
-                        ],
-                        selected: {currentTheme},
-                        onSelectionChanged: (s) => ref
-                            .read(themePreferenceProvider.notifier)
-                            .setThemeMode(s.first),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final itemWidth = (constraints.maxWidth - 12) / 2;
+                          return Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: themeOptions
+                                .map(
+                                  (option) => SizedBox(
+                                    width: itemWidth,
+                                    child: _ThemeModeCard(
+                                      option: option,
+                                      selected: currentTheme == option.mode,
+                                      onTap: () => ref
+                                          .read(
+                                            themePreferenceProvider.notifier,
+                                          )
+                                          .setThemeMode(option.mode),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          );
+                        },
                       ),
                     ],
                   ),

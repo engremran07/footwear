@@ -2,6 +2,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
@@ -26,9 +27,15 @@ import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
 import '../widgets/export_sheet.dart';
 import '../widgets/shimmer_loading.dart';
+import '../widgets/whatsapp_button.dart';
 
 class ShopsListScreen extends ConsumerStatefulWidget {
-  const ShopsListScreen({super.key});
+  /// When non-null, pre-filters shops to those belonging to routes with this
+  /// currency (e.g. 'PKR' or 'SAR') and auto-enables the Outstanding filter.
+  final String? filterCurrency;
+
+  const ShopsListScreen({super.key, this.filterCurrency});
+
   @override
   ConsumerState<ShopsListScreen> createState() => _ShopsListScreenState();
 }
@@ -37,6 +44,16 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
   String _search = '';
   _ShopQuickFilter _filter = _ShopQuickFilter.collective;
   String? _selectedRouteId;
+
+  @override
+  void initState() {
+    super.initState();
+    // When navigated from the outstanding dashboard card, pre-select
+    // the outstanding filter so the user immediately sees debtors.
+    if (widget.filterCurrency != null) {
+      _filter = _ShopQuickFilter.iWillGet;
+    }
+  }
 
   static final Map<String, String> _searchCharMap = {
     // Arabic/Urdu letter normalization
@@ -108,7 +125,17 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     return _shopHaystack(s).contains(q);
   }
 
-  List<ShopModel> _scopeShopsByRoute(List<ShopModel> shops) {
+  List<ShopModel> _scopeShopsByRoute(
+    List<ShopModel> shops, {
+    Set<String>? currencyRouteIds,
+  }) {
+    if (currencyRouteIds != null) {
+      var filtered = shops.where((s) => currencyRouteIds.contains(s.routeId));
+      if (_selectedRouteId != null) {
+        filtered = filtered.where((s) => s.routeId == _selectedRouteId);
+      }
+      return filtered.toList();
+    }
     if (_selectedRouteId == null) return shops;
     return shops.where((s) => s.routeId == _selectedRouteId).toList();
   }
@@ -142,9 +169,23 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         : null;
     final canCreateShop =
         user != null && (user.isAdmin || sellerRouteIds.isNotEmpty);
+
+    // When navigated with ?currency=X, restrict shops to routes of that currency.
+    final filterCurrency = widget.filterCurrency?.toUpperCase();
+    final currencyRouteIds =
+        (filterCurrency != null && routesAsync?.value != null)
+        ? routesAsync!.value!
+              .where((r) => r.currency.toUpperCase() == filterCurrency)
+              .map((r) => r.id)
+              .toSet()
+        : null;
+
     final scopedStatsShops = shopsAsync.value == null
         ? null
-        : _scopeShopsByRoute(shopsAsync.value!);
+        : _scopeShopsByRoute(
+            shopsAsync.value!,
+            currencyRouteIds: currencyRouteIds,
+          );
     final flowByShop =
         scopedStatsShops == null || transactionsAsync.value == null
         ? null
@@ -156,6 +197,40 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     return Scaffold(
       body: Column(
         children: [
+          // Currency filter active banner
+          if (filterCurrency != null)
+            Container(
+              color: AppBrand.warningColor.withAlpha(20),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.filter_alt,
+                    size: 16,
+                    color: AppBrand.warningColor,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '$filterCurrency ${tr('outstanding_balance', ref).toLowerCase()}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppBrand.warningColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => context.go('/shops'),
+                    child: const Icon(
+                      Icons.close,
+                      size: 16,
+                      color: AppBrand.warningColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           // Export action row + search bar (combined)
           Padding(
             padding: const EdgeInsets.fromLTRB(0, 4, 4, 0),
@@ -284,7 +359,10 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
           Expanded(
             child: shopsAsync.when(
               data: (shops) {
-                final scopedShops = _scopeShopsByRoute(shops);
+                final scopedShops = _scopeShopsByRoute(
+                  shops,
+                  currencyRouteIds: currencyRouteIds,
+                );
                 final scopedFlowByShop = _buildShopFlowStats(
                   shops: scopedShops,
                   transactions:
@@ -357,6 +435,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   },
                   child: ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: 88),
                     itemCount: filtered.length,
                     itemBuilder: (_, i) => _ShopTile(
                       shop: filtered[i],
@@ -1107,24 +1186,34 @@ class _ShopTile extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
         ),
         // Show the amount that matches the selected analytics chip.
-        trailing: Column(
+        trailing: Row(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              AppFormatters.currency(
-                trailingAmount,
-                ref.watch(routeCurrencyProvider(shop.routeId)),
-              ),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: trailingColor,
-              ),
+            WhatsAppShopCtaButton(
+              shop: shop,
+              iconSize: 20,
+              onViewStatement: () => context.push('/shops/${shop.id}'),
             ),
-            Text(
-              trailingLabel,
-              style: TextStyle(fontSize: 10, color: trailingColor),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  AppFormatters.currency(
+                    trailingAmount,
+                    ref.watch(routeCurrencyProvider(shop.routeId)),
+                  ),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: trailingColor,
+                  ),
+                ),
+                Text(
+                  trailingLabel,
+                  style: TextStyle(fontSize: 10, color: trailingColor),
+                ),
+              ],
             ),
           ],
         ),
@@ -1209,6 +1298,7 @@ class _AdminGroupedShopsViewState
     final sectionMap = {for (final s in sections) s.key: s};
 
     return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 88),
       itemCount: flatItems.length,
       itemBuilder: (context, index) {
         final entry = flatItems[index];
