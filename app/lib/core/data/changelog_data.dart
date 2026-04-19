@@ -28,6 +28,23 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.8.4',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '⚡',
+        text: {
+          AppLocale.en:
+              'Seller dashboard now loads instantly without flickering — route cards and shop data appear together in one smooth render.',
+          AppLocale.ar:
+              'لوحة تحكم البائع تُحمّل الآن فورًا بدون وميض — بطاقات المسارات وبيانات المحلات تظهر معًا في عرض سلس.',
+          AppLocale.ur:
+              'سیلر ڈیش بورڈ اب فوری لوڈ ہوتا ہے بغیر جھلملاہٹ کے — روٹ کارڈز اور دکانوں کا ڈیٹا ایک ساتھ ظاہر ہوتا ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.8.3',
     date: 'April 2026',
     items: [

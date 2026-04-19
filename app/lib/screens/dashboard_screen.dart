@@ -317,14 +317,63 @@ class _SellerDashboard extends ConsumerWidget {
       );
     }
 
+    final routesAsync = ref.watch(routesBySellerProvider(user.id));
     final shopsAsync = ref.watch(sellerAllShopsProvider);
     final inventoryPairsAsync = ref.watch(
       sellerInventoryTotalPairsProvider(user.id),
     );
 
+    // Unified loading gate: show shimmer until routes AND shops both settle.
+    // Prevents route cards rendering with zero shop data (causing flicker) and
+    // prevents independent-section spinners popping in at different times.
+    if (routesAsync.isLoading || shopsAsync.isLoading) {
+      return Scaffold(
+        body: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(routesBySellerProvider(user.id));
+            ref.invalidate(sellerAllShopsProvider);
+          },
+          child: ShimmerLoading.cards(),
+        ),
+      );
+    }
+
+    // Degrade gracefully on error (permission errors during auth warm-up are silent).
+    if (routesAsync.hasError &&
+        !AppErrorMapper.isPermissionOrAuthError(routesAsync.error!)) {
+      return Scaffold(
+        body: Center(
+          child: Text(tr(AppErrorMapper.key(routesAsync.error!), ref)),
+        ),
+      );
+    }
+    if (shopsAsync.hasError &&
+        !AppErrorMapper.isPermissionOrAuthError(shopsAsync.error!)) {
+      return Scaffold(
+        body: Center(
+          child: Text(tr(AppErrorMapper.key(shopsAsync.error!), ref)),
+        ),
+      );
+    }
+
+    // All data is ready — extract synchronously (no nested .when()).
+    final routes = routesAsync.value ?? const <RouteModel>[];
+    final shops = shopsAsync.value ?? const <ShopModel>[];
+    // Inventory: use .value if loaded, 0 while still loading — stat grid
+    // renders immediately without a nested spinner.
+    final pairs = inventoryPairsAsync.value ?? 0;
+
+    final outstanding = shops.fold<double>(0, (acc, s) => acc + s.balance);
+    final hasMultipleRoutes = routeIds.length > 1;
+    // Currency from the first assigned route — no extra provider watch needed.
+    final primaryCurrency = routes.firstOrNull?.currency ?? 'SAR';
+    final sortedRoutes = List.of(routes)
+      ..sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
+
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
+          ref.invalidate(routesBySellerProvider(user.id));
           ref.invalidate(sellerAllShopsProvider);
           ref.invalidate(sellerInventoryProvider(user.id));
           ref.invalidate(sellerInventoryTotalPairsProvider(user.id));
@@ -344,94 +393,232 @@ class _SellerDashboard extends ConsumerWidget {
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
-            // Show a card for each assigned route
-            ...routeIds.map((rid) {
-              final routeAsync = ref.watch(routeDetailProvider(rid));
-              return routeAsync.when(
-                data: (route) => route == null
-                    ? const SizedBox.shrink()
-                    : Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.route),
-                          title: Text(route.name),
-                          subtitle: Text(
-                            tr(
-                              'dashboard_route_number',
-                              ref,
-                            ).replaceAll('%s', '${route.routeNumber}'),
+
+            // Route cards — rendered once with correct shop data (no double rebuild).
+            if (sortedRoutes.isNotEmpty)
+              Column(
+                children: sortedRoutes.map((route) {
+                  final routeShops = shops
+                      .where((shop) => shop.routeId == route.id)
+                      .toList();
+                  final routeOutstanding = routeShops.fold<double>(
+                    0,
+                    (sum, shop) => sum + shop.balance,
+                  );
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Card(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => context.push('/routes/${route.id}'),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      '${route.routeNumber}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          route.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          [
+                                            if (route.area?.isNotEmpty == true)
+                                              route.area,
+                                            route.currency,
+                                          ].join(' · '),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.chevron_right,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _SellerRouteMetricChip(
+                                      icon: Icons.storefront,
+                                      label: tr('shops', ref),
+                                      value: '${routeShops.length}',
+                                      color: AppBrand.secondaryColor,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _SellerRouteMetricChip(
+                                      icon: Icons.account_balance_wallet,
+                                      label: tr('outstanding_balance', ref),
+                                      value: AppFormatters.currency(
+                                        routeOutstanding,
+                                        route.currency,
+                                      ),
+                                      color: routeOutstanding > 0
+                                          ? AppBrand.errorColor
+                                          : AppBrand.successColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                loading: () => const SizedBox.shrink(),
-                error: (_, _) => const SizedBox.shrink(),
-              );
-            }),
-            const SizedBox(height: 12),
-            shopsAsync.when(
-              data: (shops) {
-                final outstanding = shops.fold<double>(
-                  0,
-                  (acc, shop) => acc + shop.balance,
-                );
-                return inventoryPairsAsync.when(
-                  data: (pairs) => GridView.count(
-                    crossAxisCount: MediaQuery.of(context).size.width > 600
-                        ? 3
-                        : 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 4,
-                    crossAxisSpacing: 4,
-                    childAspectRatio: 1.5,
-                    children: [
-                      StatCard(
-                        title: tr('dashboard_my_shops', ref),
-                        value: shops.length.toString(),
-                        icon: Icons.store,
-                        color: AppBrand.secondaryColor,
-                        staggerIndex: 0,
-                        onTap: () => context.go('/shops'),
-                      ),
-                      StatCard(
-                        title: tr('dashboard_outstanding', ref),
-                        value: AppFormatters.currency(
-                          outstanding,
-                          ref.watch(
-                            routeCurrencyProvider(routeIds.firstOrNull ?? ''),
-                          ),
-                        ),
-                        icon: Icons.account_balance_wallet,
-                        color: outstanding > 0
-                            ? AppBrand.errorColor
-                            : AppBrand.successColor,
-                        staggerIndex: 1,
-                        onTap: () => context.go('/shops'),
-                      ),
-                      StatCard(
-                        title: tr('dashboard_my_inventory', ref),
-                        value: AppFormatters.compact(pairs.toDouble()),
-                        icon: Icons.inventory,
-                        color: AppBrand.stockColor,
-                        staggerIndex: 2,
-                        onTap: () => context.go('/inventory'),
-                      ),
-                    ],
-                  ),
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (_, _) => const SizedBox.shrink(),
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => _buildDashboardAsyncError(
-                context,
-                ref,
-                e,
-                fallback: const Center(child: CircularProgressIndicator()),
+                    ),
+                  );
+                }).toList(),
               ),
+
+            const SizedBox(height: 12),
+
+            // Stat grid — rendered immediately with whatever inventory value
+            // is available (0 while still streaming) — no nested spinner.
+            GridView.count(
+              crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 4,
+              crossAxisSpacing: 4,
+              childAspectRatio: 1.5,
+              children: [
+                StatCard(
+                  title: tr('dashboard_my_shops', ref),
+                  value: shops.length.toString(),
+                  icon: Icons.store,
+                  color: AppBrand.secondaryColor,
+                  staggerIndex: 0,
+                  onTap: () => context.go('/shops'),
+                ),
+                StatCard(
+                  title: tr('dashboard_outstanding', ref),
+                  value: hasMultipleRoutes
+                      ? AppFormatters.compact(outstanding)
+                      : AppFormatters.currency(outstanding, primaryCurrency),
+                  subtitle: hasMultipleRoutes
+                      ? '${routeIds.length} ${tr('routes', ref).toLowerCase()}'
+                      : null,
+                  icon: Icons.account_balance_wallet,
+                  color: outstanding > 0
+                      ? AppBrand.errorColor
+                      : AppBrand.successColor,
+                  staggerIndex: 1,
+                  onTap: () => context.go('/shops'),
+                ),
+                StatCard(
+                  title: tr('dashboard_my_inventory', ref),
+                  value: AppFormatters.compact(pairs.toDouble()),
+                  icon: Icons.inventory,
+                  color: AppBrand.stockColor,
+                  staggerIndex: 2,
+                  onTap: () => context.go('/inventory'),
+                ),
+              ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SellerRouteMetricChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _SellerRouteMetricChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
