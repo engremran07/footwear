@@ -110,7 +110,12 @@ class AuthNotifier extends AsyncNotifier<void> {
     // restarts — a quota spike and UI jank. autoDispose providers self-cancel
     // when no widget watches them, so we only need to reset the core ones.
     ref.invalidate(authUserProvider);
-    ref.invalidate(dashboardStatsProvider);
+    // NOTE: do NOT explicitly invalidate dashboardStatsProvider here.
+    // It is a non-autoDispose Provider that watches authUserProvider (autoDispose).
+    // Invalidating both in the same call causes Riverpod 3's priority queue
+    // to throw "No lowest priority node found" — it cannot order the rebuild of
+    // a dependent before its dependency. dashboardStatsProvider will rebuild
+    // automatically when authUserProvider rebuilds.
     // SM-01: Also invalidate the last-good cache so stale stats from the
     // previous session do not flash briefly when a new user signs in.
     ref.invalidate(lastGoodDashboardStatsProvider);

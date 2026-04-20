@@ -64,9 +64,14 @@ final routeCurrencyProvider = Provider.autoDispose.family<String, String>((
 
 final routesBySellerProvider = StreamProvider.autoDispose
     .family<List<RouteModel>, String>((ref, sellerId) {
-      final user = ref.watch(authUserProvider).value;
-      if (user == null) return const Stream.empty();
-      if (!user.isAdmin && user.id != sellerId) return const Stream.empty();
+      final (isAdmin, uid) = ref.watch(
+        authUserProvider.select((s) {
+          final u = s.value;
+          return (u?.isAdmin ?? false, u?.id ?? '');
+        }),
+      );
+      if (uid.isEmpty) return const Stream.empty();
+      if (!isAdmin && uid != sellerId) return const Stream.empty();
       return FirebaseFirestore.instance
           .collection(Collections.routes)
           .where('assigned_seller_ids', arrayContains: sellerId)

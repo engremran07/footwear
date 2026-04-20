@@ -29,8 +29,12 @@ import 'auth_provider.dart';
 final shopsProvider = StreamProvider.autoDispose<List<ShopModel>>((ref) {
   // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED
   // during auth transitions when seller credentials are active.
-  final user = ref.watch(authUserProvider).value;
-  if (user == null || !user.isAdmin) return const Stream.empty();
+  // Use select() so this provider only rebuilds when the admin flag changes,
+  // not on every user-doc heartbeat / field update.
+  final isAdmin = ref.watch(
+    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+  );
+  if (!isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('active', isEqualTo: true)
@@ -63,11 +67,20 @@ final shopsByRouteProvider = StreamProvider.autoDispose
 final sellerAllShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
   ref,
 ) {
-  final user = ref.watch(authUserProvider).value;
-  if (user == null || !user.isSeller || user.assignedRouteIds.isEmpty) {
+  // Use select() so this provider only rebuilds when route assignments change,
+  // not on every user-doc heartbeat / field update (avoids shimmer flicker).
+  final (isSeller, routeIds) = ref.watch(
+    authUserProvider.select((s) {
+      final u = s.value;
+      return (
+        u?.isSeller ?? false,
+        u?.assignedRouteIds ?? const <String>[],
+      );
+    }),
+  );
+  if (!isSeller || routeIds.isEmpty) {
     return const Stream.empty();
   }
-  final routeIds = user.assignedRouteIds;
   // Firestore whereIn supports up to 30 values — ample for route count.
   return FirebaseFirestore.instance
       .collection(Collections.customers)
@@ -84,9 +97,19 @@ final sellerAllShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
 
 final shopDetailProvider = StreamProvider.autoDispose.family<ShopModel?, String>(
   (ref, id) {
-    final user = ref.watch(authUserProvider).value;
-    if (user == null) return const Stream.empty();
-    if (user.isAdmin) {
+    // Use select() to avoid rebuilding on unrelated user-doc changes.
+    final (isAdmin, isSeller, routeIds) = ref.watch(
+      authUserProvider.select((s) {
+        final u = s.value;
+        return (
+          u?.isAdmin ?? false,
+          u?.isSeller ?? false,
+          u?.assignedRouteIds ?? const <String>[],
+        );
+      }),
+    );
+    if (!isAdmin && !isSeller) return const Stream.empty();
+    if (isAdmin) {
       return FirebaseFirestore.instance
           .collection(Collections.customers)
           .doc(id)
@@ -96,7 +119,7 @@ final shopDetailProvider = StreamProvider.autoDispose.family<ShopModel?, String>
                 doc.exists ? ShopModel.fromJson(doc.data()!, doc.id) : null,
           );
     }
-    if (!user.isSeller || user.assignedRouteIds.isEmpty) {
+    if (!isSeller || routeIds.isEmpty) {
       return const Stream.empty();
     }
     // Direct doc read — Firestore rules enforce route membership.
@@ -110,7 +133,7 @@ final shopDetailProvider = StreamProvider.autoDispose.family<ShopModel?, String>
           if (!doc.exists) return null;
           final shop = ShopModel.fromJson(doc.data()!, doc.id);
           // Client-side guard: hide shops outside the seller's assigned routes.
-          if (!user.assignedRouteIds.contains(shop.routeId)) return null;
+          if (!routeIds.contains(shop.routeId)) return null;
           return shop;
         });
   },
@@ -120,8 +143,10 @@ final outstandingShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
   ref,
 ) {
   // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
-  final user = ref.watch(authUserProvider).value;
-  if (user == null || !user.isAdmin) return const Stream.empty();
+  final isAdmin = ref.watch(
+    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+  );
+  if (!isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.customers)
       .where('active', isEqualTo: true)

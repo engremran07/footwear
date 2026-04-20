@@ -5,7 +5,6 @@ import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
-import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
@@ -201,8 +200,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         ref,
                         title: tr('inventory_report', ref),
                         headers: [
-                          triCol('lbl_variant_name'),
-                          triCol('lbl_quantity_available'),
+                          tr('variant_name', ref),
+                          tr('quantity_available', ref),
                         ],
                         rows: (isAdmin && _adminTab == 0)
                             ? warehouseVariants.value

@@ -32,10 +32,17 @@ class AboutScreen extends ConsumerWidget {
           Center(
             child: Column(
               children: [
-                Image.asset(
-                  AppBrand.logoAsset,
-                  height: 88,
-                  fit: BoxFit.contain,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(10),
+                    child: Image.asset(
+                      AppBrand.logoAsset,
+                      height: 78,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(

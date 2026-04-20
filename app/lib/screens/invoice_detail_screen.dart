@@ -5,7 +5,6 @@ import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
-import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/invoice_model.dart';
 import '../providers/auth_provider.dart';
@@ -169,12 +168,12 @@ class InvoiceDetailScreen extends ConsumerWidget {
   void _showExportSheet(BuildContext context, WidgetRef ref, InvoiceModel inv) {
     final locale = ref.read(appLocaleProvider);
     final headers = [
-      triCol('item_number'),
-      triCol('size'),
-      triCol('color'),
-      triCol('qty'),
-      triCol('unit_price'),
-      triCol('total'),
+      tr('item_number', ref),
+      tr('size', ref),
+      tr('color', ref),
+      tr('qty', ref),
+      tr('unit_price', ref),
+      tr('total', ref),
     ];
     final rows = inv.items
         .map(

@@ -10,7 +10,6 @@ import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/name_resolver.dart';
 import '../core/utils/pdf_export.dart';
-import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
@@ -781,7 +780,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                 (s, t) => s + t.balanceImpact,
                               );
                               final openingBalance = shop.balance - netTx;
-                              final labels = trilingualLabels(<String, String>{
+                              final labels = <String, String>{
                                   for (final k in const [
                                     'date',
                                     'description',
@@ -801,17 +800,17 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                     'duration',
                                   ])
                                     k: tr(k, ref),
-                                });
+                                };
                               ExportSheet.show(
                                 context,
                                 ref,
                                 title:
                                     '${shop.name} - ${tr('account_statement', ref)}',
                                 headers: [
-                                  triCol('date'),
-                                  triCol('type'),
-                                  triCol('amount'),
-                                  triCol('description'),
+                                  tr('date', ref),
+                                  tr('type', ref),
+                                  tr('amount', ref),
+                                  tr('description', ref),
                                 ],
                                 rows: sorted
                                     .map(

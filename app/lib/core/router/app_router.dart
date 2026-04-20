@@ -61,7 +61,6 @@ bool _isSellerBlockedPath(String rawPath) {
       path == '/reports' ||
       path == '/settings' ||
       path == '/routes/new' ||
-      RegExp(r'^/routes/[^/]+$').hasMatch(path) ||
       RegExp(r'^/routes/[^/]+/edit$').hasMatch(path);
 }
 
