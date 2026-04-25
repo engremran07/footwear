@@ -28,6 +28,45 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.0',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📋',
+        text: {
+          AppLocale.en:
+              'New History tab: view the last 7 days of transactions grouped by day, with tap-to-navigate to shop details.',
+          AppLocale.ar:
+              'تبويب السجل الجديد: عرض آخر 7 أيام من المعاملات مجمّعة حسب اليوم، مع النقر للانتقال إلى تفاصيل المتجر.',
+          AppLocale.ur:
+              'نیا تاریخ ٹیب: گزشتہ 7 دنوں کی ٹرانزیکشنز دن کے مطابق دیکھیں، دکان کی تفصیلات تک جانے کے لیے ٹیپ کریں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔔',
+        text: {
+          AppLocale.en:
+              'Admin notification bell: live badge in the top bar shows unread seller activity. Tap to open the Notification Center.',
+          AppLocale.ar:
+              'جرس إشعارات المسؤول: شارة حية في الشريط العلوي تعرض نشاط البائع غير المقروء. انقر لفتح مركز الإشعارات.',
+          AppLocale.ur:
+              'ایڈمن نوٹیفیکیشن بیل: اوپری بار میں لائیو بیج سیلر کی غیر پڑھی سرگرمی دکھاتا ہے۔ نوٹیفیکیشن سنٹر کھولنے کے لیے ٹیپ کریں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🏪',
+        text: {
+          AppLocale.en:
+              'Shops list: "Active Today" filter highlights shops with same-day activity. Shops automatically sort by most recent transaction.',
+          AppLocale.ar:
+              'قائمة المتاجر: فلتر "نشط اليوم" يُبرز المتاجر النشطة اليوم. تُرتَّب المتاجر تلقائيًا حسب أحدث معاملة.',
+          AppLocale.ur:
+              'دکانوں کی فہرست: "آج کی سرگرمی" فلٹر آج کی سرگرمی والی دکانیں نمایاں کرتا ہے۔ دکانیں خودکار طور پر تازہ ترین ٹرانزیکشن کے مطابق ترتیب پاتی ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.8.5',
     date: 'April 2026',
     items: [

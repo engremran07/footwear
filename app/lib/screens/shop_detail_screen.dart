@@ -782,26 +782,26 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               );
                               final openingBalance = shop.balance - netTx;
                               final labels = trilingualLabels(<String, String>{
-                                  for (final k in const [
-                                    'date',
-                                    'description',
-                                    'debit',
-                                    'credit',
-                                    'running_balance',
-                                    'account_statement',
-                                    'opening_balance',
-                                    'net_payable',
-                                    'cash_in',
-                                    'cash_out',
-                                    'total_entries',
-                                    'page',
-                                    'report_date',
-                                    'generated_by',
-                                    'entry_by',
-                                    'duration',
-                                  ])
-                                    k: tr(k, ref),
-                                });
+                                for (final k in const [
+                                  'date',
+                                  'description',
+                                  'debit',
+                                  'credit',
+                                  'running_balance',
+                                  'account_statement',
+                                  'opening_balance',
+                                  'net_payable',
+                                  'cash_in',
+                                  'cash_out',
+                                  'total_entries',
+                                  'page',
+                                  'report_date',
+                                  'generated_by',
+                                  'entry_by',
+                                  'duration',
+                                ])
+                                  k: tr(k, ref),
+                              });
                               ExportSheet.show(
                                 context,
                                 ref,

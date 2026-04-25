@@ -34,8 +34,11 @@ final sellerInventoryTotalPairsProvider =
 /// Limit is 100 to keep free-tier Firestore reads within budget.
 final adminAllSellerInventoryProvider =
     StreamProvider.autoDispose<List<SellerInventoryModel>>((ref) {
-      final user = ref.watch(authUserProvider).value;
-      if (user == null || !user.isAdmin) return const Stream.empty();
+      // Use select() so heartbeat writes to last_active do NOT restart the stream.
+      final isAdmin = ref.watch(
+        authUserProvider.select((s) => s.value?.isAdmin ?? false),
+      );
+      if (!isAdmin) return const Stream.empty();
       return FirebaseFirestore.instance
           .collection(Collections.sellerInventory)
           .where('active', isEqualTo: true)

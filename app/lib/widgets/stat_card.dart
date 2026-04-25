@@ -108,52 +108,61 @@ class StatCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const Spacer(),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: AnimatedSwitcher(
-                            duration: AppTokens.durNormal,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: AlignmentDirectional.centerStart,
-                              child: Text(
-                                value,
-                                key: ValueKey(value),
-                                style: theme.textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: cardColor,
-                                ),
+                    Expanded(
+                      child: Align(
+                        alignment: AlignmentDirectional.bottomStart,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.bottomStart,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  AnimatedSwitcher(
+                                    duration: AppTokens.durNormal,
+                                    child: Text(
+                                      value,
+                                      key: ValueKey(value),
+                                      style: theme.textTheme.headlineSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: cardColor,
+                                          ),
+                                    ),
+                                  ),
+                                  if (trend != null) ...[
+                                    const SizedBox(width: AppTokens.s4),
+                                    Icon(
+                                      trend! > 0
+                                          ? Icons.trending_up
+                                          : Icons.trending_down,
+                                      size: 16,
+                                      color: trend! > 0
+                                          ? AppBrand.successColor
+                                          : AppBrand.errorColor,
+                                    ),
+                                  ],
+                                ],
                               ),
-                            ),
+                              if (subtitle != null) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  subtitle!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                        ),
-                        if (trend != null) ...[
-                          const SizedBox(width: AppTokens.s4),
-                          Icon(
-                            trend! > 0
-                                ? Icons.trending_up
-                                : Icons.trending_down,
-                            size: 16,
-                            color: trend! > 0
-                                ? AppBrand.successColor
-                                : AppBrand.errorColor,
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),

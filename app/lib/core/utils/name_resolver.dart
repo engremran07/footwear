@@ -17,8 +17,8 @@ class NameResolver {
     required List<UserModel> users,
     Map<String, String> extra = const {},
     this.unknownLabel = '—',
-  })  : assert(unknownLabel.isNotEmpty, 'unknownLabel must not be empty'),
-        _cache = {for (final u in users) u.id: u.displayName, ...extra};
+  }) : assert(unknownLabel.isNotEmpty, 'unknownLabel must not be empty'),
+       _cache = {for (final u in users) u.id: u.displayName, ...extra};
 
   /// Resolves [uid] to a display name. Returns [unknownLabel] for unknown IDs.
   String resolve(String uid) => _cache[uid] ?? unknownLabel;

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/network_provider.dart';
+import '../providers/notification_provider.dart';
 import '../providers/shop_provider.dart';
 import '../models/user_model.dart';
 import '../core/constants/app_brand.dart';
@@ -222,14 +223,14 @@ class _AppShellState extends ConsumerState<AppShell>
         (icon: Icons.storefront, key: 'shops', route: '/shops'),
         (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
         (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
-        (icon: Icons.person, key: 'profile', route: '/profile'),
+        (icon: Icons.history, key: 'history', route: '/history'),
       ];
     }
     return const [
       (icon: Icons.dashboard, key: 'dashboard', route: '/'),
       (icon: Icons.storefront, key: 'shops', route: '/shops'),
       (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
-      (icon: Icons.analytics, key: 'reports', route: '/reports'),
+      (icon: Icons.history, key: 'history', route: '/history'),
       (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
     ];
   }
@@ -253,6 +254,9 @@ class _AppShellState extends ConsumerState<AppShell>
     final isWide = MediaQuery.of(context).size.width >= 720;
     final isOnline = ref.watch(isOnlineProvider).value ?? true;
     final currentLocation = GoRouterState.of(context).uri.path;
+    final unreadCount = (user?.isAdmin ?? false)
+        ? ref.watch(unreadNotificationCountProvider)
+        : 0;
 
     final rawItems = _filteredItems(user);
     final navItems = rawItems
@@ -411,6 +415,7 @@ class _AppShellState extends ConsumerState<AppShell>
                             menuLabel: menuLabel,
                             backLabel: backLabel,
                             drawerAnim: _drawerAnim,
+                            unreadCount: unreadCount,
                             isTopLevel: primaryItems.any(
                               (e) => e.route == currentLocation,
                             ),
@@ -562,6 +567,7 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onProfileTap;
   final bool isTopLevel;
   final VoidCallback onBack;
+  final int unreadCount;
 
   const _WhatsAppBar({
     required this.user,
@@ -574,6 +580,7 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onProfileTap,
     required this.isTopLevel,
     required this.onBack,
+    this.unreadCount = 0,
   });
 
   @override
@@ -624,6 +631,53 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
       title: _BreadcrumbTitle(location: currentLocation, isOnline: isOnline),
       actions: [
+        // Bell icon — admin-only; hidden when unread count is zero
+        if (user?.isAdmin == true)
+          Builder(
+            builder: (ctx) => Stack(
+              alignment: Alignment.center,
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.notifications_outlined,
+                    color: Colors.white,
+                  ),
+                  tooltip: 'Notifications',
+                  onPressed: () => ctx.push('/notifications'),
+                ),
+                if (unreadCount > 0)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: IgnorePointer(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16),
+                        decoration: BoxDecoration(
+                          color: AppBrand.errorAccent,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
+                        child: Text(
+                          unreadCount > 99 ? '99+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            height: 1.2,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         if (user != null)
           Padding(
             padding: const EdgeInsetsDirectional.only(end: 10),

@@ -198,7 +198,13 @@ service cloud.firestore {
 
     // --- routes -------------------------------------------------------------
     match /routes/{routeId} {
-      allow read: if isAdmin() || isSellerForRoute(routeId);
+      // isSellerForRoute(routeId) covers single-document GET requests
+      // (routeId is known). For LIST/query operations the match-path variable
+      // is NOT constrained by query filters, so Firestore can't prove it.
+      // The second branch checks the document field directly — Firestore CAN
+      // validate this against an arrayContains query constraint.
+      allow read: if isAdmin() || isSellerForRoute(routeId) ||
+        (isSeller() && request.auth.uid in resource.data.assigned_seller_ids);
       allow create, update: if isAdmin() && docSizeOk();
       allow delete: if isAdmin();
     }
@@ -428,6 +434,19 @@ service cloud.firestore {
     match /admin_config/{docId} {
       allow read: if isAdmin();
       allow write: if false;
+    }
+
+    // --- notifications (Firestore-listener notification feed) ----------------
+    // Admin reads/marks-read; any active user can create for the admin feed.
+    match /notifications/{notifId} {
+      allow read: if isAdmin() && isActiveUser();
+      allow create: if isActiveUser()
+          && request.resource.data.created_by == request.auth.uid
+          && docSizeOk();
+      allow update: if isAdmin() && isActiveUser()
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['read', 'read_at']);
+      allow delete: if false;
     }
 
     // --- Deny all other paths -----------------------------------------------

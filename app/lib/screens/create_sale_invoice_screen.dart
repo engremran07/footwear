@@ -303,21 +303,31 @@ class _CreateSaleInvoiceScreenState
                         : shops
                               .where((s) => s.id == _selectedShop!.id)
                               .firstOrNull;
-                    return DropdownButtonFormField<ShopModel>(
-                      initialValue: matchedShop,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.store),
-                        hintText: tr('select_shop', ref),
-                        isDense: true,
+                    return GestureDetector(
+                      onTap: () => _pickShop(context, shops),
+                      child: InputDecorator(
+                        isEmpty: matchedShop == null,
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.store),
+                          hintText: tr('select_shop', ref),
+                          isDense: true,
+                          suffixIcon: matchedShop != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.close, size: 18),
+                                  tooltip: tr('clear', ref),
+                                  onPressed: () =>
+                                      setState(() => _selectedShop = null),
+                                )
+                              : const Icon(Icons.arrow_drop_down),
+                        ),
+                        child: matchedShop != null
+                            ? Text(
+                                matchedShop.name,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              )
+                            : const SizedBox.shrink(),
                       ),
-                      items: shops.map((s) {
-                        return DropdownMenuItem(
-                          value: s,
-                          child: Text(s.name, overflow: TextOverflow.ellipsis),
-                        );
-                      }).toList(),
-                      onChanged: (v) => setState(() => _selectedShop = v),
                     );
                   },
                 ),
@@ -763,6 +773,18 @@ class _CreateSaleInvoiceScreenState
     );
   }
 
+  Future<void> _pickShop(BuildContext context, List<ShopModel> shops) async {
+    final selected = await showModalBottomSheet<ShopModel>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => _ShopPickerSheet(shops: shops),
+    );
+    if (selected != null) {
+      setState(() => _selectedShop = selected);
+    }
+  }
+
   Future<void> _submit(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
@@ -882,5 +904,100 @@ class _CreateSaleInvoiceScreenState
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+}
+
+// ── Shop search picker bottom-sheet ──────────────────────────────────────────
+class _ShopPickerSheet extends ConsumerStatefulWidget {
+  final List<ShopModel> shops;
+  const _ShopPickerSheet({required this.shops});
+
+  @override
+  ConsumerState<_ShopPickerSheet> createState() => _ShopPickerSheetState();
+}
+
+class _ShopPickerSheetState extends ConsumerState<_ShopPickerSheet> {
+  String _query = '';
+  final _searchC = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchC.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _query.isEmpty
+        ? widget.shops
+        : widget.shops
+              .where(
+                (s) =>
+                    s.name.toLowerCase().contains(_query.toLowerCase()) ||
+                    (s.area?.toLowerCase().contains(_query.toLowerCase()) ??
+                        false),
+              )
+              .toList();
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.7,
+      maxChildSize: 0.92,
+      minChildSize: 0.4,
+      builder: (ctx, scrollC) => Column(
+        children: [
+          const SizedBox(height: 8),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _searchC,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: tr('search', ref),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _query.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          _searchC.clear();
+                          setState(() => _query = '');
+                        },
+                      )
+                    : null,
+                isDense: true,
+              ),
+              onChanged: (v) => setState(() => _query = v),
+            ),
+          ),
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(child: Text(tr('no_data', ref)))
+                : ListView.builder(
+                    controller: scrollC,
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final shop = filtered[i];
+                      return ListTile(
+                        leading: const Icon(Icons.store),
+                        title: Text(shop.name),
+                        subtitle: shop.area?.isNotEmpty == true
+                            ? Text(shop.area!)
+                            : null,
+                        onTap: () => Navigator.pop(ctx, shop),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -56,8 +56,11 @@ final allInvoicesProvider = StreamProvider.autoDispose<List<InvoiceModel>>((
 ) {
   // Admin-only: this provider exposes ALL invoices. Non-admins get an empty
   // stream — use roleAwareInvoicesProvider or sellerInvoicesProvider instead.
-  final user = ref.watch(authUserProvider).value;
-  if (user == null || !user.isAdmin) return const Stream.empty();
+  // Use select() so heartbeat writes to last_active do NOT restart the stream.
+  final isAdmin = ref.watch(
+    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+  );
+  if (!isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.invoices)
       .orderBy('created_at', descending: true)
@@ -91,12 +94,19 @@ final sellerInvoicesProvider = StreamProvider.autoDispose
 /// listener and AsyncValue loading/error state is preserved.
 final roleAwareInvoicesProvider =
     Provider.autoDispose<AsyncValue<List<InvoiceModel>>>((ref) {
-      final user = ref.watch(authUserProvider).value;
-      if (user == null) return const AsyncData(<InvoiceModel>[]);
-      if (user.isAdmin) {
+      // Use select() with a stable key so heartbeat writes do NOT restart.
+      final (isAdmin, userId) = ref.watch(
+        authUserProvider.select((s) {
+          final u = s.value;
+          if (u == null) return (false, '');
+          return (u.isAdmin, u.id);
+        }),
+      );
+      if (userId.isEmpty) return const AsyncData(<InvoiceModel>[]);
+      if (isAdmin) {
         return ref.watch(allInvoicesProvider);
       }
-      return ref.watch(sellerInvoicesProvider(user.id));
+      return ref.watch(sellerInvoicesProvider(userId));
     });
 
 final invoiceByIdProvider = StreamProvider.autoDispose
@@ -417,6 +427,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'balance': FieldValue.increment(balanceDelta),
         'updated_at':
             FieldValue.serverTimestamp(), // server time avoids withinWriteRate skew
+        'last_transaction_at': FieldValue.serverTimestamp(),
       });
     }
 
@@ -432,6 +443,34 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
 
     await batch.commit();
+
+    // Best-effort notification for admin feed (non-critical, fire-and-forget).
+    try {
+      final appUser = ref.read(authUserProvider).value;
+      if (appUser != null && appUser.isSeller) {
+        await FirebaseFirestore.instance
+            .collection(Collections.notifications)
+            .doc()
+            .set({
+              'type': 'invoice',
+              'shop_id': shopId,
+              'shop_name': shopName,
+              'route_id': routeId,
+              'seller_id': normalizedCreatedBy,
+              'seller_name': appUser.displayName,
+              'amount': total,
+              'transaction_type': 'cash_out',
+              'invoice_number': invoiceNumber,
+              'ref_id': invRef.id,
+              'target_role': 'admin',
+              'read': false,
+              'created_by': normalizedCreatedBy,
+              'created_at': Timestamp.now(),
+            });
+      }
+    } catch (_) {
+      /* best-effort only — non-critical */
+    }
     return invRef.id;
   }
 
@@ -571,6 +610,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       batch.update(db.collection(Collections.shops).doc(shopId), {
         'balance': FieldValue.increment(-total),
         'updated_at': FieldValue.serverTimestamp(),
+        'last_transaction_at': FieldValue.serverTimestamp(),
       });
     }
 
@@ -590,6 +630,34 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
 
     await batch.commit();
+
+    // Best-effort notification for admin feed (non-critical, fire-and-forget).
+    try {
+      final appUser = ref.read(authUserProvider).value;
+      if (appUser != null && appUser.isSeller) {
+        await FirebaseFirestore.instance
+            .collection(Collections.notifications)
+            .doc()
+            .set({
+              'type': 'invoice',
+              'shop_id': shopId,
+              'shop_name': shopName,
+              'route_id': routeId,
+              'seller_id': normalizedCreatedBy,
+              'seller_name': appUser.displayName,
+              'amount': total,
+              'transaction_type': 'return',
+              'invoice_number': invoiceNumber,
+              'ref_id': invRef.id,
+              'target_role': 'admin',
+              'read': false,
+              'created_by': normalizedCreatedBy,
+              'created_at': Timestamp.now(),
+            });
+      }
+    } catch (_) {
+      /* best-effort only — non-critical */
+    }
     return invRef.id;
   }
 
@@ -698,6 +766,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       batch.update(db.collection(Collections.shops).doc(shopId), {
         'balance': FieldValue.increment(reversalDelta),
         'updated_at': now,
+        'last_transaction_at': now,
       });
 
       final rawDeductions =
@@ -865,6 +934,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           txn.update(db.collection(Collections.shops).doc(shopId), {
             'balance': FieldValue.increment(-outstanding),
             'updated_at': now,
+            'last_transaction_at': now,
           });
         }
       }

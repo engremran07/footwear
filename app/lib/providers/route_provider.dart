@@ -6,10 +6,14 @@ import '../models/route_model.dart';
 import 'auth_provider.dart';
 
 final routesProvider = StreamProvider.autoDispose<List<RouteModel>>((ref) {
+  ref.keepAlive();
   // Admin-only unfiltered query: guard so non-admin credentials never
   // subscribe, avoiding PERMISSION_DENIED during auth transitions.
-  final user = ref.watch(authUserProvider).value;
-  if (user == null || !user.isAdmin) return const Stream.empty();
+  // Use select() so heartbeat writes to last_active do NOT restart the stream.
+  final isAdmin = ref.watch(
+    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+  );
+  if (!isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.routes)
       .where('active', isEqualTo: true)
@@ -24,9 +28,17 @@ final routesProvider = StreamProvider.autoDispose<List<RouteModel>>((ref) {
 
 final routeDetailProvider = StreamProvider.autoDispose
     .family<RouteModel?, String>((ref, id) {
-      final user = ref.watch(authUserProvider).value;
-      if (user == null) return const Stream.empty();
-      if (user.isAdmin) {
+      // Use select() with a stable key so heartbeat writes to last_active
+      // do NOT restart the Firestore stream.
+      final (isAdmin, isSeller, userId) = ref.watch(
+        authUserProvider.select((s) {
+          final u = s.value;
+          if (u == null) return (false, false, '');
+          return (u.isAdmin, u.isSeller, u.id);
+        }),
+      );
+      if (!isAdmin && !isSeller) return const Stream.empty();
+      if (isAdmin) {
         return FirebaseFirestore.instance
             .collection(Collections.routes)
             .doc(id)
@@ -36,7 +48,7 @@ final routeDetailProvider = StreamProvider.autoDispose
                   doc.exists ? RouteModel.fromJson(doc.data()!, doc.id) : null,
             );
       }
-      if (!user.isSeller) return const Stream.empty();
+      if (!isSeller || userId.isEmpty) return const Stream.empty();
       // Multi-seller: read doc by ID, verify membership client-side.
       return FirebaseFirestore.instance
           .collection(Collections.routes)
@@ -46,7 +58,7 @@ final routeDetailProvider = StreamProvider.autoDispose
             if (!doc.exists) return null;
             final route = RouteModel.fromJson(doc.data()!, doc.id);
             // Check both new array and legacy scalar for un-migrated docs.
-            if (route.assignedSellerIds.contains(user.id)) return route;
+            if (route.assignedSellerIds.contains(userId)) return route;
             return null;
           });
     });
@@ -64,14 +76,16 @@ final routeCurrencyProvider = Provider.autoDispose.family<String, String>((
 
 final routesBySellerProvider = StreamProvider.autoDispose
     .family<List<RouteModel>, String>((ref, sellerId) {
-      final (isAdmin, uid) = ref.watch(
-        authUserProvider.select((s) {
-          final u = s.value;
-          return (u?.isAdmin ?? false, u?.id ?? '');
-        }),
+      ref.keepAlive();
+      if (sellerId.isEmpty) return const Stream.empty();
+      // Auth guard: only subscribe once Firebase has confirmed a valid user.
+      // Without this the subscription fires before the auth token is ready,
+      // causing an immediate PERMISSION_DENIED → AsyncError(hasValue: false)
+      // → shimmer loop that repeats until Firestore's internal retry succeeds.
+      final isAuthReady = ref.watch(
+        authUserProvider.select((s) => s.value != null),
       );
-      if (uid.isEmpty) return const Stream.empty();
-      if (!isAdmin && uid != sellerId) return const Stream.empty();
+      if (!isAuthReady) return const Stream.empty();
       return FirebaseFirestore.instance
           .collection(Collections.routes)
           .where('assigned_seller_ids', arrayContains: sellerId)

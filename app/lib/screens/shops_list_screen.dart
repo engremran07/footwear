@@ -151,7 +151,15 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         return flowStats.cashIn > 0;
       case _ShopQuickFilter.iWillGet:
         return s.balance > 0;
+      case _ShopQuickFilter.activityToday:
+        return _isToday(s.lastTransactionAt?.toDate());
     }
+  }
+
+  static bool _isToday(DateTime? dt) {
+    if (dt == null) return false;
+    final now = DateTime.now();
+    return dt.year == now.year && dt.month == now.month && dt.day == now.day;
   }
 
   @override
@@ -362,6 +370,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
             const SizedBox.shrink(),
           Expanded(
             child: shopsAsync.when(
+              skipLoadingOnRefresh: true,
               data: (shops) {
                 final scopedShops = _scopeShopsByRoute(
                   shops,
@@ -394,7 +403,18 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   case _ShopQuickFilter.iWillGet:
                     filtered.sort((a, b) => b.balance.compareTo(a.balance));
                   case _ShopQuickFilter.collective:
-                    break;
+                  case _ShopQuickFilter.activityToday:
+                    // Sort by last transaction time DESC (null = least recent)
+                    filtered.sort((a, b) {
+                      final ta = a.lastTransactionAt;
+                      final tb = b.lastTransactionAt;
+                      if (ta == null && tb == null) {
+                        return a.name.compareTo(b.name);
+                      }
+                      if (ta == null) return 1;
+                      if (tb == null) return -1;
+                      return tb.compareTo(ta);
+                    });
                 }
 
                 if (filtered.isEmpty) {
@@ -437,11 +457,9 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
                 return AppPullRefresh(
                   onRefresh: () async {
-                    if (isSeller && sellerRouteIds.isNotEmpty) {
-                      ref.invalidate(sellerAllShopsProvider);
-                    } else {
-                      ref.invalidate(shopsProvider);
-                    }
+                    // sellerAllShopsProvider is a live Firestore stream —
+                    // it auto-updates; invalidating it forces a cold-start
+                    // reload that shows the full shimmer unnecessarily.
                     await Future.delayed(const Duration(milliseconds: 300));
                   },
                   child: ListView.builder(
@@ -757,25 +775,25 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
           : tr('all_routes', ref);
 
       final labels = trilingualLabels({
-          'date': tr('date', ref),
-          'description': tr('description', ref),
-          'debit': tr('debit', ref),
-          'credit': tr('credit', ref),
-          'running_balance': tr('running_balance', ref),
-          'account_statement': tr('account_statement', ref),
-          'opening_balance': tr('opening_balance', ref),
-          'net_payable': tr('net_payable', ref),
-          'page': tr('page', ref),
-          'report_date': tr('report_date', ref),
-          'cash_in': tr('cash_in', ref),
-          'cash_out': tr('cash_out', ref),
-          'total_entries': tr('total_entries', ref),
-          'generated_by': tr('generated_by', ref),
-          'entry_by': tr('entry_by', ref),
-          'name': tr('name', ref),
-          'route': tr('route', ref),
-          'all_routes': tr('all_routes', ref),
-        });
+        'date': tr('date', ref),
+        'description': tr('description', ref),
+        'debit': tr('debit', ref),
+        'credit': tr('credit', ref),
+        'running_balance': tr('running_balance', ref),
+        'account_statement': tr('account_statement', ref),
+        'opening_balance': tr('opening_balance', ref),
+        'net_payable': tr('net_payable', ref),
+        'page': tr('page', ref),
+        'report_date': tr('report_date', ref),
+        'cash_in': tr('cash_in', ref),
+        'cash_out': tr('cash_out', ref),
+        'total_entries': tr('total_entries', ref),
+        'generated_by': tr('generated_by', ref),
+        'entry_by': tr('entry_by', ref),
+        'name': tr('name', ref),
+        'route': tr('route', ref),
+        'all_routes': tr('all_routes', ref),
+      });
 
       // Flatten transactions into rows for Excel export
       final excelHeaders = [
@@ -943,6 +961,12 @@ class _ShopStatsStrip extends ConsumerWidget {
         .where((s) => s.balance > 0)
         .fold(0.0, (sum, s) => sum + s.balance);
     final totalCollective = shops.length;
+    final now = DateTime.now();
+    final totalActivityToday = shops.where((s) {
+      final dt = s.lastTransactionAt?.toDate();
+      if (dt == null) return false;
+      return dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    }).length;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
@@ -1003,6 +1027,21 @@ class _ShopStatsStrip extends ConsumerWidget {
               color: cs.primary,
               selected: selected == _ShopQuickFilter.collective,
               onTap: () => onSelected(_ShopQuickFilter.collective),
+              contentPadding: cardPadding,
+              iconSize: iconSize,
+              labelFontSize: labelFontSize,
+              valueFontSize: valueFontSize,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _FilterStatCard(
+              icon: Icons.today,
+              label: tr('activity_today', ref),
+              value: '$totalActivityToday',
+              color: AppBrand.successColor,
+              selected: selected == _ShopQuickFilter.activityToday,
+              onTap: () => onSelected(_ShopQuickFilter.activityToday),
               contentPadding: cardPadding,
               iconSize: iconSize,
               labelFontSize: labelFontSize,
@@ -1091,7 +1130,7 @@ class _FilterStatCard extends StatelessWidget {
   }
 }
 
-enum _ShopQuickFilter { collective, iGot, iGave, iWillGet }
+enum _ShopQuickFilter { collective, iGot, iGave, iWillGet, activityToday }
 
 class _ShopTile extends ConsumerWidget {
   final ShopModel shop;
@@ -1106,6 +1145,13 @@ class _ShopTile extends ConsumerWidget {
     required this.currency,
     this.hasDuplicate = false,
   });
+
+  bool get _isActivityToday {
+    final dt = shop.lastTransactionAt?.toDate();
+    if (dt == null) return false;
+    final now = DateTime.now();
+    return dt.year == now.year && dt.month == now.month && dt.day == now.day;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1147,6 +1193,21 @@ class _ShopTile extends ConsumerWidget {
         tr('clear', ref),
         AppTheme.clearFg(cs),
       ),
+      _ShopQuickFilter.activityToday when hasDebt => (
+        shop.balance.abs(),
+        tr('i_will_get', ref),
+        AppTheme.debtFg(cs),
+      ),
+      _ShopQuickFilter.activityToday when hasCredit => (
+        shop.balance.abs(),
+        tr('i_got', ref),
+        AppTheme.clearFg(cs),
+      ),
+      _ShopQuickFilter.activityToday => (
+        0.0,
+        tr('clear', ref),
+        AppTheme.clearFg(cs),
+      ),
     };
 
     return Card(
@@ -1182,6 +1243,32 @@ class _ShopTile extends ConsumerWidget {
                   ),
                 ),
               ),
+            // "Today" activity badge
+            if (_isActivityToday)
+              Positioned(
+                bottom: -4,
+                left: -4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppBrand.successColor,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: cs.surface, width: 1),
+                  ),
+                  child: Text(
+                    tr('today', ref),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         title: Text(
@@ -1213,10 +1300,7 @@ class _ShopTile extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  AppFormatters.currency(
-                    trailingAmount,
-                    currency,
-                  ),
+                  AppFormatters.currency(trailingAmount, currency),
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,

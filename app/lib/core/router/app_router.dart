@@ -20,6 +20,8 @@ import '../../screens/product_detail_screen.dart';
 import '../../screens/variant_form_screen.dart';
 import '../../screens/inventory_screen.dart';
 import '../../screens/reports_screen.dart';
+import '../../screens/history_screen.dart';
+import '../../screens/notification_center_screen.dart';
 import '../../screens/settings_screen.dart';
 import '../../screens/profile_screen.dart';
 import '../../screens/invoices_list_screen.dart';
@@ -45,6 +47,7 @@ bool _isAdminOnlyPath(String rawPath) {
   final path = _normalizePath(rawPath);
   if (path == '/settings' ||
       path == '/users' ||
+      path == '/notifications' ||
       path == '/routes/new' ||
       path == '/products/new') {
     return true;
@@ -339,6 +342,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/reports',
             pageBuilder: (_, s) => _fadePage(const ReportsScreen(), s),
+          ),
+          // History (7-day feed — both admin and seller)
+          GoRoute(
+            path: '/history',
+            pageBuilder: (_, s) => _fadePage(const HistoryScreen(), s),
+          ),
+          // Notification center (admin-only — also guarded by _isAdminOnlyPath)
+          GoRoute(
+            path: '/notifications',
+            pageBuilder: (_, s) =>
+                _fadePage(const NotificationCenterScreen(), s),
           ),
           // Profile
           GoRoute(

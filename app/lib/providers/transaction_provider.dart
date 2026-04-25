@@ -56,8 +56,11 @@ final shopTransactionsProvider = StreamProvider.autoDispose
 final allTransactionsProvider =
     StreamProvider.autoDispose<List<TransactionModel>>((ref) {
       // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
-      final user = ref.watch(authUserProvider).value;
-      if (user == null || !user.isAdmin) return const Stream.empty();
+      // Use select() so heartbeat writes to last_active do NOT restart the stream.
+      final isAdmin = ref.watch(
+        authUserProvider.select((s) => s.value?.isAdmin ?? false),
+      );
+      if (!isAdmin) return const Stream.empty();
       return FirebaseFirestore.instance
           .collection(Collections.transactions)
           .orderBy('created_at', descending: true)
@@ -75,14 +78,33 @@ final allTransactionsProvider =
 /// Admins see all transactions; sellers see all transactions on their route.
 final shopsAnalyticsTransactionsProvider =
     StreamProvider.autoDispose<List<TransactionModel>>((ref) {
-      final user = ref.watch(authUserProvider).value;
-      if (user == null) return Stream.value(const <TransactionModel>[]);
+      ref.keepAlive();
+      // Use select() with a string key (not List<String>) so Riverpod's ==
+      // check correctly identifies no-change on heartbeat writes to last_active.
+      // List<String> uses reference equality — a new UserModel snapshot always
+      // produces a new List object, which would look like "changed" and restart
+      // this Firestore stream every 5 minutes, causing analytics strip flicker.
+      final (isAdmin, isSeller, routeKey) = ref.watch(
+        authUserProvider.select((s) {
+          final u = s.value;
+          if (u == null) return (false, false, '');
+          if (u.isAdmin) return (true, false, '');
+          if (!u.isSeller || u.assignedRouteIds.isEmpty) {
+            return (false, false, '');
+          }
+          final sorted = List<String>.from(u.assignedRouteIds)..sort();
+          return (false, true, sorted.join(','));
+        }),
+      );
+      if (!isAdmin && (!isSeller || routeKey.isEmpty)) {
+        return Stream.value(const <TransactionModel>[]);
+      }
 
       final collection = FirebaseFirestore.instance.collection(
         Collections.transactions,
       );
 
-      if (user.isAdmin) {
+      if (isAdmin) {
         return collection
             .orderBy('created_at', descending: true)
             .limit(_shopsAnalyticsTransactionsLimit)
@@ -95,11 +117,7 @@ final shopsAnalyticsTransactionsProvider =
             );
       }
 
-      final routeIds = user.assignedRouteIds;
-      if (!user.isSeller || routeIds.isEmpty) {
-        return Stream.value(const <TransactionModel>[]);
-      }
-
+      final routeIds = routeKey.split(',');
       return collection
           .where('route_id', whereIn: routeIds)
           .orderBy('created_at', descending: true)
@@ -115,8 +133,11 @@ final shopsAnalyticsTransactionsProvider =
 
 final pendingEditRequestsProvider =
     StreamProvider.autoDispose<List<TransactionModel>>((ref) {
-      final user = ref.watch(authUserProvider).value;
-      if (user == null || !user.isAdmin) {
+      // Use select() so heartbeat writes to last_active do NOT restart the stream.
+      final isAdmin = ref.watch(
+        authUserProvider.select((s) => s.value?.isAdmin ?? false),
+      );
+      if (!isAdmin) {
         return Stream.value(const <TransactionModel>[]);
       }
       return FirebaseFirestore.instance
@@ -367,6 +388,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       batch.update(db.collection(Collections.customers).doc(shopId), {
         'balance': FieldValue.increment(balanceDelta),
         'updated_at': Timestamp.now(),
+        'last_transaction_at': transactionDate ?? Timestamp.now(),
       });
     }
 
@@ -381,6 +403,34 @@ class TransactionNotifier extends AsyncNotifier<void> {
     }
 
     await batch.commit();
+
+    // Best-effort notification for admin feed (non-critical, fire-and-forget).
+    // Only written when a seller creates the transaction — admin notifies themselves.
+    try {
+      final appUser = ref.read(authUserProvider).value;
+      if (appUser != null && appUser.isSeller) {
+        await FirebaseFirestore.instance
+            .collection(Collections.notifications)
+            .doc()
+            .set({
+              'type': 'transaction',
+              'shop_id': shopId,
+              'shop_name': shopName,
+              'route_id': routeId,
+              'seller_id': normalizedCreatedBy,
+              'seller_name': appUser.displayName,
+              'amount': amount,
+              'transaction_type': type,
+              'ref_id': txRef.id,
+              'target_role': 'admin',
+              'read': false,
+              'created_by': normalizedCreatedBy,
+              'created_at': Timestamp.now(),
+            });
+      }
+    } catch (_) {
+      /* best-effort only — non-critical */
+    }
   }
 
   /// Creates a seller-side sale transaction WITHOUT going through invoicing.
@@ -446,6 +496,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
     batch.update(db.collection(Collections.customers).doc(shopId), {
       'balance': FieldValue.increment(amount),
       'updated_at': Timestamp.now(),
+      'last_transaction_at': transactionDate ?? Timestamp.now(),
     });
 
     // Deduct from seller_inventory docs
@@ -460,6 +511,33 @@ class TransactionNotifier extends AsyncNotifier<void> {
     }
 
     await batch.commit();
+
+    // Best-effort notification for admin feed (non-critical, fire-and-forget).
+    try {
+      final appUser = ref.read(authUserProvider).value;
+      if (appUser != null && appUser.isSeller) {
+        await FirebaseFirestore.instance
+            .collection(Collections.notifications)
+            .doc()
+            .set({
+              'type': 'transaction',
+              'shop_id': shopId,
+              'shop_name': shopName,
+              'route_id': routeId,
+              'seller_id': normalizedCreatedBy,
+              'seller_name': appUser.displayName,
+              'amount': amount,
+              'transaction_type': 'cash_out',
+              'ref_id': txRef.id,
+              'target_role': 'admin',
+              'read': false,
+              'created_by': normalizedCreatedBy,
+              'created_at': Timestamp.now(),
+            });
+      }
+    } catch (_) {
+      /* best-effort only — non-critical */
+    }
   }
 
   /// Seller-safe annotation: updates only the [description] field.
@@ -517,6 +595,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       batch.update(db.collection(Collections.customers).doc(shopId), {
         'balance': FieldValue.increment(reversalDelta),
         'updated_at': now,
+        'last_transaction_at': now,
       });
     }
 
@@ -563,6 +642,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       batch.update(db.collection(Collections.customers).doc(shopId), {
         'balance': FieldValue.increment(-amount),
         'updated_at': Timestamp.now(),
+        'last_transaction_at': Timestamp.now(),
       });
     }
 

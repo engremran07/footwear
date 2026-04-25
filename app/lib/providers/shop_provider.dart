@@ -67,20 +67,21 @@ final shopsByRouteProvider = StreamProvider.autoDispose
 final sellerAllShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
   ref,
 ) {
-  // Use select() so this provider only rebuilds when route assignments change,
-  // not on every user-doc heartbeat / field update (avoids shimmer flicker).
-  final (isSeller, routeIds) = ref.watch(
+  // Use select() with a string key (not List<String>) so Riverpod's == check
+  // correctly identifies no-change on heartbeat writes to last_active.
+  // List<String> uses reference equality — new object every Firestore snapshot
+  // would always be "changed", restarting the stream and causing shimmer.
+  ref.keepAlive();
+  final routeKey = ref.watch(
     authUserProvider.select((s) {
       final u = s.value;
-      return (
-        u?.isSeller ?? false,
-        u?.assignedRouteIds ?? const <String>[],
-      );
+      if (u == null || !u.isSeller || u.assignedRouteIds.isEmpty) return '';
+      final sorted = List<String>.from(u.assignedRouteIds)..sort();
+      return sorted.join(',');
     }),
   );
-  if (!isSeller || routeIds.isEmpty) {
-    return const Stream.empty();
-  }
+  if (routeKey.isEmpty) return const Stream.empty();
+  final routeIds = routeKey.split(',');
   // Firestore whereIn supports up to 30 values — ample for route count.
   return FirebaseFirestore.instance
       .collection(Collections.customers)
@@ -97,17 +98,20 @@ final sellerAllShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
 
 final shopDetailProvider = StreamProvider.autoDispose.family<ShopModel?, String>(
   (ref, id) {
-    // Use select() to avoid rebuilding on unrelated user-doc changes.
-    final (isAdmin, isSeller, routeIds) = ref.watch(
+    // Use select() with a string key (not List<String>) to avoid restarting
+    // the stream on every heartbeat. List == uses reference equality which
+    // would always be "changed" on each new UserModel snapshot.
+    final (isAdmin, isSeller, routeKey) = ref.watch(
       authUserProvider.select((s) {
         final u = s.value;
-        return (
-          u?.isAdmin ?? false,
-          u?.isSeller ?? false,
-          u?.assignedRouteIds ?? const <String>[],
-        );
+        if (u == null) return (false, false, '');
+        if (u.isAdmin) return (true, false, '');
+        if (!u.isSeller) return (false, false, '');
+        final sorted = List<String>.from(u.assignedRouteIds)..sort();
+        return (false, true, sorted.join(','));
       }),
     );
+    final routeIds = routeKey.isEmpty ? <String>[] : routeKey.split(',');
     if (!isAdmin && !isSeller) return const Stream.empty();
     if (isAdmin) {
       return FirebaseFirestore.instance
@@ -246,6 +250,7 @@ class ShopNotifier extends AsyncNotifier<void> {
       'bad_debt_date': Timestamp.now(),
       'balance': 0.0,
       'updated_at': Timestamp.now(),
+      'last_transaction_at': Timestamp.now(),
     });
 
     // Create write_off transaction

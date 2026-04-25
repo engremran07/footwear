@@ -29,4 +29,7 @@ class Collections {
 
   /// Admin-only collection — stores SA credentials for admin auth pipeline.
   static const adminConfig = 'admin_config';
+
+  /// In-app notification feed — written by providers after financial events.
+  static const notifications = 'notifications';
 }

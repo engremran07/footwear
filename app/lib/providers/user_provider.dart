@@ -11,8 +11,11 @@ import 'auth_provider.dart';
 final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
   // Admin-only list query: guard so non-admin credentials never subscribe,
   // preventing PERMISSION_DENIED during auth transitions.
-  final user = ref.watch(authUserProvider).value;
-  if (user == null || !user.isAdmin) return const Stream.empty();
+  // Use select() so heartbeat writes to last_active do NOT restart the stream.
+  final isAdmin = ref.watch(
+    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+  );
+  if (!isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.users)
       .where('active', isEqualTo: true)
@@ -47,8 +50,11 @@ final allUsersExportProvider = FutureProvider<List<UserModel>>((ref) async {
 
 final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
   // Admin-only list query: guard to prevent PERMISSION_DENIED for seller creds.
-  final user = ref.watch(authUserProvider).value;
-  if (user == null || !user.isAdmin) return const Stream.empty();
+  // Use select() so heartbeat writes to last_active do NOT restart the stream.
+  final isAdmin = ref.watch(
+    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+  );
+  if (!isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.users)
       .where('role', isEqualTo: 'seller')
@@ -65,8 +71,11 @@ final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
 final inactiveUsersProvider = StreamProvider.autoDispose<List<UserModel>>((
   ref,
 ) {
-  final user = ref.watch(authUserProvider).value;
-  if (user == null || !user.isAdmin) return const Stream.empty();
+  // Use select() so heartbeat writes to last_active do NOT restart the stream.
+  final isAdmin = ref.watch(
+    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+  );
+  if (!isAdmin) return const Stream.empty();
   return FirebaseFirestore.instance
       .collection(Collections.users)
       .where('active', isEqualTo: false)
@@ -135,7 +144,9 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     state = await AsyncValue.guard(() async {
       final normalizedRole = _normalizeRole(role);
       if (normalizedRole == 'seller' && assignedRouteIds.isEmpty) {
-        throw ArgumentError('Seller accounts require at least one assigned route.');
+        throw ArgumentError(
+          'Seller accounts require at least one assigned route.',
+        );
       }
 
       final trimmedEmail = email.trim().toLowerCase();
@@ -180,8 +191,12 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'email': trimmedEmail,
           'display_name': trimmedName,
           'role': normalizedRole,
-          'assigned_route_ids': normalizedRole == 'seller' ? assignedRouteIds : [],
-          'assigned_route_names': normalizedRole == 'seller' ? assignedRouteNames : [],
+          'assigned_route_ids': normalizedRole == 'seller'
+              ? assignedRouteIds
+              : [],
+          'assigned_route_names': normalizedRole == 'seller'
+              ? assignedRouteNames
+              : [],
           'active': true,
           'created_by': adminUid,
           'created_at': now,
@@ -260,7 +275,9 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       updateData.remove('role');
     } else {
       if (updatedRole == 'seller' && newRouteIds.isEmpty && hasRouteIdsUpdate) {
-        throw ArgumentError('Seller accounts require at least one assigned route.');
+        throw ArgumentError(
+          'Seller accounts require at least one assigned route.',
+        );
       }
 
       // Non-seller users must not retain a route assignment.
@@ -285,16 +302,13 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           .where((id) => id.isNotEmpty && !newRouteIds.contains(id))
           .toList();
       for (final routeId in removedRouteIds) {
-        batch.update(
-          db.collection(Collections.routes).doc(routeId),
-          {
-            'assigned_seller_ids': FieldValue.arrayRemove([trimmedUid]),
-            'assigned_seller_names': FieldValue.arrayRemove(
-              displayName != null ? [displayName] : [],
-            ),
-            'updated_at': now,
-          },
-        );
+        batch.update(db.collection(Collections.routes).doc(routeId), {
+          'assigned_seller_ids': FieldValue.arrayRemove([trimmedUid]),
+          'assigned_seller_names': FieldValue.arrayRemove(
+            displayName != null ? [displayName] : [],
+          ),
+          'updated_at': now,
+        });
       }
 
       // Diff: added routes
@@ -340,7 +354,10 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     final now = Timestamp.now();
 
     // Read user doc to get display_name for arrayRemove
-    final userDoc = await db.collection(Collections.users).doc(trimmedUid).get();
+    final userDoc = await db
+        .collection(Collections.users)
+        .doc(trimmedUid)
+        .get();
     final userName = (userDoc.data()?['display_name'] as String?) ?? '';
 
     // Clear seller from all assigned routes (array + legacy scalar)

@@ -20,6 +20,8 @@ import 'settings_provider.dart';
 import 'shop_provider.dart';
 import 'transaction_provider.dart';
 import 'user_provider.dart';
+import 'notification_provider.dart';
+import 'history_provider.dart';
 
 final _logger = Logger();
 const rememberMePrefKey = 'auth.remember_me';
@@ -143,11 +145,15 @@ class AuthNotifier extends AsyncNotifier<void> {
     // Seller multi-route shops provider — autoDispose but invalidate for
     // defense-in-depth against session data leak.
     ref.invalidate(sellerAllShopsProvider);
+    ref.invalidate(routesBySellerProvider);
     // Export providers: admin-only, must be flushed on sign-out so a seller
     // session cannot access cached data from a prior admin session.
     ref.invalidate(sellerTransactionsExportProvider);
     ref.invalidate(sellerInventoryExportProvider);
     ref.invalidate(alertCountsProvider);
+    // Notification + history providers scoped to role — flush on session change.
+    ref.invalidate(notificationsProvider);
+    ref.invalidate(recentTransactionsProvider);
   }
 
   Future<void> signIn(

@@ -39,6 +39,7 @@ class ShopModel {
   final String createdBy;
   final Timestamp createdAt;
   final Timestamp updatedAt;
+  final Timestamp? lastTransactionAt;
 
   const ShopModel({
     required this.id,
@@ -61,6 +62,7 @@ class ShopModel {
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
+    this.lastTransactionAt,
   });
 
   bool get hasLocation => latitude != null && longitude != null;
@@ -88,6 +90,7 @@ class ShopModel {
       createdBy: json['created_by'] as String? ?? '',
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
+      lastTransactionAt: json['last_transaction_at'] as Timestamp?,
     );
   }
 
@@ -111,6 +114,7 @@ class ShopModel {
     'created_by': createdBy,
     'created_at': createdAt,
     'updated_at': updatedAt,
+    if (lastTransactionAt != null) 'last_transaction_at': lastTransactionAt,
   };
 
   @override
@@ -119,4 +123,52 @@ class ShopModel {
 
   @override
   int get hashCode => id.hashCode;
+
+  ShopModel copyWith({
+    String? id,
+    String? name,
+    String? routeId,
+    int? routeNumber,
+    String? phone,
+    String? address,
+    String? area,
+    String? city,
+    String? contactName,
+    double? balance,
+    String? notes,
+    double? latitude,
+    double? longitude,
+    bool? active,
+    bool? badDebt,
+    double? badDebtAmount,
+    Timestamp? badDebtDate,
+    String? createdBy,
+    Timestamp? createdAt,
+    Timestamp? updatedAt,
+    Timestamp? lastTransactionAt,
+  }) {
+    return ShopModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      routeId: routeId ?? this.routeId,
+      routeNumber: routeNumber ?? this.routeNumber,
+      phone: phone ?? this.phone,
+      address: address ?? this.address,
+      area: area ?? this.area,
+      city: city ?? this.city,
+      contactName: contactName ?? this.contactName,
+      balance: balance ?? this.balance,
+      notes: notes ?? this.notes,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      active: active ?? this.active,
+      badDebt: badDebt ?? this.badDebt,
+      badDebtAmount: badDebtAmount ?? this.badDebtAmount,
+      badDebtDate: badDebtDate ?? this.badDebtDate,
+      createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lastTransactionAt: lastTransactionAt ?? this.lastTransactionAt,
+    );
+  }
 }

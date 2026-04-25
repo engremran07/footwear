@@ -7,8 +7,11 @@ import 'auth_provider.dart';
 /// All inventory transactions (admin â€” transfer history).
 final allInventoryTransactionsProvider =
     StreamProvider.autoDispose<List<InventoryTransactionModel>>((ref) {
-      final user = ref.watch(authUserProvider).value;
-      if (user == null || !user.isAdmin) return const Stream.empty();
+      // Use select() so heartbeat writes to last_active do NOT restart the stream.
+      final isAdmin = ref.watch(
+        authUserProvider.select((s) => s.value?.isAdmin ?? false),
+      );
+      if (!isAdmin) return const Stream.empty();
       return FirebaseFirestore.instance
           .collection(Collections.inventoryTransactions)
           .orderBy('created_at', descending: true)

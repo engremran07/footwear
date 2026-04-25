@@ -323,20 +323,13 @@ class _SellerDashboard extends ConsumerWidget {
       sellerInventoryTotalPairsProvider(user.id),
     );
 
-    // Stale-while-revalidate gate: shimmer only on cold start (no data yet).
-    // Once data has loaded at least once, keep showing stale data during
-    // provider re-subscriptions to prevent shimmer flash on auth stream
-    // emissions (hasValue stays true even while isLoading is true on reload).
-    if (!routesAsync.hasValue || !shopsAsync.hasValue) {
-      return Scaffold(
-        body: RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(routesBySellerProvider(user.id));
-            ref.invalidate(sellerAllShopsProvider);
-          },
-          child: ShimmerLoading.cards(),
-        ),
-      );
+    // Stale-while-revalidate gate: shimmer only on cold start (loading, no data
+    // yet, and no error). If a provider enters AsyncError (e.g. App Check
+    // PERMISSION_DENIED during debug warm-up), fall through to the error
+    // handler below — never show shimmer indefinitely on error.
+    if ((!routesAsync.hasValue && !routesAsync.hasError) ||
+        (!shopsAsync.hasValue && !shopsAsync.hasError)) {
+      return Scaffold(body: ShimmerLoading.cards());
     }
 
     // Degrade gracefully on error (permission errors during auth warm-up are silent).
@@ -357,9 +350,10 @@ class _SellerDashboard extends ConsumerWidget {
       );
     }
 
-    // All data is ready (hasValue == true) — extract synchronously.
-    final routes = routesAsync.requireValue;
-    final shops = shopsAsync.requireValue;
+    // Extract data. After the gate above, hasValue=true OR hasError=true with
+    // a permission error (treated as empty). Use .value ?? [] for safety.
+    final routes = routesAsync.value ?? const [];
+    final shops = shopsAsync.value ?? const [];
     // Inventory: use .value if loaded, 0 while still loading — stat grid
     // renders immediately without a nested spinner.
     final pairs = inventoryPairsAsync.value ?? 0;
@@ -374,8 +368,10 @@ class _SellerDashboard extends ConsumerWidget {
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(routesBySellerProvider(user.id));
-          ref.invalidate(sellerAllShopsProvider);
+          // routesBySellerProvider and sellerAllShopsProvider are live Firestore
+          // stream providers — they update automatically; invalidating them forces
+          // a cold-start reload that resets hasValue=false and shows the shimmer.
+          // Only refresh derived/computed providers that benefit from a forced reload.
           ref.invalidate(sellerInventoryProvider(user.id));
           ref.invalidate(sellerInventoryTotalPairsProvider(user.id));
           for (final rid in routeIds) {
