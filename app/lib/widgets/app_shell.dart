@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/network_provider.dart';
 import '../providers/notification_provider.dart';
+import '../providers/route_provider.dart';
 import '../providers/shop_provider.dart';
 import '../models/user_model.dart';
 import '../core/constants/app_brand.dart';
@@ -1443,6 +1444,9 @@ class _BreadcrumbTitle extends ConsumerWidget {
   String? _lookupEntityName(WidgetRef ref, String parent, String id) {
     if (parent == 'shops') {
       return ref.watch(shopDetailProvider(id)).value?.name;
+    }
+    if (parent == 'routes') {
+      return ref.watch(routeDetailProvider(id)).value?.name;
     }
     return null;
   }

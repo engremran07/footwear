@@ -151,15 +151,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         return flowStats.cashIn > 0;
       case _ShopQuickFilter.iWillGet:
         return s.balance > 0;
-      case _ShopQuickFilter.activityToday:
-        return _isToday(s.lastTransactionAt?.toDate());
     }
-  }
-
-  static bool _isToday(DateTime? dt) {
-    if (dt == null) return false;
-    final now = DateTime.now();
-    return dt.year == now.year && dt.month == now.month && dt.day == now.day;
   }
 
   @override
@@ -403,7 +395,6 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   case _ShopQuickFilter.iWillGet:
                     filtered.sort((a, b) => b.balance.compareTo(a.balance));
                   case _ShopQuickFilter.collective:
-                  case _ShopQuickFilter.activityToday:
                     // Sort by last transaction time DESC (null = least recent)
                     filtered.sort((a, b) {
                       final ta = a.lastTransactionAt;
@@ -961,12 +952,6 @@ class _ShopStatsStrip extends ConsumerWidget {
         .where((s) => s.balance > 0)
         .fold(0.0, (sum, s) => sum + s.balance);
     final totalCollective = shops.length;
-    final now = DateTime.now();
-    final totalActivityToday = shops.where((s) {
-      final dt = s.lastTransactionAt?.toDate();
-      if (dt == null) return false;
-      return dt.year == now.year && dt.month == now.month && dt.day == now.day;
-    }).length;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
@@ -1027,21 +1012,6 @@ class _ShopStatsStrip extends ConsumerWidget {
               color: cs.primary,
               selected: selected == _ShopQuickFilter.collective,
               onTap: () => onSelected(_ShopQuickFilter.collective),
-              contentPadding: cardPadding,
-              iconSize: iconSize,
-              labelFontSize: labelFontSize,
-              valueFontSize: valueFontSize,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _FilterStatCard(
-              icon: Icons.today,
-              label: tr('activity_today', ref),
-              value: '$totalActivityToday',
-              color: AppBrand.successColor,
-              selected: selected == _ShopQuickFilter.activityToday,
-              onTap: () => onSelected(_ShopQuickFilter.activityToday),
               contentPadding: cardPadding,
               iconSize: iconSize,
               labelFontSize: labelFontSize,
@@ -1130,7 +1100,7 @@ class _FilterStatCard extends StatelessWidget {
   }
 }
 
-enum _ShopQuickFilter { collective, iGot, iGave, iWillGet, activityToday }
+enum _ShopQuickFilter { collective, iGot, iGave, iWillGet }
 
 class _ShopTile extends ConsumerWidget {
   final ShopModel shop;
@@ -1145,13 +1115,6 @@ class _ShopTile extends ConsumerWidget {
     required this.currency,
     this.hasDuplicate = false,
   });
-
-  bool get _isActivityToday {
-    final dt = shop.lastTransactionAt?.toDate();
-    if (dt == null) return false;
-    final now = DateTime.now();
-    return dt.year == now.year && dt.month == now.month && dt.day == now.day;
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1193,21 +1156,6 @@ class _ShopTile extends ConsumerWidget {
         tr('clear', ref),
         AppTheme.clearFg(cs),
       ),
-      _ShopQuickFilter.activityToday when hasDebt => (
-        shop.balance.abs(),
-        tr('i_will_get', ref),
-        AppTheme.debtFg(cs),
-      ),
-      _ShopQuickFilter.activityToday when hasCredit => (
-        shop.balance.abs(),
-        tr('i_got', ref),
-        AppTheme.clearFg(cs),
-      ),
-      _ShopQuickFilter.activityToday => (
-        0.0,
-        tr('clear', ref),
-        AppTheme.clearFg(cs),
-      ),
     };
 
     return Card(
@@ -1240,32 +1188,6 @@ class _ShopTile extends ConsumerWidget {
                     Icons.priority_high,
                     size: 12,
                     color: cs.onInverseSurface,
-                  ),
-                ),
-              ),
-            // "Today" activity badge
-            if (_isActivityToday)
-              Positioned(
-                bottom: -4,
-                left: -4,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppBrand.successColor,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: cs.surface, width: 1),
-                  ),
-                  child: Text(
-                    tr('today', ref),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                      height: 1.2,
-                    ),
                   ),
                 ),
               ),

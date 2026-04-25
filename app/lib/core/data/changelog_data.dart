@@ -28,6 +28,45 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.1',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧭',
+        text: {
+          AppLocale.en:
+              'Route details now show the route name cleanly in the top breadcrumb with the normal back gesture flow.',
+          AppLocale.ar:
+              'تعرض تفاصيل المسار الآن اسم المسار فقط بشكل واضح في شريط التنقل العلوي مع سلوك الرجوع المعتاد.',
+          AppLocale.ur:
+              'روٹ کی تفصیلات میں اب اوپر کے بریڈ کرمب میں صرف روٹ کا نام صاف طور پر دکھتا ہے اور بیک جیسچر معمول کے مطابق کام کرتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '⚡',
+        text: {
+          AppLocale.en:
+              'Shops inside each route now auto-sort by latest live activity so the most recently updated shops appear first.',
+          AppLocale.ar:
+              'تُرتَّب المتاجر داخل كل مسار الآن تلقائيًا حسب أحدث نشاط مباشر بحيث تظهر المتاجر الأحدث تحديثًا أولاً.',
+          AppLocale.ur:
+              'ہر روٹ کے اندر دکانیں اب تازہ ترین لائیو سرگرمی کے مطابق خودکار طور پر ترتیب پاتی ہیں تاکہ سب سے حالیہ اپڈیٹ والی دکانیں پہلے آئیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧹',
+        text: {
+          AppLocale.en:
+              'The temporary shops "Active Today" filter and its related UI were removed for a cleaner shops screen.',
+          AppLocale.ar:
+              'تمت إزالة فلتر المتاجر المؤقت "نشط اليوم" وكل الواجهة المرتبطة به لجعل شاشة المتاجر أبسط.',
+          AppLocale.ur:
+              'عارضی دکانوں کا "آج کی سرگرمی" فلٹر اور اس سے متعلقہ UI ہٹا دیا گیا ہے تاکہ دکانوں کی اسکرین زیادہ صاف رہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.0',
     date: 'April 2026',
     items: [

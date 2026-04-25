@@ -263,8 +263,8 @@ class _HistoryTile extends ConsumerWidget {
     final sign = reducesBalance ? '+' : '−';
     final amountText = '$sign ${AppFormatters.currency(tx.amount, currency)}';
     final entryByName = tx.createdBy.isEmpty
-      ? unknownUserLabel
-      : (entryByMap[tx.createdBy] ?? unknownUserLabel);
+        ? unknownUserLabel
+        : (entryByMap[tx.createdBy] ?? unknownUserLabel);
 
     // Invoice link badge
     final bool hasInvoice = tx.invoiceId != null && tx.invoiceId!.isNotEmpty;

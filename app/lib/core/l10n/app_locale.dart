@@ -546,15 +546,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'today': 'Today',
     'yesterday': 'Yesterday',
     'n_days_ago': '%n% days ago',
-    'activity_today': 'Active Today',
-    'last_activity': 'Last activity',
     'all_caught_up': 'All caught up',
-    'no_activity_today': 'No activity today',
     'notification_new_transaction': 'New transaction',
     'notification_new_invoice': 'New invoice',
     'notification_center': 'Notification Center',
     'mark_as_read': 'Mark as read',
-    'sort_by_activity': 'Sort by activity',
     'sort_by_name': 'Sort by name',
 
     // ── Connection ──
@@ -1777,15 +1773,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'today': 'اليوم',
     'yesterday': 'أمس',
     'n_days_ago': 'منذ %n% أيام',
-    'activity_today': 'نشط اليوم',
-    'last_activity': 'آخر نشاط',
     'all_caught_up': 'أنت مطلع على كل شيء',
-    'no_activity_today': 'لا نشاط اليوم',
     'notification_new_transaction': 'معاملة جديدة',
     'notification_new_invoice': 'فاتورة جديدة',
     'notification_center': 'مركز الإشعارات',
     'mark_as_read': 'تعليم كمقروء',
-    'sort_by_activity': 'ترتيب حسب النشاط',
     'sort_by_name': 'ترتيب حسب الاسم',
 
     // ── Connection ──
@@ -3004,15 +2996,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'today': 'آج',
     'yesterday': 'کل',
     'n_days_ago': '%n% دن پہلے',
-    'activity_today': 'آج کی سرگرمی',
-    'last_activity': 'آخری سرگرمی',
     'all_caught_up': 'سب کچھ دیکھ لیا',
-    'no_activity_today': 'آج کوئی سرگرمی نہیں',
     'notification_new_transaction': 'نئی ٹرانزیکشن',
     'notification_new_invoice': 'نئی انوائس',
     'notification_center': 'نوٹیفیکیشن سنٹر',
     'mark_as_read': 'پڑھا ہوا نشان لگائیں',
-    'sort_by_activity': 'سرگرمی کے مطابق ترتیب',
     'sort_by_name': 'نام کے مطابق ترتیب',
 
     // ── Connection ──

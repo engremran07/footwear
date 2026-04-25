@@ -232,9 +232,21 @@ class RouteDetailScreen extends ConsumerWidget {
                         message: tr('no_shops', ref),
                       );
                     }
-                    // Sort by outstanding balance (highest first)
+                    // Sort by latest activity first so the route feed updates
+                    // in real time as shop cash-in/cash-out activity changes.
                     final sorted = [...shops]
-                      ..sort((a, b) => b.balance.compareTo(a.balance));
+                      ..sort((a, b) {
+                        final ta = a.lastTransactionAt;
+                        final tb = b.lastTransactionAt;
+                        if (ta == null && tb == null) {
+                          return a.name.compareTo(b.name);
+                        }
+                        if (ta == null) return 1;
+                        if (tb == null) return -1;
+                        final byActivity = tb.compareTo(ta);
+                        if (byActivity != 0) return byActivity;
+                        return a.name.compareTo(b.name);
+                      });
                     return ListView.builder(
                       itemCount: sorted.length,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
