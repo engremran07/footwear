@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,9 +10,10 @@ import '../core/utils/formatters.dart';
 import '../core/utils/snack_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
-import '../providers/settings_provider.dart';
 import '../providers/shop_provider.dart';
+import '../providers/transaction_provider.dart';
 import '../models/shop_model.dart';
+import '../models/transaction_model.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
@@ -25,6 +27,7 @@ class RouteDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final routeAsync = ref.watch(routeDetailProvider(routeId));
     final shopsAsync = ref.watch(shopsByRouteProvider(routeId));
+    final analyticsAsync = ref.watch(shopsAnalyticsTransactionsProvider);
     final user = ref.watch(authUserProvider).value;
     final isAdmin = user?.isAdmin ?? false;
     final canAddShop =
@@ -234,12 +237,31 @@ class RouteDetailScreen extends ConsumerWidget {
                         message: tr('no_shops', ref),
                       );
                     }
+                    // Pre-compute last tx per shop from analytics (fallback
+                    // for shops without the cached last_transaction_type on
+                    // their Firestore doc, i.e. shops created before v3.9.2).
+                    final lastTxByShop =
+                        <String, ({String type, double amount, Timestamp at})>{};
+                    for (final tx in analyticsAsync.value ??
+                        const <TransactionModel>[]) {
+                      if (!lastTxByShop.containsKey(tx.shopId)) {
+                        lastTxByShop[tx.shopId] = (
+                          type: tx.type,
+                          amount: tx.amount,
+                          at: tx.createdAt,
+                        );
+                      }
+                    }
                     // Sort by latest activity first so the route feed updates
                     // in real time as shop cash-in/cash-out activity changes.
+                    // Use cached lastTransactionAt first; fall back to the
+                    // timestamp derived from analytics for old shop docs.
                     final sorted = [...shops]
                       ..sort((a, b) {
-                        final ta = a.lastTransactionAt;
-                        final tb = b.lastTransactionAt;
+                        final ta =
+                            a.lastTransactionAt ?? lastTxByShop[a.id]?.at;
+                        final tb =
+                            b.lastTransactionAt ?? lastTxByShop[b.id]?.at;
                         if (ta == null && tb == null) {
                           return a.name.compareTo(b.name);
                         }
@@ -299,7 +321,12 @@ class RouteDetailScreen extends ConsumerWidget {
                                     ),
                                   ],
                                 ),
-                                _LastTxSubtitle(shop: shop, ref: ref),
+                                _LastTxSubtitle(
+                                  shop: shop,
+                                  ref: ref,
+                                  currency: route.currency,
+                                  lastTxFallback: lastTxByShop[shop.id],
+                                ),
                               ],
                             ),
                             trailing: Text(
@@ -352,26 +379,33 @@ class RouteDetailScreen extends ConsumerWidget {
 
 // ── Last-transaction subtitle row ─────────────────────────────────────────────
 // Shows: "[icon] In/Out [amount]" for the latest transaction direction + amount.
-// Hidden (SizedBox.shrink) when no transaction yet — balance is in the trailing.
+// Uses cached lastTransactionType/Amount from the shop doc when available;
+// falls back to the analytics-derived entry for shops without the cached field.
+// Hidden (SizedBox.shrink) when no transaction data is available at all.
 class _LastTxSubtitle extends StatelessWidget {
   final ShopModel shop;
   final WidgetRef ref;
-  const _LastTxSubtitle({required this.shop, required this.ref});
+  final String currency;
+  final ({String type, double amount, Timestamp at})? lastTxFallback;
+  const _LastTxSubtitle({
+    required this.shop,
+    required this.ref,
+    required this.currency,
+    this.lastTxFallback,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final txType = shop.lastTransactionType;
+    final txType = shop.lastTransactionType ?? lastTxFallback?.type;
     if (txType == null) return const SizedBox.shrink();
-    final currency = ref.watch(settingsProvider).value?.currency ?? 'PKR';
+    final txAmount =
+        shop.lastTransactionAmount ?? lastTxFallback?.amount ?? 0.0;
     final cs = Theme.of(context).colorScheme;
     final style = TextStyle(fontSize: 11, color: cs.onSurfaceVariant);
     final isIncoming = txType != 'cash_out';
     final icon = isIncoming ? Icons.arrow_downward : Icons.arrow_upward;
     final dirLabel = isIncoming ? tr('lbl_in', ref) : tr('lbl_out', ref);
-    final amtStr = AppFormatters.currency(
-      shop.lastTransactionAmount ?? 0,
-      currency,
-    );
+    final amtStr = AppFormatters.currency(txAmount, currency);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

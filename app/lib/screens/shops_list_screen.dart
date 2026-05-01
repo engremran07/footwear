@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -373,6 +374,23 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   transactions:
                       transactionsAsync.value ?? const <TransactionModel>[],
                 );
+                // Pre-compute last transaction per shop from analytics data
+                // (fallback for shops whose Firestore doc does not yet have
+                // last_transaction_type cached — e.g. shops created before
+                // the field was introduced). Analytics are ordered desc by
+                // created_at, so the first entry per shop IS the latest tx.
+                final lastTxByShop =
+                    <String, ({String type, double amount, Timestamp at})>{};
+                for (final tx
+                    in transactionsAsync.value ?? const <TransactionModel>[]) {
+                  if (!lastTxByShop.containsKey(tx.shopId)) {
+                    lastTxByShop[tx.shopId] = (
+                      type: tx.type,
+                      amount: tx.amount,
+                      at: tx.createdAt,
+                    );
+                  }
+                }
                 final filtered = scopedShops.where((s) {
                   final flowStats =
                       scopedFlowByShop[s.id] ?? const _ShopFlowStats();
@@ -395,16 +413,22 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   case _ShopQuickFilter.iWillGet:
                     filtered.sort((a, b) => b.balance.compareTo(a.balance));
                   case _ShopQuickFilter.collective:
-                    // Sort by last transaction time DESC (null = least recent)
+                    // Sort by last transaction time DESC (null = least recent).
+                    // Use cached lastTransactionAt first; fall back to the
+                    // timestamp derived from analytics for old shop docs.
                     filtered.sort((a, b) {
-                      final ta = a.lastTransactionAt;
-                      final tb = b.lastTransactionAt;
+                      final ta =
+                          a.lastTransactionAt ?? lastTxByShop[a.id]?.at;
+                      final tb =
+                          b.lastTransactionAt ?? lastTxByShop[b.id]?.at;
                       if (ta == null && tb == null) {
                         return a.name.compareTo(b.name);
                       }
                       if (ta == null) return 1;
                       if (tb == null) return -1;
-                      return tb.compareTo(ta);
+                      final byActivity = tb.compareTo(ta);
+                      if (byActivity != 0) return byActivity;
+                      return a.name.compareTo(b.name);
                     });
                 }
 
@@ -426,6 +450,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                     selectedFilter: _filter,
                     flowByShop: scopedFlowByShop,
                     showAssignedSellerNames: user?.isAdmin == true,
+                    lastTxByShop: lastTxByShop,
                   );
                 }
 
@@ -467,6 +492,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                       hasDuplicate: duplicateNames.contains(
                         filtered[i].name.toLowerCase(),
                       ),
+                      lastTxFallback: lastTxByShop[filtered[i].id],
                     ).listEntry(i),
                   ),
                 );
@@ -942,15 +968,15 @@ class _ShopStatsStrip extends ConsumerWidget {
 
     final totalGave = shops.fold(
       0.0,
-      (sum, s) => sum + (flowByShop[s.id]?.cashOut ?? 0),
+      (acc, s) => acc + (flowByShop[s.id]?.cashOut ?? 0),
     );
     final totalGot = shops.fold(
       0.0,
-      (sum, s) => sum + (flowByShop[s.id]?.cashIn ?? 0),
+      (acc, s) => acc + (flowByShop[s.id]?.cashIn ?? 0),
     );
     final totalWillGet = shops
         .where((s) => s.balance > 0)
-        .fold(0.0, (sum, s) => sum + s.balance);
+        .fold(0.0, (acc, s) => acc + s.balance);
     final totalCollective = shops.length;
 
     return Padding(
@@ -1108,12 +1134,14 @@ class _ShopTile extends ConsumerWidget {
   final _ShopFlowStats flowStats;
   final bool hasDuplicate;
   final String currency;
+  final ({String type, double amount, Timestamp at})? lastTxFallback;
   const _ShopTile({
     required this.shop,
     required this.selectedFilter,
     required this.flowStats,
     required this.currency,
     this.hasDuplicate = false,
+    this.lastTxFallback,
   });
 
   @override
@@ -1205,14 +1233,21 @@ class _ShopTile extends ConsumerWidget {
           children: [
             Text(
               [
-                if (shop.phone != null) shop.phone,
-                '${shop.routeNumber}',
-                if (shop.area != null) shop.area,
+                if (shop.phone != null) shop.phone!,
+                // Show route number only when name is duplicated within the
+                // list so the user can tell the shops apart.
+                if (hasDuplicate) 'R${shop.routeNumber}',
+                if (shop.area != null) shop.area!,
               ].join(' · '),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            _LastTxRow(shop: shop, currency: currency, ref: ref),
+            _LastTxRow(
+              shop: shop,
+              currency: currency,
+              ref: ref,
+              lastTxFallback: lastTxFallback,
+            ),
           ],
         ),
         // Show the amount that matches the selected analytics chip.
@@ -1252,30 +1287,34 @@ class _ShopTile extends ConsumerWidget {
 
 // ── Last-transaction subtitle row ─────────────────────────────────────────────
 // Shows: "[icon] In/Out [amount]" for the latest transaction direction + amount.
-// Hidden (SizedBox.shrink) when no transaction yet — balance is in the trailing.
+// Uses cached lastTransactionType/Amount from the shop doc when available;
+// falls back to the most-recent entry in the already-loaded analytics
+// transactions for shops that pre-date the cached-field feature.
+// Hidden (SizedBox.shrink) when no transaction data is available at all.
 class _LastTxRow extends StatelessWidget {
   final ShopModel shop;
   final String currency;
   final WidgetRef ref;
+  final ({String type, double amount, Timestamp at})? lastTxFallback;
   const _LastTxRow({
     required this.shop,
     required this.currency,
     required this.ref,
+    this.lastTxFallback,
   });
 
   @override
   Widget build(BuildContext context) {
-    final txType = shop.lastTransactionType;
+    final txType = shop.lastTransactionType ?? lastTxFallback?.type;
     if (txType == null) return const SizedBox.shrink();
+    final txAmount =
+        shop.lastTransactionAmount ?? lastTxFallback?.amount ?? 0.0;
     final cs = Theme.of(context).colorScheme;
     final style = TextStyle(fontSize: 11, color: cs.onSurfaceVariant);
     final isIncoming = txType != 'cash_out';
     final icon = isIncoming ? Icons.arrow_downward : Icons.arrow_upward;
     final dirLabel = isIncoming ? tr('lbl_in', ref) : tr('lbl_out', ref);
-    final amtStr = AppFormatters.currency(
-      shop.lastTransactionAmount ?? 0,
-      currency,
-    );
+    final amtStr = AppFormatters.currency(txAmount, currency);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1295,11 +1334,13 @@ class _AdminGroupedShopsView extends ConsumerStatefulWidget {
   final _ShopQuickFilter selectedFilter;
   final Map<String, _ShopFlowStats> flowByShop;
   final bool showAssignedSellerNames;
+  final Map<String, ({String type, double amount, Timestamp at})> lastTxByShop;
   const _AdminGroupedShopsView({
     required this.shops,
     required this.routes,
     required this.selectedFilter,
     required this.flowByShop,
+    required this.lastTxByShop,
     this.showAssignedSellerNames = true,
   });
 
@@ -1413,7 +1454,7 @@ class _AdminGroupedShopsViewState
                     builder: (_) {
                       final routeOutstanding = section.items
                           .where((s) => s.balance > 0)
-                          .fold(0.0, (sum, s) => sum + s.balance);
+                          .fold(0.0, (acc, s) => acc + s.balance);
                       if (routeOutstanding > 0) {
                         return Padding(
                           padding: const EdgeInsetsDirectional.only(end: 8),
@@ -1477,6 +1518,7 @@ class _AdminGroupedShopsViewState
           flowStats: widget.flowByShop[shop.id] ?? const _ShopFlowStats(),
           currency: section.route?.currency ?? 'SAR',
           hasDuplicate: (sectionNames[shop.name.toLowerCase()] ?? 0) > 1,
+          lastTxFallback: widget.lastTxByShop[shop.id],
         );
       },
     );

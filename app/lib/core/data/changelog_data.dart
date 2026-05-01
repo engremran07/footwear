@@ -28,6 +28,45 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.4',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔍',
+        text: {
+          AppLocale.en:
+              'Last transaction (In/Out + amount) now appears for all shops in both the Shops list and Route detail, even for older shops that did not previously show any activity.',
+          AppLocale.ar:
+              'تظهر الآن آخر معاملة (داخل/خارج + المبلغ) لجميع المتاجر في قائمة المتاجر وتفاصيل المسار، حتى للمتاجر القديمة التي لم تُظهر أي نشاط من قبل.',
+          AppLocale.ur:
+              'اب تمام شاپس کی آخری ٹرانزیکشن (اِن/آؤٹ + رقم) شاپس لسٹ اور روٹ ڈیٹیل دونوں میں نظر آتی ہے، پرانے شاپس کے لیے بھی جو پہلے کوئی ایکٹیویٹی نہیں دکھا رہے تھے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🗂️',
+        text: {
+          AppLocale.en:
+              'Shops list tile no longer shows the route number in the subtitle — it now shows the last transaction details instead.',
+          AppLocale.ar:
+              'لا تُظهر بطاقة قائمة المتاجر رقم المسار في العنوان الفرعي بعد الآن — بل تُظهر تفاصيل آخر معاملة بدلاً من ذلك.',
+          AppLocale.ur:
+              'شاپس لسٹ ٹائل میں اب سب ٹائٹل میں روٹ نمبر نہیں دکھایا جاتا — اس کی جگہ آخری ٹرانزیکشن کی تفصیلات دکھائی جاتی ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📅',
+        text: {
+          AppLocale.en:
+              'Shops sort by most-recent activity now works correctly for all shops, including those created before the activity-tracking feature was introduced.',
+          AppLocale.ar:
+              'يعمل الآن ترتيب المتاجر حسب أحدث نشاط بشكل صحيح لجميع المتاجر، بما في ذلك تلك التي أُنشئت قبل تقديم ميزة تتبع النشاط.',
+          AppLocale.ur:
+              'شاپس کی ترتیب تازہ ترین ایکٹیویٹی کے مطابق اب تمام شاپس کے لیے درست طریقے سے کام کرتی ہے، بشمول وہ شاپس جو ایکٹیویٹی ٹریکنگ فیچر متعارف ہونے سے پہلے بنائی گئی تھیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.3',
     date: 'April 2026',
     items: [
