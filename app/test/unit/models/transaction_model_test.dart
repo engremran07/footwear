@@ -230,4 +230,39 @@ void main() {
       },
     );
   });
+
+  group('TransactionModel.copyWith', () {
+    final base = TransactionModel(
+      id: 't1',
+      shopId: 's1',
+      shopName: 'Shop A',
+      routeId: 'r1',
+      type: 'cash_in',
+      amount: 1000.0,
+      createdBy: 'u1',
+      createdAt: ts,
+    );
+
+    test('copyWith creates updated copy with new type', () {
+      final updated = base.copyWith(type: 'cash_out');
+      expect(updated.type, equals('cash_out'));
+      expect(updated.amount, equals(1000.0));
+      expect(updated.id, equals('t1'));
+    });
+
+    test('copyWith preserves all unchanged fields', () {
+      final updated = base.copyWith(amount: 2500.0);
+      expect(updated.amount, equals(2500.0));
+      expect(updated.type, equals('cash_in'));
+      expect(updated.shopId, equals('s1'));
+      expect(updated.shopName, equals('Shop A'));
+      expect(updated.routeId, equals('r1'));
+    });
+
+    test('copyWith does not mutate original', () {
+      base.copyWith(type: 'return', amount: 500.0);
+      expect(base.type, equals('cash_in'));
+      expect(base.amount, equals(1000.0));
+    });
+  });
 }

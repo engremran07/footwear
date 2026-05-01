@@ -108,4 +108,42 @@ class NotificationModel {
 
   @override
   int get hashCode => id.hashCode;
+
+  NotificationModel copyWith({
+    String? id,
+    String? type,
+    String? shopId,
+    String? shopName,
+    String? routeId,
+    String? sellerId,
+    String? sellerName,
+    double? amount,
+    String? transactionType,
+    String? invoiceNumber,
+    String? refId,
+    String? targetRole,
+    bool? read,
+    Timestamp? readAt,
+    String? createdBy,
+    Timestamp? createdAt,
+  }) {
+    return NotificationModel(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      shopId: shopId ?? this.shopId,
+      shopName: shopName ?? this.shopName,
+      routeId: routeId ?? this.routeId,
+      sellerId: sellerId ?? this.sellerId,
+      sellerName: sellerName ?? this.sellerName,
+      amount: amount ?? this.amount,
+      transactionType: transactionType ?? this.transactionType,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
+      refId: refId ?? this.refId,
+      targetRole: targetRole ?? this.targetRole,
+      read: read ?? this.read,
+      readAt: readAt ?? this.readAt,
+      createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }

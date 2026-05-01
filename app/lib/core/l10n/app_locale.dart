@@ -397,6 +397,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Cash ──
     'cash_flow': 'Cash Flow',
     'cash_in': 'Cash In',
+    'payment': 'Payment',
     'cash_out_type': 'Cash Out',
     'reference': 'Reference',
     'approved': 'Approved',
@@ -539,6 +540,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Notifications ──
     'notifications': 'Notifications',
     'no_notifications': 'No new notifications',
+    'no_access': 'Access Denied',
     'new_order_notif': 'New order',
     'approval_needed': 'Approval needed',
     'mark_all_read': 'Mark all as read',
@@ -1018,6 +1020,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'msg_exceeds_stock': 'Exceeds available stock (%s)',
     'lbl_in_stock': 'in stock',
     'lbl_out': 'Out',
+    'lbl_in': 'In',
     'no_data_available': 'No data available',
     'share_product': 'Share product info',
     'open_source_sub': 'Open source packages, licenses, and legal notice.',
@@ -1625,6 +1628,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Cash ──
     'cash_flow': 'التدفق النقدي',
     'cash_in': 'نقد وارد',
+    'payment': 'دفعة',
     'cash_out_type': 'نقد صادر',
     'reference': 'المرجع',
     'approved': 'موافق عليه',
@@ -1766,6 +1770,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Notifications ──
     'notifications': 'الإشعارات',
     'no_notifications': 'لا توجد إشعارات جديدة',
+    'no_access': 'لا صلاحية',
     'new_order_notif': 'طلب جديد',
     'approval_needed': 'موافقة مطلوبة',
     'mark_all_read': 'تعليم الكل كمقروء',
@@ -2239,6 +2244,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'msg_exceeds_stock': 'يتجاوز المخزون المتاح (%s)',
     'lbl_in_stock': 'في المخزون',
     'lbl_out': 'نافد',
+    'lbl_in': 'استلام',
     'no_data_available': 'لا توجد بيانات',
     'share_product': 'مشاركة معلومات المنتج',
     'open_source_sub': 'حزم مفتوحة المصدر والتراخيص والإشعار القانوني.',
@@ -2848,6 +2854,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Cash ──
     'cash_flow': 'نقدی بہاؤ',
     'cash_in': 'نقد آمد',
+    'payment': 'ادائیگی',
     'cash_out_type': 'نقد اخراج',
     'reference': 'حوالہ',
     'approved': 'منظور شدہ',
@@ -2989,6 +2996,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Notifications ──
     'notifications': 'اطلاعات',
     'no_notifications': 'کوئی نئی اطلاع نہیں',
+    'no_access': 'رسائی نہیں',
     'new_order_notif': 'نیا آرڈر',
     'approval_needed': 'منظوری درکار',
     'mark_all_read': 'سب پڑھا ہوا نشان لگائیں',
@@ -3468,6 +3476,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'msg_exceeds_stock': 'دستیاب اسٹاک سے زیادہ (%s)',
     'lbl_in_stock': 'اسٹاک میں',
     'lbl_out': 'خالی',
+    'lbl_in': 'موصول',
     'no_data_available': 'کوئی ڈیٹا نہیں',
     'share_product': 'پروڈکٹ کی معلومات شیئر کریں',
     'open_source_sub': 'اوپن سورس پیکیجز، لائسنس اور قانونی نوٹس۔',

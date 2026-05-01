@@ -40,6 +40,8 @@ class ShopModel {
   final Timestamp createdAt;
   final Timestamp updatedAt;
   final Timestamp? lastTransactionAt;
+  final String? lastTransactionType;
+  final double? lastTransactionAmount;
 
   const ShopModel({
     required this.id,
@@ -63,6 +65,8 @@ class ShopModel {
     required this.createdAt,
     required this.updatedAt,
     this.lastTransactionAt,
+    this.lastTransactionType,
+    this.lastTransactionAmount,
   });
 
   bool get hasLocation => latitude != null && longitude != null;
@@ -91,6 +95,8 @@ class ShopModel {
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
       lastTransactionAt: json['last_transaction_at'] as Timestamp?,
+      lastTransactionType: json['last_transaction_type'] as String?,
+      lastTransactionAmount: (json['last_transaction_amount'] as num?)?.toDouble(),
     );
   }
 
@@ -115,6 +121,8 @@ class ShopModel {
     'created_at': createdAt,
     'updated_at': updatedAt,
     if (lastTransactionAt != null) 'last_transaction_at': lastTransactionAt,
+    if (lastTransactionType != null) 'last_transaction_type': lastTransactionType,
+    if (lastTransactionAmount != null) 'last_transaction_amount': lastTransactionAmount,
   };
 
   @override
@@ -146,6 +154,8 @@ class ShopModel {
     Timestamp? createdAt,
     Timestamp? updatedAt,
     Timestamp? lastTransactionAt,
+    String? lastTransactionType,
+    double? lastTransactionAmount,
   }) {
     return ShopModel(
       id: id ?? this.id,
@@ -169,6 +179,8 @@ class ShopModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       lastTransactionAt: lastTransactionAt ?? this.lastTransactionAt,
+      lastTransactionType: lastTransactionType ?? this.lastTransactionType,
+      lastTransactionAmount: lastTransactionAmount ?? this.lastTransactionAmount,
     );
   }
 }

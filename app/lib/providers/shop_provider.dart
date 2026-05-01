@@ -251,6 +251,8 @@ class ShopNotifier extends AsyncNotifier<void> {
       'balance': 0.0,
       'updated_at': Timestamp.now(),
       'last_transaction_at': Timestamp.now(),
+      'last_transaction_type': 'write_off',
+      'last_transaction_amount': balance,
     });
 
     // Create write_off transaction
@@ -303,6 +305,9 @@ class ShopNotifier extends AsyncNotifier<void> {
       'bad_debt_date': null,
       'balance': amount,
       'updated_at': Timestamp.now(),
+      'last_transaction_at': Timestamp.now(),
+      'last_transaction_type': 'cash_out',
+      'last_transaction_amount': amount,
     });
 
     // Create recovery transaction to record the reversal

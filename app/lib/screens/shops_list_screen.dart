@@ -1199,14 +1199,21 @@ class _ShopTile extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-        subtitle: Text(
-          [
-            if (shop.phone != null) shop.phone,
-            '${shop.routeNumber}',
-            if (shop.area != null) shop.area,
-          ].join(' · '),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              [
+                if (shop.phone != null) shop.phone,
+                '${shop.routeNumber}',
+                if (shop.area != null) shop.area,
+              ].join(' · '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            _LastTxRow(shop: shop, currency: currency, ref: ref),
+          ],
         ),
         // Show the amount that matches the selected analytics chip.
         trailing: Row(
@@ -1239,6 +1246,44 @@ class _ShopTile extends ConsumerWidget {
         ),
         onTap: () => context.push('/shops/${shop.id}'),
       ),
+    );
+  }
+}
+
+// ── Last-transaction subtitle row ─────────────────────────────────────────────
+class _LastTxRow extends StatelessWidget {
+  final ShopModel shop;
+  final String currency;
+  final WidgetRef ref;
+  const _LastTxRow({
+    required this.shop,
+    required this.currency,
+    required this.ref,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final style = TextStyle(fontSize: 11, color: cs.onSurfaceVariant);
+    final balanceStr = 'Bal ${AppFormatters.currency(shop.balance, currency)}';
+    final txType = shop.lastTransactionType;
+    if (txType == null) {
+      return Text(balanceStr, style: style);
+    }
+    final isIncoming = txType != 'cash_out';
+    final icon = isIncoming ? Icons.arrow_downward : Icons.arrow_upward;
+    final dirLabel = isIncoming ? tr('lbl_in', ref) : tr('lbl_out', ref);
+    final amtStr = AppFormatters.currency(
+      shop.lastTransactionAmount ?? 0,
+      currency,
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: cs.onSurfaceVariant),
+        const SizedBox(width: 2),
+        Text('$dirLabel $amtStr · $balanceStr', style: style),
+      ],
     );
   }
 }

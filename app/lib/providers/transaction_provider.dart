@@ -302,6 +302,9 @@ class TransactionNotifier extends AsyncNotifier<void> {
         batch.update(db.collection(Collections.customers).doc(shopId), {
           'balance': FieldValue.increment(netChange),
           'updated_at': Timestamp.now(),
+          'last_transaction_at': Timestamp.now(),
+          'last_transaction_type': newType,
+          'last_transaction_amount': newAmount,
         });
       }
     }
@@ -389,6 +392,8 @@ class TransactionNotifier extends AsyncNotifier<void> {
         'balance': FieldValue.increment(balanceDelta),
         'updated_at': Timestamp.now(),
         'last_transaction_at': transactionDate ?? Timestamp.now(),
+        'last_transaction_type': type,
+        'last_transaction_amount': amount,
       });
     }
 
@@ -497,6 +502,8 @@ class TransactionNotifier extends AsyncNotifier<void> {
       'balance': FieldValue.increment(amount),
       'updated_at': Timestamp.now(),
       'last_transaction_at': transactionDate ?? Timestamp.now(),
+      'last_transaction_type': 'cash_out',
+      'last_transaction_amount': amount,
     });
 
     // Deduct from seller_inventory docs
@@ -643,6 +650,8 @@ class TransactionNotifier extends AsyncNotifier<void> {
         'balance': FieldValue.increment(-amount),
         'updated_at': Timestamp.now(),
         'last_transaction_at': Timestamp.now(),
+        'last_transaction_type': TransactionModel.typeReturn,
+        'last_transaction_amount': amount,
       });
     }
 

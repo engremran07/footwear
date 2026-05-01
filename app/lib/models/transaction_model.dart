@@ -252,4 +252,73 @@ class TransactionModel {
     if (editRequestReviewedAt != null)
       'edit_request_reviewed_at': editRequestReviewedAt,
   };
+
+  TransactionModel copyWith({
+    String? id,
+    String? shopId,
+    String? shopName,
+    String? routeId,
+    String? type,
+    String? saleType,
+    double? amount,
+    String? currency,
+    String? description,
+    List<TransactionItem>? items,
+    String? invoiceId,
+    String? invoiceNumber,
+    String? createdBy,
+    Timestamp? createdAt,
+    bool? deleted,
+    Timestamp? deletedAt,
+    String? deletedBy,
+    bool? editRequestPending,
+    String? editRequestStatus,
+    String? editRequestRequestedBy,
+    Timestamp? editRequestRequestedAt,
+    double? editRequestNewAmount,
+    String? editRequestNewType,
+    String? editRequestNewDescription,
+    String? editRequestNewSaleType,
+    Timestamp? editRequestNewCreatedAt,
+    String? editRequestReviewedBy,
+    Timestamp? editRequestReviewedAt,
+  }) {
+    return TransactionModel(
+      id: id ?? this.id,
+      shopId: shopId ?? this.shopId,
+      shopName: shopName ?? this.shopName,
+      routeId: routeId ?? this.routeId,
+      type: type ?? this.type,
+      saleType: saleType ?? this.saleType,
+      amount: amount ?? this.amount,
+      currency: currency ?? this.currency,
+      description: description ?? this.description,
+      items: items ?? this.items,
+      invoiceId: invoiceId ?? this.invoiceId,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
+      createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+      deleted: deleted ?? this.deleted,
+      deletedAt: deletedAt ?? this.deletedAt,
+      deletedBy: deletedBy ?? this.deletedBy,
+      editRequestPending: editRequestPending ?? this.editRequestPending,
+      editRequestStatus: editRequestStatus ?? this.editRequestStatus,
+      editRequestRequestedBy:
+          editRequestRequestedBy ?? this.editRequestRequestedBy,
+      editRequestRequestedAt:
+          editRequestRequestedAt ?? this.editRequestRequestedAt,
+      editRequestNewAmount: editRequestNewAmount ?? this.editRequestNewAmount,
+      editRequestNewType: editRequestNewType ?? this.editRequestNewType,
+      editRequestNewDescription:
+          editRequestNewDescription ?? this.editRequestNewDescription,
+      editRequestNewSaleType:
+          editRequestNewSaleType ?? this.editRequestNewSaleType,
+      editRequestNewCreatedAt:
+          editRequestNewCreatedAt ?? this.editRequestNewCreatedAt,
+      editRequestReviewedBy:
+          editRequestReviewedBy ?? this.editRequestReviewedBy,
+      editRequestReviewedAt:
+          editRequestReviewedAt ?? this.editRequestReviewedAt,
+    );
+  }
 }

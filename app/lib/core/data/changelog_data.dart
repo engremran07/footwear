@@ -28,6 +28,45 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.2',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Shop tiles on the Route and Shops screens now show the last transaction direction and amount at a glance.',
+          AppLocale.ar:
+              'تعرض بطاقات المتاجر في شاشتي المسار والمتاجر الآن اتجاه آخر معاملة ومبلغها بنظرة سريعة.',
+          AppLocale.ur:
+              'روٹ اور دکانوں کی اسکرین پر دکان کارڈز اب آخری ٹرانزیکشن کی سمت اور رقم ایک نظر میں دکھاتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔧',
+        text: {
+          AppLocale.en:
+              'Fixed missing translation keys for "In", "Payment", and "Access Denied" labels shown in various screens.',
+          AppLocale.ar:
+              'تم إصلاح مفاتيح الترجمة المفقودة لتسميات "استلام" و"دفعة" و"لا صلاحية" التي تظهر في شاشات مختلفة.',
+          AppLocale.ur:
+              'مختلف اسکرینوں میں دکھائے جانے والے "موصول"، "ادائیگی" اور "رسائی نہیں" لیبلز کے گم ترجمہ کلیدیں ٹھیک کی گئیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '💡',
+        text: {
+          AppLocale.en:
+              'Internal model improvements: InvoiceModel, TransactionModel, and NotificationModel now support copy-with-changes for more reliable state updates.',
+          AppLocale.ar:
+              'تحسينات داخلية في النماذج: تدعم InvoiceModel وTransactionModel وNotificationModel الآن النسخ مع التغييرات لتحديثات حالة أكثر موثوقية.',
+          AppLocale.ur:
+              'داخلی ماڈل بہتری: InvoiceModel، TransactionModel، اور NotificationModel اب کاپی ود چینجز کو سپورٹ کرتے ہیں تاکہ اسٹیٹ اپڈیٹس زیادہ قابل اعتماد ہوں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.1',
     date: 'April 2026',
     items: [

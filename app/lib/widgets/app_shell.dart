@@ -332,6 +332,7 @@ class _AppShellState extends ConsumerState<AppShell>
     final isRtl = Directionality.of(context) == TextDirection.rtl;
     final slideWidth = MediaQuery.of(context).size.width * 0.74;
     final profileLabel = tr('profile', ref);
+    final notificationsLabel = tr('notifications', ref);
     final signOutLabel = tr('sign_out', ref);
     final menuLabel = tr('menu', ref);
     final backLabel = tr('back', ref);
@@ -415,6 +416,8 @@ class _AppShellState extends ConsumerState<AppShell>
                             isOnline: isOnline,
                             menuLabel: menuLabel,
                             backLabel: backLabel,
+                            notificationsLabel: notificationsLabel,
+                            profileLabel: profileLabel,
                             drawerAnim: _drawerAnim,
                             unreadCount: unreadCount,
                             isTopLevel: primaryItems.any(
@@ -569,6 +572,8 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool isTopLevel;
   final VoidCallback onBack;
   final int unreadCount;
+  final String notificationsLabel;
+  final String profileLabel;
 
   const _WhatsAppBar({
     required this.user,
@@ -576,6 +581,8 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.isOnline,
     required this.menuLabel,
     required this.backLabel,
+    required this.notificationsLabel,
+    required this.profileLabel,
     required this.drawerAnim,
     required this.onMenuTap,
     required this.onProfileTap,
@@ -644,7 +651,7 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
                     Icons.notifications_outlined,
                     color: Colors.white,
                   ),
-                  tooltip: 'Notifications',
+                  tooltip: notificationsLabel,
                   onPressed: () => ctx.push('/notifications'),
                 ),
                 if (unreadCount > 0)
@@ -685,7 +692,7 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
             child: GestureDetector(
               onTap: onProfileTap,
               child: Semantics(
-                label: 'Profile',
+                label: profileLabel,
                 button: true,
                 child: Stack(
                   alignment: Alignment.center,

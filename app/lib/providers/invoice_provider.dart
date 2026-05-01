@@ -428,6 +428,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'updated_at':
             FieldValue.serverTimestamp(), // server time avoids withinWriteRate skew
         'last_transaction_at': FieldValue.serverTimestamp(),
+        'last_transaction_type': 'cash_out',
+        'last_transaction_amount': total,
       });
     }
 
@@ -611,6 +613,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'balance': FieldValue.increment(-total),
         'updated_at': FieldValue.serverTimestamp(),
         'last_transaction_at': FieldValue.serverTimestamp(),
+        'last_transaction_type': 'return',
+        'last_transaction_amount': total,
       });
     }
 
@@ -767,6 +771,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'balance': FieldValue.increment(reversalDelta),
         'updated_at': now,
         'last_transaction_at': now,
+        'last_transaction_type': 'return',
+        'last_transaction_amount': reversalDelta.abs(),
       });
 
       final rawDeductions =
@@ -935,6 +941,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             'balance': FieldValue.increment(-outstanding),
             'updated_at': now,
             'last_transaction_at': now,
+            'last_transaction_type': 'cash_in',
+            'last_transaction_amount': outstanding,
           });
         }
       }

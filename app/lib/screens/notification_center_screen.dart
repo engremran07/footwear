@@ -144,7 +144,7 @@ class _UnreadBadge extends StatelessWidget {
         style: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          color: AppBrand.onPrimary,
         ),
       ),
     );

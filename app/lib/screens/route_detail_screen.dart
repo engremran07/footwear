@@ -9,7 +9,9 @@ import '../core/utils/formatters.dart';
 import '../core/utils/snack_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
+import '../providers/settings_provider.dart';
 import '../providers/shop_provider.dart';
+import '../models/shop_model.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
@@ -275,22 +277,29 @@ class RouteDetailScreen extends ConsumerWidget {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            subtitle: Row(
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (shop.phone != null)
-                                  Expanded(
-                                    child: Text(
-                                      shop.phone!,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                Row(
+                                  children: [
+                                    if (shop.phone != null)
+                                      Expanded(
+                                        child: Text(
+                                          shop.phone!,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      )
+                                    else
+                                      const Expanded(child: SizedBox.shrink()),
+                                    WhatsAppIconButton(
+                                      phone: shop.phone,
+                                      iconSize: 18,
                                     ),
-                                  )
-                                else
-                                  const Expanded(child: SizedBox.shrink()),
-                                WhatsAppIconButton(
-                                  phone: shop.phone,
-                                  iconSize: 18,
+                                  ],
                                 ),
+                                _LastTxSubtitle(shop: shop, ref: ref),
                               ],
                             ),
                             trailing: Text(
@@ -337,6 +346,43 @@ class RouteDetailScreen extends ConsumerWidget {
               child: const Icon(Icons.add),
             )
           : null,
+    );
+  }
+}
+
+// ── Last-transaction subtitle row ─────────────────────────────────────────────
+// Shows: "[icon] In/Out [amount] · Bal [balance]" or "Bal [balance]" when null.
+class _LastTxSubtitle extends StatelessWidget {
+  final ShopModel shop;
+  final WidgetRef ref;
+  const _LastTxSubtitle({required this.shop, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    final currency = ref.watch(settingsProvider).value?.currency ?? 'PKR';
+    final cs = Theme.of(context).colorScheme;
+    final style = TextStyle(fontSize: 11, color: cs.onSurfaceVariant);
+    final balanceStr =
+        'Bal ${AppFormatters.currency(shop.balance, currency)}';
+    final txType = shop.lastTransactionType;
+    if (txType == null) {
+      return Text(balanceStr, style: style);
+    }
+    final isIncoming = txType != 'cash_out';
+    final icon = isIncoming ? Icons.arrow_downward : Icons.arrow_upward;
+    final dirLabel =
+        isIncoming ? tr('lbl_in', ref) : tr('lbl_out', ref);
+    final amtStr = AppFormatters.currency(
+      shop.lastTransactionAmount ?? 0,
+      currency,
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: cs.onSurfaceVariant),
+        const SizedBox(width: 2),
+        Text('$dirLabel $amtStr · $balanceStr', style: style),
+      ],
     );
   }
 }

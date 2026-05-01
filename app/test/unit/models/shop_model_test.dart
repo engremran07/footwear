@@ -105,4 +105,41 @@ void main() {
       expect(a.hashCode, equals(b.hashCode));
     });
   });
+
+  group('lastTransaction fields', () {
+    test('fromJson parses lastTransactionType and lastTransactionAmount', () {
+      final json = Map<String, dynamic>.from(baseJson)
+        ..['last_transaction_type'] = 'cash_in'
+        ..['last_transaction_amount'] = 1500.0;
+      final shop = ShopModel.fromJson(json, 's1');
+      expect(shop.lastTransactionType, equals('cash_in'));
+      expect(shop.lastTransactionAmount, equals(1500.0));
+    });
+
+    test('fromJson returns null for missing lastTransaction fields', () {
+      final shop = ShopModel.fromJson(baseJson, 's1');
+      expect(shop.lastTransactionType, isNull);
+      expect(shop.lastTransactionAmount, isNull);
+    });
+
+    test('copyWith updates lastTransactionType and lastTransactionAmount', () {
+      final shop = ShopModel.fromJson(baseJson, 's1');
+      final updated = shop.copyWith(
+        lastTransactionType: 'cash_out',
+        lastTransactionAmount: 2500.0,
+      );
+      expect(updated.lastTransactionType, equals('cash_out'));
+      expect(updated.lastTransactionAmount, equals(2500.0));
+    });
+
+    test('copyWith preserves existing lastTransaction fields when not passed', () {
+      final json = Map<String, dynamic>.from(baseJson)
+        ..['last_transaction_type'] = 'return'
+        ..['last_transaction_amount'] = 300.0;
+      final shop = ShopModel.fromJson(json, 's1');
+      final updated = shop.copyWith(name: 'Updated Name');
+      expect(updated.lastTransactionType, equals('return'));
+      expect(updated.lastTransactionAmount, equals(300.0));
+    });
+  });
 }
