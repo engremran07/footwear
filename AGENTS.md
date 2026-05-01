@@ -449,6 +449,14 @@ Conflict resolution order for instructions:
 
 ## 10) Current Audit Status
 
+2026-04-XX audit v21 — v3.9.3+80:
+
+- **Tile subtitle deduplication:** Removed redundant `· Bal [balance]` suffix from `_LastTxSubtitle` (route_detail_screen) and `_LastTxRow` (shops_list_screen) — balance already visible in red trailing column; now shows only `[arrow] [In/Out] [amount]`; when no transaction yet shows `SizedBox.shrink()` instead of duplicating balance text
+- **Sort by latest activity:** Both screens already had sort by `lastTransactionAt` DESC (null → bottom, tie-break by name) — confirmed correct and unchanged
+- **Version bump:** 3.9.2+79 → 3.9.3+80 (versionCode 3090380); changelog entry added (trilingual EN/AR/UR)
+- **All 422 tests passing**, `No issues found!` (flutter + dart analyze), web EXIT: 0, APK 75.1MB installed to R5GL22RGT9V (versionCode=3090380 versionName=3.9.3 confirmed), hosting + Firestore deployed, commit `c43c67d` pushed to main
+- **Audit score: 96/100 → 97/100**
+
 2026-04-XX audit v20 — v3.9.2+79:
 
 - **11 audit findings resolved:** L10n keys `lbl_in`, `payment`, `no_access` added to all 3 locales; orphan composite index `invoices(customer_id+created_at)` removed from `firestore.indexes.json` and deleted from production Firestore; hardcoded "Notifications"/"Profile" strings in `app_shell.dart` replaced with L10n lookups; `Colors.white` in `notification_center_screen.dart` replaced with `AppBrand.onPrimary`
