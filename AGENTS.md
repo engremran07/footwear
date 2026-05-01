@@ -449,6 +449,17 @@ Conflict resolution order for instructions:
 
 ## 10) Current Audit Status
 
+2026-04-XX audit v22 — v3.9.4+81:
+
+- **Last-tx display fixed for all shops:** Root cause — `last_transaction_type`/`last_transaction_amount` fields only exist on shop docs written AFTER v3.9.2+79; pre-existing shops all had `null` → `_LastTxRow` and `_LastTxSubtitle` returned `SizedBox.shrink()` → nothing shown
+- **Client-side analytics fallback:** Both `shops_list_screen.dart` and `route_detail_screen.dart` now pre-compute a `lastTxByShop` map from the already-loaded `shopsAnalyticsTransactionsProvider` (500-tx window, DESC order) — first entry per shop = most recent. Zero extra Firestore reads.
+- **Sort improved for old shops:** Collective sort and route detail sort now use `shop.lastTransactionAt ?? lastTxByShop[shop.id]?.at` so shops with transactions but without the cached timestamp field still sort by real activity date.
+- **Route number removed from shops tile subtitle:** `_ShopTile` subtitle line 1 no longer shows `R{routeNumber}` unconditionally; it only appears when `hasDuplicate == true` (to disambiguate shops with identical names). Subtitle line 2 now shows last-tx In/Out + amount for all shops.
+- **Currency fix in route_detail_screen:** `_LastTxSubtitle` was reading from `settingsProvider` (wrong global currency); now accepts `currency` param and uses `route.currency` (the route's canonical currency, same as the trailing balance). Removed unused `settingsProvider` import.
+- **`cloud_firestore` import added:** Both screens needed explicit `Timestamp` import for the record type; `sum` accumulator renamed to `acc` in 4 fold callbacks to resolve `avoid_types_as_parameter_names` lint (cloud_firestore exports `Sum` class).
+- **All 422 tests passing**, `No issues found!` (flutter + dart analyze), web EXIT: 0, APK 75.2MB installed to R5GL22RGT9V, hosting + Firestore deployed, commit `6b97cfb` pushed to main
+- **Audit score: 97/100 → 97/100** (bug fix — no new features)
+
 2026-04-XX audit v21 — v3.9.3+80:
 
 - **Tile subtitle deduplication:** Removed redundant `· Bal [balance]` suffix from `_LastTxSubtitle` (route_detail_screen) and `_LastTxRow` (shops_list_screen) — balance already visible in red trailing column; now shows only `[arrow] [In/Out] [amount]`; when no transaction yet shows `SizedBox.shrink()` instead of duplicating balance text
