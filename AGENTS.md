@@ -449,6 +449,16 @@ Conflict resolution order for instructions:
 
 ## 10) Current Audit Status
 
+2026-04-XX audit v20 — v3.9.2+79:
+
+- **11 audit findings resolved:** L10n keys `lbl_in`, `payment`, `no_access` added to all 3 locales; orphan composite index `invoices(customer_id+created_at)` removed from `firestore.indexes.json` and deleted from production Firestore; hardcoded "Notifications"/"Profile" strings in `app_shell.dart` replaced with L10n lookups; `Colors.white` in `notification_center_screen.dart` replaced with `AppBrand.onPrimary`
+- **ShopModel extended:** `lastTransactionType: String?` + `lastTransactionAmount: double?` fields added (constructor, fromJson, toJson conditional, copyWith)
+- **Write site completeness:** All 10 shop-update write sites now stamp `last_transaction_type` + `last_transaction_amount` (transaction_provider: 4 sites, invoice_provider: 4 sites, shop_provider: 2 sites — markAsBadDebt + recoverBadDebt)
+- **Last-tx subtitle row added:** `_LastTxSubtitle` widget in `route_detail_screen.dart` and `_LastTxRow` widget in `shops_list_screen.dart` — both show `[arrow] [In/Out] [amount] · Bal [balance]` (or `Bal [balance]` when no transaction yet), live-updating via Riverpod stream
+- **copyWith added to 3 models:** `InvoiceModel` (25 fields), `NotificationModel` (16 fields), `TransactionModel` (29 fields)
+- **7 new tests added:** 4 in `shop_model_test.dart` (lastTransaction fields), 3 in `transaction_model_test.dart` (copyWith); **All 422 tests passing**, `No issues found!` (flutter + dart analyze), web EXIT: 0, APK 75.1MB, hosting + Firestore deployed, commit `9631d4d` pushed to main
+- **Audit score: 94/100 → 96/100**
+
 2026-04-18 audit v19 — v3.8.5+74:
 
 - **L10n hardcoded string sweep:** Added 4 missing L10n keys (`lbl_out`, `no_data_available`, `share_product`, `open_source_sub`) to all 3 locale maps (EN/AR/UR); fixed 4 hardcoded strings in `product_detail_screen.dart` (share tooltip, In Stock label, Out label, quantity subtitle) and 1 in `about_screen.dart` (open source subtitle); `app_chart_card.dart` already referenced `no_data_available` key which was missing — now resolved
