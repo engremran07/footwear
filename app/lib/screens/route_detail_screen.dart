@@ -351,7 +351,8 @@ class RouteDetailScreen extends ConsumerWidget {
 }
 
 // ── Last-transaction subtitle row ─────────────────────────────────────────────
-// Shows: "[icon] In/Out [amount] · Bal [balance]" or "Bal [balance]" when null.
+// Shows: "[icon] In/Out [amount]" for the latest transaction direction + amount.
+// Hidden (SizedBox.shrink) when no transaction yet — balance is in the trailing.
 class _LastTxSubtitle extends StatelessWidget {
   final ShopModel shop;
   final WidgetRef ref;
@@ -359,19 +360,14 @@ class _LastTxSubtitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final txType = shop.lastTransactionType;
+    if (txType == null) return const SizedBox.shrink();
     final currency = ref.watch(settingsProvider).value?.currency ?? 'PKR';
     final cs = Theme.of(context).colorScheme;
     final style = TextStyle(fontSize: 11, color: cs.onSurfaceVariant);
-    final balanceStr =
-        'Bal ${AppFormatters.currency(shop.balance, currency)}';
-    final txType = shop.lastTransactionType;
-    if (txType == null) {
-      return Text(balanceStr, style: style);
-    }
     final isIncoming = txType != 'cash_out';
     final icon = isIncoming ? Icons.arrow_downward : Icons.arrow_upward;
-    final dirLabel =
-        isIncoming ? tr('lbl_in', ref) : tr('lbl_out', ref);
+    final dirLabel = isIncoming ? tr('lbl_in', ref) : tr('lbl_out', ref);
     final amtStr = AppFormatters.currency(
       shop.lastTransactionAmount ?? 0,
       currency,
@@ -381,7 +377,7 @@ class _LastTxSubtitle extends StatelessWidget {
       children: [
         Icon(icon, size: 11, color: cs.onSurfaceVariant),
         const SizedBox(width: 2),
-        Text('$dirLabel $amtStr · $balanceStr', style: style),
+        Text('$dirLabel $amtStr', style: style),
       ],
     );
   }

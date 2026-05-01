@@ -96,7 +96,8 @@ class ShopModel {
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
       lastTransactionAt: json['last_transaction_at'] as Timestamp?,
       lastTransactionType: json['last_transaction_type'] as String?,
-      lastTransactionAmount: (json['last_transaction_amount'] as num?)?.toDouble(),
+      lastTransactionAmount: (json['last_transaction_amount'] as num?)
+          ?.toDouble(),
     );
   }
 
@@ -121,8 +122,10 @@ class ShopModel {
     'created_at': createdAt,
     'updated_at': updatedAt,
     if (lastTransactionAt != null) 'last_transaction_at': lastTransactionAt,
-    if (lastTransactionType != null) 'last_transaction_type': lastTransactionType,
-    if (lastTransactionAmount != null) 'last_transaction_amount': lastTransactionAmount,
+    if (lastTransactionType != null)
+      'last_transaction_type': lastTransactionType,
+    if (lastTransactionAmount != null)
+      'last_transaction_amount': lastTransactionAmount,
   };
 
   @override
@@ -180,7 +183,8 @@ class ShopModel {
       updatedAt: updatedAt ?? this.updatedAt,
       lastTransactionAt: lastTransactionAt ?? this.lastTransactionAt,
       lastTransactionType: lastTransactionType ?? this.lastTransactionType,
-      lastTransactionAmount: lastTransactionAmount ?? this.lastTransactionAmount,
+      lastTransactionAmount:
+          lastTransactionAmount ?? this.lastTransactionAmount,
     );
   }
 }

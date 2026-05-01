@@ -28,6 +28,34 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.3',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📊',
+        text: {
+          AppLocale.en:
+              'Shop tiles now show only the last In/Out transaction without repeating the balance already visible in the tile.',
+          AppLocale.ar:
+              'تعرض بطاقات المتاجر الآن آخر معاملة (داخل/خارج) فقط دون تكرار الرصيد الظاهر بالفعل في البطاقة.',
+          AppLocale.ur:
+              'شاپ ٹائلز اب صرف آخری اِن/آؤٹ ٹرانزیکشن دکھاتی ہیں، بیلنس دوبارہ نہیں دکھایا جاتا کیونکہ وہ پہلے سے ٹائل میں نظر آتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔄',
+        text: {
+          AppLocale.en:
+              'Shops are sorted by most recent transaction activity at the top of the route and shops lists.',
+          AppLocale.ar:
+              'يتم الآن ترتيب المتاجر حسب آخر نشاط بالمعاملات في أعلى قوائم المسارات والمتاجر.',
+          AppLocale.ur:
+              'شاپس کو روٹ اور شاپس لسٹ میں سب سے حالیہ ٹرانزیکشن سرگرمی کے مطابق اوپر سے ترتیب دیا گیا ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.2',
     date: 'April 2026',
     items: [

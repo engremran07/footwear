@@ -132,14 +132,17 @@ void main() {
       expect(updated.lastTransactionAmount, equals(2500.0));
     });
 
-    test('copyWith preserves existing lastTransaction fields when not passed', () {
-      final json = Map<String, dynamic>.from(baseJson)
-        ..['last_transaction_type'] = 'return'
-        ..['last_transaction_amount'] = 300.0;
-      final shop = ShopModel.fromJson(json, 's1');
-      final updated = shop.copyWith(name: 'Updated Name');
-      expect(updated.lastTransactionType, equals('return'));
-      expect(updated.lastTransactionAmount, equals(300.0));
-    });
+    test(
+      'copyWith preserves existing lastTransaction fields when not passed',
+      () {
+        final json = Map<String, dynamic>.from(baseJson)
+          ..['last_transaction_type'] = 'return'
+          ..['last_transaction_amount'] = 300.0;
+        final shop = ShopModel.fromJson(json, 's1');
+        final updated = shop.copyWith(name: 'Updated Name');
+        expect(updated.lastTransactionType, equals('return'));
+        expect(updated.lastTransactionAmount, equals(300.0));
+      },
+    );
   });
 }

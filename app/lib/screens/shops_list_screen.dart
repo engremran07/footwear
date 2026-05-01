@@ -1251,6 +1251,8 @@ class _ShopTile extends ConsumerWidget {
 }
 
 // ── Last-transaction subtitle row ─────────────────────────────────────────────
+// Shows: "[icon] In/Out [amount]" for the latest transaction direction + amount.
+// Hidden (SizedBox.shrink) when no transaction yet — balance is in the trailing.
 class _LastTxRow extends StatelessWidget {
   final ShopModel shop;
   final String currency;
@@ -1263,13 +1265,10 @@ class _LastTxRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final txType = shop.lastTransactionType;
+    if (txType == null) return const SizedBox.shrink();
     final cs = Theme.of(context).colorScheme;
     final style = TextStyle(fontSize: 11, color: cs.onSurfaceVariant);
-    final balanceStr = 'Bal ${AppFormatters.currency(shop.balance, currency)}';
-    final txType = shop.lastTransactionType;
-    if (txType == null) {
-      return Text(balanceStr, style: style);
-    }
     final isIncoming = txType != 'cash_out';
     final icon = isIncoming ? Icons.arrow_downward : Icons.arrow_upward;
     final dirLabel = isIncoming ? tr('lbl_in', ref) : tr('lbl_out', ref);
@@ -1282,7 +1281,7 @@ class _LastTxRow extends StatelessWidget {
       children: [
         Icon(icon, size: 11, color: cs.onSurfaceVariant),
         const SizedBox(width: 2),
-        Text('$dirLabel $amtStr · $balanceStr', style: style),
+        Text('$dirLabel $amtStr', style: style),
       ],
     );
   }
