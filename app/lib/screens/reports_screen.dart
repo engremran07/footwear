@@ -228,6 +228,7 @@ class ReportsScreen extends ConsumerWidget {
               )
               .toList();
     if (rows.isEmpty) {
+      if (!context.mounted) return;
       _showNoData(context, ref);
       return;
     }
@@ -250,9 +251,53 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final txs = user.isAdmin
-        ? ref.read(allTransactionsProvider).value ?? []
-        : ref.read(sellerTransactionsProvider(user.id)).value ?? [];
+
+    if (user.isAdmin) {
+      ref.invalidate(allTransactionsExportProvider);
+      final txs = await ref.read(allTransactionsExportProvider.future);
+      if (!context.mounted) return;
+      if (txs.isEmpty) {
+        _showNoData(context, ref);
+        return;
+      }
+      final title = tr('transactions_report', ref);
+      final headers = [
+        triCol('date'),
+        triCol('shop_name'),
+        triCol('type'),
+        triCol('amount'),
+        triCol('description'),
+      ];
+      final sortedTxs = [...txs]
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final rows = sortedTxs
+          .map(
+            (t) => [
+              AppFormatters.dateTime(t.createdAt),
+              t.shopName,
+              t.type == 'cash_in' ? tr('cash_in', ref) : tr('cash_out', ref),
+              AppFormatters.currency(t.amount),
+              t.description ?? '',
+            ],
+          )
+          .toList();
+      if (!context.mounted) return;
+      ExportSheet.show(
+        context,
+        ref,
+        title: title,
+        headers: headers,
+        rows: rows,
+        fileName: AppFormatters.exportFileName(ExportNames.transactionsReport),
+      );
+      return;
+    }
+
+    ref.invalidate(sellerTransactionsExportProvider(user.id));
+    final txs = await ref.read(
+      sellerTransactionsExportProvider(user.id).future,
+    );
+    if (!context.mounted) return;
     if (txs.isEmpty) {
       _showNoData(context, ref);
       return;
@@ -265,7 +310,9 @@ class ReportsScreen extends ConsumerWidget {
       triCol('amount'),
       triCol('description'),
     ];
-    final rows = txs
+    final sortedTxs = [...txs]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final rows = sortedTxs
         .map(
           (t) => [
             AppFormatters.dateTime(t.createdAt),
@@ -276,6 +323,7 @@ class ReportsScreen extends ConsumerWidget {
           ],
         )
         .toList();
+    if (!context.mounted) return;
     ExportSheet.show(
       context,
       ref,

@@ -266,8 +266,22 @@ final sellerTransactionsExportProvider =
     });
 
 class TransactionNotifier extends AsyncNotifier<void> {
+  bool _writeInFlight = false;
+
   @override
   Future<void> build() async {}
+
+  Future<void> _runWriteGuard(Future<void> Function() op) async {
+    if (_writeInFlight) {
+      return;
+    }
+    _writeInFlight = true;
+    try {
+      await op();
+    } finally {
+      _writeInFlight = false;
+    }
+  }
 
   void _stageTransactionUpdate({
     required WriteBatch batch,
@@ -325,117 +339,119 @@ class TransactionNotifier extends AsyncNotifier<void> {
     Timestamp? transactionDate,
     String? idempotencyKey,
   }) async {
-    final normalizedCreatedBy = createdBy.trim();
-    if (normalizedCreatedBy.isEmpty) {
-      throw ArgumentError('createdBy must not be empty');
-    }
-    // Validate type is in allowed set to prevent arbitrary transaction types
-    const allowedTypes = {
-      'cash_out',
-      'cash_in',
-      'return',
-      'payment',
-      'write_off',
-    };
-    if (!allowedTypes.contains(type)) {
-      throw ArgumentError(
-        'Invalid transaction type "$type". Allowed: ${allowedTypes.join(', ')}',
-      );
-    }
-    if (amount <= 0) {
-      throw ArgumentError('Transaction amount must be greater than 0');
-    }
-    if (shopId.trim().isEmpty) {
-      throw ArgumentError('shopId must not be empty');
-    }
-    if (routeId.trim().isEmpty) {
-      throw ArgumentError('routeId must not be empty');
-    }
-
-    final db = FirebaseFirestore.instance;
-    final batch = db.batch();
-    final normalizedKey = idempotencyKey?.trim();
-    if (normalizedKey != null && normalizedKey.isNotEmpty) {
-      final existing = await db
-          .collection(Collections.transactions)
-          .where('idempotency_key', isEqualTo: normalizedKey)
-          .limit(1)
-          .get();
-      if (existing.docs.isNotEmpty) {
-        return;
+    await _runWriteGuard(() async {
+      final normalizedCreatedBy = createdBy.trim();
+      if (normalizedCreatedBy.isEmpty) {
+        throw ArgumentError('createdBy must not be empty');
       }
-    }
-
-    // Create transaction doc
-    final txRef = db.collection(Collections.transactions).doc();
-    batch.set(txRef, {
-      'shop_id': shopId,
-      'shop_name': shopName,
-      'route_id': routeId,
-      'type': type,
-      'sale_type': saleType,
-      'amount': amount,
-      'description': description,
-      'items': items.map((e) => e.toJson()).toList(),
-      'created_by': normalizedCreatedBy,
-      'created_at': transactionDate ?? Timestamp.now(),
-      'deleted':
-          false, // DI-01: required for isNotEqualTo filter in allTransactionsProvider
-      if (normalizedKey != null && normalizedKey.isNotEmpty)
-        'idempotency_key': normalizedKey,
-    });
-
-    // Update shop balance: cash_out adds, cash_in subtracts
-    if (shopId.isNotEmpty) {
-      final balanceDelta = type == 'cash_out' ? amount : -amount;
-      batch.update(db.collection(Collections.customers).doc(shopId), {
-        'balance': FieldValue.increment(balanceDelta),
-        'updated_at': Timestamp.now(),
-        'last_transaction_at': transactionDate ?? Timestamp.now(),
-        'last_transaction_type': type,
-        'last_transaction_amount': amount,
-      });
-    }
-
-    // If cash_out with items, deduct stock from product_variants
-    if (type == 'cash_out' && items.isNotEmpty) {
-      for (final item in items) {
-        batch.update(
-          db.collection(Collections.productVariants).doc(item.variantId),
-          {'quantity_available': FieldValue.increment(-item.qty)},
+      // Validate type is in allowed set to prevent arbitrary transaction types
+      const allowedTypes = {
+        'cash_out',
+        'cash_in',
+        'return',
+        'payment',
+        'write_off',
+      };
+      if (!allowedTypes.contains(type)) {
+        throw ArgumentError(
+          'Invalid transaction type "$type". Allowed: ${allowedTypes.join(', ')}',
         );
       }
-    }
-
-    await batch.commit();
-
-    // Best-effort notification for admin feed (non-critical, fire-and-forget).
-    // Only written when a seller creates the transaction — admin notifies themselves.
-    try {
-      final appUser = ref.read(authUserProvider).value;
-      if (appUser != null && appUser.isSeller) {
-        await FirebaseFirestore.instance
-            .collection(Collections.notifications)
-            .doc()
-            .set({
-              'type': 'transaction',
-              'shop_id': shopId,
-              'shop_name': shopName,
-              'route_id': routeId,
-              'seller_id': normalizedCreatedBy,
-              'seller_name': appUser.displayName,
-              'amount': amount,
-              'transaction_type': type,
-              'ref_id': txRef.id,
-              'target_role': 'admin',
-              'read': false,
-              'created_by': normalizedCreatedBy,
-              'created_at': Timestamp.now(),
-            });
+      if (amount <= 0) {
+        throw ArgumentError('Transaction amount must be greater than 0');
       }
-    } catch (_) {
-      /* best-effort only — non-critical */
-    }
+      if (shopId.trim().isEmpty) {
+        throw ArgumentError('shopId must not be empty');
+      }
+      if (routeId.trim().isEmpty) {
+        throw ArgumentError('routeId must not be empty');
+      }
+
+      final db = FirebaseFirestore.instance;
+      final batch = db.batch();
+      final normalizedKey = idempotencyKey?.trim();
+      if (normalizedKey != null && normalizedKey.isNotEmpty) {
+        final existing = await db
+            .collection(Collections.transactions)
+            .where('idempotency_key', isEqualTo: normalizedKey)
+            .limit(1)
+            .get();
+        if (existing.docs.isNotEmpty) {
+          return;
+        }
+      }
+
+      // Create transaction doc
+      final txRef = db.collection(Collections.transactions).doc();
+      batch.set(txRef, {
+        'shop_id': shopId,
+        'shop_name': shopName,
+        'route_id': routeId,
+        'type': type,
+        'sale_type': saleType,
+        'amount': amount,
+        'description': description,
+        'items': items.map((e) => e.toJson()).toList(),
+        'created_by': normalizedCreatedBy,
+        'created_at': transactionDate ?? Timestamp.now(),
+        'deleted':
+            false, // DI-01: required for isNotEqualTo filter in allTransactionsProvider
+        if (normalizedKey != null && normalizedKey.isNotEmpty)
+          'idempotency_key': normalizedKey,
+      });
+
+      // Update shop balance: cash_out adds, cash_in subtracts
+      if (shopId.isNotEmpty) {
+        final balanceDelta = type == 'cash_out' ? amount : -amount;
+        batch.update(db.collection(Collections.customers).doc(shopId), {
+          'balance': FieldValue.increment(balanceDelta),
+          'updated_at': Timestamp.now(),
+          'last_transaction_at': transactionDate ?? Timestamp.now(),
+          'last_transaction_type': type,
+          'last_transaction_amount': amount,
+        });
+      }
+
+      // If cash_out with items, deduct stock from product_variants
+      if (type == 'cash_out' && items.isNotEmpty) {
+        for (final item in items) {
+          batch.update(
+            db.collection(Collections.productVariants).doc(item.variantId),
+            {'quantity_available': FieldValue.increment(-item.qty)},
+          );
+        }
+      }
+
+      await batch.commit();
+
+      // Best-effort notification for admin feed (non-critical, fire-and-forget).
+      // Only written when a seller creates the transaction — admin notifies themselves.
+      try {
+        final appUser = ref.read(authUserProvider).value;
+        if (appUser != null && appUser.isSeller) {
+          await FirebaseFirestore.instance
+              .collection(Collections.notifications)
+              .doc()
+              .set({
+                'type': 'transaction',
+                'shop_id': shopId,
+                'shop_name': shopName,
+                'route_id': routeId,
+                'seller_id': normalizedCreatedBy,
+                'seller_name': appUser.displayName,
+                'amount': amount,
+                'transaction_type': type,
+                'ref_id': txRef.id,
+                'target_role': 'admin',
+                'read': false,
+                'created_by': normalizedCreatedBy,
+                'created_at': Timestamp.now(),
+              });
+        }
+      } catch (_) {
+        /* best-effort only — non-critical */
+      }
+    });
   }
 
   /// Creates a seller-side sale transaction WITHOUT going through invoicing.
@@ -454,97 +470,101 @@ class TransactionNotifier extends AsyncNotifier<void> {
     String? idempotencyKey,
     Timestamp? transactionDate,
   }) async {
-    final normalizedCreatedBy = createdBy.trim();
-    if (normalizedCreatedBy.isEmpty) {
-      throw ArgumentError('createdBy must not be empty');
-    }
-    if (shopId.trim().isEmpty) {
-      throw ArgumentError('shopId must not be empty');
-    }
-    if (amount <= 0) {
-      throw ArgumentError('Transaction amount must be greater than 0');
-    }
-
-    final db = FirebaseFirestore.instance;
-    final batch = db.batch();
-
-    final normalizedKey = idempotencyKey?.trim();
-    if (normalizedKey != null && normalizedKey.isNotEmpty) {
-      final existing = await db
-          .collection(Collections.transactions)
-          .where('idempotency_key', isEqualTo: normalizedKey)
-          .limit(1)
-          .get();
-      if (existing.docs.isNotEmpty) {
-        return;
+    await _runWriteGuard(() async {
+      final normalizedCreatedBy = createdBy.trim();
+      if (normalizedCreatedBy.isEmpty) {
+        throw ArgumentError('createdBy must not be empty');
       }
-    }
+      if (shopId.trim().isEmpty) {
+        throw ArgumentError('shopId must not be empty');
+      }
+      if (amount <= 0) {
+        throw ArgumentError('Transaction amount must be greater than 0');
+      }
 
-    final txRef = db.collection(Collections.transactions).doc();
-    batch.set(txRef, {
-      'shop_id': shopId,
-      'shop_name': shopName,
-      'route_id': routeId,
-      'type': 'cash_out',
-      'sale_type': saleType ?? 'cash',
-      'amount': amount,
-      'description': description,
-      'items': items.map((e) => e.toJson()).toList(),
-      'created_by': normalizedCreatedBy,
-      'created_at': transactionDate ?? Timestamp.now(),
-      'deleted': false, // DI-01: required for isNotEqualTo filter
-      if (normalizedKey != null && normalizedKey.isNotEmpty)
-        'idempotency_key': normalizedKey,
-    });
+      final db = FirebaseFirestore.instance;
+      final batch = db.batch();
 
-    // Shop owes more
-    batch.update(db.collection(Collections.customers).doc(shopId), {
-      'balance': FieldValue.increment(amount),
-      'updated_at': Timestamp.now(),
-      'last_transaction_at': transactionDate ?? Timestamp.now(),
-      'last_transaction_type': 'cash_out',
-      'last_transaction_amount': amount,
-    });
+      final normalizedKey = idempotencyKey?.trim();
+      if (normalizedKey != null && normalizedKey.isNotEmpty) {
+        final existing = await db
+            .collection(Collections.transactions)
+            .where('idempotency_key', isEqualTo: normalizedKey)
+            .limit(1)
+            .get();
+        if (existing.docs.isNotEmpty) {
+          return;
+        }
+      }
 
-    // Deduct from seller_inventory docs
-    for (final entry in sellerInventoryDeductions.entries) {
-      if (entry.value > 0) {
-        batch
-            .update(db.collection(Collections.sellerInventory).doc(entry.key), {
+      final txRef = db.collection(Collections.transactions).doc();
+      batch.set(txRef, {
+        'shop_id': shopId,
+        'shop_name': shopName,
+        'route_id': routeId,
+        'type': 'cash_out',
+        'sale_type': saleType ?? 'cash',
+        'amount': amount,
+        'description': description,
+        'items': items.map((e) => e.toJson()).toList(),
+        'created_by': normalizedCreatedBy,
+        'created_at': transactionDate ?? Timestamp.now(),
+        'deleted': false, // DI-01: required for isNotEqualTo filter
+        if (normalizedKey != null && normalizedKey.isNotEmpty)
+          'idempotency_key': normalizedKey,
+      });
+
+      // Shop owes more
+      batch.update(db.collection(Collections.customers).doc(shopId), {
+        'balance': FieldValue.increment(amount),
+        'updated_at': Timestamp.now(),
+        'last_transaction_at': transactionDate ?? Timestamp.now(),
+        'last_transaction_type': 'cash_out',
+        'last_transaction_amount': amount,
+      });
+
+      // Deduct from seller_inventory docs
+      for (final entry in sellerInventoryDeductions.entries) {
+        if (entry.value > 0) {
+          batch.update(
+            db.collection(Collections.sellerInventory).doc(entry.key),
+            {
               'quantity_available': FieldValue.increment(-entry.value),
               'updated_at': Timestamp.now(),
-            });
+            },
+          );
+        }
       }
-    }
 
-    await batch.commit();
+      await batch.commit();
 
-    // Best-effort notification for admin feed (non-critical, fire-and-forget).
-    try {
-      final appUser = ref.read(authUserProvider).value;
-      if (appUser != null && appUser.isSeller) {
-        await FirebaseFirestore.instance
-            .collection(Collections.notifications)
-            .doc()
-            .set({
-              'type': 'transaction',
-              'shop_id': shopId,
-              'shop_name': shopName,
-              'route_id': routeId,
-              'seller_id': normalizedCreatedBy,
-              'seller_name': appUser.displayName,
-              'amount': amount,
-              'transaction_type': 'cash_out',
-              'ref_id': txRef.id,
-              'target_role': 'admin',
-              'read': false,
-              'created_by': normalizedCreatedBy,
-              'created_at': Timestamp.now(),
-            });
+      // Best-effort notification for admin feed (non-critical, fire-and-forget).
+      try {
+        final appUser = ref.read(authUserProvider).value;
+        if (appUser != null && appUser.isSeller) {
+          await FirebaseFirestore.instance
+              .collection(Collections.notifications)
+              .doc()
+              .set({
+                'type': 'transaction',
+                'shop_id': shopId,
+                'shop_name': shopName,
+                'route_id': routeId,
+                'seller_id': normalizedCreatedBy,
+                'seller_name': appUser.displayName,
+                'amount': amount,
+                'transaction_type': 'cash_out',
+                'ref_id': txRef.id,
+                'target_role': 'admin',
+                'read': false,
+                'created_by': normalizedCreatedBy,
+                'created_at': Timestamp.now(),
+              });
+        }
+      } catch (_) {
+        /* best-effort only — non-critical */
       }
-    } catch (_) {
-      /* best-effort only — non-critical */
-    }
+    });
   }
 
   /// Seller-safe annotation: updates only the [description] field.
@@ -681,41 +701,43 @@ class TransactionNotifier extends AsyncNotifier<void> {
     String? saleType,
     Timestamp? transactionDate,
   }) async {
-    if (txId.trim().isEmpty) {
-      throw ArgumentError('txId must not be empty');
-    }
-    if (newAmount <= 0) {
-      throw ArgumentError('newAmount must be greater than 0');
-    }
-    const allowedTypes = {
-      'cash_out',
-      'cash_in',
-      'return',
-      'payment',
-      'write_off',
-    };
-    if (!allowedTypes.contains(newType)) {
-      throw ArgumentError(
-        'Invalid transaction type "$newType". Allowed: ${allowedTypes.join(', ')}',
-      );
-    }
+    await _runWriteGuard(() async {
+      if (txId.trim().isEmpty) {
+        throw ArgumentError('txId must not be empty');
+      }
+      if (newAmount <= 0) {
+        throw ArgumentError('newAmount must be greater than 0');
+      }
+      const allowedTypes = {
+        'cash_out',
+        'cash_in',
+        'return',
+        'payment',
+        'write_off',
+      };
+      if (!allowedTypes.contains(newType)) {
+        throw ArgumentError(
+          'Invalid transaction type "$newType". Allowed: ${allowedTypes.join(', ')}',
+        );
+      }
 
-    final db = FirebaseFirestore.instance;
-    final batch = db.batch();
-    _stageTransactionUpdate(
-      batch: batch,
-      db: db,
-      txId: txId,
-      shopId: shopId,
-      oldAmount: oldAmount,
-      oldType: oldType,
-      newAmount: newAmount,
-      newType: newType,
-      description: description,
-      saleType: saleType,
-      transactionDate: transactionDate,
-    );
-    await batch.commit();
+      final db = FirebaseFirestore.instance;
+      final batch = db.batch();
+      _stageTransactionUpdate(
+        batch: batch,
+        db: db,
+        txId: txId,
+        shopId: shopId,
+        oldAmount: oldAmount,
+        oldType: oldType,
+        newAmount: newAmount,
+        newType: newType,
+        description: description,
+        saleType: saleType,
+        transactionDate: transactionDate,
+      );
+      await batch.commit();
+    });
   }
 
   /// Seller edits cash_in/cash_out transactions.

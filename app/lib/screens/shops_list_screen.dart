@@ -417,10 +417,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                     // Use cached lastTransactionAt first; fall back to the
                     // timestamp derived from analytics for old shop docs.
                     filtered.sort((a, b) {
-                      final ta =
-                          a.lastTransactionAt ?? lastTxByShop[a.id]?.at;
-                      final tb =
-                          b.lastTransactionAt ?? lastTxByShop[b.id]?.at;
+                      final ta = a.lastTransactionAt ?? lastTxByShop[a.id]?.at;
+                      final tb = b.lastTransactionAt ?? lastTxByShop[b.id]?.at;
                       if (ta == null && tb == null) {
                         return a.name.compareTo(b.name);
                       }
@@ -1306,19 +1304,40 @@ class _LastTxRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final txType = shop.lastTransactionType ?? lastTxFallback?.type;
-    if (txType == null) return const SizedBox.shrink();
+    if (txType == null) {
+      // While analytics is loading, old shops (no cached lastTransactionType)
+      // would flash blank. Show a subtle placeholder bar instead.
+      if (ref.watch(shopsAnalyticsTransactionsProvider).isLoading) {
+        return Container(
+          height: 13,
+          width: 72,
+          margin: const EdgeInsets.only(top: 2),
+          decoration: BoxDecoration(
+            color: Theme.of(
+              context,
+            ).colorScheme.outlineVariant.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        );
+      }
+      return const SizedBox.shrink();
+    }
     final txAmount =
         shop.lastTransactionAmount ?? lastTxFallback?.amount ?? 0.0;
-    final cs = Theme.of(context).colorScheme;
-    final style = TextStyle(fontSize: 11, color: cs.onSurfaceVariant);
     final isIncoming = txType != 'cash_out';
+    final txColor = isIncoming ? AppBrand.successColor : AppBrand.errorColor;
+    final style = TextStyle(
+      fontSize: 11,
+      color: txColor,
+      fontWeight: FontWeight.w600,
+    );
     final icon = isIncoming ? Icons.arrow_downward : Icons.arrow_upward;
     final dirLabel = isIncoming ? tr('lbl_in', ref) : tr('lbl_out', ref);
     final amtStr = AppFormatters.currency(txAmount, currency);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 11, color: cs.onSurfaceVariant),
+        Icon(icon, size: 11, color: txColor),
         const SizedBox(width: 2),
         Text('$dirLabel $amtStr', style: style),
       ],

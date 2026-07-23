@@ -27,6 +27,30 @@ import '../providers/settings_provider.dart';
 ///   fileName: 'orders',
 /// );
 /// ```
+/// Returns a white-background PNG from the given [pngBytes].
+Future<Uint8List> _whiteBackgroundPng(Uint8List pngBytes) async {
+  try {
+    final codec = await ui.instantiateImageCodec(pngBytes);
+    final frame = await codec.getNextFrame();
+    final src = frame.image;
+    final recorder = ui.PictureRecorder();
+    final canvas = ui.Canvas(
+      recorder,
+      Rect.fromLTWH(0, 0, src.width.toDouble(), src.height.toDouble()),
+    );
+    canvas.drawColor(Colors.white, ui.BlendMode.src);
+    canvas.drawImage(src, Offset.zero, Paint());
+    final picture = recorder.endRecording();
+    final result = await picture.toImage(src.width, src.height);
+    final data = await result.toByteData(format: ui.ImageByteFormat.png);
+    if (data == null) throw Exception('png export failed');
+    return data.buffer.asUint8List();
+  } catch (e, stack) {
+    debugPrint('[ExportSheet] PNG codec error: $e\n$stack');
+    throw Exception('pdf_export_failed');
+  }
+}
+
 class ExportSheet {
   ExportSheet._();
 
@@ -68,6 +92,46 @@ class ExportSheet {
       },
     );
   }
+}
+
+typedef PdfPageRasterizer =
+    Future<List<Uint8List>> Function(Uint8List pdfBytes, {double dpi});
+
+Future<List<Uint8List>> _defaultPdfPagesToPngs(
+  Uint8List pdfBytes, {
+  required double dpi,
+}) async {
+  final pages = await Printing.raster(pdfBytes, dpi: dpi).toList();
+  if (pages.isEmpty) return const <Uint8List>[];
+
+  final pngBytesList = <Uint8List>[];
+  for (final page in pages) {
+    final pngBytes = await page.toPng();
+    pngBytesList.add(pngBytes);
+  }
+
+  return pngBytesList;
+}
+
+/// Converts a PDF into one high-resolution PNG per rasterized page.
+///
+/// This keeps page-to-image export parity aligned with the PDF page count.
+Future<List<Uint8List>> rasterizePdfPagesToPngs(
+  Uint8List pdfBytes, {
+  double dpi = 300,
+  PdfPageRasterizer? rasterizer,
+}) async {
+  final pngBytesList = await (rasterizer ?? _defaultPdfPagesToPngs)(
+    pdfBytes,
+    dpi: dpi,
+  );
+
+  final whiteBgBytes = <Uint8List>[];
+  for (final pngBytes in pngBytesList) {
+    whiteBgBytes.add(await _whiteBackgroundPng(pngBytes));
+  }
+
+  return whiteBgBytes;
 }
 
 // ─── Sheet content — StatefulWidget for loading / error state ─────────────
@@ -170,13 +234,20 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
 
   Future<void> _sharePng() async {
     final pdfBytes = await _buildPdfBytes();
-    final firstPage = await Printing.raster(pdfBytes, dpi: 200).first;
-    final rawPng = await firstPage.toPng();
-    final pngBytes = await _withWhiteBackground(rawPng);
-    await shareFile(
-      bytes: pngBytes,
-      fileName: '${widget.fileName}.png',
-      mimeType: 'image/png',
+    final pagePngs = await rasterizePdfPagesToPngs(pdfBytes, dpi: 300);
+    if (pagePngs.isEmpty) throw Exception('no pages to export');
+
+    await shareFiles(
+      files: pagePngs.asMap().entries.map((entry) {
+        final pageIndex = entry.key + 1;
+        return (
+          bytes: entry.value,
+          fileName: pagePngs.length == 1
+              ? '${widget.fileName}.png'
+              : '${widget.fileName}_page_$pageIndex.png',
+          mimeType: 'image/png',
+        );
+      }).toList(),
     );
   }
 
@@ -217,29 +288,6 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
       mimeType:
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-  }
-
-  /// Returns a white-background PNG from the given [pngBytes].
-  Future<Uint8List> _withWhiteBackground(Uint8List pngBytes) async {
-    try {
-      final codec = await ui.instantiateImageCodec(pngBytes);
-      final frame = await codec.getNextFrame();
-      final src = frame.image;
-      final recorder = ui.PictureRecorder();
-      final canvas = ui.Canvas(
-        recorder,
-        Rect.fromLTWH(0, 0, src.width.toDouble(), src.height.toDouble()),
-      );
-      canvas.drawColor(Colors.white, ui.BlendMode.src);
-      canvas.drawImage(src, Offset.zero, Paint());
-      final picture = recorder.endRecording();
-      final result = await picture.toImage(src.width, src.height);
-      final data = await result.toByteData(format: ui.ImageByteFormat.png);
-      return data!.buffer.asUint8List();
-    } catch (e, stack) {
-      debugPrint('[ExportSheet] PNG codec error: $e\n$stack');
-      throw Exception('pdf_export_failed');
-    }
   }
 
   // ── UI ─────────────────────────────────────────────────────────────────

@@ -42,23 +42,45 @@ Future<void> shareFile({
   required String mimeType,
   String? text,
 }) async {
-  XFile? fileToShare;
-  try {
-    // Try to save to temp first (mobile), fall back to in-memory (web/error).
-    final path = await saveTempFile(bytes, fileName);
-    if (path != null) {
-      fileToShare = XFile(path, mimeType: mimeType, name: fileName);
+  await shareFiles(
+    files: [(bytes: bytes, fileName: fileName, mimeType: mimeType)],
+    text: text,
+  );
+}
+
+/// Shares multiple raw byte payloads via the OS share sheet.
+Future<void> shareFiles({
+  required List<({Uint8List bytes, String fileName, String mimeType})> files,
+  String? text,
+}) async {
+  final xFiles = <XFile>[];
+
+  for (final file in files) {
+    XFile? fileToShare;
+    try {
+      final path = await saveTempFile(file.bytes, file.fileName);
+      if (path != null) {
+        fileToShare = XFile(path, mimeType: file.mimeType, name: file.fileName);
+      }
+    } catch (_) {
+      // Fall back to an in-memory payload when filesystem save is unavailable.
     }
-  } catch (_) {
-    // Fall back to an in-memory payload when filesystem save is unavailable.
+
+    fileToShare ??= XFile.fromData(
+      file.bytes,
+      mimeType: file.mimeType,
+      name: file.fileName,
+    );
+    xFiles.add(fileToShare);
   }
 
-  fileToShare ??= XFile.fromData(bytes, mimeType: mimeType, name: fileName);
+  if (xFiles.isEmpty) return;
+
   await SharePlus.instance.share(
     ShareParams(
-      files: [fileToShare],
+      files: xFiles,
       text: text,
-      fileNameOverrides: [fileName],
+      fileNameOverrides: files.map((f) => f.fileName).toList(),
     ),
   );
 }
