@@ -110,7 +110,11 @@ const pw.TextDirection _amountDir = pw.TextDirection.ltr;
 
 List<List<T>> paginateItems<T>(List<T> items, int itemsPerPage) {
   if (itemsPerPage <= 0) {
-    throw ArgumentError.value(itemsPerPage, 'itemsPerPage', 'must be greater than zero');
+    throw ArgumentError.value(
+      itemsPerPage,
+      'itemsPerPage',
+      'must be greater than zero',
+    );
   }
   if (items.isEmpty) {
     return <List<T>>[<T>[]];

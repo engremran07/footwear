@@ -408,9 +408,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     } catch (e) {
                       if (sheetContext.mounted) {
                         final key = AppErrorMapper.key(e);
-                        ScaffoldMessenger.of(sheetContext).showSnackBar(
-                          errorSnackBar(tr(key, ref)),
-                        );
+                        ScaffoldMessenger.of(
+                          sheetContext,
+                        ).showSnackBar(errorSnackBar(tr(key, ref)));
                       }
                     } finally {
                       _transactionGuard.finish();
@@ -464,9 +464,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     final actionContext = context;
     if (!_transactionGuard.tryStart()) {
       if (actionContext.mounted) {
-        ScaffoldMessenger.of(actionContext).showSnackBar(
-          infoSnackBar(tr('action_in_progress', ref)),
-        );
+        ScaffoldMessenger.of(
+          actionContext,
+        ).showSnackBar(infoSnackBar(tr('action_in_progress', ref)));
       }
       return;
     }

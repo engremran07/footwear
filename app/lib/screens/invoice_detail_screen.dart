@@ -23,7 +23,8 @@ class InvoiceDetailScreen extends ConsumerStatefulWidget {
   const InvoiceDetailScreen({super.key, required this.invoiceId, this.backTo});
 
   @override
-  ConsumerState<InvoiceDetailScreen> createState() => _InvoiceDetailScreenState();
+  ConsumerState<InvoiceDetailScreen> createState() =>
+      _InvoiceDetailScreenState();
 }
 
 class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
@@ -138,9 +139,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       final actionContext = context;
       if (!_actionGuard.tryStart()) {
         if (actionContext.mounted) {
-          ScaffoldMessenger.of(actionContext).showSnackBar(
-            infoSnackBar(tr('action_in_progress', ref)),
-          );
+          ScaffoldMessenger.of(
+            actionContext,
+          ).showSnackBar(infoSnackBar(tr('action_in_progress', ref)));
         }
         return;
       }
@@ -157,8 +158,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       } catch (e) {
         if (actionContext.mounted) {
           final key = AppErrorMapper.key(e);
-          ScaffoldMessenger.of(actionContext)
-              .showSnackBar(errorSnackBar(tr(key, ref)));
+          ScaffoldMessenger.of(
+            actionContext,
+          ).showSnackBar(errorSnackBar(tr(key, ref)));
         }
       } finally {
         _actionGuard.finish();
@@ -167,9 +169,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       final actionContext = context;
       if (!_actionGuard.tryStart()) {
         if (actionContext.mounted) {
-          ScaffoldMessenger.of(actionContext).showSnackBar(
-            infoSnackBar(tr('action_in_progress', ref)),
-          );
+          ScaffoldMessenger.of(
+            actionContext,
+          ).showSnackBar(infoSnackBar(tr('action_in_progress', ref)));
         }
         return;
       }
@@ -184,8 +186,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       } catch (e) {
         if (actionContext.mounted) {
           final key = AppErrorMapper.key(e);
-          ScaffoldMessenger.of(actionContext)
-              .showSnackBar(errorSnackBar(tr(key, ref)));
+          ScaffoldMessenger.of(
+            actionContext,
+          ).showSnackBar(errorSnackBar(tr(key, ref)));
         }
       } finally {
         _actionGuard.finish();

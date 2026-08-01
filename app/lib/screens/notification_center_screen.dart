@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/constants/app_brand.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
 import '../models/notification_model.dart';
 import '../providers/auth_provider.dart';
@@ -49,11 +49,18 @@ class NotificationCenterScreen extends ConsumerWidget {
     final notifAsync = ref.watch(notificationsProvider);
     final unreadCount = ref.watch(unreadNotificationCountProvider);
 
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
-            Text(tr('notification_center', ref)),
+            Expanded(
+              child: Text(
+                tr('notification_center', ref),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             if (unreadCount > 0) ...[
               const SizedBox(width: AppTokens.s8),
               _UnreadBadge(count: unreadCount),
@@ -62,11 +69,14 @@ class NotificationCenterScreen extends ConsumerWidget {
         ),
         actions: [
           if (unreadCount > 0)
-            TextButton(
+            TextButton.icon(
               onPressed: () => _markAllRead(context, ref),
-              child: Text(
-                tr('mark_all_read', ref),
-                style: TextStyle(color: Theme.of(context).colorScheme.primary),
+              icon: const Icon(Icons.mark_email_read, size: 18),
+              label: Text(tr('mark_all_read', ref)),
+              style: TextButton.styleFrom(
+                foregroundColor:
+                    theme.appBarTheme.titleTextStyle?.color ??
+                    theme.colorScheme.onPrimary,
               ),
             ),
         ],
@@ -133,18 +143,19 @@ class _UnreadBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: AppBrand.errorAccent,
+        color: colorScheme.errorContainer,
         borderRadius: AppTokens.brFull,
       ),
       child: Text(
         count > 99 ? '99+' : '$count',
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.bold,
-          color: AppBrand.onPrimary,
+          color: colorScheme.onErrorContainer,
         ),
       ),
     );
@@ -237,30 +248,31 @@ class _NotificationTile extends ConsumerWidget {
     final isInvoice = n.type == 'invoice';
 
     // Determine icon + colors from transaction type.
+    final cs = theme.colorScheme;
     final Color accentColor;
     final IconData leadIcon;
     switch (n.transactionType) {
       case 'cash_in':
-        accentColor = AppBrand.successColor;
+        accentColor = AppTheme.success;
         leadIcon = Icons.arrow_downward;
       case 'cash_out':
-        accentColor = AppBrand.errorColor;
+        accentColor = cs.error;
         leadIcon = isInvoice ? Icons.receipt_long : Icons.arrow_upward;
       case 'return':
-        accentColor = AppBrand.infoFg;
+        accentColor = cs.tertiary;
         leadIcon = Icons.assignment_return;
       case 'write_off':
-        accentColor = AppBrand.warningColor;
+        accentColor = cs.secondary;
         leadIcon = Icons.money_off;
       default:
-        accentColor = AppBrand.infoFg;
+        accentColor = cs.tertiary;
         leadIcon = Icons.notifications_outlined;
     }
 
-    // Unread tiles get a subtle info-tinted background.
+    // Unread tiles use theme-surface semantics, not hardcoded legacy colors.
     final tileBg = isUnread
-        ? AppBrand.infoBg.withValues(alpha: 0.55)
-        : Colors.transparent;
+        ? theme.colorScheme.primary.withValues(alpha: 0.08)
+        : theme.colorScheme.surface;
 
     // Build subtitle: "New invoice #INV-042 • SAR 1,200" or "New transaction • SAR 500"
     final eventLabel = isInvoice
@@ -315,8 +327,8 @@ class _NotificationTile extends ConsumerWidget {
                           Container(
                             width: 8,
                             height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppBrand.infoAccent,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.tertiary,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -327,9 +339,7 @@ class _NotificationTile extends ConsumerWidget {
                     Text(
                       '$subtitle  •  ${AppFormatters.currency(n.amount)}',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: isUnread
-                            ? theme.colorScheme.onSurface
-                            : theme.colorScheme.onSurfaceVariant,
+                        color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: isUnread
                             ? FontWeight.w600
                             : FontWeight.normal,
@@ -337,7 +347,7 @@ class _NotificationTile extends ConsumerWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: AppTokens.s2),
+                    const SizedBox(height: AppTokens.s4),
                     // Seller name
                     if (n.sellerName.isNotEmpty)
                       Text(

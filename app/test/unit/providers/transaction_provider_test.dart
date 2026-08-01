@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:footwear_erp/models/transaction_model.dart';
 import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/transaction_provider.dart';
@@ -37,6 +38,44 @@ void main() {
   }
 
   group('Transaction export guard providers', () {
+    test(
+      'sortTransactionsForExport orders the ledger from oldest to newest',
+      () {
+        final txs = [
+          TransactionModel(
+            id: 'b',
+            shopId: 'shop-1',
+            shopName: 'Shop',
+            routeId: 'route-1',
+            type: 'cash_out',
+            amount: 25,
+            description: 'later',
+            createdBy: 'seller-1',
+            createdAt: Timestamp.fromDate(DateTime(2026, 7, 6)),
+            items: const [],
+            deleted: false,
+          ),
+          TransactionModel(
+            id: 'a',
+            shopId: 'shop-1',
+            shopName: 'Shop',
+            routeId: 'route-1',
+            type: 'cash_in',
+            amount: 10,
+            description: 'earlier',
+            createdBy: 'seller-1',
+            createdAt: Timestamp.fromDate(DateTime(2026, 7, 1)),
+            items: const [],
+            deleted: false,
+          ),
+        ];
+
+        final sorted = sortTransactionsForExport(txs);
+
+        expect(sorted.map((tx) => tx.id), ['a', 'b']);
+      },
+    );
+
     test(
       'shopTransactionsExportProvider returns empty for blank shop id',
       () async {

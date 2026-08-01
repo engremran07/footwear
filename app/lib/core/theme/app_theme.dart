@@ -16,16 +16,16 @@ class AppTheme {
   // ═══════════════════════════════════════════════════════════════════════════
   //  ARCTIC COLOR PALETTE
   // ═══════════════════════════════════════════════════════════════════════════
-  static const Color seedColor = Color(0xFF00D4FF);
+  static const Color seedColor = AppBrand.arcticSeedColor;
 
   // ── Dark Mode Colors (deep navy arctic feel) ──
-  static const Color arcticBlue = Color(0xFF00D4FF);
+  static const Color arcticBlue = AppBrand.primaryColor;
   static const Color arcticDarkBg = Color(0xFF0A0E1A);
   static const Color arcticSurface = Color(0xFF111827);
   static const Color arcticCard = Color(0xFF1A2332);
-  static const Color arcticSuccess = Color(0xFF00E676);
-  static const Color arcticError = Color(0xFFFF5252);
-  static const Color arcticWarning = Color(0xFFFFAB40);
+  static const Color arcticSuccess = AppBrand.successColor;
+  static const Color arcticError = AppBrand.errorColor;
+  static const Color arcticWarning = AppBrand.warningColor;
   static const Color arcticPending = Color(0xFFFFD740);
   static const Color arcticTextPrimary = Color(0xFFE2E8F0);
   static const Color arcticTextSecondary = Color(0xFF94A3B8);
@@ -39,10 +39,10 @@ class AppTheme {
   static const Color lightTextPrimary = Color(0xFF1E293B);
   static const Color lightTextSecondary = Color(0xFF64748B);
   static const Color lightDivider = Color(0xFFE2E8F0);
-  static const Color lightBlue = Color(0xFF0284C7);
-  static const Color lightSuccess = Color(0xFF16A34A);
-  static const Color lightError = Color(0xFFDC2626);
-  static const Color lightWarning = Color(0xFFD97706);
+  static const Color lightBlue = AppBrand.primaryColor;
+  static const Color lightSuccess = AppBrand.successColor;
+  static const Color lightError = AppBrand.errorColor;
+  static const Color lightWarning = AppBrand.warningColor;
   static const Color lightPending = Color(0xFFF59E0B);
 
   // ── High Contrast Colors (vivid neon-on-black, maximum readability) ──
@@ -52,10 +52,10 @@ class AppTheme {
   static const Color hcTextPrimary = Color(0xFFFFFFFF);
   static const Color hcTextSecondary = Color(0xFFE0E0E0);
   static const Color hcDivider = Color(0xFFFFD600);
-  static const Color hcBlue = Color(0xFF00FFFF);
-  static const Color hcSuccess = Color(0xFF00FF7F);
-  static const Color hcError = Color(0xFFFF1744);
-  static const Color hcWarning = Color(0xFFFFD600);
+  static const Color hcBlue = AppBrand.primaryColor;
+  static const Color hcSuccess = AppBrand.successColor;
+  static const Color hcError = AppBrand.errorColor;
+  static const Color hcWarning = AppBrand.warningColor;
   static const Color hcPending = Color(0xFFFFD600);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -107,11 +107,17 @@ class AppTheme {
   //  DARK THEME
   // ═══════════════════════════════════════════════════════════════════════════
   static ThemeData darkThemeForLocale(String locale) {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: seedColor,
-      brightness: Brightness.dark,
-      surface: arcticSurface,
-    ).copyWith(primary: arcticBlue, error: arcticError);
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: seedColor,
+          brightness: Brightness.dark,
+          surface: arcticSurface,
+        ).copyWith(
+          primary: arcticBlue,
+          secondary: AppBrand.secondaryColor,
+          tertiary: AppBrand.tertiaryColor,
+          error: arcticError,
+        );
 
     return ThemeData(
       useMaterial3: true,
@@ -496,6 +502,8 @@ class AppTheme {
           surface: lightSurface,
         ).copyWith(
           primary: lightBlue,
+          secondary: AppBrand.secondaryColor,
+          tertiary: AppBrand.tertiaryColor,
           error: lightError,
           onSurface: lightTextPrimary,
         );
@@ -878,11 +886,18 @@ class AppTheme {
   //  HIGH CONTRAST THEME
   // ═══════════════════════════════════════════════════════════════════════════
   static ThemeData highContrastThemeForLocale(String locale) {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: hcBlue,
-      brightness: Brightness.dark,
-      surface: hcSurface,
-    ).copyWith(primary: hcBlue, error: hcError, onSurface: hcTextPrimary);
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: hcBlue,
+          brightness: Brightness.dark,
+          surface: hcSurface,
+        ).copyWith(
+          primary: hcBlue,
+          secondary: AppBrand.secondaryColor,
+          tertiary: AppBrand.tertiaryColor,
+          error: hcError,
+          onSurface: hcTextPrimary,
+        );
 
     return ThemeData(
       useMaterial3: true,

@@ -11,6 +11,7 @@ import '../models/user_model.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/services/permissions_service.dart';
+import '../core/theme/app_theme.dart';
 import '../core/utils/snack_helper.dart';
 import '../providers/changelog_provider.dart';
 import '../providers/database_backup_provider.dart';
@@ -146,6 +147,7 @@ class _AppShellState extends ConsumerState<AppShell>
     BuildContext ctx,
     ({IconData icon, String label, String route}) item,
   ) {
+    final cs = Theme.of(ctx).colorScheme;
     HapticFeedback.mediumImpact();
     final actions = _quickActionsFor(item.route);
     if (actions.isEmpty) return;
@@ -165,7 +167,7 @@ class _AppShellState extends ConsumerState<AppShell>
           const Divider(height: 1),
           for (final action in actions)
             ListTile(
-              leading: Icon(action.icon, color: AppBrand.primaryColor),
+              leading: Icon(action.icon, color: cs.primary),
               title: Text(action.label),
               onTap: () {
                 Navigator.pop(ctx);
@@ -337,6 +339,7 @@ class _AppShellState extends ConsumerState<AppShell>
     final menuLabel = tr('menu', ref);
     final backLabel = tr('back', ref);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -344,7 +347,7 @@ class _AppShellState extends ConsumerState<AppShell>
         statusBarIconBrightness: _isDrawerOpen && !isDark
             ? Brightness.dark
             : Brightness.light,
-        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarColor: cs.surface,
         systemNavigationBarIconBrightness: isDark
             ? Brightness.light
             : Brightness.dark,
@@ -399,9 +402,7 @@ class _AppShellState extends ConsumerState<AppShell>
                         borderRadius: BorderRadius.circular(radius),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(
-                              0xFF000000,
-                            ).withAlpha(shadowAlpha),
+                            color: cs.shadow.withAlpha(shadowAlpha),
                             blurRadius: 28,
                             spreadRadius: 4,
                           ),
@@ -647,10 +648,7 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
               clipBehavior: Clip.none,
               children: [
                 IconButton(
-                  icon: const Icon(
-                    Icons.notifications_outlined,
-                    color: Colors.white,
-                  ),
+                  icon: Icon(Icons.notifications_outlined, color: cs.onPrimary),
                   tooltip: notificationsLabel,
                   onPressed: () => ctx.push('/notifications'),
                 ),
@@ -666,14 +664,14 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
                         ),
                         constraints: const BoxConstraints(minWidth: 16),
                         decoration: BoxDecoration(
-                          color: AppBrand.errorAccent,
+                          color: cs.error,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white, width: 1),
+                          border: Border.all(color: cs.onPrimary, width: 1),
                         ),
                         child: Text(
                           unreadCount > 99 ? '99+' : '$unreadCount',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: cs.onPrimary,
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
                             height: 1.2,
@@ -708,7 +706,7 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
                           height: 9,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: AppBrand.successColor,
+                            color: AppTheme.success,
                             border: Border.all(color: cs.surface, width: 1.5),
                           ),
                         ),
@@ -741,19 +739,14 @@ class _ArcticBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0D1618) : const Color(0xFFFFFFFF),
-        border: Border(
-          top: BorderSide(
-            color: isDark ? const Color(0xFF1E3340) : const Color(0xFFB6DFF0),
-            width: 1,
-          ),
-        ),
+        color: cs.surface,
+        border: Border(top: BorderSide(color: cs.outline, width: 1)),
         boxShadow: [
           BoxShadow(
-            color: AppBrand.primaryColor.withAlpha(28),
+            color: cs.primary.withAlpha(28),
             blurRadius: 14,
             offset: const Offset(0, -3),
           ),
@@ -833,10 +826,7 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selectedColor = isDark
-        ? const Color(0xFF81D4FA)
-        : AppBrand.primaryColor;
+    final selectedColor = cs.primary;
     final color = widget.isSelected ? selectedColor : cs.onSurfaceVariant;
 
     return Semantics(
@@ -949,12 +939,8 @@ class _DrawerMenuScreen extends StatelessWidget {
                   ),
                   child: InkWell(
                     onTap: onProfile,
-                    splashColor: const Color(
-                      0x1FFFFFFF,
-                    ), // white12 — ink on dark gradient header
-                    highlightColor: const Color(
-                      0x1AFFFFFF,
-                    ), // white10 — ink on dark gradient header
+                    splashColor: cs.onPrimary.withAlpha(26),
+                    highlightColor: cs.onPrimary.withAlpha(16),
                     child: Padding(
                       padding: const EdgeInsetsDirectional.fromSTEB(
                         20,
@@ -980,9 +966,9 @@ class _DrawerMenuScreen extends StatelessWidget {
                                         height: 11,
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
-                                          color: AppBrand.successColor,
+                                          color: AppTheme.success,
                                           border: Border.all(
-                                            color: AppBrand.onPrimary,
+                                            color: cs.onPrimary,
                                             width: 2,
                                           ),
                                         ),
@@ -1000,19 +986,21 @@ class _DrawerMenuScreen extends StatelessWidget {
                                     children: [
                                       Text(
                                         user!.displayName,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w600,
-                                          color: AppBrand.onPrimary,
+                                          color: cs.onPrimary,
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
                                         user!.email,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 11,
-                                          color: AppBrand.onPrimaryMuted,
+                                          color: cs.onPrimary.withValues(
+                                            alpha: 0.75,
+                                          ),
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -1045,9 +1033,7 @@ class _DrawerMenuScreen extends StatelessWidget {
                         leading: Icon(
                           item.icon,
                           size: 22,
-                          color: isSel
-                              ? AppBrand.primaryColor
-                              : cs.onSurfaceVariant,
+                          color: isSel ? cs.primary : cs.onSurfaceVariant,
                         ),
                         title: Text(
                           item.label,
@@ -1056,11 +1042,11 @@ class _DrawerMenuScreen extends StatelessWidget {
                             fontWeight: isSel
                                 ? FontWeight.w600
                                 : FontWeight.normal,
-                            color: isSel ? AppBrand.primaryColor : cs.onSurface,
+                            color: isSel ? cs.primary : cs.onSurface,
                           ),
                         ),
                         selected: isSel,
-                        selectedTileColor: AppBrand.primaryColor.withAlpha(20),
+                        selectedTileColor: cs.primary.withAlpha(20),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -1488,6 +1474,7 @@ class _ConnectivityDot extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
     return Tooltip(
       message: isOnline ? tr('online', ref) : tr('offline', ref),
       child: Container(
@@ -1495,11 +1482,11 @@ class _ConnectivityDot extends ConsumerWidget {
         height: 10,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isOnline ? AppBrand.successColor : AppBrand.stockColor,
+          color: isOnline ? AppTheme.success : cs.onSurfaceVariant,
           boxShadow: isOnline
               ? [
                   BoxShadow(
-                    color: AppBrand.successColor.withAlpha(100),
+                    color: AppTheme.success.withAlpha(100),
                     blurRadius: 4,
                   ),
                 ]

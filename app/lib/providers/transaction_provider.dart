@@ -4,6 +4,8 @@ import '../core/constants/collections.dart';
 import '../models/transaction_model.dart';
 import 'auth_provider.dart';
 
+const _kExportQueryLimit = 2000;
+
 // =============================================================================
 // TransactionProvider — all shop ledger writes go through this notifier.
 //
@@ -31,6 +33,14 @@ import 'auth_provider.dart';
 
 const _shopTransactionsLiveLimit = 150;
 const _shopsAnalyticsTransactionsLimit = 500;
+
+List<TransactionModel> sortTransactionsForExport(
+  List<TransactionModel> transactions,
+) {
+  final sorted = List<TransactionModel>.from(transactions);
+  sorted.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  return sorted;
+}
 
 final shopTransactionsProvider = StreamProvider.autoDispose
     .family<List<TransactionModel>, String>((ref, shopId) {
@@ -179,19 +189,20 @@ final shopTransactionsExportProvider =
     FutureProvider.family<List<TransactionModel>, String>((ref, shopId) async {
       final normalizedShopId = shopId.trim();
       if (normalizedShopId.isEmpty) return const <TransactionModel>[];
-      // shop_id is sole source of truth; no dual query needed.
-      // No orderBy here — results are sorted client-side; omitting it avoids
-      // the composite index requirement for the ascending direction.
+
       final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)
           .where('shop_id', isEqualTo: normalizedShopId)
-          .limit(2000)
+          .orderBy('created_at', descending: true)
+          .limit(_kExportQueryLimit)
           .get();
 
-      return snap.docs
+      final txs = snap.docs
           .where((d) => d.data()['deleted'] != true)
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList();
+
+      return sortTransactionsForExport(txs);
     });
 
 /// All transactions for a specific route — used by multi-shop PDF export.
@@ -214,12 +225,14 @@ final routeTransactionsExportProvider =
       final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)
           .where('route_id', isEqualTo: normalizedId)
-          .limit(2000)
+          .orderBy('created_at', descending: true)
+          .limit(_kExportQueryLimit)
           .get();
-      return snap.docs
+      final txs = snap.docs
           .where((d) => d.data()['deleted'] != true)
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList();
+      return sortTransactionsForExport(txs);
     });
 
 /// All transactions across all routes — admin-only bulk export.
@@ -233,12 +246,14 @@ final allTransactionsExportProvider = FutureProvider<List<TransactionModel>>((
   if (user == null || !user.isAdmin) return const <TransactionModel>[];
   final snap = await FirebaseFirestore.instance
       .collection(Collections.transactions)
-      .limit(2000)
+      .orderBy('created_at', descending: true)
+      .limit(_kExportQueryLimit)
       .get();
-  return snap.docs
+  final txs = snap.docs
       .where((d) => d.data()['deleted'] != true)
       .map((d) => TransactionModel.fromJson(d.data(), d.id))
       .toList();
+  return sortTransactionsForExport(txs);
 });
 
 /// One-shot transactions for a specific seller — used by seller report PDF.
@@ -257,12 +272,14 @@ final sellerTransactionsExportProvider =
       final snap = await FirebaseFirestore.instance
           .collection(Collections.transactions)
           .where('created_by', isEqualTo: normalizedId)
-          .limit(2000)
+          .orderBy('created_at', descending: true)
+          .limit(_kExportQueryLimit)
           .get();
-      return snap.docs
+      final txs = snap.docs
           .where((d) => d.data()['deleted'] != true)
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList();
+      return sortTransactionsForExport(txs);
     });
 
 class TransactionNotifier extends AsyncNotifier<void> {
@@ -297,15 +314,20 @@ class TransactionNotifier extends AsyncNotifier<void> {
     Timestamp? transactionDate,
     Map<String, dynamic> extraTxFields = const <String, dynamic>{},
   }) {
-    batch.update(db.collection(Collections.transactions).doc(txId), {
+    final updatePayload = <String, dynamic>{
       'amount': newAmount,
       'type': newType,
-      'description': ?description,
-      'sale_type': ?saleType,
-      'created_at': ?transactionDate,
       ...extraTxFields,
       'updated_at': Timestamp.now(),
-    });
+    };
+    if (description != null) updatePayload['description'] = description;
+    if (saleType != null) updatePayload['sale_type'] = saleType;
+    if (transactionDate != null) updatePayload['created_at'] = transactionDate;
+
+    batch.update(
+      db.collection(Collections.transactions).doc(txId),
+      updatePayload,
+    );
 
     if (shopId != null && shopId.isNotEmpty) {
       // Treat return/payment/write_off as balance-reducing amounts by default.

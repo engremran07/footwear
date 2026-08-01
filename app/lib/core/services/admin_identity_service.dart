@@ -74,7 +74,8 @@ class AdminIdentityService {
       );
     }
 
-    _cachedCreds = jsonDecode(utf8.decode(base64.decode(b64))) as Map<String, dynamic>;
+    _cachedCreds =
+        jsonDecode(utf8.decode(base64.decode(b64))) as Map<String, dynamic>;
     return _cachedCreds!;
   }
 

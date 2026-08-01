@@ -5,6 +5,8 @@ import '../core/constants/collections.dart';
 import '../models/seller_inventory_model.dart';
 import 'auth_provider.dart';
 
+const _kExportQueryLimit = 2000;
+
 final sellerInventoryProvider = StreamProvider.autoDispose
     .family<List<SellerInventoryModel>, String>((ref, sellerId) {
       return FirebaseFirestore.instance
@@ -68,6 +70,7 @@ final sellerInventoryExportProvider =
           .collection(Collections.sellerInventory)
           .where('seller_id', isEqualTo: sellerId.trim())
           .where('active', isEqualTo: true)
+          .limit(_kExportQueryLimit)
           .get();
       return snap.docs
           .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))

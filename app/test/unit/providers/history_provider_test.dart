@@ -25,21 +25,19 @@ void main() {
     });
 
     test('a transaction from 6 days ago is within the window', () {
-      final sixDaysAgo = DateTime.now().subtract(const Duration(days: 6));
-      final cutoff = DateTime.now().subtract(
-        const Duration(days: _expectedHistoryDays),
-      );
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final cutoff = today.subtract(const Duration(days: _expectedHistoryDays));
+      final sixDaysAgo = today.subtract(const Duration(days: 6));
       expect(sixDaysAgo.isAfter(cutoff), isTrue);
     });
 
     test('a transaction from exactly 7 days ago is on the boundary', () {
-      final sevenDaysAgo = DateTime.now().subtract(
-        const Duration(days: _expectedHistoryDays),
-      );
-      final cutoff = DateTime.now().subtract(
-        const Duration(days: _expectedHistoryDays),
-      );
-      // Boundary is inclusive (>= cutoff) — same instant should not be excluded
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final cutoff = today.subtract(const Duration(days: _expectedHistoryDays));
+      final sevenDaysAgo = today.subtract(const Duration(days: 7));
+      // Boundary is inclusive (>= cutoff) — same instant should not be excluded.
       expect(
         sevenDaysAgo.isAfter(cutoff) || sevenDaysAgo.isAtSameMomentAs(cutoff),
         isTrue,
@@ -47,10 +45,10 @@ void main() {
     });
 
     test('a transaction from 8 days ago is outside the window', () {
-      final eightDaysAgo = DateTime.now().subtract(const Duration(days: 8));
-      final cutoff = DateTime.now().subtract(
-        const Duration(days: _expectedHistoryDays),
-      );
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final cutoff = today.subtract(const Duration(days: _expectedHistoryDays));
+      final eightDaysAgo = today.subtract(const Duration(days: 8));
       expect(eightDaysAgo.isBefore(cutoff), isTrue);
     });
   });
