@@ -28,6 +28,62 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.25',
+    date: 'August 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🛡️',
+        text: {
+          AppLocale.en:
+              'Repeated write actions are now guarded so a single invoice or transaction submit is processed only once, preventing duplicate taps and accidental double-posts.',
+          AppLocale.ar:
+              'تمت حماية الإجراءات المتكررة الآن بحيث يتم تنفيذ إرسال فاتورة أو معاملة واحدة فقط مرة واحدة، مما يمنع النقرات المكررة والمنشورات المزدوجة عن طريق الخطأ.',
+          AppLocale.ur:
+              'بار بار دہرائے جانے والے write actions اب محفوظ ہو گئے ہیں تاکہ ایک ہی انوائس یا ٹرانزیکشن صرف ایک بار پروسیس ہو، دو بار ٹیپ اور accidental double-posts سے بچا جا سکے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📦',
+        text: {
+          AppLocale.en:
+              'Release packaging and Android build metadata are aligned again so the APK version code safely exceeds the currently installed device build during handoff.',
+          AppLocale.ar:
+              'تمت محاذاة بيانات إصدار الحزمة وبناء Android مرة أخرى حتى يتجاوز رمز إصدار APK بشكل آمن الإصدار المثبت حاليًا على الجهاز أثناء التسليم.',
+          AppLocale.ur:
+              'ریلیز پیکیجنگ اور Android build metadata دوبارہ متوازن ہو گئے ہیں تاکہ APK version code ہینڈآف کے دوران موجودہ ڈیوائس build سے محفوظ طریقے سے زیادہ ہو۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.9.5',
+    date: 'April 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'PDF exports now paginate consistently for large ledgers and account statements, so long reports are no longer truncated or cut off mid-page.',
+          AppLocale.ar:
+              'تُقسم صادرات PDF الآن بشكل متسق للقيود الكبيرة والبيانات المالية، لذلك لا يتم قطع التقارير الطويلة أو قطعها في منتصف الصفحة بعد الآن.',
+          AppLocale.ur:
+              'PDF ایکسپورٹس اب بڑے لیجرز اور اکاؤنٹ سٹیٹمنٹ کے لیے مستقل طور پر پیج بندی کرتے ہیں، اس لیے طویل رپورٹس اب نصف صفحے میں نہیں کٹے رہتے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Admin identity actions are now disabled by default in client builds unless a secure compile-time credential is provided, reducing the risk of accidental credential exposure.',
+          AppLocale.ar:
+              'تم تعطيل إجراءات الهوية الإدارية افتراضيًا في نسخ العميل ما لم يتم توفير بيانات اعتماد آمنة أثناء الترجمة، مما يقلل من خطر تسريب الاعتمادات عن طريق الخطأ.',
+          AppLocale.ur:
+              'ایڈمن آئیڈینٹی ایکشنز اب کلائنٹ builds میں ڈیفالٹ طور پر غیر فعال ہیں جب تک کہ کمپائل ٹائم پر محفوظ کریڈینشل فراہم نہ کیا جائے، جس سے accidental credential exposure کا خطرہ کم ہوتا ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.4',
     date: 'April 2026',
     items: [

@@ -111,6 +111,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'access_denied': 'Access denied',
     'error_occurred': 'An error occurred: \$e',
     'saved_successfully': 'Saved successfully',
+    'action_in_progress': 'Action already in progress. Please wait.',
     'select_option': 'Please select an option',
     'required_field': 'This field is required',
 
@@ -1347,6 +1348,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'access_denied': 'تم رفض الوصول',
     'error_occurred': 'حدث خطأ: \$e',
     'saved_successfully': 'تم الحفظ بنجاح',
+    'action_in_progress': 'الإجراء قيد التنفيذ بالفعل. يرجى الانتظار.',
     'select_option': 'الرجاء اختيار خيار',
     'required_field': 'هذا الحقل مطلوب',
 
@@ -2567,6 +2569,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'access_denied': 'رسائی سے انکار',
     'error_occurred': 'ایک خرابی پیش آئی: \$e',
     'saved_successfully': 'کامیابی سے محفوظ ہو گیا',
+    'action_in_progress': 'عمل پہلے سے جاری ہے۔ براہ کرم انتظار کریں۔',
     'select_option': 'براہ کرم ایک آپشن منتخب کریں',
     'required_field': 'یہ فیلڈ ضروری ہے',
 

@@ -1,14 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:http/http.dart' as http;
 
-import '../constants/collections.dart';
-
 /// Provides full admin-level Firebase Auth operations directly from the app
 /// without Cloud Functions — 100% Spark free-tier compatible.
+///
+/// Security hardening: this service is disabled by default in client builds.
+/// To enable it, pass a base64-encoded service-account JSON payload at compile
+/// time via the ADMIN_IDENTITY_CREDENTIAL_B64 dart-define. No Firestore lookup
+/// is used for credentials in production builds.
 ///
 /// 4-Way Sync Chain:
 ///   1. AdminIdentityService.updateAuthUser()  → Firebase Auth (email/pw/verified)
@@ -41,6 +43,10 @@ class AdminIdentityService {
   // "insufficient request scope" on the project-scoped sendOobCode endpoint.
   static const _scope = 'https://www.googleapis.com/auth/cloud-platform';
   static const _projectId = 'shoeserp-clean-20260327';
+  static const _credentialB64 = String.fromEnvironment(
+    'ADMIN_IDENTITY_CREDENTIAL_B64',
+    defaultValue: '',
+  );
   // Firebase Web API key — used only for the custom-token → ID-token exchange
   // (public value, safe to embed; it is not the SA private key).
   static const _apiKey = 'AIzaSyBkuhoehQ8G7GBCx5Gun_v3KOlM2gqyBDg';
@@ -59,19 +65,16 @@ class AdminIdentityService {
 
   Future<Map<String, dynamic>> _getOrLoadCreds() async {
     if (_cachedCreds != null) return _cachedCreds!;
-    final snap = await FirebaseFirestore.instance
-        .collection(Collections.adminConfig)
-        .doc('sa_credentials')
-        .get();
-    if (!snap.exists || snap.data() == null) {
-      throw Exception(
-        'SA credentials not provisioned. '
-        'Run the setup script to populate admin_config/sa_credentials.',
+
+    final b64 = _credentialB64.trim();
+    if (b64.isEmpty) {
+      throw StateError(
+        'Admin identity credentials are disabled in this build. '
+        'Pass ADMIN_IDENTITY_CREDENTIAL_B64 at compile time to enable it.',
       );
     }
-    final b64 = snap.data()!['sa_json_b64'] as String;
-    _cachedCreds =
-        jsonDecode(utf8.decode(base64.decode(b64))) as Map<String, dynamic>;
+
+    _cachedCreds = jsonDecode(utf8.decode(base64.decode(b64))) as Map<String, dynamic>;
     return _cachedCreds!;
   }
 

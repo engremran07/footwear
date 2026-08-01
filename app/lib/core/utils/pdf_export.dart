@@ -108,6 +108,22 @@ pw.TextDirection _cellDir(String text, pw.TextDirection fallback) =>
 
 const pw.TextDirection _amountDir = pw.TextDirection.ltr;
 
+List<List<T>> paginateItems<T>(List<T> items, int itemsPerPage) {
+  if (itemsPerPage <= 0) {
+    throw ArgumentError.value(itemsPerPage, 'itemsPerPage', 'must be greater than zero');
+  }
+  if (items.isEmpty) {
+    return <List<T>>[<T>[]];
+  }
+
+  final pages = <List<T>>[];
+  for (var index = 0; index < items.length; index += itemsPerPage) {
+    final end = (index + itemsPerPage).clamp(0, items.length);
+    pages.add(items.sublist(index, end));
+  }
+  return pages;
+}
+
 void _requireLabelKeys(
   Map<String, String> labels,
   Iterable<String> requiredKeys,
@@ -213,14 +229,11 @@ Future<Uint8List> buildPdfTable({
     final titleStyle = lc.ts(size: 16, fw: pw.FontWeight.bold);
 
     const rowsPerPage = 30;
-    final pageCount = (rows.length / rowsPerPage).ceil().clamp(1, 999);
+    final pages = paginateItems(rows, rowsPerPage);
+    final pageCount = pages.length;
 
     for (var page = 0; page < pageCount; page++) {
-      final start = page * rowsPerPage;
-      final end = (start + rowsPerPage) > rows.length
-          ? rows.length
-          : start + rowsPerPage;
-      final pageRows = rows.sublist(start, end);
+      final pageRows = pages[page];
 
       pdf.addPage(
         pw.Page(
@@ -505,14 +518,14 @@ Future<Uint8List> buildPdfLedger({
 
     final pdf = _buildDocument(primaryFont, ff);
     const rowsPerPage = 28;
-    final pageCount = ((rows.length + 1) / rowsPerPage).ceil().clamp(1, 999);
+    final pages = paginateItems(rows, rowsPerPage);
+    final pageCount = pages.length;
 
     final now = DateTime.now();
     for (var page = 0; page < pageCount; page++) {
-      final start = page * rowsPerPage;
       final isFirst = page == 0;
       final isLast = page == pageCount - 1;
-      final pageRows = rows.skip(start).take(rowsPerPage).toList();
+      final pageRows = pages[page];
 
       pdf.addPage(
         pw.Page(

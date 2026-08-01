@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
+import '../core/utils/action_guard.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
@@ -15,15 +16,22 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/error_state.dart';
 import '../widgets/export_sheet.dart';
 
-class InvoiceDetailScreen extends ConsumerWidget {
+class InvoiceDetailScreen extends ConsumerStatefulWidget {
   final String invoiceId;
   final String? backTo;
 
   const InvoiceDetailScreen({super.key, required this.invoiceId, this.backTo});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final invoiceAsync = ref.watch(invoiceByIdProvider(invoiceId));
+  ConsumerState<InvoiceDetailScreen> createState() => _InvoiceDetailScreenState();
+}
+
+class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
+  final ActionGuard _actionGuard = ActionGuard();
+
+  @override
+  Widget build(BuildContext context) {
+    final invoiceAsync = ref.watch(invoiceByIdProvider(widget.invoiceId));
     final isAdmin = ref.watch(authUserProvider).value?.isAdmin ?? false;
 
     return Scaffold(
@@ -42,7 +50,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
                     children: [
                       PopupMenuButton<String>(
                         onSelected: (action) =>
-                            _handleAction(context, ref, action, inv),
+                            _handleAction(context, action, inv),
                         itemBuilder: (_) => [
                           if (inv.status != InvoiceModel.statusPaid)
                             PopupMenuItem(
@@ -66,14 +74,14 @@ class InvoiceDetailScreen extends ConsumerWidget {
         error: (e, _) => mappedErrorState(
           error: e,
           ref: ref,
-          onRetry: () => ref.invalidate(invoiceByIdProvider(invoiceId)),
+          onRetry: () => ref.invalidate(invoiceByIdProvider(widget.invoiceId)),
         ),
       ),
       floatingActionButton: invoiceAsync.whenOrNull(
         data: (inv) {
           if (inv == null) return null;
           return FloatingActionButton(
-            onPressed: () => _showExportSheet(context, ref, inv),
+            onPressed: () => _showExportSheet(context, inv),
             tooltip: tr('share_pdf', ref),
             child: const Icon(Icons.picture_as_pdf),
           );
@@ -84,7 +92,6 @@ class InvoiceDetailScreen extends ConsumerWidget {
 
   Future<void> _handleAction(
     BuildContext context,
-    WidgetRef ref,
     String action,
     InvoiceModel inv,
   ) async {
@@ -128,6 +135,15 @@ class InvoiceDetailScreen extends ConsumerWidget {
         );
         if (confirmed != true) return;
       }
+      final actionContext = context;
+      if (!_actionGuard.tryStart()) {
+        if (actionContext.mounted) {
+          ScaffoldMessenger.of(actionContext).showSnackBar(
+            infoSnackBar(tr('action_in_progress', ref)),
+          );
+        }
+        return;
+      }
       try {
         await ref
             .read(invoiceNotifierProvider.notifier)
@@ -139,14 +155,24 @@ class InvoiceDetailScreen extends ConsumerWidget {
               refundMode: refundMode,
             );
       } catch (e) {
-        if (context.mounted) {
+        if (actionContext.mounted) {
           final key = AppErrorMapper.key(e);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(errorSnackBar(tr(key, ref)));
+          ScaffoldMessenger.of(actionContext)
+              .showSnackBar(errorSnackBar(tr(key, ref)));
         }
+      } finally {
+        _actionGuard.finish();
       }
     } else if (action == 'paid') {
+      final actionContext = context;
+      if (!_actionGuard.tryStart()) {
+        if (actionContext.mounted) {
+          ScaffoldMessenger.of(actionContext).showSnackBar(
+            infoSnackBar(tr('action_in_progress', ref)),
+          );
+        }
+        return;
+      }
       try {
         await ref
             .read(invoiceNotifierProvider.notifier)
@@ -156,17 +182,18 @@ class InvoiceDetailScreen extends ConsumerWidget {
               createdBy: ref.read(authStateProvider).value?.uid ?? '',
             );
       } catch (e) {
-        if (context.mounted) {
+        if (actionContext.mounted) {
           final key = AppErrorMapper.key(e);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(errorSnackBar(tr(key, ref)));
+          ScaffoldMessenger.of(actionContext)
+              .showSnackBar(errorSnackBar(tr(key, ref)));
         }
+      } finally {
+        _actionGuard.finish();
       }
     }
   }
 
-  void _showExportSheet(BuildContext context, WidgetRef ref, InvoiceModel inv) {
+  void _showExportSheet(BuildContext context, InvoiceModel inv) {
     final locale = ref.read(appLocaleProvider);
     final headers = [
       triCol('item_number'),

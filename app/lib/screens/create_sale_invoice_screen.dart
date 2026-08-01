@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
+import '../core/utils/action_guard.dart';
 import '../core/utils/app_sanitizer.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
@@ -69,6 +70,7 @@ class _CreateSaleInvoiceScreenState
   bool _isDirty = false;
   String? _pendingInvoiceIdempotencyKey;
   String? _pendingInvoiceFingerprint;
+  final ActionGuard _submitGuard = ActionGuard();
 
   /// Builds invoice line items.
   /// [ppc] = pairs per dozen (always 12 from settings).
@@ -852,6 +854,11 @@ class _CreateSaleInvoiceScreenState
       _pendingInvoiceIdempotencyKey = const Uuid().v4();
     }
 
+    if (!_submitGuard.tryStart()) {
+      messenger.showSnackBar(infoSnackBar(tr('action_in_progress', ref)));
+      return;
+    }
+
     setState(() => _submitting = true);
 
     try {
@@ -902,6 +909,7 @@ class _CreateSaleInvoiceScreenState
         messenger.showSnackBar(errorSnackBar(tr(key, ref)));
       }
     } finally {
+      _submitGuard.finish();
       if (mounted) setState(() => _submitting = false);
     }
   }

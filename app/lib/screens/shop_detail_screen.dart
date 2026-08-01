@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/utils/action_guard.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
@@ -58,6 +59,8 @@ class ShopDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
+  final ActionGuard _transactionGuard = ActionGuard();
+
   void _showEditTransactionDialog(TransactionModel tx) {
     final user = ref.read(authUserProvider).value;
     final isAdmin = user?.isAdmin == true;
@@ -189,6 +192,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                   onPressed: () async {
                     final newAmount = double.tryParse(amountC.text.trim());
                     if (newAmount == null || newAmount <= 0) return;
+                    if (!_transactionGuard.tryStart()) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        infoSnackBar(tr('action_in_progress', ref)),
+                      );
+                      return;
+                    }
                     try {
                       await ref
                           .read(transactionNotifierProvider.notifier)
@@ -356,8 +365,20 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () async {
+                    final sheetContext = ctx;
+                    if (!_transactionGuard.tryStart()) {
+                      if (sheetContext.mounted) {
+                        ScaffoldMessenger.of(sheetContext).showSnackBar(
+                          infoSnackBar(tr('action_in_progress', ref)),
+                        );
+                      }
+                      return;
+                    }
                     final newAmount = double.tryParse(amountC.text.trim());
-                    if (newAmount == null || newAmount <= 0) return;
+                    if (newAmount == null || newAmount <= 0) {
+                      _transactionGuard.finish();
+                      return;
+                    }
                     try {
                       final user = await ref.read(authUserProvider.future);
                       final appliedImmediately = await ref
@@ -374,21 +395,25 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             transactionDate: Timestamp.fromDate(selectedDate),
                           );
                       if (!mounted) return;
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        successSnackBar(
-                          appliedImmediately
-                              ? tr('saved_successfully', ref)
-                              : tr('edit_request_submitted', ref),
-                        ),
-                      );
-                    } catch (e) {
-                      if (ctx.mounted) {
-                        final key = AppErrorMapper.key(e);
-                        ScaffoldMessenger.of(
-                          ctx,
-                        ).showSnackBar(errorSnackBar(tr(key, ref)));
+                      if (sheetContext.mounted) Navigator.pop(sheetContext);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          successSnackBar(
+                            appliedImmediately
+                                ? tr('saved_successfully', ref)
+                                : tr('edit_request_submitted', ref),
+                          ),
+                        );
                       }
+                    } catch (e) {
+                      if (sheetContext.mounted) {
+                        final key = AppErrorMapper.key(e);
+                        ScaffoldMessenger.of(sheetContext).showSnackBar(
+                          errorSnackBar(tr(key, ref)),
+                        );
+                      }
+                    } finally {
+                      _transactionGuard.finish();
                     }
                   },
                   child: Text(tr('save', ref)),
@@ -436,6 +461,15 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       message: tr('confirm_delete_transaction', ref),
     );
     if (confirmed != true) return;
+    final actionContext = context;
+    if (!_transactionGuard.tryStart()) {
+      if (actionContext.mounted) {
+        ScaffoldMessenger.of(actionContext).showSnackBar(
+          infoSnackBar(tr('action_in_progress', ref)),
+        );
+      }
+      return;
+    }
     try {
       final authUser = await ref.read(authUserProvider.future);
       await ref
@@ -452,6 +486,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
         final key = AppErrorMapper.key(e);
         ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
+    } finally {
+      _transactionGuard.finish();
     }
   }
 
@@ -580,12 +616,24 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     foregroundColor: AppBrand.onPrimary,
                   ),
                   onPressed: () async {
+                    if (!_transactionGuard.tryStart()) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        infoSnackBar(tr('action_in_progress', ref)),
+                      );
+                      return;
+                    }
                     final amount = double.tryParse(amountC.text.trim());
-                    if (amount == null || amount <= 0) return;
+                    if (amount == null || amount <= 0) {
+                      _transactionGuard.finish();
+                      return;
+                    }
                     final shop = ref
                         .read(shopDetailProvider(widget.shopId))
                         .value;
-                    if (shop == null) return;
+                    if (shop == null) {
+                      _transactionGuard.finish();
+                      return;
+                    }
                     final user = await ref.read(authUserProvider.future);
                     try {
                       await ref
