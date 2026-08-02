@@ -1,0 +1,24 @@
+default_platform(:android)
+
+platform :android do
+  desc 'Upload the release APK to Google Play using supply'
+  lane :deploy_google_play do
+    json_key_path = ENV['GOOGLE_PLAY_JSON_KEY_PATH'] || '../google-play-service-account.json'
+    apk_path = ENV['PLAY_STORE_APK_PATH']
+
+    unless File.exist?(json_key_path)
+      UI.user_error!("Google Play service account JSON not found at #{json_key_path}")
+    end
+
+    unless apk_path && File.exist?(apk_path)
+      UI.user_error!('PLAY_STORE_APK_PATH must be set to a valid APK path')
+    end
+
+    supply(
+      package_name: 'footwear.pk.com',
+      json_key: json_key_path,
+      apk: apk_path,
+      track: 'internal'
+    )
+  end
+end

@@ -6,6 +6,7 @@ param(
   [switch]$SkipGit,
   [switch]$SkipDeploy,
   [switch]$SkipInstall,
+  [switch]$PlayUpload,
   [switch]$WebOnly,
   [switch]$DryRun
 )
@@ -138,6 +139,10 @@ try {
 
   # 4. Build
   if (-not $SkipBuild) {
+    if ($PlayUpload -and $WebOnly) {
+      DIE "PlayUpload requires APK build; do not use -WebOnly."
+    }
+
     if (-not $WebOnly) {
       # 4a. Fat APK (single file: arm32 + arm64 + x86_64)
       # Always build the single fat APK per project rules.
@@ -158,6 +163,50 @@ try {
         }
       } else {
         WARN "[DRY] Would copy app-release.apk to releases\FootWear-V{semver}.apk"
+      }
+
+      if ($PlayUpload) {
+        Step "Uploading release APK to Google Play"
+        $playJsonPath = $env:GOOGLE_PLAY_JSON_KEY_PATH
+        if (-not $playJsonPath) {
+          $playJsonPath = Join-Path $rootDir "google-play-service-account.json"
+        }
+
+        if (-not $DryRun -and -not (Test-Path $playJsonPath)) {
+          DIE "Google Play service account JSON not found at $playJsonPath. Create the file or set GOOGLE_PLAY_JSON_KEY_PATH."
+        }
+
+        $fastlaneCmd = $null
+        $fastlaneExec = Get-Command fastlane -ErrorAction SilentlyContinue
+        if ($fastlaneExec) {
+          $fastlaneCmd = $fastlaneExec.Source
+        } else {
+          $bundleExec = Get-Command bundle -ErrorAction SilentlyContinue
+          if ($bundleExec) {
+            $fastlaneCmd = "bundle exec fastlane"
+          }
+        }
+
+        if (-not $DryRun -and -not $fastlaneCmd) {
+          DIE "fastlane not found. Install fastlane or install bundler and run bundle install in the fastlane directory."
+        }
+
+        if ($DryRun) {
+          WARN "[DRY] Would run: $fastlaneCmd deploy_google_play"
+        } else {
+          if (-not $releaseApk) {
+            DIE "Release APK path not available for Play Store upload."
+          }
+
+          $env:PLAY_STORE_APK_PATH = $releaseApk
+          $env:GOOGLE_PLAY_JSON_KEY_PATH = $playJsonPath
+
+          Push-Location $rootDir
+          $fastlaneCommandLine = if ($fastlaneCmd -match '\s') { "`"$fastlaneCmd`" deploy_google_play" } else { "$fastlaneCmd deploy_google_play" }
+          DRY $fastlaneCommandLine
+          Pop-Location
+          OK "Google Play upload lane executed"
+        }
       }
     }
 
