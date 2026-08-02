@@ -27,6 +27,8 @@
 | RR-015 | P1-FIXED | Firestore rules: seller transaction over-permission | When approval toggle OFF, sellers could update `amount` and `type` on own transactions — allows fraudulent amount manipulation and cash_in/cash_out type flip. `updateTransactionNote()` provider was already restricted; rules were behind. | Fixed v3.5.0.1 — removed `amount`, `type`, `sale_type`, `created_at` from allowed field set; seller approval-disabled path now restricted to `description`, `updated_at`, `updated_by`, `edit_request_*` only. | v3.0.0 |
 | RR-016 | P1-FIXED | Export "Entry By" name resolution | Entry By column showed "—" for all transactions in PDF/Excel exports. Two sub-causes: (1) `allUsersProvider` has `where('active', isEqualTo: true)` filter — deactivated sellers' historical transactions could never resolve to a name; (2) `ref.read(allUsersProvider).value ?? []` cache-miss pattern — if the `StreamProvider.autoDispose` hadn't emitted yet, the entire entryByMap was empty. | Fixed v3.7.11 — new `allUsersExportProvider` (`FutureProvider.autoDispose`, no active filter, one-shot `.get()`, limit 200) used in all 3 export paths (shops_list_screen, shop_detail_screen, reports_screen). | v3.7.9 |
 
+| RR-017 | P1-FIXED (pending apply) | `pdf_export.dart` | `buildPdfLedger()` used a fixed 28-rows-per-page manual chunk with an unbudgeted "Final balance" block appended only on the last page, silently overflowing the newest transactions (rows are sorted oldest→newest, so the last/overflowing page always held the newest data). | Fixed 2026-08-01 — migrated `buildPdfLedger` to `pw.MultiPage` with header/footer callbacks; manual row-budget pagination removed for this function. | v3.9.25+83 |
+
 ---
 
 ## Process Improvement (PI) Backlog

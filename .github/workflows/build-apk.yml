@@ -106,7 +106,7 @@ jobs:
 
       - name: Build release APK (fat)
         if: github.event.inputs.build_type == 'release'
-        run: cd app && flutter build apk --release
+        run: cd app && flutter build apk --release --dart-define=USE_PLAY_INTEGRITY=true
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

@@ -142,7 +142,7 @@ try {
       # 4a. Fat APK (single file: arm32 + arm64 + x86_64)
       # Always build the single fat APK per project rules.
       Step "Building fat release APK"
-      DRY "flutter build apk --release"
+      DRY "flutter build apk --release --dart-define=USE_PLAY_INTEGRITY=true"
 
       if (-not $DryRun) {
         $apkDir = Join-Path $appDir "build\app\outputs\flutter-apk"

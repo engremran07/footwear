@@ -120,7 +120,7 @@ jobs:
         run: cd app && flutter build web --release
 
       - name: Build release APK (fat)
-        run: cd app && flutter build apk --release
+        run: cd app && flutter build apk --release --dart-define=USE_PLAY_INTEGRITY=true
 
       - name: APK size gate
         run: |
