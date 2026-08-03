@@ -214,10 +214,33 @@ class ShopNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> updateShop(String id, Map<String, dynamic> data) async {
+    const allowedFields = <String>{
+      'name',
+      'route_id',
+      'route_number',
+      'phone',
+      'address',
+      'area',
+      'city',
+      'contact_name',
+      'category',
+      'notes',
+      'latitude',
+      'longitude',
+    };
+    final filteredData = <String, dynamic>{
+      for (final entry in data.entries)
+        if (allowedFields.contains(entry.key)) entry.key: entry.value,
+    };
+
+    if (filteredData.isEmpty) {
+      throw ArgumentError('No writable shop fields were provided');
+    }
+
     await FirebaseFirestore.instance
         .collection(Collections.customers)
         .doc(id)
-        .update({...data, 'updated_at': Timestamp.now()});
+        .update({...filteredData, 'updated_at': Timestamp.now()});
   }
 
   /// Admin-only: marks a shop as bad debt, writes off outstanding balance.

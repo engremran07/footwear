@@ -56,6 +56,12 @@ android {
         }
     }
 
+    splits {
+        abi {
+            isEnable = false
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true

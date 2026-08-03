@@ -13,6 +13,7 @@ void main() {
     'area': 'Downtown',
     'city': 'Riyadh',
     'contact_name': 'Ahmed',
+    'category': 'VIP',
     'balance': 1500.0,
     'notes': 'VIP customer',
     'latitude': 24.7136,
@@ -35,6 +36,7 @@ void main() {
       expect(m.area, 'Downtown');
       expect(m.city, 'Riyadh');
       expect(m.contactName, 'Ahmed');
+      expect(m.category, 'VIP');
       expect(m.balance, 1500.0);
       expect(m.notes, 'VIP customer');
       expect(m.latitude, 24.7136);
@@ -82,7 +84,14 @@ void main() {
       expect(restored.name, original.name);
       expect(restored.routeId, original.routeId);
       expect(restored.routeNumber, original.routeNumber);
+      expect(restored.category, original.category);
       expect(restored.balance, original.balance);
+    });
+
+    test('toJson keeps category when present', () {
+      final original = ShopModel.fromJson(baseJson, 's1');
+      final json = original.toJson();
+      expect(json['category'], equals('VIP'));
     });
   });
 
@@ -122,12 +131,14 @@ void main() {
       expect(shop.lastTransactionAmount, isNull);
     });
 
-    test('copyWith updates lastTransactionType and lastTransactionAmount', () {
+    test('copyWith updates category and lastTransaction fields', () {
       final shop = ShopModel.fromJson(baseJson, 's1');
       final updated = shop.copyWith(
+        category: 'VIP',
         lastTransactionType: 'cash_out',
         lastTransactionAmount: 2500.0,
       );
+      expect(updated.category, equals('VIP'));
       expect(updated.lastTransactionType, equals('cash_out'));
       expect(updated.lastTransactionAmount, equals(2500.0));
     });

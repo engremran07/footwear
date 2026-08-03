@@ -190,7 +190,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () async {
-                    final newAmount = double.tryParse(amountC.text.trim());
+                    final newAmount = AppFormatters.parseAmountText(
+                      amountC.text,
+                    );
                     if (newAmount == null || newAmount <= 0) return;
                     if (!_transactionGuard.tryStart()) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
@@ -374,7 +376,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       }
                       return;
                     }
-                    final newAmount = double.tryParse(amountC.text.trim());
+                    final newAmount = AppFormatters.parseAmountText(
+                      amountC.text,
+                    );
                     if (newAmount == null || newAmount <= 0) {
                       _transactionGuard.finish();
                       return;
@@ -1002,14 +1006,23 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               shop.phone!,
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
-                            WhatsAppIconButton(phone: shop.phone, iconSize: 18),
+                            WhatsAppShopCtaButton(
+                              shop: shop,
+                              iconSize: 18,
+                              onViewStatement: () =>
+                                  context.push('/shops/${shop.id}'),
+                            ),
                           ],
-                          if (shop.area != null || shop.city != null) ...[
+                          if (shop.area != null ||
+                              shop.city != null ||
+                              shop.category?.trim().isNotEmpty == true) ...[
                             const Spacer(),
                             Text(
                               [
                                 shop.area,
                                 shop.city,
+                                if (shop.category?.trim().isNotEmpty == true)
+                                  shop.category,
                               ].whereType<String>().join(', '),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),

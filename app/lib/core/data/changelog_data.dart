@@ -28,6 +28,34 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.26',
+    date: 'August 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧩',
+        text: {
+          AppLocale.en:
+              'Shop category tags now show directly in the shops list and detail cards, making customer grouping easier to scan at a glance.',
+          AppLocale.ar:
+              'تظهر الآن وسوم فئة المتجر مباشرةً في قائمة المتاجر وبطاقات التفاصيل، مما يجعل تجميع العملاء أسهل في الفحص السريع.',
+          AppLocale.ur:
+              'شاپ کاٹیگری ٹیگز اب شاپس لسٹ اور ڈیٹیل کارڈز میں براہِ راست دکھائی دیتے ہیں، جس سے کسٹمر گروپنگ ایک نظر میں آسان ہو جاتی ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Manual amount entry now accepts the same common text formats used in the field, including commas and currency text, so payment collection is more forgiving.',
+          AppLocale.ar:
+              'تقبل إدخالات المبالغ اليدوية الآن نفس التنسيقات النصية الشائعة المستخدمة في الحقل، بما في ذلك الفواصل ونص العملة، مما يجعل جمع المدفوعات أكثر مرونة.',
+          AppLocale.ur:
+              'دستی رقم داخل کرنا اب اسی عام فارمیٹس کو قبول کرتا ہے جو فیلڈ میں استعمال ہوتے ہیں، بشمول commas اور currency text، اس لیے ادائیگی جمع کرنا زیادہ آسان ہو جاتا ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.25',
     date: 'August 2026',
     items: [

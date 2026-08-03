@@ -37,6 +37,49 @@ class AppFormatters {
         'PKR' => _pkr.format(amount),
         _ => _sar.format(amount),
       };
+
+  /// Parses common manual amount text such as `1,200.50`, `SAR 1,200.50`,
+  /// or `1.200,50` into a numeric amount.
+  static double? parseAmountText(String? raw) {
+    final input = raw?.trim();
+    if (input == null || input.isEmpty) return null;
+
+    final withoutCurrency = input
+        .replaceAll('﷼', '')
+        .replaceAll('Rs', '')
+        .replaceAll('SAR', '')
+        .replaceAll('PKR', '')
+        .trim();
+    if (withoutCurrency.isEmpty) return null;
+
+    final cleaned = withoutCurrency.replaceAll(RegExp(r'[^0-9,\.\-]'), '');
+    if (cleaned.isEmpty) return null;
+
+    if (cleaned.contains(',') && cleaned.contains('.')) {
+      final commaIndex = cleaned.lastIndexOf(',');
+      final dotIndex = cleaned.lastIndexOf('.');
+      if (commaIndex > dotIndex) {
+        return double.tryParse(
+          cleaned.replaceAll('.', '').replaceAll(',', '.'),
+        );
+      }
+      return double.tryParse(cleaned.replaceAll(',', ''));
+    }
+
+    if (cleaned.contains(',')) {
+      final parts = cleaned.split(',');
+      if (parts.length > 2) {
+        return double.tryParse(cleaned.replaceAll(',', ''));
+      }
+      if (parts.length == 2 && parts[1].length == 3) {
+        return double.tryParse(parts.join());
+      }
+      return double.tryParse(cleaned.replaceAll(',', '.'));
+    }
+
+    return double.tryParse(cleaned);
+  }
+
   static String number(num value) => _num.format(value);
 
   static String date(Timestamp? ts) =>

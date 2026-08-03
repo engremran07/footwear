@@ -242,7 +242,19 @@ service cloud.firestore {
           isSeller() &&
           resource.data.route_id is string &&
           resource.data.route_id != '' &&
-          isSellerForRoute(resource.data.route_id)
+          isSellerForRoute(resource.data.route_id) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name',
+            'phone',
+            'address',
+            'area',
+            'city',
+            'contact_name',
+            'notes',
+            'latitude',
+            'longitude',
+            'updated_at'
+          ])
         )) && docSizeOk();
       allow delete: if isAdmin();
     }

@@ -48,7 +48,9 @@ final authTokenGuardProvider = StreamProvider.autoDispose<void>((ref) async* {
         // Account was disabled in Firebase Console — sign out immediately
         ref.read(authNotifierProvider.notifier).signOut();
       }
-    } catch (_) {}
+    } catch (e) {
+      _logger.w('Auth token guard skipped: $e');
+    }
   }
 });
 
@@ -231,7 +233,11 @@ class AuthNotifier extends AsyncNotifier<void> {
           // not serve incorrect state during the self-heal bootstrap flow.
           try {
             await FirebaseFirestore.instance.clearPersistence();
-          } catch (_) {}
+          } catch (e) {
+            _logger.w(
+              'Missing profile self-heal persistence clear skipped: $e',
+            );
+          }
 
           final legacyByEmail = await usersRef
               .where('email', isEqualTo: email)
@@ -301,7 +307,9 @@ class AuthNotifier extends AsyncNotifier<void> {
               'updated_at': Timestamp.now(),
             });
           }
-        } catch (_) {}
+        } catch (e) {
+          _logger.w('Email verification sync skipped: $e');
+        }
         // ─────────────────────────────────────────────────────────────────
 
         final prefs = await SharedPreferences.getInstance();
@@ -344,12 +352,16 @@ class AuthNotifier extends AsyncNotifier<void> {
       if (kIsWeb) {
         try {
           await FirebaseAuth.instance.setPersistence(Persistence.NONE);
-        } catch (_) {}
+        } catch (e) {
+          _logger.w('Sign-out persistence reset skipped: $e');
+        }
       }
       await FirebaseAuth.instance.signOut();
       try {
         await FirebaseFirestore.instance.clearPersistence();
-      } catch (_) {}
+      } catch (e) {
+        _logger.w('Sign-out Firestore cache clear skipped: $e');
+      }
       // Clear cached SA OAuth2 token so next admin session gets a fresh one.
       AdminIdentityService.instance.clearCache();
       // S-01: Clear Crashlytics identity on sign-out (FIND-008)
@@ -385,7 +397,9 @@ class AuthNotifier extends AsyncNotifier<void> {
           .collection(Collections.users)
           .doc(fresh.uid)
           .update({'email_verified': true, 'updated_at': Timestamp.now()});
-    } catch (_) {}
+    } catch (e) {
+      _logger.w('Email verification resync skipped: $e');
+    }
   }
 
   Future<void> changePassword(

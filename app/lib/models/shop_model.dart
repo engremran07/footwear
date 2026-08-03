@@ -28,6 +28,7 @@ class ShopModel {
   final String? area;
   final String? city;
   final String? contactName;
+  final String? category;
   final double balance;
   final String? notes;
   final double? latitude;
@@ -53,6 +54,7 @@ class ShopModel {
     this.area,
     this.city,
     this.contactName,
+    this.category,
     required this.balance,
     this.notes,
     this.latitude,
@@ -83,6 +85,7 @@ class ShopModel {
       area: json['area'] as String?,
       city: json['city'] as String?,
       contactName: json['contact_name'] as String?,
+      category: json['category'] as String?,
       balance: (json['balance'] as num?)?.toDouble() ?? 0,
       notes: json['notes'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
@@ -110,6 +113,7 @@ class ShopModel {
     'area': area,
     'city': city,
     'contact_name': contactName,
+    if (category != null && category!.trim().isNotEmpty) 'category': category,
     'balance': balance,
     'notes': notes,
     'latitude': latitude,
@@ -145,6 +149,7 @@ class ShopModel {
     String? area,
     String? city,
     String? contactName,
+    String? category,
     double? balance,
     String? notes,
     double? latitude,
@@ -170,6 +175,7 @@ class ShopModel {
       area: area ?? this.area,
       city: city ?? this.city,
       contactName: contactName ?? this.contactName,
+      category: category ?? this.category,
       balance: balance ?? this.balance,
       notes: notes ?? this.notes,
       latitude: latitude ?? this.latitude,

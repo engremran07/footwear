@@ -26,8 +26,9 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
   final _nameC = TextEditingController();
   final _phoneC = TextEditingController();
   final _cityC = TextEditingController();
+  final _categoryC = TextEditingController();
   String? _routeId;
-  int _routeNumber = 0;
+  int? _routeNumber;
   bool _loaded = false;
   bool _saving = false;
   bool _isDirty = false;
@@ -46,6 +47,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     _nameC.dispose();
     _phoneC.dispose();
     _cityC.dispose();
+    _categoryC.dispose();
     super.dispose();
   }
 
@@ -66,6 +68,11 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       _cityC.value = TextEditingValue(
         text: city,
         selection: TextSelection.collapsed(offset: city.length),
+      );
+      final category = shop.category ?? '';
+      _categoryC.value = TextEditingValue(
+        text: category,
+        selection: TextSelection.collapsed(offset: category.length),
       );
       _routeId = shop.routeId;
       _routeNumber = shop.routeNumber;
@@ -92,13 +99,16 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       final data = {
         'name': AppSanitizer.name(_nameC.text),
         'route_id': _routeId,
-        'route_number': _routeNumber,
+        'route_number': _routeNumber ?? 0,
         'phone': _phoneC.text.trim().isEmpty
             ? null
             : AppSanitizer.phone(_phoneC.text),
         'city': _cityC.text.trim().isEmpty
             ? null
             : AppSanitizer.text(_cityC.text, maxLength: 100),
+        'category': _categoryC.text.trim().isEmpty
+            ? null
+            : AppSanitizer.text(_categoryC.text, maxLength: 80),
       };
       if (isEdit) {
         await ref
@@ -141,7 +151,9 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     final allRoutes = routesAsync.value ?? [];
     final routes = user?.isAdmin == true
         ? allRoutes
-        : allRoutes.where((r) => user?.assignedRouteIds.contains(r.id) ?? false).toList();
+        : allRoutes
+              .where((r) => user?.assignedRouteIds.contains(r.id) ?? false)
+              .toList();
 
     // Seller: auto-assign first route from profile when creating a new shop.
     // Guard with !isEdit so edit-mode shops keep their stored route_id.
@@ -156,7 +168,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       });
     }
     // Sync routeNumber once route list loads (works for both admin and seller).
-    if (_routeId != null && _routeNumber == 0) {
+    if (_routeId != null && _routeNumber == null) {
       final r = allRoutes.where((r) => r.id == _routeId).firstOrNull;
       if (r != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -272,6 +284,13 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                     controller: _cityC,
                     decoration: InputDecoration(labelText: tr('city', ref)),
                     inputFormatters: [AppInputFormatters.maxLength(100)],
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _categoryC,
+                    decoration: InputDecoration(labelText: tr('category', ref)),
+                    inputFormatters: [AppInputFormatters.maxLength(80)],
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) => _save(),
                   ),

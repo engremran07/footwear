@@ -12,9 +12,29 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
-const PROJECT = 'shoeserp-clean-20260327';
-const DB = `projects/${PROJECT}/databases/(default)/documents`;
+const PROJECT_ID = 'shoeserp-clean-20260327';
+const DRY_RUN = !process.argv.includes('--apply');
+const DB = `projects/${PROJECT_ID}/databases/(default)/documents`;
 const BASE = 'firestore.googleapis.com';
+
+async function confirmProjectId() {
+  if (!process.argv.includes('--apply')) return true;
+  const prompt = `Type the project ID to confirm reset: ${PROJECT_ID}\n> `;
+  const input = await new Promise((resolve) => {
+    const rl = require('readline').createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question(prompt, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+  if (input !== PROJECT_ID) {
+    throw new Error('Project ID confirmation failed. Aborting reset.');
+  }
+  return true;
+}
 
 // ── Get access token from Firebase CLI stored credentials ──────────────────
 function getToken() {
@@ -165,10 +185,17 @@ async function resetShopBalances(token) {
 }
 
 async function main() {
+  await confirmProjectId();
   console.log('\n════════════════════════════════════════');
   console.log('  DEV RESET — financial state only');
-  console.log(`  Project: ${PROJECT}`);
+  console.log(`  Project: ${PROJECT_ID}`);
+  console.log(`  Mode   : ${DRY_RUN ? 'DRY RUN — no writes' : 'APPLY — writes enabled'}`);
   console.log('════════════════════════════════════════');
+
+  if (DRY_RUN) {
+    console.log('\nDry run only: use --apply to actually reset balances and the invoice counter.\n');
+    return;
+  }
 
   const token = await getToken();
   console.log('  Auth: ✓ token obtained');

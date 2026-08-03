@@ -144,9 +144,11 @@ class _CreateSaleInvoiceScreenState
     super.dispose();
   }
 
-  double get _saleAmount => double.tryParse(_saleAmountC.text.trim()) ?? 0;
+  double get _saleAmount =>
+      AppFormatters.parseAmountText(_saleAmountC.text) ?? 0;
 
-  double get _discountAmount => double.tryParse(_discountC.text.trim()) ?? 0;
+  double get _discountAmount =>
+      AppFormatters.parseAmountText(_discountC.text) ?? 0;
 
   double get _invoiceTotal {
     final t = _saleAmount - _discountAmount;
@@ -154,7 +156,7 @@ class _CreateSaleInvoiceScreenState
   }
 
   double get _amountReceived =>
-      double.tryParse(_amountReceivedC.text.trim()) ?? 0;
+      AppFormatters.parseAmountText(_amountReceivedC.text) ?? 0;
 
   double get _previousBalance => _selectedShop?.balance ?? 0;
 

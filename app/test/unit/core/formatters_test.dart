@@ -47,6 +47,22 @@ void main() {
     });
   });
 
+  group('AppFormatters.parseAmountText', () {
+    test('parses plain numeric strings and thousands separators', () {
+      expect(AppFormatters.parseAmountText('1200.50'), 1200.5);
+      expect(AppFormatters.parseAmountText('1,200.50'), 1200.5);
+      expect(AppFormatters.parseAmountText('SAR 1,200.50'), 1200.5);
+    });
+
+    test('parses European decimal formats with dot-thousands', () {
+      expect(AppFormatters.parseAmountText('1.200,50'), 1200.5);
+    });
+
+    test('returns null for non-numeric text', () {
+      expect(AppFormatters.parseAmountText('not a number'), isNull);
+    });
+  });
+
   group('AppFormatters.currency', () {
     test('uses sar for SAR symbol', () {
       expect(AppFormatters.currency(1000.0, 'SAR'), contains('﷼'));

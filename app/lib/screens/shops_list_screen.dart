@@ -1236,6 +1236,7 @@ class _ShopTile extends ConsumerWidget {
                 // list so the user can tell the shops apart.
                 if (hasDuplicate) 'R${shop.routeNumber}',
                 if (shop.area != null) shop.area!,
+                if (shop.category?.trim().isNotEmpty == true) shop.category!,
               ].join(' · '),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
