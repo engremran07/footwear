@@ -17,7 +17,7 @@ This is a Flutter ERP for route-based shoe distribution.
 
 - **Tech:** Flutter + Riverpod + Firestore + Firebase Auth (Spark free tier, zero Cloud Functions)
 
-- **Key constraints:** Fat APK only, no Firebase Storage, admin = seller + admin
+- **Key constraints:** split-per-ABI Android APK release path, no Firebase Storage, admin = seller + admin
 
 ## Agent Roster (launch ALL concurrently)
 
@@ -53,7 +53,7 @@ Check: Listener count (Spark free limit), aggregate query volume, last-good-cach
 
 **Agent 8 — Android / Gradle Build**
 Audit: `app/android/app/build.gradle.kts`, `app/android/gradle.properties`, `app/proguard-rules.pro`, `app/pubspec.yaml`
-Check: Fat APK (no split-per-abi), signing config, ProGuard rules 8+ plugins, isMinifyEnabled, versionCode monotonic
+Check: split-per-ABI APK release path, signing config, ProGuard rules 8+ plugins, isMinifyEnabled, versionCode monotonic
 
 **Agent 9 — Navigation & Routing**
 Audit: `app/lib/core/router/app_router.dart`
@@ -85,7 +85,7 @@ Check: All EN keys exist in AR and UR, tr() calls use valid keys, no hardcoded u
 
 **Agent 16 — Documentation & Markdown Accuracy**  
 Audit: `AGENTS.md`, `CLAUDE.md`, `README.md`, `app/README.md`, `SYSTEM_DEEP_DIVE_2026-03-27.md`
-Check: Version number consistency, build commands accuracy (fat APK only), no split-per-abi in instructions, runtime contract alignment
+Check: Version number consistency, build commands accuracy (split-per-ABI release path), no legacy fat-APK-only wording, runtime contract alignment
 
 **Agent 17 — GitHub Instructions + Prompts System**
 Audit: `.github/instructions/`, `.github/prompts/`, `.claude/skills/`

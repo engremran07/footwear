@@ -4,6 +4,7 @@ import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/role_utils.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
@@ -100,8 +101,29 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     selected: _roleFilter == 'admin',
                     color: AppBrand.adminRoleColor,
                     onTap: () => setState(
-                      () =>
-                          _roleFilter = _roleFilter == 'admin' ? null : 'admin',
+                      () => _roleFilter = _roleFilter == 'admin' ? null : 'admin',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _RoleChip(
+                    label: tr('role_tenant_admin', ref),
+                    selected: _roleFilter == 'tenant_admin',
+                    color: AppBrand.adminRoleColor,
+                    onTap: () => setState(
+                      () => _roleFilter = _roleFilter == 'tenant_admin'
+                          ? null
+                          : 'tenant_admin',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _RoleChip(
+                    label: tr('role_super_admin', ref),
+                    selected: _roleFilter == 'super_admin',
+                    color: AppBrand.adminRoleColor,
+                    onTap: () => setState(
+                      () => _roleFilter = _roleFilter == 'super_admin'
+                          ? null
+                          : 'super_admin',
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -142,10 +164,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       u.assignedRouteNames.any(
                         (n) => n.toLowerCase().contains(_search),
                       );
-                  final matchesRole =
-                      _roleFilter == null ||
-                      (_roleFilter == 'admin' ? u.isAdmin : u.isSeller);
-                  return matchesSearch && matchesRole;
+                  final userRoleValue = roleValueFromUserRole(u.role);
+                final matchesRole = _roleFilter == null ||
+                    _roleFilter == userRoleValue;
+                return matchesSearch && matchesRole;
                 }).toList();
 
                 if (filtered.isEmpty) {
@@ -248,6 +270,14 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       DropdownMenuItem(
                         value: 'seller',
                         child: Text(tr('lbl_seller', ref)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'tenant_admin',
+                        child: Text(tr('role_tenant_admin', ref)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'super_admin',
+                        child: Text(tr('role_super_admin', ref)),
                       ),
                     ],
                     onChanged: (v) => setS(() {
@@ -366,7 +396,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     final nameC = TextEditingController(text: user.displayName);
     final emailC = TextEditingController(text: user.email);
     final passwordC = TextEditingController();
-    String role = user.isAdmin ? 'admin' : 'seller';
+    String role = roleValueFromUserRole(user.role);
     final currentUser = ref.read(authUserProvider).value;
     final isSelf = currentUser?.id == user.id;
     final selectedRouteIds = List<String>.from(user.assignedRouteIds);
@@ -509,7 +539,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       enabled: false,
                       decoration: InputDecoration(
                         labelText: tr('role', ref),
-                        hintText: role,
+                        hintText: tr(roleLabelKeyFromRoleValue(role), ref),
                       ),
                     )
                   else
@@ -524,6 +554,14 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         DropdownMenuItem(
                           value: 'seller',
                           child: Text(tr('lbl_seller', ref)),
+                        ),
+                        DropdownMenuItem(
+                          value: 'tenant_admin',
+                          child: Text(tr('role_tenant_admin', ref)),
+                        ),
+                        DropdownMenuItem(
+                          value: 'super_admin',
+                          child: Text(tr('role_super_admin', ref)),
                         ),
                       ],
                       onChanged: (v) => setS(() {
@@ -621,12 +659,19 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       );
                     }
                     // ── Step 2: Firestore profile (name / role / routes) ──
-                    await notifier.updateUser(user.id, {
+                    final profileUpdate = <String, dynamic>{
                       'display_name': nameC.text.trim(),
-                      'role': isSelf ? 'admin' : role,
                       'assigned_route_ids': selectedRouteIds,
                       'assigned_route_names': selectedRouteNames,
-                    }, previousRouteIds: oldRouteIds);
+                    };
+                    if (!isSelf) {
+                      profileUpdate['role'] = role;
+                    }
+                    await notifier.updateUser(
+                      user.id,
+                      profileUpdate,
+                      previousRouteIds: oldRouteIds,
+                    );
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -982,7 +1027,12 @@ class _UserTile extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    user.role.name,
+                    tr(
+                      roleLabelKeyFromRoleValue(
+                        roleValueFromUserRole(user.role),
+                      ),
+                      ref,
+                    ),
                     style: TextStyle(
                       fontSize: 10,
                       color: roleColor,
@@ -1049,7 +1099,7 @@ class _UserTile extends ConsumerWidget {
 
 // ─── Inactive user tile ────────────────────────────────────────────────────────────────────
 
-class _InactiveUserTile extends StatelessWidget {
+class _InactiveUserTile extends ConsumerWidget {
   final UserModel user;
   final VoidCallback onReactivate;
   final VoidCallback onSendReset;
@@ -1063,7 +1113,7 @@ class _InactiveUserTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final roleColor = user.isAdmin
         ? AppBrand.adminRoleColor
         : AppBrand.sellerRoleColor;
@@ -1123,7 +1173,12 @@ class _InactiveUserTile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      user.role.name,
+                      tr(
+                        roleLabelKeyFromRoleValue(
+                          roleValueFromUserRole(user.role),
+                        ),
+                        ref,
+                      ),
                       style: TextStyle(
                         fontSize: 10,
                         color: roleColor,

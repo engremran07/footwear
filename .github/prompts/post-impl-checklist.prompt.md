@@ -77,15 +77,15 @@ grep -rn "\.collection('" app/lib/ | grep -v Collections\.
 
 Expected: zero matches. All collection references use `Collections.*` constants.
 
-## Gate 9 — Fat APK in All Documentation
+## Gate 9 — Split-per-ABI release wording in all documentation
 
 ```bash
 
-grep "split-per-abi" README.md app/README.md AGENTS.md CLAUDE.md
+grep -E "split-per-abi|adb push .*app-arm64-v8a-release.apk" README.md app/README.md AGENTS.md CLAUDE.md
 
 ```
 
-Expected: zero matches in build command context. Only historical-note mentions acceptable.
+Expected: release command references are present and historical fat-APK-only wording is removed.
 
 ## Gate 10 — Provider Write Guards
 

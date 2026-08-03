@@ -22,7 +22,7 @@ service cloud.firestore {
     }
 
     function isAdminRole(role) {
-      return role is string && role.matches('(?i)^\\s*(admin|manager)\\s*$');
+      return role is string && role.matches('(?i)^\\s*(admin|manager|tenant_admin|super_admin)\\s*$');
     }
 
     function isSellerRole(role) {
@@ -135,7 +135,7 @@ service cloud.firestore {
     // Validates role values to prevent arbitrary role strings being stored
     function isValidRole(role) {
       return role is string &&
-        role.matches('(?i)^\\s*(admin|manager|seller)\\s*$');
+        role.matches('(?i)^\\s*(admin|manager|tenant_admin|super_admin|seller)\\s*$');
     }
 
     function requiresSellerTransactionEditApproval() {

@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/role_utils.dart';
+import '../core/utils/tenant_scope.dart';
 import '../models/seller_inventory_model.dart';
 import 'auth_provider.dart';
 
@@ -9,8 +11,16 @@ const _kExportQueryLimit = 2000;
 
 final sellerInventoryProvider = StreamProvider.autoDispose
     .family<List<SellerInventoryModel>, String>((ref, sellerId) {
-      return FirebaseFirestore.instance
-          .collection(Collections.sellerInventory)
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.sellerInventory),
+        tenantId: tenantId,
+      );
+      return query
           .where('seller_id', isEqualTo: sellerId)
           .where('active', isEqualTo: true)
           .orderBy('variant_name')
@@ -40,9 +50,17 @@ final adminAllSellerInventoryProvider =
       final isAdmin = ref.watch(
         authUserProvider.select((s) => s.value?.isAdmin ?? false),
       );
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
       if (!isAdmin) return const Stream.empty();
-      return FirebaseFirestore.instance
-          .collection(Collections.sellerInventory)
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.sellerInventory),
+        tenantId: tenantId,
+      );
+      return query
           .where('active', isEqualTo: true)
           .orderBy('variant_name')
           .limit(100)
@@ -66,8 +84,12 @@ final sellerInventoryExportProvider =
       if (sellerId.trim().isEmpty) return const <SellerInventoryModel>[];
       final user = await ref.read(authUserProvider.future);
       if (user == null || !user.isAdmin) return const <SellerInventoryModel>[];
-      final snap = await FirebaseFirestore.instance
-          .collection(Collections.sellerInventory)
+      final tenantId = TenantScope.normalize(user.tenantId);
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.sellerInventory),
+        tenantId: tenantId,
+      );
+      final snap = await query
           .where('seller_id', isEqualTo: sellerId.trim())
           .where('active', isEqualTo: true)
           .limit(_kExportQueryLimit)
@@ -88,8 +110,8 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
         .collection(Collections.users)
         .doc(authUser.uid)
         .get();
-    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
-    if (role != 'admin' && role != 'manager') {
+    final role = (me.data()?['role'] as String? ?? '').trim();
+    if (!isPrivilegedRoleName(role)) {
       throw StateError('Only admin can return stock to warehouse');
     }
   }

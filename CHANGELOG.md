@@ -122,7 +122,7 @@ Most recent first.
 - `.markdownlint.json`: added `MD024 siblings_only`, disabled `MD056`
 - AGENTS.md: Rules 19–22 added; §8 pre-commit checklist extended to Gate 8 (temp-artifact check)
 - CLAUDE.md: Chain 6 (StateProvider lifecycle), Anti-Bypass Enforcement Matrix added
-- README.md × 2 fully rewritten (v3.7.0+48 content, fat APK commands, all 21 routes)
+- README.md × 2 fully rewritten (v3.7.0+48 content, split-per-ABI release commands, all 21 routes)
 - `.gitignore` extended: installer flags (`*.flag`), temp build outputs
 
 ### Fixed

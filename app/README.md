@@ -37,15 +37,19 @@ grep -E "^version:|appVersion|buildNumber" pubspec.yaml lib/core/constants/app_b
 flutter build web --release
 firebase deploy --only hosting
 
-# Release APK (fat, universal — never split-per-abi)
-flutter build apk --release
-# Output: build/app/outputs/flutter-apk/app-release.apk
+# Release APK (split-per-ABI binaries for device delivery)
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
+# Output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+#         build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+#         build/app/outputs/flutter-apk/app-x86_64-release.apk
+#         build/app/outputs/flutter-apk/app-release.apk
 
 # From the repo root, deploy Firestore rules/indexes before commit/push completes.
 # firebase deploy --only firestore:rules,firestore:indexes
 
 # Install to connected device
-adb install -r build/app/outputs/flutter-apk/app-release.apk
+adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/
+adb install -r /sdcard/Download/app-arm64-v8a-release.apk
 ```
 
 ---

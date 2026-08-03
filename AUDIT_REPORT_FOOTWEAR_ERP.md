@@ -209,7 +209,7 @@ Dashboard uses per-metric safe aggregate calls with cached fallback (`_lastGoodD
 
 **E5 — APK Size Auditor**  
 Status: ✅ Pass  
-Fat APK baseline: 75MB (~75000 KB). ProGuard minification active. No Firebase Storage, no large bundled assets.
+Split-per-ABI release baseline: arm64-v8a APK plus universal release wrapper, with ProGuard minification active. No Firebase Storage, no large bundled assets.
 
 ---
 

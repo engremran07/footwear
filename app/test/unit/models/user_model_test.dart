@@ -4,9 +4,17 @@ import 'package:footwear_erp/models/user_model.dart';
 
 void main() {
   group('UserRole', () {
-    test('has exactly admin and seller', () {
-      expect(UserRole.values, containsAll([UserRole.admin, UserRole.seller]));
-      expect(UserRole.values.length, 2);
+    test('includes tenant-aware roles alongside legacy roles', () {
+      expect(
+        UserRole.values,
+        containsAll([
+          UserRole.admin,
+          UserRole.seller,
+          UserRole.tenantAdmin,
+          UserRole.superAdmin,
+        ]),
+      );
+      expect(UserRole.values.length, 4);
     });
   });
 
@@ -41,6 +49,26 @@ void main() {
       expect(m.role, UserRole.admin);
     });
 
+    test('tenant admin role parses correctly', () {
+      final m = UserModel.fromJson({
+        ...baseJson,
+        'role': 'tenant_admin',
+      }, 'uid3');
+      expect(m.role, UserRole.tenantAdmin);
+      expect(m.isAdmin, isTrue);
+      expect(m.isSeller, isFalse);
+    });
+
+    test('super admin role parses correctly', () {
+      final m = UserModel.fromJson({
+        ...baseJson,
+        'role': 'super_admin',
+      }, 'uid4');
+      expect(m.role, UserRole.superAdmin);
+      expect(m.isAdmin, isTrue);
+      expect(m.isSeller, isFalse);
+    });
+
     test('unknown role defaults to seller', () {
       final m = UserModel.fromJson({...baseJson, 'role': 'xyz'}, 'uid4');
       expect(m.role, UserRole.seller);
@@ -51,6 +79,7 @@ void main() {
       expect(m.email, '');
       expect(m.displayName, '');
       expect(m.active, isTrue);
+      expect(m.tenantId, isNull);
     });
   });
 
@@ -184,6 +213,21 @@ void main() {
       );
       final json = m.toJson();
       expect(json['phone'], '+1234567890');
+    });
+
+    test('toJson includes tenant_id when present', () {
+      final m = UserModel(
+        id: 'uid',
+        email: 'u@test.com',
+        displayName: 'U',
+        role: UserRole.tenantAdmin,
+        tenantId: 'tenant-1',
+        active: true,
+        createdAt: ts,
+        updatedAt: ts,
+      );
+      final json = m.toJson();
+      expect(json['tenant_id'], 'tenant-1');
     });
   });
 }

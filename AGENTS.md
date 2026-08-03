@@ -8,6 +8,8 @@ This repository is a route/seller distribution ERP.
 
 - Roles: admin, seller
 - Legacy role value manager must be treated as admin-equivalent in app and rules
+- Tenant-aware roles tenant_admin and super_admin are now supported and must be treated as privileged, tenant-scoped roles in app and rules
+- New tenant-scoped users should carry a tenant_id and device pairing metadata where applicable, and must not cross tenant boundaries in rules or providers
 - Canonical collections:
   - users
   - products
@@ -261,8 +263,8 @@ dart analyze test/
 flutter test -r expanded
 flutter build web --release
 firebase deploy --only hosting
-# Fat APK (canonical — always fat, never ABI-split)
-flutter build apk --release
+# Split-per-ABI Android APKs (canonical phone-delivery artifact set)
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
 cd ..
 firebase deploy --only firestore:rules,firestore:indexes
 git log --oneline -5
@@ -363,10 +365,10 @@ Evidence required: quote "Deploy complete!" from output.
 #### Step 9 — APK release build
 
 ```powershell
-flutter build apk --release
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
 ```
 
-Evidence required: quote `Built build\app\outputs\flutter-apk\app-release.apk (XXmb)`
+Evidence required: quote the generated ABI APK path(s) and size(s), for example `Built build\app\outputs\flutter-apk\app-arm64-v8a-release.apk (XXmb)`.
 
 #### Step 10 — Firestore rules + indexes deploy
 
@@ -621,7 +623,7 @@ Conflict resolution order for instructions:
 - AGENTS.md §4: Rules 17+18 added (provider leak guard, collection constants mandate)
 - AGENTS.md §8: Hygiene grep gates added to pre-commit checklist
 - CLAUDE.md: Breakage Chain Reference, Vibe-Coded Debt Signals, Five Pre-Commit Checks, Auth Pipeline
-- Release: v3.4.0+30, fat APK + web deployed
+- Release: v3.4.0+30, split-per-ABI APK + web deployed
 
 2026-04-06 audit v7 — v3.3.0+21:
 
@@ -630,7 +632,7 @@ Conflict resolution order for instructions:
 - Transfer dialog: `sellersProvider` → `allUsersProvider` so admin appears as a recipient for self-transfer
 - product_provider.transferToSeller: fixed audit log to write to `inventory_transactions` (not `transactions`); type corrected to `transfer_out` matching InventoryTransactionModel constants — was violating Firestore rules AND not appearing in transfer history
 - customer transaction visibility fixed (v3.2.7+19): client-side `deleted != true` filter on all providers
-- Build standard: fat APK only (`flutter build apk --release`), never ABI-split builds
+- Build standard: split-per-ABI APK release path (`flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true`), phone-delivery artifact set
 - user_model: added `canHaveSellerInventory` getter (always true; admin = god tier)
 
 2026-04-06 audit v6 — v3.2.6+18:

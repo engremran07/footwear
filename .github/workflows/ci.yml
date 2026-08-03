@@ -93,17 +93,15 @@ jobs:
           fi
           echo "✅ allTransactionsProvider present in auth_provider.dart"
 
-      - name: Gate 3 — No split-per-abi in READMEs (fat APK only)
+      - name: Gate 3 — No legacy fat-APK-only documentation
         run: |
-          FOUND=$(grep -rn "\-\-split-per-abi" README.md app/README.md AGENTS.md CLAUDE.md -- || true)
-          # Only flag if found in a build command context (not comment lines)
-          CMD=$(echo "$FOUND" | grep "flutter build" | grep -v "#" || true)
-          if [ -n "$CMD" ]; then
-            echo "❌ --split-per-abi found in build command (fat APK only):"
-            echo "$CMD"
+          FOUND=$(grep -rn "fat APK only\|always fat\|never ABI-split\|single fat APK" README.md app/README.md AGENTS.md CLAUDE.md -- || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ Legacy fat-APK-only wording detected:"
+            echo "$FOUND"
             exit 1
           fi
-          echo "✅ No --split-per-abi in build commands"
+          echo "✅ Release docs reflect the split-per-ABI Android contract"
 
       - name: Gate 4 — No direct Firestore writes from screens/widgets
         run: |

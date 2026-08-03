@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/tenant_scope.dart';
 import '../models/invoice_model.dart';
 import 'auth_provider.dart';
 
@@ -38,8 +39,16 @@ enum VoidRefundMode { cashRefund, creditBalance }
 /// For all-invoice listing use [roleAwareInvoicesProvider].
 final invoicesByShopProvider = StreamProvider.autoDispose
     .family<List<InvoiceModel>, String>((ref, shopId) {
-      return FirebaseFirestore.instance
-          .collection(Collections.invoices)
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.invoices),
+        tenantId: tenantId,
+      );
+      return query
           .where('shop_id', isEqualTo: shopId)
           .orderBy('created_at', descending: true)
           .limit(100)
@@ -60,9 +69,15 @@ final allInvoicesProvider = StreamProvider.autoDispose<List<InvoiceModel>>((
   final isAdmin = ref.watch(
     authUserProvider.select((s) => s.value?.isAdmin ?? false),
   );
+  final tenantId = ref.watch(
+    authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
+  );
   if (!isAdmin) return const Stream.empty();
-  return FirebaseFirestore.instance
-      .collection(Collections.invoices)
+  final query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.invoices),
+    tenantId: tenantId,
+  );
+  return query
       .orderBy('created_at', descending: true)
       .limit(200)
       .snapshots()
@@ -76,8 +91,16 @@ final allInvoicesProvider = StreamProvider.autoDispose<List<InvoiceModel>>((
 /// Seller-scoped: only invoices created by this seller.
 final sellerInvoicesProvider = StreamProvider.autoDispose
     .family<List<InvoiceModel>, String>((ref, sellerId) {
-      return FirebaseFirestore.instance
-          .collection(Collections.invoices)
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.invoices),
+        tenantId: tenantId,
+      );
+      return query
           .where('seller_id', isEqualTo: sellerId)
           .orderBy('created_at', descending: true)
           .limit(200)
@@ -111,14 +134,20 @@ final roleAwareInvoicesProvider =
 
 final invoiceByIdProvider = StreamProvider.autoDispose
     .family<InvoiceModel?, String>((ref, invoiceId) {
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
       return FirebaseFirestore.instance
           .collection(Collections.invoices)
           .doc(invoiceId)
           .snapshots()
-          .map(
-            (doc) =>
-                doc.exists ? InvoiceModel.fromJson(doc.data()!, doc.id) : null,
-          );
+          .map((doc) {
+            if (!doc.exists) return null;
+            if (!TenantScope.matchesTenant(doc.data(), tenantId)) return null;
+            return InvoiceModel.fromJson(doc.data()!, doc.id);
+          });
     });
 
 class InvoiceNotifier extends AsyncNotifier<void> {

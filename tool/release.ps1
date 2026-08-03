@@ -77,11 +77,11 @@ try {
     if (-not $g2) { $gateErrors += "Gate 2: allTransactionsProvider not found in auth_provider.dart" }
     else          { OK "Gate 2 — allTransactionsProvider in auth_provider.dart" }
 
-    # Gate 3 — No --split-per-abi in build command context
-    $g3 = Select-String "\-\-split-per-abi" (Join-Path $rootDir "README.md"), (Join-Path $rootDir "AGENTS.md"), (Join-Path $rootDir "CLAUDE.md") -ErrorAction SilentlyContinue |
-          Where-Object { $_.Line -match "flutter build" -and $_.Line -notmatch "^#" }
-    if ($g3) { $gateErrors += "Gate 3: --split-per-abi in build command docs" }
-    else     { OK "Gate 3 — No --split-per-abi in build commands" }
+    # Gate 3 — Build-command docs must be split-per-ABI for phone delivery
+    $g3 = Select-String "flutter build apk --release$|flutter build apk --release --dart-define=USE_PLAY_INTEGRITY=true" (Join-Path $rootDir "README.md"), (Join-Path $rootDir "AGENTS.md"), (Join-Path $rootDir "CLAUDE.md") -ErrorAction SilentlyContinue |
+          Where-Object { $_.Line -match "flutter build" -and $_.Line -notmatch "^#" -and $_.Line -notmatch "split-per-abi" }
+    if ($g3) { $gateErrors += "Gate 3: fat APK-only build command docs detected" }
+    else     { OK "Gate 3 — Split-per-ABI release build commands documented" }
 
     # Gate 4 — No direct Firestore writes from screens/widgets
     $g4 = Get-ChildItem (Join-Path $appDir "lib\screens"), (Join-Path $appDir "lib\widgets") -Recurse -Filter "*.dart" -ErrorAction SilentlyContinue |
@@ -144,15 +144,14 @@ try {
     }
 
     if (-not $WebOnly) {
-      # 4a. Fat APK (single file: arm32 + arm64 + x86_64)
-      # Always build the single fat APK per project rules.
-      Step "Building fat release APK"
-      DRY "flutter build apk --release --dart-define=USE_PLAY_INTEGRITY=true"
+      # 4a. Split-per-ABI APKs for phone delivery
+      Step "Building split-per-ABI release APKs"
+      DRY "flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true"
 
       if (-not $DryRun) {
         $apkDir = Join-Path $appDir "build\app\outputs\flutter-apk"
         $src = Join-Path $apkDir "app-release.apk"
-        if (-not (Test-Path $src)) { WARN "APK not found: $src" }
+        if (-not (Test-Path $src)) { WARN "Universal APK not found: $src" }
         else {
           $destName = "FootWear-V$($script:semver).apk"
           $dest = Join-Path $releasesDir $destName
@@ -235,17 +234,32 @@ try {
       $adbExe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
     }
     if ($DryRun) {
-      WARN "[DRY] adb install FootWear-V{semver}.apk"
+      WARN "[DRY] adb push app-arm64-v8a-release.apk /sdcard/Download/ && adb install -r /sdcard/Download/app-arm64-v8a-release.apk"
     } elseif (-not $adbExe) {
       WARN "adb not found -- skipping install (add platform-tools to PATH)"
     } elseif ($releaseApk -and (Test-Path $releaseApk)) {
       $devices = (& $adbExe devices 2>$null) | Select-String '^\w' | Where-Object { $_ -notmatch '^List' }
       if ($devices) {
-        & $adbExe install -r $releaseApk
-        if ($LASTEXITCODE -eq 0) {
-          OK "Installed $(Split-Path -Leaf $releaseApk) to device"
+        $arm64Apk = Join-Path $appDir "build\app\outputs\flutter-apk\app-arm64-v8a-release.apk"
+        if (Test-Path $arm64Apk) {
+          & $adbExe push $arm64Apk "/sdcard/Download/app-arm64-v8a-release.apk"
+          if ($LASTEXITCODE -eq 0) {
+            & $adbExe install -r "/sdcard/Download/app-arm64-v8a-release.apk"
+            if ($LASTEXITCODE -eq 0) {
+              OK "Installed app-arm64-v8a-release.apk to device"
+            } else {
+              WARN "adb install returned exit code $LASTEXITCODE -- check device connection"
+            }
+          } else {
+            WARN "adb push returned exit code $LASTEXITCODE -- check device connection"
+          }
         } else {
-          WARN "adb install returned exit code $LASTEXITCODE -- check device connection"
+          & $adbExe install -r $releaseApk
+          if ($LASTEXITCODE -eq 0) {
+            OK "Installed $(Split-Path -Leaf $releaseApk) to device"
+          } else {
+            WARN "adb install returned exit code $LASTEXITCODE -- check device connection"
+          }
         }
       } else {
         WARN "No Android device connected -- skipping adb install"

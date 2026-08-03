@@ -13,7 +13,7 @@ description: "Use when: creating or updating GitHub Actions workflows for Flutte
 
 | `.github/workflows/ci.yml` | push / PR | Analyse + test + 17 hygiene gates |
 
-| `.github/workflows/build-apk.yml` | workflow_dispatch | Debug + release fat APK |
+| `.github/workflows/build-apk.yml` | workflow_dispatch | Debug + release split-per-ABI APK set |
 
 | `.github/workflows/release.yml` | push tag `v*` | Full validate + build + deploy + GitHub Release |
 
@@ -67,10 +67,10 @@ if ! grep -q "allTransactionsProvider" app/lib/providers/auth_provider.dart; the
   exit 1
 fi
 
-# Gate 3: No split-per-abi
+# Gate 3: Release docs must match the split-per-ABI download flow
 
-if grep -rn "split-per-abi" .github/ app/ --include="*.{yml,yaml,sh}"; then
-  echo "FAIL: split-per-abi detected — use fat APK only"
+if grep -rn "fat APK only\|always fat\|single fat APK" .github/ app/ README.md AGENTS.md CLAUDE.md --include="*.{yml,yaml,md,sh}"; then
+  echo "FAIL: legacy fat-APK-only wording detected"
   exit 1
 fi
 

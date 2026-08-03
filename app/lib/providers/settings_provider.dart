@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/role_utils.dart';
 import '../models/settings_model.dart';
 import 'auth_provider.dart';
 
@@ -52,10 +53,8 @@ class SettingsNotifier extends AsyncNotifier<void> {
       throw StateError('Authenticated user profile not found');
     }
 
-    final role = (profileSnap.data()?['role'] as String? ?? '')
-        .trim()
-        .toLowerCase();
-    if (role != 'admin' && role != 'manager') {
+    final role = (profileSnap.data()?['role'] as String? ?? '').trim();
+    if (!isPrivilegedRoleName(role)) {
       throw StateError('Admin privileges required');
     }
   }

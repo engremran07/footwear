@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/role_utils.dart';
+import '../core/utils/tenant_scope.dart';
 import '../models/route_model.dart';
 import 'auth_provider.dart';
 
@@ -13,9 +15,15 @@ final routesProvider = StreamProvider.autoDispose<List<RouteModel>>((ref) {
   final isAdmin = ref.watch(
     authUserProvider.select((s) => s.value?.isAdmin ?? false),
   );
+  final tenantId = ref.watch(
+    authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
+  );
   if (!isAdmin) return const Stream.empty();
-  return FirebaseFirestore.instance
-      .collection(Collections.routes)
+  final query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.routes),
+    tenantId: tenantId,
+  );
+  return query
       .where('active', isEqualTo: true)
       .orderBy('route_number')
       .limit(200)
@@ -37,16 +45,22 @@ final routeDetailProvider = StreamProvider.autoDispose
           return (u.isAdmin, u.isSeller, u.id);
         }),
       );
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
       if (!isAdmin && !isSeller) return const Stream.empty();
       if (isAdmin) {
         return FirebaseFirestore.instance
             .collection(Collections.routes)
             .doc(id)
             .snapshots()
-            .map(
-              (doc) =>
-                  doc.exists ? RouteModel.fromJson(doc.data()!, doc.id) : null,
-            );
+            .map((doc) {
+              if (!doc.exists) return null;
+              if (!TenantScope.matchesTenant(doc.data(), tenantId)) return null;
+              return RouteModel.fromJson(doc.data()!, doc.id);
+            });
       }
       if (!isSeller || userId.isEmpty) return const Stream.empty();
       // Multi-seller: read doc by ID, verify membership client-side.
@@ -56,6 +70,7 @@ final routeDetailProvider = StreamProvider.autoDispose
           .snapshots()
           .map((doc) {
             if (!doc.exists) return null;
+            if (!TenantScope.matchesTenant(doc.data(), tenantId)) return null;
             final route = RouteModel.fromJson(doc.data()!, doc.id);
             // Check both new array and legacy scalar for un-migrated docs.
             if (route.assignedSellerIds.contains(userId)) return route;
@@ -86,8 +101,16 @@ final routesBySellerProvider = StreamProvider.autoDispose
         authUserProvider.select((s) => s.value != null),
       );
       if (!isAuthReady) return const Stream.empty();
-      return FirebaseFirestore.instance
-          .collection(Collections.routes)
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.routes),
+        tenantId: tenantId,
+      );
+      return query
           .where('assigned_seller_ids', arrayContains: sellerId)
           .where('active', isEqualTo: true)
           .orderBy('route_number')
@@ -112,8 +135,8 @@ class RouteNotifier extends AsyncNotifier<void> {
 
     final db = FirebaseFirestore.instance;
     final me = await db.collection(Collections.users).doc(authUser.uid).get();
-    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
-    if (role != 'admin' && role != 'manager') return;
+    final role = (me.data()?['role'] as String? ?? '').trim();
+    if (!isPrivilegedRoleName(role)) return;
 
     final routesSnap = await db
         .collection(Collections.routes)
@@ -303,8 +326,8 @@ class RouteNotifier extends AsyncNotifier<void> {
     }
     final db = FirebaseFirestore.instance;
     final me = await db.collection(Collections.users).doc(authUser.uid).get();
-    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
-    if (role != 'admin' && role != 'manager') {
+    final role = (me.data()?['role'] as String? ?? '').trim();
+    if (!isPrivilegedRoleName(role)) {
       throw StateError('Only admin can delete routes');
     }
 

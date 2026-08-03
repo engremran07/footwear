@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/collections.dart';
+import '../core/utils/tenant_scope.dart';
 import '../models/transaction_model.dart';
 import 'auth_provider.dart';
 
@@ -39,8 +40,14 @@ final recentTransactionsProvider =
         DateTime.now().subtract(const Duration(days: _kHistoryDays)),
       );
 
-      final collection = FirebaseFirestore.instance.collection(
-        Collections.transactions,
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final collection = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.transactions),
+        tenantId: tenantId,
       );
 
       if (isAdmin) {

@@ -104,13 +104,13 @@ jobs:
         if: github.event.inputs.build_type == 'debug'
         run: cd app && flutter build apk --debug
 
-      - name: Build release APK (fat)
+      - name: Build release APK (split-per-abi)
         if: github.event.inputs.build_type == 'release'
-        run: cd app && flutter build apk --release --dart-define=USE_PLAY_INTEGRITY=true
+        run: cd app && flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: apk-${{ github.event.inputs.build_type }}-${{ github.sha }}
-          path: app/build/app/outputs/flutter-apk/app-${{ github.event.inputs.build_type }}.apk
+          path: app/build/app/outputs/flutter-apk/*.apk
           retention-days: 14

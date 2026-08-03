@@ -113,7 +113,7 @@ Always use client-side:
 
 ### 7. Build Hygiene
 
-- Always fat APK: `flutter build apk --release` — NEVER `--split-per-abi`
+- Android release artifact path is split-per-ABI: `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true`
 
 - `app/pubspec.yaml` version == `AppBrand.appVersion + '+' + AppBrand.buildNumber`
 
@@ -176,7 +176,7 @@ before starting new work and complete all missing steps first.
 [ ] Deleted-field filter is client-side !=true
 [ ] Every where(A)+orderBy(B) query has composite index
 [ ] Admin-as-seller paths: sellerId/sellerName always populated in invoice submit
-[ ] Fat APK build command in all scripts/docs
+[ ] Split-per-ABI build command in all release scripts/docs
 [ ] version bumped in pubspec.yaml AND app_brand.dart
 [ ] Every transaction/invoice write also updates shop.balance atomically in same batch
 [ ] No screen/widget writes directly to transactions, invoices, or shop.balance
@@ -258,7 +258,7 @@ final names = NameResolver(
 
 | Entry By blank for old/historical tx | Seller deactivated after tx; `where('active',isEqualTo:true)` excluded them | `allUsersExportProvider` has no active filter — covers all historical users |
 
-| Fat APK not installed, wrong ABI file | build used `--split-per-abi` | Always `flutter build apk --release` |
+| Split-per-ABI APK not installed, wrong ABI file | build used the wrong artifact or install path | Use `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true` then `adb push` / `adb install -r` |
 
 | Stale balance after dev flush | transactions deleted via console/CLI without updating shop.balance | Run `node dev_reset.js` from repo root after any manual flush |
 
@@ -322,11 +322,11 @@ grep -rn "FirebaseFirestore\|\.doc(\|\.collection(" app/lib/screens/
 
 # Expected: zero matches
 
-# 5. Fat APK only
+# 5. Split-per-ABI release contract
 
-grep -rn "flutter build apk" . --include="*.{yml,yaml,md,sh}"
+grep -rn "flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true" . --include="*.{yml,yaml,md,sh}"
 
-# Expected: all lines use --release, none use --split-per-abi
+# Expected: release docs use the split-per-abi command and phone-storage install flow
 
 ```
 

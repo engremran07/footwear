@@ -4,6 +4,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../core/services/admin_identity_service.dart';
+import '../core/utils/role_utils.dart';
+import '../core/utils/tenant_scope.dart';
 import '../firebase_options.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
@@ -15,9 +17,15 @@ final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
   final isAdmin = ref.watch(
     authUserProvider.select((s) => s.value?.isAdmin ?? false),
   );
+  final tenantId = ref.watch(
+    authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
+  );
   if (!isAdmin) return const Stream.empty();
-  return FirebaseFirestore.instance
-      .collection(Collections.users)
+  final query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.users),
+    tenantId: tenantId,
+  );
+  return query
       .where('active', isEqualTo: true)
       .orderBy('display_name')
       .limit(100)
@@ -41,10 +49,12 @@ final allUsersExportProvider = FutureProvider<List<UserModel>>((ref) async {
   // potentially-null .value while the StreamProvider is still loading.
   final user = await ref.read(authUserProvider.future);
   if (user == null || !user.isAdmin) return const <UserModel>[];
-  final snap = await FirebaseFirestore.instance
-      .collection(Collections.users)
-      .limit(200) // higher than UI limit; covers large teams
-      .get();
+  final tenantId = TenantScope.normalize(user.tenantId);
+  final query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.users),
+    tenantId: tenantId,
+  );
+  final snap = await query.limit(200).get();
   return snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList();
 });
 
@@ -54,9 +64,15 @@ final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
   final isAdmin = ref.watch(
     authUserProvider.select((s) => s.value?.isAdmin ?? false),
   );
+  final tenantId = ref.watch(
+    authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
+  );
   if (!isAdmin) return const Stream.empty();
-  return FirebaseFirestore.instance
-      .collection(Collections.users)
+  final query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.users),
+    tenantId: tenantId,
+  );
+  return query
       .where('role', isEqualTo: 'seller')
       .where('active', isEqualTo: true)
       .limit(100)
@@ -75,9 +91,15 @@ final inactiveUsersProvider = StreamProvider.autoDispose<List<UserModel>>((
   final isAdmin = ref.watch(
     authUserProvider.select((s) => s.value?.isAdmin ?? false),
   );
+  final tenantId = ref.watch(
+    authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
+  );
   if (!isAdmin) return const Stream.empty();
-  return FirebaseFirestore.instance
-      .collection(Collections.users)
+  final query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.users),
+    tenantId: tenantId,
+  );
+  return query
       .where('active', isEqualTo: false)
       .orderBy('updated_at', descending: true)
       .limit(200)
@@ -93,10 +115,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
   Future<void> build() async {}
 
   String _normalizeRole(String role) {
-    final normalized = role.trim().toLowerCase();
-    if (normalized == 'manager') return 'admin';
-    if (normalized == 'admin') return 'admin';
-    return 'seller';
+    return normalizeRoleName(role);
   }
 
   Future<bool> _isCurrentUserAdmin() async {
@@ -113,9 +132,8 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     if (!profileSnap.exists) return false;
 
     final role = (profileSnap.data()?['role'] as String? ?? '')
-        .trim()
-        .toLowerCase();
-    return role == 'admin' || role == 'manager';
+        .trim();
+    return isPrivilegedRoleName(role);
   }
 
   Future<String> _requireAdminUid() async {
@@ -159,6 +177,11 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         );
       }
 
+      final tenantId = TenantScope.normalize(
+            ref.read(authUserProvider).value?.tenantId,
+          ) ??
+          'default-tenant';
+
       // Use a secondary FirebaseApp so the admin stays signed in
       FirebaseApp? tempApp;
       try {
@@ -191,6 +214,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'email': trimmedEmail,
           'display_name': trimmedName,
           'role': normalizedRole,
+          'tenant_id': tenantId,
           'assigned_route_ids': normalizedRole == 'seller'
               ? assignedRouteIds
               : [],

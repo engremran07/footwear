@@ -1364,6 +1364,14 @@ class _RoleBadge extends ConsumerWidget {
     final (label, color) = switch (role) {
       UserRole.admin => (tr('role_admin', ref), AppBrand.adminRoleColor),
       UserRole.seller => (tr('role_seller', ref), AppBrand.sellerRoleColor),
+      UserRole.tenantAdmin => (
+        tr('role_tenant_admin', ref),
+        AppBrand.adminRoleColor,
+      ),
+      UserRole.superAdmin => (
+        tr('role_super_admin', ref),
+        AppBrand.adminRoleColor,
+      ),
     };
     return Container(
       padding: EdgeInsets.symmetric(

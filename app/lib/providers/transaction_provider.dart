@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/tenant_scope.dart';
 import '../models/transaction_model.dart';
 import 'auth_provider.dart';
 
@@ -48,9 +49,16 @@ final shopTransactionsProvider = StreamProvider.autoDispose
       if (normalizedShopId.isEmpty) {
         return Stream.value(const <TransactionModel>[]);
       }
-      // shop_id is the sole identifier. Query by shop_id only.
-      return FirebaseFirestore.instance
-          .collection(Collections.transactions)
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.transactions),
+        tenantId: tenantId,
+      );
+      return query
           .where('shop_id', isEqualTo: normalizedShopId)
           .orderBy('created_at', descending: true)
           .limit(_shopTransactionsLiveLimit)
@@ -70,9 +78,17 @@ final allTransactionsProvider =
       final isAdmin = ref.watch(
         authUserProvider.select((s) => s.value?.isAdmin ?? false),
       );
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
       if (!isAdmin) return const Stream.empty();
-      return FirebaseFirestore.instance
-          .collection(Collections.transactions)
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.transactions),
+        tenantId: tenantId,
+      );
+      return query
           .orderBy('created_at', descending: true)
           .limit(200)
           .snapshots()
@@ -110,8 +126,14 @@ final shopsAnalyticsTransactionsProvider =
         return Stream.value(const <TransactionModel>[]);
       }
 
-      final collection = FirebaseFirestore.instance.collection(
-        Collections.transactions,
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final collection = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.transactions),
+        tenantId: tenantId,
       );
 
       if (isAdmin) {
@@ -150,8 +172,16 @@ final pendingEditRequestsProvider =
       if (!isAdmin) {
         return Stream.value(const <TransactionModel>[]);
       }
-      return FirebaseFirestore.instance
-          .collection(Collections.transactions)
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.transactions),
+        tenantId: tenantId,
+      );
+      return query
           .where('edit_request_pending', isEqualTo: true)
           .orderBy('created_at', descending: true)
           .limit(50)
@@ -167,8 +197,16 @@ final pendingEditRequestsProvider =
 /// Seller-scoped: transactions created by this seller.
 final sellerTransactionsProvider = StreamProvider.autoDispose
     .family<List<TransactionModel>, String>((ref, sellerId) {
-      return FirebaseFirestore.instance
-          .collection(Collections.transactions)
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.transactions),
+        tenantId: tenantId,
+      );
+      return query
           .where('created_by', isEqualTo: sellerId)
           .orderBy('created_at', descending: true)
           .limit(200)
@@ -190,8 +228,14 @@ final shopTransactionsExportProvider =
       final normalizedShopId = shopId.trim();
       if (normalizedShopId.isEmpty) return const <TransactionModel>[];
 
-      final snap = await FirebaseFirestore.instance
-          .collection(Collections.transactions)
+      final tenantId = await ref
+          .read(authUserProvider.future)
+          .then((user) => TenantScope.normalize(user?.tenantId));
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.transactions),
+        tenantId: tenantId,
+      );
+      final snap = await query
           .where('shop_id', isEqualTo: normalizedShopId)
           .orderBy('created_at', descending: true)
           .limit(_kExportQueryLimit)
@@ -222,8 +266,12 @@ final routeTransactionsExportProvider =
           return const <TransactionModel>[];
         }
       }
-      final snap = await FirebaseFirestore.instance
-          .collection(Collections.transactions)
+      final tenantId = TenantScope.normalize(user.tenantId);
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.transactions),
+        tenantId: tenantId,
+      );
+      final snap = await query
           .where('route_id', isEqualTo: normalizedId)
           .orderBy('created_at', descending: true)
           .limit(_kExportQueryLimit)
@@ -244,8 +292,12 @@ final allTransactionsExportProvider = FutureProvider<List<TransactionModel>>((
   // potentially-null .value while the StreamProvider is still loading.
   final user = await ref.read(authUserProvider.future);
   if (user == null || !user.isAdmin) return const <TransactionModel>[];
-  final snap = await FirebaseFirestore.instance
-      .collection(Collections.transactions)
+  final tenantId = TenantScope.normalize(user.tenantId);
+  final query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.transactions),
+    tenantId: tenantId,
+  );
+  final snap = await query
       .orderBy('created_at', descending: true)
       .limit(_kExportQueryLimit)
       .get();
@@ -269,8 +321,12 @@ final sellerTransactionsExportProvider =
       if (normalizedId.isEmpty) return const <TransactionModel>[];
       final user = await ref.read(authUserProvider.future);
       if (user == null || !user.isAdmin) return const <TransactionModel>[];
-      final snap = await FirebaseFirestore.instance
-          .collection(Collections.transactions)
+      final tenantId = TenantScope.normalize(user.tenantId);
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.transactions),
+        tenantId: tenantId,
+      );
+      final snap = await query
           .where('created_by', isEqualTo: normalizedId)
           .orderBy('created_at', descending: true)
           .limit(_kExportQueryLimit)

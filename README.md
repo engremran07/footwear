@@ -39,7 +39,7 @@ English, Arabic (RTL), Urdu (RTL) — 372+ translation keys synced across all sc
 
 | Layer | Technology |
 | --- | --- |
-| Mobile + Web | Flutter 3.41.6 — Android fat APK + Firebase Hosting web |
+| Mobile + Web | Flutter 3.41.6 — Android split-per-ABI APKs + Firebase Hosting web |
 | Dart SDK | >=3.11.0 |
 | State management | flutter_riverpod 3.3.1 (`NotifierProvider`, `AsyncNotifierProvider`, `StreamProvider`) |
 | Navigation | go_router 17.2.0 with role-based redirect guards |
@@ -100,12 +100,23 @@ cd app
 flutter run
 ```
 
-### Build release APK (fat — always fat, never split-per-abi)
+### Build release APK (split-per-ABI for phone delivery)
 
 ```bash
 cd app
-flutter build apk --release
-# Output: app/build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
+# Output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+#         build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+#         build/app/outputs/flutter-apk/app-x86_64-release.apk
+#         build/app/outputs/flutter-apk/app-release.apk
+```
+
+### Install the release APK to a connected phone
+
+```bash
+cd app
+adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/
+adb install -r /sdcard/Download/app-arm64-v8a-release.apk
 ```
 
 ### Build web
@@ -117,8 +128,8 @@ firebase deploy --only hosting
 ```
 
 Canonical release order: sync or bump the version first, then build web,
-deploy Hosting, build the fat APK, deploy Firestore rules/indexes, review the
-local git delta, and only then commit/push.
+deploy Hosting, build the split-per-ABI Android APK set, deploy Firestore
+rules/indexes, review the local git delta, and only then commit/push.
 
 ---
 
@@ -209,11 +220,11 @@ grep -rn "StateProvider\b" app/lib/ --include="*.dart"
 4. `flutter test -r expanded` → quote pass count.
 5. `flutter build web --release` → confirm `EXIT: $LASTEXITCODE` = 0.
 6. `firebase deploy --only hosting` after the web build.
-7. `flutter build apk --release` → quote APK file size.
+7. `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true` → quote the generated ABI APK path(s) and size(s).
 8. `firebase deploy --only firestore:rules,firestore:indexes` on every signoff, before commit/push is considered complete.
 9. `git log --oneline -5`, `git status --short`, and `git diff --stat HEAD` → confirm only expected local changes remain.
 10. `git add -A`, `git commit -m "type: summary — vX.Y.Z+N"`, and `git push` → quote commit hash and push output.
-11. `adb install -r app-release.apk` to install to a connected device when Android delivery is part of the request.
+11. `adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/` followed by `adb install -r /sdcard/Download/app-arm64-v8a-release.apk` to install the phone-delivery APK to a connected device when Android delivery is part of the request.
 
 ---
 

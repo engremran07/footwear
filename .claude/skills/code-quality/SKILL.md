@@ -24,7 +24,7 @@ and a recognizable catalog of vibe-coded debt signals.
 
 | `ref.read(provider)` inside `build()` | Stale data guarantee | `ref.watch(provider)` |
 
-| `flutter build apk --release --split-per-abi` | Wrong APK split | `flutter build apk --release` (fat APK) |
+| `flutter build apk --release --split-per-abi` | Correct Android release artifact path | `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true` |
 
 | Hardcoded `Colors.red`, `Colors.white` | Theme breakage in dark mode | `AppBrand.errorFg`, `AppBrand.errorBg`, etc. |
 

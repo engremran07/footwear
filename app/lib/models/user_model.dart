@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum UserRole { admin, seller }
+enum UserRole { admin, seller, tenantAdmin, superAdmin }
 
 UserRole _roleFromString(String s) {
   final role = s.trim().toLowerCase();
@@ -8,6 +8,12 @@ UserRole _roleFromString(String s) {
     case 'admin':
     case 'manager':
       return UserRole.admin;
+    case 'tenant_admin':
+    case 'tenant-admin':
+      return UserRole.tenantAdmin;
+    case 'super_admin':
+    case 'super-admin':
+      return UserRole.superAdmin;
     default:
       return UserRole.seller;
   }
@@ -19,6 +25,10 @@ String _roleToString(UserRole r) {
       return 'admin';
     case UserRole.seller:
       return 'seller';
+    case UserRole.tenantAdmin:
+      return 'tenant_admin';
+    case UserRole.superAdmin:
+      return 'super_admin';
   }
 }
 
@@ -28,6 +38,10 @@ class UserModel {
   final String displayName;
   final UserRole role;
   final String? phone;
+  final String? tenantId;
+  final bool devicePairingEnabled;
+  final String? devicePairingId;
+  final String? devicePairingResetBy;
 
   /// Multi-route assignment (many-to-many). Each seller can serve multiple routes.
   final List<String> assignedRouteIds;
@@ -44,6 +58,10 @@ class UserModel {
     required this.displayName,
     required this.role,
     this.phone,
+    this.tenantId,
+    this.devicePairingEnabled = false,
+    this.devicePairingId,
+    this.devicePairingResetBy,
     this.assignedRouteIds = const [],
     this.assignedRouteNames = const [],
     required this.active,
@@ -52,8 +70,13 @@ class UserModel {
     required this.updatedAt,
   });
 
-  bool get isAdmin => role == UserRole.admin;
+  bool get isAdmin =>
+      role == UserRole.admin ||
+      role == UserRole.tenantAdmin ||
+      role == UserRole.superAdmin;
   bool get isSeller => role == UserRole.seller;
+  bool get isTenantAdmin => role == UserRole.tenantAdmin;
+  bool get isSuperAdmin => role == UserRole.superAdmin;
 
   /// True for any user who can carry vehicle (seller) inventory.
   /// Admin is warehouse owner + field seller simultaneously — no assigned_route_id,
@@ -67,7 +90,8 @@ class UserModel {
     final rawRouteNames = json['assigned_route_names'] as List<dynamic>?;
 
     final routeIds = rawRouteIds?.cast<String>().toList() ?? const <String>[];
-    final routeNames = rawRouteNames?.cast<String>().toList() ?? const <String>[];
+    final routeNames =
+        rawRouteNames?.cast<String>().toList() ?? const <String>[];
 
     return UserModel(
       id: docId,
@@ -75,6 +99,10 @@ class UserModel {
       displayName: json['display_name'] as String? ?? '',
       role: _roleFromString(json['role'] as String? ?? 'seller'),
       phone: json['phone'] as String?,
+      tenantId: json['tenant_id'] as String?,
+      devicePairingEnabled: json['device_pairing_enabled'] as bool? ?? false,
+      devicePairingId: json['device_pairing_id'] as String?,
+      devicePairingResetBy: json['device_pairing_reset_by'] as String?,
       assignedRouteIds: routeIds,
       assignedRouteNames: routeNames,
       active: json['active'] as bool? ?? true,
@@ -89,6 +117,10 @@ class UserModel {
     'display_name': displayName,
     'role': _roleToString(role),
     'phone': phone,
+    'tenant_id': tenantId,
+    'device_pairing_enabled': devicePairingEnabled,
+    'device_pairing_id': devicePairingId,
+    'device_pairing_reset_by': devicePairingResetBy,
     'assigned_route_ids': assignedRouteIds,
     'assigned_route_names': assignedRouteNames,
     'active': active,
@@ -103,6 +135,10 @@ class UserModel {
     String? displayName,
     UserRole? role,
     String? phone,
+    String? tenantId,
+    bool? devicePairingEnabled,
+    String? devicePairingId,
+    String? devicePairingResetBy,
     List<String>? assignedRouteIds,
     List<String>? assignedRouteNames,
     bool? active,
@@ -116,6 +152,10 @@ class UserModel {
       displayName: displayName ?? this.displayName,
       role: role ?? this.role,
       phone: phone ?? this.phone,
+      tenantId: tenantId ?? this.tenantId,
+      devicePairingEnabled: devicePairingEnabled ?? this.devicePairingEnabled,
+      devicePairingId: devicePairingId ?? this.devicePairingId,
+      devicePairingResetBy: devicePairingResetBy ?? this.devicePairingResetBy,
       assignedRouteIds: assignedRouteIds ?? this.assignedRouteIds,
       assignedRouteNames: assignedRouteNames ?? this.assignedRouteNames,
       active: active ?? this.active,

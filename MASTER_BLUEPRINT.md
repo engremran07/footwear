@@ -11,7 +11,7 @@
 ShoesERP is a route/seller distribution ERP for a footwear distribution business operating in Saudi Arabia. It manages inventory, routes, shop (customer) management, invoicing, cash collection, and financial reporting.
 
 **Tier:** Firebase Spark (free). No Cloud Functions, no Firebase Storage.  
-**Platforms:** Android (fat APK) + Web (Firebase Hosting)  
+**Platforms:** Android (split-per-ABI APK set) + Web (Firebase Hosting)
 **State management:** Riverpod 3.x (`NotifierProvider`, `AsyncNotifier`, `StreamProvider.autoDispose`)  
 **Navigation:** GoRouter (21 routes, auth guard)  
 **Auth:** Firebase Auth (email+password) + secondary FirebaseApp for safe user creation
@@ -139,7 +139,7 @@ Defined in `app/lib/core/router/app_router.dart`. Auth guard redirects unauthent
 | File | Trigger | Key steps |
 |------|---------|-----------|
 | `.github/workflows/ci.yml` | push/PR to main | analyse (3.29.2) → test --coverage → hygiene (13 gates) |
-| `.github/workflows/build-apk.yml` | workflow_dispatch | fat APK build + monotonic versionCode check |
+| `.github/workflows/build-apk.yml` | workflow_dispatch | split-per-ABI APK build + monotonic versionCode check |
 | `.github/workflows/deploy-web.yml` | push to main | analyze → test → build web → Firebase Hosting deploy |
 | `.github/workflows/release.yml` | tag push / workflow_dispatch | validate → build APK + web → deploy → GitHub Release |
 

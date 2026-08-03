@@ -33,6 +33,7 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 6. Dashboard and inventory must not surface transient permission-denied or unauthenticated states during startup; keep role-scoped UI in loading, empty, or cached fallback until auth/profile streams settle.
 7. Any where+orderBy query requires index entry when fields differ.
 8. Keep role handling canonical and normalized (trim/lowercase in app writes).
+   Tenant-aware roles (tenant_admin, super_admin) must be treated as privileged roles and must carry a tenant_id in new documents and in the user profile.
 9. Keep admin-only write enforcement in submit methods (screen-level defense in depth).
 10. Validate required identity fields (for example created_by/route_id/shop_id) before provider writes.
 11. No Firebase Storage — company logos stored as base64 in Firestore, product images use external HTTP URLs. Do not add firebase_storage dependency.
@@ -44,7 +45,8 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
     (dual-write for backward compatibility with pre-unification documents).
 15. Stock tracking and selling unit is DOZENS (1 dozen = 12 pairs). quantity_available
     in Firestore stores PAIRS for legacy compat. UI always shows and accepts dozens as
-    primary, with optional extra pairs (0–11). Always fat APK: flutter build apk --release.
+    primary, with optional extra pairs (0–11). Android release artifact path is
+    split-per-ABI: flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true.
 16. Admin has no assigned_route_id — admin is the warehouse AND a field seller.
     Admin can own seller_inventory docs (seller_id = adminUid). isAdmin() in Firestore
     rules covers all admin operations including self-stock-allocation.
@@ -223,7 +225,7 @@ Never keep ambiguity-driven workaround code without explicit justification.
 | `if (user.isSeller && ...)` on stock source | Admin silently excluded | `sellerInventoryProvider(user.id)` for all |
 | `.where('deleted', isEqualTo: false)` | Pre-DI-01 docs excluded | Client-side `d.data()['deleted'] != true` |
 | `ref.read(provider)` in `build()` | Stale data guarantee | `ref.watch(provider)` |
-| ABI-split APK build command | Wrong split APK | `flutter build apk --release` (fat) |
+| ABI-split APK build command | Wrong split APK | `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true` |
 | Hardcoded `Colors.red`, `Colors.white` | Dark mode breakage | `AppBrand.errorFg`, `AppBrand.errorBg` |
 | Raw `SnackBar(content: Text(...))` | Unstyled SnackBar | `errorSnackBar()` / `successSnackBar()` |
 | `avoid_double_and_int_checks lint violation` in web build | Transitive dep locked to old `image`/`archive` by another pkg | Find blocking package; replace or upgrade it — see Chain 5 |

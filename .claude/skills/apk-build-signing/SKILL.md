@@ -41,12 +41,15 @@ grep -E "^version:|appVersion|buildNumber" pubspec.yaml lib/core/constants/app_b
 flutter build web --release
 firebase deploy --only hosting
 
-# Fat APK — single universal file, direct sideload to any device.
+# Split-per-ABI APK set — canonical phone-delivery artifact set.
 
-flutter build apk --release
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
 
-# Output location:
+# Output locations:
 
+# build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+# build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+# build/app/outputs/flutter-apk/app-x86_64-release.apk
 # build/app/outputs/flutter-apk/app-release.apk
 
 # Firestore rules/indexes complete the release before commit/push.
@@ -54,13 +57,10 @@ flutter build apk --release
 cd ..
 firebase deploy --only firestore:rules,firestore:indexes
 
-# ── NEVER use --split-per-abi — project standard is fat APK only ──────────
+# Install the phone-delivery artifact to a connected device.
 
-# (split-per-abi is for Play Store; this app is sideloaded)
-
-# App Bundle (Play Store only — NOT the standard for this project)
-
-# flutter build appbundle --release
+adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/
+adb install -r /sdcard/Download/app-arm64-v8a-release.apk
 
 ```
 

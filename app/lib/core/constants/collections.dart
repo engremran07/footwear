@@ -26,6 +26,7 @@ class Collections {
   static const transactions = 'transactions';
   static const invoices = 'invoices';
   static const settings = 'settings';
+  static const tenants = 'tenants';
 
   /// Admin-only collection — stores SA credentials for admin auth pipeline.
   static const adminConfig = 'admin_config';

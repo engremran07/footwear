@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/role_utils.dart';
+import '../core/utils/tenant_scope.dart';
 import '../models/shop_model.dart';
 import 'auth_provider.dart';
 
@@ -34,9 +36,15 @@ final shopsProvider = StreamProvider.autoDispose<List<ShopModel>>((ref) {
   final isAdmin = ref.watch(
     authUserProvider.select((s) => s.value?.isAdmin ?? false),
   );
+  final tenantId = ref.watch(
+    authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
+  );
   if (!isAdmin) return const Stream.empty();
-  return FirebaseFirestore.instance
-      .collection(Collections.customers)
+  final query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.customers),
+    tenantId: tenantId,
+  );
+  return query
       .where('active', isEqualTo: true)
       .orderBy('name')
       .limit(500)
@@ -49,8 +57,16 @@ final shopsProvider = StreamProvider.autoDispose<List<ShopModel>>((ref) {
 
 final shopsByRouteProvider = StreamProvider.autoDispose
     .family<List<ShopModel>, String>((ref, routeId) {
-      return FirebaseFirestore.instance
-          .collection(Collections.customers)
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.customers),
+        tenantId: tenantId,
+      );
+      return query
           .where('route_id', isEqualTo: routeId)
           .where('active', isEqualTo: true)
           .orderBy('name')
@@ -72,6 +88,9 @@ final sellerAllShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
   // List<String> uses reference equality — new object every Firestore snapshot
   // would always be "changed", restarting the stream and causing shimmer.
   ref.keepAlive();
+  final tenantId = ref.watch(
+    authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
+  );
   final routeKey = ref.watch(
     authUserProvider.select((s) {
       final u = s.value;
@@ -83,8 +102,11 @@ final sellerAllShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
   if (routeKey.isEmpty) return const Stream.empty();
   final routeIds = routeKey.split(',');
   // Firestore whereIn supports up to 30 values — ample for route count.
-  return FirebaseFirestore.instance
-      .collection(Collections.customers)
+  final query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.customers),
+    tenantId: tenantId,
+  );
+  return query
       .where('route_id', whereIn: routeIds)
       .where('active', isEqualTo: true)
       .orderBy('name')
@@ -111,6 +133,9 @@ final shopDetailProvider = StreamProvider.autoDispose.family<ShopModel?, String>
         return (false, true, sorted.join(','));
       }),
     );
+    final tenantId = ref.watch(
+      authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
+    );
     final routeIds = routeKey.isEmpty ? <String>[] : routeKey.split(',');
     if (!isAdmin && !isSeller) return const Stream.empty();
     if (isAdmin) {
@@ -118,10 +143,11 @@ final shopDetailProvider = StreamProvider.autoDispose.family<ShopModel?, String>
           .collection(Collections.customers)
           .doc(id)
           .snapshots()
-          .map(
-            (doc) =>
-                doc.exists ? ShopModel.fromJson(doc.data()!, doc.id) : null,
-          );
+          .map((doc) {
+            if (!doc.exists) return null;
+            if (!TenantScope.matchesTenant(doc.data(), tenantId)) return null;
+            return ShopModel.fromJson(doc.data()!, doc.id);
+          });
     }
     if (!isSeller || routeIds.isEmpty) {
       return const Stream.empty();
@@ -135,6 +161,7 @@ final shopDetailProvider = StreamProvider.autoDispose.family<ShopModel?, String>
         .snapshots()
         .map((doc) {
           if (!doc.exists) return null;
+          if (!TenantScope.matchesTenant(doc.data(), tenantId)) return null;
           final shop = ShopModel.fromJson(doc.data()!, doc.id);
           // Client-side guard: hide shops outside the seller's assigned routes.
           if (!routeIds.contains(shop.routeId)) return null;
@@ -150,9 +177,15 @@ final outstandingShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
   final isAdmin = ref.watch(
     authUserProvider.select((s) => s.value?.isAdmin ?? false),
   );
+  final tenantId = ref.watch(
+    authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
+  );
   if (!isAdmin) return const Stream.empty();
-  return FirebaseFirestore.instance
-      .collection(Collections.customers)
+  final query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.customers),
+    tenantId: tenantId,
+  );
+  return query
       .where('active', isEqualTo: true)
       .where('balance', isGreaterThan: 0)
       .orderBy('balance', descending: true)
@@ -166,8 +199,16 @@ final outstandingShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
 
 final outstandingShopsByRouteProvider = StreamProvider.autoDispose
     .family<List<ShopModel>, String>((ref, routeId) {
-      return FirebaseFirestore.instance
-          .collection(Collections.customers)
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.customers),
+        tenantId: tenantId,
+      );
+      return query
           .where('route_id', isEqualTo: routeId)
           .where('active', isEqualTo: true)
           .where('balance', isGreaterThan: 0)
@@ -251,8 +292,8 @@ class ShopNotifier extends AsyncNotifier<void> {
         .collection(Collections.users)
         .doc(authUser.uid)
         .get();
-    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
-    if (role != 'admin' && role != 'manager') {
+    final role = (me.data()?['role'] as String? ?? '').trim();
+    if (!isPrivilegedRoleName(role)) {
       throw StateError('Only admin can mark bad debt');
     }
 
@@ -304,8 +345,8 @@ class ShopNotifier extends AsyncNotifier<void> {
         .collection(Collections.users)
         .doc(authUser.uid)
         .get();
-    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
-    if (role != 'admin' && role != 'manager') {
+    final role = (me.data()?['role'] as String? ?? '').trim();
+    if (!isPrivilegedRoleName(role)) {
       throw StateError('Only admin can recover bad debt');
     }
 
@@ -360,8 +401,8 @@ class ShopNotifier extends AsyncNotifier<void> {
         .collection(Collections.users)
         .doc(authUser.uid)
         .get();
-    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
-    if (role != 'admin' && role != 'manager') {
+    final role = (me.data()?['role'] as String? ?? '').trim();
+    if (!isPrivilegedRoleName(role)) {
       throw StateError('Only admin can delete shops');
     }
 

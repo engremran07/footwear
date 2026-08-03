@@ -2,12 +2,21 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/role_utils.dart';
+import '../core/utils/tenant_scope.dart';
 import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
+import 'auth_provider.dart';
 
 final productsProvider = StreamProvider.autoDispose<List<ProductModel>>((ref) {
-  return FirebaseFirestore.instance
-      .collection(Collections.products)
+  final tenantId = ref.watch(
+    authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
+  );
+  final query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.products),
+    tenantId: tenantId,
+  );
+  return query
       .where('active', isEqualTo: true)
       .orderBy('name')
       .limit(200)
@@ -21,20 +30,34 @@ final productsProvider = StreamProvider.autoDispose<List<ProductModel>>((ref) {
 
 final productDetailProvider = StreamProvider.autoDispose
     .family<ProductModel?, String>((ref, id) {
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
       return FirebaseFirestore.instance
           .collection(Collections.products)
           .doc(id)
           .snapshots()
-          .map(
-            (doc) =>
-                doc.exists ? ProductModel.fromJson(doc.data()!, doc.id) : null,
-          );
+          .map((doc) {
+            if (!doc.exists) return null;
+            if (!TenantScope.matchesTenant(doc.data(), tenantId)) return null;
+            return ProductModel.fromJson(doc.data()!, doc.id);
+          });
     });
 
 final productVariantsProvider = StreamProvider.autoDispose
     .family<List<ProductVariantModel>, String>((ref, productId) {
-      return FirebaseFirestore.instance
-          .collection(Collections.productVariants)
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.productVariants),
+        tenantId: tenantId,
+      );
+      return query
           .where('product_id', isEqualTo: productId)
           .where('active', isEqualTo: true)
           .orderBy('variant_name')
@@ -49,8 +72,16 @@ final productVariantsProvider = StreamProvider.autoDispose
 
 final allVariantsProvider =
     StreamProvider.autoDispose<List<ProductVariantModel>>((ref) {
-      return FirebaseFirestore.instance
-          .collection(Collections.productVariants)
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.productVariants),
+        tenantId: tenantId,
+      );
+      return query
           .where('active', isEqualTo: true)
           .orderBy('variant_name')
           .limit(500)
@@ -73,8 +104,8 @@ class ProductNotifier extends AsyncNotifier<void> {
         .collection(Collections.users)
         .doc(authUser.uid)
         .get();
-    final role = (me.data()?['role'] as String? ?? '').trim().toLowerCase();
-    if (role != 'admin' && role != 'manager') {
+    final role = (me.data()?['role'] as String? ?? '').trim();
+    if (!isPrivilegedRoleName(role)) {
       throw StateError('Only admin can manage products');
     }
   }
