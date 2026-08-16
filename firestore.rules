@@ -25,6 +25,35 @@ service cloud.firestore {
       return role is string && role.matches('(?i)^\\s*(admin|manager|tenant_admin|super_admin)\\s*$');
     }
 
+    function isTenantAdminOnlyRole(role) {
+      return role is string && role.matches('(?i)^\\s*tenant_admin\\s*$');
+    }
+    function isTenantAdminRole(role) {
+      return isTenantAdminOnlyRole(role);
+    }
+    function isSuperAdminRole(role) {
+      return role is string && role.matches('(?i)^\\s*super_admin\\s*$');
+    }
+
+    function currentUserTenantId() {
+      return userDoc().data.tenant_id;
+    }
+
+    function canAccessTenant(tenantId) {
+      return isSuperAdmin() || (
+        isTenantAdmin() &&
+        currentUserTenantId() == tenantId
+      );
+    }
+
+    function isTenantAdmin() {
+      return isActiveUser() && isTenantAdminOnlyRole(getUserRole());
+    }
+
+    function isSuperAdmin() {
+      return isActiveUser() && isSuperAdminRole(getUserRole());
+    }
+
     function isSellerRole(role) {
       return role is string && role.matches('(?i)^\\s*seller\\s*$');
     }
@@ -146,9 +175,15 @@ service cloud.firestore {
     // --- users --------------------------------------------------------------
     match /users/{userId} {
       // get (single doc): own doc or admin
-      allow get: if isOwnDoc(userId) || isAdmin();
-      // list (collection query): admin only — avoids per-doc wildcard ambiguity
-      allow list: if isAdmin();
+      allow get: if isOwnDoc(userId) || isAdmin() || (
+        isActiveUser() &&
+        isTenantAdminRole(getUserRole()) &&
+        resource.data.tenant_id == currentUserTenantId()
+      );
+      allow list: if isAdmin() || (
+        isTenantAdmin() &&
+        resource.data.tenant_id == currentUserTenantId()
+      );
       allow create: if (isBootstrapAdminCreate(userId) ||
         (
           isAdmin() &&
@@ -172,9 +207,40 @@ service cloud.firestore {
             .hasOnly(['display_name', 'updated_at', 'last_active', 'email_verified']) &&
           docSizeOk() &&
           withinWriteRate()
+        ) ||
+        (
+          isActiveUser() &&
+          isTenantAdminRole(getUserRole()) &&
+          resource.data.tenant_id == currentUserTenantId() &&
+          request.resource.data.tenant_id == resource.data.tenant_id &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['device_pairing_enabled', 'device_pairing_id', 'device_pairing_reset_by', 'updated_at']) &&
+          docSizeOk()
         )
       );
       allow delete: if isAdmin();
+    }
+
+    // --- tenants -----------------------------------------------------------
+    match /tenants/{tenantId} {
+      allow read: if canAccessTenant(tenantId);
+      allow list: if isSuperAdmin() || (
+        isTenantAdmin() &&
+        resource.data.tenant_id == currentUserTenantId()
+      );
+      allow create: if isSuperAdmin() &&
+        request.resource.data.tenant_id == tenantId &&
+        docSizeOk();
+      allow update: if isSuperAdmin() || (
+        isTenantAdmin() &&
+        resource.data.tenant_id == currentUserTenantId() &&
+        request.resource.data.tenant_id == tenantId &&
+        request.resource.data.tenant_id == currentUserTenantId() &&
+        resource.data.owner_user_id == request.auth.uid &&
+        request.resource.data.owner_user_id == resource.data.owner_user_id &&
+        docSizeOk()
+      );
+      allow delete: if isSuperAdmin();
     }
 
     // --- products -----------------------------------------------------------
@@ -253,7 +319,9 @@ service cloud.firestore {
             'notes',
             'latitude',
             'longitude',
-            'updated_at'
+            'updated_at',
+            'balance',
+            'last_transaction_at'
           ])
         )) && docSizeOk();
       allow delete: if isAdmin();

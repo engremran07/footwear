@@ -31,6 +31,7 @@ class AppShell extends ConsumerStatefulWidget {
     (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
     (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
     (icon: Icons.analytics, key: 'reports', route: '/reports'),
+    (icon: Icons.apartment, key: 'workspaces', route: '/tenants'),
     (icon: Icons.manage_accounts, key: 'users', route: '/users'),
     (icon: Icons.settings, key: 'settings', route: '/settings'),
   ];
@@ -212,6 +213,7 @@ class _AppShellState extends ConsumerState<AppShell>
     }
     return AppShell._navItems.where((e) {
       if (e.route == '/settings' || e.route == '/users') return user.isAdmin;
+      if (e.route == '/tenants') return user.isSuperAdmin || user.isTenantAdmin;
       return true;
     }).toList();
   }

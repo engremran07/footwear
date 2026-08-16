@@ -51,7 +51,55 @@ ShoesERP is a route/seller distribution ERP for a footwear distribution business
 
 ---
 
-## 4. Financial Pipeline (Non-Negotiable)
+## 4. SaaS Architecture
+
+ShoesERP is built as a shared-Firebase multi-workspace SaaS application. The preferred Spark-plan architecture is one Firebase project with tenant partitioning instead of one project per customer.
+
+### Tenant model
+
+- `tenants` collection (`Collections.tenants`) stores workspace records.
+- Each tenant document contains `tenant_id`, `name`, `slug`, `plan`, `active`, `owner_user_id`, `require_device_pairing`, `allow_admin_reset_only`, `created_at`, and `updated_at`.
+- `tenant_id` is the canonical workspace partition key used across users and business collections.
+
+### Role semantics
+
+- `super_admin` — global SaaS operator with cross-tenant access.
+- `tenant_admin` — workspace administrator scoped to one tenant.
+- `admin` — tenant-scoped admin/warehouse seller within the tenant.
+- `seller` — tenant-scoped field seller with assigned-route access.
+
+### Tenant scoping
+
+- `TenantScope.applyToQuery(query, tenantId: ...)` is the canonical query gating helper.
+- `TenantScope.applyToData(data, tenantId: ...)` is the canonical write decoration helper.
+- `TenantScope.matchesTenant(doc.data(), tenantId)` is the canonical runtime tenant filter.
+- `TenantScope.globalTenantId == '__global__'` is reserved for global/system documents.
+- Missing tenant context defaults to the sentinel `__tenant_missing__` to avoid accidental cross-tenant reads.
+
+### Shared project strategy
+
+- One Firestore instance.
+- One Firebase Auth instance.
+- One Firebase Hosting deployment.
+- One set of Firestore rules and composite indexes.
+- Tenant partitioning via `tenant_id` provides SaaS segmentation without extra Firebase projects.
+
+### Repository-wide tenant gating checklist
+
+1. Add `tenant_id` to every tenant-scoped write path in providers and model factories.
+2. Use `TenantScope.applyToQuery(...)` for every business collection query.
+3. Use `TenantScope.applyToData(..., tenantId: ...)` or explicit `tenant_id` on every write.
+4. Ensure providers select the current user tenant from `authUserProvider` and normalize it with `TenantScope.normalize(...)`.
+5. Guard `/tenants` and tenant management screens to `tenant_admin`/`super_admin` only.
+6. Enforce tenant ownership in Firestore rules for all tenant-scoped collections.
+7. Reserve `__global__` only for global settings and system docs.
+8. Keep `Collections.tenants` as the canonical workspace collection constant.
+9. Add Firestore emulator tests for tenant-scoped access patterns when new collections are introduced.
+10. Document any new tenant-scoped collection or rule change in this blueprint.
+
+---
+
+## 5. Financial Pipeline (Non-Negotiable)
 
 ```text
 Pathway 1 — Sale with stock:

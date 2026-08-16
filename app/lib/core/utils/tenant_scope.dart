@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class TenantScope {
   const TenantScope._();
 
+  static const globalTenantId = '__global__';
+
   static String? normalize(String? tenantId) {
     final value = tenantId?.trim();
     if (value == null || value.isEmpty) return null;
@@ -40,6 +42,9 @@ class TenantScope {
     final normalized = normalize(tenantId);
     if (normalized == null) {
       return query.where('tenant_id', isEqualTo: '__tenant_missing__');
+    }
+    if (normalized == globalTenantId) {
+      return query;
     }
     return query.where('tenant_id', isEqualTo: normalized);
   }

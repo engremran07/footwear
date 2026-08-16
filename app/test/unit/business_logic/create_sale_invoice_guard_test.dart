@@ -11,6 +11,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 // ── pure-logic helpers mirroring createSaleInvoice guards ─────────────────
 
+/// Validates the sale amount entered on the create sale invoice screen.
+/// Returns an error message, or null if valid.
+String? validateSaleAmount({required double saleAmount}) {
+  if (saleAmount <= 0) {
+    return 'sale_amount_required';
+  }
+  return null;
+}
+
 /// Validates amount received vs invoice total.
 /// Returns an error message, or null if valid.
 String? validateAmountReceived({
@@ -36,6 +45,20 @@ bool isInvoiceMathValid({
 // ── tests ──────────────────────────────────────────────────────────────────
 
 void main() {
+  group('createSaleInvoice — sale amount guard', () {
+    test('fails when sale amount is zero', () {
+      expect(validateSaleAmount(saleAmount: 0), 'sale_amount_required');
+    });
+
+    test('fails when sale amount is negative', () {
+      expect(validateSaleAmount(saleAmount: -1), 'sale_amount_required');
+    });
+
+    test('passes when sale amount is positive', () {
+      expect(validateSaleAmount(saleAmount: 100.0), isNull);
+    });
+  });
+
   group('createSaleInvoice — amountReceived guard', () {
     test('passes when amountReceived equals total (fully paid)', () {
       expect(validateAmountReceived(amountReceived: 1000, total: 1000), isNull);

@@ -101,7 +101,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     selected: _roleFilter == 'admin',
                     color: AppBrand.adminRoleColor,
                     onTap: () => setState(
-                      () => _roleFilter = _roleFilter == 'admin' ? null : 'admin',
+                      () =>
+                          _roleFilter = _roleFilter == 'admin' ? null : 'admin',
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -165,9 +166,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         (n) => n.toLowerCase().contains(_search),
                       );
                   final userRoleValue = roleValueFromUserRole(u.role);
-                final matchesRole = _roleFilter == null ||
-                    _roleFilter == userRoleValue;
-                return matchesSearch && matchesRole;
+                  final matchesRole =
+                      _roleFilter == null || _roleFilter == userRoleValue;
+                  return matchesSearch && matchesRole;
                 }).toList();
 
                 if (filtered.isEmpty) {

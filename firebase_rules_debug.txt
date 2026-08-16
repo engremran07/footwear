@@ -1,0 +1,43 @@
+(node:9916) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2026-08-05T04:46:07.478Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[2026-08-05T04:46:07.478Z] > authorizing via signed-in user (engremran89@gmail.com)
+[2026-08-05T04:46:07.478Z] [iam] checking project shoeserp-clean-20260327 for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[2026-08-05T04:46:07.480Z] Checked if tokens are valid: false, expires at: 1785894617344
+[2026-08-05T04:46:07.480Z] Checked if tokens are valid: false, expires at: 1785894617344
+[2026-08-05T04:46:07.480Z] > refreshing access token with scopes: []
+[2026-08-05T04:46:07.481Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[2026-08-05T04:46:07.481Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[2026-08-05T04:46:07.847Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[2026-08-05T04:46:07.847Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[2026-08-05T04:46:07.859Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/shoeserp-clean-20260327:testIamPermissions [none]
+[2026-08-05T04:46:07.860Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/shoeserp-clean-20260327:testIamPermissions  x-goog-user-project=shoeserp-clean-20260327
+[2026-08-05T04:46:07.860Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/shoeserp-clean-20260327:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[2026-08-05T04:46:08.695Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/shoeserp-clean-20260327:testIamPermissions 200
+[2026-08-05T04:46:08.695Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/shoeserp-clean-20260327:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+
+=== Deploying to 'shoeserp-clean-20260327'...
+
+i  deploying firestore 
+i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[2026-08-05T04:46:08.698Z] Checked if tokens are valid: true, expires at: 1785908766848
+[2026-08-05T04:46:08.698Z] Checked if tokens are valid: true, expires at: 1785908766848
+[2026-08-05T04:46:08.698Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/shoeserp-clean-20260327/databases/(default) [none]
+[2026-08-05T04:46:10.518Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/shoeserp-clean-20260327/databases/(default) 200
+[2026-08-05T04:46:10.518Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/shoeserp-clean-20260327/databases/(default) {"name":"projects/shoeserp-clean-20260327/databases/(default)","uid":"6bb56670-3ecd-48c5-868a-6e7857407216","createTime":"2026-03-27T07:46:30.561159Z","updateTime":"2026-03-27T07:46:30.561159Z","locationId":"nam5","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2026-08-05T03:46:10.434070Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"s","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"IOeGpZrXiJYDMI2bvJvLv5MD"}
+i  firestore: reading indexes from firestore.indexes.json... 
+i  cloud.firestore: checking firestore.rules for compilation errors... 
+[2026-08-05T04:46:10.522Z] Checked if tokens are valid: true, expires at: 1785908766848
+[2026-08-05T04:46:10.522Z] Checked if tokens are valid: true, expires at: 1785908766848
+[2026-08-05T04:46:10.523Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/shoeserp-clean-20260327:test [none]
+[2026-08-05T04:46:10.523Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/shoeserp-clean-20260327:test [omitted]
+[2026-08-05T04:46:11.904Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/shoeserp-clean-20260327:test 200
+[2026-08-05T04:46:11.904Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/shoeserp-clean-20260327:test {"issues":[{"sourcePosition":{"fileName":"firestore.rules","line":185,"column":23,"currentOffset":6227,"endOffset":6231},"description":"Invalid function name: where.","severity":"WARNING"},{"sourcePosition":{"fileName":"firestore.rules","line":229,"column":23,"currentOffset":8020,"endOffset":8024},"description":"Invalid function name: where.","severity":"WARNING"}]}
+!  [W] 185:23 - Invalid function name: where. 
+!  [W] 229:23 - Invalid function name: where. 
++  cloud.firestore: rules file firestore.rules compiled successfully 
+
++  Dry run complete! 
+
+Project Console: https://console.firebase.google.com/project/shoeserp-clean-20260327/overview

@@ -28,7 +28,7 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
-    version: '3.9.46',
+    version: '3.9.26',
     date: 'August 2026',
     items: [
       ChangelogItem(

@@ -61,6 +61,15 @@ void main() {
     test('returns null for non-numeric text', () {
       expect(AppFormatters.parseAmountText('not a number'), isNull);
     });
+
+    test('parses Arabic-Indic numerals', () {
+      expect(AppFormatters.parseAmountText('١٢٠٠.٥٠'), 1200.5);
+      expect(AppFormatters.parseAmountText('SAR ١,٢٠٠.٥٠'), 1200.5);
+    });
+
+    test('parses Eastern Arabic/Persian numerals', () {
+      expect(AppFormatters.parseAmountText('۱٬۲۰۰٫۵۰'), 1200.5);
+    });
   });
 
   group('AppFormatters.currency', () {

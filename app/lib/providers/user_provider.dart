@@ -131,8 +131,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         .get();
     if (!profileSnap.exists) return false;
 
-    final role = (profileSnap.data()?['role'] as String? ?? '')
-        .trim();
+    final role = (profileSnap.data()?['role'] as String? ?? '').trim();
     return isPrivilegedRoleName(role);
   }
 
@@ -177,9 +176,8 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         );
       }
 
-      final tenantId = TenantScope.normalize(
-            ref.read(authUserProvider).value?.tenantId,
-          ) ??
+      final tenantId =
+          TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
           'default-tenant';
 
       // Use a secondary FirebaseApp so the admin stays signed in

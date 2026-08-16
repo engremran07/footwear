@@ -144,6 +144,29 @@ No Cloud Functions deployment needed. User creation uses a secondary `FirebaseAp
 
 ---
 
+## SaaS Architecture
+
+ShoesERP is designed as a single-project SaaS app. All tenant data lives in one Firebase project and is partitioned by `tenant_id` to support multiple workspaces on the Spark free tier.
+
+- The `tenants` collection stores workspace metadata, plan flags, owner user, and device-pairing policy.
+- Every tenant-scoped business document (`users`, `routes`, `customers`/`shops`, `products`, `seller_inventory`, `transactions`, `invoices`, etc.) must carry `tenant_id`.
+- `tenant_admin` is scoped to a single tenant; `super_admin` is the global SaaS operator.
+- `TenantScope` in `app/lib/core/utils/tenant_scope.dart` is the canonical helper for query and write gating.
+- `__global__` is reserved for global/system documents only.
+
+### Tenant Gating Checklist
+
+1. Use `TenantScope.applyToQuery(..., tenantId: ...)` for every business collection query.
+2. Use `TenantScope.applyToData(..., tenantId: ...)` or explicit `tenant_id` on every tenant-scoped write.
+3. Keep `tenant_admin` tenant-scoped and reserve `super_admin` for global access.
+4. Use `Collections.tenants` for workspace documents; avoid hardcoded `tenants` collection strings.
+5. Verify Firestore rules enforce tenant ownership for each tenant-scoped collection.
+6. Treat shops as `Collections.shops` (`customers` collection alias) with tenant partitioning, not as a separate customer model.
+7. Ensure providers select current user tenant context from `authUserProvider` and do not leak cross-tenant streams.
+8. Document new tenant-scoped collections and any tenant gating rule changes in both this README and `MASTER_BLUEPRINT.md`.
+
+---
+
 ## Roles & Permissions
 
 | Action | Admin | Seller |

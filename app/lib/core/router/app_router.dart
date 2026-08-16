@@ -30,6 +30,7 @@ import '../../screens/create_sale_invoice_screen.dart';
 import '../../screens/bootstrap_profile_screen.dart';
 import '../../screens/about_screen.dart';
 import '../../screens/users_list_screen.dart';
+import '../../screens/tenant_management_screen.dart';
 import '../../screens/database_flush_screen.dart';
 import '../../screens/database_backup_screen.dart';
 import '../../widgets/app_shell.dart';
@@ -56,6 +57,11 @@ bool _isAdminOnlyPath(String rawPath) {
       RegExp(r'^/products/[^/]+/edit$').hasMatch(path) ||
       RegExp(r'^/products/[^/]+/variants/new$').hasMatch(path) ||
       RegExp(r'^/products/[^/]+/variants/[^/]+/edit$').hasMatch(path);
+}
+
+bool _isTenantManagementPath(String rawPath) {
+  final path = _normalizePath(rawPath);
+  return path == '/tenants';
 }
 
 bool _isSellerBlockedPath(String rawPath) {
@@ -175,6 +181,10 @@ class RouterNotifier extends ChangeNotifier {
 
     if (isLoginRoute || isBootstrapRoute) return '/';
 
+    if (_isTenantManagementPath(state.matchedLocation) &&
+        !(appUser.isSuperAdmin || appUser.isTenantAdmin)) {
+      return '/';
+    }
     if (_isAdminOnlyPath(state.matchedLocation) && !appUser.isAdmin) {
       return '/';
     }
@@ -342,6 +352,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/reports',
             pageBuilder: (_, s) => _fadePage(const ReportsScreen(), s),
+          ),
+          // Workspaces / tenants
+          GoRoute(
+            path: '/tenants',
+            pageBuilder: (_, s) => _fadePage(const TenantManagementScreen(), s),
           ),
           // History (7-day feed — both admin and seller)
           GoRoute(

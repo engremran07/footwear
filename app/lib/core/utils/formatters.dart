@@ -40,11 +40,28 @@ class AppFormatters {
 
   /// Parses common manual amount text such as `1,200.50`, `SAR 1,200.50`,
   /// or `1.200,50` into a numeric amount.
+  static const _arabicIndicDigits = '٠١٢٣٤٥٦٧٨٩';
+  static const _easternArabicDigits = '۰۱۲۳۴۵۶۷۸۹';
+
+  static String _normalizeDigits(String input) {
+    var normalized = input
+        .replaceAll('٬', ',')
+        .replaceAll('٫', '.')
+        .replaceAll('،', ',');
+
+    for (var i = 0; i < 10; i++) {
+      normalized = normalized.replaceAll(_arabicIndicDigits[i], '$i');
+      normalized = normalized.replaceAll(_easternArabicDigits[i], '$i');
+    }
+    return normalized;
+  }
+
   static double? parseAmountText(String? raw) {
     final input = raw?.trim();
     if (input == null || input.isEmpty) return null;
 
-    final withoutCurrency = input
+    final normalizedDigits = _normalizeDigits(input);
+    final withoutCurrency = normalizedDigits
         .replaceAll('﷼', '')
         .replaceAll('Rs', '')
         .replaceAll('SAR', '')

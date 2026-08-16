@@ -32,12 +32,10 @@ class BootstrapNotifier extends AsyncNotifier<void> {
 
       final adminSnap = await db
           .collection(Collections.users)
-          .where('role', whereIn: [
-            'admin',
-            'manager',
-            'tenant_admin',
-            'super_admin',
-          ])
+          .where(
+            'role',
+            whereIn: ['admin', 'manager', 'tenant_admin', 'super_admin'],
+          )
           .limit(1)
           .get();
 
@@ -52,6 +50,7 @@ class BootstrapNotifier extends AsyncNotifier<void> {
         'email': email,
         'display_name': (authUser.displayName ?? 'Admin').trim(),
         'role': 'admin',
+        'tenant_id': '__global__',
         'active': true,
         'created_at': Timestamp.now(),
         'updated_at': Timestamp.now(),

@@ -9,6 +9,7 @@ import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
 import '../core/services/admin_identity_service.dart';
 import '../core/utils/role_utils.dart';
+import '../core/utils/tenant_scope.dart';
 import '../models/user_model.dart';
 import 'alert_provider.dart';
 import 'dashboard_provider.dart';
@@ -255,8 +256,14 @@ class AuthNotifier extends AsyncNotifier<void> {
               'created_at': data['created_at'] ?? Timestamp.now(),
             }, SetOptions(merge: true));
           } else {
-            final isBootstrapAdmin = email == 'admin@footwear.pk';
-            if (!isBootstrapAdmin) {
+            final existingPrivilegedLink = await usersRef
+                .where(
+                  'role',
+                  whereIn: ['admin', 'manager', 'tenant_admin', 'super_admin'],
+                )
+                .limit(1)
+                .get();
+            if (existingPrivilegedLink.docs.isNotEmpty) {
               await FirebaseAuth.instance.signOut();
               throw FirebaseAuthException(
                 code: 'permission-denied',
@@ -272,6 +279,7 @@ class AuthNotifier extends AsyncNotifier<void> {
                   ? display
                   : 'Admin',
               'role': 'admin',
+              'tenant_id': TenantScope.globalTenantId,
               'active': true,
               'created_by': uid,
               'created_at': Timestamp.now(),
@@ -283,12 +291,10 @@ class AuthNotifier extends AsyncNotifier<void> {
         final refreshedDoc = await usersRef.doc(uid).get();
         final userData = refreshedDoc.data();
         final isActive = userData?['active'] == true;
-        var normalizedRole = (userData?['role'] as String? ?? '').trim();
-        var tenantId = userData?['tenant_id'] as String?;
-        if (email.toLowerCase() == 'gsmenfinity@gmail.com' &&
-            normalizedRole.toLowerCase() != 'super_admin') {
-          normalizedRole = 'super_admin';
-          tenantId ??= 'default-tenant';
+        final normalizedRole = (userData?['role'] as String? ?? '').trim();
+        String? tenantId = userData?['tenant_id'] as String?;
+        if (normalizedRole.toLowerCase() == 'super_admin') {
+          tenantId ??= TenantScope.globalTenantId;
           await usersRef.doc(uid).set({
             'role': 'super_admin',
             'tenant_id': tenantId,
@@ -360,6 +366,39 @@ class AuthNotifier extends AsyncNotifier<void> {
       }
       throw nextState.error!;
     }
+  }
+
+  Future<void> setDevicePairingState(
+    String targetUserId, {
+    required bool enabled,
+    String? pairingId,
+  }) async {
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) {
+      throw StateError('Not authenticated');
+    }
+
+    final actorDoc = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(authUser.uid)
+        .get();
+    final actorData = actorDoc.data();
+    final actorRole = (actorData?['role'] as String? ?? '').trim();
+    if (!isPrivilegedRoleName(actorRole)) {
+      throw StateError('Only admin or super admin can manage device pairing');
+    }
+
+    await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(targetUserId)
+        .set({
+          'device_pairing_enabled': enabled,
+          'device_pairing_id': enabled
+              ? (pairingId ?? 'paired:$targetUserId')
+              : null,
+          'device_pairing_reset_by': enabled ? null : authUser.uid,
+          'updated_at': Timestamp.now(),
+        }, SetOptions(merge: true));
   }
 
   Future<void> resetDevicePairing(String targetUserId) async {
