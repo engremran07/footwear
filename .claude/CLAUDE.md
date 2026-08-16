@@ -97,4 +97,4 @@ See AGENTS.md §10 for latest audit findings.
 
 - git add -A ; git commit ; git push
 
-- adb install -r (if device connected)
+- adb install --streaming -r (if device connected)

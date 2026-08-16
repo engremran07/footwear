@@ -70,6 +70,9 @@ final tenantProvider = StreamProvider.family<TenantModel?, String>((
       });
 });
 
+/// Workspace-scoped users (admin + sellers) for the enhanced users management screen.
+/// Super admin can select any workspace; tenant_admin sees only their workspace.
+/// No role filtering — context is implicit from the workspace selection.
 final tenantUsersProvider = StreamProvider.family<List<UserModel>, String>((
   ref,
   tenantId,
@@ -99,6 +102,45 @@ final tenantUsersProvider = StreamProvider.family<List<UserModel>, String>((
       .collection(Collections.users)
       .where('tenant_id', isEqualTo: tenantId)
       .where('active', isEqualTo: true)
+      .orderBy('display_name')
+      .snapshots()
+      .map(
+        (snap) => snap.docs
+            .map((doc) => UserModel.fromJson(doc.data(), doc.id))
+            .toList(),
+      );
+});
+
+/// Inactive users for a specific workspace (super admin or tenant admin only)
+final allInactiveUsersForTenantProvider = StreamProvider.family<List<UserModel>, String>((
+  ref,
+  tenantId,
+) {
+  final currentUser = ref.watch(authUserProvider).value;
+  if (currentUser == null) return const Stream<List<UserModel>>.empty();
+
+  if (currentUser.isSuperAdmin) {
+    return FirebaseFirestore.instance
+        .collection(Collections.users)
+        .where('tenant_id', isEqualTo: tenantId)
+        .where('active', isEqualTo: false)
+        .orderBy('display_name')
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((doc) => UserModel.fromJson(doc.data(), doc.id))
+              .toList(),
+        );
+  }
+
+  if (!currentUser.isTenantAdmin) return const Stream<List<UserModel>>.empty();
+  final tenantIdForUser = TenantScope.normalize(currentUser.tenantId);
+  if (tenantIdForUser != tenantId) return const Stream<List<UserModel>>.empty();
+
+  return FirebaseFirestore.instance
+      .collection(Collections.users)
+      .where('tenant_id', isEqualTo: tenantId)
+      .where('active', isEqualTo: false)
       .orderBy('display_name')
       .snapshots()
       .map(

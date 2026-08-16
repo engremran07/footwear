@@ -5,17 +5,29 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/role_utils.dart';
+import '../core/utils/tenant_scope.dart';
 import '../models/settings_model.dart';
+import '../models/user_model.dart';
 import 'auth_provider.dart';
 
+String _settingsDocumentIdForCurrentUser(UserModel? currentUser) {
+  final tenantId = TenantScope.normalize(currentUser?.tenantId);
+  return tenantId ?? TenantScope.globalTenantId;
+}
+
 final settingsProvider = StreamProvider<SettingsModel>((ref) {
+  final currentUser = ref.watch(authUserProvider).value;
+  final settingsDocId = _settingsDocumentIdForCurrentUser(currentUser);
+
   return FirebaseFirestore.instance
       .collection(Collections.settings)
-      .doc('global')
+      .doc(settingsDocId)
       .snapshots()
       .map((doc) {
-        if (!doc.exists) {
+        final data = doc.data();
+        if (data == null) {
           return SettingsModel(
+            tenantId: settingsDocId,
             companyName: 'My Business',
             currency: 'SAR',
             pairsPerCarton: 12,
@@ -23,7 +35,9 @@ final settingsProvider = StreamProvider<SettingsModel>((ref) {
             updatedAt: Timestamp.now(),
           );
         }
-        return SettingsModel.fromJson(doc.data()!);
+
+        final model = SettingsModel.fromJson(data);
+        return model.copyWith(tenantId: settingsDocId);
       });
 });
 
@@ -61,15 +75,26 @@ class SettingsNotifier extends AsyncNotifier<void> {
 
   Future<void> save(Map<String, dynamic> data) async {
     await _requireAdmin();
+    final currentUser = ref.read(authUserProvider).value;
+    final tenantId = TenantScope.normalize(currentUser?.tenantId) ??
+        TenantScope.globalTenantId;
     await FirebaseFirestore.instance
         .collection(Collections.settings)
-        .doc('global')
-        .set({...data, 'updated_at': Timestamp.now()}, SetOptions(merge: true));
+        .doc(tenantId)
+        .set(
+          {
+            ...data,
+            'tenant_id': tenantId,
+            'updated_at': Timestamp.now(),
+          },
+          SetOptions(merge: true),
+        );
   }
 
-  /// Encodes [imageBytes] as Base64 and stores it directly in the
-  /// settings/global Firestore document. No Firebase Storage required.
-  /// All connected devices receive the updated logo via the real-time stream.
+  /// Encodes [imageBytes] as Base64 and stores it directly in the workspace
+  /// settings Firestore document for the signed-in tenant. No Firebase Storage
+  /// required. All connected devices receive the updated logo via the real-time
+  /// stream.
   Future<void> uploadLogo(Uint8List imageBytes) async {
     final encoded = base64Encode(imageBytes);
     await save({'logo_base64': encoded, 'logo_url': null});

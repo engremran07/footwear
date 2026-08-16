@@ -1,5 +1,6 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:footwear_erp/core/utils/role_utils.dart';
 import 'package:footwear_erp/models/user_model.dart';
 
 void main() {
@@ -15,6 +16,30 @@ void main() {
         ]),
       );
       expect(UserRole.values.length, 4);
+    });
+  });
+
+  group('role separation', () {
+    test('tenant admins cannot manage workspaces; only super admins can', () {
+      expect(
+        canManageWorkspaceRole(roleValueFromUserRole(UserRole.tenantAdmin)),
+        isFalse,
+      );
+      expect(
+        canManageUserAccountsRole(roleValueFromUserRole(UserRole.tenantAdmin)),
+        isFalse,
+      );
+    });
+
+    test('super admins manage both workspaces and user accounts', () {
+      expect(
+        canManageWorkspaceRole(roleValueFromUserRole(UserRole.superAdmin)),
+        isTrue,
+      );
+      expect(
+        canManageUserAccountsRole(roleValueFromUserRole(UserRole.superAdmin)),
+        isTrue,
+      );
     });
   });
 

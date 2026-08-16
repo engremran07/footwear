@@ -419,7 +419,8 @@ Evidence required: quote push output including branch name and commit hash.
 
 ```powershell
 adb devices   # if any device listed below header, MUST proceed with install
-adb -s <device-id> install -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-release.apk"
+adb -s <device-id> push "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" /sdcard/Download/
+adb -s <device-id> install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
 ```
 
 Evidence required: quote `Success` from adb output, OR quote exact `adb devices`

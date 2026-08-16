@@ -159,7 +159,8 @@ git push                              # quote branch + hash
 # Step 7 — device install (if device connected)
 
 adb devices
-adb -s <device-id> install -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-release.apk"  # quote "Success"
+adb -s <device-id> push "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" /sdcard/Download/
+adb -s <device-id> install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk  # quote "Success"
 
 ```
 
@@ -258,7 +259,7 @@ final names = NameResolver(
 
 | Entry By blank for old/historical tx | Seller deactivated after tx; `where('active',isEqualTo:true)` excluded them | `allUsersExportProvider` has no active filter — covers all historical users |
 
-| Split-per-ABI APK not installed, wrong ABI file | build used the wrong artifact or install path | Use `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true` then `adb push` / `adb install -r` |
+| Split-per-ABI APK not installed, wrong ABI file | build used the wrong artifact or install path | Use `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true` then `adb push` / `adb install --streaming -r` |
 
 | Stale balance after dev flush | transactions deleted via console/CLI without updating shop.balance | Run `node dev_reset.js` from repo root after any manual flush |
 

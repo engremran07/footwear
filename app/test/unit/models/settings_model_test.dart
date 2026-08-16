@@ -6,6 +6,7 @@ void main() {
   group('SettingsModel.fromJson', () {
     final ts = Timestamp.fromMillisecondsSinceEpoch(0);
     final baseJson = <String, dynamic>{
+      'tenant_id': 'jbm-impex',
       'company_name': 'Test Co',
       'currency': 'SAR',
       'pairs_per_carton': 12,
@@ -15,6 +16,7 @@ void main() {
 
     test('parses all fields correctly', () {
       final m = SettingsModel.fromJson(baseJson);
+      expect(m.tenantId, 'jbm-impex');
       expect(m.companyName, 'Test Co');
       expect(m.currency, 'SAR');
       expect(m.pairsPerCarton, 12);
@@ -24,6 +26,7 @@ void main() {
 
     test('missing fields use defaults', () {
       final m = SettingsModel.fromJson({});
+      expect(m.tenantId, '__global__');
       expect(m.companyName, 'My Business');
       expect(m.currency, 'SAR');
       expect(m.pairsPerCarton, 12);

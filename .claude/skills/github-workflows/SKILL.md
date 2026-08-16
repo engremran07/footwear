@@ -160,7 +160,7 @@ Before every commit, ALL of the following must succeed and evidence quoted:
 
 | 12 | `git add -A && git commit && git push` | commit hash + push output |
 
-| 13 | `adb install -r <apk>` (if connected) | `Success` |
+| 13 | `adb install --streaming -r <apk>` (if connected) | `Success` |
 
 When `firebase_options.dart` is gitignored, CI must generate a stub:
 

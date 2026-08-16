@@ -60,7 +60,7 @@ firebase deploy --only firestore:rules,firestore:indexes
 # Install the phone-delivery artifact to a connected device.
 
 adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/
-adb install -r /sdcard/Download/app-arm64-v8a-release.apk
+adb install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
 
 ```
 

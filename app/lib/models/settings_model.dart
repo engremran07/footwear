@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SettingsModel {
+  final String tenantId;
   final String companyName;
   final String currency;
   final int pairsPerCarton;
@@ -14,6 +15,7 @@ class SettingsModel {
   final Timestamp updatedAt;
 
   const SettingsModel({
+    this.tenantId = '__global__',
     required this.companyName,
     required this.currency,
     required this.pairsPerCarton,
@@ -23,6 +25,7 @@ class SettingsModel {
   }) : assert(pairsPerCarton > 0, 'pairsPerCarton must be greater than 0');
 
   SettingsModel copyWith({
+    String? tenantId,
     String? companyName,
     String? currency,
     int? pairsPerCarton,
@@ -32,6 +35,7 @@ class SettingsModel {
     Timestamp? updatedAt,
   }) {
     return SettingsModel(
+      tenantId: tenantId ?? this.tenantId,
       companyName: companyName ?? this.companyName,
       currency: currency ?? this.currency,
       pairsPerCarton: pairsPerCarton ?? this.pairsPerCarton,
@@ -55,7 +59,9 @@ class SettingsModel {
   }
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) {
+    final tenantId = json['tenant_id'] as String? ?? '__global__';
     return SettingsModel(
+      tenantId: tenantId,
       companyName: json['company_name'] as String? ?? 'My Business',
       currency: json['currency'] as String? ?? 'SAR',
       pairsPerCarton: json['pairs_per_carton'] as int? ?? 12,
@@ -69,6 +75,7 @@ class SettingsModel {
   }
 
   Map<String, dynamic> toJson() => {
+    'tenant_id': tenantId,
     'company_name': companyName,
     'currency': currency,
     'pairs_per_carton': pairsPerCarton,
@@ -82,6 +89,7 @@ class SettingsModel {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SettingsModel &&
+          other.tenantId == tenantId &&
           other.companyName == companyName &&
           other.currency == currency &&
           other.pairsPerCarton == pairsPerCarton &&
@@ -92,6 +100,7 @@ class SettingsModel {
 
   @override
   int get hashCode => Object.hash(
+    tenantId,
     companyName,
     currency,
     pairsPerCarton,

@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/models/tenant_model.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/snack_helper.dart';
+import '../core/utils/tenant_scope.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
+import '../providers/tenant_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/app_search_bar.dart';
@@ -19,7 +23,14 @@ import '../widgets/shimmer_loading.dart';
 
 /// Dedicated admin-only user management screen (/users).
 ///
-/// Shows all users with search, role filter, and full CRUD actions.
+/// **Workspace-First UX (Enterprise v3.10+)**
+/// - Super admin selects workspace → sees all admin + seller users in that workspace
+/// - Tenant admin sees only their own workspace users
+/// - No role tags; context is implicit from workspace selection
+/// - Search + active/inactive tabs only
+///
+/// This eliminates the need for tenant_admin/tenant_seller role tags since
+/// the workspace boundary is explicit.
 class UsersListScreen extends ConsumerStatefulWidget {
   const UsersListScreen({super.key});
 
@@ -29,38 +40,148 @@ class UsersListScreen extends ConsumerStatefulWidget {
 
 class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   String _search = '';
-  // null means 'all'
-  String? _roleFilter;
   // Active/Inactive tab toggle
   bool _showInactive = false;
+  // Selected workspace for super admin; null means "select one"
+  String? _selectedTenantId;
 
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authUserProvider).value;
 
-    // Admin guard: render access-denied if not admin
-    if (currentUser != null && !currentUser.isAdmin) {
+    final canViewUserAccounts = currentUser != null &&
+        canManageUserAccountsRole(roleValueFromUserRole(currentUser.role));
+
+    // Account management must be isolated from workspace management.
+    if (!canViewUserAccounts) {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
 
+    final isSuperAdmin = currentUser.isSuperAdmin;
+    final tenantId = _selectedTenantId ??
+        TenantScope.normalize(currentUser.tenantId) ??
+        TenantScope.globalTenantId;
+
+    // ── Workspace selector (super admin only) ──────────────────────────
+    final tenantsAsync = ref.watch(tenantsProvider);
+
+    // ── Users for selected workspace ────────────────────────────────────
     final usersAsync = _showInactive
-        ? ref.watch(inactiveUsersProvider)
-        : ref.watch(allUsersProvider);
+        ? ref.watch(
+            allInactiveUsersForTenantProvider(tenantId),
+          )
+        : ref.watch(tenantUsersProvider(tenantId));
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateUserDialog(),
+        onPressed: () => _showCreateUserDialog(tenantId),
         icon: const Icon(Icons.person_add),
         label: Text(tr('new_user', ref)),
         tooltip: tr('new_user', ref),
       ),
       body: Column(
         children: [
+          // ── Workspace Selector (Super Admin Only) ──────────────────────
+          if (isSuperAdmin)
+            tenantsAsync.when(
+              data: (workspaces) {
+                final selectedWorkspace = workspaces
+                    .firstWhere(
+                      (w) => w.id == _selectedTenantId,
+                      orElse: () => workspaces.isNotEmpty
+                          ? workspaces.first
+                          : TenantModel(
+                              id: TenantScope.globalTenantId,
+                              name: 'Global Workspace',
+                              slug: 'global',
+                              createdAt: Timestamp.now(),
+                              updatedAt: Timestamp.now(),
+                            ),
+                    );
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr('workspaces', ref),
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                      const SizedBox(height: 4),
+                      DropdownButton<String>(
+                        value: selectedWorkspace.id,
+                        isExpanded: true,
+                        items: workspaces.map((w) {
+                          return DropdownMenuItem(
+                            value: w.id,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.workspaces,
+                                  size: 16,
+                                  color: AppBrand.primaryColor,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    w.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (v) => setState(
+                          () => _selectedTenantId = v,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${workspaces.fold<int>(0, (sum, w) => sum + 1)} ${tr('workspaces', ref).toLowerCase()}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                );
+              },
+              loading: () => Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  height: 48,
+                  child: Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(
+                          AppBrand.primaryColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              error: (_, __) => Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  tr('err_loading_data', ref),
+                  style: TextStyle(color: AppBrand.errorFg),
+                ),
+              ),
+            ),
+          const Divider(height: 1),
+          // ── Search bar ──────────────────────────────────────────────────
           AppSearchBar(
             hintText: tr('search', ref),
             onChanged: (v) => setState(() => _search = v.toLowerCase()),
           ),
-          // Active / Inactive segmented tab
+          // ── Active / Inactive segmented tab ─────────────────────────────
           Padding(
             padding: const EdgeInsetsDirectional.symmetric(
               horizontal: 12,
@@ -83,65 +204,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
               style: const ButtonStyle(visualDensity: VisualDensity.compact),
             ),
           ),
-          // Role filter chips (active tab only)
-          if (!_showInactive)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Row(
-                children: [
-                  _RoleChip(
-                    label: tr('all', ref),
-                    selected: _roleFilter == null,
-                    onTap: () => setState(() => _roleFilter = null),
-                  ),
-                  const SizedBox(width: 8),
-                  _RoleChip(
-                    label: tr('lbl_admin', ref),
-                    selected: _roleFilter == 'admin',
-                    color: AppBrand.adminRoleColor,
-                    onTap: () => setState(
-                      () =>
-                          _roleFilter = _roleFilter == 'admin' ? null : 'admin',
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _RoleChip(
-                    label: tr('role_tenant_admin', ref),
-                    selected: _roleFilter == 'tenant_admin',
-                    color: AppBrand.adminRoleColor,
-                    onTap: () => setState(
-                      () => _roleFilter = _roleFilter == 'tenant_admin'
-                          ? null
-                          : 'tenant_admin',
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _RoleChip(
-                    label: tr('role_super_admin', ref),
-                    selected: _roleFilter == 'super_admin',
-                    color: AppBrand.adminRoleColor,
-                    onTap: () => setState(
-                      () => _roleFilter = _roleFilter == 'super_admin'
-                          ? null
-                          : 'super_admin',
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _RoleChip(
-                    label: tr('lbl_seller', ref),
-                    selected: _roleFilter == 'seller',
-                    color: AppBrand.sellerRoleColor,
-                    onTap: () => setState(
-                      () => _roleFilter = _roleFilter == 'seller'
-                          ? null
-                          : 'seller',
-                    ),
-                  ),
-                ],
-              ),
-            ),
           const Divider(height: 1),
+          // ── Users list (workspace-scoped, no role tags) ──────────────────
           Expanded(
             child: usersAsync.when(
               loading: () => const ShimmerLoading(),
@@ -150,9 +214,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                 ref: ref,
                 onRetry: () {
                   if (_showInactive) {
-                    ref.invalidate(inactiveUsersProvider);
+                    ref.invalidate(allInactiveUsersForTenantProvider(tenantId));
                   } else {
-                    ref.invalidate(allUsersProvider);
+                    ref.invalidate(tenantUsersProvider(tenantId));
                   }
                 },
               ),
@@ -165,10 +229,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       u.assignedRouteNames.any(
                         (n) => n.toLowerCase().contains(_search),
                       );
-                  final userRoleValue = roleValueFromUserRole(u.role);
-                  final matchesRole =
-                      _roleFilter == null || _roleFilter == userRoleValue;
-                  return matchesSearch && matchesRole;
+                  return matchesSearch;
                 }).toList();
 
                 if (filtered.isEmpty) {
@@ -181,9 +242,11 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                 return AppPullRefresh(
                   onRefresh: () async {
                     if (_showInactive) {
-                      ref.invalidate(inactiveUsersProvider);
+                      ref.invalidate(
+                        allInactiveUsersForTenantProvider(tenantId),
+                      );
                     } else {
-                      ref.invalidate(allUsersProvider);
+                      ref.invalidate(tenantUsersProvider(tenantId));
                     }
                     await Future.delayed(const Duration(milliseconds: 300));
                   },
@@ -204,7 +267,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         : _UserTile(
                             user: filtered[i],
                             currentUser: currentUser,
-                            onEdit: () => _showEditUserDialog(filtered[i]),
+                            onEdit: () => _showEditUserDialog(
+                              filtered[i],
+                              tenantId,
+                            ),
                             onDelete: () => _confirmDeleteUser(filtered[i]),
                             onToggle: (v) => ref
                                 .read(userManagementNotifierProvider.notifier)
@@ -222,7 +288,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
   // ── Create user dialog ───────────────────────────────────────────────────
 
-  void _showCreateUserDialog() {
+  void _showCreateUserDialog(String tenantId) {
     final emailC = TextEditingController();
     final passC = TextEditingController();
     final nameC = TextEditingController();
@@ -362,6 +428,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                           role: role,
                           assignedRouteIds: selectedRouteIds,
                           assignedRouteNames: selectedRouteNames,
+                          tenantId: tenantId,
                         );
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (mounted) {
@@ -393,7 +460,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
   // ── Edit user dialog ─────────────────────────────────────────────────────
 
-  void _showEditUserDialog(UserModel user) {
+  void _showEditUserDialog(UserModel user, String tenantId) {
     final nameC = TextEditingController(text: user.displayName);
     final emailC = TextEditingController(text: user.email);
     final passwordC = TextEditingController();
@@ -891,37 +958,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   }
 }
 
-// ─── Role filter chip ─────────────────────────────────────────────────────────
-
-class _RoleChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final Color? color;
-  final VoidCallback onTap;
-
-  const _RoleChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final chipColor = color ?? Theme.of(context).colorScheme.primary;
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      selectedColor: chipColor.withAlpha(40),
-      checkmarkColor: chipColor,
-      labelStyle: TextStyle(
-        color: selected ? chipColor : null,
-        fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-      ),
-    );
-  }
-}
+// ─── (Unused role chip removed in v3.10 workspace-first UX) ────────────────────
 
 // ─── User tile ────────────────────────────────────────────────────────────────
 

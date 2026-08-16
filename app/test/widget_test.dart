@@ -13,7 +13,9 @@ import 'package:footwear_erp/widgets/app_shell.dart';
 
 void main() {
   group('App shell SaaS nav rules', () {
-    testWidgets('workspace CRUD is exposed as a first-class admin section', (tester) async {
+    testWidgets('workspace CRUD is exposed as a first-class admin section', (
+      tester,
+    ) async {
       final superAdmin = UserModel(
         id: 'sa',
         email: 'global@example.com',
@@ -43,10 +45,10 @@ void main() {
       );
 
       expect(AppShell.canManageWorkspaces(superAdmin), isTrue);
-      expect(AppShell.canManageWorkspaces(tenantAdmin), isTrue);
+      expect(AppShell.canManageWorkspaces(tenantAdmin), isFalse);
       expect(AppShell.canManageWorkspaces(seller), isFalse);
       expect(AppShell.canManageUsers(superAdmin), isTrue);
-      expect(AppShell.canManageUsers(tenantAdmin), isTrue);
+      expect(AppShell.canManageUsers(tenantAdmin), isFalse);
       expect(AppShell.canManageUsers(seller), isFalse);
     });
   });

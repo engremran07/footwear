@@ -11,6 +11,7 @@ import '../models/user_model.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/services/permissions_service.dart';
+import '../core/utils/role_utils.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/snack_helper.dart';
 import '../providers/changelog_provider.dart';
@@ -24,11 +25,13 @@ class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.child});
 
   static bool canManageWorkspaces(UserModel? user) {
-    return user != null && (user.isSuperAdmin || user.isTenantAdmin);
+    if (user == null) return false;
+    return canManageWorkspaceRole(roleValueFromUserRole(user.role));
   }
 
   static bool canManageUsers(UserModel? user) {
-    return user != null && (user.isAdmin || user.isTenantAdmin || user.isSuperAdmin);
+    if (user == null) return false;
+    return canManageUserAccountsRole(roleValueFromUserRole(user.role));
   }
 
   static const _navItems = [
@@ -249,9 +252,11 @@ class _AppShellState extends ConsumerState<AppShell>
       const (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
     ];
     if (AppShell.canManageWorkspaces(user)) {
-      items.add(
-        const (icon: Icons.apartment, key: 'workspaces', route: '/tenants'),
-      );
+      items.add(const (
+        icon: Icons.apartment,
+        key: 'workspaces',
+        route: '/tenants',
+      ));
     }
     return items;
   }

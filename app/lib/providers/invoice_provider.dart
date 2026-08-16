@@ -222,11 +222,17 @@ class InvoiceNotifier extends AsyncNotifier<void> {
 
   /// Generates the next invoice number: INV-YYYY-NNNN.
   ///
-  /// Uses a Firestore transaction on settings/global.last_invoice_number so
-  /// that concurrent invoice creation never produces duplicate numbers.
+  /// Uses a Firestore transaction on the current tenant's
+  /// settings.last_invoice_number so concurrent invoice creation never produces
+  /// duplicate numbers.
   Future<String> _nextInvoiceNumber() async {
     final db = FirebaseFirestore.instance;
-    final settingsRef = db.collection(Collections.settings).doc('global');
+    final tenantId = TenantScope.normalize(
+      (await ref.read(authUserProvider.future))?.tenantId,
+    );
+    final settingsRef = db
+        .collection(Collections.settings)
+        .doc(tenantId ?? TenantScope.globalTenantId);
     final next = await db.runTransaction<int>((txn) async {
       final doc = await txn.get(settingsRef);
       final currentNum = (doc.data()?['last_invoice_number'] as int?) ?? 0;

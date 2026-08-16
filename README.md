@@ -116,7 +116,7 @@ flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=tru
 ```bash
 cd app
 adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/
-adb install -r /sdcard/Download/app-arm64-v8a-release.apk
+adb install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
 ```
 
 ### Build web
@@ -247,7 +247,7 @@ grep -rn "StateProvider\b" app/lib/ --include="*.dart"
 8. `firebase deploy --only firestore:rules,firestore:indexes` on every signoff, before commit/push is considered complete.
 9. `git log --oneline -5`, `git status --short`, and `git diff --stat HEAD` → confirm only expected local changes remain.
 10. `git add -A`, `git commit -m "type: summary — vX.Y.Z+N"`, and `git push` → quote commit hash and push output.
-11. `adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/` followed by `adb install -r /sdcard/Download/app-arm64-v8a-release.apk` to install the phone-delivery APK to a connected device when Android delivery is part of the request.
+11. `adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/` followed by `adb install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk` to install the phone-delivery APK to a connected device when Android delivery is part of the request.
 
 ---
 

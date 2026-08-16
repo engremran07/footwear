@@ -82,23 +82,26 @@ class AuthNotifier extends AsyncNotifier<void> {
   Future<void> _runPostSignInSelfHeal({
     required String uid,
     required String role,
+    required String? tenantId,
   }) async {
     final normalizedRole = role.trim().toLowerCase();
     if (!isPrivilegedRoleName(normalizedRole)) return;
 
     try {
-      final globalSettingsRef = FirebaseFirestore.instance
+      final settingsDocId = TenantScope.normalize(tenantId) ??
+          TenantScope.globalTenantId;
+      final settingsRef = FirebaseFirestore.instance
           .collection(Collections.settings)
-          .doc('global');
-      final settingsSnap = await globalSettingsRef.get();
+          .doc(settingsDocId);
+      final settingsSnap = await settingsRef.get();
       if (!settingsSnap.exists) {
-        await globalSettingsRef.set({
+        await settingsRef.set({
           'company_name': 'My Business',
           'currency': 'SAR',
           'pairs_per_carton': 12,
           'require_admin_approval_for_seller_transaction_edits': false,
+          'tenant_id': settingsDocId,
           'updated_at': Timestamp.now(),
-          'tenant_id': TenantScope.globalTenantId,
         }, SetOptions(merge: true));
       }
     } catch (e) {
@@ -296,7 +299,9 @@ class AuthNotifier extends AsyncNotifier<void> {
         final userData = refreshedDoc.data();
         final isActive = userData?['active'] == true;
         final normalizedRole = (userData?['role'] as String? ?? '').trim();
-        String? tenantId = TenantScope.normalize(userData?['tenant_id'] as String?);
+        String? tenantId = TenantScope.normalize(
+          userData?['tenant_id'] as String?,
+        );
 
         if (tenantId == null) {
           tenantId = TenantScope.globalTenantId;
@@ -322,7 +327,11 @@ class AuthNotifier extends AsyncNotifier<void> {
           );
         }
 
-        await _runPostSignInSelfHeal(uid: uid, role: normalizedRole);
+        await _runPostSignInSelfHeal(
+          uid: uid,
+          role: normalizedRole,
+          tenantId: tenantId,
+        );
 
         // ── Email-verified sync (Auth → Firestore, non-blocking) ──────────
         // Reload Auth user to get latest emailVerified from Firebase servers.

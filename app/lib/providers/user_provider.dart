@@ -11,16 +11,19 @@ import '../models/user_model.dart';
 import 'auth_provider.dart';
 
 final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
-  // Admin-only list query: guard so non-admin credentials never subscribe,
-  // preventing PERMISSION_DENIED during auth transitions.
-  // Use select() so heartbeat writes to last_active do NOT restart the stream.
-  final isAdmin = ref.watch(
-    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+  // Account management is separate from tenant/workspace administration.
+  // Only legacy admins and super admins can access this provider.
+  final canManageUsers = ref.watch(
+    authUserProvider.select(
+      (s) => canManageUserAccountsRole(
+        roleValueFromUserRole(s.value?.role ?? UserRole.seller),
+      ),
+    ),
   );
   final tenantId = ref.watch(
     authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
   );
-  if (!isAdmin) return const Stream.empty();
+  if (!canManageUsers) return const Stream.empty();
   final query = TenantScope.applyToQuery(
     FirebaseFirestore.instance.collection(Collections.users),
     tenantId: tenantId,
@@ -48,7 +51,10 @@ final allUsersExportProvider = FutureProvider<List<UserModel>>((ref) async {
   // Use .future to await the first auth emission instead of reading a
   // potentially-null .value while the StreamProvider is still loading.
   final user = await ref.read(authUserProvider.future);
-  if (user == null || !user.isAdmin) return const <UserModel>[];
+  if (user == null ||
+      !canManageUserAccountsRole(roleValueFromUserRole(user.role))) {
+    return const <UserModel>[];
+  }
   final tenantId = TenantScope.normalize(user.tenantId);
   final query = TenantScope.applyToQuery(
     FirebaseFirestore.instance.collection(Collections.users),
@@ -59,15 +65,19 @@ final allUsersExportProvider = FutureProvider<List<UserModel>>((ref) async {
 });
 
 final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
-  // Admin-only list query: guard to prevent PERMISSION_DENIED for seller creds.
-  // Use select() so heartbeat writes to last_active do NOT restart the stream.
-  final isAdmin = ref.watch(
-    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+  // Account management is separate from tenant/workspace management. This
+  // seller roster is still admin-controlled, but tenant_admin cannot use it.
+  final canManageUsers = ref.watch(
+    authUserProvider.select(
+      (s) => canManageUserAccountsRole(
+        roleValueFromUserRole(s.value?.role ?? UserRole.seller),
+      ),
+    ),
   );
   final tenantId = ref.watch(
     authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
   );
-  if (!isAdmin) return const Stream.empty();
+  if (!canManageUsers) return const Stream.empty();
   final query = TenantScope.applyToQuery(
     FirebaseFirestore.instance.collection(Collections.users),
     tenantId: tenantId,
@@ -88,13 +98,17 @@ final inactiveUsersProvider = StreamProvider.autoDispose<List<UserModel>>((
   ref,
 ) {
   // Use select() so heartbeat writes to last_active do NOT restart the stream.
-  final isAdmin = ref.watch(
-    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+  final canManageUsers = ref.watch(
+    authUserProvider.select(
+      (s) => canManageUserAccountsRole(
+        roleValueFromUserRole(s.value?.role ?? UserRole.seller),
+      ),
+    ),
   );
   final tenantId = ref.watch(
     authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
   );
-  if (!isAdmin) return const Stream.empty();
+  if (!canManageUsers) return const Stream.empty();
   final query = TenantScope.applyToQuery(
     FirebaseFirestore.instance.collection(Collections.users),
     tenantId: tenantId,
@@ -120,7 +134,9 @@ class UserManagementNotifier extends AsyncNotifier<void> {
 
   Future<bool> _isCurrentUserAdmin() async {
     final cachedUser = ref.read(authUserProvider).value;
-    if (cachedUser != null) return cachedUser.isAdmin;
+    if (cachedUser != null) {
+      return canManageUserAccountsRole(roleValueFromUserRole(cachedUser.role));
+    }
 
     final authUser = FirebaseAuth.instance.currentUser;
     if (authUser == null) return false;
@@ -132,7 +148,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     if (!profileSnap.exists) return false;
 
     final role = (profileSnap.data()?['role'] as String? ?? '').trim();
-    return isPrivilegedRoleName(role);
+    return canManageUserAccountsRole(role);
   }
 
   Future<String> _requireAdminUid() async {
@@ -155,6 +171,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     String? phone,
     List<String> assignedRouteIds = const [],
     List<String> assignedRouteNames = const [],
+    String? tenantId,
   }) async {
     final adminUid = await _requireAdminUid();
     state = const AsyncLoading();
@@ -176,7 +193,8 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         );
       }
 
-      final tenantId =
+      // Use provided tenantId or fall back to current user's tenant
+      final effectiveTenantId = TenantScope.normalize(tenantId) ??
           TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
           TenantScope.globalTenantId;
 
@@ -212,7 +230,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'email': trimmedEmail,
           'display_name': trimmedName,
           'role': normalizedRole,
-          'tenant_id': tenantId,
+          'tenant_id': effectiveTenantId,
           'assigned_route_ids': normalizedRole == 'seller'
               ? assignedRouteIds
               : [],

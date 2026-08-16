@@ -311,7 +311,8 @@ git push
 
 # 15 — APK install + final smoke verification
 adb devices
-adb -s <device-id> install -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-release.apk"
+adb -s <device-id> push "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" /sdcard/Download/
+adb -s <device-id> install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
 ```
 
 ## Anti-Bypass Enforcement Matrix
@@ -358,7 +359,7 @@ mandatory. Key checks in brief:
 - firebase deploy --only firestore:rules,firestore:indexes → Deploy complete!
 - git log --oneline -5 + git status --short + git diff --stat HEAD → no unexpected artifacts
 - git add -A + git commit + git push → quote commit hash + push output
-- If device connected: adb install -r → Success
+- If device connected: adb install --streaming -r → Success
 - Verify admin and seller startup for `/` and `/inventory`; transient permission-denied UI during stream warm-up is a regression.
 
 ## Security Baseline

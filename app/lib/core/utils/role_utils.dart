@@ -21,6 +21,16 @@ String normalizeRoleName(String role) {
   }
 }
 
+bool canManageUserAccountsRole(String role) {
+  final normalized = normalizeRoleName(role);
+  return normalized == 'admin' || normalized == 'super_admin';
+}
+
+bool canManageWorkspaceRole(String role) {
+  final normalized = normalizeRoleName(role);
+  return normalized == 'super_admin';
+}
+
 bool isPrivilegedRoleName(String role) {
   final normalized = normalizeRoleName(role);
   return normalized == 'admin' ||

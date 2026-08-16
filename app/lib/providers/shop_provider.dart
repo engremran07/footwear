@@ -230,9 +230,9 @@ class ShopNotifier extends AsyncNotifier<void> {
     final db = FirebaseFirestore.instance;
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     if (uid.isEmpty) throw StateError('Not authenticated');
-    final tenantId = TenantScope.normalize(
-      ref.read(authUserProvider).value?.tenantId,
-    ) ?? TenantScope.globalTenantId;
+    final tenantId =
+        TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
+        TenantScope.globalTenantId;
     // Pre-generate doc ID so retries on network failure are idempotent
     // (using add() can create a duplicate if the first write succeeds but
     // the ACK is lost and the SDK retries the request).

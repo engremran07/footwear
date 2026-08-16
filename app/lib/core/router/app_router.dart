@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
+import '../utils/role_utils.dart';
 import '../../screens/login_screen.dart';
 import '../../screens/dashboard_screen.dart';
 import '../../screens/routes_list_screen.dart';
@@ -182,10 +183,11 @@ class RouterNotifier extends ChangeNotifier {
     if (isLoginRoute || isBootstrapRoute) return '/';
 
     if (_isTenantManagementPath(state.matchedLocation) &&
-        !(appUser.isSuperAdmin || appUser.isTenantAdmin)) {
+        !canManageWorkspaceRole(roleValueFromUserRole(appUser.role))) {
       return '/';
     }
-    if (_isAdminOnlyPath(state.matchedLocation) && !appUser.isAdmin) {
+    if (_isAdminOnlyPath(state.matchedLocation) &&
+        !canManageUserAccountsRole(roleValueFromUserRole(appUser.role))) {
       return '/';
     }
     if (appUser.isSeller && _isSellerBlockedPath(state.matchedLocation)) {

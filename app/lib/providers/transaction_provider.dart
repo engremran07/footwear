@@ -872,9 +872,12 @@ class TransactionNotifier extends AsyncNotifier<void> {
       throw StateError('Only cash_in/cash_out transactions can be edited');
     }
 
+    final tenantId = TenantScope.normalize(
+      await ref.read(authUserProvider.future).then((value) => value?.tenantId),
+    );
     final settingsDoc = await db
         .collection(Collections.settings)
-        .doc('global')
+        .doc(tenantId ?? TenantScope.globalTenantId)
         .get();
     final requireApproval =
         (settingsDoc

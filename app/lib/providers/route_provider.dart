@@ -191,7 +191,8 @@ class RouteNotifier extends AsyncNotifier<void> {
   Future<void> create(Map<String, dynamic> data) async {
     final db = FirebaseFirestore.instance;
     final currentUser = ref.read(authUserProvider).value;
-    final tenantId = TenantScope.normalize(currentUser?.tenantId) ??
+    final tenantId =
+        TenantScope.normalize(currentUser?.tenantId) ??
         TenantScope.globalTenantId;
     final routeRef = db.collection(Collections.routes).doc();
     final routeName = data['name'] as String? ?? '';
@@ -258,9 +259,8 @@ class RouteNotifier extends AsyncNotifier<void> {
           data['name'] as String? ??
           currentRoute.data()?['name'] as String? ??
           '';
-      final tenantId = TenantScope.normalize(
-            ref.read(authUserProvider).value?.tenantId,
-          ) ??
+      final tenantId =
+          TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
           TenantScope.globalTenantId;
       final currency =
           data['currency'] as String? ??
