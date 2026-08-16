@@ -76,19 +76,17 @@ class SettingsNotifier extends AsyncNotifier<void> {
   Future<void> save(Map<String, dynamic> data) async {
     await _requireAdmin();
     final currentUser = ref.read(authUserProvider).value;
-    final tenantId = TenantScope.normalize(currentUser?.tenantId) ??
+    final tenantId =
+        TenantScope.normalize(currentUser?.tenantId) ??
         TenantScope.globalTenantId;
     await FirebaseFirestore.instance
         .collection(Collections.settings)
         .doc(tenantId)
-        .set(
-          {
-            ...data,
-            'tenant_id': tenantId,
-            'updated_at': Timestamp.now(),
-          },
-          SetOptions(merge: true),
-        );
+        .set({
+          ...data,
+          'tenant_id': tenantId,
+          'updated_at': Timestamp.now(),
+        }, SetOptions(merge: true));
   }
 
   /// Encodes [imageBytes] as Base64 and stores it directly in the workspace

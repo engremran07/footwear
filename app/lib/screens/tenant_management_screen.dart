@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/models/tenant_model.dart';
+import '../core/utils/device_pairing.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/tenant_provider.dart';
@@ -88,10 +89,13 @@ class _TenantManagementScreenState
   Future<void> _toggleDevicePairing(UserModel user, bool enabled) async {
     final authNotifier = ref.read(authNotifierProvider.notifier);
     try {
+      final devicePairingId = enabled
+          ? DevicePairing.generate(user.devicePairingId, user.id)
+          : null;
       await authNotifier.setDevicePairingState(
         user.id,
         enabled: enabled,
-        pairingId: enabled ? 'paired:${user.id}' : null,
+        pairingId: devicePairingId,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -112,43 +112,45 @@ final tenantUsersProvider = StreamProvider.family<List<UserModel>, String>((
 });
 
 /// Inactive users for a specific workspace (super admin or tenant admin only)
-final allInactiveUsersForTenantProvider = StreamProvider.family<List<UserModel>, String>((
-  ref,
-  tenantId,
-) {
-  final currentUser = ref.watch(authUserProvider).value;
-  if (currentUser == null) return const Stream<List<UserModel>>.empty();
+final allInactiveUsersForTenantProvider =
+    StreamProvider.family<List<UserModel>, String>((ref, tenantId) {
+      final currentUser = ref.watch(authUserProvider).value;
+      if (currentUser == null) return const Stream<List<UserModel>>.empty();
 
-  if (currentUser.isSuperAdmin) {
-    return FirebaseFirestore.instance
-        .collection(Collections.users)
-        .where('tenant_id', isEqualTo: tenantId)
-        .where('active', isEqualTo: false)
-        .orderBy('display_name')
-        .snapshots()
-        .map(
-          (snap) => snap.docs
-              .map((doc) => UserModel.fromJson(doc.data(), doc.id))
-              .toList(),
-        );
-  }
+      if (currentUser.isSuperAdmin) {
+        return FirebaseFirestore.instance
+            .collection(Collections.users)
+            .where('tenant_id', isEqualTo: tenantId)
+            .where('active', isEqualTo: false)
+            .orderBy('display_name')
+            .snapshots()
+            .map(
+              (snap) => snap.docs
+                  .map((doc) => UserModel.fromJson(doc.data(), doc.id))
+                  .toList(),
+            );
+      }
 
-  if (!currentUser.isTenantAdmin) return const Stream<List<UserModel>>.empty();
-  final tenantIdForUser = TenantScope.normalize(currentUser.tenantId);
-  if (tenantIdForUser != tenantId) return const Stream<List<UserModel>>.empty();
+      if (!currentUser.isTenantAdmin) {
+        return const Stream<List<UserModel>>.empty();
+      }
+      final tenantIdForUser = TenantScope.normalize(currentUser.tenantId);
+      if (tenantIdForUser != tenantId) {
+        return const Stream<List<UserModel>>.empty();
+      }
 
-  return FirebaseFirestore.instance
-      .collection(Collections.users)
-      .where('tenant_id', isEqualTo: tenantId)
-      .where('active', isEqualTo: false)
-      .orderBy('display_name')
-      .snapshots()
-      .map(
-        (snap) => snap.docs
-            .map((doc) => UserModel.fromJson(doc.data(), doc.id))
-            .toList(),
-      );
-});
+      return FirebaseFirestore.instance
+          .collection(Collections.users)
+          .where('tenant_id', isEqualTo: tenantId)
+          .where('active', isEqualTo: false)
+          .orderBy('display_name')
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((doc) => UserModel.fromJson(doc.data(), doc.id))
+                .toList(),
+          );
+    });
 
 class TenantManagementNotifier extends AsyncNotifier<void> {
   @override

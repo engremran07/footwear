@@ -194,7 +194,8 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       }
 
       // Use provided tenantId or fall back to current user's tenant
-      final effectiveTenantId = TenantScope.normalize(tenantId) ??
+      final effectiveTenantId =
+          TenantScope.normalize(tenantId) ??
           TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
           TenantScope.globalTenantId;
 

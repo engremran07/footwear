@@ -49,7 +49,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authUserProvider).value;
 
-    final canViewUserAccounts = currentUser != null &&
+    final canViewUserAccounts =
+        currentUser != null &&
         canManageUserAccountsRole(roleValueFromUserRole(currentUser.role));
 
     // Account management must be isolated from workspace management.
@@ -58,7 +59,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     }
 
     final isSuperAdmin = currentUser.isSuperAdmin;
-    final tenantId = _selectedTenantId ??
+    final tenantId =
+        _selectedTenantId ??
         TenantScope.normalize(currentUser.tenantId) ??
         TenantScope.globalTenantId;
 
@@ -67,9 +69,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
     // ── Users for selected workspace ────────────────────────────────────
     final usersAsync = _showInactive
-        ? ref.watch(
-            allInactiveUsersForTenantProvider(tenantId),
-          )
+        ? ref.watch(allInactiveUsersForTenantProvider(tenantId))
         : ref.watch(tenantUsersProvider(tenantId));
 
     return Scaffold(
@@ -85,19 +85,18 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
           if (isSuperAdmin)
             tenantsAsync.when(
               data: (workspaces) {
-                final selectedWorkspace = workspaces
-                    .firstWhere(
-                      (w) => w.id == _selectedTenantId,
-                      orElse: () => workspaces.isNotEmpty
-                          ? workspaces.first
-                          : TenantModel(
-                              id: TenantScope.globalTenantId,
-                              name: 'Global Workspace',
-                              slug: 'global',
-                              createdAt: Timestamp.now(),
-                              updatedAt: Timestamp.now(),
-                            ),
-                    );
+                final selectedWorkspace = workspaces.firstWhere(
+                  (w) => w.id == _selectedTenantId,
+                  orElse: () => workspaces.isNotEmpty
+                      ? workspaces.first
+                      : TenantModel(
+                          id: TenantScope.globalTenantId,
+                          name: 'Global Workspace',
+                          slug: 'global',
+                          createdAt: Timestamp.now(),
+                          updatedAt: Timestamp.now(),
+                        ),
+                );
 
                 return Padding(
                   padding: const EdgeInsets.symmetric(
@@ -116,11 +115,11 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         value: selectedWorkspace.id,
                         isExpanded: true,
                         items: workspaces.map((w) {
-                          return DropdownMenuItem(
+                          return DropdownMenuItem<String>(
                             value: w.id,
                             child: Row(
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.workspaces,
                                   size: 16,
                                   color: AppBrand.primaryColor,
@@ -136,21 +135,19 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                             ),
                           );
                         }).toList(),
-                        onChanged: (v) => setState(
-                          () => _selectedTenantId = v,
-                        ),
+                        onChanged: (v) => setState(() => _selectedTenantId = v),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${workspaces.fold<int>(0, (sum, w) => sum + 1)} ${tr('workspaces', ref).toLowerCase()}',
+                        '${workspaces.fold<int>(0, (acc, w) => acc + 1)} ${tr('workspaces', ref).toLowerCase()}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
                   ),
                 );
               },
-              loading: () => Padding(
-                padding: const EdgeInsets.all(12),
+              loading: () => const Padding(
+                padding: EdgeInsets.all(12),
                 child: SizedBox(
                   height: 48,
                   child: Center(
@@ -167,10 +164,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                   ),
                 ),
               ),
-              error: (_, __) => Padding(
-                padding: const EdgeInsets.all(12),
+              error: (_, _) => const Padding(
+                padding: EdgeInsets.all(12),
                 child: Text(
-                  tr('err_loading_data', ref),
+                  'Error loading data',
                   style: TextStyle(color: AppBrand.errorFg),
                 ),
               ),
@@ -267,10 +264,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         : _UserTile(
                             user: filtered[i],
                             currentUser: currentUser,
-                            onEdit: () => _showEditUserDialog(
-                              filtered[i],
-                              tenantId,
-                            ),
+                            onEdit: () =>
+                                _showEditUserDialog(filtered[i], tenantId),
                             onDelete: () => _confirmDeleteUser(filtered[i]),
                             onToggle: (v) => ref
                                 .read(userManagementNotifierProvider.notifier)

@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
 import '../core/services/admin_identity_service.dart';
+import '../core/services/device_identity_service.dart';
+import '../core/utils/device_pairing.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/user_model.dart';
@@ -88,8 +90,8 @@ class AuthNotifier extends AsyncNotifier<void> {
     if (!isPrivilegedRoleName(normalizedRole)) return;
 
     try {
-      final settingsDocId = TenantScope.normalize(tenantId) ??
-          TenantScope.globalTenantId;
+      final settingsDocId =
+          TenantScope.normalize(tenantId) ?? TenantScope.globalTenantId;
       final settingsRef = FirebaseFirestore.instance
           .collection(Collections.settings)
           .doc(settingsDocId);
@@ -409,14 +411,20 @@ class AuthNotifier extends AsyncNotifier<void> {
       throw StateError('Only admin or super admin can manage device pairing');
     }
 
+    final resolvedPairingId = enabled
+        ? (pairingId ??
+            DevicePairing.generate(
+              await DeviceIdentityService.instance.currentDeviceId(),
+              targetUserId,
+            ))
+        : null;
+
     await FirebaseFirestore.instance
         .collection(Collections.users)
         .doc(targetUserId)
         .set({
           'device_pairing_enabled': enabled,
-          'device_pairing_id': enabled
-              ? (pairingId ?? 'paired:$targetUserId')
-              : null,
+          'device_pairing_id': resolvedPairingId,
           'device_pairing_reset_by': enabled ? null : authUser.uid,
           'updated_at': Timestamp.now(),
         }, SetOptions(merge: true));
