@@ -178,7 +178,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
 
       final tenantId =
           TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
-          'default-tenant';
+          TenantScope.globalTenantId;
 
       // Use a secondary FirebaseApp so the admin stays signed in
       FirebaseApp? tempApp;

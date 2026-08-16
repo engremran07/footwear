@@ -49,7 +49,7 @@ flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=tru
 
 # Install to connected device
 adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/
-adb install -r /sdcard/Download/app-arm64-v8a-release.apk
+adb install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
 ```
 
 ---

@@ -230,12 +230,15 @@ class ShopNotifier extends AsyncNotifier<void> {
     final db = FirebaseFirestore.instance;
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     if (uid.isEmpty) throw StateError('Not authenticated');
+    final tenantId = TenantScope.normalize(
+      ref.read(authUserProvider).value?.tenantId,
+    ) ?? TenantScope.globalTenantId;
     // Pre-generate doc ID so retries on network failure are idempotent
     // (using add() can create a duplicate if the first write succeeds but
     // the ACK is lost and the SDK retries the request).
     final shopRef = db.collection(Collections.customers).doc();
     await shopRef.set({
-      ...data,
+      ...TenantScope.applyToData(data, tenantId: tenantId),
       // Always overwrite created_by with the verified Firebase Auth uid.
       // Screens may pass an empty string if authUserProvider hasn't resolved
       // yet; using the Auth uid directly is the authoritative source.

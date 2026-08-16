@@ -87,16 +87,20 @@ class AuthNotifier extends AsyncNotifier<void> {
     if (!isPrivilegedRoleName(normalizedRole)) return;
 
     try {
-      await FirebaseFirestore.instance
+      final globalSettingsRef = FirebaseFirestore.instance
           .collection(Collections.settings)
-          .doc('global')
-          .set({
-            'company_name': 'My Business',
-            'currency': 'SAR',
-            'pairs_per_carton': 12,
-            'require_admin_approval_for_seller_transaction_edits': false,
-            'updated_at': Timestamp.now(),
-          }, SetOptions(merge: true));
+          .doc('global');
+      final settingsSnap = await globalSettingsRef.get();
+      if (!settingsSnap.exists) {
+        await globalSettingsRef.set({
+          'company_name': 'My Business',
+          'currency': 'SAR',
+          'pairs_per_carton': 12,
+          'require_admin_approval_for_seller_transaction_edits': false,
+          'updated_at': Timestamp.now(),
+          'tenant_id': TenantScope.globalTenantId,
+        }, SetOptions(merge: true));
+      }
     } catch (e) {
       _logger.w('Post-sign-in settings self-heal skipped: $e');
     }
@@ -292,9 +296,17 @@ class AuthNotifier extends AsyncNotifier<void> {
         final userData = refreshedDoc.data();
         final isActive = userData?['active'] == true;
         final normalizedRole = (userData?['role'] as String? ?? '').trim();
-        String? tenantId = userData?['tenant_id'] as String?;
+        String? tenantId = TenantScope.normalize(userData?['tenant_id'] as String?);
+
+        if (tenantId == null) {
+          tenantId = TenantScope.globalTenantId;
+          await usersRef.doc(uid).set({
+            'tenant_id': tenantId,
+            'updated_at': Timestamp.now(),
+          }, SetOptions(merge: true));
+        }
+
         if (normalizedRole.toLowerCase() == 'super_admin') {
-          tenantId ??= TenantScope.globalTenantId;
           await usersRef.doc(uid).set({
             'role': 'super_admin',
             'tenant_id': tenantId,
@@ -339,7 +351,7 @@ class AuthNotifier extends AsyncNotifier<void> {
         if (!kIsWeb) {
           FirebaseCrashlytics.instance.setUserIdentifier(uid);
           FirebaseCrashlytics.instance.setCustomKey('role', normalizedRole);
-          if (tenantId != null && tenantId.isNotEmpty) {
+          if (tenantId.isNotEmpty) {
             FirebaseCrashlytics.instance.setCustomKey('tenant_id', tenantId);
           }
           FirebaseCrashlytics.instance.setCustomKey(

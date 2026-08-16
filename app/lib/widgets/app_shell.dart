@@ -23,6 +23,14 @@ class AppShell extends ConsumerStatefulWidget {
   final Widget child;
   const AppShell({super.key, required this.child});
 
+  static bool canManageWorkspaces(UserModel? user) {
+    return user != null && (user.isSuperAdmin || user.isTenantAdmin);
+  }
+
+  static bool canManageUsers(UserModel? user) {
+    return user != null && (user.isAdmin || user.isTenantAdmin || user.isSuperAdmin);
+  }
+
   static const _navItems = [
     (icon: Icons.dashboard, key: 'dashboard', route: '/'),
     (icon: Icons.route, key: 'routes', route: '/routes'),
@@ -212,8 +220,9 @@ class _AppShellState extends ConsumerState<AppShell>
           .toList();
     }
     return AppShell._navItems.where((e) {
-      if (e.route == '/settings' || e.route == '/users') return user.isAdmin;
-      if (e.route == '/tenants') return user.isSuperAdmin || user.isTenantAdmin;
+      if (e.route == '/settings') return user.isAdmin;
+      if (e.route == '/users') return AppShell.canManageUsers(user);
+      if (e.route == '/tenants') return AppShell.canManageWorkspaces(user);
       return true;
     }).toList();
   }
@@ -231,13 +240,20 @@ class _AppShellState extends ConsumerState<AppShell>
         (icon: Icons.history, key: 'history', route: '/history'),
       ];
     }
-    return const [
-      (icon: Icons.dashboard, key: 'dashboard', route: '/'),
-      (icon: Icons.storefront, key: 'shops', route: '/shops'),
-      (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
-      (icon: Icons.history, key: 'history', route: '/history'),
-      (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
+
+    final items = <({IconData icon, String key, String route})>[
+      const (icon: Icons.dashboard, key: 'dashboard', route: '/'),
+      const (icon: Icons.storefront, key: 'shops', route: '/shops'),
+      const (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
+      const (icon: Icons.history, key: 'history', route: '/history'),
+      const (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
     ];
+    if (AppShell.canManageWorkspaces(user)) {
+      items.add(
+        const (icon: Icons.apartment, key: 'workspaces', route: '/tenants'),
+      );
+    }
+    return items;
   }
 
   int _selectedIndex(

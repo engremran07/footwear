@@ -10,9 +10,11 @@ UserRole _roleFromString(String s) {
       return UserRole.admin;
     case 'tenant_admin':
     case 'tenant-admin':
+    case 'tenantadmin':
       return UserRole.tenantAdmin;
     case 'super_admin':
     case 'super-admin':
+    case 'superadmin':
       return UserRole.superAdmin;
     default:
       return UserRole.seller;

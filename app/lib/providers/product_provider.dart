@@ -112,6 +112,9 @@ class ProductNotifier extends AsyncNotifier<void> {
 
   Future<String> createProduct(Map<String, dynamic> data) async {
     await _requireAdmin();
+    final tenantId = TenantScope.normalize(
+      ref.read(authUserProvider).value?.tenantId,
+    ) ?? TenantScope.globalTenantId;
     // enforce HTTPS for product image URLs
     final imageUrl = data['image_url'] as String? ?? '';
     if (imageUrl.isNotEmpty && !imageUrl.startsWith('https://')) {
@@ -119,7 +122,7 @@ class ProductNotifier extends AsyncNotifier<void> {
     }
     final db = FirebaseFirestore.instance;
     final doc = await db.collection(Collections.products).add({
-      ...data,
+      ...TenantScope.applyToData(data, tenantId: tenantId),
       'active': true,
       'created_at': Timestamp.now(),
       'updated_at': Timestamp.now(),
@@ -129,6 +132,9 @@ class ProductNotifier extends AsyncNotifier<void> {
 
   Future<void> updateProduct(String id, Map<String, dynamic> data) async {
     await _requireAdmin();
+    final tenantId = TenantScope.normalize(
+      ref.read(authUserProvider).value?.tenantId,
+    ) ?? TenantScope.globalTenantId;
     // enforce HTTPS for product image URLs on update
     final imageUrl = data['image_url'] as String? ?? '';
     if (imageUrl.isNotEmpty && !imageUrl.startsWith('https://')) {
@@ -137,7 +143,7 @@ class ProductNotifier extends AsyncNotifier<void> {
     await FirebaseFirestore.instance
         .collection(Collections.products)
         .doc(id)
-        .update({...data, 'updated_at': Timestamp.now()});
+        .update({...TenantScope.applyToData(data, tenantId: tenantId), 'updated_at': Timestamp.now()});
   }
 
   Future<void> deleteProduct(String id) async {
@@ -150,10 +156,13 @@ class ProductNotifier extends AsyncNotifier<void> {
 
   Future<void> createVariant(Map<String, dynamic> data) async {
     await _requireAdmin();
+    final tenantId = TenantScope.normalize(
+      ref.read(authUserProvider).value?.tenantId,
+    ) ?? TenantScope.globalTenantId;
     await FirebaseFirestore.instance
         .collection(Collections.productVariants)
         .add({
-          ...data,
+          ...TenantScope.applyToData(data, tenantId: tenantId),
           'active': true,
           'created_at': Timestamp.now(),
           'updated_at': Timestamp.now(),
@@ -162,10 +171,13 @@ class ProductNotifier extends AsyncNotifier<void> {
 
   Future<void> updateVariant(String id, Map<String, dynamic> data) async {
     await _requireAdmin();
+    final tenantId = TenantScope.normalize(
+      ref.read(authUserProvider).value?.tenantId,
+    ) ?? TenantScope.globalTenantId;
     await FirebaseFirestore.instance
         .collection(Collections.productVariants)
         .doc(id)
-        .update({...data, 'updated_at': Timestamp.now()});
+        .update({...TenantScope.applyToData(data, tenantId: tenantId), 'updated_at': Timestamp.now()});
   }
 
   Future<void> deleteVariant(String id) async {

@@ -28,6 +28,67 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.47',
+    date: 'August 2026',
+    items: [
+      ChangelogItem(
+        emoji: '�',
+        text: {
+          AppLocale.en:
+              'Workspace and Tenant accounts are now fully isolated by default. Each seller is assigned to specific routes within their workspace, and can only see shops and inventory within those routes.',
+          AppLocale.ar:
+              'أصبحت حسابات مساحة العمل والمستأجرين معزولة بالكامل الآن بشكل افتراضي. يتم تخصيص كل بائع لمسارات معينة داخل مساحة عمله، ولا يمكنه سوى رؤية المتاجر والمخزون داخل تلك المسارات.',
+          AppLocale.ur:
+              'ورکسپیس اور ٹینٹ اکاؤنٹس اب ڈیفالٹ طور پر مکمل طور پر الگ تھلگ ہیں۔ ہر بروکر کو ان کے ورکسپیس میں مخصوص روٹس کے لیے تفویض کیا جاتا ہے، اور وہ صرف ان روٹس میں شاپس اور انوینٹری دیکھ سکتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Admin accounts can now manage entire workspaces. When you sign in as admin, you see all routes, shops, and seller performance across the workspace. Sellers only see their assigned routes.',
+          AppLocale.ar:
+              'يمكن لحسابات المسؤول الآن إدارة مساحات العمل بالكامل. عند تسجيل الدخول كمسؤول، ترى جميع المسارات والمتاجر وأداء البائعين في جميع أنحاء مساحة العمل. لا يرى البائعون سوى مساراتهم المعينة.',
+          AppLocale.ur:
+              'ایڈمن اکاؤنٹس اب پورے ورکسپیس کو منیج کر سکتے ہیں۔ جب آپ ایڈمن کے طور پر سائن ان کرتے ہیں، تو آپ پورے ورکسپیس میں تمام روٹس، شاپس، اور فروخت کی کارکردگی دیکھتے ہیں۔ بروکر صرف اپنے تفویض شدہ روٹس دیکھتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📦',
+        text: {
+          AppLocale.en:
+              'Previous workspace data has been automatically transferred to the new workspace model. All shops, routes, and transactions remain intact and are now scoped to the default global workspace.',
+          AppLocale.ar:
+              'تم نقل بيانات مساحة العمل السابقة تلقائيًا إلى نموذج مساحة العمل الجديد. تبقى جميع المتاجر والمسارات والمعاملات سليمة وتقتصر الآن على مساحة العمل العالمية الافتراضية.',
+          AppLocale.ur:
+              'پچھلے ورکسپیس ڈیٹا کو خودکار طور پر نئے ورکسپیس ماڈل میں منتقل کیا گیا ہے۔ تمام شاپس، روٹس، اور ٹرانزیکشنز برقرار ہیں اور اب ڈیفالٹ گلوبل ورکسپیس کے لیے محدود ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '�📲',
+        text: {
+          AppLocale.en:
+              'The release APK is now copied to phone storage before installation so the app package is preserved on-device for recovery and handoff.',
+          AppLocale.ar:
+              'يتم الآن نسخ حزمة الإصدار إلى تخزين الهاتف قبل التثبيت، بحيث يتم الاحتفاظ بحزمة التطبيق على الجهاز لأغراض الاسترداد والتسليم.',
+          AppLocale.ur:
+              'ریلیز APK اب انسٹال سے پہلے فون کے اسٹوریج میں کاپی ہو جاتا ہے تاکہ اپلیکیشن پیکیج ڈیوائس پر محفوظ رہے اور ریسیوری/ہینڈآف کے لیے دستیاب رہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧩',
+        text: {
+          AppLocale.en:
+              'The app now follows the streamed install flow in the governance pack to keep release installs consistent with the required device-delivery workflow.',
+          AppLocale.ar:
+              'يتبع التطبيق الآن تدفق التثبيت المتدفق في حزمة الحوكمة للحفاظ على اتساق عمليات تثبيت الإصدار مع سير عمل تسليم الجهاز المطلوب.',
+          AppLocale.ur:
+              'ایپ اب گورننس پیک میں streamed install flow کی پیروی کرتی ہے تاکہ ریلیز انسٹال required device-delivery workflow کے ساتھ مستقل رہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.26',
     date: 'August 2026',
     items: [

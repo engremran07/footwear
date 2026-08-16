@@ -5,10 +5,52 @@
 /// produces the expected widget tree under mocked auth state.
 library;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:footwear_erp/models/user_model.dart';
+import 'package:footwear_erp/widgets/app_shell.dart';
 
 void main() {
+  group('App shell SaaS nav rules', () {
+    testWidgets('workspace CRUD is exposed as a first-class admin section', (tester) async {
+      final superAdmin = UserModel(
+        id: 'sa',
+        email: 'global@example.com',
+        displayName: 'Global Admin',
+        role: UserRole.superAdmin,
+        active: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+      final tenantAdmin = UserModel(
+        id: 'ta',
+        email: 'tenant@example.com',
+        displayName: 'Tenant Admin',
+        role: UserRole.tenantAdmin,
+        active: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+      final seller = UserModel(
+        id: 's',
+        email: 'seller@example.com',
+        displayName: 'Seller',
+        role: UserRole.seller,
+        active: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+
+      expect(AppShell.canManageWorkspaces(superAdmin), isTrue);
+      expect(AppShell.canManageWorkspaces(tenantAdmin), isTrue);
+      expect(AppShell.canManageWorkspaces(seller), isFalse);
+      expect(AppShell.canManageUsers(superAdmin), isTrue);
+      expect(AppShell.canManageUsers(tenantAdmin), isTrue);
+      expect(AppShell.canManageUsers(seller), isFalse);
+    });
+  });
+
   group('App shell smoke tests', () {
     testWidgets('MaterialApp renders without error', (tester) async {
       await tester.pumpWidget(

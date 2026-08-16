@@ -190,6 +190,9 @@ class RouteNotifier extends AsyncNotifier<void> {
 
   Future<void> create(Map<String, dynamic> data) async {
     final db = FirebaseFirestore.instance;
+    final currentUser = ref.read(authUserProvider).value;
+    final tenantId = TenantScope.normalize(currentUser?.tenantId) ??
+        TenantScope.globalTenantId;
     final routeRef = db.collection(Collections.routes).doc();
     final routeName = data['name'] as String? ?? '';
     final currency = data['currency'] as String? ?? 'SAR';
@@ -220,7 +223,7 @@ class RouteNotifier extends AsyncNotifier<void> {
 
       final now = Timestamp.now();
       txn.set(routeRef, {
-        ...data,
+        ...TenantScope.applyToData(data, tenantId: tenantId),
         'assigned_seller_ids': sellerIds,
         'assigned_seller_names': sellerNames,
         'currency': currency,
@@ -255,6 +258,10 @@ class RouteNotifier extends AsyncNotifier<void> {
           data['name'] as String? ??
           currentRoute.data()?['name'] as String? ??
           '';
+      final tenantId = TenantScope.normalize(
+            ref.read(authUserProvider).value?.tenantId,
+          ) ??
+          TenantScope.globalTenantId;
       final currency =
           data['currency'] as String? ??
           currentRoute.data()?['currency'] as String? ??
@@ -292,7 +299,7 @@ class RouteNotifier extends AsyncNotifier<void> {
 
       final now = Timestamp.now();
       txn.update(routeRef, {
-        ...data,
+        ...TenantScope.applyToData(data, tenantId: tenantId),
         'assigned_seller_ids': newSellerIds.toList(),
         'assigned_seller_names': newSellerNames,
         'currency': currency,
