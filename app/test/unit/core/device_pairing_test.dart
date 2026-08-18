@@ -20,5 +20,11 @@ void main() {
         isFalse,
       );
     });
+
+    test('returns a non-empty stable device identifier', () async {
+      final id = await DevicePairing.currentDeviceIdentifier();
+      expect(id, isNotEmpty);
+      expect(DevicePairing.sanitize(id), equals(id));
+    });
   });
 }

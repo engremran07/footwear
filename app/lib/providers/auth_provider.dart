@@ -446,9 +446,8 @@ class AuthNotifier extends AsyncNotifier<void> {
     if (enabled) {
       final normalizedPairingId =
           pairingId ??
-          // P2-14 FIX: Use DevicePairing.currentDeviceIdentifier() instead of DeviceIdentityService
-          DevicePairing.generate(
-            DevicePairing.currentDeviceIdentifier(),
+          await DevicePairing.generate(
+            await DevicePairing.currentDeviceIdentifier(),
             targetUserId,
           );
       final alreadyPaired = existingPairings.contains(normalizedPairingId);

@@ -19,7 +19,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 - **Invoices** — sale invoices, credit notes, void/paid lifecycle, 3-step payment progression bar
 - **Reports** — monthly cash flow BarChart, outstanding PieChart, PDF/Excel/image export
 - **User Management** — create/edit admin and seller accounts, soft-delete; password reset by email
-- **Settings** — company name, logo (base64 ≤50 KB), pairs-per-carton, business preferences
+- **Settings** — workspace-scoped company name, logo (base64 ≤50 KB), pairs-per-carton, business preferences, and per-workspace device pairing limits
 - **Profile** — name, language, theme and password controls for all users
 
 ### Seller

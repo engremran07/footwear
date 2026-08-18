@@ -35,6 +35,22 @@ service cloud.firestore {
       return role is string && role.matches('(?i)^\\s*super_admin\\s*$');
     }
 
+    function isSuperAdmin() {
+      return isActiveUser() && isSuperAdminRole(getUserRole());
+    }
+
+    // P0-2 FIX: isAdminForTenant(tenantId) checks if the current user is an
+    // admin-tier account that can access this specific tenant's data. Used as
+    // the security boundary for all tenant-owned documents: routes, shops,
+    // transactions, invoices, products, inventory, notifications, etc.
+    function isAdminForTenant(tenantId) {
+      return isSuperAdmin() || (
+        isActiveUser() &&
+        isTenantAdminRole(getUserRole()) &&
+        currentUserTenantId() == tenantId
+      );
+    }
+
     function currentUserTenantId() {
       return userDoc().data.tenant_id;
     }
@@ -48,10 +64,6 @@ service cloud.firestore {
 
     function isTenantAdmin() {
       return isActiveUser() && isTenantAdminOnlyRole(getUserRole());
-    }
-
-    function isSuperAdmin() {
-      return isActiveUser() && isSuperAdminRole(getUserRole());
     }
 
     function isSellerRole(role) {
@@ -189,6 +201,8 @@ service cloud.firestore {
           isAdmin() &&
           request.resource.data.created_by == request.auth.uid &&
           isValidRole(request.resource.data.role) &&
+          // P2-13 FIX: Enforce tenant ownership on admin user creation
+          request.resource.data.tenant_id == currentUserTenantId() &&
           (
             request.resource.data.role != 'seller' ||
             (
@@ -213,8 +227,11 @@ service cloud.firestore {
           isTenantAdminRole(getUserRole()) &&
           resource.data.tenant_id == currentUserTenantId() &&
           request.resource.data.tenant_id == resource.data.tenant_id &&
+          // P1-7 FIX: tenant_admin can now manage seller fields (display_name, phone,
+          // active status, route assignment) within their tenant, but cannot change
+          // role or tenant_id (which remain admin/super_admin only).
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['device_pairing_enabled', 'device_pairing_id', 'device_pairing_reset_by', 'updated_at']) &&
+            .hasOnly(['display_name', 'phone', 'active', 'assigned_route_ids', 'assigned_route_names', 'device_pairing_enabled', 'device_pairing_id', 'device_pairing_reset_by', 'updated_at']) &&
           docSizeOk()
         )
       );
@@ -246,20 +263,22 @@ service cloud.firestore {
     // --- products -----------------------------------------------------------
     match /products/{productId} {
       allow read: if isActiveUser();
-      allow create, update: if isAdmin() && docSizeOk()
+      // P0-2 FIX: products are tenant-owned; use isAdminForTenant check
+      allow create, update: if isAdminForTenant(request.resource.data.tenant_id) && docSizeOk()
         && (!('image_url' in request.resource.data)
           || !(request.resource.data.image_url is string)
           || request.resource.data.image_url == ''
           || request.resource.data.image_url.matches('https://.*'));
-      allow delete: if isAdmin();
+      allow delete: if isAdminForTenant(resource.data.tenant_id);
     }
 
     // --- product_variants ---------------------------------------------------
     match /product_variants/{variantId} {
       allow read: if isActiveUser();
-      allow create: if isAdmin() && docSizeOk();
-      allow update: if isAdmin() && docSizeOk();
-      allow delete: if isAdmin();
+      // P0-2 FIX: product_variants are tenant-owned; use isAdminForTenant check
+      allow create: if isAdminForTenant(request.resource.data.tenant_id) && docSizeOk();
+      allow update: if isAdminForTenant(request.resource.data.tenant_id) && docSizeOk();
+      allow delete: if isAdminForTenant(resource.data.tenant_id);
     }
 
     // --- routes -------------------------------------------------------------
@@ -269,10 +288,11 @@ service cloud.firestore {
       // is NOT constrained by query filters, so Firestore can't prove it.
       // The second branch checks the document field directly — Firestore CAN
       // validate this against an arrayContains query constraint.
-      allow read: if isAdmin() || isSellerForRoute(routeId) ||
+      allow read: if isAdminForTenant(resource.data.tenant_id) || isSellerForRoute(routeId) ||
         (isSeller() && request.auth.uid in resource.data.assigned_seller_ids);
-      allow create, update: if isAdmin() && docSizeOk();
-      allow delete: if isAdmin();
+      // P0-2 FIX: routes are tenant-owned; use isAdminForTenant check
+      allow create, update: if isAdminForTenant(request.resource.data.tenant_id) && docSizeOk();
+      allow delete: if isAdminForTenant(resource.data.tenant_id);
     }
 
     // --- customers (= shops) ------------------------------------------------
@@ -283,14 +303,15 @@ service cloud.firestore {
     // BALANCE FIELD: balance > 0 means shop owes us money (accounts receivable).
     // Updated atomically with every transaction/invoice write.
     match /customers/{customerId} {
-      allow read: if isAdmin() ||
+      allow read: if isAdminForTenant(resource.data.tenant_id) ||
         (
           isSeller() &&
           resource.data.route_id != null &&
           isSellerForRoute(resource.data.route_id)
         );
       // Sellers must include a non-empty route_id when creating customers
-      allow create: if (isAdmin() ||
+      // P0-2 FIX: customers are tenant-owned; use isAdminForTenant check
+      allow create: if (isAdminForTenant(request.resource.data.tenant_id) ||
         (
           isSeller() &&
           request.resource.data.name is string &&
@@ -303,7 +324,8 @@ service cloud.firestore {
       // SR-08: withinWriteRate() removed from customers — financial ledger writes
       // (balance increments from invoice batches) must not be throttled; atomic
       // WriteBatch integrity is the correct guard, not a 1-second time gate.
-      allow update: if (isAdmin() ||
+      // P0-2 FIX: customers are tenant-owned; use isAdminForTenant check
+      allow update: if (isAdminForTenant(resource.data.tenant_id) ||
         (
           isSeller() &&
           resource.data.route_id is string &&
@@ -324,7 +346,7 @@ service cloud.firestore {
             'last_transaction_at'
           ])
         )) && docSizeOk();
-      allow delete: if isAdmin();
+      allow delete: if isAdminForTenant(resource.data.tenant_id);
     }
 
     // --- transactions -------------------------------------------------------
@@ -336,9 +358,10 @@ service cloud.firestore {
     // Allowed types: cash_in | cash_out | return | payment | write_off
     match /transactions/{txId} {
       // Seller can read only route-owned transactions.
-      allow read: if isAdmin() || isSellerRouteTransaction();
+      // P0-2 FIX: transactions are tenant-owned; use isAdminForTenant check
+      allow read: if isAdminForTenant(resource.data.tenant_id) || isSellerRouteTransaction();
       // Field validation: type must be in allowed set, amount must be positive
-      allow create: if (isAdmin() ||
+      allow create: if (isAdminForTenant(request.resource.data.tenant_id) ||
         (
           isSeller() &&
           request.resource.data.created_by == request.auth.uid &&
@@ -362,7 +385,7 @@ service cloud.firestore {
       // Sellers can:
       // 1) submit edit request fields when approval toggle is ON
       // 2) directly edit own cash_in/cash_out transactions when toggle is OFF
-      allow update: if isAdmin() ||
+      allow update: if isAdminForTenant(resource.data.tenant_id) ||
         (
           requestIsSellerRouteTransaction() &&
           (
@@ -411,21 +434,22 @@ service cloud.firestore {
             )
           )
         );
-      allow delete: if isAdmin();
+      allow delete: if isAdminForTenant(resource.data.tenant_id);
     }
 
     // --- seller inventory ---------------------------------------------------
     match /seller_inventory/{docId} {
-      allow read: if isAdmin() ||
+      // P0-2 FIX: seller_inventory is tenant-owned; use isAdminForTenant check
+      allow read: if isAdminForTenant(resource.data.tenant_id) ||
         (isSeller() && resource.data.seller_id == request.auth.uid);
-      allow create, delete: if isAdmin();
+      allow create, delete: if isAdminForTenant(request.resource.data.tenant_id);
       // Seller can update quantity_available (stock deduction on sale).
       // Post-state quantity_available must stay >= 0 to prevent negative stock.
       // SR-07: withinWriteRate() intentionally excluded here — rapid sequential
       // sales (two invoices < 1 ms apart) would otherwise block the second
       // stock deduction, creating ghost inventory discrepancies. The
       // quantity_available >= 0 guard is the true integrity constraint.
-      allow update: if (isAdmin() ||
+      allow update: if (isAdminForTenant(resource.data.tenant_id) ||
         (
           isSeller() &&
           resource.data.seller_id == request.auth.uid &&
@@ -437,9 +461,10 @@ service cloud.firestore {
 
     // --- inventory transactions (audit log for all stock movements) ---------
     match /inventory_transactions/{docId} {
-      allow read: if isAdmin() ||
+      // P0-2 FIX: inventory_transactions are tenant-owned; use isAdminForTenant check
+      allow read: if isAdminForTenant(resource.data.tenant_id) ||
         (isSeller() && resource.data.seller_id == request.auth.uid);
-      allow create: if (isAdmin() ||
+      allow create: if (isAdminForTenant(request.resource.data.tenant_id) ||
         (
           isSeller() &&
           request.resource.data.seller_id == request.auth.uid &&
@@ -449,17 +474,18 @@ service cloud.firestore {
         && request.resource.data.quantity is int
         && request.resource.data.quantity > 0
         && docSizeOk();
-      allow update, delete: if isAdmin();
+      allow update, delete: if isAdminForTenant(resource.data.tenant_id);
     }
 
     // --- settings -----------------------------------------------------------
     match /settings/{docId} {
       allow read: if isActiveUser();
-      allow create, delete: if isAdmin();
+      // P0-2 FIX: settings docs are tenant-owned (docId = tenant_id); use isAdminForTenant check
+      allow create, delete: if isAdminForTenant(docId);
       // Admin: full update.
       // Sellers: only invoice counter — and only increment by exactly 1 to
       // prevent fraudulent bulk increments of the invoice sequence.
-      allow update: if (isAdmin() ||
+      allow update: if (isAdminForTenant(docId) ||
         (isActiveUser() &&
          request.resource.data.diff(resource.data).affectedKeys()
            .hasOnly(['last_invoice_number']) &&
@@ -469,7 +495,8 @@ service cloud.firestore {
 
     // --- invoices -----------------------------------------------------------
     match /invoices/{invoiceId} {
-      allow read: if isAdmin() ||
+      // P0-2 FIX: invoices are tenant-owned; use isAdminForTenant check
+      allow read: if isAdminForTenant(resource.data.tenant_id) ||
         (
           isSeller() && (
             resource.data.seller_id == request.auth.uid ||
@@ -478,7 +505,7 @@ service cloud.firestore {
              isSellerForRoute(resource.data.route_id))
           )
         );
-      allow create: if (isAdmin() ||
+      allow create: if (isAdminForTenant(request.resource.data.tenant_id) ||
         (
           isSeller() &&
           request.resource.data.created_by == request.auth.uid &&
@@ -504,8 +531,8 @@ service cloud.firestore {
         && request.resource.data.total >= request.resource.data.subtotal - request.resource.data.discount - 0.01
         && request.resource.data.total <= request.resource.data.subtotal - request.resource.data.discount + 0.01
         && docSizeOk();
-      allow update: if isAdmin() && docSizeOk();
-      allow delete: if isAdmin();
+      allow update: if isAdminForTenant(resource.data.tenant_id) && docSizeOk();
+      allow delete: if isAdminForTenant(resource.data.tenant_id);
     }
 
     // --- admin_config (SA credentials for admin auth pipeline) ---------------
@@ -518,12 +545,13 @@ service cloud.firestore {
 
     // --- notifications (Firestore-listener notification feed) ----------------
     // Admin reads/marks-read; any active user can create for the admin feed.
+    // P0-2 FIX: notifications are tenant-owned; use isAdminForTenant check
     match /notifications/{notifId} {
-      allow read: if isAdmin() && isActiveUser();
+      allow read: if isAdminForTenant(resource.data.tenant_id) && isActiveUser();
       allow create: if isActiveUser()
           && request.resource.data.created_by == request.auth.uid
           && docSizeOk();
-      allow update: if isAdmin() && isActiveUser()
+      allow update: if isAdminForTenant(resource.data.tenant_id) && isActiveUser()
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['read', 'read_at']);
       allow delete: if false;

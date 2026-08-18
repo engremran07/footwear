@@ -10,6 +10,7 @@ This repository is a route/seller distribution ERP.
 - Legacy role value manager must be treated as admin-equivalent in app and rules
 - Tenant-aware roles tenant_admin and super_admin are now supported and must be treated as privileged, tenant-scoped roles in app and rules
 - New tenant-scoped users should carry a tenant_id and device pairing metadata where applicable, and must not cross tenant boundaries in rules or providers
+- Each workspace owns its own settings document and device-pairing policy; no super-admin-only global settings override is allowed for tenant branding or pairing limits
 - Canonical collections:
   - users
   - products
@@ -68,6 +69,8 @@ Seller:
 ## 4) Non-Negotiable Engineering Rules
 
 1. Role alignment is mandatory in all three layers: app/lib/models/user_model.dart, firestore.rules, and provider write guards on security-critical fields.
+
+1. Workspace settings and device-pairing limits are tenant-scoped. Each workspace must own its own business name, logo, and max device policy; never simplify these into a single super-admin global profile.
 
 1. Do not invent collections; use constants only.
 

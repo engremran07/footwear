@@ -1,9 +1,13 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 class DevicePairing {
   const DevicePairing._();
+
+  static const String _storageKey = 'device_pairing.device_id';
 
   static String sanitize(String? raw) {
     final value = (raw ?? '').trim();
@@ -11,13 +15,16 @@ class DevicePairing {
     return value.toLowerCase().replaceAll(RegExp(r'\s+'), '');
   }
 
-  static String currentDeviceIdentifier() {
+  static Future<String> currentDeviceIdentifier() async {
     if (kIsWeb) {
-      // P2-15 FIX: Web device ID time-based issue
-      // TODO: Replace with stable UUID persisted to browser storage,
-      // or omit device pairing on web entirely.
-      // For now, return empty string to disable device pairing on web.
-      return '';
+      final prefs = await SharedPreferences.getInstance();
+      final existing = prefs.getString(_storageKey)?.trim();
+      if (existing != null && existing.isNotEmpty) {
+        return sanitize(existing);
+      }
+      final generated = const Uuid().v4();
+      await prefs.setString(_storageKey, generated);
+      return sanitize(generated);
     }
 
     final os = Platform.operatingSystem;
@@ -34,8 +41,8 @@ class DevicePairing {
     return expectedValue == actualValue;
   }
 
-  static String generate(String? deviceId, String userId) {
-    final normalizedDevice = sanitize(deviceId ?? currentDeviceIdentifier());
+  static Future<String> generate(String? deviceId, String userId) async {
+    final normalizedDevice = sanitize(deviceId ?? await currentDeviceIdentifier());
     final normalizedUser = sanitize(userId);
     if (normalizedDevice.isEmpty) {
       return 'paired:$normalizedUser';

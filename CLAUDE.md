@@ -34,6 +34,7 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 7. Any where+orderBy query requires index entry when fields differ.
 8. Keep role handling canonical and normalized (trim/lowercase in app writes).
    Tenant-aware roles (tenant_admin, super_admin) must be treated as privileged roles and must carry a tenant_id in new documents and in the user profile.
+   Each workspace owns its own settings and device-pairing limits; branding and pairing limits are scoped to the tenant, not a super-admin global profile.
 9. Keep admin-only write enforcement in submit methods (screen-level defense in depth).
 10. Validate required identity fields (for example created_by/route_id/shop_id) before provider writes.
 11. No Firebase Storage — company logos stored as base64 in Firestore, product images use external HTTP URLs. Do not add firebase_storage dependency.
