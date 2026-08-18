@@ -124,7 +124,8 @@ final routesBySellerProvider = StreamProvider.autoDispose
           .limit(100)
           .snapshots()
           .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException && error.code == 'failed-precondition') {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
               return const <RouteModel>[];
             }
             throw error;

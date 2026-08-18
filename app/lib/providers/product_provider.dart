@@ -30,7 +30,9 @@ final productsProvider = StreamProvider.autoDispose<List<ProductModel>>((ref) {
         final products = snap.docs
             .map((d) => ProductModel.fromJson(d.data(), d.id))
             .toList();
-        products.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        products.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
         return products;
       });
 });
@@ -70,7 +72,8 @@ final productVariantsProvider = StreamProvider.autoDispose
           .limit(100)
           .snapshots()
           .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException && error.code == 'failed-precondition') {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
               return const <ProductVariantModel>[];
             }
             throw error;
@@ -80,7 +83,9 @@ final productVariantsProvider = StreamProvider.autoDispose
                 .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
                 .toList();
             variants.sort(
-              (a, b) => a.variantName.toLowerCase().compareTo(b.variantName.toLowerCase()),
+              (a, b) => a.variantName.toLowerCase().compareTo(
+                b.variantName.toLowerCase(),
+              ),
             );
             return variants;
           });
@@ -102,7 +107,8 @@ final allVariantsProvider =
           .limit(500)
           .snapshots()
           .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException && error.code == 'failed-precondition') {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
               return const <ProductVariantModel>[];
             }
             throw error;
@@ -112,7 +118,9 @@ final allVariantsProvider =
                 .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
                 .toList();
             variants.sort(
-              (a, b) => a.variantName.toLowerCase().compareTo(b.variantName.toLowerCase()),
+              (a, b) => a.variantName.toLowerCase().compareTo(
+                b.variantName.toLowerCase(),
+              ),
             );
             return variants;
           });

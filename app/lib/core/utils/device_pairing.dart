@@ -42,7 +42,9 @@ class DevicePairing {
   }
 
   static Future<String> generate(String? deviceId, String userId) async {
-    final normalizedDevice = sanitize(deviceId ?? await currentDeviceIdentifier());
+    final normalizedDevice = sanitize(
+      deviceId ?? await currentDeviceIdentifier(),
+    );
     final normalizedUser = sanitize(userId);
     if (normalizedDevice.isEmpty) {
       return 'paired:$normalizedUser';

@@ -82,7 +82,8 @@ final shopsByRouteProvider = StreamProvider.autoDispose
           .limit(200)
           .snapshots()
           .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException && error.code == 'failed-precondition') {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
               return const <ShopModel>[];
             }
             throw error;
@@ -259,7 +260,8 @@ final outstandingShopsByRouteProvider = StreamProvider.autoDispose
             return shops;
           })
           .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException && error.code == 'failed-precondition') {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
               return const <ShopModel>[];
             }
             throw error;

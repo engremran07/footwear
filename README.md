@@ -164,6 +164,7 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 6. Treat shops as `Collections.shops` (`customers` collection alias) with tenant partitioning, not as a separate customer model.
 7. Ensure providers select current user tenant context from `authUserProvider` and do not leak cross-tenant streams.
 8. Document new tenant-scoped collections and any tenant gating rule changes in both this README and `MASTER_BLUEPRINT.md`.
+9. Prefer evolving the canonical governance files already in the repo instead of creating additional markdown artifacts for each follow-up pass.
 
 ---
 

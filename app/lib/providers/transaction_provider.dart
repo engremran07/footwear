@@ -63,11 +63,56 @@ final shopTransactionsProvider = StreamProvider.autoDispose
           .orderBy('created_at', descending: true)
           .limit(_shopTransactionsLiveLimit)
           .snapshots()
+          .handleError((Object error, StackTrace stack) {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
+              return const <TransactionModel>[];
+            }
+            throw error;
+          })
           .map(
             (snap) => snap.docs
                 .where((d) => d.data()['deleted'] != true)
                 .map((d) => TransactionModel.fromJson(d.data(), d.id))
                 .toList(),
+          );
+    });
+
+final shopTransactionsFallbackProvider = StreamProvider.autoDispose
+    .family<List<TransactionModel>, String>((ref, shopId) {
+      final normalizedShopId = shopId.trim();
+      if (normalizedShopId.isEmpty) {
+        return Stream.value(const <TransactionModel>[]);
+      }
+
+      final tenantId = ref.watch(
+        authUserProvider.select(
+          (s) => TenantScope.normalize(s.value?.tenantId),
+        ),
+      );
+      final base = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.transactions),
+        tenantId: tenantId,
+      );
+
+      return base
+          .where('shop_id', isEqualTo: normalizedShopId)
+          .limit(_shopTransactionsLiveLimit)
+          .snapshots()
+          .handleError((Object error, StackTrace stack) {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
+              return const <TransactionModel>[];
+            }
+            throw error;
+          })
+          .map(
+            (snap) =>
+                snap.docs
+                    .where((d) => d.data()['deleted'] != true)
+                    .map((d) => TransactionModel.fromJson(d.data(), d.id))
+                    .toList()
+                  ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
           );
     });
 
@@ -92,6 +137,13 @@ final allTransactionsProvider =
           .orderBy('created_at', descending: true)
           .limit(200)
           .snapshots()
+          .handleError((Object error, StackTrace stack) {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
+              return const <TransactionModel>[];
+            }
+            throw error;
+          })
           .map(
             (snap) => snap.docs
                 .where((d) => d.data()['deleted'] != true)
@@ -141,6 +193,13 @@ final shopsAnalyticsTransactionsProvider =
             .orderBy('created_at', descending: true)
             .limit(_shopsAnalyticsTransactionsLimit)
             .snapshots()
+            .handleError((Object error, StackTrace stack) {
+              if (error is FirebaseException &&
+                  error.code == 'failed-precondition') {
+                return const <TransactionModel>[];
+              }
+              throw error;
+            })
             .map(
               (snap) => snap.docs
                   .where((d) => d.data()['deleted'] != true)
@@ -155,6 +214,13 @@ final shopsAnalyticsTransactionsProvider =
           .orderBy('created_at', descending: true)
           .limit(_shopsAnalyticsTransactionsLimit)
           .snapshots()
+          .handleError((Object error, StackTrace stack) {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
+              return const <TransactionModel>[];
+            }
+            throw error;
+          })
           .map(
             (snap) => snap.docs
                 .where((d) => d.data()['deleted'] != true)
@@ -186,6 +252,13 @@ final pendingEditRequestsProvider =
           .orderBy('created_at', descending: true)
           .limit(50)
           .snapshots()
+          .handleError((Object error, StackTrace stack) {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
+              return const <TransactionModel>[];
+            }
+            throw error;
+          })
           .map(
             (snap) => snap.docs
                 .where((d) => d.data()['deleted'] != true)
@@ -211,6 +284,13 @@ final sellerTransactionsProvider = StreamProvider.autoDispose
           .orderBy('created_at', descending: true)
           .limit(200)
           .snapshots()
+          .handleError((Object error, StackTrace stack) {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
+              return const <TransactionModel>[];
+            }
+            throw error;
+          })
           .map(
             (snap) => snap.docs
                 .where((d) => d.data()['deleted'] != true)
@@ -341,6 +421,11 @@ final sellerTransactionsExportProvider =
 class TransactionNotifier extends AsyncNotifier<void> {
   bool _writeInFlight = false;
 
+  Future<String> _currentTenantId() async {
+    final user = await ref.read(authUserProvider.future);
+    return TenantScope.normalize(user?.tenantId) ?? TenantScope.globalTenantId;
+  }
+
   @override
   Future<void> build() async {}
 
@@ -447,6 +532,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
       final db = FirebaseFirestore.instance;
       final batch = db.batch();
+      final tenantId = await _currentTenantId();
       final normalizedKey = idempotencyKey?.trim();
       if (normalizedKey != null && normalizedKey.isNotEmpty) {
         final existing = await db
@@ -465,6 +551,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
         'shop_id': shopId,
         'shop_name': shopName,
         'route_id': routeId,
+        'tenant_id': tenantId,
         'type': type,
         'sale_type': saleType,
         'amount': amount,
@@ -564,6 +651,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
       final db = FirebaseFirestore.instance;
       final batch = db.batch();
+      final tenantId = await _currentTenantId();
 
       final normalizedKey = idempotencyKey?.trim();
       if (normalizedKey != null && normalizedKey.isNotEmpty) {
@@ -582,6 +670,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
         'shop_id': shopId,
         'shop_name': shopName,
         'route_id': routeId,
+        'tenant_id': tenantId,
         'type': 'cash_out',
         'sale_type': saleType ?? 'cash',
         'amount': amount,
@@ -730,12 +819,14 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
     final db = FirebaseFirestore.instance;
     final batch = db.batch();
+    final tenantId = await _currentTenantId();
 
     final txRef = db.collection(Collections.transactions).doc();
     batch.set(txRef, {
       'shop_id': shopId,
       'shop_name': shopName,
       'route_id': routeId,
+      'tenant_id': tenantId,
       'type': TransactionModel.typeReturn,
       'sale_type': 'return',
       'amount': amount,

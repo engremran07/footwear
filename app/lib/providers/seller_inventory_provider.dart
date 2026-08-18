@@ -26,7 +26,8 @@ final sellerInventoryProvider = StreamProvider.autoDispose
           .limit(500)
           .snapshots()
           .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException && error.code == 'failed-precondition') {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
               return const <SellerInventoryModel>[];
             }
             throw error;
@@ -36,7 +37,9 @@ final sellerInventoryProvider = StreamProvider.autoDispose
                 .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
                 .toList();
             inventory.sort(
-              (a, b) => a.variantName.toLowerCase().compareTo(b.variantName.toLowerCase()),
+              (a, b) => a.variantName.toLowerCase().compareTo(
+                b.variantName.toLowerCase(),
+              ),
             );
             return inventory;
           });
@@ -74,7 +77,8 @@ final adminAllSellerInventoryProvider =
           .limit(100)
           .snapshots()
           .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException && error.code == 'failed-precondition') {
+            if (error is FirebaseException &&
+                error.code == 'failed-precondition') {
               return const <SellerInventoryModel>[];
             }
             throw error;
@@ -84,7 +88,9 @@ final adminAllSellerInventoryProvider =
                 .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
                 .toList();
             inventory.sort(
-              (a, b) => a.variantName.toLowerCase().compareTo(b.variantName.toLowerCase()),
+              (a, b) => a.variantName.toLowerCase().compareTo(
+                b.variantName.toLowerCase(),
+              ),
             );
             return inventory;
           });

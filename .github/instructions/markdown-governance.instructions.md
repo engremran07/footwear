@@ -79,6 +79,13 @@ The following docs are critical governance artifacts — **never delete them**:
 `AUDIT_REPORT_FOOTWEAR_ERP.md`, `SESSION_LOG.md`,
 `.claude/CLAUDE.md`, `.claude/skills/*/SKILL.md`
 
+## Consolidated Governance Rule
+
+Prefer updating the canonical governance files above over creating additional
+follow-up markdown files. New markdown should only be added when the repo already
+has no valid home for the information; otherwise append to an existing document or
+merge it into the active central governance source.
+
 ---
 
 ## Load the Full Skill for Complex Edits

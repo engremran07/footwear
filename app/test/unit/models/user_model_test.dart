@@ -20,16 +20,21 @@ void main() {
   });
 
   group('role separation', () {
-    test('tenant admins can manage tenant users but not global workspace settings', () {
-      expect(
-        canManageWorkspaceRole(roleValueFromUserRole(UserRole.tenantAdmin)),
-        isFalse,
-      );
-      expect(
-        canManageUserAccountsRole(roleValueFromUserRole(UserRole.tenantAdmin)),
-        isTrue,
-      );
-    });
+    test(
+      'tenant admins can manage tenant users but not global workspace settings',
+      () {
+        expect(
+          canManageWorkspaceRole(roleValueFromUserRole(UserRole.tenantAdmin)),
+          isFalse,
+        );
+        expect(
+          canManageUserAccountsRole(
+            roleValueFromUserRole(UserRole.tenantAdmin),
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('super admins manage both workspaces and user accounts', () {
       expect(
