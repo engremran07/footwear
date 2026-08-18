@@ -195,33 +195,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              // â”€â”€ Danger Zone â”€â”€
-              Card(
-                color: AppBrand.errorColor.withAlpha(12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: AppBrand.errorColor.withAlpha(80)),
-                ),
-                child: ListTile(
-                  leading: const Icon(
-                    Icons.warning_amber_rounded,
-                    color: AppBrand.errorColor,
+              if (ref.watch(authUserProvider).value?.isSuperAdmin == true)
+                Card(
+                  color: AppBrand.errorColor.withAlpha(12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: AppBrand.errorColor.withAlpha(80)),
                   ),
-                  title: Text(
-                    tr('danger_zone', ref),
-                    style: const TextStyle(
+                  child: ListTile(
+                    leading: const Icon(
+                      Icons.warning_amber_rounded,
                       color: AppBrand.errorColor,
-                      fontWeight: FontWeight.bold,
                     ),
+                    title: Text(
+                      tr('danger_zone', ref),
+                      style: const TextStyle(
+                        color: AppBrand.errorColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    subtitle: Text(tr('danger_zone_subtitle', ref)),
+                    trailing: const Icon(
+                      Icons.chevron_right,
+                      color: AppBrand.errorColor,
+                    ),
+                    onTap: () => context.push('/settings/flush'),
                   ),
-                  subtitle: Text(tr('danger_zone_subtitle', ref)),
-                  trailing: const Icon(
-                    Icons.chevron_right,
-                    color: AppBrand.errorColor,
-                  ),
-                  onTap: () => context.push('/settings/flush'),
                 ),
-              ),
             ],
             const SizedBox(height: 16),
             // Sign out

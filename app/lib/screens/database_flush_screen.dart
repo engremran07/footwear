@@ -194,7 +194,7 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authUserProvider).value;
-    if (currentUser == null || !currentUser.isAdmin) {
+    if (currentUser == null || !currentUser.isSuperAdmin) {
       return Scaffold(
         appBar: AppBar(title: Text(tr('danger_zone', ref))),
         body: Center(child: Text(tr('permission_denied', ref))),

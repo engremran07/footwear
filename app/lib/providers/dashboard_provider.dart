@@ -5,10 +5,13 @@ import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
 import '../models/route_model.dart';
 import '../models/shop_model.dart';
+import '../models/user_model.dart';
 import 'auth_provider.dart';
 import 'product_provider.dart';
 import 'route_provider.dart';
 import 'shop_provider.dart';
+import 'tenant_provider.dart';
+import 'user_provider.dart';
 
 /// Per-currency aggregated stats for dashboard conditional widgets.
 class CurrencyStats {
@@ -32,6 +35,10 @@ class DashboardStats {
   final int totalProducts;
   final int totalVariants;
   final int totalStockPairs;
+  final int totalWorkspaces;
+  final int activeWorkspaces;
+  final int totalUsers;
+  final int usersInActiveWorkspaces;
 
   /// Per-currency breakdown (e.g. {'SAR': CurrencyStats(...), 'PKR': ...}).
   final Map<String, CurrencyStats> currencyStats;
@@ -42,6 +49,10 @@ class DashboardStats {
     this.totalProducts = 0,
     this.totalVariants = 0,
     this.totalStockPairs = 0,
+    this.totalWorkspaces = 0,
+    this.activeWorkspaces = 0,
+    this.totalUsers = 0,
+    this.usersInActiveWorkspaces = 0,
     this.currencyStats = const {},
   });
 }
@@ -89,6 +100,29 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
 
   final AsyncValue<List<RouteModel>> routes;
   final AsyncValue<List<ShopModel>> shops;
+  if (user.isSuperAdmin) {
+    final workspaces = ref.watch(tenantsProvider);
+    final users = ref.watch(allUsersProvider);
+    if (workspaces.isLoading || users.isLoading) {
+      final cached = ref.read(_lastGoodDashboardStatsProvider);
+      return cached != null ? AsyncData(cached) : const AsyncLoading();
+    }
+
+    final workspaceList = workspaces.value ?? const <dynamic>[];
+    final userList = users.value ?? const <UserModel>[];
+    final activeWorkspaces = workspaceList.where((w) => w.active == true).length;
+    final stats = DashboardStats(
+      totalWorkspaces: workspaceList.length,
+      activeWorkspaces: activeWorkspaces,
+      totalUsers: userList.length,
+      usersInActiveWorkspaces: userList.where((u) => u.active).length,
+    );
+    Future.microtask(
+      () => ref.read(_lastGoodDashboardStatsProvider.notifier).set(stats),
+    );
+    return AsyncData(stats);
+  }
+
   if (user.isAdmin) {
     routes = ref.watch(routesProvider);
     shops = ref.watch(shopsProvider);

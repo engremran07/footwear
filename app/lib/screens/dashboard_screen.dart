@@ -15,7 +15,9 @@ import '../providers/route_provider.dart';
 import '../providers/seller_inventory_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/shop_provider.dart';
+import '../providers/tenant_provider.dart';
 import '../providers/transaction_provider.dart';
+import '../providers/user_provider.dart';
 import '../models/route_model.dart';
 import '../models/shop_model.dart';
 import '../models/transaction_model.dart';
@@ -116,6 +118,9 @@ class DashboardScreen extends ConsumerWidget {
     if (user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+    if (user.isSuperAdmin) {
+      return _SuperAdminDashboard(user: user);
+    }
     if (!user.isAdmin) {
       return _SellerDashboard(user: user);
     }
@@ -158,10 +163,35 @@ class DashboardScreen extends ConsumerWidget {
                 // Welcome
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppTokens.s16),
-                  child: Text(
-                    '${tr('welcome', ref)}, ${user.displayName}',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  child: RichText(
+                    text: TextSpan(
+                      text: '${tr('welcome', ref)}, ',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: user.displayName.trim().isNotEmpty
+                              ? user.displayName
+                              : tr('profile', ref),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppBrand.warningColor
+                                    : AppBrand.primaryColor,
+                                fontFamily: Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppBrand.fontFamilyArabic
+                                    : AppBrand.fontFamilyUrdu,
+                                letterSpacing: 0.2,
+                              ),
+                        ),
+                      ],
                     ),
                   ),
                 ).animate().fadeIn(duration: AppTokens.durNormal),
@@ -304,6 +334,128 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
+class _SuperAdminDashboard extends ConsumerWidget {
+  final UserModel user;
+  const _SuperAdminDashboard({required this.user});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stats = ref.watch(dashboardStatsProvider);
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(dashboardStatsProvider);
+          ref.invalidate(tenantsProvider);
+          ref.invalidate(allUsersProvider);
+        },
+        child: stats.when(
+          data: (s) {
+            return ListView(
+              padding: const EdgeInsets.all(AppTokens.s16),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTokens.s16),
+                  child: RichText(
+                    text: TextSpan(
+                      text: '${tr('welcome', ref)}, ',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: user.displayName.trim().isNotEmpty
+                              ? user.displayName
+                              : tr('profile', ref),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppBrand.warningColor
+                                    : AppBrand.primaryColor,
+                                fontFamily: Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppBrand.fontFamilyArabic
+                                    : AppBrand.fontFamilyUrdu,
+                                letterSpacing: 0.2,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                GridView.count(
+                  crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: AppTokens.s8,
+                  crossAxisSpacing: AppTokens.s8,
+                  childAspectRatio: 1.2,
+                  children: [
+                    StatCard(
+                      title: tr('workspaces', ref),
+                      value: s.totalWorkspaces.toString(),
+                      icon: Icons.apartment,
+                      color: AppBrand.primaryColor,
+                      staggerIndex: 0,
+                      onTap: () => context.go('/tenants'),
+                    ),
+                    StatCard(
+                      title: tr('active_workspaces', ref),
+                      value: s.activeWorkspaces.toString(),
+                      icon: Icons.check_circle,
+                      color: AppBrand.successColor,
+                      staggerIndex: 1,
+                      onTap: () => context.go('/tenants'),
+                    ),
+                    StatCard(
+                      title: tr('user_accounts', ref),
+                      value: s.totalUsers.toString(),
+                      icon: Icons.people,
+                      color: AppBrand.secondaryColor,
+                      staggerIndex: 2,
+                      onTap: () => context.go('/users'),
+                    ),
+                    StatCard(
+                      title: tr('spark_plan', ref),
+                      value: 'Free',
+                      subtitle: tr('firebase_free_tier_guard', ref),
+                      icon: Icons.cloud_done,
+                      color: AppBrand.warningColor,
+                      staggerIndex: 3,
+                    ),
+                    StatCard(
+                      title: tr('read_limit', ref),
+                      value: '50k/day',
+                      subtitle: tr('firebase_read_guard', ref),
+                      icon: Icons.read_more,
+                      color: AppBrand.adminRoleColor,
+                      staggerIndex: 4,
+                    ),
+                    StatCard(
+                      title: tr('write_limit', ref),
+                      value: '20k/day',
+                      subtitle: tr('firebase_write_guard', ref),
+                      icon: Icons.edit_note,
+                      color: AppBrand.errorColor,
+                      staggerIndex: 5,
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+          loading: () => ShimmerLoading.cards(),
+          error: (e, _) => _buildDashboardAsyncError(context, ref, e),
+        ),
+      ),
+    );
+  }
+}
+
 class _SellerDashboard extends ConsumerWidget {
   final UserModel user;
   const _SellerDashboard({required this.user});
@@ -383,11 +535,31 @@ class _SellerDashboard extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                '${tr('welcome', ref)}, ${user.displayName}',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              child: RichText(
+                text: TextSpan(
+                  text: '${tr('welcome', ref)}, ',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  children: [
+                    TextSpan(
+                      text: user.displayName.trim().isNotEmpty
+                          ? user.displayName
+                          : tr('profile', ref),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppBrand.warningColor
+                            : AppBrand.primaryColor,
+                        fontFamily: Theme.of(context).brightness == Brightness.dark
+                            ? AppBrand.fontFamilyArabic
+                            : AppBrand.fontFamilyUrdu,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
 

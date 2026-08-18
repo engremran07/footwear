@@ -7,8 +7,14 @@ library;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/models/user_model.dart';
+import 'package:footwear_erp/core/router/app_router.dart';
+import 'package:footwear_erp/providers/auth_provider.dart';
+import 'package:footwear_erp/providers/dashboard_provider.dart';
+import 'package:footwear_erp/screens/dashboard_screen.dart';
+import 'package:footwear_erp/screens/database_flush_screen.dart';
 import 'package:footwear_erp/widgets/app_shell.dart';
 
 void main() {
@@ -84,6 +90,67 @@ void main() {
       // Should find the loading indicator, not admin-only widgets.
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
+    });
+
+    testWidgets('tenant admins are blocked from the flush screen', (
+      tester,
+    ) async {
+      final tenantAdmin = UserModel(
+        id: 'ta',
+        email: 'tenant@example.com',
+        displayName: 'Workspace Admin',
+        role: UserRole.tenantAdmin,
+        active: true,
+        tenantId: 'workspace-1',
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(tenantAdmin)),
+          ],
+          child: const MaterialApp(home: DatabaseFlushScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Access Denied'), findsOneWidget);
+      expect(find.text('Danger Zone'), findsOneWidget);
+    });
+
+    testWidgets('super admins see workspace metrics instead of route totals', (
+      tester,
+    ) async {
+      final superAdmin = UserModel(
+        id: 'sa',
+        email: 'global@example.com',
+        displayName: 'Global Admin',
+        role: UserRole.superAdmin,
+        active: true,
+        tenantId: null,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(superAdmin)),
+            dashboardStatsProvider.overrideWith(
+              (ref) => const AsyncData(
+                DashboardStats(totalRoutes: 8, totalShops: 36),
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: DashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Workspaces'), findsOneWidget);
+      expect(find.textContaining('Total Routes'), findsNothing);
     });
   });
 }

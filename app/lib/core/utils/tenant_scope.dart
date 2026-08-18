@@ -51,7 +51,7 @@ class TenantScope {
   }) {
     final normalized = normalize(tenantId);
     if (normalized == null) {
-      return query.where('tenant_id', isNull: true);
+      return query;
     }
     if (normalized == globalTenantId) {
       return query.where('tenant_id', isEqualTo: globalTenantId);
