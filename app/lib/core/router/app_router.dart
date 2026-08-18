@@ -186,9 +186,7 @@ class RouterNotifier extends ChangeNotifier {
         !canManageWorkspaceRole(roleValueFromUserRole(appUser.role))) {
       return '/';
     }
-    if ((state.matchedLocation == '/settings/flush' ||
-            state.matchedLocation == '/settings/backup') &&
-        !appUser.isSuperAdmin) {
+    if (state.matchedLocation == '/settings/flush' && !appUser.isSuperAdmin) {
       return '/';
     }
     if (_isAdminOnlyPath(state.matchedLocation) &&

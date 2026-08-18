@@ -11,9 +11,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
+import '../core/services/google_drive_backup_service.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
+import 'transaction_provider.dart';
 
 // ─── SharedPreferences keys ──────────────────────────────────────────────────
 const _kAutoEnabled = 'backup_auto_enabled';
@@ -38,6 +40,9 @@ class BackupPreview {
   final String appVersion;
   final String createdAt;
   final String? createdByUid;
+  final String tenantId;
+  final String scope;
+  final List<String> routeIds;
   final Map<String, int> counts;
   final bool checksumOk;
   final Map<String, dynamic> rawData; // collections, not metadata
@@ -46,6 +51,9 @@ class BackupPreview {
     required this.appVersion,
     required this.createdAt,
     this.createdByUid,
+    required this.tenantId,
+    required this.scope,
+    required this.routeIds,
     required this.counts,
     required this.checksumOk,
     required this.rawData,
@@ -114,7 +122,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
     await prefs.setString(_kLastRestoreBy, byName);
     // Persist to Firestore so all admin devices see the restore event.
     // P1-12 FIX: Use per-tenant settings doc ID instead of hardcoded 'global'
-    final currentUser = ref.read(authUserProvider).value;
+    final currentUser = await ref.read(authUserProvider.future);
     final settingsDocId = _settingsDocumentIdForCurrentUser(currentUser);
     await _db.collection(Collections.settings).doc(settingsDocId).set({
       'last_restore_at': Timestamp.now(),
@@ -183,14 +191,33 @@ class DatabaseBackupNotifier extends Notifier<void> {
 
   // ─── Firestore serialisation ───────────────────────────────────────────────
 
-  Future<List<Map<String, dynamic>>> _readCollection(String path) async {
+  Future<List<Map<String, dynamic>>> _readCollection(
+    String path,
+    UserModel currentUser,
+    String? tenantScopeId,
+  ) async {
     final result = <Map<String, dynamic>>[];
     QueryDocumentSnapshot<Map<String, dynamic>>? lastVisible;
     while (true) {
-      Query<Map<String, dynamic>> q = _db
-          .collection(path)
-          .orderBy(FieldPath.documentId)
-          .limit(500);
+      Query<Map<String, dynamic>> q = TenantScope.applyToQuery(
+        _db.collection(path),
+        tenantId: tenantScopeId,
+      );
+      if (currentUser.isSeller) {
+        if (path == Collections.sellerInventory ||
+            path == Collections.inventoryTransactions) {
+          q = q.where('seller_id', isEqualTo: currentUser.id);
+        } else if (path == Collections.routes) {
+          q = q.where('assigned_seller_ids', arrayContains: currentUser.id);
+        } else if (path == Collections.shops ||
+            path == Collections.transactions ||
+            path == Collections.invoices) {
+          final routeIds = currentUser.assignedRouteIds;
+          if (routeIds.isEmpty) return result;
+          q = q.where('route_id', whereIn: routeIds.take(10).toList());
+        }
+      }
+      q = q.orderBy(FieldPath.documentId).limit(500);
       if (lastVisible != null) q = q.startAfterDocument(lastVisible);
       final snap = await q.get();
       for (final d in snap.docs) {
@@ -233,10 +260,18 @@ class DatabaseBackupNotifier extends Notifier<void> {
 
   // ─── Firestore write helpers ───────────────────────────────────────────────
 
-  Future<int> _deleteCollection(String path) async {
+  Future<int> _deleteCollection(
+    String path,
+    UserModel user,
+    String tenantScopeId,
+  ) async {
     var deleted = 0;
     while (true) {
-      final snap = await _db.collection(path).limit(400).get();
+      final query = TenantScope.applyToQuery(
+        _db.collection(path),
+        tenantId: tenantScopeId,
+      );
+      final snap = await query.limit(400).get();
       if (snap.docs.isEmpty) break;
       final batch = _db.batch();
       for (final doc in snap.docs) {
@@ -272,13 +307,29 @@ class DatabaseBackupNotifier extends Notifier<void> {
   /// returns the bytes so the caller can share them via the OS share sheet.
   Future<({Uint8List bytes, String localPath})> createBackup({
     required Set<String> selected,
+    String? tenantIdOverride,
   }) async {
-    final adminUser = ref.read(authUserProvider).value;
+    final adminUser = await ref.read(authUserProvider.future);
+    if (adminUser == null || !adminUser.active) {
+      throw StateError('An active user is required to create a backup');
+    }
+    final ownTenantId = TenantScope.normalize(adminUser.tenantId);
+    final tenantScopeId = adminUser.isSuperAdmin
+        ? TenantScope.normalize(tenantIdOverride)
+        : ownTenantId;
+    if (tenantScopeId == null) {
+      throw StateError('Select a workspace before creating a backup');
+    }
+    if (!adminUser.isSuperAdmin &&
+        tenantIdOverride != null &&
+        TenantScope.normalize(tenantIdOverride) != ownTenantId) {
+      throw StateError('Backup workspace does not match your account');
+    }
     final data = <String, dynamic>{};
     final counts = <String, int>{};
 
     Future<void> read(String key, String collPath) async {
-      final docs = await _readCollection(collPath);
+      final docs = await _readCollection(collPath, adminUser, tenantScopeId);
       data[key] = docs;
       counts[key] = docs.length;
     }
@@ -308,7 +359,13 @@ class DatabaseBackupNotifier extends Notifier<void> {
         'app': 'ShoesERP',
         'app_version': AppBrand.versionDisplay,
         'created_at': DateTime.now().toUtc().toIso8601String(),
-        'created_by_uid': adminUser?.id ?? '',
+        'created_by_uid': adminUser.id,
+        'tenant_id':
+            tenantScopeId,
+        'scope': adminUser.isSeller ? 'seller_routes' : 'workspace',
+        'route_ids': adminUser.isSeller
+            ? List<String>.from(adminUser.assignedRouteIds)
+            : const <String>[],
         'record_counts': counts,
         'checksum': checksum,
       },
@@ -321,6 +378,78 @@ class DatabaseBackupNotifier extends Notifier<void> {
     await _recordBackupNow();
     final localPath = await _saveToLocal(bytes);
     return (bytes: bytes, localPath: localPath);
+  }
+
+  Future<GoogleDriveBackupFile> uploadBackupToDrive({
+    required Uint8List bytes,
+    required String fileName,
+    String? tenantIdOverride,
+  }) async {
+    final user = await ref.read(authUserProvider.future);
+    if (user == null || !user.active) {
+      throw StateError('An active user is required for Google Drive backup');
+    }
+    final preview = verifyBackup(bytes);
+    final ownTenantId = TenantScope.normalize(user.tenantId);
+    final tenantId = user.isSuperAdmin
+        ? TenantScope.normalize(tenantIdOverride)
+        : ownTenantId;
+    if (tenantId == null) {
+      throw StateError('Select a workspace before uploading a backup');
+    }
+    if (preview.tenantId != tenantId) {
+      throw StateError('Backup workspace does not match the selected workspace');
+    }
+    final checksum = preview.rawData.isEmpty ? '' : _checksum(preview.rawData);
+    return GoogleDriveBackupService.upload(
+      bytes: bytes,
+      fileName: fileName,
+      tenantId: tenantId,
+      createdBy: user.id,
+      checksum: checksum,
+      scope: user.isSeller ? 'seller_routes' : 'workspace',
+      routeIds: user.isSeller ? user.assignedRouteIds : const <String>[],
+    );
+  }
+
+  Future<List<GoogleDriveBackupFile>> listDriveBackups({
+    String? tenantIdOverride,
+  }) async {
+    final user = await ref.read(authUserProvider.future);
+    if (user == null || !user.active) {
+      throw StateError('An active user is required for Google Drive backup');
+    }
+    final tenantId = user.isSuperAdmin
+        ? TenantScope.normalize(tenantIdOverride)
+        : TenantScope.normalize(user.tenantId);
+    if (tenantId == null) {
+      throw StateError('Select a workspace before listing backups');
+    }
+    return GoogleDriveBackupService.list(
+      tenantId: tenantId,
+      createdBy: user.isSeller ? user.id : null,
+    );
+  }
+
+  Future<Uint8List> downloadDriveBackup(
+    String fileId, {
+    String? tenantIdOverride,
+  }) async {
+    final user = await ref.read(authUserProvider.future);
+    if (user == null || !user.active) {
+      throw StateError('An active user is required for Google Drive restore');
+    }
+    final tenantId = user.isSuperAdmin
+        ? TenantScope.normalize(tenantIdOverride)
+        : TenantScope.normalize(user.tenantId);
+    if (tenantId == null) {
+      throw StateError('Select a workspace before downloading a backup');
+    }
+    return GoogleDriveBackupService.download(
+      fileId: fileId,
+      tenantId: tenantId,
+      createdBy: user.isSeller ? user.id : null,
+    );
   }
 
   /// Parses and integrity-checks a backup file.
@@ -353,6 +482,11 @@ class DatabaseBackupNotifier extends Notifier<void> {
       appVersion: metadata['app_version'] as String? ?? '?',
       createdAt: metadata['created_at'] as String? ?? '?',
       createdByUid: metadata['created_by_uid'] as String?,
+      tenantId: metadata['tenant_id'] as String? ?? TenantScope.globalTenantId,
+      scope: metadata['scope'] as String? ?? 'unknown',
+      routeIds: (metadata['route_ids'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .toList(),
       counts: counts,
       checksumOk: checksumOk,
       rawData: data,
@@ -366,7 +500,64 @@ class DatabaseBackupNotifier extends Notifier<void> {
   Future<int> restoreFromBackup(
     BackupPreview preview, {
     required String adminName,
+    String? routeId,
   }) async {
+    final user = await ref.read(authUserProvider.future);
+    if (user == null || !user.active) {
+      throw StateError('An active user is required for restore');
+    }
+    if (!preview.checksumOk) {
+      throw const FormatException('Backup checksum verification failed');
+    }
+    final currentTenantId = TenantScope.normalize(user.tenantId);
+    if (user.isSeller) {
+      final selectedRouteId = routeId?.trim() ?? '';
+      if (preview.scope != 'seller_routes' || selectedRouteId.isEmpty) {
+        throw StateError('Seller restore requires a route-scoped backup');
+      }
+      if (!preview.routeIds.contains(selectedRouteId) ||
+          !user.assignedRouteIds.contains(selectedRouteId)) {
+        throw StateError('Route access has been revoked');
+      }
+      final rawTransactions = preview.rawData['transactions'];
+      if (rawTransactions is! List) return 0;
+      final documents = rawTransactions
+          .whereType<Map<String, dynamic>>()
+          .map((doc) => _restoreTypes(doc) as Map<String, dynamic>)
+          .toList();
+      final restored = await ref
+          .read(transactionNotifierProvider.notifier)
+          .restoreSellerRouteTransactions(
+            routeId: selectedRouteId,
+            documents: documents,
+          );
+      await _recordRestoreNow(user.displayName.trim().isNotEmpty
+          ? user.displayName
+          : adminName);
+      return restored;
+    }
+    if (!user.isAdmin) {
+      throw StateError('Admin privileges required for full database restore');
+    }
+    if (preview.scope != 'workspace') {
+      throw StateError('Full restore requires a workspace backup');
+    }
+    if (preview.tenantId == TenantScope.globalTenantId) {
+      throw StateError('A concrete workspace is required for full restore');
+    }
+    if (!user.isSuperAdmin && preview.tenantId != currentTenantId) {
+      throw StateError('Backup belongs to another workspace');
+    }
+    for (final docs in preview.rawData.values) {
+      if (docs is! List) continue;
+      for (final rawDoc in docs) {
+        if (rawDoc is Map<String, dynamic> &&
+            !TenantScope.matchesTenant(rawDoc, preview.tenantId)) {
+          throw StateError('Backup contains another workspace');
+        }
+      }
+    }
+
     const collectionMap = {
       'routes': Collections.routes,
       'shops': Collections.shops,
@@ -382,7 +573,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
     for (final entry in collectionMap.entries) {
       final docs = preview.rawData[entry.key];
       if (docs == null) continue;
-      await _deleteCollection(entry.value);
+      await _deleteCollection(entry.value, user, preview.tenantId);
       totalRestored += await _writeCollection(
         entry.value,
         docs as List<dynamic>,

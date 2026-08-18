@@ -76,6 +76,19 @@ class AppFonts {
     };
   }
 
+  static TextStyle userName(
+    String locale, {
+    Color? color,
+    double fontSize = 18,
+  }) {
+    return heading(
+      locale,
+      fontSize: fontSize,
+      fontWeight: FontWeight.w800,
+      color: color,
+    ).copyWith(letterSpacing: 0.2);
+  }
+
   /// Build a full TextTheme for the locale.
   static TextTheme textTheme(
     String locale, {

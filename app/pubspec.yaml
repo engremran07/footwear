@@ -1,7 +1,7 @@
 name: footwear_erp
 description: Footwear business ERP — production, inventory, orders, payroll, P&L.
 publish_to: 'none'
-version: 3.9.47+86
+version: 3.9.49+88
 
 environment:
   sdk: '>=3.11.0 <4.0.0'
@@ -40,6 +40,7 @@ dependencies:
   archive: ^4.0.0
   dart_jsonwebtoken: ^3.4.0
   crypto: ^3.0.3
+  google_sign_in: ^7.2.0
 
 dependency_overrides:
   permission_handler_android: 13.0.1

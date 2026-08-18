@@ -349,7 +349,9 @@ service cloud.firestore {
             'longitude',
             'updated_at',
             'balance',
-            'last_transaction_at'
+            'last_transaction_at',
+            'last_transaction_type',
+            'last_transaction_amount'
           ])
         )) && docSizeOk();
       allow delete: if isAdminForTenant(resource.data.tenant_id);
@@ -413,6 +415,8 @@ service cloud.firestore {
               ]) &&
               request.resource.data.edit_request_pending == true &&
               request.resource.data.edit_request_status == 'pending' &&
+              (!('edit_request_new_type' in request.resource.data) ||
+                isValidSellerTransactionType(request.resource.data.edit_request_new_type)) &&
               (!('edit_request_new_amount' in request.resource.data) ||
                 (request.resource.data.edit_request_new_amount is number &&
                   request.resource.data.edit_request_new_amount > 0))
@@ -421,6 +425,8 @@ service cloud.firestore {
               !requiresSellerTransactionEditApproval() &&
               resource.data.created_by == request.auth.uid &&
               request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'amount',
+                'type',
                 'description',
                 'updated_at',
                 'updated_by',
@@ -434,6 +440,9 @@ service cloud.firestore {
                 'edit_request_new_sale_type',
                 'edit_request_new_created_at'
               ]) &&
+              request.resource.data.amount is number &&
+              request.resource.data.amount > 0 &&
+              isValidSellerTransactionType(request.resource.data.type) &&
               (!('edit_request_new_amount' in request.resource.data) ||
                 (request.resource.data.edit_request_new_amount is number &&
                   request.resource.data.edit_request_new_amount > 0))

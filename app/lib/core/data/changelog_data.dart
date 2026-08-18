@@ -28,6 +28,62 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.49',
+    date: 'August 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Google Drive backup now uses your Google account, workspace scope, and route permissions. Sellers can restore only their own permitted route transactions.',
+          AppLocale.ar:
+              'تستخدم النسخة الاحتياطية في Google Drive الآن حسابك ونطاق مساحة العمل وصلاحيات المسارات. يمكن للبائع استعادة معاملات مساراته المسموح بها فقط.',
+          AppLocale.ur:
+              'Google Drive بیک اپ اب آپ کے Google اکاؤنٹ، ورک اسپیس اور روٹ اجازتوں کے مطابق ہے۔ سیلر صرف اپنے مجاز روٹ کی ٹرانزیکشنز بحال کر سکتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '☁️',
+        text: {
+          AppLocale.en:
+              'Super admins select a workspace before backup or restore, preventing cross-workspace data replacement.',
+          AppLocale.ar:
+              'يختار المسؤول الأعلى مساحة عمل قبل النسخ أو الاستعادة، مما يمنع استبدال بيانات مساحات العمل الأخرى.',
+          AppLocale.ur:
+              'سپر ایڈمن بیک اپ یا ریسٹور سے پہلے ورک اسپیس منتخب کرتا ہے، جس سے دوسری ورک اسپیس کا ڈیٹا تبدیل نہیں ہوتا۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.9.48',
+    date: 'August 2026',
+    items: [
+      ChangelogItem(
+        emoji: '☁️',
+        text: {
+          AppLocale.en:
+              'Backups can now be uploaded to your own Google Drive, with workspace-scoped data and verified restore protection for administrators.',
+          AppLocale.ar:
+              'يمكن الآن رفع النسخ الاحتياطية إلى Google Drive الخاص بك، مع بيانات مخصصة لمساحة العمل وحماية استعادة موثوقة للمسؤولين.',
+          AppLocale.ur:
+              'اب بیک اپ آپ کے اپنے Google Drive پر اپ لوڈ ہو سکتے ہیں، ورک اسپیس کے مطابق ڈیٹا اور ایڈمن کے لیے تصدیق شدہ ریسٹور تحفظ کے ساتھ۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🛡️',
+        text: {
+          AppLocale.en:
+              'Seller cash transactions and approved edit settings now respect workspace permissions, and super-admin flush tools can target one workspace safely.',
+          AppLocale.ar:
+              'تحترم معاملات النقدية وتعديلات البائعين الآن صلاحيات مساحة العمل، ويمكن لأدوات المسح للمسؤول الأعلى استهداف مساحة عمل واحدة بأمان.',
+          AppLocale.ur:
+              'سیلر کیش ٹرانزیکشنز اور ایڈٹ سیٹنگز اب ورک اسپیس اجازتوں کی پابندی کرتی ہیں، اور سپر ایڈمن فلش ٹولز ایک ورک اسپیس کو محفوظ طریقے سے منتخب کر سکتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.47',
     date: 'August 2026',
     items: [

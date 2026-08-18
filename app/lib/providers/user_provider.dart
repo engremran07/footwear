@@ -65,8 +65,8 @@ final allUsersExportProvider = FutureProvider<List<UserModel>>((ref) async {
 });
 
 final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
-  // Account management is separate from tenant/workspace management. This
-  // seller roster is still admin-controlled, but tenant_admin cannot use it.
+  // Route assignment includes workspace admins because tenant admins can also
+  // operate as field sellers.
   final canManageUsers = ref.watch(
     authUserProvider.select(
       (s) => canManageUserAccountsRole(
@@ -83,13 +83,14 @@ final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
     tenantId: tenantId,
   );
   return query
-      .where('role', isEqualTo: 'seller')
       .where('active', isEqualTo: true)
       .limit(100)
       .snapshots()
       .map(
-        (snap) =>
-            snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList(),
+        (snap) => snap.docs
+            .map((d) => UserModel.fromJson(d.data(), d.id))
+            .where((user) => user.role != UserRole.superAdmin)
+            .toList(),
       );
 });
 

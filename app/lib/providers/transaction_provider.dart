@@ -421,6 +421,10 @@ final sellerTransactionsExportProvider =
 class TransactionNotifier extends AsyncNotifier<void> {
   bool _writeInFlight = false;
 
+  Future<void> _commit(WriteBatch batch) {
+    return batch.commit().timeout(const Duration(seconds: 20));
+  }
+
   Future<String> _currentTenantId() async {
     final user = await ref.read(authUserProvider.future);
     return TenantScope.normalize(user?.tenantId) ?? TenantScope.globalTenantId;
@@ -587,7 +591,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
         }
       }
 
-      await batch.commit();
+      await _commit(batch);
 
       // Best-effort notification for admin feed (non-critical, fire-and-forget).
       // Only written when a seller creates the transaction — admin notifies themselves.
@@ -619,6 +623,80 @@ class TransactionNotifier extends AsyncNotifier<void> {
         /* best-effort only — non-critical */
       }
     });
+  }
+
+  /// Restores seller-owned cash ledger entries for one currently assigned
+  /// route. Existing transaction IDs are left untouched, and each imported
+  /// entry updates the shop balance in the same Firestore transaction.
+  Future<int> restoreSellerRouteTransactions({
+    required String routeId,
+    required List<Map<String, dynamic>> documents,
+  }) async {
+    final user = await ref.read(authUserProvider.future);
+    if (user == null || !user.active || !user.isSeller) {
+      throw StateError('Seller privileges required for route restore');
+    }
+    final normalizedRouteId = routeId.trim();
+    if (normalizedRouteId.isEmpty ||
+        !user.assignedRouteIds.contains(normalizedRouteId)) {
+      throw StateError('Route access has been revoked');
+    }
+    final tenantId =
+        TenantScope.normalize(user.tenantId) ?? TenantScope.globalTenantId;
+    var restored = 0;
+
+    await _runWriteGuard(() async {
+      final db = FirebaseFirestore.instance;
+      for (final raw in documents) {
+        final txId = (raw['__id'] as String?)?.trim() ?? '';
+        final rawRouteId = (raw['route_id'] as String?)?.trim() ?? '';
+        final createdBy = (raw['created_by'] as String?)?.trim() ?? '';
+        final shopId = (raw['shop_id'] as String?)?.trim() ?? '';
+        final type = (raw['type'] as String?)?.trim() ?? '';
+        final amount = (raw['amount'] as num?)?.toDouble() ?? 0;
+        if (txId.isEmpty ||
+            rawRouteId != normalizedRouteId ||
+            createdBy != user.id ||
+            shopId.isEmpty ||
+            (type != TransactionModel.typeCashIn &&
+                type != TransactionModel.typeCashOut) ||
+            amount <= 0 ||
+            !TenantScope.matchesTenant(raw, tenantId)) {
+          continue;
+        }
+
+        final txRef = db.collection(Collections.transactions).doc(txId);
+        final shopRef = db.collection(Collections.customers).doc(shopId);
+        final imported = await db.runTransaction<bool>((transaction) async {
+          final existing = await transaction.get(txRef);
+          if (existing.exists) return false;
+          final shop = await transaction.get(shopRef);
+          final shopData = shop.data();
+          if (!shop.exists ||
+              shopData == null ||
+              !TenantScope.matchesTenant(shopData, tenantId) ||
+              shopData['route_id'] != normalizedRouteId) {
+            return false;
+          }
+          final model = TransactionModel.fromJson(raw, txId);
+          transaction.set(txRef, {
+            ...model.toJson(),
+            'tenant_id': tenantId,
+            'deleted': false,
+          });
+          transaction.update(shopRef, {
+            'balance': FieldValue.increment(model.balanceImpact),
+            'updated_at': Timestamp.now(),
+            'last_transaction_at': model.createdAt,
+            'last_transaction_type': model.type,
+            'last_transaction_amount': model.amount,
+          });
+          return true;
+        });
+        if (imported) restored++;
+      }
+    });
+    return restored;
   }
 
   /// Creates a seller-side sale transaction WITHOUT going through invoicing.
@@ -705,7 +783,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
         }
       }
 
-      await batch.commit();
+      await _commit(batch);
 
       // Best-effort notification for admin feed (non-critical, fire-and-forget).
       // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
@@ -797,7 +875,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       });
     }
 
-    await batch.commit();
+    await _commit(batch);
   }
 
   /// Creates a return transaction: reduces what the customer owes and optionally
@@ -859,7 +937,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       }
     }
 
-    await batch.commit();
+    await _commit(batch);
   }
 
   /// Updates a transaction and adjusts customer balance for the change.
@@ -909,7 +987,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
         saleType: saleType,
         transactionDate: transactionDate,
       );
-      await batch.commit();
+      await _commit(batch);
     });
   }
 
@@ -980,18 +1058,20 @@ class TransactionNotifier extends AsyncNotifier<void> {
         false;
 
     if (requireApproval) {
-      await txRef.update({
-        'edit_request_pending': true,
-        'edit_request_status': 'pending',
-        'edit_request_requested_by': sellerId.trim(),
-        'edit_request_requested_at': Timestamp.now(),
-        'edit_request_new_amount': newAmount,
-        'edit_request_new_type': newType,
-        'edit_request_new_description': description,
-        'edit_request_new_sale_type': saleType,
-        'edit_request_new_created_at': transactionDate,
-        'updated_at': Timestamp.now(),
-      });
+      await txRef
+          .update({
+            'edit_request_pending': true,
+            'edit_request_status': 'pending',
+            'edit_request_requested_by': sellerId.trim(),
+            'edit_request_requested_at': Timestamp.now(),
+            'edit_request_new_amount': newAmount,
+            'edit_request_new_type': newType,
+            'edit_request_new_description': description,
+            'edit_request_new_sale_type': saleType,
+            'edit_request_new_created_at': transactionDate,
+            'updated_at': Timestamp.now(),
+          })
+          .timeout(const Duration(seconds: 20));
       return false;
     }
 
@@ -1020,7 +1100,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
         'edit_request_new_created_at': FieldValue.delete(),
       },
     );
-    await batch.commit();
+    await _commit(batch);
     return true;
   }
 
@@ -1035,6 +1115,11 @@ class TransactionNotifier extends AsyncNotifier<void> {
       throw ArgumentError('reviewerId must not be empty');
     }
 
+    final reviewer = await ref.read(authUserProvider.future);
+    if (reviewer == null || !reviewer.isAdmin) {
+      throw StateError('Admin privileges required');
+    }
+
     final db = FirebaseFirestore.instance;
     final txRef = db.collection(Collections.transactions).doc(txId);
     final txDoc = await txRef.get();
@@ -1045,13 +1130,15 @@ class TransactionNotifier extends AsyncNotifier<void> {
     if (!pending) return;
 
     if (!approved) {
-      await txRef.update({
-        'edit_request_pending': false,
-        'edit_request_status': 'rejected',
-        'edit_request_reviewed_by': reviewerId.trim(),
-        'edit_request_reviewed_at': Timestamp.now(),
-        'updated_at': Timestamp.now(),
-      });
+      await txRef
+          .update({
+            'edit_request_pending': false,
+            'edit_request_status': 'rejected',
+            'edit_request_reviewed_by': reviewerId.trim(),
+            'edit_request_reviewed_at': Timestamp.now(),
+            'updated_at': Timestamp.now(),
+          })
+          .timeout(const Duration(seconds: 20));
       return;
     }
 
@@ -1086,7 +1173,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
         'edit_request_new_created_at': FieldValue.delete(),
       },
     );
-    await batch.commit();
+    await _commit(batch);
   }
 }
 

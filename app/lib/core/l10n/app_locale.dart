@@ -1246,6 +1246,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'flush_in_progress': 'Flushing data… Do not close the app.',
     'flush_include_users': 'Also delete all users (except admin)',
     'flush_select_user': 'Select user to flush',
+    'flush_select_workspace': 'Workspace scope',
+    'flush_all_workspaces': 'All workspaces',
     'approve_seller_edit': 'Approve Seller Edit',
     'reject_seller_edit': 'Reject Seller Edit',
 
@@ -1260,6 +1262,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_transactions': 'Transactions',
     'backup_invoices': 'Invoices',
     'backup_now': 'Backup Now',
+    'backup_to_google_drive': 'Back up to Google Drive',
+    'restore_from_google_drive': 'Restore from Google Drive',
+    'backup_drive_success': 'Backup uploaded to your Google Drive',
+    'backup_drive_none': 'No ShoesERP backups found in your Google Drive',
+    'backup_restore_scope_denied':
+        'Restore is limited to your workspace and currently assigned routes',
     'backup_in_progress': 'Creating backup…',
     'backup_share_text':
         'ShoesERP data backup — save to Google Drive for safekeeping',
@@ -2496,6 +2504,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'flush_in_progress': 'جارٍ مسح البيانات… لا تغلق التطبيق.',
     'flush_include_users': 'حذف جميع المستخدمين أيضاً (ما عدا المدير)',
     'flush_select_user': 'اختر المستخدم للمسح',
+    'flush_select_workspace': 'نطاق مساحة العمل',
+    'flush_all_workspaces': 'جميع مساحات العمل',
     'approve_seller_edit': 'الموافقة على تعديل البائع',
     'reject_seller_edit': 'رفض تعديل البائع',
 
@@ -2510,6 +2520,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_transactions': 'المعاملات',
     'backup_invoices': 'الفواتير',
     'backup_now': 'نسخ الآن',
+    'backup_to_google_drive': 'النسخ الاحتياطي إلى Google Drive',
+    'restore_from_google_drive': 'الاستعادة من Google Drive',
+    'backup_drive_success': 'تم رفع النسخة الاحتياطية إلى Google Drive الخاص بك',
+    'backup_drive_none': 'لا توجد نسخ ShoesERP احتياطية في Google Drive الخاص بك',
+    'backup_restore_scope_denied':
+        'الاستعادة محدودة بمساحة عملك والمسارات المعيّنة لك حالياً',
     'backup_in_progress': 'جارٍ إنشاء النسخة الاحتياطية…',
     'backup_share_text': 'نسخة احتياطية من بيانات ShoesERP',
     'backup_nav_subtitle': 'نسخ احتياطي، استعادة وجدولة تلقائية',
@@ -3761,6 +3777,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'flush_in_progress': 'ڈیٹا صاف ہو رہا ہے… ایپ بند نہ کریں۔',
     'flush_include_users': 'تمام صارفین بھی حذف کریں (ایڈمن کے علاوہ)',
     'flush_select_user': 'صاف کرنے کے لیے صارف منتخب کریں',
+    'flush_select_workspace': 'ورک اسپیس کا دائرہ',
+    'flush_all_workspaces': 'تمام ورک اسپیسز',
     'approve_seller_edit': 'سیلر ترمیم منظور کریں',
     'reject_seller_edit': 'سیلر ترمیم مسترد کریں',
 
@@ -3775,6 +3793,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_transactions': 'ٹرانزیکشنز',
     'backup_invoices': 'انوائسز',
     'backup_now': 'ابھی بیک اپ کریں',
+    'backup_to_google_drive': 'Google Drive پر بیک اپ کریں',
+    'restore_from_google_drive': 'Google Drive سے ریسٹور کریں',
+    'backup_drive_success': 'بیک اپ آپ کے Google Drive پر اپ لوڈ ہو گیا',
+    'backup_drive_none': 'آپ کے Google Drive میں ShoesERP بیک اپ نہیں ملا',
+    'backup_restore_scope_denied':
+        'ری اسٹور صرف آپ کی ورک اسپیس اور موجودہ مقررہ روٹس تک محدود ہے',
     'backup_in_progress': 'بیک اپ بنایا جا رہا ہے…',
     'backup_share_text': 'ShoesERP ڈیٹا بیک اپ',
     'backup_nav_subtitle': 'بیک اپ، ریسٹور اور خودکار شیڈول',

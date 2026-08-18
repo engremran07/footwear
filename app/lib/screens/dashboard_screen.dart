@@ -7,6 +7,7 @@ import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/theme/app_fonts.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../providers/auth_provider.dart';
@@ -36,6 +37,14 @@ Widget _buildDashboardAsyncError(
     return fallback ?? ShimmerLoading.cards();
   }
   return Center(child: Text(tr(AppErrorMapper.key(error), ref)));
+}
+
+TextStyle _userNameStyle(BuildContext context, WidgetRef ref) {
+  final locale = ref.watch(appLocaleProvider).locale.languageCode;
+  return AppFonts.userName(
+    locale,
+    color: Theme.of(context).colorScheme.primary,
+  );
 }
 
 class DashboardScreen extends ConsumerWidget {
@@ -175,21 +184,7 @@ class DashboardScreen extends ConsumerWidget {
                           text: user.displayName.trim().isNotEmpty
                               ? user.displayName
                               : tr('profile', ref),
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? AppBrand.warningColor
-                                    : AppBrand.primaryColor,
-                                fontFamily: Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? AppBrand.fontFamilyArabic
-                                    : AppBrand.fontFamilyUrdu,
-                                letterSpacing: 0.2,
-                              ),
+                          style: _userNameStyle(context, ref),
                         ),
                       ],
                     ),
@@ -367,28 +362,16 @@ class _SuperAdminDashboard extends ConsumerWidget {
                           text: user.displayName.trim().isNotEmpty
                               ? user.displayName
                               : tr('profile', ref),
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? AppBrand.warningColor
-                                    : AppBrand.primaryColor,
-                                fontFamily: Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? AppBrand.fontFamilyArabic
-                                    : AppBrand.fontFamilyUrdu,
-                                letterSpacing: 0.2,
-                              ),
+                          style: _userNameStyle(context, ref),
                         ),
                       ],
                     ),
                   ),
                 ),
                 GridView.count(
-                  crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                  crossAxisCount: MediaQuery.of(context).size.width > 600
+                      ? 3
+                      : 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: AppTokens.s8,
@@ -547,16 +530,7 @@ class _SellerDashboard extends ConsumerWidget {
                       text: user.displayName.trim().isNotEmpty
                           ? user.displayName
                           : tr('profile', ref),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? AppBrand.warningColor
-                            : AppBrand.primaryColor,
-                        fontFamily: Theme.of(context).brightness == Brightness.dark
-                            ? AppBrand.fontFamilyArabic
-                            : AppBrand.fontFamilyUrdu,
-                        letterSpacing: 0.2,
-                      ),
+                      style: _userNameStyle(context, ref),
                     ),
                   ],
                 ),

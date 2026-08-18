@@ -10,7 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/models/user_model.dart';
-import 'package:footwear_erp/core/router/app_router.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/dashboard_provider.dart';
 import 'package:footwear_erp/screens/dashboard_screen.dart';

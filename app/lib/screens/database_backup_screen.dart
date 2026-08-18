@@ -4,17 +4,21 @@ import 'package:intl/intl.dart';
 
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/services/google_drive_backup_service.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/share_helper.dart';
 import '../core/utils/snack_helper.dart';
+import '../core/utils/tenant_scope.dart';
+import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/database_backup_provider.dart';
 import '../providers/database_flush_provider.dart';
+import '../providers/tenant_provider.dart';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 /// Full-featured backup & restore screen.
-/// Admin-only: sellers see a permission-denied message immediately.
+/// Active users can back up their permitted data; restore scope is role-based.
 class DatabaseBackupScreen extends ConsumerStatefulWidget {
   const DatabaseBackupScreen({super.key});
 
@@ -28,6 +32,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   bool _loadingPrefs = true;
   bool _loading = false; // backup creation in progress
   bool _restoring = false; // restore in progress
+  String? _selectedWorkspaceId;
 
   // ── prefs state ───────────────────────────────────────────────────────────
   bool _autoEnabled = false;
@@ -79,11 +84,17 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
 
   Future<void> _doBackup() async {
     if (_selected.isEmpty) return;
+    final user = await ref.read(authUserProvider.future);
+    if (user == null) return;
+    final workspaceId = _workspaceIdFor(user);
     setState(() => _loading = true);
     try {
       final result = await ref
           .read(databaseBackupProvider.notifier)
-          .createBackup(selected: Set.unmodifiable(_selected));
+          .createBackup(
+            selected: Set.unmodifiable(_selected),
+            tenantIdOverride: workspaceId,
+          );
       if (!mounted) return;
       setState(() {
         _lastBackupAt = DateTime.now();
@@ -105,9 +116,156 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     }
   }
 
+  Future<void> _doDriveBackup() async {
+    if (_selected.isEmpty) return;
+    final user = await ref.read(authUserProvider.future);
+    if (user == null) return;
+    final workspaceId = _workspaceIdFor(user);
+    setState(() => _loading = true);
+    try {
+      final notifier = ref.read(databaseBackupProvider.notifier);
+      final result = await notifier.createBackup(
+        selected: Set.unmodifiable(_selected),
+        tenantIdOverride: workspaceId,
+      );
+      await notifier.uploadBackupToDrive(
+        bytes: result.bytes,
+        fileName: result.localPath.split('/').last.split('\\').last,
+        tenantIdOverride: workspaceId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _lastBackupAt = DateTime.now();
+        _loading = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(successSnackBar(tr('backup_drive_success', ref)));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
+    }
+  }
+
+  Future<void> _pickAndRestoreFromDrive() async {
+    final user = await ref.read(authUserProvider.future);
+    if (!mounted) return;
+    if (user == null || !user.active) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
+      return;
+    }
+    String? selectedRouteId;
+    if (user.isSeller) {
+      selectedRouteId = await _chooseRestoreRoute(user);
+      if (selectedRouteId == null || !mounted) return;
+    }
+    final workspaceId = _workspaceIdFor(user);
+    try {
+      final files = await ref
+          .read(databaseBackupProvider.notifier)
+          .listDriveBackups(tenantIdOverride: workspaceId);
+      if (!mounted) return;
+      if (files.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(infoSnackBar(tr('backup_drive_none', ref)));
+        return;
+      }
+      final picked = await showModalBottomSheet<GoogleDriveBackupFile>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => _DriveFilePickerSheet(files: files),
+      );
+      if (picked == null || !mounted) return;
+      final bytes = await ref
+          .read(databaseBackupProvider.notifier)
+          .downloadDriveBackup(picked.id, tenantIdOverride: workspaceId);
+      final preview = ref
+          .read(databaseBackupProvider.notifier)
+          .verifyBackup(bytes);
+      if (!mounted || await _showPreviewDialog(preview) != true) return;
+      if (!mounted || await _showPasswordCountdownDialog() != true) return;
+      final adminName = user.displayName.trim().isNotEmpty
+          ? user.displayName
+          : (user.email.isNotEmpty ? user.email : 'admin');
+      setState(() => _restoring = true);
+      final count = await ref
+          .read(databaseBackupProvider.notifier)
+          .restoreFromBackup(
+            preview,
+            adminName: adminName,
+            routeId: selectedRouteId,
+          );
+      if (!mounted) return;
+      setState(() {
+        _restoring = false;
+        _lastRestoreAt = DateTime.now();
+        _lastRestoreBy = adminName;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        successSnackBar(
+          tr('backup_restore_success', ref).replaceAll('%s', '$count'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _restoring = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
+    }
+  }
+
+  Future<String?> _chooseRestoreRoute(UserModel user) {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(tr('select_route', ref)),
+        children: [
+          for (var i = 0; i < user.assignedRouteIds.length; i++)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, user.assignedRouteIds[i]),
+              child: Text(
+                user.assignedRouteNames.length > i &&
+                        user.assignedRouteNames[i].trim().isNotEmpty
+                    ? user.assignedRouteNames[i]
+                    : user.assignedRouteIds[i],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String? _workspaceIdFor(UserModel user) {
+    final ownTenantId = TenantScope.normalize(user.tenantId);
+    if (!user.isSuperAdmin) return ownTenantId;
+    if (_selectedWorkspaceId != null) return _selectedWorkspaceId;
+    final tenants = ref.read(tenantsProvider).value ?? const [];
+    return tenants.isEmpty ? null : tenants.first.id;
+  }
+
   // ── Restore ────────────────────────────────────────────────────────────────
 
   Future<void> _pickAndRestore() async {
+    final user = await ref.read(authUserProvider.future);
+    if (!mounted) return;
+    if (user == null || !user.active) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
+      return;
+    }
+    String? selectedRouteId;
+    if (user.isSeller) {
+      selectedRouteId = await _chooseRestoreRoute(user);
+      if (selectedRouteId == null || !mounted) return;
+    }
     final backups = await ref
         .read(databaseBackupProvider.notifier)
         .listLocalBackups();
@@ -150,16 +308,19 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     if (authenticated != true || !mounted) return;
 
     // 5 — execute restore
-    final adminUser = ref.read(authUserProvider).value;
-    final adminName = adminUser != null && adminUser.displayName.isNotEmpty
-        ? adminUser.displayName
-        : (adminUser?.email ?? 'admin');
+    final adminName = user.displayName.isNotEmpty
+      ? user.displayName
+      : (user.email.isNotEmpty ? user.email : 'admin');
 
     setState(() => _restoring = true);
     try {
       final count = await ref
           .read(databaseBackupProvider.notifier)
-          .restoreFromBackup(preview, adminName: adminName);
+          .restoreFromBackup(
+            preview,
+            adminName: adminName,
+            routeId: selectedRouteId,
+          );
       if (!mounted) return;
       setState(() {
         _restoring = false;
@@ -405,7 +566,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).value;
-    final isAdmin = user?.isAdmin ?? false;
+    final tenants = ref.watch(tenantsProvider).value ?? const [];
+    final isActive = user?.active ?? false;
 
     return Stack(
       children: [
@@ -415,7 +577,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
             backgroundColor: AppBrand.primaryColor,
             foregroundColor: AppBrand.onPrimary,
           ),
-          body: !isAdmin
+          body: !isActive
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -443,6 +605,35 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                       lastRestoreByTemplate: tr('backup_last_restore_by', ref),
                     ),
                     const SizedBox(height: 16),
+
+                    if (user?.isSuperAdmin == true) ...[
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _selectedWorkspaceId ??
+                                (tenants.isNotEmpty ? tenants.first.id : null),
+                            decoration: InputDecoration(
+                              labelText: tr('workspaces', ref),
+                            ),
+                            items: tenants
+                                .map(
+                                  (tenant) => DropdownMenuItem<String>(
+                                    value: tenant.id,
+                                    child: Text(tenant.name),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: tenants.isEmpty
+                                ? null
+                                : (value) => setState(
+                                      () => _selectedWorkspaceId = value,
+                                    ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     // ── Auto-backup Card ─────────────────────────────
                     Card(
@@ -591,6 +782,15 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                         minimumSize: const Size.fromHeight(48),
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _loading ? null : _doDriveBackup,
+                      icon: const Icon(Icons.cloud_upload_outlined),
+                      label: Text(tr('backup_to_google_drive', ref)),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                    ),
                     const SizedBox(height: 32),
 
                     // ── Restore section ──────────────────────────────
@@ -649,6 +849,17 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                         minimumSize: const Size.fromHeight(48),
                       ),
                     ),
+                    if (user?.active == true) ...[
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: _restoring ? null : _pickAndRestoreFromDrive,
+                        icon: const Icon(Icons.cloud_download_outlined),
+                        label: Text(tr('restore_from_google_drive', ref)),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Text(
                       'For cross-device or emergency recovery, use dev_restore.js '
@@ -875,6 +1086,31 @@ class _BackupFilePickerSheet extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DriveFilePickerSheet extends StatelessWidget {
+  final List<GoogleDriveBackupFile> files;
+
+  const _DriveFilePickerSheet({required this.files});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ListView.builder(
+        shrinkWrap: true,
+        itemCount: files.length,
+        itemBuilder: (_, index) {
+          final file = files[index];
+          return ListTile(
+            leading: const Icon(Icons.cloud_outlined),
+            title: Text(file.name),
+            subtitle: Text(file.createdAt?.toLocal().toString() ?? ''),
+            onTap: () => Navigator.pop(context, file),
+          );
+        },
       ),
     );
   }

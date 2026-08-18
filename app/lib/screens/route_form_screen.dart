@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/theme/app_fonts.dart';
 import '../core/utils/app_sanitizer.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/input_formatters.dart';
@@ -174,9 +175,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
                   // Currency selector
                   DropdownButtonFormField<String>(
                     initialValue: _currency,
-                    decoration: InputDecoration(
-                      labelText: tr('currency', ref),
-                    ),
+                    decoration: InputDecoration(labelText: tr('currency', ref)),
                     items: const [
                       DropdownMenuItem(value: 'SAR', child: Text('SAR (﷼)')),
                       DropdownMenuItem(value: 'PKR', child: Text('PKR (Rs)')),
@@ -205,10 +204,16 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
                       children: sellers.map((s) {
                         final selected = _selectedSellerIds.contains(s.id);
                         return FilterChip(
-                          label: Text(s.displayName),
+                          label: Text(
+                            s.displayName,
+                            style: AppFonts.userName(
+                              ref.watch(appLocaleProvider).locale.languageCode,
+                              fontSize: 13,
+                              color: cs.onSurface,
+                            ),
+                          ),
                           selected: selected,
-                          onSelected: (_) =>
-                              _toggleSeller(s.id, s.displayName),
+                          onSelected: (_) => _toggleSeller(s.id, s.displayName),
                         );
                       }).toList(),
                     ),
