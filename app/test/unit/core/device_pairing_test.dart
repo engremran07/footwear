@@ -11,10 +11,7 @@ void main() {
     });
 
     test('matches accepts equivalent device IDs regardless of casing', () {
-      expect(
-        DevicePairing.matches('android:abc123', 'ANDROID:ABC123'),
-        isTrue,
-      );
+      expect(DevicePairing.matches('android:abc123', 'ANDROID:ABC123'), isTrue);
     });
 
     test('matches rejects mismatched identifiers', () {

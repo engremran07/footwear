@@ -1,7 +1,20 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import '../../models/user_model.dart';
 
+/// P1-8 FIX: Normalize role name with explicit defaulting and Vibe Debt logging.
 String normalizeRoleName(String role) {
+  if (role.isEmpty) {
+    debugPrint('[VIB] P1-8 Signal: Empty role string in normalizeRoleName; defaulting to seller');
+    return 'seller';
+  }
+
   final normalized = role.trim().toLowerCase();
+  
+  if (normalized.isEmpty) {
+    debugPrint('[VIB] P1-8 Signal: Whitespace-only role string in normalizeRoleName; defaulting to seller');
+    return 'seller';
+  }
+
   switch (normalized) {
     case 'manager':
     case 'admin':
@@ -17,13 +30,15 @@ String normalizeRoleName(String role) {
     case 'seller':
       return 'seller';
     default:
+      debugPrint('[VIB] P1-8 Signal: Unknown role "$role" in normalizeRoleName; defaulting to seller');
       return 'seller';
   }
 }
 
 bool canManageUserAccountsRole(String role) {
   final normalized = normalizeRoleName(role);
-  return normalized == 'admin' || normalized == 'super_admin';
+  // P1-6 FIX: tenant_admin should be able to manage users within their tenant
+  return normalized == 'admin' || normalized == 'tenant_admin' || normalized == 'super_admin';
 }
 
 bool canManageWorkspaceRole(String role) {

@@ -286,6 +286,15 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     final isAdmin = await _isCurrentUserAdmin();
     final db = FirebaseFirestore.instance;
     final updateData = <String, dynamic>{...data};
+    if (updateData['tenant_id'] != null) {
+      final normalizedTenant = TenantScope.normalize(
+        updateData['tenant_id'].toString(),
+      );
+      if (normalizedTenant == null || normalizedTenant.isEmpty) {
+        throw ArgumentError('tenant_id must not be empty');
+      }
+      updateData['tenant_id'] = normalizedTenant;
+    }
     if (updateData['role'] is String) {
       updateData['role'] = _normalizeRole(updateData['role'] as String);
     }
@@ -366,6 +375,72 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         });
       }
     }
+
+    await batch.commit();
+  }
+
+  Future<void> transferUserToWorkspace({
+    required String uid,
+    required String targetTenantId,
+  }) async {
+    final trimmedUid = uid.trim();
+    final normalizedTarget = TenantScope.normalize(targetTenantId);
+    if (trimmedUid.isEmpty ||
+        normalizedTarget == null ||
+        normalizedTarget.isEmpty) {
+      throw ArgumentError('A valid target workspace is required.');
+    }
+
+    final actingUser = FirebaseAuth.instance.currentUser;
+    if (actingUser == null) {
+      throw StateError('No authenticated user found');
+    }
+
+    final db = FirebaseFirestore.instance;
+    final actingSnap = await db
+        .collection(Collections.users)
+        .doc(actingUser.uid)
+        .get();
+    if (!actingSnap.exists) {
+      throw StateError('Acting user profile not found.');
+    }
+
+    final actingUserModel = UserModel.fromJson(
+      actingSnap.data()!,
+      actingSnap.id,
+    );
+    if (!canManageUserAccountsRole(
+      roleValueFromUserRole(actingUserModel.role),
+    )) {
+      throw StateError(
+        'Only workspace managers can move users between workspaces.',
+      );
+    }
+
+    final currentTenant = TenantScope.normalize(
+      (await db.collection(Collections.users).doc(trimmedUid).get())
+              .data()?['tenant_id']
+          as String?,
+    );
+
+    if (!actingUserModel.isSuperAdmin) {
+      final actingTenant = TenantScope.normalize(actingUserModel.tenantId);
+      if (actingTenant == null || actingTenant != normalizedTarget) {
+        throw StateError(
+          'You can only move users within your current workspace.',
+        );
+      }
+    }
+
+    if (currentTenant == normalizedTarget) {
+      return;
+    }
+
+    final batch = db.batch();
+    batch.update(db.collection(Collections.users).doc(trimmedUid), {
+      'tenant_id': normalizedTarget,
+      'updated_at': Timestamp.now(),
+    });
 
     await batch.commit();
   }

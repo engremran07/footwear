@@ -11,6 +11,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/tenant_scope.dart';
+import '../models/user_model.dart';
 import 'auth_provider.dart';
 
 // ─── SharedPreferences keys ──────────────────────────────────────────────────
@@ -19,6 +21,15 @@ const _kIntervalDays = 'backup_interval_days';
 const _kLastBackupMs = 'backup_last_ms';
 const _kLastRestoreMs = 'backup_last_restore_ms';
 const _kLastRestoreBy = 'backup_last_restore_by';
+
+// ─── Helper functions ────────────────────────────────────────────────────────
+
+/// P1-12 FIX: Derive per-tenant settings doc ID from user profile.
+/// Matches the pattern used in settings_provider.dart.
+String _settingsDocumentIdForCurrentUser(UserModel? currentUser) {
+  final tenantId = TenantScope.normalize(currentUser?.tenantId);
+  return tenantId ?? TenantScope.globalTenantId;
+}
 
 // ─── Data classes ─────────────────────────────────────────────────────────────
 
@@ -102,7 +113,10 @@ class DatabaseBackupNotifier extends Notifier<void> {
     await prefs.setInt(_kLastRestoreMs, DateTime.now().millisecondsSinceEpoch);
     await prefs.setString(_kLastRestoreBy, byName);
     // Persist to Firestore so all admin devices see the restore event.
-    await _db.collection(Collections.settings).doc('global').set({
+    // P1-12 FIX: Use per-tenant settings doc ID instead of hardcoded 'global'
+    final currentUser = ref.read(authUserProvider).value;
+    final settingsDocId = _settingsDocumentIdForCurrentUser(currentUser);
+    await _db.collection(Collections.settings).doc(settingsDocId).set({
       'last_restore_at': Timestamp.now(),
       'last_restore_by': byName,
       'updated_at': Timestamp.now(),

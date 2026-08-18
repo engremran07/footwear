@@ -482,6 +482,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     await batch.commit();
 
     // Best-effort notification for admin feed (non-critical, fire-and-forget).
+    // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
     try {
       final appUser = ref.read(authUserProvider).value;
       if (appUser != null && appUser.isSeller) {
@@ -502,6 +503,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
               'target_role': 'admin',
               'read': false,
               'created_by': normalizedCreatedBy,
+              'tenant_id': appUser.tenantId,
               'created_at': Timestamp.now(),
             });
       }
@@ -671,6 +673,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     await batch.commit();
 
     // Best-effort notification for admin feed (non-critical, fire-and-forget).
+    // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
     try {
       final appUser = ref.read(authUserProvider).value;
       if (appUser != null && appUser.isSeller) {
@@ -691,6 +694,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
               'target_role': 'admin',
               'read': false,
               'created_by': normalizedCreatedBy,
+              'tenant_id': appUser.tenantId,
               'created_at': Timestamp.now(),
             });
       }

@@ -9,6 +9,7 @@ class TenantModel {
   final bool isTrial;
   final bool requireDevicePairing;
   final bool allowAdminResetOnly;
+  final int maxDevicesAllowed;
   final Timestamp createdAt;
   final Timestamp updatedAt;
   final String? ownerUserId;
@@ -24,6 +25,7 @@ class TenantModel {
     this.isTrial = false,
     this.requireDevicePairing = false,
     this.allowAdminResetOnly = true,
+    this.maxDevicesAllowed = 1,
     required this.createdAt,
     required this.updatedAt,
     this.ownerUserId,
@@ -41,6 +43,9 @@ class TenantModel {
       isTrial: json['is_trial'] as bool? ?? false,
       requireDevicePairing: json['require_device_pairing'] as bool? ?? false,
       allowAdminResetOnly: json['allow_admin_reset_only'] as bool? ?? true,
+      maxDevicesAllowed: ((json['max_devices_allowed'] as num?) ?? 1)
+          .toInt()
+          .clamp(1, 999),
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
       ownerUserId: json['owner_user_id'] as String?,
@@ -57,6 +62,7 @@ class TenantModel {
     'is_trial': isTrial,
     'require_device_pairing': requireDevicePairing,
     'allow_admin_reset_only': allowAdminResetOnly,
+    'max_devices_allowed': maxDevicesAllowed,
     'created_at': createdAt,
     'updated_at': updatedAt,
     'owner_user_id': ownerUserId,

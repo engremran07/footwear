@@ -13,6 +13,7 @@ void main() {
         plan: 'pro',
         active: true,
         isTrial: false,
+        maxDevicesAllowed: 3,
         createdAt: ts,
         updatedAt: ts,
         ownerUserId: 'owner-1',
@@ -27,6 +28,7 @@ void main() {
       expect(restored.name, original.name);
       expect(restored.slug, original.slug);
       expect(restored.plan, original.plan);
+      expect(restored.maxDevicesAllowed, original.maxDevicesAllowed);
       expect(restored.ownerUserId, original.ownerUserId);
       expect(restored.primaryColor, original.primaryColor);
       expect(restored.accentColor, original.accentColor);
@@ -42,6 +44,7 @@ void main() {
       expect(m.active, isTrue);
       expect(m.isTrial, isFalse);
       expect(m.plan, isNull);
+      expect(m.maxDevicesAllowed, 1);
     });
   });
 }

@@ -1,9 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 enum UserRole { admin, seller, tenantAdmin, superAdmin }
 
+/// P1-8 FIX: Convert role string to UserRole enum with explicit defaulting and logging.
+/// Vibe Debt Signal: empty or null role strings should be logged to surface data quality issues.
 UserRole _roleFromString(String s) {
+  if (s.isEmpty) {
+    debugPrint('[VIB] P1-8 Signal: Empty role string; defaulting to seller');
+    return UserRole.seller;
+  }
+
   final role = s.trim().toLowerCase();
+  
+  if (role.isEmpty) {
+    debugPrint('[VIB] P1-8 Signal: Whitespace-only role string; defaulting to seller');
+    return UserRole.seller;
+  }
+
   switch (role) {
     case 'admin':
     case 'manager':
@@ -16,7 +30,11 @@ UserRole _roleFromString(String s) {
     case 'super-admin':
     case 'superadmin':
       return UserRole.superAdmin;
+    case 'seller':
+      return UserRole.seller;
     default:
+      // Unknown role: log and default to seller (safest)
+      debugPrint('[VIB] P1-8 Signal: Unknown role "$s"; defaulting to seller');
       return UserRole.seller;
   }
 }
@@ -43,6 +61,7 @@ class UserModel {
   final String? tenantId;
   final bool devicePairingEnabled;
   final String? devicePairingId;
+  final List<String> pairedDeviceIds;
   final String? devicePairingResetBy;
 
   /// Multi-route assignment (many-to-many). Each seller can serve multiple routes.
@@ -63,6 +82,7 @@ class UserModel {
     this.tenantId,
     this.devicePairingEnabled = false,
     this.devicePairingId,
+    this.pairedDeviceIds = const [],
     this.devicePairingResetBy,
     this.assignedRouteIds = const [],
     this.assignedRouteNames = const [],
@@ -90,10 +110,16 @@ class UserModel {
   factory UserModel.fromJson(Map<String, dynamic> json, String docId) {
     final rawRouteIds = json['assigned_route_ids'] as List<dynamic>?;
     final rawRouteNames = json['assigned_route_names'] as List<dynamic>?;
+    final rawPairedDevices =
+        json['device_pairing_ids'] as List<dynamic>? ??
+        ((json['device_pairing_id'] == null)
+            ? const <dynamic>[]
+            : <dynamic>[json['device_pairing_id']]);
 
     final routeIds = rawRouteIds?.cast<String>().toList() ?? const <String>[];
     final routeNames =
         rawRouteNames?.cast<String>().toList() ?? const <String>[];
+    final pairedDeviceIds = rawPairedDevices.cast<String>().toList();
 
     return UserModel(
       id: docId,
@@ -104,6 +130,7 @@ class UserModel {
       tenantId: json['tenant_id'] as String?,
       devicePairingEnabled: json['device_pairing_enabled'] as bool? ?? false,
       devicePairingId: json['device_pairing_id'] as String?,
+      pairedDeviceIds: pairedDeviceIds,
       devicePairingResetBy: json['device_pairing_reset_by'] as String?,
       assignedRouteIds: routeIds,
       assignedRouteNames: routeNames,
@@ -122,6 +149,7 @@ class UserModel {
     'tenant_id': tenantId,
     'device_pairing_enabled': devicePairingEnabled,
     'device_pairing_id': devicePairingId,
+    'device_pairing_ids': pairedDeviceIds,
     'device_pairing_reset_by': devicePairingResetBy,
     'assigned_route_ids': assignedRouteIds,
     'assigned_route_names': assignedRouteNames,
@@ -140,6 +168,7 @@ class UserModel {
     String? tenantId,
     bool? devicePairingEnabled,
     String? devicePairingId,
+    List<String>? pairedDeviceIds,
     String? devicePairingResetBy,
     List<String>? assignedRouteIds,
     List<String>? assignedRouteNames,
@@ -157,6 +186,7 @@ class UserModel {
       tenantId: tenantId ?? this.tenantId,
       devicePairingEnabled: devicePairingEnabled ?? this.devicePairingEnabled,
       devicePairingId: devicePairingId ?? this.devicePairingId,
+      pairedDeviceIds: pairedDeviceIds ?? this.pairedDeviceIds,
       devicePairingResetBy: devicePairingResetBy ?? this.devicePairingResetBy,
       assignedRouteIds: assignedRouteIds ?? this.assignedRouteIds,
       assignedRouteNames: assignedRouteNames ?? this.assignedRouteNames,

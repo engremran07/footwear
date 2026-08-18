@@ -504,6 +504,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
       // Best-effort notification for admin feed (non-critical, fire-and-forget).
       // Only written when a seller creates the transaction — admin notifies themselves.
+      // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
       try {
         final appUser = ref.read(authUserProvider).value;
         if (appUser != null && appUser.isSeller) {
@@ -523,6 +524,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
                 'target_role': 'admin',
                 'read': false,
                 'created_by': normalizedCreatedBy,
+                'tenant_id': appUser.tenantId,
                 'created_at': Timestamp.now(),
               });
         }
@@ -617,6 +619,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       await batch.commit();
 
       // Best-effort notification for admin feed (non-critical, fire-and-forget).
+      // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
       try {
         final appUser = ref.read(authUserProvider).value;
         if (appUser != null && appUser.isSeller) {
@@ -636,6 +639,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
                 'target_role': 'admin',
                 'read': false,
                 'created_by': normalizedCreatedBy,
+                'tenant_id': appUser.tenantId,
                 'created_at': Timestamp.now(),
               });
         }

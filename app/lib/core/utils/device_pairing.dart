@@ -13,7 +13,11 @@ class DevicePairing {
 
   static String currentDeviceIdentifier() {
     if (kIsWeb) {
-      return 'web:${DateTime.now().millisecondsSinceEpoch}';
+      // P2-15 FIX: Web device ID time-based issue
+      // TODO: Replace with stable UUID persisted to browser storage,
+      // or omit device pairing on web entirely.
+      // For now, return empty string to disable device pairing on web.
+      return '';
     }
 
     final os = Platform.operatingSystem;

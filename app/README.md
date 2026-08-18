@@ -12,6 +12,7 @@ Mobile-first Android + Web ERP for footwear distribution. Admins manage products
 - Android SDK (API 21+)
 - Java 17
 - Firebase project with Firestore and Auth enabled (no Storage, no Cloud Functions needed)
+- Workspace ownership: each tenant has its own branding settings and device-pairing limit policy
 
 ---
 

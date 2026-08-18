@@ -465,6 +465,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     final selectedRouteIds = List<String>.from(user.assignedRouteIds);
     final selectedRouteNames = List<String>.from(user.assignedRouteNames);
     final oldRouteIds = List<String>.from(user.assignedRouteIds);
+    final currentTenantId = TenantScope.normalize(user.tenantId) ?? tenantId;
+    String? selectedTenantId = currentTenantId;
     bool obscurePassword = true;
 
     showDialog(
@@ -472,6 +474,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
           final routes = ref.watch(routesProvider).value ?? [];
+          final workspaceOptions = ref.watch(tenantsProvider).value ?? [];
           return AlertDialog(
             title: Text(tr('edit_user', ref)),
             content: SingleChildScrollView(
@@ -596,6 +599,26 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     ],
                   ),
                   const Divider(height: 16),
+                  // ── Workspace ──
+                  if (currentUser != null &&
+                      (currentUser.isSuperAdmin || currentUser.isTenantAdmin))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: DropdownButtonFormField<String>(
+                        initialValue: selectedTenantId,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: tr('workspaces', ref),
+                        ),
+                        items: workspaceOptions.map((tenant) {
+                          return DropdownMenuItem<String>(
+                            value: tenant.id,
+                            child: Text(tenant.name),
+                          );
+                        }).toList(),
+                        onChanged: (v) => setS(() => selectedTenantId = v),
+                      ),
+                    ),
                   // ── Role ──
                   if (isSelf)
                     TextField(
@@ -721,12 +744,20 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         newPassword: passwordSet ? passwordC.text.trim() : null,
                       );
                     }
-                    // ── Step 2: Firestore profile (name / role / routes) ──
+                    // ── Step 2: Firestore profile (name / role / routes / workspace) ──
                     final profileUpdate = <String, dynamic>{
                       'display_name': nameC.text.trim(),
                       'assigned_route_ids': selectedRouteIds,
                       'assigned_route_names': selectedRouteNames,
                     };
+                    if (selectedTenantId != null &&
+                        selectedTenantId != currentTenantId) {
+                      await notifier.transferUserToWorkspace(
+                        uid: user.id,
+                        targetTenantId: selectedTenantId!,
+                      );
+                      profileUpdate['tenant_id'] = selectedTenantId;
+                    }
                     if (!isSelf) {
                       profileUpdate['role'] = role;
                     }

@@ -169,11 +169,13 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
     required String slug,
     required bool requireDevicePairing,
     required bool allowAdminResetOnly,
+    required int maxDevicesAllowed,
     String? ownerUserId,
   }) async {
     final tenantSlug = slug.trim().isEmpty
         ? _slugify(name)
         : slug.trim().toLowerCase();
+    final normalizedLimit = maxDevicesAllowed.clamp(1, 999);
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final now = Timestamp.now();
@@ -191,6 +193,7 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
             'is_trial': false,
             'require_device_pairing': requireDevicePairing,
             'allow_admin_reset_only': allowAdminResetOnly,
+            'max_devices_allowed': normalizedLimit,
             'created_at': now,
             'updated_at': now,
             'owner_user_id': ownerUserId,
@@ -204,8 +207,10 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
     required String slug,
     required bool requireDevicePairing,
     required bool allowAdminResetOnly,
+    required int maxDevicesAllowed,
     String? ownerUserId,
   }) async {
+    final normalizedLimit = maxDevicesAllowed.clamp(1, 999);
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       await FirebaseFirestore.instance
@@ -217,6 +222,7 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
             'tenant_id': tenantId,
             'require_device_pairing': requireDevicePairing,
             'allow_admin_reset_only': allowAdminResetOnly,
+            'max_devices_allowed': normalizedLimit,
             'owner_user_id': ownerUserId,
             'updated_at': Timestamp.now(),
           }, SetOptions(merge: true));

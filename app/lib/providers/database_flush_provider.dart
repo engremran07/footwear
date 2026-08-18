@@ -24,11 +24,12 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
 
   FirebaseFirestore get _db => FirebaseFirestore.instance;
 
-  /// Verifies the current user is admin before allowing flush operations.
-  UserModel _requireAdmin() {
+  /// Verifies the current user is super_admin (only role allowed to perform unrestricted flush).
+  /// P0-1 FIX: Only super_admin can flush data (not tenant_admin or regular admin).
+  UserModel _requireSuperAdmin() {
     final user = ref.read(authUserProvider).value;
-    if (user == null || !user.isAdmin) {
-      throw ArgumentError('Only admin can perform database flush operations');
+    if (user == null || !user.isSuperAdmin) {
+      throw ArgumentError('Only super_admin can perform database flush operations');
     }
     return user;
   }
@@ -51,11 +52,17 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
   }
 
   /// Deletes all documents in a collection using batched writes (max 400/batch).
+  /// If tenantId is provided, only deletes docs matching that tenant_id.
+  /// P0-1 FIX: Add tenant filtering to prevent cross-tenant deletion.
   /// Returns the number of deleted documents.
-  Future<int> _deleteCollection(String collectionPath) async {
+  Future<int> _deleteCollection(String collectionPath, {String? tenantId}) async {
     int deleted = 0;
     while (true) {
-      final snap = await _db.collection(collectionPath).limit(400).get();
+      Query query = _db.collection(collectionPath).limit(400);
+      if (tenantId != null) {
+        query = query.where('tenant_id', isEqualTo: tenantId);
+      }
+      final snap = await query.get();
       if (snap.docs.isEmpty) break;
       final batch = _db.batch();
       for (final doc in snap.docs) {
@@ -68,18 +75,24 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
   }
 
   /// Deletes documents in a collection where a field matches a value.
+  /// If tenantId is provided, also filters by tenant_id.
+  /// P0-1 FIX: Add tenant filtering to prevent cross-tenant deletion.
   Future<int> _deleteWhere(
     String collectionPath,
     String field,
-    String value,
-  ) async {
+    String value, {
+    String? tenantId,
+  }) async {
     int deleted = 0;
     while (true) {
-      final snap = await _db
+      Query query = _db
           .collection(collectionPath)
           .where(field, isEqualTo: value)
-          .limit(400)
-          .get();
+          .limit(400);
+      if (tenantId != null) {
+        query = query.where('tenant_id', isEqualTo: tenantId);
+      }
+      final snap = await query.get();
       if (snap.docs.isEmpty) break;
       final batch = _db.batch();
       for (final doc in snap.docs) {
@@ -103,23 +116,30 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
   // Public methods wrap them with state management.
   // [flushAll] calls these directly to avoid state flickering.
 
-  Future<FlushResult> _implFlushFinancialData() async {
+  Future<FlushResult> _implFlushFinancialData({String? tenantId}) async {
     int deleted = 0;
     int reset = 0;
 
-    deleted += await _deleteCollection(Collections.invoices);
-    deleted += await _deleteCollection(Collections.transactions);
-    deleted += await _deleteCollection(Collections.inventoryTransactions);
+    // P0-1 FIX: Add tenantId filtering to all delete operations
+    deleted += await _deleteCollection(Collections.invoices, tenantId: tenantId);
+    deleted += await _deleteCollection(Collections.transactions, tenantId: tenantId);
+    deleted += await _deleteCollection(Collections.inventoryTransactions, tenantId: tenantId);
 
     // Reset invoice counter (merge — only updates this field)
-    await _db.collection(Collections.settings).doc('global').set({
+    // For tenant scope: use the tenantId as the doc ID
+    final settingsDocId = tenantId ?? 'global';
+    await _db.collection(Collections.settings).doc(settingsDocId).set({
       'last_invoice_number': 0,
       'updated_at': Timestamp.now(),
     }, SetOptions(merge: true));
     reset++;
 
-    // Reset all shop balances to 0
-    final shops = await _db.collection(Collections.shops).get();
+    // Reset all shop balances to 0 (tenant-scoped if tenantId provided)
+    Query shopsQuery = _db.collection(Collections.shops);
+    if (tenantId != null) {
+      shopsQuery = shopsQuery.where('tenant_id', isEqualTo: tenantId);
+    }
+    final shops = await shopsQuery.get();
     for (var i = 0; i < shops.docs.length; i += 400) {
       final batch = _db.batch();
       final end = (i + 400 > shops.docs.length) ? shops.docs.length : i + 400;
@@ -142,14 +162,19 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
     );
   }
 
-  Future<FlushResult> _implFlushInventory() async {
+  Future<FlushResult> _implFlushInventory({String? tenantId}) async {
     int deleted = 0;
     int reset = 0;
 
-    deleted += await _deleteCollection(Collections.sellerInventory);
+    // P0-1 FIX: Add tenantId filtering
+    deleted += await _deleteCollection(Collections.sellerInventory, tenantId: tenantId);
 
     // Reset warehouse stock (product_variants.quantity_available → 0)
-    final variants = await _db.collection(Collections.productVariants).get();
+    Query variantsQuery = _db.collection(Collections.productVariants);
+    if (tenantId != null) {
+      variantsQuery = variantsQuery.where('tenant_id', isEqualTo: tenantId);
+    }
+    final variants = await variantsQuery.get();
     for (var i = 0; i < variants.docs.length; i += 400) {
       final batch = _db.batch();
       final end = (i + 400 > variants.docs.length)
@@ -172,14 +197,19 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
     );
   }
 
-  Future<FlushResult> _implFlushShops() async {
+  Future<FlushResult> _implFlushShops({String? tenantId}) async {
     int deleted = 0;
     int reset = 0;
 
-    deleted += await _deleteCollection(Collections.shops);
+    // P0-1 FIX: Add tenantId filtering
+    deleted += await _deleteCollection(Collections.shops, tenantId: tenantId);
 
-    // Reset route total_shops counters
-    final routes = await _db.collection(Collections.routes).get();
+    // Reset route total_shops counters (tenant-scoped)
+    Query routesQuery = _db.collection(Collections.routes);
+    if (tenantId != null) {
+      routesQuery = routesQuery.where('tenant_id', isEqualTo: tenantId);
+    }
+    final routes = await routesQuery.get();
     for (var i = 0; i < routes.docs.length; i += 400) {
       final batch = _db.batch();
       final end = (i + 400 > routes.docs.length) ? routes.docs.length : i + 400;
@@ -200,14 +230,19 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
     );
   }
 
-  Future<FlushResult> _implFlushRoutes() async {
+  Future<FlushResult> _implFlushRoutes({String? tenantId}) async {
     int deleted = 0;
     int reset = 0;
 
-    deleted += await _deleteCollection(Collections.routes);
+    // P0-1 FIX: Add tenantId filtering
+    deleted += await _deleteCollection(Collections.routes, tenantId: tenantId);
 
-    // Clear assigned route arrays on all users
-    final users = await _db.collection(Collections.users).get();
+    // Clear assigned route arrays on all users (tenant-scoped)
+    Query usersQuery = _db.collection(Collections.users);
+    if (tenantId != null) {
+      usersQuery = usersQuery.where('tenant_id', isEqualTo: tenantId);
+    }
+    final users = await usersQuery.get();
     for (var i = 0; i < users.docs.length; i += 400) {
       final batch = _db.batch();
       final end = (i + 400 > users.docs.length) ? users.docs.length : i + 400;
@@ -229,10 +264,11 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
     );
   }
 
-  Future<FlushResult> _implFlushProducts() async {
+  Future<FlushResult> _implFlushProducts({String? tenantId}) async {
     int deleted = 0;
-    deleted += await _deleteCollection(Collections.products);
-    deleted += await _deleteCollection(Collections.productVariants);
+    // P0-1 FIX: Add tenantId filtering
+    deleted += await _deleteCollection(Collections.products, tenantId: tenantId);
+    deleted += await _deleteCollection(Collections.productVariants, tenantId: tenantId);
     return FlushResult(
       deletedCount: deleted,
       resetCount: 0,
@@ -368,44 +404,50 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
 
   /// Flush financial data: invoices, transactions, inventory_transactions.
   /// Resets invoice counter and all shop balances.
+  /// P0-1 FIX: Only super_admin can flush (not tenant_admin)
   Future<FlushResult> flushFinancialData() async {
-    _requireAdmin();
+    _requireSuperAdmin();
     state = const AsyncLoading();
     return _stateGuard(_implFlushFinancialData);
   }
 
   /// Flush inventory: seller_inventory docs + reset warehouse stock to 0.
+  /// P0-1 FIX: Only super_admin can flush (not tenant_admin)
   Future<FlushResult> flushInventory() async {
-    _requireAdmin();
+    _requireSuperAdmin();
     state = const AsyncLoading();
     return _stateGuard(_implFlushInventory);
   }
 
   /// Flush shops: delete all shop/customer docs + reset route total_shops.
+  /// P0-1 FIX: Only super_admin can flush (not tenant_admin)
   Future<FlushResult> flushShops() async {
-    _requireAdmin();
+    _requireSuperAdmin();
     state = const AsyncLoading();
     return _stateGuard(_implFlushShops);
   }
 
   /// Flush routes: delete all route docs + clear user assigned_route_id.
+  /// P0-1 FIX: Only super_admin can flush (not tenant_admin)
   Future<FlushResult> flushRoutes() async {
-    _requireAdmin();
+    _requireSuperAdmin();
     state = const AsyncLoading();
     return _stateGuard(_implFlushRoutes);
   }
 
   /// Flush products: delete products + product_variants.
+  /// P0-1 FIX: Only super_admin can flush (not tenant_admin)
   Future<FlushResult> flushProducts() async {
-    _requireAdmin();
+    _requireSuperAdmin();
     state = const AsyncLoading();
     return _stateGuard(_implFlushProducts);
   }
 
   /// Flush users: delete all user docs EXCEPT the specified admin.
   /// Does NOT delete Firebase Auth accounts (no Admin SDK available).
+  /// P0-1 FIX: Only super_admin can flush users (not tenant_admin)
   Future<FlushResult> flushUsers(String keepAdminId) async {
-    _requireAdmin();
+    _requireSuperAdmin();
     if (keepAdminId.isEmpty) {
       throw ArgumentError('keepAdminId must not be empty');
     }
@@ -417,8 +459,9 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
   /// and inventory_transactions (by created_by / seller_id).
   /// Also resets shop balances to 0 for all shops backed by this user's
   /// transactions — financial integrity after transaction deletion.
+  /// P0-1 FIX: Only super_admin can flush users (not tenant_admin)
   Future<FlushResult> flushPerUser(String userId) async {
-    _requireAdmin();
+    _requireSuperAdmin();
     if (userId.isEmpty) {
       throw ArgumentError('userId must not be empty');
     }
@@ -427,8 +470,9 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
   }
 
   /// Reset settings to defaults (logo removed, counters zeroed).
+  /// P0-1 FIX: Only super_admin can reset (not tenant_admin)
   Future<FlushResult> resetSettings() async {
-    _requireAdmin();
+    _requireSuperAdmin();
     state = const AsyncLoading();
     return _stateGuard(_implResetSettings);
   }
@@ -437,11 +481,12 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
   ///
   /// Calls private [_impl*] methods directly so that state is managed here
   /// exclusively — no flickering from sub-method state writes.
+  /// P0-1 FIX: Only super_admin can flush all (not tenant_admin)
   Future<FlushResult> flushAll({
     required String keepAdminId,
     required bool includeUsers,
   }) async {
-    _requireAdmin();
+    _requireSuperAdmin();
     state = const AsyncLoading();
     return _stateGuard(() async {
       int totalDeleted = 0;

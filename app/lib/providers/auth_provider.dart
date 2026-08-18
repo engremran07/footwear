@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
 import '../core/services/admin_identity_service.dart';
-import '../core/services/device_identity_service.dart';
 import '../core/utils/device_pairing.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
@@ -301,25 +300,34 @@ class AuthNotifier extends AsyncNotifier<void> {
         final userData = refreshedDoc.data();
         final isActive = userData?['active'] == true;
         final normalizedRole = (userData?['role'] as String? ?? '').trim();
-        String? tenantId = TenantScope.normalize(
-          userData?['tenant_id'] as String?,
-        );
 
-        if (tenantId == null) {
-          tenantId = TenantScope.globalTenantId;
-          await usersRef.doc(uid).set({
-            'tenant_id': tenantId,
-            'updated_at': Timestamp.now(),
-          }, SetOptions(merge: true));
-        }
-
-        if (normalizedRole.toLowerCase() == 'super_admin') {
-          await usersRef.doc(uid).set({
-            'role': 'super_admin',
-            'tenant_id': tenantId,
-            'active': true,
-            'updated_at': Timestamp.now(),
-          }, SetOptions(merge: true));
+        // P1-5 FIX: Check role BEFORE tenant_id self-heal. Super admin must
+        // never carry a tenant_id (it's tenant-independent everywhere else).
+        // For non-super_admin roles, ensure tenant_id is set to __global__ if null.
+        final isSuperAdmin = normalizedRole.toLowerCase() == 'super_admin';
+        String? tenantId;
+        if (!isSuperAdmin) {
+          tenantId = TenantScope.normalize(
+            userData?['tenant_id'] as String?,
+          );
+          if (tenantId == null) {
+            tenantId = TenantScope.globalTenantId;
+            await usersRef.doc(uid).set({
+              'tenant_id': tenantId,
+              'updated_at': Timestamp.now(),
+            }, SetOptions(merge: true));
+          }
+        } else {
+          // Super admin: ensure no tenant_id is set by deleting it if present.
+          // Use FieldValue.delete() so it won't be re-stamped.
+          if (userData?['tenant_id'] != null) {
+            await usersRef.doc(uid).set({
+              'role': 'super_admin',
+              'tenant_id': FieldValue.delete(),
+              'active': true,
+              'updated_at': Timestamp.now(),
+            }, SetOptions(merge: true));
+          }
         }
         if (!isActive) {
           await FirebaseAuth.instance.signOut();
@@ -362,7 +370,7 @@ class AuthNotifier extends AsyncNotifier<void> {
         if (!kIsWeb) {
           FirebaseCrashlytics.instance.setUserIdentifier(uid);
           FirebaseCrashlytics.instance.setCustomKey('role', normalizedRole);
-          if (tenantId.isNotEmpty) {
+          if (tenantId != null && tenantId.isNotEmpty) {
             FirebaseCrashlytics.instance.setCustomKey('tenant_id', tenantId);
           }
           FirebaseCrashlytics.instance.setCustomKey(
@@ -411,21 +419,71 @@ class AuthNotifier extends AsyncNotifier<void> {
       throw StateError('Only admin or super admin can manage device pairing');
     }
 
-    final resolvedPairingId = enabled
-        ? (pairingId ??
-            DevicePairing.generate(
-              await DeviceIdentityService.instance.currentDeviceId(),
-              targetUserId,
-            ))
-        : null;
+    final targetDoc = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(targetUserId)
+        .get();
+    final targetData = targetDoc.data();
+    final tenantId =
+        (targetData?['tenant_id'] as String?) ??
+        (actorData?['tenant_id'] as String?);
+    final tenantDoc = tenantId == null || tenantId.isEmpty
+        ? null
+        : await FirebaseFirestore.instance
+              .collection(Collections.tenants)
+              .doc(tenantId)
+              .get();
+    final tenantData = tenantDoc?.data();
+    final maxDevicesAllowed =
+        ((tenantData?['max_devices_allowed'] as num?) ?? 1).toInt().clamp(
+          1,
+          999,
+        );
+    final existingPairings =
+        (targetData?['device_pairing_ids'] as List<dynamic>?)
+            ?.whereType<String>()
+            .toList() ??
+        <String>[];
 
+    if (enabled) {
+      final normalizedPairingId =
+          pairingId ??
+          // P2-14 FIX: Use DevicePairing.currentDeviceIdentifier() instead of DeviceIdentityService
+          DevicePairing.generate(
+            DevicePairing.currentDeviceIdentifier(),
+            targetUserId,
+          );
+      final alreadyPaired = existingPairings.contains(normalizedPairingId);
+      if (!alreadyPaired && existingPairings.length >= maxDevicesAllowed) {
+        throw StateError(
+          'Workspace device limit reached ($maxDevicesAllowed).',
+        );
+      }
+      final nextPairings = alreadyPaired
+          ? existingPairings
+          : [...existingPairings, normalizedPairingId];
+      await FirebaseFirestore.instance
+          .collection(Collections.users)
+          .doc(targetUserId)
+          .set({
+            'device_pairing_enabled': true,
+            'device_pairing_id': normalizedPairingId,
+            'device_pairing_ids': nextPairings,
+            'device_pairing_reset_by': null,
+            'updated_at': Timestamp.now(),
+          }, SetOptions(merge: true));
+      return;
+    }
+
+    final nextPairings = <String>[];
     await FirebaseFirestore.instance
         .collection(Collections.users)
         .doc(targetUserId)
         .set({
-          'device_pairing_enabled': enabled,
-          'device_pairing_id': resolvedPairingId,
-          'device_pairing_reset_by': enabled ? null : authUser.uid,
+          'device_pairing_enabled': false,
+          'device_pairing_id': null,
+          'device_pairing_ids': nextPairings,
+          'device_pairing_reset_by': authUser.uid,
           'updated_at': Timestamp.now(),
         }, SetOptions(merge: true));
   }
