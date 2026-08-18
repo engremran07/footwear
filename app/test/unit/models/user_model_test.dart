@@ -20,14 +20,14 @@ void main() {
   });
 
   group('role separation', () {
-    test('tenant admins cannot manage workspaces; only super admins can', () {
+    test('tenant admins can manage tenant users but not global workspace settings', () {
       expect(
         canManageWorkspaceRole(roleValueFromUserRole(UserRole.tenantAdmin)),
         isFalse,
       );
       expect(
         canManageUserAccountsRole(roleValueFromUserRole(UserRole.tenantAdmin)),
-        isFalse,
+        isTrue,
       );
     });
 

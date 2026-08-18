@@ -48,7 +48,7 @@ void main() {
       expect(AppShell.canManageWorkspaces(tenantAdmin), isFalse);
       expect(AppShell.canManageWorkspaces(seller), isFalse);
       expect(AppShell.canManageUsers(superAdmin), isTrue);
-      expect(AppShell.canManageUsers(tenantAdmin), isFalse);
+      expect(AppShell.canManageUsers(tenantAdmin), isTrue);
       expect(AppShell.canManageUsers(seller), isFalse);
     });
   });

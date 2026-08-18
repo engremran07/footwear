@@ -96,7 +96,7 @@ class _TenantManagementScreenState
     final authNotifier = ref.read(authNotifierProvider.notifier);
     try {
       final devicePairingId = enabled
-          ? DevicePairing.generate(user.devicePairingId, user.id)
+          ? await DevicePairing.generate(user.devicePairingId, user.id)
           : null;
       await authNotifier.setDevicePairingState(
         user.id,

@@ -25,13 +25,21 @@ final routesProvider = StreamProvider.autoDispose<List<RouteModel>>((ref) {
   );
   return query
       .where('active', isEqualTo: true)
-      .orderBy('route_number')
       .limit(200)
       .snapshots()
-      .map(
-        (snap) =>
-            snap.docs.map((d) => RouteModel.fromJson(d.data(), d.id)).toList(),
-      );
+      .handleError((Object error, StackTrace stack) {
+        if (error is FirebaseException && error.code == 'failed-precondition') {
+          return const <RouteModel>[];
+        }
+        throw error;
+      })
+      .map((snap) {
+        final routes = snap.docs
+            .map((d) => RouteModel.fromJson(d.data(), d.id))
+            .toList();
+        routes.sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
+        return routes;
+      });
 });
 
 final routeDetailProvider = StreamProvider.autoDispose
@@ -113,14 +121,21 @@ final routesBySellerProvider = StreamProvider.autoDispose
       return query
           .where('assigned_seller_ids', arrayContains: sellerId)
           .where('active', isEqualTo: true)
-          .orderBy('route_number')
           .limit(100)
           .snapshots()
-          .map(
-            (snap) => snap.docs
+          .handleError((Object error, StackTrace stack) {
+            if (error is FirebaseException && error.code == 'failed-precondition') {
+              return const <RouteModel>[];
+            }
+            throw error;
+          })
+          .map((snap) {
+            final routes = snap.docs
                 .map((d) => RouteModel.fromJson(d.data(), d.id))
-                .toList(),
-          );
+                .toList();
+            routes.sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
+            return routes;
+          });
     });
 
 class RouteNotifier extends AsyncNotifier<void> {

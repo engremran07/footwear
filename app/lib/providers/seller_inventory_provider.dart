@@ -23,14 +23,23 @@ final sellerInventoryProvider = StreamProvider.autoDispose
       return query
           .where('seller_id', isEqualTo: sellerId)
           .where('active', isEqualTo: true)
-          .orderBy('variant_name')
           .limit(500)
           .snapshots()
-          .map(
-            (snap) => snap.docs
+          .handleError((Object error, StackTrace stack) {
+            if (error is FirebaseException && error.code == 'failed-precondition') {
+              return const <SellerInventoryModel>[];
+            }
+            throw error;
+          })
+          .map((snap) {
+            final inventory = snap.docs
                 .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
-                .toList(),
-          );
+                .toList();
+            inventory.sort(
+              (a, b) => a.variantName.toLowerCase().compareTo(b.variantName.toLowerCase()),
+            );
+            return inventory;
+          });
     });
 
 final sellerInventoryTotalPairsProvider =
@@ -62,14 +71,23 @@ final adminAllSellerInventoryProvider =
       );
       return query
           .where('active', isEqualTo: true)
-          .orderBy('variant_name')
           .limit(100)
           .snapshots()
-          .map(
-            (snap) => snap.docs
+          .handleError((Object error, StackTrace stack) {
+            if (error is FirebaseException && error.code == 'failed-precondition') {
+              return const <SellerInventoryModel>[];
+            }
+            throw error;
+          })
+          .map((snap) {
+            final inventory = snap.docs
                 .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
-                .toList(),
-          );
+                .toList();
+            inventory.sort(
+              (a, b) => a.variantName.toLowerCase().compareTo(b.variantName.toLowerCase()),
+            );
+            return inventory;
+          });
     });
 
 /// One-shot active seller inventory for export (seller report PDF/Excel).

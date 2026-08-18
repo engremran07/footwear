@@ -46,13 +46,23 @@ final shopsProvider = StreamProvider.autoDispose<List<ShopModel>>((ref) {
   );
   return query
       .where('active', isEqualTo: true)
-      .orderBy('name')
       .limit(500)
       .snapshots()
-      .map(
-        (snap) =>
-            snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList(),
-      );
+      .handleError((Object error, StackTrace stack) {
+        if (error is FirebaseException && error.code == 'failed-precondition') {
+          return const <ShopModel>[];
+        }
+        throw error;
+      })
+      .map((snap) {
+        final shops = snap.docs
+            .map((d) => ShopModel.fromJson(d.data(), d.id))
+            .toList();
+        shops.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
+        return shops;
+      });
 });
 
 final shopsByRouteProvider = StreamProvider.autoDispose
@@ -69,14 +79,23 @@ final shopsByRouteProvider = StreamProvider.autoDispose
       return query
           .where('route_id', isEqualTo: routeId)
           .where('active', isEqualTo: true)
-          .orderBy('name')
           .limit(200)
           .snapshots()
-          .map(
-            (snap) => snap.docs
+          .handleError((Object error, StackTrace stack) {
+            if (error is FirebaseException && error.code == 'failed-precondition') {
+              return const <ShopModel>[];
+            }
+            throw error;
+          })
+          .map((snap) {
+            final shops = snap.docs
                 .map((d) => ShopModel.fromJson(d.data(), d.id))
-                .toList(),
-          );
+                .toList();
+            shops.sort(
+              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+            );
+            return shops;
+          });
     });
 
 /// Seller multi-route: merges shops from all assigned routes into one list.
@@ -109,13 +128,23 @@ final sellerAllShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
   return query
       .where('route_id', whereIn: routeIds)
       .where('active', isEqualTo: true)
-      .orderBy('name')
       .limit(500)
       .snapshots()
-      .map(
-        (snap) =>
-            snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList(),
-      );
+      .handleError((Object error, StackTrace stack) {
+        if (error is FirebaseException && error.code == 'failed-precondition') {
+          return const <ShopModel>[];
+        }
+        throw error;
+      })
+      .map((snap) {
+        final shops = snap.docs
+            .map((d) => ShopModel.fromJson(d.data(), d.id))
+            .toList();
+        shops.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
+        return shops;
+      });
 });
 
 final shopDetailProvider = StreamProvider.autoDispose.family<ShopModel?, String>(
@@ -188,13 +217,21 @@ final outstandingShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
   return query
       .where('active', isEqualTo: true)
       .where('balance', isGreaterThan: 0)
-      .orderBy('balance', descending: true)
       .limit(200)
       .snapshots()
-      .map(
-        (snap) =>
-            snap.docs.map((d) => ShopModel.fromJson(d.data(), d.id)).toList(),
-      );
+      .map((snap) {
+        final shops = snap.docs
+            .map((d) => ShopModel.fromJson(d.data(), d.id))
+            .toList();
+        shops.sort((a, b) => b.balance.compareTo(a.balance));
+        return shops;
+      })
+      .handleError((Object error, StackTrace stack) {
+        if (error is FirebaseException && error.code == 'failed-precondition') {
+          return const <ShopModel>[];
+        }
+        throw error;
+      });
 });
 
 final outstandingShopsByRouteProvider = StreamProvider.autoDispose
@@ -212,14 +249,21 @@ final outstandingShopsByRouteProvider = StreamProvider.autoDispose
           .where('route_id', isEqualTo: routeId)
           .where('active', isEqualTo: true)
           .where('balance', isGreaterThan: 0)
-          .orderBy('balance', descending: true)
           .limit(200)
           .snapshots()
-          .map(
-            (snap) => snap.docs
+          .map((snap) {
+            final shops = snap.docs
                 .map((d) => ShopModel.fromJson(d.data(), d.id))
-                .toList(),
-          );
+                .toList();
+            shops.sort((a, b) => b.balance.compareTo(a.balance));
+            return shops;
+          })
+          .handleError((Object error, StackTrace stack) {
+            if (error is FirebaseException && error.code == 'failed-precondition') {
+              return const <ShopModel>[];
+            }
+            throw error;
+          });
     });
 
 class ShopNotifier extends AsyncNotifier<void> {

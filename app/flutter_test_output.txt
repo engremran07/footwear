@@ -1,0 +1,458 @@
+00:00 +0: loading D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart
+00:00 +0: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +1: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +2: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +3: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +4: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +5: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +6: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +7: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +8: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +9: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +10: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +11: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +12: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +13: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +14: D:/Footwear/app/test/pdf_and_excel_export_integration_test.dart: Long ledger PDF and Excel export produce non-empty bytes
+00:00 +15: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö sale amount guard fails when sale amount is zero
+00:00 +16: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö sale amount guard fails when sale amount is negative
+00:01 +17: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö sale amount guard passes when sale amount is positive
+00:01 +18: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö amountReceived guard passes when amountReceived equals total (fully paid)
+00:01 +19: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö amountReceived guard passes when amountReceived is zero (unpaid)
+00:01 +20: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö amountReceived guard passes when amountReceived is partial
+00:01 +21: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö amountReceived guard fails when amountReceived exceeds total by 1 paisa
+00:01 +22: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö amountReceived guard fails when amountReceived is far above total
+00:01 +23: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö invoice math validation passes when total equals subtotal minus discount exactly
+00:01 +24: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö invoice math validation passes within 0.01 tolerance (floating point rounding)
+00:01 +25: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö invoice math validation passes with zero discount
+00:01 +26: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö invoice math validation fails when total is off by more than 0.01
+00:01 +27: D:/Footwear/app/test/unit/business_logic/create_sale_invoice_guard_test.dart: createSaleInvoice ÔÇö invoice math validation fails when total is inflated above subtotal minus discount
+00:01 +28: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 1 ÔÇö Invoice: balance delta full credit sale: full amount added to balance
+00:01 +29: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 1 ÔÇö Invoice: balance delta partial payment: partial amount added to balance
+00:01 +30: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 1 ÔÇö Invoice: balance delta full cash sale: no change to balance (paid immediately)
+00:01 +31: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 1 ÔÇö Invoice: balance delta over-payment reduces old balance (amountReceived > total)
+00:01 +32: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 1 ÔÇö Invoice: status derivation amountReceived=0 ÔåÆ status: issued
+00:01 +33: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 1 ÔÇö Invoice: status derivation amountReceived > 0 and < total ÔåÆ status: partial
+00:01 +34: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 1 ÔÇö Invoice: status derivation amountReceived == total ÔåÆ status: paid
+00:01 +35: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 1 ÔÇö Invoice: status derivation amountReceived > total ÔåÆ status: paid (guard blocks this in UI)
+00:01 +36: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 1 ÔÇö Invoice: sale type derivation fully paid ÔåÆ sale_type: cash
+00:01 +37: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 1 ÔÇö Invoice: sale type derivation partial payment ÔåÆ sale_type: credit
+00:01 +38: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 1 ÔÇö Invoice: sale type derivation unpaid ÔåÆ sale_type: credit
+00:01 +39: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 2 ÔÇö Ledger: cash_in reduces balance cash_in 2000 ÔåÆ balance decreases by 2000
+00:01 +40: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 2 ÔÇö Ledger: cash_in reduces balance large cash_in clears significant debt
+00:01 +41: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 2 ÔÇö Ledger: cash_in reduces balance cash_in with zero amount has zero delta
+00:01 +42: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 2 ÔÇö Ledger: cash_out increases balance cash_out 3000 ÔåÆ balance increases by 3000
+00:01 +43: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Pathway 2 ÔÇö Ledger: return reduces balance return 1000 ÔåÆ balance decreases by 1000
+00:01 +44: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Running balance simulation invoice then partial cash collection reduces balance correctly
+00:01 +45: D:/Footwear/app/test/unit/business_logic/financial_pathways_test.dart: Running balance simulation two invoices then full repayment
+00:02 +46: D:/Footwear/app/test/unit/business_logic/mark_paid_outstanding_test.dart: markAsPaid ÔÇö outstanding resolution uses stored outstanding when present
+00:02 +47: D:/Footwear/app/test/unit/business_logic/mark_paid_outstanding_test.dart: markAsPaid ÔÇö outstanding resolution fallback computes total minus amountReceived
+00:02 +48: D:/Footwear/app/test/unit/business_logic/mark_paid_outstanding_test.dart: markAsPaid ÔÇö outstanding resolution fallback with zero amountReceived returns full total
+00:02 +49: D:/Footwear/app/test/unit/business_logic/mark_paid_outstanding_test.dart: markAsPaid ÔÇö outstanding resolution fallback with full payment returns zero
+00:02 +50: D:/Footwear/app/test/unit/business_logic/mark_paid_outstanding_test.dart: markAsPaid ÔÇö outstanding resolution fallback clamps negative result to zero (overpayment guard)
+00:02 +51: D:/Footwear/app/test/unit/business_logic/mark_paid_outstanding_test.dart: markAsPaid ÔÇö outstanding resolution stored outstanding of zero is used as-is (not treated as null)
+00:02 +52: D:/Footwear/app/test/unit/business_logic/mark_paid_outstanding_test.dart: markAsPaid ÔÇö outstanding resolution fallback fractional result is preserved
+00:02 +53: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö allowed types cash_in is valid
+00:02 +54: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö allowed types cash_out is valid
+00:02 +55: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö allowed types return is valid
+00:02 +56: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö allowed types payment is valid
+00:02 +57: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö allowed types write_off is valid
+00:02 +58: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö rejected types empty string is rejected
+00:02 +59: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö rejected types arbitrary string is rejected
+00:02 +60: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö rejected types uppercase variant is rejected (case-sensitive)
+00:02 +61: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö rejected types sale is rejected (only invoice creates sale records)
+00:02 +62: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö rejected types debit is rejected
+00:02 +63: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö rejected types credit is rejected (sale_type field, not transaction type)
+00:02 +64: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö rejected types refund is rejected (use return instead)
+00:02 +65: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: TransactionType ÔÇö rejected types null-like string is rejected
+00:02 +66: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: Transaction type ÔÇö balance delta signs cash_out increases balance (shop owes more)
+00:02 +67: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: Transaction type ÔÇö balance delta signs cash_in decreases balance (shop owes less)
+00:02 +68: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: Transaction type ÔÇö balance delta signs return decreases balance (goods returned)
+00:02 +69: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: Transaction type ÔÇö balance delta signs payment decreases balance (generic payment)
+00:02 +70: D:/Footwear/app/test/unit/business_logic/transaction_type_validation_test.dart: Transaction type ÔÇö balance delta signs write_off is handled by ShopNotifier directly (not delta)
+00:03 +71: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö creditBalance mode reversalDelta equals -total for sale invoice
+00:03 +72: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö creditBalance mode reversalDelta equals -total when amountReceived is zero
+00:03 +73: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö creditBalance mode reversalAmount for creditBalance equals total
+00:03 +74: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö creditBalance mode preserved originals plus reversal leave customer credit only
+00:03 +75: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö cashRefund mode reversalDelta equals -outstandingAmount for sale invoice
+00:03 +76: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö cashRefund mode no refund tx written when amountReceived is zero
+00:03 +77: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö cashRefund mode refund tx written when amountReceived > 0
+00:03 +78: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö cashRefund mode cashRefund reversalAmount equals outstandingAmount
+00:03 +79: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö cashRefund mode preserved originals plus reversal and refund return to zero
+00:03 +80: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö credit note (non-sale) mode reversalDelta is +total for return invoice
+00:03 +81: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö credit note (non-sale) mode reversalDelta is +total for credit note regardless of refundMode
+00:03 +82: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö guard validation empty invoiceId string should be caught at provider boundary
+00:03 +83: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö guard validation empty createdBy should be caught at provider boundary
+00:03 +84: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö guard validation void status triggers double-void guard condition
+00:03 +85: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö stock restoration logic empty rawDeductions triggers warehouse restore path
+00:03 +86: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö stock restoration logic non-empty rawDeductions triggers seller inventory restore
+00:04 +87: D:/Footwear/app/test/unit/business_logic/void_invoice_balance_test.dart: voidInvoice ÔÇö stock restoration logic zero qty entries in rawDeductions are skipped
+00:04 +88: D:/Footwear/app/test/unit/core/action_guard_test.dart: ActionGuard allows the first execution and blocks a duplicate start
+00:04 +89: D:/Footwear/app/test/unit/core/action_guard_test.dart: ActionGuard reports the busy state correctly
+00:05 +90: D:/Footwear/app/test/unit/core/changelog_data_test.dart: kChangelog list is non-empty
+00:05 +91: D:/Footwear/app/test/unit/core/changelog_data_test.dart: kChangelog first entry is the current release
+00:05 +92: D:/Footwear/app/test/unit/core/changelog_data_test.dart: kChangelog every entry has a non-empty version, date, and items
+00:05 +93: D:/Footwear/app/test/unit/core/changelog_data_test.dart: kChangelog every item has an emoji and trilingual text
+00:05 +94: D:/Footwear/app/test/unit/core/changelog_data_test.dart: ChangelogItem.textFor returns correct EN text
+00:05 +95: D:/Footwear/app/test/unit/core/changelog_data_test.dart: ChangelogItem.textFor returns correct AR text
+00:05 +96: D:/Footwear/app/test/unit/core/changelog_data_test.dart: ChangelogItem.textFor returns correct UR text
+00:05 +97: D:/Footwear/app/test/unit/core/changelog_data_test.dart: ChangelogItem.textFor falls back to EN when locale missing
+00:05 +98: D:/Footwear/app/test/unit/core/changelog_data_test.dart: ChangelogItem.textFor returns empty string when no locales available
+00:05 +99: D:/Footwear/app/test/unit/core/changelog_data_test.dart: ChangelogEntry version 3.7.6 is present and has PDF fix entry
+00:05 +100: D:/Footwear/app/test/unit/core/collections_test.dart: Collections ÔÇö canonical Firestore collection names customers collection name is "customers"
+00:05 +101: D:/Footwear/app/test/unit/core/collections_test.dart: Collections ÔÇö canonical Firestore collection names shops alias equals customers (same Firestore collection)
+00:05 +102: D:/Footwear/app/test/unit/core/collections_test.dart: Collections ÔÇö canonical Firestore collection names transactions collection name is "transactions"
+00:05 +103: D:/Footwear/app/test/unit/core/collections_test.dart: Collections ÔÇö canonical Firestore collection names invoices collection name is "invoices"
+00:05 +104: D:/Footwear/app/test/unit/core/collections_test.dart: Collections ÔÇö canonical Firestore collection names inventory_transactions collection name is correct
+00:05 +105: D:/Footwear/app/test/unit/core/collections_test.dart: Collections ÔÇö canonical Firestore collection names seller_inventory collection name is correct
+00:05 +106: D:/Footwear/app/test/unit/core/collections_test.dart: Collections ÔÇö canonical Firestore collection names product_variants collection name is correct
+00:05 +107: D:/Footwear/app/test/unit/core/collections_test.dart: Collections ÔÇö canonical Firestore collection names settings collection name is "settings"
+00:05 +108: D:/Footwear/app/test/unit/core/collections_test.dart: Collections ÔÇö canonical Firestore collection names users collection name is "users"
+00:05 +109: D:/Footwear/app/test/unit/core/collections_test.dart: Collections ÔÇö canonical Firestore collection names routes collection name is "routes"
+00:05 +110: D:/Footwear/app/test/unit/core/collections_test.dart: Collections ÔÇö canonical Firestore collection names all collections are distinct (no accidental duplicates)
+00:06 +111: D:/Footwear/app/test/unit/core/device_pairing_test.dart: DevicePairing sanitize normalizes device IDs consistently
+00:06 +112: D:/Footwear/app/test/unit/core/device_pairing_test.dart: DevicePairing matches accepts equivalent device IDs regardless of casing
+00:06 +113: D:/Footwear/app/test/unit/core/device_pairing_test.dart: DevicePairing matches rejects mismatched identifiers
+00:06 +114: D:/Footwear/app/test/unit/core/device_pairing_test.dart: DevicePairing returns a non-empty stable device identifier
+00:06 +115: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseAuthException wrong-password ÔåÆ err_invalid_credentials
+00:06 +116: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseAuthException invalid-credential ÔåÆ err_invalid_credentials
+00:06 +117: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseAuthException user-not-found ÔåÆ err_user_not_found
+00:06 +118: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseAuthException user-disabled ÔåÆ err_user_disabled
+00:06 +119: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseAuthException too-many-requests ÔåÆ err_too_many_requests
+00:06 +120: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseAuthException email-already-in-use ÔåÆ err_email_in_use
+00:06 +121: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseAuthException weak-password ÔåÆ err_weak_password
+00:06 +122: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseAuthException network-request-failed ÔåÆ err_network
+00:06 +123: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseAuthException requires-recent-login ÔåÆ err_requires_recent_login
+00:06 +124: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseAuthException unknown code ÔåÆ err_auth_generic
+00:06 +125: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseException (Firestore) permission-denied ÔåÆ err_permission_denied
+00:06 +126: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseException (Firestore) not-found ÔåÆ err_not_found
+00:06 +127: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseException (Firestore) already-exists ÔåÆ err_already_exists
+00:06 +128: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseException (Firestore) resource-exhausted ÔåÆ err_resource_exhausted
+00:06 +129: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseException (Firestore) unavailable ÔåÆ err_service_unavailable
+00:06 +130: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseException (Firestore) cancelled ÔåÆ err_cancelled
+00:06 +131: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseException (Firestore) unauthenticated ÔåÆ err_unauthenticated
+00:06 +132: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö FirebaseException (Firestore) unknown code ÔåÆ err_firebase_generic
+00:06 +133: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö plain Dart errors exception containing "socket" ÔåÆ err_network
+00:06 +134: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö plain Dart errors exception containing "timeout" ÔåÆ err_timeout
+00:07 +135: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö plain Dart errors exception containing "format" ÔåÆ err_invalid_data
+00:07 +136: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö plain Dart errors exception containing "no user found" ÔåÆ err_user_not_found
+00:07 +137: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö plain Dart errors StateError "Not authenticated" ÔåÆ err_unauthenticated
+00:07 +138: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö plain Dart errors ArgumentError "sellerId must not be empty" ÔåÆ err_unauthenticated
+00:07 +139: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö plain Dart errors unrecognised exception ÔåÆ err_unknown
+00:07 +140: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö plain Dart errors StateError "Bad state: No element" ÔåÆ err_pdf_failed
+00:07 +141: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö plain Dart errors StateError lowercase "bad state" ÔåÆ err_pdf_failed
+00:07 +142: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.key ÔÇö plain Dart errors Exception with "no element" message ÔåÆ err_pdf_failed
+00:07 +143: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.isPermissionOrAuthError permission-denied error returns true
+00:07 +144: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.isPermissionOrAuthError unauthenticated auth error returns true
+00:07 +145: D:/Footwear/app/test/unit/core/error_mapper_test.dart: AppErrorMapper.isPermissionOrAuthError network error returns false
+00:07 +146: D:/Footwear/app/test/unit/core/excel_export_test.dart: buildStyledExcelBytes returns a non-empty workbook payload
+00:07 +147: D:/Footwear/app/test/unit/core/excel_export_test.dart: buildStyledExcelBytes guards against formula injection after trimming leading spaces
+00:08 +148: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.sar formats zero
+00:08 +149: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.sar formats positive amount with 2 decimal places
+00:08 +150: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.sar formats 1234.56 with comma separator
+00:08 +151: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.sar formats negative amount keeping rial symbol
+00:08 +152: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.sar formats zero as 0.00
+00:08 +153: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.sar formats large amount with full precision not compact
+00:08 +154: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.parseAmountText parses plain numeric strings and thousands separators
+00:08 +155: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.parseAmountText parses European decimal formats with dot-thousands
+00:08 +156: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.parseAmountText returns null for non-numeric text
+00:08 +157: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.parseAmountText parses Arabic-Indic numerals
+00:08 +158: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.parseAmountText parses Eastern Arabic/Persian numerals
+00:08 +159: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.currency uses sar for SAR symbol
+00:08 +160: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.currency uses sar for any symbol
+00:08 +161: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.number formats with thousands separator
+00:08 +162: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.number formats small number
+00:08 +163: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.number strips trailing zeros on decimals
+00:08 +164: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.date returns dash for null timestamp
+00:08 +165: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.date formats timestamp as dd MMM yyyy
+00:08 +166: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.dateTime returns dash for null
+00:08 +167: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.dateTime formats with time component
+00:08 +168: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.period formats YYYY-MM to Mon YYYY
+00:08 +169: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.period formats December
+00:08 +170: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.period returns input on malformed string
+00:08 +171: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.currentPeriod returns YYYY-MM format
+00:08 +172: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.currentPeriod matches current year and month
+00:08 +173: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.compact formats millions
+00:08 +174: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.compact formats thousands
+00:08 +175: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.compact formats small numbers as integer string
+00:08 +176: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.compact formats zero
+00:08 +177: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.last12Periods returns exactly 12 periods
+00:08 +178: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.last12Periods first period is current month
+00:08 +179: D:/Footwear/app/test/unit/core/formatters_test.dart: AppFormatters.last12Periods all periods have YYYY-MM format
+00:08 +180: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets (setUpAll)
+00:08 +180: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets EN locale has at least 372 keys (regression floor)
+00:08 +181: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets AR key count equals EN key count
+00:08 +182: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets UR key count equals EN key count
+00:08 +183: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets AR contains every EN key
+00:08 +184: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets UR contains every EN key
+00:08 +185: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets AR does not contain dead keys absent from EN
+00:08 +186: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets UR does not contain dead keys absent from EN
+00:08 +187: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets login reset hint exists in all locales
+00:08 +188: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets No duplicate keys in EN locale
+00:08 +189: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets No duplicate keys in AR locale
+00:08 +190: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets No duplicate keys in UR locale
+00:08 +191: D:/Footwear/app/test/unit/core/l10n_test.dart: L10n parity ÔÇö all locales must have identical key sets (tearDownAll)
+00:09 +191: D:/Footwear/app/test/unit/core/pdf_export_test.dart: paginateItems splits a list into page-sized chunks
+00:09 +192: D:/Footwear/app/test/unit/core/pdf_export_test.dart: buildPdfLedger rejects missing required labels before font loading
+00:09 +193: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.text trims leading/trailing whitespace
+00:09 +194: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.text collapses multiple spaces
+00:09 +195: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.text strips control characters
+00:09 +196: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.text truncates to maxLength
+00:09 +197: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.text empty string returns empty
+00:09 +198: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.name removes non-letter characters like digits and symbols
+00:09 +199: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.name preserves hyphens and apostrophes
+00:09 +200: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.name preserves unicode letters
+00:09 +201: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.name truncates to maxLength
+00:09 +202: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.sku keeps alphanumeric, hyphens, underscores
+00:09 +203: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.sku strips spaces and special chars
+00:09 +204: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.sku truncates to maxLength
+00:09 +205: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.phone keeps digits, plus, hyphens, spaces
+00:09 +206: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.phone strips non-phone characters
+00:09 +207: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.amount keeps digits and single decimal
+00:09 +208: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.amount strips non-digit non-dot characters
+00:09 +209: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.amount keeps only first decimal point
+00:09 +210: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.amount integer string passes through
+00:09 +211: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.clamp returns value when within range
+00:09 +212: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.clamp clamps below min
+00:09 +213: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.clamp clamps above max
+00:09 +214: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.clamp exactly at min boundary returns min
+00:09 +215: D:/Footwear/app/test/unit/core/sanitizer_test.dart: AppSanitizer.clamp exactly at max boundary returns max
+00:10 +216: D:/Footwear/app/test/unit/core/share_helper_test.dart: normalizeWhatsAppPhone strips non-digit characters
+00:10 +217: D:/Footwear/app/test/unit/core/share_helper_test.dart: isValidWhatsAppPhone accepts valid E.164-like phone numbers
+00:10 +218: D:/Footwear/app/test/unit/core/share_helper_test.dart: isValidWhatsAppPhone rejects empty, short, leading-zero, and overlong numbers
+00:10 +219: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.required returns validator function
+00:10 +220: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.required rejects null input
+00:10 +221: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.required rejects empty string
+00:10 +222: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.required rejects whitespace-only string
+00:10 +223: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.required accepts non-empty value
+00:10 +224: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.required includes field name in message when provided
+00:10 +225: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.required uses generic message when no field name
+00:10 +226: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.positiveNumber rejects null
+00:10 +227: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.positiveNumber rejects empty string
+00:10 +228: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.positiveNumber rejects non-numeric string
+00:10 +229: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.positiveNumber rejects zero
+00:10 +230: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.positiveNumber rejects negative
+00:10 +231: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.positiveNumber accepts positive integer
+00:10 +232: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.positiveNumber accepts positive decimal
+00:10 +233: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.nonNegativeNumber rejects null
+00:10 +234: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.nonNegativeNumber rejects negative
+00:10 +235: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.nonNegativeNumber accepts zero
+00:10 +236: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.nonNegativeNumber accepts positive
+00:10 +237: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.positiveInt rejects null
+00:10 +238: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.positiveInt rejects decimal
+00:10 +239: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.positiveInt rejects zero
+00:10 +240: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.positiveInt rejects negative
+00:10 +241: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.positiveInt accepts positive integer
+00:10 +242: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.email returns null for empty (optional field)
+00:10 +243: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.email rejects invalid email formats
+00:11 +244: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.email accepts valid email
+00:11 +245: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.phone rejects null
+00:11 +246: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.phone rejects empty
+00:11 +247: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.phone rejects too-short number
+00:11 +248: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.phone accepts valid number
+00:11 +249: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.sku rejects empty
+00:11 +250: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.sku rejects single character
+00:11 +251: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.sku accepts valid SKU
+00:11 +252: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.minLength rejects too-short value
+00:11 +253: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.minLength accepts value meeting min length
+00:11 +254: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.minLength returns error for null
+00:11 +255: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.minLength localizes and interpolates minimum length
+00:11 +256: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.maxLength rejects too-long value with interpolated message
+00:11 +257: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.maxLength accepts value within max length
+00:11 +258: D:/Footwear/app/test/unit/core/validators_test.dart: AppValidators.maxLength returns null for null input
+00:11 +259: D:/Footwear/app/test/unit/core/validators_test.dart: Validators alias class notEmpty rejects blank
+00:11 +260: D:/Footwear/app/test/unit/core/validators_test.dart: Validators alias class notEmpty accepts non-blank
+00:11 +261: D:/Footwear/app/test/unit/core/validators_test.dart: Validators alias class positiveInt delegates correctly
+00:11 +262: D:/Footwear/app/test/unit/core/validators_test.dart: Validators alias class positiveDouble delegates correctly
+00:11 +263: D:/Footwear/app/test/unit/core/validators_test.dart: Validators alias class nonNegativeDouble delegates correctly
+00:11 +264: D:/Footwear/app/test/unit/models/inventory_transaction_model_test.dart: InventoryTransactionModel.fromJson parses all fields correctly
+00:11 +265: D:/Footwear/app/test/unit/models/inventory_transaction_model_test.dart: InventoryTransactionModel.fromJson missing fields use safe defaults
+00:11 +266: D:/Footwear/app/test/unit/models/inventory_transaction_model_test.dart: InventoryTransactionModel.fromJson notes field may be null
+00:11 +267: D:/Footwear/app/test/unit/models/inventory_transaction_model_test.dart: InventoryTransactionModel.toJson toJson round-trips all fields
+00:11 +268: D:/Footwear/app/test/unit/models/inventory_transaction_model_test.dart: InventoryTransactionModel.toJson toJson excludes id field
+00:11 +269: D:/Footwear/app/test/unit/models/inventory_transaction_model_test.dart: InventoryTransactionModel.toJson copyWith can update and clear notes
+00:11 +270: D:/Footwear/app/test/unit/models/inventory_transaction_model_test.dart: InventoryTransactionModel.toJson equality is based on id
+00:11 +271: D:/Footwear/app/test/unit/models/inventory_transaction_model_test.dart: type constants typeTransferOut has correct value
+00:11 +272: D:/Footwear/app/test/unit/models/inventory_transaction_model_test.dart: type constants typeReturnToWarehouse has correct value
+00:11 +273: D:/Footwear/app/test/unit/models/inventory_transaction_model_test.dart: type constants typeReturnFromShop has correct value
+00:11 +274: D:/Footwear/app/test/unit/models/inventory_transaction_model_test.dart: type constants typeStockAdjustment has correct value
+00:12 +275: D:/Footwear/app/test/unit/models/invoice_model_extended_test.dart: sellerInventoryDeductions ÔÇö round-trip (TEST-023) non-empty deductions survive fromJson/toJson round-trip
+00:12 +276: D:/Footwear/app/test/unit/models/invoice_model_extended_test.dart: sellerInventoryDeductions ÔÇö empty map excluded from toJson (TEST-024) empty deductions map is not written to toJson output
+00:12 +277: D:/Footwear/app/test/unit/models/invoice_model_extended_test.dart: sellerInventoryDeductions ÔÇö empty map excluded from toJson (TEST-024) non-empty deductions map IS written to toJson output
+00:12 +278: D:/Footwear/app/test/unit/models/invoice_model_extended_test.dart: partial status flags ÔÇö mutual exclusion (TEST-025) partial status ÔåÆ isPartial=true, all others false
+00:12 +279: D:/Footwear/app/test/unit/models/invoice_model_extended_test.dart: partial status flags ÔÇö mutual exclusion (TEST-025) partial status fromJson round-trip preserves status
+00:12 +280: D:/Footwear/app/test/unit/models/invoice_model_extended_test.dart: void status flags ÔÇö mutual exclusion (TEST-026) void status ÔåÆ isVoid=true, all others false
+00:12 +281: D:/Footwear/app/test/unit/models/invoice_model_extended_test.dart: void status flags ÔÇö mutual exclusion (TEST-026) void status fromJson round-trip preserves status
+00:12 +282: D:/Footwear/app/test/unit/models/invoice_model_extended_test.dart: invoice type helpers round-trip isSale true for type=sale
+00:12 +283: D:/Footwear/app/test/unit/models/invoice_model_extended_test.dart: invoice type helpers round-trip isReturn true for type=return
+00:12 +284: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel.fromJson parses all fields correctly
+00:12 +285: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel.fromJson missing fields use defaults
+00:12 +286: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel.fromJson parses items list
+00:12 +287: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel type helpers isSale is true for sale type
+00:12 +288: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel type helpers isReturn is true for return type
+00:12 +289: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel type helpers isCreditNote is true for credit_note type
+00:12 +290: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel status helpers isDraft is true for draft status
+00:12 +291: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel status helpers isIssued is true for issued status
+00:12 +292: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel status helpers isPaid is true for paid status
+00:12 +293: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel status helpers isPartial is true for partial status
+00:12 +294: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel status helpers isVoid is true for void status
+00:12 +295: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel status helpers status helpers are mutually exclusive for known statuses
+00:12 +296: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel.toJson round-trips through fromJson/toJson
+00:12 +297: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel.toJson toJson includes outstanding_amount and idempotency_key
+00:12 +298: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel constants type constants
+00:12 +299: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel constants status constants
+00:12 +300: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel linked_invoice_id null linked_invoice_id round-trips correctly
+00:12 +301: D:/Footwear/app/test/unit/models/invoice_model_test.dart: InvoiceModel linked_invoice_id non-null linked_invoice_id round-trips correctly
+00:13 +302: D:/Footwear/app/test/unit/models/notification_model_test.dart: NotificationModel.fromJson parses all fields correctly
+00:13 +303: D:/Footwear/app/test/unit/models/notification_model_test.dart: NotificationModel.fromJson read defaults to false when absent
+00:13 +304: D:/Footwear/app/test/unit/models/notification_model_test.dart: NotificationModel.fromJson invoiceNumber is populated for invoice type
+00:13 +305: D:/Footwear/app/test/unit/models/notification_model_test.dart: NotificationModel.fromJson missing fields use defaults
+00:13 +306: D:/Footwear/app/test/unit/models/notification_model_test.dart: NotificationModel.toJson round-trips all core fields
+00:13 +307: D:/Footwear/app/test/unit/models/notification_model_test.dart: NotificationModel.toJson invoice_number is included when set
+00:13 +308: D:/Footwear/app/test/unit/models/notification_model_test.dart: NotificationModel equality + hashCode two instances with same fields are equal
+00:13 +309: D:/Footwear/app/test/unit/models/notification_model_test.dart: NotificationModel equality + hashCode different ids are not equal
+00:13 +310: D:/Footwear/app/test/unit/models/notification_model_test.dart: NotificationModel equality + hashCode same id with different read state are equal (id-based equality)
+00:13 +311: D:/Footwear/app/test/unit/models/product_model_test.dart: ProductModel.fromJson parses all fields correctly
+00:13 +312: D:/Footwear/app/test/unit/models/product_model_test.dart: ProductModel.fromJson missing fields use defaults
+00:13 +313: D:/Footwear/app/test/unit/models/product_model_test.dart: ProductModel.toJson round-trips through fromJson/toJson
+00:13 +314: D:/Footwear/app/test/unit/models/product_model_test.dart: ProductModel.toJson copyWith preserves untouched fields and can clear imageUrl
+00:13 +315: D:/Footwear/app/test/unit/models/product_model_test.dart: ProductModel.toJson equality is based on id
+00:14 +316: D:/Footwear/app/test/unit/models/product_variant_model_test.dart: ProductVariantModel.fromJson parses all fields correctly
+00:14 +317: D:/Footwear/app/test/unit/models/product_variant_model_test.dart: ProductVariantModel.fromJson missing fields use safe defaults
+00:14 +318: D:/Footwear/app/test/unit/models/product_variant_model_test.dart: ProductVariantModel.fromJson active=false parses correctly
+00:14 +319: D:/Footwear/app/test/unit/models/product_variant_model_test.dart: ProductVariantModel.fromJson zero stock parses correctly
+00:14 +320: D:/Footwear/app/test/unit/models/product_variant_model_test.dart: ProductVariantModel.toJson round-trips all fields
+00:14 +321: D:/Footwear/app/test/unit/models/product_variant_model_test.dart: ProductVariantModel.toJson toJson excludes id field
+00:14 +322: D:/Footwear/app/test/unit/models/product_variant_model_test.dart: ProductVariantModel.toJson toJson preserves quantity_available correctly
+00:14 +323: D:/Footwear/app/test/unit/models/product_variant_model_test.dart: ProductVariantModel.copyWith copyWith changes only the specified field
+00:14 +324: D:/Footwear/app/test/unit/models/product_variant_model_test.dart: ProductVariantModel.copyWith copyWith with no args returns equivalent object
+00:14 +325: D:/Footwear/app/test/unit/models/route_model_test.dart: RouteModel.fromJson parses all fields correctly
+00:14 +326: D:/Footwear/app/test/unit/models/route_model_test.dart: RouteModel.fromJson missing fields use defaults
+00:14 +327: D:/Footwear/app/test/unit/models/route_model_test.dart: RouteModel.toJson round-trips through fromJson/toJson
+00:14 +328: D:/Footwear/app/test/unit/models/route_model_test.dart: RouteModel.toJson includes all keys
+00:14 +329: D:/Footwear/app/test/unit/models/route_model_test.dart: RouteModel.toJson copyWith can update and clear nullable fields
+00:14 +330: D:/Footwear/app/test/unit/models/route_model_test.dart: RouteModel.toJson equality is based on id
+00:15 +331: D:/Footwear/app/test/unit/models/seller_inventory_model_test.dart: SellerInventoryModel.fromJson parses all fields correctly
+00:15 +332: D:/Footwear/app/test/unit/models/seller_inventory_model_test.dart: SellerInventoryModel.fromJson missing fields use safe defaults
+00:15 +333: D:/Footwear/app/test/unit/models/seller_inventory_model_test.dart: SellerInventoryModel.fromJson active=false parses correctly
+00:15 +334: D:/Footwear/app/test/unit/models/seller_inventory_model_test.dart: SellerInventoryModel.fromJson zero quantity parses correctly
+00:15 +335: D:/Footwear/app/test/unit/models/seller_inventory_model_test.dart: SellerInventoryModel.toJson round-trips all fields
+00:15 +336: D:/Footwear/app/test/unit/models/seller_inventory_model_test.dart: SellerInventoryModel.toJson toJson excludes id field
+00:15 +337: D:/Footwear/app/test/unit/models/seller_inventory_model_test.dart: SellerInventoryModel.toJson toJson preserves all 9 expected keys
+00:15 +338: D:/Footwear/app/test/unit/models/seller_inventory_model_test.dart: SellerInventoryModel.toJson quantity_available reflects updated value
+00:15 +339: D:/Footwear/app/test/unit/models/seller_inventory_model_test.dart: SellerInventoryModel.toJson copyWith updates selected fields
+00:15 +340: D:/Footwear/app/test/unit/models/seller_inventory_model_test.dart: SellerInventoryModel.toJson equality is based on id
+00:15 +341: D:/Footwear/app/test/unit/models/settings_model_test.dart: SettingsModel.fromJson parses all fields correctly
+00:15 +342: D:/Footwear/app/test/unit/models/settings_model_test.dart: SettingsModel.fromJson missing fields use defaults
+00:15 +343: D:/Footwear/app/test/unit/models/settings_model_test.dart: SettingsModel.toJson round-trips through fromJson/toJson
+00:15 +344: D:/Footwear/app/test/unit/models/settings_model_test.dart: SettingsModel.toJson copyWith can update and clear optional logo field
+00:15 +345: D:/Footwear/app/test/unit/models/settings_model_test.dart: SettingsModel.toJson equality includes business fields
+00:15 +346: D:/Footwear/app/test/unit/models/settings_model_test.dart: SettingsModel.toJson asserts when pairsPerCarton is not positive
+00:16 +347: D:/Footwear/app/test/unit/models/shop_model_bad_debt_test.dart: ShopModel ÔÇö bad debt defaults bad_debt defaults to false when field absent
+00:16 +348: D:/Footwear/app/test/unit/models/shop_model_bad_debt_test.dart: ShopModel ÔÇö bad debt defaults bad_debt_amount defaults to 0 when field absent
+00:16 +349: D:/Footwear/app/test/unit/models/shop_model_bad_debt_test.dart: ShopModel ÔÇö bad debt defaults bad_debt_date defaults to null when field absent
+00:16 +350: D:/Footwear/app/test/unit/models/shop_model_bad_debt_test.dart: ShopModel ÔÇö bad debt parsing parses bad_debt = true correctly
+00:16 +351: D:/Footwear/app/test/unit/models/shop_model_bad_debt_test.dart: ShopModel ÔÇö bad debt parsing parses bad_debt_amount correctly
+00:16 +352: D:/Footwear/app/test/unit/models/shop_model_bad_debt_test.dart: ShopModel ÔÇö bad debt parsing bad_debt_amount coerces int to double
+00:16 +353: D:/Footwear/app/test/unit/models/shop_model_bad_debt_test.dart: ShopModel ÔÇö bad debt toJson round-trip bad_debt fields survive fromJson ÔåÆ toJson ÔåÆ fromJson
+00:16 +354: D:/Footwear/app/test/unit/models/shop_model_bad_debt_test.dart: ShopModel ÔÇö bad debt toJson round-trip bad_debt_date is omitted from toJson when null
+00:16 +355: D:/Footwear/app/test/unit/models/shop_model_bad_debt_test.dart: ShopModel ÔÇö bad debt toJson round-trip bad_debt_date is included in toJson when set
+00:16 +356: D:/Footwear/app/test/unit/models/shop_model_bad_debt_test.dart: ShopModel ÔÇö hasOutstanding after bad debt hasOutstanding false when balance zeroed after write-off
+00:16 +357: D:/Footwear/app/test/unit/models/shop_model_bad_debt_test.dart: ShopModel ÔÇö hasOutstanding after bad debt hasOutstanding true while balance > 0 (before write-off)
+00:17 +358: D:/Footwear/app/test/unit/models/shop_model_test.dart: ShopModel.fromJson parses all fields correctly
+00:17 +359: D:/Footwear/app/test/unit/models/shop_model_test.dart: ShopModel.fromJson missing fields use defaults
+00:17 +360: D:/Footwear/app/test/unit/models/shop_model_test.dart: ShopModel.fromJson hasLocation is true when both lat/lng present
+00:17 +361: D:/Footwear/app/test/unit/models/shop_model_test.dart: ShopModel.fromJson hasLocation is false when lat/lng missing
+00:17 +362: D:/Footwear/app/test/unit/models/shop_model_test.dart: ShopModel.fromJson hasOutstanding is true when balance > 0
+00:17 +363: D:/Footwear/app/test/unit/models/shop_model_test.dart: ShopModel.fromJson hasOutstanding is false when balance is 0
+00:17 +364: D:/Footwear/app/test/unit/models/shop_model_test.dart: ShopModel.toJson round-trips through fromJson/toJson
+00:17 +365: D:/Footwear/app/test/unit/models/shop_model_test.dart: ShopModel.toJson toJson keeps category when present
+00:17 +366: D:/Footwear/app/test/unit/models/shop_model_test.dart: ShopModel equality two shops with same id are equal
+00:17 +367: D:/Footwear/app/test/unit/models/shop_model_test.dart: ShopModel equality two shops with different ids are not equal
+00:17 +368: D:/Footwear/app/test/unit/models/shop_model_test.dart: ShopModel equality hashCode is based on id
+00:17 +369: D:/Footwear/app/test/unit/models/shop_model_test.dart: lastTransaction fields fromJson parses lastTransactionType and lastTransactionAmount
+00:17 +370: D:/Footwear/app/test/unit/models/shop_model_test.dart: lastTransaction fields fromJson returns null for missing lastTransaction fields
+00:17 +371: D:/Footwear/app/test/unit/models/shop_model_test.dart: lastTransaction fields copyWith updates category and lastTransaction fields
+00:17 +372: D:/Footwear/app/test/unit/models/shop_model_test.dart: lastTransaction fields copyWith preserves existing lastTransaction fields when not passed
+00:17 +373: D:/Footwear/app/test/unit/models/tenant_model_test.dart: TenantModel round-trips through fromJson/toJson
+00:17 +374: D:/Footwear/app/test/unit/models/tenant_model_test.dart: TenantModel uses defaults for missing optional fields
+00:18 +375: D:/Footwear/app/test/unit/models/tenant_scope_test.dart: TenantScope normalizes blank tenant ids to null
+00:18 +376: D:/Footwear/app/test/unit/models/tenant_scope_test.dart: TenantScope applies tenant_id to data payloads
+00:18 +377: D:/Footwear/app/test/unit/models/tenant_scope_test.dart: TenantScope extracts tenant_id from user data
+00:18 +378: D:/Footwear/app/test/unit/models/tenant_scope_test.dart: TenantScope matches tenant ids for provider filtering
+00:18 +379: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionItem fromJson parses all fields
+00:18 +380: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionItem fromJson defaults for missing fields
+00:18 +381: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionItem toJson round-trips
+00:18 +382: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionItem copyWith overrides selected fields only
+00:18 +383: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel.fromJson parses all fields correctly
+00:18 +384: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel.fromJson missing fields use defaults
+00:18 +385: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel type helpers isCashIn
+00:18 +386: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel type helpers isCashOut
+00:18 +387: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel type helpers isReturn
+00:18 +388: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel type helpers payment and write-off helpers map to reducing balance flows
+00:18 +389: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel type helpers hasItems is false for empty items
+00:18 +390: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel type helpers hasItems is true when items present
+00:18 +391: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel.toJson round-trips through fromJson/toJson
+00:18 +392: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel.toJson includes deleted audit fields when present
+00:18 +393: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel constants type constants are correct
+00:18 +394: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel constants balanceImpact returns 0 for unknown transaction type (never crash export)
+00:18 +395: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel.copyWith copyWith creates updated copy with new type
+00:18 +396: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel.copyWith copyWith preserves all unchanged fields
+00:18 +397: D:/Footwear/app/test/unit/models/transaction_model_test.dart: TransactionModel.copyWith copyWith does not mutate original
+00:19 +398: D:/Footwear/app/test/unit/models/user_model_test.dart: UserRole includes tenant-aware roles alongside legacy roles
+00:19 +399: D:/Footwear/app/test/unit/models/user_model_test.dart: role separation tenant admins can manage tenant users but not global workspace settings
+00:19 +400: D:/Footwear/app/test/unit/models/user_model_test.dart: role separation super admins manage both workspaces and user accounts
+00:19 +401: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel.fromJson parses admin role
+00:19 +402: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel.fromJson parses seller role
+00:19 +403: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel.fromJson manager maps to admin (backward compat)
+00:19 +404: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel.fromJson tenant admin role parses correctly
+00:19 +405: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel.fromJson super admin role parses correctly
+00:19 +406: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel.fromJson unknown role defaults to seller
+[VIB] P1-8 Signal: Unknown role "xyz"; defaulting to seller
+00:19 +407: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel.fromJson missing fields use defaults
+00:19 +408: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel.toJson round-trips through fromJson/toJson
+00:19 +409: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel.copyWith copies with changed role
+00:19 +410: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel.copyWith copies with assigned route fields
+00:19 +411: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel.copyWith copies with active toggled to false
+00:19 +412: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel.copyWith copyWith preserves identity fields when unchanged
+00:19 +413: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel route assignment fields seller with assigned route parses correctly
+00:19 +414: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel route assignment fields admin has no assigned route
+00:19 +415: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel route assignment fields phone field parses from json
+00:19 +416: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel route assignment fields phone field defaults to null when absent
+00:19 +417: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel route assignment fields toJson includes phone when set
+00:19 +418: D:/Footwear/app/test/unit/models/user_model_test.dart: UserModel route assignment fields toJson includes tenant_id when present
+00:19 +419: D:/Footwear/app/test/unit/providers/changelog_provider_test.dart: changelogSeenVersionProvider returns null when no version has been seen
+00:20 +420: D:/Footwear/app/test/unit/providers/changelog_provider_test.dart: changelogSeenVersionProvider returns version after markChangelogSeen is called
+00:20 +421: D:/Footwear/app/test/unit/providers/changelog_provider_test.dart: changelogSeenVersionProvider overwrites previous version when called again
+00:20 +422: D:/Footwear/app/test/unit/providers/changelog_provider_test.dart: changelogSeenVersionProvider version does not match a different release
+00:20 +423: D:/Footwear/app/test/unit/providers/changelog_provider_test.dart: markChangelogSeen persists version to SharedPreferences
+00:20 +424: D:/Footwear/app/test/unit/providers/changelog_provider_test.dart: markChangelogSeen handles empty version string without throwing
+00:20 +425: D:/Footwear/app/test/unit/providers/history_provider_test.dart: History 7-day cutoff arithmetic cutoff is exactly 7 days before midnight today
+00:20 +426: D:/Footwear/app/test/unit/providers/history_provider_test.dart: History 7-day cutoff arithmetic a transaction from 6 days ago is within the window
+00:20 +427: D:/Footwear/app/test/unit/providers/history_provider_test.dart: History 7-day cutoff arithmetic a transaction from exactly 7 days ago is on the boundary
+00:20 +428: D:/Footwear/app/test/unit/providers/history_provider_test.dart: History 7-day cutoff arithmetic a transaction from 8 days ago is outside the window
+00:20 +429: D:/Footwear/app/test/unit/providers/history_provider_test.dart: Client-side deleted filter non-deleted transaction passes client-side filter
+00:20 +430: D:/Footwear/app/test/unit/providers/history_provider_test.dart: Client-side deleted filter deleted=true transaction is filtered out by client-side check
+00:20 +431: D:/Footwear/app/test/unit/providers/history_provider_test.dart: Client-side deleted filter missing deleted field passes the client-side filter
+00:20 +432: D:/Footwear/app/test/unit/providers/history_provider_test.dart: Client-side deleted filter TransactionModel.fromJson with deleted=true still parses
+00:21 +433: D:/Footwear/app/test/unit/providers/settings_provider_test.dart: SettingsNotifier admin guard save throws for seller credentials
+00:21 +434: D:/Footwear/app/test/unit/providers/settings_provider_test.dart: SettingsNotifier admin guard uploadLogo throws for seller credentials
+00:21 +435: D:/Footwear/app/test/unit/providers/settings_provider_test.dart: SettingsNotifier admin guard deleteLogo throws for seller credentials
+00:21 +436: D:/Footwear/app/test/unit/providers/transaction_provider_test.dart: Transaction export guard providers sortTransactionsForExport orders the ledger from oldest to newest
+00:21 +437: D:/Footwear/app/test/unit/providers/transaction_provider_test.dart: Transaction export guard providers shopTransactionsExportProvider returns empty for blank shop id
+00:21 +438: D:/Footwear/app/test/unit/providers/transaction_provider_test.dart: Transaction export guard providers routeTransactionsExportProvider returns empty for seller outside assigned route
+00:21 +439: D:/Footwear/app/test/unit/providers/transaction_provider_test.dart: Transaction export guard providers allTransactionsExportProvider returns empty for seller
+00:21 +440: D:/Footwear/app/test/unit/providers/transaction_provider_test.dart: Transaction export guard providers sellerTransactionsExportProvider returns empty for seller (non-admin)
+00:21 +441: D:/Footwear/app/test/unit/providers/transaction_provider_test.dart: Transaction export guard providers sellerTransactionsExportProvider returns empty for blank seller id
+00:22 +442: D:/Footwear/app/test/unit/widgets/export_sheet_page_export_test.dart: rasterizePdfPagesToPngs preserves one image per PDF page
+00:23 +443: D:/Footwear/app/test/widget/app_online_indicator_test.dart: AppOnlineIndicator uses success color when online
+00:24 +444: D:/Footwear/app/test/widget/confirm_dialog_test.dart: ConfirmDialog shows localized default action labels
+00:24 +445: D:/Footwear/app/test/widget/confirm_dialog_test.dart: ConfirmDialog shows localized default action labels
+00:25 +446: D:/Footwear/app/test/widget/empty_state_test.dart: EmptyState renders message, key, and actions
+00:25 +447: D:/Footwear/app/test/widget/empty_state_test.dart: EmptyState renders message, key, and actions
+00:26 +448: D:/Footwear/app/test/widget/stat_card_test.dart: StatCard renders title, value, subtitle, and key
+00:26 +449: D:/Footwear/app/test/widget_test.dart: App shell SaaS nav rules workspace CRUD is exposed as a first-class admin section
+00:26 +450: D:/Footwear/app/test/widget/stat_card_test.dart: StatCard invokes onTap when pressed
+00:26 +451: D:/Footwear/app/test/widget_test.dart: App shell smoke tests MaterialApp renders without error
+00:27 +452: D:/Footwear/app/test/widget_test.dart: App shell smoke tests Unauthenticated shell shows no main nav
+00:27 +453: All tests passed!
