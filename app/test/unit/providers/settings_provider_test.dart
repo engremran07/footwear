@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:footwear_erp/core/utils/tenant_scope.dart';
 import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/settings_provider.dart';
@@ -35,6 +36,17 @@ void main() {
       fireImmediately: true,
     );
   }
+
+  group('Workspace settings resolution', () {
+    test('uses the current tenant settings document instead of the global fallback', () {
+      final tenantUser = seller.copyWith(
+        tenantId: 'tenant-42',
+      );
+
+      expect(settingsDocumentIdForUser(tenantUser), 'tenant-42');
+      expect(settingsDocumentIdForUser(null), TenantScope.globalTenantId);
+    });
+  });
 
   group('SettingsNotifier admin guard', () {
     test('save throws for seller credentials', () async {

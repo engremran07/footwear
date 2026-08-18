@@ -10,14 +10,14 @@ import '../models/settings_model.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
 
-String _settingsDocumentIdForCurrentUser(UserModel? currentUser) {
+String settingsDocumentIdForUser(UserModel? currentUser) {
   final tenantId = TenantScope.normalize(currentUser?.tenantId);
   return tenantId ?? TenantScope.globalTenantId;
 }
 
 final settingsProvider = StreamProvider<SettingsModel>((ref) {
   final currentUser = ref.watch(authUserProvider).value;
-  final settingsDocId = _settingsDocumentIdForCurrentUser(currentUser);
+  final settingsDocId = settingsDocumentIdForUser(currentUser);
 
   return FirebaseFirestore.instance
       .collection(Collections.settings)

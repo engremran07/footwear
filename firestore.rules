@@ -179,8 +179,14 @@ service cloud.firestore {
         role.matches('(?i)^\\s*(admin|manager|tenant_admin|super_admin|seller)\\s*$');
     }
 
+    function currentUserSettingsDocId() {
+      return isActiveUser() &&
+        userDoc().data.tenant_id is string &&
+        userDoc().data.tenant_id != '' ? userDoc().data.tenant_id : '__global__';
+    }
+
     function requiresSellerTransactionEditApproval() {
-      return get(/databases/$(database)/documents/settings/global)
+      return get(/databases/$(database)/documents/settings/$(currentUserSettingsDocId()))
         .data.require_admin_approval_for_seller_transaction_edits == true;
     }
 
