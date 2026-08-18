@@ -12,9 +12,11 @@ UserRole _roleFromString(String s) {
   }
 
   final role = s.trim().toLowerCase();
-  
+
   if (role.isEmpty) {
-    debugPrint('[VIB] P1-8 Signal: Whitespace-only role string; defaulting to seller');
+    debugPrint(
+      '[VIB] P1-8 Signal: Whitespace-only role string; defaulting to seller',
+    );
     return UserRole.seller;
   }
 

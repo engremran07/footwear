@@ -307,9 +307,7 @@ class AuthNotifier extends AsyncNotifier<void> {
         final isSuperAdmin = normalizedRole.toLowerCase() == 'super_admin';
         String? tenantId;
         if (!isSuperAdmin) {
-          tenantId = TenantScope.normalize(
-            userData?['tenant_id'] as String?,
-          );
+          tenantId = TenantScope.normalize(userData?['tenant_id'] as String?);
           if (tenantId == null) {
             tenantId = TenantScope.globalTenantId;
             await usersRef.doc(uid).set({
