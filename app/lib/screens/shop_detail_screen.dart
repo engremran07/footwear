@@ -224,6 +224,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           ctx,
                         ).showSnackBar(errorSnackBar(tr(key, ref)));
                       }
+                    } finally {
+                      _transactionGuard.finish();
                     }
                   },
                   child: Text(tr('save', ref)),
@@ -665,6 +667,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           ctx,
                         ).showSnackBar(errorSnackBar(tr(key, ref)));
                       }
+                    } finally {
+                      _transactionGuard.finish();
                     }
                   },
                   child: Text(tr('save', ref)),

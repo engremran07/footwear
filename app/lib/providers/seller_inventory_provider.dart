@@ -25,13 +25,6 @@ final sellerInventoryProvider = StreamProvider.autoDispose
           .where('active', isEqualTo: true)
           .limit(500)
           .snapshots()
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <SellerInventoryModel>[];
-            }
-            throw error;
-          })
           .map((snap) {
             final inventory = snap.docs
                 .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
@@ -72,28 +65,19 @@ final adminAllSellerInventoryProvider =
         FirebaseFirestore.instance.collection(Collections.sellerInventory),
         tenantId: tenantId,
       );
-      return query
-          .where('active', isEqualTo: true)
-          .limit(100)
-          .snapshots()
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <SellerInventoryModel>[];
-            }
-            throw error;
-          })
-          .map((snap) {
-            final inventory = snap.docs
-                .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
-                .toList();
-            inventory.sort(
-              (a, b) => a.variantName.toLowerCase().compareTo(
-                b.variantName.toLowerCase(),
-              ),
-            );
-            return inventory;
-          });
+      return query.where('active', isEqualTo: true).limit(100).snapshots().map((
+        snap,
+      ) {
+        final inventory = snap.docs
+            .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
+            .toList();
+        inventory.sort(
+          (a, b) => a.variantName.toLowerCase().compareTo(
+            b.variantName.toLowerCase(),
+          ),
+        );
+        return inventory;
+      });
     });
 
 /// One-shot active seller inventory for export (seller report PDF/Excel).

@@ -49,6 +49,10 @@ final shopTransactionsProvider = StreamProvider.autoDispose
       if (normalizedShopId.isEmpty) {
         return Stream.value(const <TransactionModel>[]);
       }
+      final profileReady = ref.watch(
+        authUserProvider.select((s) => s.hasValue && s.value != null),
+      );
+      if (!profileReady) return const Stream.empty();
       final tenantId = ref.watch(
         authUserProvider.select(
           (s) => TenantScope.normalize(s.value?.tenantId),
@@ -63,13 +67,6 @@ final shopTransactionsProvider = StreamProvider.autoDispose
           .orderBy('created_at', descending: true)
           .limit(_shopTransactionsLiveLimit)
           .snapshots()
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <TransactionModel>[];
-            }
-            throw error;
-          })
           .map(
             (snap) => snap.docs
                 .where((d) => d.data()['deleted'] != true)
@@ -84,6 +81,10 @@ final shopTransactionsFallbackProvider = StreamProvider.autoDispose
       if (normalizedShopId.isEmpty) {
         return Stream.value(const <TransactionModel>[]);
       }
+      final profileReady = ref.watch(
+        authUserProvider.select((s) => s.hasValue && s.value != null),
+      );
+      if (!profileReady) return const Stream.empty();
 
       final tenantId = ref.watch(
         authUserProvider.select(
@@ -99,13 +100,6 @@ final shopTransactionsFallbackProvider = StreamProvider.autoDispose
           .where('shop_id', isEqualTo: normalizedShopId)
           .limit(_shopTransactionsLiveLimit)
           .snapshots()
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <TransactionModel>[];
-            }
-            throw error;
-          })
           .map(
             (snap) =>
                 snap.docs
@@ -137,13 +131,6 @@ final allTransactionsProvider =
           .orderBy('created_at', descending: true)
           .limit(200)
           .snapshots()
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <TransactionModel>[];
-            }
-            throw error;
-          })
           .map(
             (snap) => snap.docs
                 .where((d) => d.data()['deleted'] != true)
@@ -193,13 +180,6 @@ final shopsAnalyticsTransactionsProvider =
             .orderBy('created_at', descending: true)
             .limit(_shopsAnalyticsTransactionsLimit)
             .snapshots()
-            .handleError((Object error, StackTrace stack) {
-              if (error is FirebaseException &&
-                  error.code == 'failed-precondition') {
-                return const <TransactionModel>[];
-              }
-              throw error;
-            })
             .map(
               (snap) => snap.docs
                   .where((d) => d.data()['deleted'] != true)
@@ -214,13 +194,6 @@ final shopsAnalyticsTransactionsProvider =
           .orderBy('created_at', descending: true)
           .limit(_shopsAnalyticsTransactionsLimit)
           .snapshots()
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <TransactionModel>[];
-            }
-            throw error;
-          })
           .map(
             (snap) => snap.docs
                 .where((d) => d.data()['deleted'] != true)
@@ -252,13 +225,6 @@ final pendingEditRequestsProvider =
           .orderBy('created_at', descending: true)
           .limit(50)
           .snapshots()
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <TransactionModel>[];
-            }
-            throw error;
-          })
           .map(
             (snap) => snap.docs
                 .where((d) => d.data()['deleted'] != true)
@@ -284,13 +250,6 @@ final sellerTransactionsProvider = StreamProvider.autoDispose
           .orderBy('created_at', descending: true)
           .limit(200)
           .snapshots()
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <TransactionModel>[];
-            }
-            throw error;
-          })
           .map(
             (snap) => snap.docs
                 .where((d) => d.data()['deleted'] != true)
@@ -541,6 +500,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       if (normalizedKey != null && normalizedKey.isNotEmpty) {
         final existing = await db
             .collection(Collections.transactions)
+            .where('tenant_id', isEqualTo: tenantId)
             .where('idempotency_key', isEqualTo: normalizedKey)
             .limit(1)
             .get();
@@ -735,6 +695,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       if (normalizedKey != null && normalizedKey.isNotEmpty) {
         final existing = await db
             .collection(Collections.transactions)
+            .where('tenant_id', isEqualTo: tenantId)
             .where('idempotency_key', isEqualTo: normalizedKey)
             .limit(1)
             .get();

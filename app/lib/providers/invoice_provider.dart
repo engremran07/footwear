@@ -39,6 +39,10 @@ enum VoidRefundMode { cashRefund, creditBalance }
 /// For all-invoice listing use [roleAwareInvoicesProvider].
 final invoicesByShopProvider = StreamProvider.autoDispose
     .family<List<InvoiceModel>, String>((ref, shopId) {
+      final profileReady = ref.watch(
+        authUserProvider.select((s) => s.hasValue && s.value != null),
+      );
+      if (!profileReady) return const Stream.empty();
       final tenantId = ref.watch(
         authUserProvider.select(
           (s) => TenantScope.normalize(s.value?.tenantId),
@@ -134,6 +138,10 @@ final roleAwareInvoicesProvider =
 
 final invoiceByIdProvider = StreamProvider.autoDispose
     .family<InvoiceModel?, String>((ref, invoiceId) {
+      final profileReady = ref.watch(
+        authUserProvider.select((s) => s.hasValue && s.value != null),
+      );
+      if (!profileReady) return const Stream.empty();
       final tenantId = ref.watch(
         authUserProvider.select(
           (s) => TenantScope.normalize(s.value?.tenantId),
@@ -153,6 +161,18 @@ final invoiceByIdProvider = StreamProvider.autoDispose
 class InvoiceNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
+
+  Future<String> _requireTenantId() async {
+    final user = await ref.read(authUserProvider.future);
+    if (user == null || !user.active) {
+      throw StateError('An active user profile is required');
+    }
+    final tenantId = TenantScope.normalize(user.tenantId);
+    if (tenantId == null) {
+      throw StateError('A workspace is required for invoice operations');
+    }
+    return tenantId;
+  }
 
   void _restoreWarehouseStock(
     WriteBatch batch,
@@ -348,10 +368,12 @@ class InvoiceNotifier extends AsyncNotifier<void> {
 
     // Idempotency guard: if caller passes a key, check for existing invoice
     final db = FirebaseFirestore.instance;
+    final tenantId = await _requireTenantId();
     final resolvedKey = idempotencyKey ?? const Uuid().v4();
     if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
       final existing = await db
           .collection(Collections.invoices)
+          .where('tenant_id', isEqualTo: tenantId)
           .where('idempotency_key', isEqualTo: idempotencyKey)
           .limit(1)
           .get();
@@ -390,6 +412,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     // Create invoice doc
     final invRef = db.collection(Collections.invoices).doc();
     batch.set(invRef, {
+      'tenant_id': tenantId,
       'invoice_number': invoiceNumber,
       'idempotency_key': resolvedKey,
       'type': InvoiceModel.typeSale,
@@ -418,6 +441,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     // Create cash_out transaction for the sale (goods delivered)
     final txRef = db.collection(Collections.transactions).doc();
     batch.set(txRef, {
+      'tenant_id': tenantId,
       'shop_id': shopId,
       'shop_name': shopName,
       'route_id': routeId,
@@ -437,6 +461,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (amountReceived > 0) {
       final payRef = db.collection(Collections.transactions).doc();
       batch.set(payRef, {
+        'tenant_id': tenantId,
         'shop_id': shopId,
         'shop_name': shopName,
         'route_id': routeId,
@@ -555,6 +580,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
 
     final db = FirebaseFirestore.instance;
+    final tenantId = await _requireTenantId();
     // I-12: 30-day time-lock on credit note creation
     if (normalizedLinkedInvoiceId.isNotEmpty) {
       final origSnap = await db
@@ -589,6 +615,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (normalizedKey != null && normalizedKey.isNotEmpty) {
       final existing = await db
           .collection(Collections.invoices)
+          .where('tenant_id', isEqualTo: tenantId)
           .where('idempotency_key', isEqualTo: normalizedKey)
           .limit(1)
           .get();
@@ -603,6 +630,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
 
     final invRef = db.collection(Collections.invoices).doc();
     batch.set(invRef, {
+      'tenant_id': tenantId,
       'invoice_number': invoiceNumber,
       'idempotency_key': resolvedKey,
       'type': InvoiceModel.typeCreditNote,
@@ -629,6 +657,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     // Create return transaction
     final txRef = db.collection(Collections.transactions).doc();
     batch.set(txRef, {
+      'tenant_id': tenantId,
       'shop_id': shopId,
       'shop_name': shopName,
       'route_id': routeId,
@@ -722,10 +751,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (createdBy.trim().isEmpty) {
       throw ArgumentError('createdBy must not be empty');
     } // Defense-in-depth: enforce admin-only at app level (rules enforce at DB level)
-    final currentUser = ref.read(authUserProvider).value;
+    final currentUser = await ref.read(authUserProvider.future);
     if (currentUser == null || !currentUser.isAdmin) {
       throw StateError('voidInvoice requires admin privileges');
     }
+    final tenantId = await _requireTenantId();
     final db = FirebaseFirestore.instance;
     final invoiceRef = db.collection(Collections.invoices).doc(invoiceId);
     final now = Timestamp.now();
@@ -778,6 +808,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       String txShopName = '',
     }) {
       return {
+        'tenant_id': (data['tenant_id'] as String?)?.trim().isNotEmpty == true
+            ? data['tenant_id']
+            : tenantId,
         'shop_id': txShopId,
         'shop_name': txShopName,
         'route_id': routeId,
@@ -905,6 +938,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       throw ArgumentError('createdBy must not be empty');
     }
     final db = FirebaseFirestore.instance;
+    final currentUser = await ref.read(authUserProvider.future);
+    if (currentUser == null || !currentUser.isAdmin) {
+      throw StateError('markAsPaid requires admin privileges');
+    }
+    final tenantId = await _requireTenantId();
     final invRef = db.collection(Collections.invoices).doc(invoiceId);
 
     await db.runTransaction((txn) async {
@@ -959,6 +997,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       if (outstanding > 0) {
         final payRef = db.collection(Collections.transactions).doc();
         txn.set(payRef, {
+          'tenant_id': tenantId,
           'shop_id': shopId,
           'shop_name': shopName,
           'route_id': routeId,

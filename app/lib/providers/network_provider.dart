@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'network_probe.dart';
 
 /// Bidirectional online/offline detection with hysteresis.
 ///
@@ -20,10 +20,7 @@ final networkStatusProvider = StreamProvider.autoDispose<bool>((ref) {
   var lastStatus = true;
 
   Future<bool> probe() async {
-    final result = await InternetAddress.lookup(
-      probeHost,
-    ).timeout(probeTimeout);
-    return result.isNotEmpty && result.first.rawAddress.isNotEmpty;
+    return probeNetworkReachability(probeHost, probeTimeout);
   }
 
   Future<void> check() async {

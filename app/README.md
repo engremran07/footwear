@@ -1,4 +1,4 @@
-﻿# FootWear ERP — Flutter App (v3.7.5+53)
+﻿# FootWear ERP — Flutter App (v3.9.50+89)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
@@ -25,6 +25,8 @@ flutter run
 ```
 
 Place `google-services.json` in `android/app/` before running (obtain from Firebase Console — gitignored).
+
+Google Drive backup requires a Google OAuth web client and Android client for package `footwear.pk.com`. Configure the release SHA-1 in Google Cloud/Firebase, then provide `GOOGLE_DRIVE_CLIENT_ID` and `GOOGLE_DRIVE_SERVER_CLIENT_ID` as `--dart-define` values for web and Android builds. The app requests only the `drive.file` scope.
 
 ---
 

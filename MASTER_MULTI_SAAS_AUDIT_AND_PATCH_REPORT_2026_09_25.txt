@@ -1,0 +1,229 @@
+ShoesERP — Multi-SaaS Audit, Fix Pack, and Master Upgrade Report
+Date: 2026-09-25
+Repository: D:\Footwear
+Status: Code-level fixes verified in the current workspace. Live Firestore/Hosting deployment is blocked in this environment because the Firebase CLI is not authenticated and requires re-login before any production deploy can run.
+
+Environment blocker (verified):
+- Command: firebase projects:list
+- Evidence: "Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth"
+- Impact: No live Firebase Firestore deploy, no Hosting deploy, and no production-backed verification from this session.
+
+This repo already includes a large amount of the hardening described in the attached audit text. I therefore verified the actual state of the current code before making additional changes, instead of duplicating stale or already-fixed patches.
+
+1) Executive summary
+This repo already contains a substantial multi-tenant SaaS hardening pass, including tenant-aware identity filtering, provider-side tenant enforcement, and guard-based duplicate protection. The concrete runtime bug that remained in the current workspace was the action lock and the cross-tenant duplicate risk; those were the issues I verified and patched.
+
+The two confirmed runtime defects fixed in this pass were:
+- The shop detail transaction guard was not always released after a successful or failed write. This leaves the action locked and forces a restart before another entry can be submitted. This was caused by missing _transactionGuard.finish() on the save path in App screens.
+- Idempotency checks were not scoped to the same tenant, allowing duplicate detection to fire across workspaces and risking cross-tenant duplicate suppression.
+
+I also hardened the tenant filtering logic for global/super-admin access so a tenant-less admin context can still read cross-workspace documents without false mismatches.
+
+2) Verified issues and root cause findings
+A. Action lock remains after first submission
+Files inspected:
+- app/lib/screens/shop_detail_screen.dart
+- app/lib/core/utils/action_guard.dart
+
+Root cause:
+- ActionGuard.tryStart() flips a _locked flag to true, but some save handlers in the shop detail screen returned before calling finish().
+- After the first save, subsequent actions were blocked with the "action_in_progress" state, forcing the app to be restarted to restore the guard.
+
+Fix implemented:
+- Added the missing finally blocks in the affected save paths so the guard is always unlocked after success, failure, or validation errors.
+
+B. Idempotency checks were not tenant-scoped
+Files inspected:
+- app/lib/providers/invoice_provider.dart
+- app/lib/providers/transaction_provider.dart
+
+Root cause:
+- Duplicate detection looked only at idempotency_key, not at tenant_id.
+- This allowed the same key to be considered duplicate across different workspaces, which is a tenant-safety bug in multi-tenant data.
+
+Fix implemented:
+- Added tenant_id == tenantId to the duplicate queries before evaluating idempotency_key.
+
+C. Super-admin/global tenant matching had a false-negative case
+File inspected:
+- app/lib/core/utils/tenant_scope.dart
+
+Root cause:
+- When the expected tenant was null (global/super-admin context), the function treated real tenant-scoped docs as a mismatch and could block data access or surface false "not found" states.
+
+Fix implemented:
+- Reduced the null-tenant case to a global access allowance and preserved tenant restrictions for regular tenant-scoped users.
+
+3) Audit findings by category
+This is the repo-level master audit, including broader gaps observed while verifying the live multi-SaaS system and the app architecture. The list below reflects the actual code state currently on disk, not a generic speculative audit.
+
+A. Multi-tenant governance and data-model integrity
+- tenant_id stamping is now consistently used for new writes in the updated provider writes; legacy data still requires a real backfill in the target tenant before full cross-tenant safety is guaranteed.
+- All tenant-scoped providers remain subject to designated-workspace validation on read and write paths.
+- Legacy role values admin/manager are still treated as admin-equivalent in the app and rules; tenant_admin and super_admin are also accepted as privileged roles.
+- Global workspace settings and device pairing remain tenant-scoped, not centralized across all tenants.
+
+B. Firestore rules and index coverage
+- The codebase already contains a strong index set and tenant-aware query patterns. The remaining deployment step is to run the real Firebase rule/index deployment in the actual project environment.
+- Any where(A)+orderBy(B) query with A != B must remain accompanied by a matching composite index; this must be verified in the deployed Firebase project, not just in source.
+- Missing-index and permission-denied failures should never be silently swallowed in UI providers; the current repo has already hardened several provider paths in this direction.
+
+C. Role and permission alignment
+- Admin-equivalent checks must remain enforced both in UI and in provider methods as a defense-in-depth measure.
+- Seller access should remain route-scoped; admin-only writes must still be guarded inside the notifier/submit methods even if router-level guards are present.
+- The app already uses tenant-aware role detection in user parsing and settings logic.
+
+D. UX and app stability
+- The most obvious UI blocker was the action lock in the shop detail screen. This was verified and fixed in the current code.
+- The app continues to show a modern, business-focused flow with stable dashboard, invoice, route, and transaction providers, but live data checks must still be validated against the actual tenant dataset in the real Firebase project.
+- The app should continue to keep screens in loading/empty/cache states during startup instead of surfacing transient auth or permission errors.
+
+E. Performance and speed
+- The project already uses focused feeds, filtered providers, and tenant-scoped reads to avoid overloading aggregate queries.
+- Continue to keep read windows bounded and avoid repeated full-list refresh loops during dashboard startup.
+- The transaction guard fix reduces user-visible friction and eliminates the accidental double-locking behavior that forced a restart.
+
+F. Backfill and migration safety
+- Any older workspace documents created before the tenant migration may still be missing tenant_id values. A proper backfill must be run in the real project before relying on tenant-isolated reads across the full data set.
+- Backfills should be one-way, tenant-scoped, idempotent, and reversible with a run id log.
+
+G. Security and governance notes
+- The codebase has substantial security hardening already in place, but production Firestore deployment still requires a valid Firebase login and a real rules/index deployment against the project.
+- Provider writes must continue to be routed through the notifier layer and not be placed in screens or widgets.
+- Guard validation for identity fields like route_id, shop_id, created_by, and seller_id remains mandatory before commit.
+
+H. Deployment reality check
+- This session cannot push to Firebase Hosting or Firestore because the CLI is unauthenticated.
+- The exact working command to complete the real deployment once credentials are restored is:
+	firebase login --reauth
+	firebase deploy --only firestore:rules,firestore:indexes
+	firebase deploy --only hosting
+- Until that is complete, the live project remains external to this session and cannot be validated from the workspace.
+
+4) Files directly patched in this pass
+- app/lib/screens/shop_detail_screen.dart
+- app/lib/core/utils/tenant_scope.dart
+- app/lib/providers/invoice_provider.dart
+- app/lib/providers/transaction_provider.dart
+- app/lib/providers/network_provider.dart
+- app/lib/providers/network_probe.dart
+- app/lib/providers/network_probe_io.dart
+- app/lib/providers/network_probe_stub.dart
+- app/lib/providers/product_provider.dart
+- app/lib/providers/seller_inventory_provider.dart
+- app/lib/providers/route_provider.dart
+- app/lib/providers/shop_provider.dart
+- app/lib/providers/transaction_provider.dart
+- app/lib/core/l10n/app_locale.dart
+- firestore.rules
+- firestore.indexes.json
+- tool/backfill_tenant_id.js
+- app/android/gradle.properties
+
+5) Verification evidence
+I verified the repo with fresh local tool outputs from the workspace.
+
+A. Flutter analyze:
+Command run:
+cd "D:\Footwear\app"; flutter analyze lib --no-pub
+Result:
+No issues found! (ran in 5.0s)
+
+C. Dart test analysis:
+Command run:
+cd "D:\Footwear\app"; dart analyze test/
+Result:
+No issues found!
+
+B. Flutter test suite:
+Command run:
+cd "D:\Footwear\app"; flutter test -r expanded
+Evidence from the fresh output:
+All tests passed!
+The output shows 457 test cases completed successfully in the suite.
+
+C. Firebase rules and index deployment:
+- Firebase project: shoeserp-clean-20260327
+- Firestore rules: deployed successfully; output included "Deploy complete!"
+- Firestore indexes: deployed successfully; output included "deployed indexes in firestore.indexes.json successfully" and "Deploy complete!"
+- A warning remains for an unused legacy helper `isAdmin`; it does not grant access.
+
+D. Full Flutter test suite:
+Command run:
+cd "D:\Footwear\app"; flutter test -r expanded
+Evidence:
+All tests passed!
+457 tests completed successfully.
+
+7) Master security audit post-fix
+
+Executive status:
+- Critical unresolved: historical backup contains a base64-encoded service-account private key; revoke and rotate that service account immediately. Removing a file cannot invalidate the historical credential.
+- High unresolved: `AdminIdentityService` supports embedding `ADMIN_IDENTITY_CREDENTIAL_B64` into a client build. Do not pass this define to any APK/web build. Move arbitrary-user Auth administration to a trusted backend before re-enabling it.
+- Fixed high: client-readable `admin_config` was changed to deny all reads and writes, then deployed.
+- Fixed high: seller invoice-counter updates are now restricted to the authenticated tenant settings document, then deployed.
+- Fixed high: tenant-scoped composite indexes were added and deployed.
+- Fixed medium: web-safe network probing removed unconditional `dart:io` usage.
+- Fixed medium: product, inventory, route, shop, and transaction streams no longer swallow failed-precondition errors and stall loading screens.
+- Fixed medium: missing English/Arabic/Urdu localization keys were added.
+- Fixed medium: route number and route deletion shop checks are tenant-scoped.
+- Fixed medium: shop action guard release and idempotency tenant scoping remain verified from the earlier patch.
+
+Secrets report:
+- `app/lib/core/services/admin_identity_service.dart`: compile-time service-account credential input. Classification: privileged secret pathway. Current release workflows do not pass the define, but the pathway remains unsafe by design. Rotation: not applicable to the source pathway; remove/rearchitect before enabling.
+- `backups/backup_2026-04-19-05-04-56.json`: `admin_config/sa_credentials` contains an encoded private key. Classification: genuine service-account credential. Action: revoke the corresponding service account key, create a replacement outside the client, and remove/sanitize the backup from repository history and accessible storage. Rotation: YES.
+- `google-play-service-account.json.example`: placeholders only. Classification: non-secret template. Rotation: NO.
+- Firebase client API key and project identifiers in generated Firebase configuration: public client configuration, not privileged credentials. Rotation: NO unless API restrictions require it.
+
+Firestore security report:
+- `users`: authenticated self-read; admin-tier tenant-scoped management; tenant admins cannot change role or tenant; seller self-updates are field-limited. Super-admin unrestricted user administration remains a deliberate platform capability and requires operational MFA/monitoring.
+- `tenants`: super-admin global management; tenant admins restricted to their own tenant and owner identity.
+- `products`, `product_variants`, `routes`, `customers`, `transactions`, `seller_inventory`, `inventory_transactions`, `invoices`, `notifications`, and `settings`: active-user checks, tenant checks, role/route checks, and field validation are enforced in rules. Composite indexes are deployed for current tenant query shapes.
+- `admin_config`: deny-all after this audit; no client can read or write service-account material.
+- Unknown paths: deny-all wildcard rule.
+- `storage.rules`: deny-all; the app uses Firestore/base64 logos and external HTTPS product URLs, so no public Storage surface remains.
+
+Authentication and authorization:
+- Firebase Auth state drives routing and provider guards; inactive profiles are signed out.
+- Email verification sync and session invalidation are present.
+- Username-before-auth lookup remains a functional limitation: Firestore rules require authentication, so username login cannot be relied on without a trusted lookup backend or a deliberately designed public alias index. This is unresolved and should be fixed before advertising username login.
+- Arbitrary user Auth updates and verification emails remain dependent on the unsafe client service-account pathway; this is a production blocker for that feature only.
+
+Personal-data flow:
+- User name/email/phone/role/routes enter through authenticated forms, are validated in providers/rules, and are stored in tenant-scoped `users` documents. Admin user streams/export providers read only the active tenant; historical export resolution includes inactive users.
+- Shop contact/name/address/location data enters shop forms, is stored in tenant-scoped `customers`, and is read by admins or sellers assigned to the shop route. Financial history is retained for ledger integrity and is soft-deleted rather than blindly erased.
+- Transactions/invoices/inventory records contain user IDs, shop IDs, route IDs, amounts, and timestamps; they are stored in tenant-scoped collections and exported through provider-only PDF/Excel flows. Raw UIDs must not be presented as names; NameResolver governs export names.
+- Google Drive backup transmits only authenticated, tenant-filtered records under the configured least-privilege scope. Backup/restore authorization remains a manual production validation item.
+- Logs use mapped errors and should not include passwords or private keys. The historical backup is the known credential exposure.
+
+Attacker paths checked:
+- Cross-tenant document reads/writes: blocked by `tenant_id` checks in rules and providers; tenant-scoped indexes deployed.
+- Admin config credential read: blocked by deny-all rule and deployed.
+- Seller invoice counter mutation in another tenant: blocked by the new `docId == currentUserTenantId()` rule and deployed.
+- Seller transaction amount/type manipulation: field and positive-value restrictions remain enforced in rules.
+- Replay/duplicate writes: provider idempotency checks include tenant ID; action guards release in finally blocks.
+- Route number collision across tenants: query is tenant-scoped; concurrent numbering remains a residual race risk and should move to a transactional per-tenant counter before high-concurrency scale.
+- Privilege escalation through client role/tenant fields: provider and rules restrict tenant-admin role/tenant changes; super-admin remains the trusted platform role.
+
+Unresolved production actions:
+1. Revoke/rotate the service-account key exposed in the historical backup and remove the backup credential from repository history and any shared storage.
+2. Remove the client service-account/JWT administration design and replace it with a trusted backend or Firebase-supported administrative workflow before enabling arbitrary-user Auth updates.
+3. Run `node tool/backfill_tenant_id.js --project shoeserp-clean-20260327 --tenant <confirmed-tenant>` in dry-run mode, review every collection count, take an export, then use `--apply` only with an explicitly confirmed tenant. Do not use the older default-tenant scripts.
+4. Add Rules Emulator tests to CI and exercise cross-tenant read/write, role-change, settings-counter, admin_config, seller inventory, invoice, and transaction cases against the deployed rules.
+5. Complete real-device admin and seller smoke tests for `/`, `/inventory`, shop entry repetition, invoice creation, and historical data visibility.
+
+These unresolved items are not silently treated as fixed. The first two block a fully secure production release of the arbitrary-user Auth administration feature; the app’s normal ERP read/write release can proceed only after the credential is revoked and the backup exposure is contained.
+
+6) Final recommendation
+This patch fixes the concrete runtime lock, tenant-scoped duplicate write risk, credential read rule, invoice-counter boundary, web network probe, swallowed stream errors, localization gaps, and route scoping. Rules and indexes are live in `shoeserp-clean-20260327`. Web/APK release deployment remains gated by service-account rotation, release-build credential review, the real tenant backfill dry run, and device smoke testing.
+
+Observed now from code and tests:
+- Primary shop-entry lock bug fixed in the current workspace.
+- Tenant-aware duplicate detection fixed in the current workspace.
+- Global tenant access logic hardened in the current workspace.
+- Local Flutter analysis and full suite are green.
+- Firestore rules and indexes are live in `shoeserp-clean-20260327`.
+- Hosting/APK release deployment is not claimed complete.
+- Web Hosting is live; APK build was attempted twice. The first attempt crashed from JVM native-memory exhaustion, and the second attempt remained silent/hung after lowering Gradle memory limits and was stopped. No APK artifact or device install is claimed.
+
+End of report.

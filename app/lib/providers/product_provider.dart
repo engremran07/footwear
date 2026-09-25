@@ -16,25 +16,17 @@ final productsProvider = StreamProvider.autoDispose<List<ProductModel>>((ref) {
     FirebaseFirestore.instance.collection(Collections.products),
     tenantId: tenantId,
   );
-  return query
-      .where('active', isEqualTo: true)
-      .limit(200)
-      .snapshots()
-      .handleError((Object error, StackTrace stack) {
-        if (error is FirebaseException && error.code == 'failed-precondition') {
-          return const <ProductModel>[];
-        }
-        throw error;
-      })
-      .map((snap) {
-        final products = snap.docs
-            .map((d) => ProductModel.fromJson(d.data(), d.id))
-            .toList();
-        products.sort(
-          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-        );
-        return products;
-      });
+  return query.where('active', isEqualTo: true).limit(200).snapshots().map((
+    snap,
+  ) {
+    final products = snap.docs
+        .map((d) => ProductModel.fromJson(d.data(), d.id))
+        .toList();
+    products.sort(
+      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+    );
+    return products;
+  });
 });
 
 final productDetailProvider = StreamProvider.autoDispose
@@ -71,13 +63,6 @@ final productVariantsProvider = StreamProvider.autoDispose
           .where('active', isEqualTo: true)
           .limit(100)
           .snapshots()
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <ProductVariantModel>[];
-            }
-            throw error;
-          })
           .map((snap) {
             final variants = snap.docs
                 .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
@@ -102,28 +87,19 @@ final allVariantsProvider =
         FirebaseFirestore.instance.collection(Collections.productVariants),
         tenantId: tenantId,
       );
-      return query
-          .where('active', isEqualTo: true)
-          .limit(500)
-          .snapshots()
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <ProductVariantModel>[];
-            }
-            throw error;
-          })
-          .map((snap) {
-            final variants = snap.docs
-                .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
-                .toList();
-            variants.sort(
-              (a, b) => a.variantName.toLowerCase().compareTo(
-                b.variantName.toLowerCase(),
-              ),
-            );
-            return variants;
-          });
+      return query.where('active', isEqualTo: true).limit(500).snapshots().map((
+        snap,
+      ) {
+        final variants = snap.docs
+            .map((d) => ProductVariantModel.fromJson(d.data(), d.id))
+            .toList();
+        variants.sort(
+          (a, b) => a.variantName.toLowerCase().compareTo(
+            b.variantName.toLowerCase(),
+          ),
+        );
+        return variants;
+      });
     });
 
 class ProductNotifier extends AsyncNotifier<void> {

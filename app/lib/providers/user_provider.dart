@@ -175,9 +175,16 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     String? tenantId,
   }) async {
     final adminUid = await _requireAdminUid();
+    final actingUser = await ref.read(authUserProvider.future);
+    if (actingUser == null || !actingUser.active) {
+      throw StateError('An active user profile is required');
+    }
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final normalizedRole = _normalizeRole(role);
+      if (actingUser.isTenantAdmin && normalizedRole != 'seller') {
+        throw StateError('Workspace admins can create seller accounts only');
+      }
       if (normalizedRole == 'seller' && assignedRouteIds.isEmpty) {
         throw ArgumentError(
           'Seller accounts require at least one assigned route.',
@@ -197,8 +204,14 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       // Use provided tenantId or fall back to current user's tenant
       final effectiveTenantId =
           TenantScope.normalize(tenantId) ??
-          TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
+          TenantScope.normalize(actingUser.tenantId) ??
           TenantScope.globalTenantId;
+      if (actingUser.isTenantAdmin &&
+          effectiveTenantId != TenantScope.normalize(actingUser.tenantId)) {
+        throw StateError(
+          'Workspace users must belong to the current workspace',
+        );
+      }
 
       // Use a secondary FirebaseApp so the admin stays signed in
       FirebaseApp? tempApp;
@@ -285,6 +298,10 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     }
 
     final isAdmin = await _isCurrentUserAdmin();
+    final actingUser = await ref.read(authUserProvider.future);
+    if (actingUser == null || !actingUser.active) {
+      throw StateError('An active user profile is required');
+    }
     final db = FirebaseFirestore.instance;
     final updateData = <String, dynamic>{...data};
     if (updateData['tenant_id'] != null) {
@@ -298,6 +315,13 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     }
     if (updateData['role'] is String) {
       updateData['role'] = _normalizeRole(updateData['role'] as String);
+    }
+
+    if (actingUser.isTenantAdmin) {
+      if (updateData.containsKey('role') ||
+          updateData.containsKey('tenant_id')) {
+        throw StateError('Workspace admins cannot change role or workspace');
+      }
     }
 
     final hasRoleUpdate = updateData.containsKey('role');

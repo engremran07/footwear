@@ -49,6 +49,9 @@ class AppErrorMapper {
 
     // ── Dart built-in errors ───────────────────────────────────────────
     final msg = error.toString().toLowerCase();
+    if (msg.contains('google drive') || msg.contains('oauth')) {
+      return 'backup_drive_error';
+    }
     if (msg.contains('route_has_seller')) return 'route_has_seller';
     if (msg.contains('route_has_shops')) return 'route_has_shops';
     if (msg.contains('no user found')) return 'err_user_not_found';

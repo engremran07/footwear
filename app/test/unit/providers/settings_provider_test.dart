@@ -38,14 +38,15 @@ void main() {
   }
 
   group('Workspace settings resolution', () {
-    test('uses the current tenant settings document instead of the global fallback', () {
-      final tenantUser = seller.copyWith(
-        tenantId: 'tenant-42',
-      );
+    test(
+      'uses the current tenant settings document instead of the global fallback',
+      () {
+        final tenantUser = seller.copyWith(tenantId: 'tenant-42');
 
-      expect(settingsDocumentIdForUser(tenantUser), 'tenant-42');
-      expect(settingsDocumentIdForUser(null), TenantScope.globalTenantId);
-    });
+        expect(settingsDocumentIdForUser(tenantUser), 'tenant-42');
+        expect(settingsDocumentIdForUser(null), TenantScope.globalTenantId);
+      },
+    );
   });
 
   group('SettingsNotifier admin guard', () {

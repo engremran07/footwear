@@ -23,23 +23,15 @@ final routesProvider = StreamProvider.autoDispose<List<RouteModel>>((ref) {
     FirebaseFirestore.instance.collection(Collections.routes),
     tenantId: tenantId,
   );
-  return query
-      .where('active', isEqualTo: true)
-      .limit(200)
-      .snapshots()
-      .handleError((Object error, StackTrace stack) {
-        if (error is FirebaseException && error.code == 'failed-precondition') {
-          return const <RouteModel>[];
-        }
-        throw error;
-      })
-      .map((snap) {
-        final routes = snap.docs
-            .map((d) => RouteModel.fromJson(d.data(), d.id))
-            .toList();
-        routes.sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
-        return routes;
-      });
+  return query.where('active', isEqualTo: true).limit(200).snapshots().map((
+    snap,
+  ) {
+    final routes = snap.docs
+        .map((d) => RouteModel.fromJson(d.data(), d.id))
+        .toList();
+    routes.sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
+    return routes;
+  });
 });
 
 final routeDetailProvider = StreamProvider.autoDispose
@@ -123,13 +115,6 @@ final routesBySellerProvider = StreamProvider.autoDispose
           .where('active', isEqualTo: true)
           .limit(100)
           .snapshots()
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <RouteModel>[];
-            }
-            throw error;
-          })
           .map((snap) {
             final routes = snap.docs
                 .map((d) => RouteModel.fromJson(d.data(), d.id))
@@ -146,26 +131,28 @@ class RouteNotifier extends AsyncNotifier<void> {
   /// Reconciles each route's `total_shops` against active shops in Firestore.
   /// Safe to run after partial DB flushes so route counters self-heal.
   Future<void> reconcileRouteShopCounters() async {
+    final currentUser = await ref.read(authUserProvider.future);
     final authUser = FirebaseAuth.instance.currentUser;
-    if (authUser == null) return;
+    if (authUser == null || currentUser == null || !currentUser.active) return;
+    final tenantId =
+        TenantScope.normalize(currentUser.tenantId) ??
+        TenantScope.globalTenantId;
 
     final db = FirebaseFirestore.instance;
     final me = await db.collection(Collections.users).doc(authUser.uid).get();
     final role = (me.data()?['role'] as String? ?? '').trim();
     if (!isPrivilegedRoleName(role)) return;
 
-    final routesSnap = await db
-        .collection(Collections.routes)
-        .where('active', isEqualTo: true)
-        .limit(500)
-        .get();
+    final routesSnap = await TenantScope.applyToQuery(
+      db.collection(Collections.routes),
+      tenantId: tenantId,
+    ).where('active', isEqualTo: true).limit(500).get();
     if (routesSnap.docs.isEmpty) return;
 
-    final shopsSnap = await db
-        .collection(Collections.customers)
-        .where('active', isEqualTo: true)
-        .limit(2000)
-        .get();
+    final shopsSnap = await TenantScope.applyToQuery(
+      db.collection(Collections.customers),
+      tenantId: tenantId,
+    ).where('active', isEqualTo: true).limit(2000).get();
 
     final countsByRoute = <String, int>{};
     for (final shop in shopsSnap.docs) {
@@ -193,9 +180,10 @@ class RouteNotifier extends AsyncNotifier<void> {
     }
   }
 
-  Future<int> _nextRouteNumber(FirebaseFirestore db) async {
+  Future<int> _nextRouteNumber(FirebaseFirestore db, String tenantId) async {
     final snap = await db
         .collection(Collections.routes)
+        .where('tenant_id', isEqualTo: tenantId)
         .orderBy('route_number', descending: true)
         .limit(1)
         .get();
@@ -206,9 +194,12 @@ class RouteNotifier extends AsyncNotifier<void> {
 
   Future<void> create(Map<String, dynamic> data) async {
     final db = FirebaseFirestore.instance;
-    final currentUser = ref.read(authUserProvider).value;
+    final currentUser = await ref.read(authUserProvider.future);
+    if (currentUser == null || !currentUser.active) {
+      throw StateError('An active user profile is required');
+    }
     final tenantId =
-        TenantScope.normalize(currentUser?.tenantId) ??
+        TenantScope.normalize(currentUser.tenantId) ??
         TenantScope.globalTenantId;
     final routeRef = db.collection(Collections.routes).doc();
     final routeName = data['name'] as String? ?? '';
@@ -226,7 +217,7 @@ class RouteNotifier extends AsyncNotifier<void> {
         const <String>[];
     final routeNumber = ((data['route_number'] as int?) ?? 0) > 0
         ? (data['route_number'] as int)
-        : await _nextRouteNumber(db);
+        : await _nextRouteNumber(db, tenantId);
 
     await db.runTransaction<void>((txn) async {
       // Verify all sellers exist.
@@ -264,6 +255,10 @@ class RouteNotifier extends AsyncNotifier<void> {
 
   Future<void> updateRoute(String id, Map<String, dynamic> data) async {
     final db = FirebaseFirestore.instance;
+    final currentUser = await ref.read(authUserProvider.future);
+    if (currentUser == null || !currentUser.active) {
+      throw StateError('An active user profile is required');
+    }
     final routeRef = db.collection(Collections.routes).doc(id);
     await db.runTransaction<void>((txn) async {
       final currentRoute = await txn.get(routeRef);
@@ -276,7 +271,7 @@ class RouteNotifier extends AsyncNotifier<void> {
           currentRoute.data()?['name'] as String? ??
           '';
       final tenantId =
-          TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
+          TenantScope.normalize(currentUser.tenantId) ??
           TenantScope.globalTenantId;
       final currency =
           data['currency'] as String? ??
@@ -353,6 +348,9 @@ class RouteNotifier extends AsyncNotifier<void> {
     if (!isPrivilegedRoleName(role)) {
       throw StateError('Only admin can delete routes');
     }
+    final tenantId =
+        TenantScope.normalize(me.data()?['tenant_id'] as String?) ??
+        TenantScope.globalTenantId;
 
     // Check for assigned sellers
     final routeDoc = await db.collection(Collections.routes).doc(id).get();
@@ -365,6 +363,7 @@ class RouteNotifier extends AsyncNotifier<void> {
     // Check for active shops/customers linked to this route
     final shopsSnap = await db
         .collection(Collections.customers)
+        .where('tenant_id', isEqualTo: tenantId)
         .where('route_id', isEqualTo: id)
         .where('active', isEqualTo: true)
         .limit(1)

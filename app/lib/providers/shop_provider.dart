@@ -44,29 +44,23 @@ final shopsProvider = StreamProvider.autoDispose<List<ShopModel>>((ref) {
     FirebaseFirestore.instance.collection(Collections.customers),
     tenantId: tenantId,
   );
-  return query
-      .where('active', isEqualTo: true)
-      .limit(500)
-      .snapshots()
-      .handleError((Object error, StackTrace stack) {
-        if (error is FirebaseException && error.code == 'failed-precondition') {
-          return const <ShopModel>[];
-        }
-        throw error;
-      })
-      .map((snap) {
-        final shops = snap.docs
-            .map((d) => ShopModel.fromJson(d.data(), d.id))
-            .toList();
-        shops.sort(
-          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-        );
-        return shops;
-      });
+  return query.where('active', isEqualTo: true).limit(500).snapshots().map((
+    snap,
+  ) {
+    final shops = snap.docs
+        .map((d) => ShopModel.fromJson(d.data(), d.id))
+        .toList();
+    shops.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return shops;
+  });
 });
 
 final shopsByRouteProvider = StreamProvider.autoDispose
     .family<List<ShopModel>, String>((ref, routeId) {
+      final profileReady = ref.watch(
+        authUserProvider.select((s) => s.hasValue && s.value != null),
+      );
+      if (!profileReady) return const Stream.empty();
       final tenantId = ref.watch(
         authUserProvider.select(
           (s) => TenantScope.normalize(s.value?.tenantId),
@@ -81,13 +75,6 @@ final shopsByRouteProvider = StreamProvider.autoDispose
           .where('active', isEqualTo: true)
           .limit(200)
           .snapshots()
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <ShopModel>[];
-            }
-            throw error;
-          })
           .map((snap) {
             final shops = snap.docs
                 .map((d) => ShopModel.fromJson(d.data(), d.id))
@@ -131,12 +118,6 @@ final sellerAllShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
       .where('active', isEqualTo: true)
       .limit(500)
       .snapshots()
-      .handleError((Object error, StackTrace stack) {
-        if (error is FirebaseException && error.code == 'failed-precondition') {
-          return const <ShopModel>[];
-        }
-        throw error;
-      })
       .map((snap) {
         final shops = snap.docs
             .map((d) => ShopModel.fromJson(d.data(), d.id))
@@ -226,17 +207,15 @@ final outstandingShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
             .toList();
         shops.sort((a, b) => b.balance.compareTo(a.balance));
         return shops;
-      })
-      .handleError((Object error, StackTrace stack) {
-        if (error is FirebaseException && error.code == 'failed-precondition') {
-          return const <ShopModel>[];
-        }
-        throw error;
       });
 });
 
 final outstandingShopsByRouteProvider = StreamProvider.autoDispose
     .family<List<ShopModel>, String>((ref, routeId) {
+      final profileReady = ref.watch(
+        authUserProvider.select((s) => s.hasValue && s.value != null),
+      );
+      if (!profileReady) return const Stream.empty();
       final tenantId = ref.watch(
         authUserProvider.select(
           (s) => TenantScope.normalize(s.value?.tenantId),
@@ -258,13 +237,6 @@ final outstandingShopsByRouteProvider = StreamProvider.autoDispose
                 .toList();
             shops.sort((a, b) => b.balance.compareTo(a.balance));
             return shops;
-          })
-          .handleError((Object error, StackTrace stack) {
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              return const <ShopModel>[];
-            }
-            throw error;
           });
     });
 
@@ -274,10 +246,13 @@ class ShopNotifier extends AsyncNotifier<void> {
 
   Future<void> create(Map<String, dynamic> data) async {
     final db = FirebaseFirestore.instance;
+    final currentUser = await ref.read(authUserProvider.future);
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    if (uid.isEmpty) throw StateError('Not authenticated');
+    if (uid.isEmpty || currentUser == null || !currentUser.active) {
+      throw StateError('An active user profile is required');
+    }
     final tenantId =
-        TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
+        TenantScope.normalize(currentUser.tenantId) ??
         TenantScope.globalTenantId;
     // Pre-generate doc ID so retries on network failure are idempotent
     // (using add() can create a duplicate if the first write succeeds but
@@ -347,6 +322,11 @@ class ShopNotifier extends AsyncNotifier<void> {
     }
 
     final db = FirebaseFirestore.instance;
+    final tenantId =
+        TenantScope.normalize(
+          (await ref.read(authUserProvider.future))?.tenantId,
+        ) ??
+        TenantScope.globalTenantId;
     final shopDoc = await db
         .collection(Collections.customers)
         .doc(shopId)
@@ -371,6 +351,7 @@ class ShopNotifier extends AsyncNotifier<void> {
     // Create write_off transaction
     final txRef = db.collection(Collections.transactions).doc();
     batch.set(txRef, {
+      'tenant_id': tenantId,
       'type': 'write_off',
       'shop_id': shopId,
       'shop_name': shopDoc.data()?['name'] ?? '',
@@ -400,6 +381,11 @@ class ShopNotifier extends AsyncNotifier<void> {
     }
 
     final db = FirebaseFirestore.instance;
+    final tenantId =
+        TenantScope.normalize(
+          (await ref.read(authUserProvider.future))?.tenantId,
+        ) ??
+        TenantScope.globalTenantId;
     final shopDoc = await db
         .collection(Collections.customers)
         .doc(shopId)
@@ -426,6 +412,7 @@ class ShopNotifier extends AsyncNotifier<void> {
     // Create recovery transaction to record the reversal
     final txRef = db.collection(Collections.transactions).doc();
     batch.set(txRef, {
+      'tenant_id': tenantId,
       'type': 'cash_out',
       'shop_id': shopId,
       'shop_name': shopDoc.data()?['name'] ?? '',

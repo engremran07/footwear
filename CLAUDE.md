@@ -75,6 +75,12 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
     task is no longer relevant, mark it explicitly as "dropped — reason: ..." rather than
     silently removing it.
 
+22. Google Drive backup is least-privilege and scope-bound. Web builds must receive
+  `GOOGLE_DRIVE_CLIENT_ID`; Android builds must receive the matching web
+  `GOOGLE_DRIVE_SERVER_CLIENT_ID`. Sellers may restore only their own records
+  for currently assigned routes. Super admins must select a concrete tenant
+  before backup or restore. Never silently fall back to a global snapshot.
+
 ## Financial Pathways (never mix these)
 
 ```text

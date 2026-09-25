@@ -208,28 +208,32 @@ Seller:
 
 1. permission-denied on route create/inventory add
 
-- Common causes:
   - role value drift (Admin/manager casing, trailing spaces, legacy values)
   - user doc inactive
   - rules not deployed
 
 1. resource-exhausted on dashboard
 
-- Common causes:
   - aggregate query quota pressure
   - repeated refresh hitting count/sum endpoints
 
 1. lists empty without obvious UI error
 
-- Common cause:
   - missing composite index
 
 1. export/PDF generates empty data or crashes
 
-- Common causes:
   - `ref.read(authUserProvider).value` in async/provider context → null during loading
   - Fix: use `await ref.read(authUserProvider.future)` in ALL export providers and screen export methods
   - Grep gate: `grep -rn "ref\.read(authUserProvider)\.value" app/lib/providers/` must return zero in export contexts
+
+### Google Drive OAuth and tenant backup contract
+
+- Drive backup uses the least-privilege `drive.file` scope and must be filtered by the authenticated Firebase user and workspace.
+- Tenant admins may back up and restore their own workspace; sellers may back up only assigned-route data and restore only their own transactions for a route that is currently assigned.
+- Super admins must select a concrete workspace before backup or restore; a global all-workspace client snapshot is forbidden.
+- Web builds require `GOOGLE_DRIVE_CLIENT_ID`; Android builds require the matching web `GOOGLE_DRIVE_SERVER_CLIENT_ID` and a registered Android OAuth client for package `footwear.pk.com`.
+- The release keystore SHA-1 must be registered in Firebase/Google Cloud before Google Sign-In can authorize Drive on the APK.
 
 ## 6) Mandatory Triage Order
 

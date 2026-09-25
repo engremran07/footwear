@@ -28,6 +28,50 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.51',
+    date: 'September 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📱',
+        text: {
+          AppLocale.en:
+              'Android 17-era compatibility and release build reliability have been improved.',
+          AppLocale.ar: 'تم تحسين توافق Android 17 وموثوقية إنشاء الإصدار.',
+          AppLocale.ur:
+              'Android 17 دور کی مطابقت اور ریلیز بلڈ کی قابل اعتماد کارکردگی بہتر کی گئی ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.9.50',
+    date: 'August 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🛡️',
+        text: {
+          AppLocale.en:
+              'Workspace permissions now protect every route, shop, ledger, invoice, inventory, and user operation. Legacy admin accounts work only inside their own workspace.',
+          AppLocale.ar:
+              'تحمي صلاحيات مساحة العمل الآن كل عمليات المسارات والمتاجر والدفاتر والفواتير والمخزون والمستخدمين. تعمل حسابات المسؤول القديمة داخل مساحة عملها فقط.',
+          AppLocale.ur:
+              'ورک اسپیس اجازتیں اب روٹ، شاپ، لیجر، انوائس، انوینٹری اور صارف کی ہر کارروائی کو محفوظ کرتی ہیں۔ پرانے ایڈمن اکاؤنٹس صرف اپنی ورک اسپیس میں کام کرتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '☁️',
+        text: {
+          AppLocale.en:
+              'Drive backup now reports OAuth configuration problems clearly. Web and Android builds use the same configured Google Drive client settings.',
+          AppLocale.ar:
+              'تعرض النسخة الاحتياطية في Drive مشاكل إعداد OAuth بوضوح. تستخدم إصدارات الويب وAndroid إعدادات عميل Google Drive نفسها.',
+          AppLocale.ur:
+              'Drive بیک اپ اب OAuth کنفیگریشن کے مسائل واضح طور پر بتاتا ہے۔ ویب اور Android بلڈز ایک ہی Google Drive کلائنٹ سیٹنگز استعمال کرتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.49',
     date: 'August 2026',
     items: [

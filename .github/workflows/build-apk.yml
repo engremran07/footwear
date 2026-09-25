@@ -102,11 +102,18 @@ jobs:
 
       - name: Build debug APK
         if: github.event.inputs.build_type == 'debug'
-        run: cd app && flutter build apk --debug
+        env:
+          GOOGLE_DRIVE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_SERVER_CLIENT_ID }}
+        run: cd app && flutter build apk --debug \
+          --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID"
 
       - name: Build release APK (split-per-abi)
         if: github.event.inputs.build_type == 'release'
-        run: cd app && flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
+        env:
+          GOOGLE_DRIVE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_SERVER_CLIENT_ID }}
+        run: cd app && flutter build apk --release --split-per-abi \
+          --dart-define=USE_PLAY_INTEGRITY=true \
+          --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

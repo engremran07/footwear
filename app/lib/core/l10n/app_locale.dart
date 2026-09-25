@@ -92,6 +92,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'refresh': 'Refresh',
     'retry': 'Retry',
     'no_results_found': 'No results found',
+    'no_results': 'No results found',
+    'discard': 'Discard',
+    'confirm_delete_user': 'Delete this user?',
+    'no_access_to_workspaces': 'You do not have access to any workspace.',
     'copy_link': 'Copy Link',
     'required': 'Required',
     'submit': 'Submit',
@@ -1266,6 +1270,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'restore_from_google_drive': 'Restore from Google Drive',
     'backup_drive_success': 'Backup uploaded to your Google Drive',
     'backup_drive_none': 'No ShoesERP backups found in your Google Drive',
+    'backup_drive_error':
+        'Google Drive is not configured or authorization was not granted. Contact the administrator.',
     'backup_restore_scope_denied':
         'Restore is limited to your workspace and currently assigned routes',
     'backup_in_progress': 'Creating backup…',
@@ -1809,6 +1815,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'notifications': 'الإشعارات',
     'no_notifications': 'لا توجد إشعارات جديدة',
     'no_access': 'لا صلاحية',
+    'no_results': 'لا توجد نتائج',
+    'discard': 'تجاهل',
+    'confirm_delete_user': 'هل تريد حذف هذا المستخدم؟',
+    'no_access_to_workspaces': 'لا تملك صلاحية الوصول إلى أي مساحة عمل.',
     'new_order_notif': 'طلب جديد',
     'approval_needed': 'موافقة مطلوبة',
     'mark_all_read': 'تعليم الكل كمقروء',
@@ -2522,8 +2532,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_now': 'نسخ الآن',
     'backup_to_google_drive': 'النسخ الاحتياطي إلى Google Drive',
     'restore_from_google_drive': 'الاستعادة من Google Drive',
-    'backup_drive_success': 'تم رفع النسخة الاحتياطية إلى Google Drive الخاص بك',
-    'backup_drive_none': 'لا توجد نسخ ShoesERP احتياطية في Google Drive الخاص بك',
+    'backup_drive_success':
+        'تم رفع النسخة الاحتياطية إلى Google Drive الخاص بك',
+    'backup_drive_none':
+        'لا توجد نسخ ShoesERP احتياطية في Google Drive الخاص بك',
+    'backup_drive_error':
+        'Google Drive غير مهيأ أو لم تتم الموافقة على التفويض. تواصل مع المسؤول.',
     'backup_restore_scope_denied':
         'الاستعادة محدودة بمساحة عملك والمسارات المعيّنة لك حالياً',
     'backup_in_progress': 'جارٍ إنشاء النسخة الاحتياطية…',
@@ -3072,6 +3086,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'notifications': 'اطلاعات',
     'no_notifications': 'کوئی نئی اطلاع نہیں',
     'no_access': 'رسائی نہیں',
+    'no_results': 'کوئی نتائج نہیں ملے',
+    'discard': 'نظر انداز کریں',
+    'confirm_delete_user': 'کیا اس صارف کو حذف کرنا ہے؟',
+    'no_access_to_workspaces': 'آپ کو کسی ورک اسپیس تک رسائی حاصل نہیں۔',
     'new_order_notif': 'نیا آرڈر',
     'approval_needed': 'منظوری درکار',
     'mark_all_read': 'سب پڑھا ہوا نشان لگائیں',
@@ -3797,6 +3815,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'restore_from_google_drive': 'Google Drive سے ریسٹور کریں',
     'backup_drive_success': 'بیک اپ آپ کے Google Drive پر اپ لوڈ ہو گیا',
     'backup_drive_none': 'آپ کے Google Drive میں ShoesERP بیک اپ نہیں ملا',
+    'backup_drive_error':
+        'Google Drive کنفیگر نہیں ہے یا اجازت نہیں دی گئی۔ ایڈمن سے رابطہ کریں۔',
     'backup_restore_scope_denied':
         'ری اسٹور صرف آپ کی ورک اسپیس اور موجودہ مقررہ روٹس تک محدود ہے',
     'backup_in_progress': 'بیک اپ بنایا جا رہا ہے…',

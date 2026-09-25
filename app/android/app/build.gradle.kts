@@ -24,7 +24,7 @@ fun computeAndroidVersionCode(versionName: String, buildNumber: Int): Int {
 
 android {
     namespace = "footwear.pk.com"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -40,7 +40,7 @@ android {
     defaultConfig {
         applicationId = "footwear.pk.com"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 36
         versionCode = computeAndroidVersionCode(flutter.versionName, flutter.versionCode)
         versionName = flutter.versionName
     }

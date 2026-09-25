@@ -360,8 +360,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
         'app_version': AppBrand.versionDisplay,
         'created_at': DateTime.now().toUtc().toIso8601String(),
         'created_by_uid': adminUser.id,
-        'tenant_id':
-            tenantScopeId,
+        'tenant_id': tenantScopeId,
         'scope': adminUser.isSeller ? 'seller_routes' : 'workspace',
         'route_ids': adminUser.isSeller
             ? List<String>.from(adminUser.assignedRouteIds)
@@ -398,7 +397,9 @@ class DatabaseBackupNotifier extends Notifier<void> {
       throw StateError('Select a workspace before uploading a backup');
     }
     if (preview.tenantId != tenantId) {
-      throw StateError('Backup workspace does not match the selected workspace');
+      throw StateError(
+        'Backup workspace does not match the selected workspace',
+      );
     }
     final checksum = preview.rawData.isEmpty ? '' : _checksum(preview.rawData);
     return GoogleDriveBackupService.upload(
@@ -531,9 +532,9 @@ class DatabaseBackupNotifier extends Notifier<void> {
             routeId: selectedRouteId,
             documents: documents,
           );
-      await _recordRestoreNow(user.displayName.trim().isNotEmpty
-          ? user.displayName
-          : adminName);
+      await _recordRestoreNow(
+        user.displayName.trim().isNotEmpty ? user.displayName : adminName,
+      );
       return restored;
     }
     if (!user.isAdmin) {
@@ -587,6 +588,8 @@ class DatabaseBackupNotifier extends Notifier<void> {
   /// Checks whether an auto-backup is due; if so, runs it silently.
   /// Returns null if the interval has not elapsed or auto is disabled.
   Future<({Uint8List bytes, String localPath})?> checkAndAutoBackup() async {
+    final user = await ref.read(authUserProvider.future);
+    if (user == null || !user.active || user.isSuperAdmin) return null;
     final enabled = await getAutoEnabled();
     if (!enabled) return null;
     final intervalDays = await getIntervalDays();
@@ -595,7 +598,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
         DateTime.now().difference(lastAt).inDays < intervalDays) {
       return null;
     }
-    return createBackup(
+    final result = await createBackup(
       selected: const {
         'routes',
         'shops',
@@ -605,6 +608,11 @@ class DatabaseBackupNotifier extends Notifier<void> {
         'invoices',
       },
     );
+    await uploadBackupToDrive(
+      bytes: result.bytes,
+      fileName: result.localPath.split(Platform.pathSeparator).last,
+    );
+    return result;
   }
 }
 

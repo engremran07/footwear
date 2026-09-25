@@ -309,8 +309,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
 
     // 5 — execute restore
     final adminName = user.displayName.isNotEmpty
-      ? user.displayName
-      : (user.email.isNotEmpty ? user.email : 'admin');
+        ? user.displayName
+        : (user.email.isNotEmpty ? user.email : 'admin');
 
     setState(() => _restoring = true);
     try {
@@ -611,7 +611,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: DropdownButtonFormField<String>(
-                            initialValue: _selectedWorkspaceId ??
+                            initialValue:
+                                _selectedWorkspaceId ??
                                 (tenants.isNotEmpty ? tenants.first.id : null),
                             decoration: InputDecoration(
                               labelText: tr('workspaces', ref),
@@ -627,8 +628,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                             onChanged: tenants.isEmpty
                                 ? null
                                 : (value) => setState(
-                                      () => _selectedWorkspaceId = value,
-                                    ),
+                                    () => _selectedWorkspaceId = value,
+                                  ),
                           ),
                         ),
                       ),

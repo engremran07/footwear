@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
@@ -36,9 +37,16 @@ class GoogleDriveBackupService {
   static Future<void>? _initializeFuture;
 
   static Future<void> _initialize() {
+    final clientId = _configuredValue('GOOGLE_DRIVE_CLIENT_ID');
+    final serverClientId = _configuredValue('GOOGLE_DRIVE_SERVER_CLIENT_ID');
+    if (kIsWeb && clientId == null) {
+      throw StateError(
+        'Google Drive web OAuth is not configured. Set GOOGLE_DRIVE_CLIENT_ID.',
+      );
+    }
     return _initializeFuture ??= GoogleSignIn.instance.initialize(
-      clientId: _configuredValue('GOOGLE_DRIVE_CLIENT_ID'),
-      serverClientId: _configuredValue('GOOGLE_DRIVE_SERVER_CLIENT_ID'),
+      clientId: clientId,
+      serverClientId: serverClientId,
     );
   }
 
@@ -207,26 +215,27 @@ class GoogleDriveBackupService {
       createdAt: DateTime.tryParse(json['createdTime'] as String? ?? ''),
       size: int.tryParse(json['size'] as String? ?? '') ?? 0,
       tenantId:
-        ((json['appProperties'] as Map<String, dynamic>?)?['tenant_id']
-          as String?) ??
-        '',
+          ((json['appProperties'] as Map<String, dynamic>?)?['tenant_id']
+              as String?) ??
+          '',
       createdBy:
-        ((json['appProperties'] as Map<String, dynamic>?)?['created_by']
-          as String?) ??
-        '',
+          ((json['appProperties'] as Map<String, dynamic>?)?['created_by']
+              as String?) ??
+          '',
       scope:
-        ((json['appProperties'] as Map<String, dynamic>?)?['scope']
-          as String?) ??
-        'unknown',
-      routeIds: ((json['appProperties'] as Map<String, dynamic>?)?['route_ids']
-          as String? ??
-        '')
-        .split(',')
-        .where((id) => id.isNotEmpty)
-        .toList(),
+          ((json['appProperties'] as Map<String, dynamic>?)?['scope']
+              as String?) ??
+          'unknown',
+      routeIds:
+          ((json['appProperties'] as Map<String, dynamic>?)?['route_ids']
+                      as String? ??
+                  '')
+              .split(',')
+              .where((id) => id.isNotEmpty)
+              .toList(),
     );
   }
 
-    static String _escapeQueryValue(String value) =>
+  static String _escapeQueryValue(String value) =>
       value.replaceAll(r'\', r'\\').replaceAll("'", r"\'");
 }

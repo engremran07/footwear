@@ -117,10 +117,21 @@ jobs:
         run: cd app && flutter test -r expanded
 
       - name: Build web
-        run: cd app && flutter build web --release
+        env:
+          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_SERVER_CLIENT_ID }}
+        run: |
+          test -n "$GOOGLE_DRIVE_CLIENT_ID" || { echo "Missing GOOGLE_DRIVE_CLIENT_ID secret"; exit 1; }
+          cd app && flutter build web --release \
+            --dart-define=GOOGLE_DRIVE_CLIENT_ID="$GOOGLE_DRIVE_CLIENT_ID" \
+            --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID"
 
       - name: Build release APK (split-per-abi)
-        run: cd app && flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
+        env:
+          GOOGLE_DRIVE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_SERVER_CLIENT_ID }}
+        run: cd app && flutter build apk --release --split-per-abi \
+          --dart-define=USE_PLAY_INTEGRITY=true \
+          --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID"
 
       - name: APK size gate
         run: |

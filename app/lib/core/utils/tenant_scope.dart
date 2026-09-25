@@ -36,13 +36,21 @@ class TenantScope {
 
   static bool matchesTenant(Map<String, dynamic>? data, String? tenantId) {
     final expectedTenantId = normalize(tenantId);
-    if (expectedTenantId == null) {
-      final docTenantId = normalize(data?['tenant_id'] as String?);
-      return docTenantId == null || docTenantId == globalTenantId;
-    }
     final docTenantId = normalize(data?['tenant_id'] as String?);
+
+    // No tenant filter means the caller is effectively global/super-admin and may
+    // read across tenant-scoped documents. This preserves cross-workspace admin
+    // views while still allowing tenant-scoped isolation for regular users.
+    if (expectedTenantId == null) {
+      return true;
+    }
+
+    if (docTenantId == null) {
+      return expectedTenantId == globalTenantId;
+    }
+
     return docTenantId == expectedTenantId ||
-        (expectedTenantId == globalTenantId && docTenantId == null);
+        (expectedTenantId == globalTenantId && docTenantId == globalTenantId);
   }
 
   static Query<Map<String, dynamic>> applyToQuery(

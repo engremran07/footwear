@@ -110,7 +110,9 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
 
     final workspaceList = workspaces.value ?? const <dynamic>[];
     final userList = users.value ?? const <UserModel>[];
-    final activeWorkspaces = workspaceList.where((w) => w.active == true).length;
+    final activeWorkspaces = workspaceList
+        .where((w) => w.active == true)
+        .length;
     final stats = DashboardStats(
       totalWorkspaces: workspaceList.length,
       activeWorkspaces: activeWorkspaces,
@@ -187,13 +189,9 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
   for (final shop in shopList) {
     final cur = routeCurrencyMap[shop.routeId] ?? 'SAR';
     currencyShopCount[cur] = (currencyShopCount[cur] ?? 0) + 1;
-    currencyOutstanding[cur] =
-        (currencyOutstanding[cur] ?? 0) + shop.balance;
+    currencyOutstanding[cur] = (currencyOutstanding[cur] ?? 0) + shop.balance;
   }
-  final allCurrencies = {
-    ...currencyRouteCount.keys,
-    ...currencyShopCount.keys,
-  };
+  final allCurrencies = {...currencyRouteCount.keys, ...currencyShopCount.keys};
   final cStats = <String, CurrencyStats>{};
   for (final c in allCurrencies) {
     cStats[c] = CurrencyStats(

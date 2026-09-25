@@ -50,7 +50,14 @@ jobs:
         run: cd app && flutter test -r expanded
 
       - name: Build web release
-        run: cd app && flutter build web --release
+        env:
+          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_SERVER_CLIENT_ID }}
+        run: |
+          test -n "$GOOGLE_DRIVE_CLIENT_ID" || { echo "Missing GOOGLE_DRIVE_CLIENT_ID secret"; exit 1; }
+          cd app && flutter build web --release \
+            --dart-define=GOOGLE_DRIVE_CLIENT_ID="$GOOGLE_DRIVE_CLIENT_ID" \
+            --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID"
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
