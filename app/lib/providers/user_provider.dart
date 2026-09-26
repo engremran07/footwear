@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
-import '../core/services/admin_identity_service.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
 import '../firebase_options.dart';
@@ -161,6 +160,12 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     if (!await _isCurrentUserAdmin()) {
       throw StateError('Admin privileges required');
     }
+    final profile = await ref.read(authUserProvider.future);
+    if (profile?.isSuperAdmin == true && profile?.tenantId == null) {
+      throw StateError(
+        'Select a workspace support context before managing users.',
+      );
+    }
     return adminUid;
   }
 
@@ -182,6 +187,11 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final normalizedRole = _normalizeRole(role);
+      if (normalizedRole == 'super_admin') {
+        throw StateError(
+          'Platform super-admin accounts require trusted out-of-band provisioning.',
+        );
+      }
       if (actingUser.isTenantAdmin && normalizedRole != 'seller') {
         throw StateError('Workspace admins can create seller accounts only');
       }
@@ -315,6 +325,11 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     }
     if (updateData['role'] is String) {
       updateData['role'] = _normalizeRole(updateData['role'] as String);
+      if (updateData['role'] == 'super_admin') {
+        throw StateError(
+          'Platform super-admin roles cannot be granted from the client.',
+        );
+      }
     }
 
     if (actingUser.isTenantAdmin) {
@@ -400,72 +415,6 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         });
       }
     }
-
-    await batch.commit();
-  }
-
-  Future<void> transferUserToWorkspace({
-    required String uid,
-    required String targetTenantId,
-  }) async {
-    final trimmedUid = uid.trim();
-    final normalizedTarget = TenantScope.normalize(targetTenantId);
-    if (trimmedUid.isEmpty ||
-        normalizedTarget == null ||
-        normalizedTarget.isEmpty) {
-      throw ArgumentError('A valid target workspace is required.');
-    }
-
-    final actingUser = FirebaseAuth.instance.currentUser;
-    if (actingUser == null) {
-      throw StateError('No authenticated user found');
-    }
-
-    final db = FirebaseFirestore.instance;
-    final actingSnap = await db
-        .collection(Collections.users)
-        .doc(actingUser.uid)
-        .get();
-    if (!actingSnap.exists) {
-      throw StateError('Acting user profile not found.');
-    }
-
-    final actingUserModel = UserModel.fromJson(
-      actingSnap.data()!,
-      actingSnap.id,
-    );
-    if (!canManageUserAccountsRole(
-      roleValueFromUserRole(actingUserModel.role),
-    )) {
-      throw StateError(
-        'Only workspace managers can move users between workspaces.',
-      );
-    }
-
-    final currentTenant = TenantScope.normalize(
-      (await db.collection(Collections.users).doc(trimmedUid).get())
-              .data()?['tenant_id']
-          as String?,
-    );
-
-    if (!actingUserModel.isSuperAdmin) {
-      final actingTenant = TenantScope.normalize(actingUserModel.tenantId);
-      if (actingTenant == null || actingTenant != normalizedTarget) {
-        throw StateError(
-          'You can only move users within your current workspace.',
-        );
-      }
-    }
-
-    if (currentTenant == normalizedTarget) {
-      return;
-    }
-
-    final batch = db.batch();
-    batch.update(db.collection(Collections.users).doc(trimmedUid), {
-      'tenant_id': normalizedTarget,
-      'updated_at': Timestamp.now(),
-    });
 
     await batch.commit();
   }
@@ -586,10 +535,22 @@ class UserManagementNotifier extends AsyncNotifier<void> {
   ///
   /// Guard: only inactive users can be hard-deleted; admin cannot delete self.
   Future<void> hardDeleteUser(String uid, String currentAdminUid) async {
-    final adminUid = await _requireAdminUid();
+    final authUid = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
+    final actor = await ref.read(authUserProvider.future);
+    final tenantId = TenantScope.normalize(actor?.tenantId);
+    if (authUid.isEmpty ||
+        authUid != currentAdminUid.trim() ||
+        actor == null ||
+        !actor.active ||
+        !actor.isSuperAdmin ||
+        tenantId == null) {
+      throw StateError(
+        'Only a super-admin in an active workspace may permanently delete users',
+      );
+    }
     final trimmedUid = uid.trim();
     if (trimmedUid.isEmpty) throw ArgumentError('uid must not be empty');
-    if (trimmedUid == adminUid || trimmedUid == currentAdminUid.trim()) {
+    if (trimmedUid == authUid) {
       throw ArgumentError('Admin cannot delete their own account.');
     }
 
@@ -599,6 +560,11 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         .doc(trimmedUid)
         .get();
     if (!userSnap.exists) throw ArgumentError('User not found: $trimmedUid');
+
+    if (TenantScope.normalize(userSnap.data()?['tenant_id'] as String?) !=
+        tenantId) {
+      throw StateError('User profile is outside the active workspace');
+    }
 
     final isActive = userSnap.data()?['active'] as bool? ?? true;
     if (isActive) {
@@ -649,110 +615,6 @@ class UserManagementNotifier extends AsyncNotifier<void> {
 
     await currentUser.reauthenticateWithCredential(credential);
     await currentUser.updatePassword(trimmedNew);
-  }
-
-  // ── Admin 4-Way Sync Auth Pipeline ───────────────────────────────────────
-
-  FirebaseAuthException _mapAdminIdentityError(Object error) {
-    final msg = error.toString();
-    final lower = msg.toLowerCase();
-    if (lower.contains('sa credentials not provisioned')) {
-      return FirebaseAuthException(
-        code: 'operation-not-allowed',
-        message:
-            'Admin credentials are not configured. Contact system administrator.',
-      );
-    }
-    if (lower.contains('timeout') || lower.contains('timed out')) {
-      return FirebaseAuthException(
-        code: 'network-request-failed',
-        message: 'Admin identity service request timed out.',
-      );
-    }
-    return FirebaseAuthException(code: 'operation-not-allowed', message: msg);
-  }
-
-  /// Admin-only: Update email, password, and/or emailVerified for ANY user.
-  ///
-  /// 4-way sync:
-  ///   1. Firebase Auth  → AdminIdentityService (SA JWT → OAuth2 → REST API)
-  ///   2. Firestore      → atomic doc update (email + email_verified fields)
-  ///   3. Riverpod       → allUsersProvider / authUserProvider streams auto-fire
-  ///   4. UI             → re-renders from Riverpod state (no manual refresh needed)
-  ///
-  /// Admin self-email changes are synced the same way — the Riverpod authUserProvider
-  /// stream picks up the Firestore change and the profile re-renders automatically.
-  Future<void> adminUpdateUserAuth({
-    required String uid,
-    String? newEmail,
-    String? newPassword,
-    bool? emailVerified,
-  }) async {
-    await _requireAdminUid();
-    final trimmedEmail = newEmail?.trim().toLowerCase();
-    final trimmedPassword = newPassword?.trim();
-
-    final hasEmailChange = trimmedEmail != null && trimmedEmail.isNotEmpty;
-    final hasPasswordChange =
-        trimmedPassword != null && trimmedPassword.isNotEmpty;
-
-    if (hasPasswordChange && trimmedPassword.length < 8) {
-      throw FirebaseAuthException(
-        code: 'weak-password',
-        message: 'Password is too weak. Use at least 8 characters.',
-      );
-    }
-
-    if (!hasEmailChange && !hasPasswordChange && emailVerified == null) return;
-
-    // Step 1: Update Firebase Auth via SA OAuth2 (Identity Toolkit admin API)
-    try {
-      await AdminIdentityService.instance.updateAuthUser(
-        uid: uid,
-        email: hasEmailChange ? trimmedEmail : null,
-        password: hasPasswordChange ? trimmedPassword : null,
-        // New email → mark unverified; explicit override allowed
-        emailVerified: hasEmailChange ? false : emailVerified,
-      );
-    } catch (e) {
-      throw _mapAdminIdentityError(e);
-    }
-
-    // Step 2: Sync Firestore (only changed fields — keeps batch minimal)
-    final fsUpdate = <String, dynamic>{'updated_at': Timestamp.now()};
-    if (hasEmailChange) {
-      fsUpdate['email'] = trimmedEmail;
-      fsUpdate['email_verified'] = false; // new email, needs re-verification
-    }
-    if (!hasEmailChange && emailVerified != null) {
-      fsUpdate['email_verified'] = emailVerified;
-    }
-
-    await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(uid)
-        .update(fsUpdate);
-    // Steps 3+4: Riverpod allUsersProvider / authUserProvider are real-time
-    // Firestore streams → auto-fire on doc change → UI re-renders.
-  }
-
-  /// Admin-only: Send email verification to any user.
-  /// Requires both [uid] and [email] — see AdminIdentityService for 3-step flow.
-  Future<void> adminSendVerificationEmail(String uid, String email) async {
-    await _requireAdminUid();
-    try {
-      await AdminIdentityService.instance.sendVerificationEmail(
-        uid,
-        email.trim().toLowerCase(),
-      );
-    } catch (e) {
-      throw _mapAdminIdentityError(e);
-    }
-  }
-
-  /// Admin-only: Explicitly mark a user's email as verified in Auth + Firestore.
-  Future<void> adminMarkEmailVerified(String uid) async {
-    await adminUpdateUserAuth(uid: uid, emailVerified: true);
   }
 }
 

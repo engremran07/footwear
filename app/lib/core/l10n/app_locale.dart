@@ -96,6 +96,19 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'discard': 'Discard',
     'confirm_delete_user': 'Delete this user?',
     'no_access_to_workspaces': 'You do not have access to any workspace.',
+    'select_workspace': 'Select workspace',
+    'access_workspace': 'Access workspace',
+    'end_workspace_access': 'End workspace access',
+    'workspace_access_reason': 'Reason for access',
+    'workspace_access_reason_hint': 'Enter a support or operational reason',
+    'workspace_access_active': 'Workspace support access is active',
+    'credentials_owner_managed':
+        'The account owner manages email and password changes.',
+    'send_password_reset': 'Send password reset email',
+    'change_email': 'Change email',
+    'new_email': 'New email address',
+    'email_change_verification_sent':
+        'A verification link was sent to the new address.',
     'copy_link': 'Copy Link',
     'required': 'Required',
     'submit': 'Submit',
@@ -159,7 +172,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'forgot_password': 'Forgot Password?',
     'enter_email_to_reset': 'Enter your email to receive a reset link.',
     'login_reset_email_hint':
-        'You can enter either your username or your email address.',
+        'Enter the email address registered to your account.',
     'confirm_delete_transaction':
         'Delete this transaction and reverse the balance change?',
     'seller_edit_cash_only': 'Seller can edit only cash in/out transactions.',
@@ -222,9 +235,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Auth ──
     'email': 'Email',
-    'username_or_email': 'Username or Email',
+    'username_or_email': 'Email',
     'password': 'Password',
-    'username_required': 'Username or email is required',
+    'username_required': 'Email is required',
 
     // ── Navigation ──
     'dashboard': 'Dashboard',
@@ -1371,6 +1384,19 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'refresh': 'تحديث',
     'retry': 'إعادة المحاولة',
     'no_results_found': 'لم يتم العثور على نتائج',
+    'select_workspace': 'اختر مساحة العمل',
+    'access_workspace': 'دخول مساحة العمل',
+    'end_workspace_access': 'إنهاء الوصول لمساحة العمل',
+    'workspace_access_reason': 'سبب الوصول',
+    'workspace_access_reason_hint': 'أدخل سبب الدعم أو العملية',
+    'workspace_access_active': 'وصول دعم مساحة العمل نشط',
+    'credentials_owner_managed':
+        'يدير مالك الحساب تغييرات البريد وكلمة المرور.',
+    'send_password_reset': 'إرسال بريد إعادة تعيين كلمة المرور',
+    'change_email': 'تغيير البريد الإلكتروني',
+    'new_email': 'البريد الإلكتروني الجديد',
+    'email_change_verification_sent':
+        'تم إرسال رابط التحقق إلى العنوان الجديد.',
     'copy_link': 'نسخ الرابط',
     'required': 'مطلوب',
     'submit': 'إرسال',
@@ -1493,9 +1519,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Auth ──
     'email': 'البريد الإلكتروني',
-    'username_or_email': 'اسم المستخدم أو البريد الإلكتروني',
+    'username_or_email': 'البريد الإلكتروني',
     'password': 'كلمة المرور',
-    'username_required': 'اسم المستخدم أو البريد الإلكتروني مطلوب',
+    'username_required': 'البريد الإلكتروني مطلوب',
 
     // ── Navigation ──
     'dashboard': 'لوحة التحكم',
@@ -2636,6 +2662,18 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'refresh': 'تازہ کاری',
     'retry': 'دوبارہ کوشش',
     'no_results_found': 'کوئی نتائج نہیں ملے',
+    'select_workspace': 'ورک اسپیس منتخب کریں',
+    'access_workspace': 'ورک اسپیس کھولیں',
+    'end_workspace_access': 'ورک اسپیس رسائی ختم کریں',
+    'workspace_access_reason': 'رسائی کی وجہ',
+    'workspace_access_reason_hint': 'سپورٹ یا عملی وجہ درج کریں',
+    'workspace_access_active': 'ورک اسپیس سپورٹ رسائی فعال ہے',
+    'credentials_owner_managed':
+        'اکاؤنٹ کا مالک ای میل اور پاس ورڈ کی تبدیلی خود کرتا ہے۔',
+    'send_password_reset': 'پاس ورڈ ری سیٹ ای میل بھیجیں',
+    'change_email': 'ای میل تبدیل کریں',
+    'new_email': 'نیا ای میل پتہ',
+    'email_change_verification_sent': 'نئے پتے پر تصدیقی لنک بھیج دیا گیا ہے۔',
     'copy_link': 'لنک کاپی کریں',
     'required': 'ضروری',
     'submit': 'جمع کرائیں',
@@ -2763,9 +2801,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Auth ──
     'email': 'ای میل',
-    'username_or_email': 'صارف نام یا ای میل',
+    'username_or_email': 'ای میل',
     'password': 'پاس ورڈ',
-    'username_required': 'صارف نام یا ای میل ضروری ہے',
+    'username_required': 'ای میل ضروری ہے',
 
     // ── Navigation ──
     'dashboard': 'ڈیش بورڈ',

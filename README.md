@@ -151,7 +151,9 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 
 - The `tenants` collection stores workspace metadata, plan flags, owner user, and device-pairing policy.
 - Every tenant-scoped business document (`users`, `routes`, `customers`/`shops`, `products`, `seller_inventory`, `transactions`, `invoices`, etc.) must carry `tenant_id`.
-- `tenant_admin` is scoped to a single tenant; `super_admin` is the global SaaS operator.
+- `tenant_admin` is scoped to a single tenant. `super_admin` is a platform operator and sees workspace metadata globally, but sees no workspace business records by default.
+- Super-admin business support requires selecting one active workspace and entering a reason; the app records access start/end in append-only `platform_access_logs`. Firestore rules enforce the selected workspace regardless of client navigation.
+- Platform super-admin accounts cannot be created or promoted from the client. Arbitrary-user Firebase Auth administration is not performed with client-held service-account keys; admins send password-reset email and account owners complete credential changes themselves.
 - `TenantScope` in `app/lib/core/utils/tenant_scope.dart` is the canonical helper for query and write gating.
 - `__global__` is reserved for global/system documents only.
 
@@ -159,7 +161,7 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 
 1. Use `TenantScope.applyToQuery(..., tenantId: ...)` for every business collection query.
 2. Use `TenantScope.applyToData(..., tenantId: ...)` or explicit `tenant_id` on every tenant-scoped write.
-3. Keep `tenant_admin` tenant-scoped and reserve `super_admin` for global access.
+3. Keep `tenant_admin` tenant-scoped. Keep `super_admin` platform-only unless an explicit, reasoned workspace support context is active.
 4. Use `Collections.tenants` for workspace documents; avoid hardcoded `tenants` collection strings.
 5. Verify Firestore rules enforce tenant ownership for each tenant-scoped collection.
 6. Treat shops as `Collections.shops` (`customers` collection alias) with tenant partitioning, not as a separate customer model.

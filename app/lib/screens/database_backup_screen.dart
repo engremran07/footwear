@@ -32,11 +32,10 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   bool _loadingPrefs = true;
   bool _loading = false; // backup creation in progress
   bool _restoring = false; // restore in progress
-  String? _selectedWorkspaceId;
 
   // ── prefs state ───────────────────────────────────────────────────────────
   bool _autoEnabled = false;
-  int _intervalDays = 7;
+  int _intervalMinutes = 1440;
   DateTime? _lastBackupAt;
   DateTime? _lastRestoreAt;
   String? _lastRestoreBy;
@@ -62,14 +61,14 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   Future<void> _loadPrefs() async {
     final n = ref.read(databaseBackupProvider.notifier);
     final auto = await n.getAutoEnabled();
-    final interval = await n.getIntervalDays();
+    final interval = await n.getIntervalMinutes();
     final lastBackup = await n.getLastBackupAt();
     final lastRestore = await n.getLastRestoreAt();
     final lastRestoreBy = await n.getLastRestoreBy();
     if (mounted) {
       setState(() {
         _autoEnabled = auto;
-        _intervalDays = interval;
+        _intervalMinutes = interval;
         _lastBackupAt = lastBackup;
         _lastRestoreAt = lastRestore;
         _lastRestoreBy = lastRestoreBy;
@@ -80,6 +79,76 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
 
   String _fmt(DateTime dt) => _dateFmt.format(dt.toLocal());
 
+  Future<String?> _requestBackupPassphrase({
+    required bool confirmPassphrase,
+  }) async {
+    final passwordC = TextEditingController();
+    final confirmationC = TextEditingController();
+    String? errorText;
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(tr('backup_encryption_title', ref)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(tr('backup_encryption_hint', ref)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordC,
+                autofocus: true,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: tr('backup_passphrase', ref),
+                  errorText: errorText,
+                ),
+              ),
+              if (confirmPassphrase) ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: confirmationC,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: tr('backup_passphrase_confirm', ref),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(tr('cancel', ref)),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (passwordC.text.trim().length < 12) {
+                  setDialogState(
+                    () => errorText = tr('backup_passphrase_too_short', ref),
+                  );
+                  return;
+                }
+                if (confirmPassphrase && passwordC.text != confirmationC.text) {
+                  setDialogState(
+                    () => errorText = tr('backup_passphrase_mismatch', ref),
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext, passwordC.text);
+              },
+              child: Text(tr('backup_restore_proceed', ref)),
+            ),
+          ],
+        ),
+      ),
+    );
+    passwordC.dispose();
+    confirmationC.dispose();
+    return result;
+  }
+
   // ── Backup ─────────────────────────────────────────────────────────────────
 
   Future<void> _doBackup() async {
@@ -87,12 +156,15 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     final user = await ref.read(authUserProvider.future);
     if (user == null) return;
     final workspaceId = _workspaceIdFor(user);
+    final passphrase = await _requestBackupPassphrase(confirmPassphrase: true);
+    if (passphrase == null || !mounted) return;
     setState(() => _loading = true);
     try {
       final result = await ref
           .read(databaseBackupProvider.notifier)
           .createBackup(
             selected: Set.unmodifiable(_selected),
+            encryptionPassword: passphrase,
             tenantIdOverride: workspaceId,
           );
       if (!mounted) return;
@@ -121,16 +193,20 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     final user = await ref.read(authUserProvider.future);
     if (user == null) return;
     final workspaceId = _workspaceIdFor(user);
+    final passphrase = await _requestBackupPassphrase(confirmPassphrase: false);
+    if (passphrase == null || !mounted) return;
     setState(() => _loading = true);
     try {
       final notifier = ref.read(databaseBackupProvider.notifier);
       final result = await notifier.createBackup(
         selected: Set.unmodifiable(_selected),
+        encryptionPassword: passphrase,
         tenantIdOverride: workspaceId,
       );
       await notifier.uploadBackupToDrive(
         bytes: result.bytes,
         fileName: result.localPath.split('/').last.split('\\').last,
+        encryptionPassword: passphrase,
         tenantIdOverride: workspaceId,
       );
       if (!mounted) return;
@@ -154,6 +230,12 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     final user = await ref.read(authUserProvider.future);
     if (!mounted) return;
     if (user == null || !user.active) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
+      return;
+    }
+    if (!user.isSuperAdmin && !user.isSeller) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
@@ -243,11 +325,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   }
 
   String? _workspaceIdFor(UserModel user) {
-    final ownTenantId = TenantScope.normalize(user.tenantId);
-    if (!user.isSuperAdmin) return ownTenantId;
-    if (_selectedWorkspaceId != null) return _selectedWorkspaceId;
-    final tenants = ref.read(tenantsProvider).value ?? const [];
-    return tenants.isEmpty ? null : tenants.first.id;
+    return TenantScope.normalize(user.tenantId);
   }
 
   // ── Restore ────────────────────────────────────────────────────────────────
@@ -261,14 +339,24 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
       return;
     }
+    if (!user.isSuperAdmin && !user.isSeller) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
+      return;
+    }
     String? selectedRouteId;
     if (user.isSeller) {
       selectedRouteId = await _chooseRestoreRoute(user);
       if (selectedRouteId == null || !mounted) return;
     }
+    final workspaceId = _workspaceIdFor(user);
     final backups = await ref
         .read(databaseBackupProvider.notifier)
-        .listLocalBackups();
+        .listLocalBackups(
+          tenantId: workspaceId ?? TenantScope.globalTenantId,
+          creatorUid: user.id,
+        );
     if (!mounted) return;
 
     if (backups.isEmpty) {
@@ -557,8 +645,13 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   }
 
   Future<void> _setInterval(int days) async {
-    await ref.read(databaseBackupProvider.notifier).setIntervalDays(days);
-    setState(() => _intervalDays = days);
+    final minutes = days * 24 * 60;
+    await ref
+        .read(databaseBackupProvider.notifier)
+        .setIntervalMinutes(minutes);
+    setState(() {
+      _intervalMinutes = minutes;
+    });
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -567,6 +660,13 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).value;
     final tenants = ref.watch(tenantsProvider).value ?? const [];
+    final activeTenantId = TenantScope.normalize(user?.tenantId);
+    final activeTenantMatches = tenants
+        .where((tenant) => tenant.id == activeTenantId)
+        .toList();
+    final activeTenantName = activeTenantMatches.isEmpty
+        ? activeTenantId
+        : activeTenantMatches.first.name;
     final isActive = user?.active ?? false;
 
     return Stack(
@@ -608,29 +708,10 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
 
                     if (user?.isSuperAdmin == true) ...[
                       Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: DropdownButtonFormField<String>(
-                            initialValue:
-                                _selectedWorkspaceId ??
-                                (tenants.isNotEmpty ? tenants.first.id : null),
-                            decoration: InputDecoration(
-                              labelText: tr('workspaces', ref),
-                            ),
-                            items: tenants
-                                .map(
-                                  (tenant) => DropdownMenuItem<String>(
-                                    value: tenant.id,
-                                    child: Text(tenant.name),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: tenants.isEmpty
-                                ? null
-                                : (value) => setState(
-                                    () => _selectedWorkspaceId = value,
-                                  ),
-                          ),
+                        child: ListTile(
+                          leading: const Icon(Icons.domain_outlined),
+                          title: Text(tr('workspace_access_active', ref)),
+                          subtitle: Text(activeTenantName ?? ''),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -663,7 +744,9 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                               ListTile(
                                 title: Text(tr('backup_interval', ref)),
                                 trailing: DropdownButton<int>(
-                                  value: _intervalDays,
+                                  value: (_intervalMinutes / 24 / 60)
+                                      .round()
+                                      .clamp(1, 30),
                                   underline: const SizedBox.shrink(),
                                   onChanged: (v) {
                                     if (v != null) _setInterval(v);
@@ -794,81 +877,96 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                     ),
                     const SizedBox(height: 32),
 
-                    // ── Restore section ──────────────────────────────
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.restore,
-                          color: AppBrand.warningColor,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                tr('backup_restore', ref),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppBrand.warningColor,
-                                ),
-                              ),
-                              Text(
-                                tr('backup_restore_subtitle', ref),
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: AppBrand.stockColor),
-                              ),
-                            ],
+                    if (user?.isSuperAdmin == true ||
+                        user?.isSeller == true) ...[
+                      // ── Restore section ──────────────────────────────
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.restore,
+                            color: AppBrand.warningColor,
+                            size: 22,
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _restoring ? null : _pickAndRestore,
-                      icon: _restoring
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(
-                              Icons.folder_open_outlined,
-                              color: AppBrand.errorColor,
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  tr('backup_restore', ref),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppBrand.warningColor,
+                                  ),
+                                ),
+                                Text(
+                                  tr('backup_restore_subtitle', ref),
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: AppBrand.stockColor),
+                                ),
+                              ],
                             ),
-                      label: Text(
-                        _restoring
-                            ? tr('backup_restore_in_progress', ref)
-                            : tr('backup_restore', ref),
-                        style: const TextStyle(color: AppBrand.errorColor),
+                          ),
+                        ],
                       ),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppBrand.errorColor),
-                        minimumSize: const Size.fromHeight(48),
-                      ),
-                    ),
-                    if (user?.active == true) ...[
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       OutlinedButton.icon(
-                        onPressed: _restoring ? null : _pickAndRestoreFromDrive,
-                        icon: const Icon(Icons.cloud_download_outlined),
-                        label: Text(tr('restore_from_google_drive', ref)),
+                        onPressed: _restoring ? null : _pickAndRestore,
+                        icon: _restoring
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.folder_open_outlined,
+                                color: AppBrand.errorColor,
+                              ),
+                        label: Text(
+                          _restoring
+                              ? tr('backup_restore_in_progress', ref)
+                              : tr('backup_restore', ref),
+                          style: const TextStyle(color: AppBrand.errorColor),
+                        ),
                         style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppBrand.errorColor),
                           minimumSize: const Size.fromHeight(48),
                         ),
                       ),
-                    ],
-                    const SizedBox(height: 8),
-                    Text(
-                      'For cross-device or emergency recovery, use dev_restore.js '
-                      'with Firebase Admin SDK.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppBrand.stockColor,
+                      if (user?.active == true) ...[
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed: _restoring
+                              ? null
+                              : _pickAndRestoreFromDrive,
+                          icon: const Icon(Icons.cloud_download_outlined),
+                          label: Text(tr('restore_from_google_drive', ref)),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'For cross-device or emergency recovery, use dev_restore.js '
+                        'with Firebase Admin SDK.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppBrand.stockColor,
+                        ),
                       ),
-                    ),
+                    ],
+                    if (user?.isAdmin == true && user?.isSuperAdmin != true)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 24),
+                        child: Text(
+                          tr('backup_restore_scope_denied', ref),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                   ],
                 ),
         ),

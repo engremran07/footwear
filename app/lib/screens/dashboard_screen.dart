@@ -395,12 +395,20 @@ class _SuperAdminDashboard extends ConsumerWidget {
                       onTap: () => context.go('/tenants'),
                     ),
                     StatCard(
-                      title: tr('user_accounts', ref),
-                      value: s.totalUsers.toString(),
-                      icon: Icons.people,
+                      title: user.tenantId == null
+                          ? tr('select_workspace', ref)
+                          : tr('user_accounts', ref),
+                      value: user.tenantId == null
+                          ? '—'
+                          : s.totalUsers.toString(),
+                      icon: user.tenantId == null
+                          ? Icons.apartment
+                          : Icons.people,
                       color: AppBrand.secondaryColor,
                       staggerIndex: 2,
-                      onTap: () => context.go('/users'),
+                      onTap: () => context.go(
+                        user.tenantId == null ? '/tenants' : '/users',
+                      ),
                     ),
                     StatCard(
                       title: tr('spark_plan', ref),

@@ -14,6 +14,9 @@ class GoogleDriveBackupFile {
   final String createdBy;
   final String scope;
   final List<String> routeIds;
+  final String checksum;
+  final int formatVersion;
+  final bool encrypted;
 
   const GoogleDriveBackupFile({
     required this.id,
@@ -24,6 +27,9 @@ class GoogleDriveBackupFile {
     required this.createdBy,
     required this.scope,
     required this.routeIds,
+    required this.checksum,
+    required this.formatVersion,
+    required this.encrypted,
   });
 }
 
@@ -80,6 +86,7 @@ class GoogleDriveBackupService {
     required String checksum,
     required String scope,
     required List<String> routeIds,
+    required int formatVersion,
   }) async {
     final authHeaders = await _headers();
     final boundary = 'shoeserp_${DateTime.now().microsecondsSinceEpoch}';
@@ -94,6 +101,8 @@ class GoogleDriveBackupService {
           'checksum': checksum,
           'scope': scope,
           'route_ids': routeIds.join(','),
+          'format_version': formatVersion.toString(),
+          'encrypted': 'true',
         },
       }),
     );
@@ -127,7 +136,7 @@ class GoogleDriveBackupService {
 
     final response = await http.post(
       Uri.parse(
-        '$_driveUploadUri?uploadType=multipart&fields=id,name,createdTime,size',
+        '$_driveUploadUri?uploadType=multipart&fields=id,name,createdTime,size,appProperties',
       ),
       headers: {
         ...authHeaders,
@@ -233,6 +242,21 @@ class GoogleDriveBackupService {
               .split(',')
               .where((id) => id.isNotEmpty)
               .toList(),
+      checksum:
+          ((json['appProperties'] as Map<String, dynamic>?)?['checksum']
+              as String?) ??
+          '',
+      formatVersion:
+          int.tryParse(
+            ((json['appProperties'] as Map<String, dynamic>?)?['format_version']
+                    as String?) ??
+                '',
+          ) ??
+          0,
+      encrypted:
+          ((json['appProperties'] as Map<String, dynamic>?)?['encrypted']
+              as String?) ==
+          'true',
     );
   }
 

@@ -23,7 +23,6 @@ class DatabaseFlushScreen extends ConsumerStatefulWidget {
 class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
   bool _includeUsers = false;
   String? _selectedUserId;
-  String? _selectedTenantId;
   bool _flushing = false;
 
   Future<void> _executeFlush(
@@ -203,16 +202,18 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
         body: Center(child: Text(tr('permission_denied', ref))),
       );
     }
+    final tenantId = TenantScope.normalize(currentUser.tenantId);
+    if (tenantId == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(tr('danger_zone', ref))),
+        body: Center(child: Text(tr('permission_denied', ref))),
+      );
+    }
     final users = ref.watch(allUsersProvider).value ?? [];
-    final tenants = ref.watch(tenantsProvider).value ?? [];
+    final tenant = ref.watch(tenantProvider(tenantId)).value;
     final nonAdminUsers = users
         .where((u) => !u.isAdmin)
-        .where(
-          (u) =>
-              _selectedTenantId == null ||
-              TenantScope.normalize(u.tenantId) ==
-                  TenantScope.normalize(_selectedTenantId),
-        )
+        .where((u) => TenantScope.normalize(u.tenantId) == tenantId)
         .toList();
 
     return Stack(
@@ -272,33 +273,10 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
               const SizedBox(height: 16),
 
               Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: DropdownButtonFormField<String?>(
-                    initialValue: _selectedTenantId,
-                    decoration: InputDecoration(
-                      labelText: tr('flush_select_workspace', ref),
-                      isDense: true,
-                    ),
-                    items: [
-                      DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text(tr('flush_all_workspaces', ref)),
-                      ),
-                      ...tenants.map(
-                        (tenant) => DropdownMenuItem<String?>(
-                          value: tenant.id,
-                          child: Text(tenant.name),
-                        ),
-                      ),
-                    ],
-                    onChanged: _flushing
-                        ? null
-                        : (value) => setState(() {
-                            _selectedTenantId = value;
-                            _selectedUserId = null;
-                          }),
-                  ),
+                child: ListTile(
+                  leading: const Icon(Icons.domain_outlined),
+                  title: Text(tr('flush_select_workspace', ref)),
+                  subtitle: Text(tenant?.name ?? tenantId),
                 ),
               ),
 
@@ -316,7 +294,7 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
                         'flush_financial_desc',
                         () => ref
                             .read(databaseFlushProvider.notifier)
-                            .flushFinancialData(tenantId: _selectedTenantId),
+                            .flushFinancialData(tenantId: tenantId),
                       ),
                     ),
                     const Divider(height: 1, indent: 56),
@@ -328,7 +306,7 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
                         'flush_inventory_desc',
                         () => ref
                             .read(databaseFlushProvider.notifier)
-                            .flushInventory(tenantId: _selectedTenantId),
+                            .flushInventory(tenantId: tenantId),
                       ),
                     ),
                     const Divider(height: 1, indent: 56),
@@ -340,7 +318,7 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
                         'flush_shops_desc',
                         () => ref
                             .read(databaseFlushProvider.notifier)
-                            .flushShops(tenantId: _selectedTenantId),
+                            .flushShops(tenantId: tenantId),
                       ),
                     ),
                     const Divider(height: 1, indent: 56),
@@ -352,7 +330,7 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
                         'flush_routes_desc',
                         () => ref
                             .read(databaseFlushProvider.notifier)
-                            .flushRoutes(tenantId: _selectedTenantId),
+                            .flushRoutes(tenantId: tenantId),
                       ),
                     ),
                     const Divider(height: 1, indent: 56),
@@ -364,7 +342,7 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
                         'flush_products_desc',
                         () => ref
                             .read(databaseFlushProvider.notifier)
-                            .flushProducts(tenantId: _selectedTenantId),
+                            .flushProducts(tenantId: tenantId),
                       ),
                     ),
                     const Divider(height: 1, indent: 56),
@@ -376,7 +354,7 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
                         'flush_settings_desc',
                         () => ref
                             .read(databaseFlushProvider.notifier)
-                            .resetSettings(tenantId: _selectedTenantId),
+                            .resetSettings(tenantId: tenantId),
                       ),
                     ),
                   ],
@@ -439,7 +417,7 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
                                       .read(databaseFlushProvider.notifier)
                                       .flushPerUser(
                                         _selectedUserId!,
-                                        tenantId: _selectedTenantId,
+                                        tenantId: tenantId,
                                       ),
                                 ),
                           icon: const Icon(
@@ -512,7 +490,7 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
                                       .flushAll(
                                         keepAdminId: currentUser.id,
                                         includeUsers: _includeUsers,
-                                        tenantId: _selectedTenantId,
+                                        tenantId: tenantId,
                                       ),
                                 ),
                           icon: const Icon(Icons.delete_forever, size: 20),

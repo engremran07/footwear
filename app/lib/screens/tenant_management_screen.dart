@@ -92,6 +92,66 @@ class _TenantManagementScreenState
     }
   }
 
+  Future<void> _changeWorkspaceAccess(TenantModel tenant) async {
+    final currentUser = await ref.read(authUserProvider.future);
+    if (!mounted || currentUser == null || !currentUser.isSuperAdmin) return;
+    if (currentUser.activeWorkspaceId == tenant.id) {
+      try {
+        await ref.read(authNotifierProvider.notifier).endWorkspaceAccess();
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(error.toString())));
+        }
+      }
+      return;
+    }
+
+    final reasonController = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('access_workspace', ref)),
+        content: TextField(
+          controller: reasonController,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 4,
+          maxLength: 240,
+          decoration: InputDecoration(
+            labelText: tr('workspace_access_reason', ref),
+            hintText: tr('workspace_access_reason_hint', ref),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(tr('cancel', ref)),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, reasonController.text.trim()),
+            child: Text(tr('confirm', ref)),
+          ),
+        ],
+      ),
+    );
+    reasonController.dispose();
+    if (reason == null || !mounted) return;
+    try {
+      await ref
+          .read(authNotifierProvider.notifier)
+          .selectWorkspace(workspaceId: tenant.id, reason: reason);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    }
+  }
+
   Future<void> _toggleDevicePairing(UserModel user, bool enabled) async {
     final authNotifier = ref.read(authNotifierProvider.notifier);
     try {
@@ -337,67 +397,99 @@ class _TenantManagementScreenState
                       Text(
                         '${tr('admin_reset_only', ref)}: ${tenant.allowAdminResetOnly ? tr('yes', ref) : tr('no', ref)}',
                       ),
+                      if (currentUser?.isSuperAdmin == true) ...[
+                        const SizedBox(height: 12),
+                        if (currentUser?.activeWorkspaceId == tenant.id &&
+                            currentUser?.activeWorkspaceReason != null)
+                          Text(
+                            '${tr('workspace_access_active', ref)}: ${currentUser!.activeWorkspaceReason}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: TextButton.icon(
+                            onPressed: () => _changeWorkspaceAccess(tenant),
+                            icon: Icon(
+                              currentUser?.activeWorkspaceId == tenant.id
+                                  ? Icons.lock_open
+                                  : Icons.admin_panel_settings_outlined,
+                            ),
+                            label: Text(
+                              tr(
+                                currentUser?.activeWorkspaceId == tenant.id
+                                    ? 'end_workspace_access'
+                                    : 'access_workspace',
+                                ref,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
-                      Consumer(
-                        builder: (context, ref, child) {
-                          final usersAsync = ref.watch(
-                            tenantUsersProvider(tenant.id),
-                          );
-                          return usersAsync.when(
-                            data: (users) {
-                              if (users.isEmpty) {
-                                return Text(tr('no_members_yet', ref));
-                              }
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    tr('authorized_devices', ref),
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleSmall,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  for (final user in users)
-                                    ListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      title: Text(
-                                        user.displayName.isEmpty
-                                            ? user.email
-                                            : user.displayName,
-                                      ),
-                                      subtitle: Text(
-                                        user.devicePairingEnabled
-                                            ? '${tr('paired', ref)}: ${user.devicePairingId ?? 'active'}'
-                                            : tr('not_paired', ref),
-                                      ),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Switch.adaptive(
-                                            value: user.devicePairingEnabled,
-                                            onChanged: (enabled) =>
-                                                _toggleDevicePairing(
-                                                  user,
-                                                  enabled,
-                                                ),
-                                          ),
-                                          IconButton(
-                                            onPressed: () =>
-                                                _resetDevicePairing(user),
-                                            icon: const Icon(Icons.lock_reset),
-                                          ),
-                                        ],
-                                      ),
+                      if (!currentUser!.isSuperAdmin ||
+                          currentUser.activeWorkspaceId == tenant.id)
+                        Consumer(
+                          builder: (context, ref, child) {
+                            final usersAsync = ref.watch(
+                              tenantUsersProvider(tenant.id),
+                            );
+                            return usersAsync.when(
+                              data: (users) {
+                                if (users.isEmpty) {
+                                  return Text(tr('no_members_yet', ref));
+                                }
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      tr('authorized_devices', ref),
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall,
                                     ),
-                                ],
-                              );
-                            },
-                            loading: () => const LinearProgressIndicator(),
-                            error: (error, _) => Text(error.toString()),
-                          );
-                        },
-                      ),
+                                    const SizedBox(height: 8),
+                                    for (final user in users)
+                                      ListTile(
+                                        contentPadding: EdgeInsets.zero,
+                                        title: Text(
+                                          user.displayName.isEmpty
+                                              ? user.email
+                                              : user.displayName,
+                                        ),
+                                        subtitle: Text(
+                                          user.devicePairingEnabled
+                                              ? '${tr('paired', ref)}: ${user.devicePairingId ?? 'active'}'
+                                              : tr('not_paired', ref),
+                                        ),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Switch.adaptive(
+                                              value: user.devicePairingEnabled,
+                                              onChanged: (enabled) =>
+                                                  _toggleDevicePairing(
+                                                    user,
+                                                    enabled,
+                                                  ),
+                                            ),
+                                            IconButton(
+                                              onPressed: () =>
+                                                  _resetDevicePairing(user),
+                                              icon: const Icon(
+                                                Icons.lock_reset,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                              loading: () => const LinearProgressIndicator(),
+                              error: (error, _) => Text(error.toString()),
+                            );
+                          },
+                        ),
                     ],
                   ),
                 ),

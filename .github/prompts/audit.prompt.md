@@ -69,7 +69,7 @@ Check: DI-01 soft-delete pattern (`deleted != true`), toJson/fromJson round-trip
 
 **Agent 12 — User Management**
 Audit: `app/lib/screens/users_list_screen.dart`, `app/lib/providers/user_provider.dart`, `app/lib/core/services/admin_identity_service.dart`
-Check: 4-way auth pipeline, SA credentials provisioned, email verification 3-step, password reset, edit dialog email read-only
+Check: no client service-account key path, no client-side role escalation, owner-controlled password reset, super-admin business access requires an audited selected workspace
 
 **Agent 13 — Composite Firestore Indexes**
 Audit: `firestore.indexes.json`, all providers with Firestore queries

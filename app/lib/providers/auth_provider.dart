@@ -7,7 +7,6 @@ import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
-import '../core/services/admin_identity_service.dart';
 import '../core/utils/device_pairing.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
@@ -169,7 +168,7 @@ class AuthNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> signIn(
-    String emailOrUsername,
+    String emailAddress,
     String password, {
     bool rememberMe = true,
   }) async {
@@ -188,31 +187,12 @@ class AuthNotifier extends AsyncNotifier<void> {
           }
         }
 
-        String email = emailOrUsername.trim();
-
-        // If not an email, look up by display_name in Firestore
-        if (!email.contains('@')) {
-          try {
-            final snap = await FirebaseFirestore.instance
-                .collection(Collections.users)
-                .where('display_name', isEqualTo: email)
-                .limit(1)
-                .get();
-            if (snap.docs.isEmpty) {
-              throw FirebaseAuthException(
-                code: 'invalid-credential',
-                message: 'Invalid username or password',
-              );
-            }
-            email = (snap.docs.first.data()['email'] as String).trim();
-          } catch (e) {
-            _logger.e('Username lookup failed: $e');
-            rethrow;
-          }
-        }
-
-        if (email.contains('@')) {
-          email = email.toLowerCase();
+        final email = emailAddress.trim().toLowerCase();
+        if (email.isEmpty || !email.contains('@')) {
+          throw FirebaseAuthException(
+            code: 'invalid-email',
+            message: 'Enter the email address registered to this account.',
+          );
         }
 
         // Sign in with email and password
@@ -236,64 +216,13 @@ class AuthNotifier extends AsyncNotifier<void> {
         final userDoc = await usersRef.doc(uid).get();
 
         if (!userDoc.exists) {
-          _logger.w(
-            'Signed in user has no profile document: $uid. Attempting self-heal.',
+          await FirebaseAuth.instance.signOut();
+          _invalidateRoleScopedProviders();
+          throw FirebaseAuthException(
+            code: 'permission-denied',
+            message:
+                'User profile is not provisioned. Contact your workspace administrator.',
           );
-          // DI-05: clear offline persistence so stale pre-flush cache docs do
-          // not serve incorrect state during the self-heal bootstrap flow.
-          try {
-            await FirebaseFirestore.instance.clearPersistence();
-          } catch (e) {
-            _logger.w(
-              'Missing profile self-heal persistence clear skipped: $e',
-            );
-          }
-
-          final legacyByEmail = await usersRef
-              .where('email', isEqualTo: email)
-              .limit(1)
-              .get();
-
-          if (legacyByEmail.docs.isNotEmpty) {
-            final data = legacyByEmail.docs.first.data();
-            await usersRef.doc(uid).set({
-              ...data,
-              'email': email,
-              'active': data['active'] ?? true,
-              'updated_at': Timestamp.now(),
-              'created_at': data['created_at'] ?? Timestamp.now(),
-            }, SetOptions(merge: true));
-          } else {
-            final existingPrivilegedLink = await usersRef
-                .where(
-                  'role',
-                  whereIn: ['admin', 'manager', 'tenant_admin', 'super_admin'],
-                )
-                .limit(1)
-                .get();
-            if (existingPrivilegedLink.docs.isNotEmpty) {
-              await FirebaseAuth.instance.signOut();
-              throw FirebaseAuthException(
-                code: 'permission-denied',
-                message:
-                    'User profile is not provisioned. Ask admin to create your account with route assignment.',
-              );
-            }
-
-            final display = cred.user?.displayName?.trim();
-            await usersRef.doc(uid).set({
-              'email': email,
-              'display_name': (display != null && display.isNotEmpty)
-                  ? display
-                  : 'Admin',
-              'role': 'admin',
-              'tenant_id': TenantScope.globalTenantId,
-              'active': true,
-              'created_by': uid,
-              'created_at': Timestamp.now(),
-              'updated_at': Timestamp.now(),
-            }, SetOptions(merge: true));
-          }
         }
 
         final refreshedDoc = await usersRef.doc(uid).get();
@@ -350,8 +279,16 @@ class AuthNotifier extends AsyncNotifier<void> {
           final isVerified =
               FirebaseAuth.instance.currentUser?.emailVerified ?? false;
           if (isVerified) {
+            final authEmail = FirebaseAuth.instance.currentUser?.email
+                ?.trim()
+                .toLowerCase();
+            final profileEmail = (userData?['email'] as String?)
+                ?.trim()
+                .toLowerCase();
             await usersRef.doc(uid).update({
-              'email_verified': true,
+              if (authEmail != null && authEmail != profileEmail)
+                'email': authEmail,
+              if (userData?['email_verified'] != true) 'email_verified': true,
               'updated_at': Timestamp.now(),
             });
           }
@@ -515,6 +452,45 @@ class AuthNotifier extends AsyncNotifier<void> {
   Future<void> signOut() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
+      final authUser = FirebaseAuth.instance.currentUser;
+      if (authUser != null) {
+        final profile = await FirebaseFirestore.instance
+            .collection(Collections.users)
+            .doc(authUser.uid)
+            .get();
+        final profileData = profile.data();
+        if ((profileData?['role'] as String? ?? '').trim().toLowerCase() ==
+            'super_admin') {
+          final workspaceId = profileData?['active_workspace_id'] as String?;
+          final reason = profileData?['active_workspace_reason'] as String?;
+          final now = Timestamp.now();
+          final batch = FirebaseFirestore.instance.batch();
+          final accessLogRef = workspaceId != null && reason != null
+              ? FirebaseFirestore.instance
+                    .collection(Collections.platformAccessLogs)
+                    .doc()
+              : null;
+          batch.update(profile.reference, {
+            'active_workspace_id': FieldValue.delete(),
+            'active_workspace_reason': FieldValue.delete(),
+            'active_workspace_selected_at': FieldValue.delete(),
+            'active_workspace_access_log_id': FieldValue.delete(),
+            if (accessLogRef != null)
+              'last_workspace_access_log_id': accessLogRef.id,
+            'updated_at': now,
+          });
+          if (accessLogRef != null) {
+            batch.set(accessLogRef, {
+              'actor_user_id': authUser.uid,
+              'workspace_id': workspaceId,
+              'event_type': 'workspace_access_ended',
+              'reason': reason,
+              'created_at': FieldValue.serverTimestamp(),
+            });
+          }
+          await batch.commit();
+        }
+      }
       if (kIsWeb) {
         try {
           await FirebaseAuth.instance.setPersistence(Persistence.NONE);
@@ -528,8 +504,6 @@ class AuthNotifier extends AsyncNotifier<void> {
       } catch (e) {
         _logger.w('Sign-out Firestore cache clear skipped: $e');
       }
-      // Clear cached SA OAuth2 token so next admin session gets a fresh one.
-      AdminIdentityService.instance.clearCache();
       // S-01: Clear Crashlytics identity on sign-out (FIND-008)
       if (!kIsWeb) {
         FirebaseCrashlytics.instance.setUserIdentifier('');
@@ -537,6 +511,87 @@ class AuthNotifier extends AsyncNotifier<void> {
       }
       _invalidateRoleScopedProviders();
     });
+  }
+
+  Future<void> selectWorkspace({
+    required String workspaceId,
+    required String reason,
+  }) async {
+    final normalizedId = TenantScope.normalize(workspaceId);
+    final normalizedReason = reason.trim();
+    if (normalizedId == null ||
+        normalizedReason.length < 10 ||
+        normalizedReason.length > 240) {
+      throw ArgumentError(
+        'Choose a workspace and enter a reason of at least 10 characters.',
+      );
+    }
+    final user = await ref.read(authUserProvider.future);
+    if (user == null || !user.active || !user.isSuperAdmin) {
+      throw StateError('Active super-admin access is required.');
+    }
+    final db = FirebaseFirestore.instance;
+    final workspace = await db
+        .collection(Collections.tenants)
+        .doc(normalizedId)
+        .get();
+    if (!workspace.exists || workspace.data()?['active'] != true) {
+      throw StateError('The selected workspace is unavailable.');
+    }
+    final batch = db.batch();
+    final accessLogRef = db.collection(Collections.platformAccessLogs).doc();
+    batch.update(db.collection(Collections.users).doc(user.id), {
+      'active_workspace_id': normalizedId,
+      'active_workspace_reason': normalizedReason,
+      'active_workspace_selected_at': FieldValue.serverTimestamp(),
+      'active_workspace_access_log_id': accessLogRef.id,
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+    batch.set(accessLogRef, {
+      'actor_user_id': user.id,
+      'workspace_id': normalizedId,
+      'event_type': 'workspace_access_started',
+      'reason': normalizedReason,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
+  Future<void> endWorkspaceAccess() async {
+    final user = await ref.read(authUserProvider.future);
+    if (user == null || !user.active || !user.isSuperAdmin) {
+      throw StateError('Active super-admin access is required.');
+    }
+    final batch = FirebaseFirestore.instance.batch();
+    final workspaceId = user.activeWorkspaceId;
+    final reason = user.activeWorkspaceReason;
+    final accessLogRef = workspaceId != null && reason != null
+        ? FirebaseFirestore.instance
+              .collection(Collections.platformAccessLogs)
+              .doc()
+        : null;
+    batch.update(
+      FirebaseFirestore.instance.collection(Collections.users).doc(user.id),
+      {
+        'active_workspace_id': FieldValue.delete(),
+        'active_workspace_reason': FieldValue.delete(),
+        'active_workspace_selected_at': FieldValue.delete(),
+        'active_workspace_access_log_id': FieldValue.delete(),
+        if (accessLogRef != null)
+          'last_workspace_access_log_id': accessLogRef.id,
+        'updated_at': FieldValue.serverTimestamp(),
+      },
+    );
+    if (accessLogRef != null) {
+      batch.set(accessLogRef, {
+        'actor_user_id': user.id,
+        'workspace_id': workspaceId,
+        'event_type': 'workspace_access_ended',
+        'reason': reason,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
   }
 
   /// Reload Firebase Auth state from server and sync [email_verified] to
@@ -552,17 +607,32 @@ class AuthNotifier extends AsyncNotifier<void> {
       // Reload from Firebase Auth servers to get latest emailVerified state.
       await user.reload();
       final fresh = FirebaseAuth.instance.currentUser;
-      if (fresh?.emailVerified != true) return;
-      // Only hit Firestore if the flag isn't already set — avoids redundant writes.
+      if (fresh == null) return;
       final doc = await FirebaseFirestore.instance
           .collection(Collections.users)
-          .doc(fresh!.uid)
-          .get();
-      if (!doc.exists || doc.data()?['email_verified'] == true) return;
-      await FirebaseFirestore.instance
-          .collection(Collections.users)
           .doc(fresh.uid)
-          .update({'email_verified': true, 'updated_at': Timestamp.now()});
+          .get();
+      if (!doc.exists) return;
+      final patch = <String, dynamic>{};
+      final authEmail = fresh.email?.trim().toLowerCase();
+      final profileEmail = (doc.data()?['email'] as String?)
+          ?.trim()
+          .toLowerCase();
+      if (fresh.emailVerified &&
+          authEmail != null &&
+          authEmail != profileEmail) {
+        patch['email'] = authEmail;
+      }
+      if (fresh.emailVerified && doc.data()?['email_verified'] != true) {
+        patch['email_verified'] = true;
+      }
+      if (patch.isNotEmpty) {
+        patch['updated_at'] = Timestamp.now();
+        await FirebaseFirestore.instance
+            .collection(Collections.users)
+            .doc(fresh.uid)
+            .update(patch);
+      }
     } catch (e) {
       _logger.w('Email verification resync skipped: $e');
     }
@@ -594,39 +664,54 @@ class AuthNotifier extends AsyncNotifier<void> {
     await firebaseUser.updatePassword(trimmedNew);
   }
 
-  Future<void> sendPasswordReset(String emailOrUsername) async {
-    var normalizedInput = emailOrUsername.trim();
-    if (normalizedInput.isEmpty) {
+  Future<void> sendOwnVerificationEmail() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
       throw FirebaseAuthException(
-        code: 'invalid-email',
-        message: 'Email or username is required',
+        code: 'user-not-found',
+        message: 'No signed-in user found.',
       );
     }
+    if (currentUser.emailVerified) return;
+    await currentUser.sendEmailVerification();
+  }
 
-    if (!normalizedInput.contains('@')) {
-      final snap = await FirebaseFirestore.instance
-          .collection(Collections.users)
-          .where('display_name', isEqualTo: normalizedInput)
-          .limit(1)
-          .get();
-      if (snap.docs.isEmpty) {
-        throw FirebaseAuthException(
-          code: 'invalid-credential',
-          message: 'Invalid username or password',
-        );
-      }
-      normalizedInput = (snap.docs.first.data()['email'] as String? ?? '')
-          .trim();
-    }
-
-    final normalizedEmail = normalizedInput.toLowerCase();
-    if (normalizedEmail.isEmpty) {
+  Future<void> requestOwnEmailChange({
+    required String currentPassword,
+    required String newEmail,
+  }) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final currentEmail = currentUser?.email?.trim();
+    final normalizedNewEmail = newEmail.trim().toLowerCase();
+    if (currentUser == null || currentEmail == null || currentEmail.isEmpty) {
       throw FirebaseAuthException(
-        code: 'invalid-email',
-        message: 'Email is required',
+        code: 'user-not-found',
+        message: 'No signed-in email account found.',
       );
     }
+    if (normalizedNewEmail.isEmpty || !normalizedNewEmail.contains('@')) {
+      throw FirebaseAuthException(
+        code: 'invalid-email',
+        message: 'Enter a valid email address.',
+      );
+    }
+    if (normalizedNewEmail == currentEmail.toLowerCase()) return;
+    final credential = EmailAuthProvider.credential(
+      email: currentEmail,
+      password: currentPassword,
+    );
+    await currentUser.reauthenticateWithCredential(credential);
+    await currentUser.verifyBeforeUpdateEmail(normalizedNewEmail);
+  }
 
+  Future<void> sendPasswordReset(String emailAddress) async {
+    final normalizedEmail = emailAddress.trim().toLowerCase();
+    if (normalizedEmail.isEmpty || !normalizedEmail.contains('@')) {
+      throw FirebaseAuthException(
+        code: 'invalid-email',
+        message: 'Enter a valid email address.',
+      );
+    }
     await FirebaseAuth.instance.sendPasswordResetEmail(email: normalizedEmail);
   }
 }

@@ -27,7 +27,6 @@ const COLLECTIONS = [
   'transactions',
   'invoices',
   'settings',
-  'admin_config',
 ];
 
 // ── Auth — reuse Firebase CLI refresh token ─────────────────────────────────

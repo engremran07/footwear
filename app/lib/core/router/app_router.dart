@@ -182,6 +182,12 @@ class RouterNotifier extends ChangeNotifier {
 
     if (isLoginRoute || isBootstrapRoute) return '/';
 
+    if (appUser.isSuperAdmin &&
+        appUser.tenantId == null &&
+        _isTenantBusinessPath(state.matchedLocation)) {
+      return '/tenants';
+    }
+
     if (_isTenantManagementPath(state.matchedLocation) &&
         !canManageWorkspaceRole(roleValueFromUserRole(appUser.role))) {
       return '/';
@@ -197,6 +203,24 @@ class RouterNotifier extends ChangeNotifier {
       return '/';
     }
     return null;
+  }
+
+  bool _isTenantBusinessPath(String path) {
+    return path == '/routes' ||
+        path.startsWith('/routes/') ||
+        path == '/shops' ||
+        path.startsWith('/shops/') ||
+        path == '/products' ||
+        path.startsWith('/products/') ||
+        path == '/inventory' ||
+        path == '/invoices' ||
+        path.startsWith('/invoices/') ||
+        path == '/reports' ||
+        path == '/history' ||
+        path == '/notifications' ||
+        path == '/users' ||
+        path == '/settings' ||
+        path.startsWith('/settings/');
   }
 }
 

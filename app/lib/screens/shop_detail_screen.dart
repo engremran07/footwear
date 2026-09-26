@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -68,7 +70,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     // Sellers can edit cash_in/cash_out; update may require admin approval
     // depending on settings toggle.
     if (!isAdmin) {
-      _showSellerEditTransactionDialog(tx);
+      unawaited(_showSellerEditTransactionDialog(tx));
       return;
     }
 
@@ -243,13 +245,18 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
 
   /// Seller edit flow for cash_in/cash_out transactions.
   /// If admin approval is enabled, this submits a pending request.
-  void _showSellerEditTransactionDialog(TransactionModel tx) {
+  Future<void> _showSellerEditTransactionDialog(TransactionModel tx) async {
     if (tx.type != 'cash_in' && tx.type != 'cash_out') {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(warningSnackBar(tr('seller_edit_cash_only', ref)));
       return;
     }
+
+    final settings = await ref.read(settingsProvider.future);
+    if (!mounted) return;
+    final requireApproval =
+        settings.requireAdminApprovalForSellerTransactionEdits;
 
     final amountC = TextEditingController(text: tx.amount.toStringAsFixed(2));
     final descC = TextEditingController(text: tx.description ?? '');
@@ -273,41 +280,45 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
             children: [
               Text(tr('edit', ref), style: Theme.of(ctx).textTheme.titleLarge),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: ChoiceChip(
-                      label: Text(tr('cash_in', ref)),
-                      selected: txType == 'cash_in',
-                      onSelected: (_) => setS(() => txType = 'cash_in'),
-                      selectedColor: AppTheme.clearBg(
-                        Theme.of(ctx).colorScheme,
+              if (requireApproval) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: ChoiceChip(
+                        label: Text(tr('cash_in', ref)),
+                        selected: txType == 'cash_in',
+                        onSelected: (_) => setS(() => txType = 'cash_in'),
+                        selectedColor: AppTheme.clearBg(
+                          Theme.of(ctx).colorScheme,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ChoiceChip(
-                      label: Text(tr('cash_out', ref)),
-                      selected: txType == 'cash_out',
-                      onSelected: (_) => setS(() => txType = 'cash_out'),
-                      selectedColor: AppTheme.debtBg(Theme.of(ctx).colorScheme),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: Text(tr('cash_out', ref)),
+                        selected: txType == 'cash_out',
+                        onSelected: (_) => setS(() => txType = 'cash_out'),
+                        selectedColor: AppTheme.debtBg(
+                          Theme.of(ctx).colorScheme,
+                        ),
+                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: amountC,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: amountC,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                  decoration: InputDecoration(
+                    labelText: tr('amount', ref),
+                    prefixIcon: const Icon(Icons.currency_exchange),
+                  ),
+                  autofocus: true,
                 ),
-                decoration: InputDecoration(
-                  labelText: tr('amount', ref),
-                  prefixIcon: const Icon(Icons.currency_exchange),
-                ),
-                autofocus: true,
-              ),
+              ],
               const SizedBox(height: 12),
               TextField(
                 controller: descC,
@@ -316,53 +327,55 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                   prefixIcon: const Icon(Icons.notes),
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ChoiceChip(
-                      label: Text(tr('sale_cash', ref)),
-                      selected: saleType == 'cash',
-                      onSelected: (_) => setS(() => saleType = 'cash'),
-                      selectedColor: AppTheme.clearBg(
-                        Theme.of(ctx).colorScheme,
+              if (requireApproval) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ChoiceChip(
+                        label: Text(tr('sale_cash', ref)),
+                        selected: saleType == 'cash',
+                        onSelected: (_) => setS(() => saleType = 'cash'),
+                        selectedColor: AppTheme.clearBg(
+                          Theme.of(ctx).colorScheme,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ChoiceChip(
-                      label: Text(tr('sale_credit', ref)),
-                      selected: saleType == 'credit',
-                      onSelected: (_) => setS(() => saleType = 'credit'),
-                      selectedColor: AppTheme.warningBg(
-                        Theme.of(ctx).colorScheme,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: Text(tr('sale_credit', ref)),
+                        selected: saleType == 'credit',
+                        onSelected: (_) => setS(() => saleType = 'credit'),
+                        selectedColor: AppTheme.warningBg(
+                          Theme.of(ctx).colorScheme,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              InkWell(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: ctx,
-                    initialDate: selectedDate,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime.now(),
-                  );
-                  if (picked != null) setS(() => selectedDate = picked);
-                },
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: tr('date', ref),
-                    prefixIcon: const Icon(Icons.calendar_today),
-                  ),
-                  child: Text(
-                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                  ],
+                ),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) setS(() => selectedDate = picked);
+                  },
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: tr('date', ref),
+                      prefixIcon: const Icon(Icons.calendar_today),
+                    ),
+                    child: Text(
+                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                    ),
                   ),
                 ),
-              ),
+              ],
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -378,13 +391,17 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       }
                       return;
                     }
-                    final newAmount = AppFormatters.parseAmountText(
+                    final parsedAmount = AppFormatters.parseAmountText(
                       amountC.text,
                     );
-                    if (newAmount == null || newAmount <= 0) {
+                    if (requireApproval &&
+                        (parsedAmount == null || parsedAmount <= 0)) {
                       _transactionGuard.finish();
                       return;
                     }
+                    final newAmount = requireApproval
+                        ? parsedAmount!
+                        : tx.amount;
                     try {
                       final user = await ref.read(authUserProvider.future);
                       final appliedImmediately = await ref
@@ -393,12 +410,14 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             txId: tx.id,
                             sellerId: user?.id ?? '',
                             newAmount: newAmount,
-                            newType: txType,
+                            newType: requireApproval ? txType : tx.type,
                             description: descC.text.trim().isEmpty
                                 ? null
                                 : descC.text.trim(),
-                            saleType: saleType,
-                            transactionDate: Timestamp.fromDate(selectedDate),
+                            saleType: requireApproval ? saleType : null,
+                            transactionDate: requireApproval
+                                ? Timestamp.fromDate(selectedDate)
+                                : null,
                           );
                       if (!mounted) return;
                       if (sheetContext.mounted) Navigator.pop(sheetContext);

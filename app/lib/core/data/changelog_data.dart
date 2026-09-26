@@ -28,6 +28,34 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.52',
+    date: 'September 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🛡️',
+        text: {
+          AppLocale.en:
+              'Platform admins now see workspace business data only after selecting a workspace and recording a support reason.',
+          AppLocale.ar:
+              'لا يرى مسؤولو المنصة بيانات العمل إلا بعد اختيار مساحة عمل وتسجيل سبب الدعم.',
+          AppLocale.ur:
+              'پلیٹ فارم ایڈمن اب ورک اسپیس منتخب کرنے اور سپورٹ وجہ درج کرنے کے بعد ہی کاروباری ڈیٹا دیکھتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Account owners control their own email and password changes; administrators can send password-reset emails.',
+          AppLocale.ar:
+              'يتحكم أصحاب الحسابات في تغيير البريد وكلمة المرور، ويمكن للمسؤولين إرسال رسائل إعادة تعيين كلمة المرور.',
+          AppLocale.ur:
+              'اکاؤنٹ مالکان ای میل اور پاس ورڈ کی تبدیلی خود کرتے ہیں؛ ایڈمن پاس ورڈ ری سیٹ ای میل بھیج سکتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.51',
     date: 'September 2026',
     items: [

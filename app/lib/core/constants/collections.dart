@@ -28,9 +28,9 @@ class Collections {
   static const settings = 'settings';
   static const tenants = 'tenants';
 
-  /// Admin-only collection — stores SA credentials for admin auth pipeline.
-  static const adminConfig = 'admin_config';
-
   /// In-app notification feed — written by providers after financial events.
   static const notifications = 'notifications';
+
+  /// Append-only audit trail for platform super-admin workspace support access.
+  static const platformAccessLogs = 'platform_access_logs';
 }

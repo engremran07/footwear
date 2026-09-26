@@ -25,10 +25,16 @@ void main() {
       final data = {'tenant_id': 'tenant-2'};
       expect(TenantScope.matchesTenant(data, 'tenant-2'), isTrue);
       expect(TenantScope.matchesTenant(data, 'tenant-3'), isFalse);
+      expect(TenantScope.matchesTenant(data, null), isFalse);
+      expect(TenantScope.matchesTenant(null, null), isFalse);
       expect(
         TenantScope.matchesTenant({'tenant_id': ' '}, 'tenant-2'),
         isFalse,
       );
+    });
+
+    test('unselected workspace queries are fail-closed', () {
+      expect(TenantScope.noActiveWorkspaceId, '__no_active_workspace__');
     });
   });
 }

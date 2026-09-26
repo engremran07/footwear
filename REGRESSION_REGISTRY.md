@@ -10,7 +10,7 @@
 
 | ID | Severity | Component | Summary | Status | Since |
 |----|----------|-----------|---------|--------|-------|
-| RR-001 | P0-DEFERRED | `admin_identity_service.dart` | RSA private key stored in Flutter client heap (L35,L65). OAuth2 cloud-platform scope. Requires Blaze tier + Cloud Functions for secure signing. | Documented, no Spark-tier fix | v3.0.0 |
+| RR-001 | P0-FIXED | Client Auth administration | A historical backup exposed a user-managed service-account key, and the client contained a `dart-define` signing path for arbitrary-user Auth changes. | Fixed 2026-09-26 — key revoked (IAM lookup 404), Firestore credential doc deleted, local backup sanitized, client signing service removed; use owner-controlled Firebase Auth flows pending trusted backend | v3.0.0 |
 | RR-002 | P0-DEFERRED | Financial arithmetic | `double` floating-point used for monetary values. ±0.01 rounding gap in Firestore vs UI tolerated via epsilon equality check in `invoice_provider`. | Documented, deferred | v1.0.0 |
 | RR-003 | P1-DEFERRED | `session_guard.dart:L377` | Admin lock overlay is tap-to-dismiss without biometric/password re-authentication. Full re-auth requires `local_auth` sprint. | Documented, deferred | v3.0.0 |
 | RR-004 | P1-DEFERRED | Shop analytics / transaction list | Hard pagination caps: 150 transactions in live ledger, 500 shops in analytics listener. Full cursor-based pagination is a separate sprint. | Documented, deferred | v3.4.11 |
@@ -35,7 +35,7 @@
 
 | ID | Category | Description | Priority |
 |----|----------|-------------|----------|
-| PI-001 | Security | Migrate SA key signing to Cloud Functions on Blaze upgrade. Eliminates RR-001. | P0 on tier upgrade |
+| PI-001 | Security | If arbitrary-user Auth administration is required, implement it in a trusted backend with least-privilege IAM; never restore client service-account signing. | Before re-enabling feature |
 | PI-002 | Financial | Replace `double` monetary arithmetic with integer-pence representation. Eliminates RR-002. Requires migration script for all Firestore `balance`,`amount` fields. | P0 on next accounting sprint |
 | PI-003 | UX/Security | Implement `local_auth` biometric/PIN re-authentication for admin lock screen overlay. Eliminates RR-003. | P1 on next auth sprint |
 | PI-004 | Performance | Replace hard pagination caps with cursor-based pagination (`startAfterDocument`). Required for routes >500 shops or sellers >150 transactions. Eliminates RR-004. | P1 on scale sprint |

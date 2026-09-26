@@ -123,10 +123,9 @@ Verify:
 
 All seller-facing shop/transaction creation must include `route_id` validation. Sellers cannot create shops or transactions outside their `assigned_route_id`. Check that all seller shop create calls pass `route_id`.
 
-## Gate 15 — SA Credentials Provisioned
+## Gate 15 — Privileged Credential Safety
 
-Check `admin_config/sa_credentials` Firestore doc exists (manual confirmation or note in PR).
-If `AdminIdentityService` features are in scope, verify `clearCache()` is called on sign-out.
+Verify no service-account key is stored in Firestore, repository backups, client code, or build defines. Arbitrary-user Auth administration must use a trusted backend; use Firebase Auth owner-controlled reset and verification flows from the client.
 
 ## Gate 16 — PDF Generation in Isolate
 

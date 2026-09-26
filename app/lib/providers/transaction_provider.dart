@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/notification_writer.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/transaction_model.dart';
 import 'auth_provider.dart';
@@ -538,6 +539,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
           'last_transaction_at': transactionDate ?? Timestamp.now(),
           'last_transaction_type': type,
           'last_transaction_amount': amount,
+          'last_transaction_id': txRef.id,
         });
       }
 
@@ -557,27 +559,26 @@ class TransactionNotifier extends AsyncNotifier<void> {
       // Only written when a seller creates the transaction — admin notifies themselves.
       // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
       try {
-        final appUser = ref.read(authUserProvider).value;
+        final appUser = await ref.read(authUserProvider.future);
         if (appUser != null && appUser.isSeller) {
-          await FirebaseFirestore.instance
-              .collection(Collections.notifications)
-              .doc()
-              .set({
-                'type': 'transaction',
-                'shop_id': shopId,
-                'shop_name': shopName,
-                'route_id': routeId,
-                'seller_id': normalizedCreatedBy,
-                'seller_name': appUser.displayName,
-                'amount': amount,
-                'transaction_type': type,
-                'ref_id': txRef.id,
-                'target_role': 'admin',
-                'read': false,
-                'created_by': normalizedCreatedBy,
-                'tenant_id': appUser.tenantId,
-                'created_at': Timestamp.now(),
-              });
+          await writeRateLimitedNotification(
+            db: db,
+            actorUid: appUser.id,
+            data: {
+              'type': 'transaction',
+              'shop_id': shopId,
+              'shop_name': shopName,
+              'route_id': routeId,
+              'seller_id': normalizedCreatedBy,
+              'seller_name': appUser.displayName,
+              'amount': amount,
+              'transaction_type': type,
+              'ref_id': txRef.id,
+              'target_role': 'admin',
+              'read': false,
+              'tenant_id': appUser.tenantId,
+            },
+          );
         }
       } catch (_) {
         /* best-effort only — non-critical */
@@ -650,6 +651,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
             'last_transaction_at': model.createdAt,
             'last_transaction_type': model.type,
             'last_transaction_amount': model.amount,
+            'last_transaction_id': txId,
           });
           return true;
         });
@@ -729,6 +731,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
         'last_transaction_at': transactionDate ?? Timestamp.now(),
         'last_transaction_type': 'cash_out',
         'last_transaction_amount': amount,
+        'last_transaction_id': txRef.id,
       });
 
       // Deduct from seller_inventory docs
@@ -749,27 +752,26 @@ class TransactionNotifier extends AsyncNotifier<void> {
       // Best-effort notification for admin feed (non-critical, fire-and-forget).
       // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
       try {
-        final appUser = ref.read(authUserProvider).value;
+        final appUser = await ref.read(authUserProvider.future);
         if (appUser != null && appUser.isSeller) {
-          await FirebaseFirestore.instance
-              .collection(Collections.notifications)
-              .doc()
-              .set({
-                'type': 'transaction',
-                'shop_id': shopId,
-                'shop_name': shopName,
-                'route_id': routeId,
-                'seller_id': normalizedCreatedBy,
-                'seller_name': appUser.displayName,
-                'amount': amount,
-                'transaction_type': 'cash_out',
-                'ref_id': txRef.id,
-                'target_role': 'admin',
-                'read': false,
-                'created_by': normalizedCreatedBy,
-                'tenant_id': appUser.tenantId,
-                'created_at': Timestamp.now(),
-              });
+          await writeRateLimitedNotification(
+            db: db,
+            actorUid: appUser.id,
+            data: {
+              'type': 'transaction',
+              'shop_id': shopId,
+              'shop_name': shopName,
+              'route_id': routeId,
+              'seller_id': normalizedCreatedBy,
+              'seller_name': appUser.displayName,
+              'amount': amount,
+              'transaction_type': 'cash_out',
+              'ref_id': txRef.id,
+              'target_role': 'admin',
+              'read': false,
+              'tenant_id': appUser.tenantId,
+            },
+          );
         }
       } catch (_) {
         /* best-effort only — non-critical */
@@ -1036,32 +1038,31 @@ class TransactionNotifier extends AsyncNotifier<void> {
       return false;
     }
 
-    final batch = db.batch();
-    _stageTransactionUpdate(
-      batch: batch,
-      db: db,
-      txId: txId,
-      shopId: (data['shop_id'] as String?)?.trim(),
-      oldAmount: (data['amount'] as num?)?.toDouble() ?? 0,
-      oldType: oldType,
-      newAmount: newAmount,
-      newType: newType,
-      description: description,
-      saleType: saleType,
-      transactionDate: transactionDate,
-      extraTxFields: {
-        'edit_request_pending': false,
-        'edit_request_status': 'approved',
-        'edit_request_reviewed_by': sellerId.trim(),
-        'edit_request_reviewed_at': Timestamp.now(),
-        'edit_request_new_amount': FieldValue.delete(),
-        'edit_request_new_type': FieldValue.delete(),
-        'edit_request_new_description': FieldValue.delete(),
-        'edit_request_new_sale_type': FieldValue.delete(),
-        'edit_request_new_created_at': FieldValue.delete(),
-      },
-    );
-    await _commit(batch);
+    final oldAmount = (data['amount'] as num?)?.toDouble() ?? 0;
+    final oldCreatedAt = data['created_at'] as Timestamp?;
+    final dateChanged =
+        transactionDate != null &&
+        oldCreatedAt?.millisecondsSinceEpoch !=
+            transactionDate.millisecondsSinceEpoch;
+    final oldSaleType = data['sale_type'] as String?;
+    if (newAmount != oldAmount ||
+        newType != oldType ||
+        dateChanged ||
+        (saleType != null && saleType != oldSaleType)) {
+      throw StateError(
+        'Sellers may only annotate transactions when admin approval is disabled',
+      );
+    }
+
+    await txRef
+        .update({
+          'description': description?.trim().isNotEmpty == true
+              ? description!.trim()
+              : FieldValue.delete(),
+          'updated_by': sellerId.trim(),
+          'updated_at': Timestamp.now(),
+        })
+        .timeout(const Duration(seconds: 20));
     return true;
   }
 

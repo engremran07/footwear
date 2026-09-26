@@ -99,6 +99,23 @@ void main() {
       expect(m.isSeller, isFalse);
     });
 
+    test('super admin business context is scoped to explicit workspace', () {
+      final unscoped = UserModel.fromJson({
+        ...baseJson,
+        'role': 'super_admin',
+      }, 'uid5');
+      expect(unscoped.tenantId, isNull);
+
+      final scoped = UserModel.fromJson({
+        ...baseJson,
+        'role': 'super_admin',
+        'active_workspace_id': 'tenant-1',
+        'active_workspace_reason': 'Customer support investigation',
+      }, 'uid6');
+      expect(scoped.tenantId, 'tenant-1');
+      expect(scoped.activeWorkspaceReason, 'Customer support investigation');
+    });
+
     test('unknown role defaults to seller', () {
       final m = UserModel.fromJson({...baseJson, 'role': 'xyz'}, 'uid4');
       expect(m.role, UserRole.seller);
@@ -129,6 +146,24 @@ void main() {
       final restored = UserModel.fromJson(json, 'id1');
       expect(restored.email, original.email);
       expect(restored.role, original.role);
+    });
+
+    test('active workspace context round-trips', () {
+      final timestamp = Timestamp.fromMillisecondsSinceEpoch(1000);
+      final original = UserModel(
+        id: 'platform-user',
+        email: 'platform@example.com',
+        displayName: 'Platform Admin',
+        role: UserRole.superAdmin,
+        activeWorkspaceId: 'tenant-1',
+        activeWorkspaceReason: 'Incident investigation',
+        active: true,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      );
+      final restored = UserModel.fromJson(original.toJson(), original.id);
+      expect(restored.tenantId, 'tenant-1');
+      expect(restored.activeWorkspaceReason, 'Incident investigation');
     });
   });
 

@@ -205,8 +205,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.done,
                   autofocus: emailController.text.isEmpty,
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? tr('required', ref)
+                  validator: (v) => (v == null || !v.trim().contains('@'))
+                      ? tr('err_invalid_email', ref)
                       : null,
                   onFieldSubmitted: (_) => submitReset(setDlgState, ctx),
                 ),
@@ -463,18 +463,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 TextFormField(
                   controller: _emailC,
                   focusNode: _emailFocus,
-                  autofillHints: const [
-                    AutofillHints.email,
-                    AutofillHints.username,
-                  ],
+                  autofillHints: const [AutofillHints.email],
                   decoration: InputDecoration(
                     labelText: tr('email', ref),
                     prefixIcon: const Icon(Icons.person_outline),
                   ),
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
-                  validator: (v) => v == null || v.trim().isEmpty
-                      ? tr('required', ref)
+                  validator: (v) => v == null || !v.trim().contains('@')
+                      ? tr('err_invalid_email', ref)
                       : null,
                 ).animate().fadeIn(
                   delay: 100.ms,

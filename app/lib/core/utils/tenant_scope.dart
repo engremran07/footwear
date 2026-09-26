@@ -6,6 +6,7 @@ class TenantScope {
   const TenantScope._();
 
   static const globalTenantId = '__global__';
+  static const noActiveWorkspaceId = '__no_active_workspace__';
 
   static String? normalize(String? tenantId) {
     final value = tenantId?.trim();
@@ -38,11 +39,8 @@ class TenantScope {
     final expectedTenantId = normalize(tenantId);
     final docTenantId = normalize(data?['tenant_id'] as String?);
 
-    // No tenant filter means the caller is effectively global/super-admin and may
-    // read across tenant-scoped documents. This preserves cross-workspace admin
-    // views while still allowing tenant-scoped isolation for regular users.
     if (expectedTenantId == null) {
-      return true;
+      return false;
     }
 
     if (docTenantId == null) {
@@ -59,7 +57,7 @@ class TenantScope {
   }) {
     final normalized = normalize(tenantId);
     if (normalized == null) {
-      return query;
+      return query.where('tenant_id', isEqualTo: noActiveWorkspaceId);
     }
     if (normalized == globalTenantId) {
       return query.where('tenant_id', isEqualTo: globalTenantId);

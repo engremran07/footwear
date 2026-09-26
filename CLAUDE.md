@@ -1,12 +1,13 @@
 ﻿# ShoesERP AI Coding Rules (CLAUDE.md)
 
-Last updated: 2026-04-13
+Last updated: 2026-09-26
 
 ## Runtime Override (Always First)
 
 The live codebase is a route/seller distribution ERP.
 
 - Roles: admin, seller (manager must be admin-equivalent)
+- Super-admin is platform-only by default. Tenant business data requires explicit `active_workspace_id` plus a reasoned support context; selection start/end is written to append-only `platform_access_logs`.
 - Collections: users, products, product_variants, seller_inventory, inventory_transactions,
   routes, shops [Firestore name: 'customers' — legacy, use Collections.shops],
   transactions, invoices, settings
@@ -80,6 +81,9 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
   `GOOGLE_DRIVE_SERVER_CLIENT_ID`. Sellers may restore only their own records
   for currently assigned routes. Super admins must select a concrete tenant
   before backup or restore. Never silently fall back to a global snapshot.
+23. Never store or ship service-account credentials. Arbitrary-user Auth administration belongs in a trusted backend; the client may not create/promote super-admins or mutate another user's Auth credentials.
+24. Platform super-admins may read workspace metadata globally, but every business-data operation must be scoped to the selected workspace and an auditable support reason. No selection means no business records.
+25. Super-admin business-context selection and exit events are append-only in `platform_access_logs`. Never create/promote platform super-admin accounts or mutate another user's Auth credentials from client code. Never store service-account credentials in Firestore, backups, APKs, or web builds.
 
 ## Financial Pathways (never mix these)
 

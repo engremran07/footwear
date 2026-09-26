@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
-import '../core/models/tenant_model.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/snack_helper.dart';
@@ -42,8 +40,6 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   String _search = '';
   // Active/Inactive tab toggle
   bool _showInactive = false;
-  // Selected workspace for super admin; null means "select one"
-  String? _selectedTenantId;
 
   @override
   Widget build(BuildContext context) {
@@ -58,14 +54,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
 
-    final isSuperAdmin = currentUser.isSuperAdmin;
     final tenantId =
-        _selectedTenantId ??
         TenantScope.normalize(currentUser.tenantId) ??
-        TenantScope.globalTenantId;
-
-    // ── Workspace selector (super admin only) ──────────────────────────
-    final tenantsAsync = ref.watch(tenantsProvider);
+        TenantScope.noActiveWorkspaceId;
 
     // ── Users for selected workspace ────────────────────────────────────
     final usersAsync = _showInactive
@@ -81,97 +72,6 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       ),
       body: Column(
         children: [
-          // ── Workspace Selector (Super Admin Only) ──────────────────────
-          if (isSuperAdmin)
-            tenantsAsync.when(
-              data: (workspaces) {
-                final selectedWorkspace = workspaces.firstWhere(
-                  (w) => w.id == _selectedTenantId,
-                  orElse: () => workspaces.isNotEmpty
-                      ? workspaces.first
-                      : TenantModel(
-                          id: TenantScope.globalTenantId,
-                          name: 'Global Workspace',
-                          slug: 'global',
-                          createdAt: Timestamp.now(),
-                          updatedAt: Timestamp.now(),
-                        ),
-                );
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tr('workspaces', ref),
-                        style: Theme.of(context).textTheme.labelSmall,
-                      ),
-                      const SizedBox(height: 4),
-                      DropdownButton<String>(
-                        value: selectedWorkspace.id,
-                        isExpanded: true,
-                        items: workspaces.map((w) {
-                          return DropdownMenuItem<String>(
-                            value: w.id,
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.workspaces,
-                                  size: 16,
-                                  color: AppBrand.primaryColor,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    w.name,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (v) => setState(() => _selectedTenantId = v),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${workspaces.fold<int>(0, (acc, w) => acc + 1)} ${tr('workspaces', ref).toLowerCase()}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                );
-              },
-              loading: () => const Padding(
-                padding: EdgeInsets.all(12),
-                child: SizedBox(
-                  height: 48,
-                  child: Center(
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(
-                          AppBrand.primaryColor,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              error: (_, _) => const Padding(
-                padding: EdgeInsets.all(12),
-                child: Text(
-                  'Error loading data',
-                  style: TextStyle(color: AppBrand.errorFg),
-                ),
-              ),
-            ),
           const Divider(height: 1),
           // ── Search bar ──────────────────────────────────────────────────
           AppSearchBar(
@@ -258,8 +158,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                                 _confirmReactivateUser(filtered[i]),
                             onSendReset: () =>
                                 _sendResetEmailForUser(filtered[i]),
-                            onHardDelete: () =>
-                                _confirmHardDeleteUser(filtered[i]),
+                            onHardDelete: currentUser.isSuperAdmin
+                                ? () => _confirmHardDeleteUser(filtered[i])
+                                : null,
                           ).listEntry(i)
                         : _UserTile(
                             user: filtered[i],
@@ -336,10 +237,6 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       DropdownMenuItem(
                         value: 'tenant_admin',
                         child: Text(tr('role_tenant_admin', ref)),
-                      ),
-                      DropdownMenuItem(
-                        value: 'super_admin',
-                        child: Text(tr('role_super_admin', ref)),
                       ),
                     ],
                     onChanged: (v) => setS(() {
@@ -458,23 +355,18 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   void _showEditUserDialog(UserModel user, String tenantId) {
     final nameC = TextEditingController(text: user.displayName);
     final emailC = TextEditingController(text: user.email);
-    final passwordC = TextEditingController();
     String role = roleValueFromUserRole(user.role);
     final currentUser = ref.read(authUserProvider).value;
     final isSelf = currentUser?.id == user.id;
     final selectedRouteIds = List<String>.from(user.assignedRouteIds);
     final selectedRouteNames = List<String>.from(user.assignedRouteNames);
     final oldRouteIds = List<String>.from(user.assignedRouteIds);
-    final currentTenantId = TenantScope.normalize(user.tenantId) ?? tenantId;
-    String? selectedTenantId = currentTenantId;
-    bool obscurePassword = true;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
           final routes = ref.watch(routesProvider).value ?? [];
-          final workspaceOptions = ref.watch(tenantsProvider).value ?? [];
           return AlertDialog(
             title: Text(tr('edit_user', ref)),
             content: SingleChildScrollView(
@@ -488,39 +380,22 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     textCapitalization: TextCapitalization.words,
                   ),
                   const SizedBox(height: 8),
-                  // ── Email (admin-editable, syncs Auth + Firestore) ──
+                  // Account credentials are controlled by the account owner.
                   TextField(
                     controller: emailC,
-                    enabled: !isSelf,
+                    readOnly: true,
                     decoration: InputDecoration(
                       labelText: tr('email', ref),
-                      helperText: isSelf
-                          ? tr('lbl_email_no_change', ref)
-                          : tr('lbl_email_change_note', ref),
+                      helperText: tr('credentials_owner_managed', ref),
                       helperMaxLines: 2,
                     ),
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 8),
-                  // ── Set Password (optional — blank = no change) ──
-                  TextField(
-                    controller: passwordC,
-                    obscureText: obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: tr('lbl_set_password', ref),
-                      hintText: tr('hint_set_password', ref),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                          size: 20,
-                        ),
-                        onPressed: () =>
-                            setS(() => obscurePassword = !obscurePassword),
-                        tooltip: obscurePassword ? 'Show' : 'Hide',
-                      ),
-                    ),
+                  OutlinedButton.icon(
+                    onPressed: () => _sendResetEmailForUser(user),
+                    icon: const Icon(Icons.lock_reset),
+                    label: Text(tr('send_password_reset', ref)),
                   ),
                   const SizedBox(height: 10),
                   // ── Email Verified badge + Send Verification button ──
@@ -552,73 +427,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         visualDensity: VisualDensity.compact,
                         side: BorderSide.none,
                       ),
-                      if (!user.emailVerified)
-                        TextButton.icon(
-                          icon: const Icon(Icons.forward_to_inbox, size: 14),
-                          label: Text(
-                            tr('btn_send_verification', ref),
-                            style: const TextStyle(fontSize: 11),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          onPressed: () async {
-                            try {
-                              final targetEmail = emailC.text.trim().isNotEmpty
-                                  ? emailC.text.trim()
-                                  : user.email;
-                              await ref
-                                  .read(userManagementNotifierProvider.notifier)
-                                  .adminSendVerificationEmail(
-                                    user.id,
-                                    targetEmail,
-                                  );
-                              if (ctx.mounted) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
-                                  successSnackBar(
-                                    tr(
-                                      'msg_verification_sent',
-                                      ref,
-                                    ).replaceAll('%s', targetEmail),
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              if (ctx.mounted) {
-                                final key = AppErrorMapper.key(e);
-                                ScaffoldMessenger.of(
-                                  ctx,
-                                ).showSnackBar(errorSnackBar(tr(key, ref)));
-                              }
-                            }
-                          },
-                        ),
                     ],
                   ),
                   const Divider(height: 16),
-                  // ── Workspace ──
-                  if (currentUser != null &&
-                      (currentUser.isSuperAdmin || currentUser.isTenantAdmin))
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: DropdownButtonFormField<String>(
-                        initialValue: selectedTenantId,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: tr('workspaces', ref),
-                        ),
-                        items: workspaceOptions.map((tenant) {
-                          return DropdownMenuItem<String>(
-                            value: tenant.id,
-                            child: Text(tenant.name),
-                          );
-                        }).toList(),
-                        onChanged: (v) => setS(() => selectedTenantId = v),
-                      ),
-                    ),
                   // ── Role ──
                   if (isSelf)
                     TextField(
@@ -644,10 +455,6 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         DropdownMenuItem(
                           value: 'tenant_admin',
                           child: Text(tr('role_tenant_admin', ref)),
-                        ),
-                        DropdownMenuItem(
-                          value: 'super_admin',
-                          child: Text(tr('role_super_admin', ref)),
                         ),
                       ],
                       onChanged: (v) => setS(() {
@@ -722,42 +529,12 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     final notifier = ref.read(
                       userManagementNotifierProvider.notifier,
                     );
-                    // ── Step 1: Auth sync via 4-way pipeline ──────────────
-                    final emailChanged =
-                        !isSelf &&
-                        emailC.text.trim().toLowerCase() !=
-                            user.email.trim().toLowerCase() &&
-                        emailC.text.trim().isNotEmpty;
-                    final passwordSet = passwordC.text.trim().isNotEmpty;
-                    if (passwordSet && passwordC.text.trim().length < 8) {
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          warningSnackBar(tr('err_weak_password', ref)),
-                        );
-                      }
-                      return;
-                    }
-                    if (emailChanged || passwordSet) {
-                      await notifier.adminUpdateUserAuth(
-                        uid: user.id,
-                        newEmail: emailChanged ? emailC.text.trim() : null,
-                        newPassword: passwordSet ? passwordC.text.trim() : null,
-                      );
-                    }
-                    // ── Step 2: Firestore profile (name / role / routes / workspace) ──
+                    // Profile and authorization changes remain provider/rules guarded.
                     final profileUpdate = <String, dynamic>{
                       'display_name': nameC.text.trim(),
                       'assigned_route_ids': selectedRouteIds,
                       'assigned_route_names': selectedRouteNames,
                     };
-                    if (selectedTenantId != null &&
-                        selectedTenantId != currentTenantId) {
-                      await notifier.transferUserToWorkspace(
-                        uid: user.id,
-                        targetTenantId: selectedTenantId!,
-                      );
-                      profileUpdate['tenant_id'] = selectedTenantId;
-                    }
                     if (!isSelf) {
                       profileUpdate['role'] = role;
                     }
@@ -790,7 +567,6 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     ).whenComplete(() {
       nameC.dispose();
       emailC.dispose();
-      passwordC.dispose();
     });
   }
 
@@ -893,7 +669,11 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   Future<void> _confirmHardDeleteUser(UserModel user) async {
     final me = await ref.read(authUserProvider.future);
     if (!mounted) return;
-    if (me?.isAdmin != true) return;
+    if (me?.isSuperAdmin != true ||
+        TenantScope.normalize(user.tenantId) !=
+            TenantScope.normalize(me?.tenantId)) {
+      return;
+    }
 
     final confirmed = await ConfirmDialog.show(
       context,
@@ -1167,7 +947,7 @@ class _InactiveUserTile extends ConsumerWidget {
   final UserModel user;
   final VoidCallback onReactivate;
   final VoidCallback onSendReset;
-  final VoidCallback onHardDelete;
+  final VoidCallback? onHardDelete;
 
   const _InactiveUserTile({
     required this.user,
@@ -1279,18 +1059,19 @@ class _InactiveUserTile extends ConsumerWidget {
                 visualDensity: VisualDensity.compact,
               ),
             ),
-            Tooltip(
-              message: 'Permanently Delete',
-              child: IconButton(
-                icon: const Icon(
-                  Icons.delete_forever,
-                  size: 20,
-                  color: AppBrand.errorColor,
+            if (onHardDelete != null)
+              Tooltip(
+                message: 'Permanently Delete',
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.delete_forever,
+                    size: 20,
+                    color: AppBrand.errorColor,
+                  ),
+                  onPressed: onHardDelete,
+                  visualDensity: VisualDensity.compact,
                 ),
-                onPressed: onHardDelete,
-                visualDensity: VisualDensity.compact,
               ),
-            ),
           ],
         ),
       ),

@@ -60,11 +60,9 @@ Run before every commit touching Dart files:
 
 ## Breakage Chain Reference
 
-### Chain 1: Admin SA Key Change
+### Chain 1: Platform Auth Administration
 
-SA key in Firestore `admin_config/sa_credentials` → `AdminIdentityService._getOrLoadCreds()` → cache cleared by `clearCache()` on sign-out → `_getAccessToken()` with scope `cloud-platform` → 3-step VERIFY_EMAIL.
-
-**When key changes:** Update Firestore doc → call `clearCache()` → test Send Verification.
+Service-account credentials are never stored in Firestore or embedded in client builds. Arbitrary-user Firebase Auth administration requires a trusted backend. Client user management uses owner-controlled password-reset and verification flows.
 
 ### Chain 2: New Firestore Field
 
@@ -114,4 +112,4 @@ All Firestore writes go through provider notifiers. Screens call notifier method
 
 - M7 (Client-Side Auth): Admin checks in provider submit methods, not only in router guards
 
-- M9 (Insecure Data Storage): No sensitive data in SharedPreferences; SA key only in Firestore
+- M9 (Insecure Data Storage): No service-account key exists in Firestore, local backups, or client artifacts; rotate immediately if historical copies are discovered

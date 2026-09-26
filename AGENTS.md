@@ -1,6 +1,6 @@
 ﻿# ShoesERP AGENTS Runtime Contract
 
-Last updated: 2026-04-18
+Last updated: 2026-09-26
 
 ## 1) Runtime Truth (Authoritative)
 
@@ -9,6 +9,7 @@ This repository is a route/seller distribution ERP.
 - Roles: admin, seller
 - Legacy role value manager must be treated as admin-equivalent in app and rules
 - Tenant-aware roles tenant_admin and super_admin are now supported and must be treated as privileged, tenant-scoped roles in app and rules
+- Super-admin is a platform operator, not a global business-data reader. By default it may access workspace metadata only; client business data requires an explicit `active_workspace_id`, a support reason of at least 10 characters, and an append-only `platform_access_logs` event. Access ends by clearing the active workspace context.
 - New tenant-scoped users should carry a tenant_id and device pairing metadata where applicable, and must not cross tenant boundaries in rules or providers
 - Each workspace owns its own settings document and device-pairing policy; no super-admin-only global settings override is allowed for tenant branding or pairing limits
 - Canonical collections:
@@ -22,6 +23,8 @@ This repository is a route/seller distribution ERP.
   - transactions
   - invoices
   - settings
+  - tenants
+  - platform_access_logs
 
 Source of collection truth: app/lib/core/constants/collections.dart
 
@@ -71,6 +74,10 @@ Seller:
 1. Role alignment is mandatory in all three layers: app/lib/models/user_model.dart, firestore.rules, and provider write guards on security-critical fields.
 
 1. Workspace settings and device-pairing limits are tenant-scoped. Each workspace must own its own business name, logo, and max device policy; never simplify these into a single super-admin global profile.
+
+1. Super-admin business access is workspace-scoped. Never let a super-admin read tenant routes, shops, products, inventory, invoices, transactions, reports, users, or tenant settings without an explicit active workspace context. Platform workspace metadata may remain globally visible. Record support access starts/ends in the append-only `platform_access_logs` collection; never use UI visibility as the security boundary.
+
+1. Service-account credentials must never be stored in Firestore, backups, client code, or APK/web defines. Arbitrary-user Firebase Auth administration requires a trusted backend; client code must use owner-controlled Firebase Auth flows. Never create/promote super-admin accounts from the client.
 
 1. Do not invent collections; use constants only.
 
@@ -208,24 +215,24 @@ Seller:
 
 1. permission-denied on route create/inventory add
 
-  - role value drift (Admin/manager casing, trailing spaces, legacy values)
-  - user doc inactive
-  - rules not deployed
+- role value drift (Admin/manager casing, trailing spaces, legacy values)
+- user doc inactive
+- rules not deployed
 
 1. resource-exhausted on dashboard
 
-  - aggregate query quota pressure
-  - repeated refresh hitting count/sum endpoints
+- aggregate query quota pressure
+- repeated refresh hitting count/sum endpoints
 
 1. lists empty without obvious UI error
 
-  - missing composite index
+- missing composite index
 
 1. export/PDF generates empty data or crashes
 
-  - `ref.read(authUserProvider).value` in async/provider context → null during loading
-  - Fix: use `await ref.read(authUserProvider.future)` in ALL export providers and screen export methods
-  - Grep gate: `grep -rn "ref\.read(authUserProvider)\.value" app/lib/providers/` must return zero in export contexts
+- `ref.read(authUserProvider).value` in async/provider context → null during loading
+- Fix: use `await ref.read(authUserProvider.future)` in ALL export providers and screen export methods
+- Grep gate: `grep -rn "ref\.read(authUserProvider)\.value" app/lib/providers/` must return zero in export contexts
 
 ### Google Drive OAuth and tenant backup contract
 
@@ -458,6 +465,15 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-09-26 security remediation — v3.9.52+91:
+
+- Revoked exposed service-account key `e3e6afda...`; IAM lookup after revocation returned 404.
+- Deleted `admin_config/sa_credentials` from the live Firestore project and removed the credential payload from the local backup; backup tooling no longer exports `admin_config`.
+- Removed the client service-account/JWT Identity Toolkit service and direct arbitrary-user email/password/verification mutation methods. User editor now uses owner-controlled credentials and standard password-reset email.
+- Super-admin now sees platform workspace metadata by default; business records require explicit `active_workspace_id` plus a reason of at least 10 characters. Start/end events are append-only in `platform_access_logs`.
+- Firestore rules enforce selected-workspace scope; client super-admin creation/promotion is denied. User/business updates cannot change a document's tenant ID.
+- Pending verification: emulator rules tests and production app release build/install for v3.9.52+91.
 
 2026-04-XX audit v22 — v3.9.4+81:
 

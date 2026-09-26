@@ -60,7 +60,9 @@ class UserModel {
   final String displayName;
   final UserRole role;
   final String? phone;
-  final String? tenantId;
+  final String? _tenantId;
+  final String? activeWorkspaceId;
+  final String? activeWorkspaceReason;
   final bool devicePairingEnabled;
   final String? devicePairingId;
   final List<String> pairedDeviceIds;
@@ -81,7 +83,9 @@ class UserModel {
     required this.displayName,
     required this.role,
     this.phone,
-    this.tenantId,
+    String? tenantId,
+    this.activeWorkspaceId,
+    this.activeWorkspaceReason,
     this.devicePairingEnabled = false,
     this.devicePairingId,
     this.pairedDeviceIds = const [],
@@ -92,7 +96,7 @@ class UserModel {
     this.emailVerified = false,
     required this.createdAt,
     required this.updatedAt,
-  });
+  }) : _tenantId = tenantId;
 
   bool get isAdmin =>
       role == UserRole.admin ||
@@ -101,6 +105,7 @@ class UserModel {
   bool get isSeller => role == UserRole.seller;
   bool get isTenantAdmin => role == UserRole.tenantAdmin;
   bool get isSuperAdmin => role == UserRole.superAdmin;
+  String? get tenantId => isSuperAdmin ? activeWorkspaceId : _tenantId;
 
   /// True for any user who can carry vehicle (seller) inventory.
   /// Admin is warehouse owner + field seller simultaneously — no assigned_route_id,
@@ -123,13 +128,20 @@ class UserModel {
         rawRouteNames?.cast<String>().toList() ?? const <String>[];
     final pairedDeviceIds = rawPairedDevices.cast<String>().toList();
 
+    final role = _roleFromString(json['role'] as String? ?? 'seller');
     return UserModel(
       id: docId,
       email: json['email'] as String? ?? '',
       displayName: json['display_name'] as String? ?? '',
-      role: _roleFromString(json['role'] as String? ?? 'seller'),
+      role: role,
       phone: json['phone'] as String?,
       tenantId: json['tenant_id'] as String?,
+      activeWorkspaceId: role == UserRole.superAdmin
+          ? json['active_workspace_id'] as String?
+          : null,
+      activeWorkspaceReason: role == UserRole.superAdmin
+          ? json['active_workspace_reason'] as String?
+          : null,
       devicePairingEnabled: json['device_pairing_enabled'] as bool? ?? false,
       devicePairingId: json['device_pairing_id'] as String?,
       pairedDeviceIds: pairedDeviceIds,
@@ -148,7 +160,10 @@ class UserModel {
     'display_name': displayName,
     'role': _roleToString(role),
     'phone': phone,
-    'tenant_id': tenantId,
+    'tenant_id': _tenantId,
+    if (activeWorkspaceId != null) 'active_workspace_id': activeWorkspaceId,
+    if (activeWorkspaceReason != null)
+      'active_workspace_reason': activeWorkspaceReason,
     'device_pairing_enabled': devicePairingEnabled,
     'device_pairing_id': devicePairingId,
     'device_pairing_ids': pairedDeviceIds,
@@ -168,6 +183,8 @@ class UserModel {
     UserRole? role,
     String? phone,
     String? tenantId,
+    String? activeWorkspaceId,
+    String? activeWorkspaceReason,
     bool? devicePairingEnabled,
     String? devicePairingId,
     List<String>? pairedDeviceIds,
@@ -185,7 +202,10 @@ class UserModel {
       displayName: displayName ?? this.displayName,
       role: role ?? this.role,
       phone: phone ?? this.phone,
-      tenantId: tenantId ?? this.tenantId,
+      tenantId: tenantId ?? _tenantId,
+      activeWorkspaceId: activeWorkspaceId ?? this.activeWorkspaceId,
+      activeWorkspaceReason:
+          activeWorkspaceReason ?? this.activeWorkspaceReason,
       devicePairingEnabled: devicePairingEnabled ?? this.devicePairingEnabled,
       devicePairingId: devicePairingId ?? this.devicePairingId,
       pairedDeviceIds: pairedDeviceIds ?? this.pairedDeviceIds,

@@ -29,6 +29,8 @@ $rootDir     = Split-Path -Parent $scriptDir
 $appDir      = Join-Path $rootDir "app"
 $pubspec     = Join-Path $appDir "pubspec.yaml"
 $releasesDir = Join-Path $rootDir "releases"
+$apkBuildCommand = "flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true"
+$webBuildCommand = "flutter build web --release"
 
 if (-not (Test-Path $pubspec)) {
   DIE "pubspec.yaml not found at $pubspec -- check repo layout."
@@ -116,6 +118,14 @@ try {
     if ($g13) { $gateErrors += "Gate 13: Raw SnackBar usage — use errorSnackBar/successSnackBar/infoSnackBar/warningSnackBar:`n$($g13 | ForEach-Object { "  $_" } | Out-String)" }
     else      { OK "Gate 13 — No raw SnackBar" }
 
+    # Gate 14 — Never embed retired service-account credentials in a release build
+    $g14 = @($apkBuildCommand, $webBuildCommand) |
+           Where-Object { $_ -match '--dart-define=ADMIN_IDENTITY_CREDENTIAL_B64=' }
+    if (-not [string]::IsNullOrWhiteSpace($env:ADMIN_IDENTITY_CREDENTIAL_B64) -or $g14) {
+      $gateErrors += "Gate 14: ADMIN_IDENTITY_CREDENTIAL_B64 must not be set or passed to a Flutter build"
+    }
+    else { OK "Gate 14 — No client service-account credential in build environment or command" }
+
     if ($gateErrors.Count -gt 0) {
       Write-Host ""
       foreach ($err in $gateErrors) {
@@ -146,7 +156,7 @@ try {
     if (-not $WebOnly) {
       # 4a. Split-per-ABI APKs for phone delivery
       Step "Building split-per-ABI release APKs"
-      DRY "flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true"
+      DRY $apkBuildCommand
 
       if (-not $DryRun) {
         $apkDir = Join-Path $appDir "build\app\outputs\flutter-apk"
@@ -212,7 +222,7 @@ try {
     # 4b. Web build
     Step "Building Flutter web (release)"
     # FLUTTER_WEB_USE_SKIA was removed in Flutter 3.10+ — do NOT pass it.
-    DRY "flutter build web --release"
+    DRY $webBuildCommand
     if (-not $DryRun) { OK "Web build -> app/build/web/" }
 
   } else {

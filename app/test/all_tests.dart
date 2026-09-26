@@ -9,6 +9,7 @@ import 'unit/models/shop_model_test.dart' as shop_model;
 import 'unit/models/route_model_test.dart' as route_model;
 import 'unit/models/shop_model_bad_debt_test.dart' as shop_model_bad_debt;
 import 'unit/core/collections_test.dart' as collections;
+import 'unit/core/backup_cipher_test.dart' as backup_cipher;
 import 'unit/business_logic/financial_pathways_test.dart' as financial_pathways;
 import 'unit/business_logic/bad_debt_writeoff_test.dart' as bad_debt_writeoff;
 import 'unit/business_logic/transaction_type_validation_test.dart'
@@ -51,6 +52,7 @@ void main() {
   route_model.main();
   shop_model_bad_debt.main();
   collections.main();
+  backup_cipher.main();
   financial_pathways.main();
   bad_debt_writeoff.main();
   transaction_type_validation.main();

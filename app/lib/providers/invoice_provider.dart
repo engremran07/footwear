@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/notification_writer.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/invoice_model.dart';
 import 'auth_provider.dart';
@@ -408,6 +409,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final invoiceNumber = await _nextInvoiceNumber();
     final batch = db.batch();
     final now = Timestamp.now();
+    final paymentTxRef = amountReceived > 0
+        ? db.collection(Collections.transactions).doc()
+        : null;
 
     // Create invoice doc
     final invRef = db.collection(Collections.invoices).doc();
@@ -426,6 +430,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       'discount': discount,
       'total': total,
       'amount_received': amountReceived,
+      if (paymentTxRef != null) 'payment_transaction_id': paymentTxRef.id,
       'outstanding_amount': total - amountReceived,
       'currency': currency,
       'sale_type': saleType,
@@ -458,9 +463,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     });
 
     // If payment received, create a separate cash_in transaction
-    if (amountReceived > 0) {
-      final payRef = db.collection(Collections.transactions).doc();
-      batch.set(payRef, {
+    if (paymentTxRef != null) {
+      batch.set(paymentTxRef, {
         'tenant_id': tenantId,
         'shop_id': shopId,
         'shop_name': shopName,
@@ -490,6 +494,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'last_transaction_at': FieldValue.serverTimestamp(),
         'last_transaction_type': 'cash_out',
         'last_transaction_amount': total,
+        'last_transaction_id': txRef.id,
       });
     }
 
@@ -509,28 +514,27 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     // Best-effort notification for admin feed (non-critical, fire-and-forget).
     // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
     try {
-      final appUser = ref.read(authUserProvider).value;
+      final appUser = await ref.read(authUserProvider.future);
       if (appUser != null && appUser.isSeller) {
-        await FirebaseFirestore.instance
-            .collection(Collections.notifications)
-            .doc()
-            .set({
-              'type': 'invoice',
-              'shop_id': shopId,
-              'shop_name': shopName,
-              'route_id': routeId,
-              'seller_id': normalizedCreatedBy,
-              'seller_name': appUser.displayName,
-              'amount': total,
-              'transaction_type': 'cash_out',
-              'invoice_number': invoiceNumber,
-              'ref_id': invRef.id,
-              'target_role': 'admin',
-              'read': false,
-              'created_by': normalizedCreatedBy,
-              'tenant_id': appUser.tenantId,
-              'created_at': Timestamp.now(),
-            });
+        await writeRateLimitedNotification(
+          db: db,
+          actorUid: appUser.id,
+          data: {
+            'type': 'invoice',
+            'shop_id': shopId,
+            'shop_name': shopName,
+            'route_id': routeId,
+            'seller_id': normalizedCreatedBy,
+            'seller_name': appUser.displayName,
+            'amount': total,
+            'transaction_type': 'cash_out',
+            'invoice_number': invoiceNumber,
+            'ref_id': invRef.id,
+            'target_role': 'admin',
+            'read': false,
+            'tenant_id': appUser.tenantId,
+          },
+        );
       }
     } catch (_) {
       /* best-effort only — non-critical */
@@ -704,28 +708,27 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     // Best-effort notification for admin feed (non-critical, fire-and-forget).
     // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
     try {
-      final appUser = ref.read(authUserProvider).value;
+      final appUser = await ref.read(authUserProvider.future);
       if (appUser != null && appUser.isSeller) {
-        await FirebaseFirestore.instance
-            .collection(Collections.notifications)
-            .doc()
-            .set({
-              'type': 'invoice',
-              'shop_id': shopId,
-              'shop_name': shopName,
-              'route_id': routeId,
-              'seller_id': normalizedCreatedBy,
-              'seller_name': appUser.displayName,
-              'amount': total,
-              'transaction_type': 'return',
-              'invoice_number': invoiceNumber,
-              'ref_id': invRef.id,
-              'target_role': 'admin',
-              'read': false,
-              'created_by': normalizedCreatedBy,
-              'tenant_id': appUser.tenantId,
-              'created_at': Timestamp.now(),
-            });
+        await writeRateLimitedNotification(
+          db: db,
+          actorUid: appUser.id,
+          data: {
+            'type': 'invoice',
+            'shop_id': shopId,
+            'shop_name': shopName,
+            'route_id': routeId,
+            'seller_id': normalizedCreatedBy,
+            'seller_name': appUser.displayName,
+            'amount': total,
+            'transaction_type': 'return',
+            'invoice_number': invoiceNumber,
+            'ref_id': invRef.id,
+            'target_role': 'admin',
+            'read': false,
+            'tenant_id': appUser.tenantId,
+          },
+        );
       }
     } catch (_) {
       /* best-effort only — non-critical */

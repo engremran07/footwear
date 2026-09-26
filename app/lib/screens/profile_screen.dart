@@ -143,6 +143,71 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  Future<void> _showChangeEmailDialog() async {
+    final newEmailController = TextEditingController();
+    final passwordController = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('change_email', ref)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: newEmailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(labelText: tr('new_email', ref)),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: tr('current_password', ref),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(tr('cancel', ref)),
+          ),
+          FilledButton(
+            onPressed: () async {
+              try {
+                await ref
+                    .read(authNotifierProvider.notifier)
+                    .requestOwnEmailChange(
+                      currentPassword: passwordController.text,
+                      newEmail: newEmailController.text,
+                    );
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    successSnackBar(
+                      tr('email_change_verification_sent', ref),
+                    ),
+                  );
+                }
+              } catch (error) {
+                if (dialogContext.mounted) {
+                  final key = AppErrorMapper.key(error);
+                  ScaffoldMessenger.of(
+                    dialogContext,
+                  ).showSnackBar(errorSnackBar(tr(key, ref)));
+                }
+              }
+            },
+            child: Text(tr('confirm', ref)),
+          ),
+        ],
+      ),
+    );
+    newEmailController.dispose();
+    passwordController.dispose();
+  }
+
   void _showChangePasswordDialog() {
     final currentPassC = TextEditingController();
     final newPassC = TextEditingController();
@@ -340,6 +405,43 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           currentUser.email,
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: TextButton.icon(
+                            onPressed: _showChangeEmailDialog,
+                            icon: const Icon(Icons.edit_outlined),
+                            label: Text(tr('change_email', ref)),
+                          ),
+                        ),
+                        if (!currentUser.emailVerified)
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: TextButton.icon(
+                              onPressed: () async {
+                                final messenger = ScaffoldMessenger.maybeOf(context);
+                                try {
+                                  await ref
+                                      .read(authNotifierProvider.notifier)
+                                      .sendOwnVerificationEmail();
+                                  if (!mounted || messenger == null) return;
+                                  messenger.showSnackBar(
+                                    successSnackBar(
+                                      tr('msg_verification_sent', ref)
+                                          .replaceAll('%s', currentUser.email),
+                                    ),
+                                  );
+                                } catch (error) {
+                                  if (!mounted || messenger == null) return;
+                                  final key = AppErrorMapper.key(error);
+                                  messenger.showSnackBar(
+                                    errorSnackBar(tr(key, ref)),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.forward_to_inbox),
+                              label: Text(tr('btn_send_verification', ref)),
+                            ),
+                          ),
                       ],
                     ],
                   ),
