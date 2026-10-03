@@ -53,6 +53,7 @@ Defined in app/lib/core/router/app_router.dart:
 - /invoices/:id
 - /reports
 - /profile
+- /about
 - /settings
 
 ## 3) Permission Matrix
@@ -74,6 +75,8 @@ Seller:
 1. Role alignment is mandatory in all three layers: app/lib/models/user_model.dart, firestore.rules, and provider write guards on security-critical fields.
 
 1. Workspace settings and device-pairing limits are tenant-scoped. Each workspace must own its own business name, logo, and max device policy; never simplify these into a single super-admin global profile.
+
+1. Platform super-admins without an active workspace may open `/settings` only as a platform hub for workspace metadata, profile preferences, About, and What's New. Tenant business settings remain unavailable until explicit workspace support access is active. About is navigation-accessible to every authenticated role.
 
 1. Super-admin business access is workspace-scoped. Never let a super-admin read tenant routes, shops, products, inventory, invoices, transactions, reports, users, or tenant settings without an explicit active workspace context. Platform workspace metadata may remain globally visible. Record support access starts/ends in the append-only `platform_access_logs` collection; never use UI visibility as the security boundary.
 
@@ -481,6 +484,11 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-10-03 settings and About access — v3.9.55+94:
+
+- Unscoped super-admin `/settings` is a platform-only hub; tenant business settings remain gated on active workspace support access.
+- About is available in authenticated app navigation across roles, and release-date formatting initializes Arabic/Urdu date symbols before rendering.
 
 2026-10-03 frontend accessibility pass — v3.9.54+93:
 

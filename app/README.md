@@ -1,4 +1,4 @@
-﻿# FootWear ERP — Flutter App (v3.9.54+93)
+﻿# FootWear ERP — Flutter App (v3.9.55+94)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
@@ -120,13 +120,16 @@ lib/
 | `/invoices` | Invoices list | All |
 | `/invoices/:id` | Invoice detail | All |
 | `/reports` | Reports (PDF / Excel) | Admin |
-| `/settings` | Settings | Admin |
+| `/settings` | Workspace settings, or platform-only hub without active workspace | Admin; super-admin |
+| `/about` | About and What's New | All authenticated roles |
 
 ---
 
 ## Roles
 
 Super-admin is platform-only by default: workspace metadata is global, but workspace business records are unavailable until one workspace is explicitly selected with a support reason. The active context is visible in the shell and start/end events are written to append-only `platform_access_logs`; Firestore rules enforce this boundary.
+
+Without an active workspace, super-admin Settings shows only workspace management, profile preferences, About, and What's New. Tenant business settings remain hidden until explicit support access is active. About is available in app navigation for every authenticated role.
 
 Platform super-admin accounts are provisioned out of band. The client never embeds service-account credentials or changes another user's Firebase Auth credentials. Administrators may send password-reset emails; account owners control password and email changes.
 

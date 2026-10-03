@@ -52,7 +52,47 @@ class AppShell extends ConsumerStatefulWidget {
     (icon: Icons.apartment, key: 'workspaces', route: '/tenants'),
     (icon: Icons.manage_accounts, key: 'users', route: '/users'),
     (icon: Icons.settings, key: 'settings', route: '/settings'),
+    (icon: Icons.info_outline, key: 'about_us', route: '/about'),
   ];
+
+  static List<({IconData icon, String key, String route})> _filteredItems(
+    UserModel? user,
+  ) {
+    if (user == null) return [];
+    if (user.isSuperAdmin && user.tenantId == null) {
+      return _navItems
+          .where(
+            (e) =>
+                e.route == '/' ||
+                e.route == '/tenants' ||
+                e.route == '/settings' ||
+                e.route == '/about',
+          )
+          .toList();
+    }
+    if (user.isSeller) {
+      return _navItems
+          .where(
+            (e) =>
+                e.route == '/' ||
+                e.route == '/shops' ||
+                e.route == '/products' ||
+                e.route == '/inventory' ||
+                e.route == '/invoices' ||
+                e.route == '/about',
+          )
+          .toList();
+    }
+    return _navItems.where((e) {
+      if (e.route == '/settings') return user.isAdmin;
+      if (e.route == '/users') return canManageUsers(user);
+      if (e.route == '/tenants') return canManageWorkspaces(user);
+      return true;
+    }).toList();
+  }
+
+  static List<String> navigationRoutesFor(UserModel? user) =>
+      _filteredItems(user).map((item) => item.route).toList(growable: false);
 
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
@@ -230,35 +270,6 @@ class _AppShellState extends ConsumerState<AppShell>
     return '/';
   }
 
-  List<({IconData icon, String key, String route})> _filteredItems(
-    UserModel? user,
-  ) {
-    if (user == null) return [];
-    if (user.isSuperAdmin && user.tenantId == null) {
-      return AppShell._navItems
-          .where((e) => e.route == '/' || e.route == '/tenants')
-          .toList();
-    }
-    if (user.isSeller) {
-      return AppShell._navItems
-          .where(
-            (e) =>
-                e.route == '/' ||
-                e.route == '/shops' ||
-                e.route == '/products' ||
-                e.route == '/inventory' ||
-                e.route == '/invoices',
-          )
-          .toList();
-    }
-    return AppShell._navItems.where((e) {
-      if (e.route == '/settings') return user.isAdmin;
-      if (e.route == '/users') return AppShell.canManageUsers(user);
-      if (e.route == '/tenants') return AppShell.canManageWorkspaces(user);
-      return true;
-    }).toList();
-  }
-
   List<({IconData icon, String key, String route})> _primaryNavItems(
     UserModel? user,
   ) {
@@ -267,6 +278,7 @@ class _AppShellState extends ConsumerState<AppShell>
       return const [
         (icon: Icons.dashboard, key: 'dashboard', route: '/'),
         (icon: Icons.apartment, key: 'workspaces', route: '/tenants'),
+        (icon: Icons.settings, key: 'settings', route: '/settings'),
       ];
     }
     if (user.isSeller) {
@@ -314,11 +326,14 @@ class _AppShellState extends ConsumerState<AppShell>
     if (tenantId == null || (!user.isSuperAdmin && !user.isTenantAdmin)) {
       return const SizedBox.shrink();
     }
-    final tenantName = ref.watch(tenantProvider(tenantId)).when(
-      data: (tenant) => tenant?.name ?? tr('workspace_name_unavailable', ref),
-      loading: () => tr('loading', ref),
-      error: (_, _) => tr('workspace_name_unavailable', ref),
-    );
+    final tenantName = ref
+        .watch(tenantProvider(tenantId))
+        .when(
+          data: (tenant) =>
+              tenant?.name ?? tr('workspace_name_unavailable', ref),
+          loading: () => tr('loading', ref),
+          error: (_, _) => tr('workspace_name_unavailable', ref),
+        );
     final hasSupportAccess = user.isSuperAdmin;
     final reason = user.activeWorkspaceReason?.trim();
     return Material(
@@ -356,9 +371,9 @@ class _AppShellState extends ConsumerState<AppShell>
                   } catch (error) {
                     if (mounted) {
                       final key = AppErrorMapper.key(error);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        errorSnackBar(tr(key, ref)),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(errorSnackBar(tr(key, ref)));
                     }
                   }
                 },
@@ -381,7 +396,7 @@ class _AppShellState extends ConsumerState<AppShell>
         ? ref.watch(unreadNotificationCountProvider)
         : 0;
 
-    final rawItems = _filteredItems(user);
+    final rawItems = AppShell._filteredItems(user);
     final navItems = rawItems
         .map((e) => (icon: e.icon, label: tr(e.key, ref), route: e.route))
         .toList();
@@ -427,7 +442,7 @@ class _AppShellState extends ConsumerState<AppShell>
             children: [
               _ScrollableNavRail(
                 extended:
-                  screenWidth >= AppTokens.breakpointExtendedNavigationRail,
+                    screenWidth >= AppTokens.breakpointExtendedNavigationRail,
                 selectedIndex: _selectedIndex(navItems, currentLocation),
                 items: navItems,
                 onItem: (i) => context.go(navItems[i].route),

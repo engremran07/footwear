@@ -28,6 +28,34 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.55',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '⚙️',
+        text: {
+          AppLocale.en:
+              'Platform admins now have a safe Settings hub for workspaces, profile preferences, About, and What’s New. Business settings remain tied to a selected workspace.',
+          AppLocale.ar:
+              'أصبح لدى مسؤولي المنصة مركز إعدادات آمن لمساحات العمل والتفضيلات والنبذة والجديد. تظل إعدادات الأعمال مرتبطة بمساحة عمل محددة.',
+          AppLocale.ur:
+              'پلیٹ فارم ایڈمنز کے لیے ورک اسپیس، پروفائل ترجیحات، تعارف اور نئی تبدیلیوں کا محفوظ سیٹنگز مرکز دستیاب ہے۔ کاروباری سیٹنگز منتخب ورک اسپیس سے منسلک رہتی ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: 'ℹ️',
+        text: {
+          AppLocale.en:
+              'About is available from app navigation for every role, and its release date now renders in Arabic and Urdu.',
+          AppLocale.ar:
+              'أصبحت صفحة النبذة متاحة من تنقل التطبيق لجميع الأدوار، ويظهر تاريخ الإصدار الآن بالعربية والأردية.',
+          AppLocale.ur:
+              'About صفحہ اب ہر کردار کے لیے ایپ نیویگیشن میں دستیاب ہے، اور ریلیز کی تاریخ عربی اور اردو میں دکھتی ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.54',
     date: 'October 2026',
     items: [

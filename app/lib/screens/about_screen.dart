@@ -3,12 +3,23 @@ import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart' show initializeDateFormatting;
 import 'package:url_launcher/url_launcher.dart';
 import '../core/utils/share_helper.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/snack_helper.dart';
 import '../widgets/whats_new_sheet.dart';
+
+final Map<String, Future<String>> _releaseDateByLocale = {};
+
+Future<String> _localizedReleaseDate(String localeCode) =>
+    _releaseDateByLocale.putIfAbsent(localeCode, () async {
+      await initializeDateFormatting(localeCode);
+      return DateFormat.yMMMMd(
+        localeCode,
+      ).format(DateTime.parse(AppBrand.releaseDateIso));
+    });
 
 /// About screen — single source of truth for version / build info.
 /// Reads from [AppBrand] which is synced by bump_version.dart on every release.
@@ -37,7 +48,7 @@ class AboutScreen extends ConsumerWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
-                    color: Colors.white,
+                    color: cs.surfaceContainerHighest,
                     padding: const EdgeInsets.all(10),
                     child: Image.asset(
                       AppBrand.logoAsset,
@@ -85,11 +96,12 @@ class AboutScreen extends ConsumerWidget {
             value: AppBrand.buildNumber,
             onTap: () => _copyToClipboard(context, AppBrand.buildNumber, ref),
           ),
-          _InfoTile(
-            icon: Icons.calendar_today_outlined,
-            label: tr('release_date', ref),
-            value: DateFormat.yMMMMd(localeCode).format(
-              DateTime.parse(AppBrand.releaseDateIso),
+          FutureBuilder<String>(
+            future: _localizedReleaseDate(localeCode),
+            builder: (context, snapshot) => _InfoTile(
+              icon: Icons.calendar_today_outlined,
+              label: tr('release_date', ref),
+              value: snapshot.data ?? AppBrand.releaseDateIso,
             ),
           ),
           _InfoTile(
@@ -202,7 +214,10 @@ class AboutScreen extends ConsumerWidget {
           const SizedBox(height: 32),
           Center(
             child: Text(
-              tr('copyright_notice', ref).replaceAll('%s', AppBrand.companyName),
+              tr(
+                'copyright_notice',
+                ref,
+              ).replaceAll('%s', AppBrand.companyName),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: cs.onSurfaceVariant,
               ),

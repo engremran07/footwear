@@ -92,6 +92,7 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 31. Export queries must cursor-page to exhaustion. Tenant-admin backup restore is upsert-only and never prunes; selected super-admin restore upserts before pruning obsolete records in the active tenant. Reject legacy plaintext backup archives.
 32. Keep sessions on transient token-refresh/network failures. Firebase initialization failure must render a retry state and must not mount the normal app shell.
 33. Copilot chat history and request IDs do not merge across GitHub identities through repository changes. Preserve durable decisions, pending tasks, audit IDs, and verification evidence in `SESSION_LOG.md` and the current audit report. On an account/profile switch, read those plus `git status`/`git diff`; never store credentials or full chat transcripts in the repository or claim separate accounts were synchronized.
+34. Keep unscoped super-admin `/settings` platform-only; never read or mutate tenant settings without active workspace support context. Keep About and What's New discoverable for every authenticated role.
 
 ## Financial Pathways (never mix these)
 

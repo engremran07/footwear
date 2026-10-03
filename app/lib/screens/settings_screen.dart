@@ -16,6 +16,7 @@ import '../providers/settings_provider.dart';
 
 import '../widgets/confirm_dialog.dart';
 import '../widgets/error_state.dart';
+import '../widgets/whats_new_sheet.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -56,6 +57,59 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Widget _buildPlatformSettingsHub() {
+    final theme = Theme.of(context);
+    return Scaffold(
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(
+            tr('platform_settings', ref),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            tr('platform_settings_scope', ref),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.apartment_outlined),
+            title: Text(tr('workspaces', ref)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/tenants'),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.person_outline),
+            title: Text(tr('profile', ref)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/profile'),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.info_outline),
+            title: Text(tr('about_us', ref)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/about'),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.new_releases_outlined),
+            title: Text(tr('whats_new', ref)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => WhatsNewSheet.show(context, ref),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveSettings() async {
     try {
       await ref.read(settingsNotifierProvider.notifier).save({
@@ -80,8 +134,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final settingsAsync = ref.watch(settingsProvider);
     final currentUser = ref.watch(authUserProvider).value;
+    if (currentUser?.isSuperAdmin == true &&
+        currentUser?.activeWorkspaceId == null) {
+      return _buildPlatformSettingsHub();
+    }
+
+    final settingsAsync = ref.watch(settingsProvider);
     if (currentUser != null && !currentUser.isAdmin) {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }

@@ -1,4 +1,4 @@
-﻿# FootWear ERP — v3.9.54+93
+﻿# FootWear ERP — v3.9.55+94
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
@@ -6,6 +6,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 > **v3.9.50+89 (2026-08-18)** — Tenant permissions are enforced across business collections, invoice-generated ledger records carry workspace identity, and Google Drive backup configuration is shared by web and Android builds.
 > **v3.9.53+92 (2026-10-03)** — Tenant admins merge encrypted backups into their own workspace; selected platform admins can prune only within their active support workspace. Unsupported roles and workspace-less accounts receive recovery guidance instead of being treated as sellers.
 > **v3.9.54+93 (2026-10-03)** — Status labels are localized and high-contrast status colors are more legible.
+> **v3.9.55+94 (2026-10-03)** — Platform admins have a scoped Settings hub; About and What's New are discoverable for every role, and About dates render in Arabic and Urdu.
 
 ---
 
@@ -23,6 +24,8 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 - **Reports** — monthly cash flow BarChart, outstanding PieChart, PDF/Excel/image export
 - **User Management** — create/edit admin and seller accounts, soft-delete; password reset by email
 - **Settings** — workspace-scoped company name, logo (base64 ≤50 KB), pairs-per-carton, business preferences, and per-workspace device pairing limits
+- **Platform Settings** — super-admins can open workspace management, profile preferences, About, and What's New without exposing tenant settings outside an active support workspace
+- **About** — available from app navigation to every authenticated role, with localized release dates and What's New
 - **Profile** — name, language, theme and password controls for all users
 
 ### Seller
@@ -155,6 +158,7 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 - Every tenant-scoped business document (`users`, `routes`, `customers`/`shops`, `products`, `seller_inventory`, `transactions`, `invoices`, etc.) must carry `tenant_id`.
 - `tenant_admin` is scoped to a single tenant. `super_admin` is a platform operator and sees workspace metadata globally, but sees no workspace business records by default.
 - Super-admin business support requires selecting one active workspace and entering a reason; the app records access start/end in append-only `platform_access_logs`. Firestore rules enforce the selected workspace regardless of client navigation.
+- Without a selected workspace, super-admin Settings is a platform-only hub; business settings remain available only inside the selected support workspace. About and What's New remain accessible to all roles.
 - Platform super-admin accounts cannot be created or promoted from the client. Arbitrary-user Firebase Auth administration is not performed with client-held service-account keys; admins send password-reset email and account owners complete credential changes themselves.
 - `TenantScope` in `app/lib/core/utils/tenant_scope.dart` is the canonical helper for query and write gating.
 - `__global__` is reserved for global/system documents only.

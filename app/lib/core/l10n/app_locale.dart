@@ -90,6 +90,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'sign_in_failed': 'Sign in failed',
     'remember_me': 'Remember me',
     'about_us': 'About Us',
+    'platform_settings': 'Platform Settings',
+    'platform_settings_scope':
+        'Select a workspace before opening its business settings.',
     'contact_us': 'Contact Us',
     'app_version': 'App Version',
     'version_info': 'Version Info',
@@ -1419,6 +1422,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'sign_in_failed': 'فشل تسجيل الدخول',
     'remember_me': 'تذكرني',
     'about_us': 'من نحن',
+    'platform_settings': 'إعدادات المنصة',
+    'platform_settings_scope': 'اختر مساحة عمل لفتح إعدادات أعمالها.',
     'contact_us': 'اتصل بنا',
     'app_version': 'إصدار التطبيق',
     'version_info': 'معلومات الإصدار',
@@ -2733,6 +2738,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'sign_in_failed': 'سائن ان ناکام',
     'remember_me': 'مجھے یاد رکھیں',
     'about_us': 'ہمارے بارے میں',
+    'platform_settings': 'پلیٹ فارم کی ترتیبات',
+    'platform_settings_scope':
+        'کاروباری ترتیبات کھولنے کے لیے ورک اسپیس منتخب کریں۔',
     'contact_us': 'ہم سے رابطہ کریں',
     'app_version': 'ایپ ورژن',
     'version_info': 'ورژن کی معلومات',

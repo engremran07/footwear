@@ -7,6 +7,17 @@ Most recent first.
 
 ---
 
+## [3.9.55+94] — 2026-10-03 — Platform settings and About access
+
+### Added
+
+- Platform super-admins can open a safe Settings hub for workspaces, profile preferences, About, and What's New without reading tenant settings.
+- About is available from app navigation for every authenticated role.
+
+### Fixed
+
+- Arabic and Urdu About pages no longer fail while formatting the release date before locale symbols are initialized.
+
 ## [3.9.54+93] — 2026-10-03 — Accessible status labels
 
 ### Changed

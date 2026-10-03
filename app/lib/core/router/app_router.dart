@@ -239,7 +239,6 @@ class RouterNotifier extends ChangeNotifier {
         path == '/history' ||
         path == '/notifications' ||
         path == '/users' ||
-        path == '/settings' ||
         path.startsWith('/settings/');
   }
 }
