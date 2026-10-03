@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -871,11 +872,13 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       );
     } catch (e, st) {
       debugPrint('MultiShopPdf export error: $e\n$st');
-      FirebaseCrashlytics.instance.recordError(
-        e,
-        st,
-        reason: 'multi-shop PDF export',
-      );
+      if (!kIsWeb) {
+        FirebaseCrashlytics.instance.recordError(
+          e,
+          st,
+          reason: 'multi-shop PDF export',
+        );
+      }
       if (mounted) {
         if (!progressDismissed) {
           Navigator.of(context, rootNavigator: true).pop();

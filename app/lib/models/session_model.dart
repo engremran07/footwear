@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SessionModel {
   final String id;
+  final String sessionId;
+  final int slotNumber;
   final String userId;
   final String tenantId;
   final String deviceId;
@@ -18,6 +20,8 @@ class SessionModel {
 
   const SessionModel({
     required this.id,
+    this.sessionId = '',
+    this.slotNumber = 0,
     required this.userId,
     required this.tenantId,
     required this.deviceId,
@@ -36,6 +40,8 @@ class SessionModel {
   factory SessionModel.fromJson(Map<String, dynamic> json, String docId) {
     return SessionModel(
       id: docId,
+      sessionId: json['session_id'] as String? ?? docId,
+      slotNumber: (json['slot_number'] as num?)?.toInt() ?? 0,
       userId: json['user_id'] as String? ?? '',
       tenantId: json['tenant_id'] as String? ?? '',
       deviceId: json['device_id'] as String? ?? '',
@@ -53,6 +59,8 @@ class SessionModel {
   }
 
   Map<String, dynamic> toJson() => {
+    'session_id': sessionId,
+    'slot_number': slotNumber,
     'user_id': userId,
     'tenant_id': tenantId,
     'device_id': deviceId,
@@ -70,6 +78,8 @@ class SessionModel {
 
   SessionModel copyWith({
     String? id,
+    String? sessionId,
+    int? slotNumber,
     String? userId,
     String? tenantId,
     String? deviceId,
@@ -86,6 +96,8 @@ class SessionModel {
   }) {
     return SessionModel(
       id: id ?? this.id,
+      sessionId: sessionId ?? this.sessionId,
+      slotNumber: slotNumber ?? this.slotNumber,
       userId: userId ?? this.userId,
       tenantId: tenantId ?? this.tenantId,
       deviceId: deviceId ?? this.deviceId,

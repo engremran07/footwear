@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
@@ -535,6 +536,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           onPressed: _showChangePasswordDialog,
                           icon: const Icon(Icons.lock_reset),
                           label: Text(tr('change_password', ref)),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => context.push('/profile/security'),
+                          icon: const Icon(Icons.devices_other_outlined),
+                          label: Text(tr('security_devices_sessions', ref)),
                         ),
                       ),
                     ],

@@ -1,4 +1,5 @@
 # SaaS Migration Audit Report
+
 **Date:** 2026-08-16  
 **Version:** 3.9.47+86  
 **Status:** ✅ AUDIT COMPLETE — Ready for deployment
@@ -26,10 +27,12 @@ The workspace/tenant/admin/seller isolation model is **fully implemented and cor
 ### 1. Tenant Isolation (PASS ✅)
 
 **Verified Files:**
+
 - `app/lib/core/utils/tenant_scope.dart` — Centralized tenant normalization
 - `app/lib/providers/*_provider.dart` — All 12 providers use `TenantScope.normalize()` and `TenantScope.applyToQuery()`
 
 **Key Evidence:**
+
 - `TenantScope.normalize()` converts `null | blank | 'global'` → `__global__` (single ground-truth tenant ID)
 - `TenantScope.applyToQuery()` adds `.where('tenant_id', isEqualTo: normalized_value)` to every Firestore query
 - `TenantScope.matchesTenant()` validates document tenant_id against user's tenant_id on single-doc reads
@@ -38,12 +41,14 @@ The workspace/tenant/admin/seller isolation model is **fully implemented and cor
 ### 2. Admin Account Isolation (PASS ✅)
 
 **Admin Access Pattern:**
+
 - Admins query all routes, shops, products, users within their tenant
 - Admin Firestore rules allow `isAdmin()` to bypass seller-specific route constraints
 - Admin role values normalized in [app/lib/core/utils/role_utils.dart](app/lib/core/utils/role_utils.dart) to handle `admin | manager` (legacy)
 - Admin self-heal in [app/lib/providers/auth_provider.dart](app/lib/providers/auth_provider.dart) repairs missing `tenant_id` on login
 
 **Cross-Admin Guard:**
+
 - Multiple admins in same tenant see the same workspace data ✅
 - Admin from tenant-A cannot see data from tenant-B ✅
 - Firestore rules enforce `currentUserTenantId() == resource.data.tenant_id` on all admin operations ✅
@@ -51,17 +56,20 @@ The workspace/tenant/admin/seller isolation model is **fully implemented and cor
 ### 3. Seller Account Isolation (PASS ✅)
 
 **Seller Access Pattern:**
+
 - Sellers query shops only where `route_id in [assignedRouteIds]`
 - [app/lib/providers/shop_provider.dart](app/lib/providers/shop_provider.dart) uses `sellerAllShopsProvider` with multi-route aggregation
 - Client-side guard in `shopDetailProvider`: `if (!routeIds.contains(shop.routeId)) return null`
 - Firestore rules enforce `isSellerForRoute(routeId)` on write attempts
 
 **Seller Assignment:**
+
 - Routes assigned via `user.assigned_route_ids` array (created by admin in user_provider.dart)
 - Seller with empty `assigned_route_ids` shows "no shops yet" ✅ (correct behavior)
 - Seller creation enforces at least 1 route: `if (role == 'seller' && assignedRouteIds.isEmpty) throw`
 
 **Cross-Seller Guard:**
+
 - Seller-A assigned to Route-1 cannot see shops on Route-2 ✅
 - Two sellers on same route share shops (intended for route coverage) ✅
 - Sellers never see data from other routes or other tenants ✅
@@ -69,6 +77,7 @@ The workspace/tenant/admin/seller isolation model is **fully implemented and cor
 ### 4. Workspace/Tenant Data Isolation (PASS ✅)
 
 **Verified Collections:**
+
 - `users` — filtered by `tenant_id`
 - `routes` — filtered by `tenant_id`
 - `customers` (shops) — filtered by `tenant_id`
@@ -83,6 +92,7 @@ The workspace/tenant/admin/seller isolation model is **fully implemented and cor
 - `tenants` — access controlled by `canAccessTenant(tenantId)`
 
 **Migration Status:**
+
 - Legacy data (pre-SaaS) assigned to `__global__` workspace ✅
 - New workspaces get explicit `tenant_id` on creation ✅
 - Self-heal on login repairs missing `tenant_id` ✅
@@ -90,12 +100,14 @@ The workspace/tenant/admin/seller isolation model is **fully implemented and cor
 ### 5. Firestore Rules Alignment (PASS ✅)
 
 **Role Enforcement:**
+
 - `isAdminRole(role)` — regex match: `(?i)^\\s*(admin|manager|tenant_admin|super_admin)\\s*$`
 - `isTenantAdminRole(role)` — regex match: `(?i)^\\s*tenant_admin\\s*$`
 - `isSuperAdminRole(role)` — regex match: `(?i)^\\s*super_admin\\s*$`
 - `isSellerRole(role)` — regex match: `(?i)^\\s*seller\\s*$`
 
 **Tenant Checks (Sample):**
+
 ```firestore
 // users collection
 allow get: if isOwnDoc(userId) || isAdmin() || (
@@ -121,6 +133,7 @@ allow read: if isActiveUser() && (
 **File:** [app/lib/core/data/changelog_data.dart](app/lib/core/data/changelog_data.dart)
 
 **New Entry (v3.9.47):**
+
 - 🚀 Workspace and Tenant accounts fully isolated — sellers assigned to specific routes
 - 🔐 Admin can manage entire workspaces; sellers only see assigned routes
 - 📦 Previous workspace data automatically transferred and scoped to global workspace
@@ -147,6 +160,7 @@ When a seller sees "no shops yet":
 ### Admin Data Remains Intact
 
 ✅ **Verified:**
+
 - Admin queries don't require `assigned_route_ids`
 - Admin reads all shops where `tenant_id` matches and `active=true`
 - No data deletion found in any provider write path
@@ -155,11 +169,13 @@ When a seller sees "no shops yet":
 ### New APK Required
 
 **Why:** Client-side changes are deployment-only. The old APK will:
+
 - Use old provider query logic (pre-tenant scope)
 - Not apply the self-heal `tenant_id` repair on login
 - Still show "no shops yet" if seller has no routes
 
 **When Installed:** New APK will:
+
 - Apply `TenantScope.applyToQuery()` to all reads
 - Trigger self-heal on login to repair missing `tenant_id`
 - Show correct seller route assignments
@@ -169,6 +185,7 @@ When a seller sees "no shops yet":
 ## 8 Medium-Priority Improvements (Next Sprint)
 
 ### 1. **Seller Self-Service Route Assignment UI**
+
 - **Status:** Not started
 - **Scope:** Add a "Request Route Assignment" flow in seller settings
 - **Impact:** Reduces admin burden; sellers can self-nominate for routes
@@ -176,6 +193,7 @@ When a seller sees "no shops yet":
 - **Files:** `screens/profile_screen.dart`, new `sellers_route_request_provider.dart`
 
 ### 2. **Bulk Tenant Assignment for Legacy Data**
+
 - **Status:** Not started
 - **Scope:** Admin tool to bulk-assign multiple seller accounts to a new workspace
 - **Impact:** Simplifies large workspace migrations
@@ -183,6 +201,7 @@ When a seller sees "no shops yet":
 - **Files:** New `screens/bulk_tenant_assignment_screen.dart`, `user_provider.dart`
 
 ### 3. **Workspace Switcher in Navigation**
+
 - **Status:** Not started
 - **Scope:** Add dropdown/menu to app bar to switch between assigned workspaces (tenant_admin + super_admin)
 - **Impact:** Multi-workspace admins can toggle context faster
@@ -190,6 +209,7 @@ When a seller sees "no shops yet":
 - **Files:** `app_shell.dart`, `tenant_provider.dart`
 
 ### 4. **Tenant Usage Dashboard Widget**
+
 - **Status:** Not started
 - **Scope:** Admin dashboard shows users/routes/shops/transactions per workspace
 - **Impact:** Visibility into workspace health and growth
@@ -197,6 +217,7 @@ When a seller sees "no shops yet":
 - **Files:** New `dashboard_tenant_stats_widget.dart`, `tenant_provider.dart`
 
 ### 5. **Cross-Tenant Report (Super Admin Only)**
+
 - **Status:** Not started
 - **Scope:** Super admin can view consolidated P&L across multiple workspaces
 - **Impact:** Multi-tenant business insights
@@ -204,6 +225,7 @@ When a seller sees "no shops yet":
 - **Files:** New `screens/multi_tenant_report_screen.dart`, `reports_provider.dart`
 
 ### 6. **Device Pairing Validation UI**
+
 - **Status:** Not started
 - **Scope:** Admin can view/revoke device pairings for each user; user can clear own pairing
 - **Impact:** Security; prevents unauthorized access on shared devices
@@ -211,6 +233,7 @@ When a seller sees "no shops yet":
 - **Files:** New `screens/device_pairing_screen.dart`, `user_provider.dart`
 
 ### 7. **Seller Inventory Transfer Between Routes**
+
 - **Status:** Not started
 - **Scope:** Seller can request stock move to a different assigned route (admin approval flow)
 - **Impact:** Flexibility for multi-route sellers during demand shifts
@@ -218,6 +241,7 @@ When a seller sees "no shops yet":
 - **Files:** `inventory_transaction_provider.dart`, new `transfer_request_screen.dart`
 
 ### 8. **Workspace Audit Log**
+
 - **Status:** Not started
 - **Scope:** Firestore collection `workspace_audit_logs` recording all user/route/seller admin actions
 - **Impact:** Compliance, debugging, accountability
@@ -264,6 +288,7 @@ When a seller sees "no shops yet":
 **Status:** ✅ **APPROVED FOR DEPLOYMENT**
 
 **Next steps:**
+
 1. Build APK with latest code
 2. Deploy Firestore rules + indexes + hosting
 3. Install APK on test device

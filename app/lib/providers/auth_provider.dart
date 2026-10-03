@@ -10,6 +10,7 @@ import '../core/constants/collections.dart';
 import '../core/utils/device_pairing.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
+import 'tenant_provider.dart';
 import '../models/user_model.dart';
 import 'alert_provider.dart';
 import 'dashboard_provider.dart';
@@ -226,6 +227,22 @@ class AuthNotifier extends AsyncNotifier<void> {
           );
         }
 
+        if (!isSuperAdmin && tenantId != null) {
+          try {
+            await ref
+                .read(sessionManagementNotifierProvider.notifier)
+                .registerCurrentAccess(userId: uid, tenantId: tenantId);
+          } catch (error) {
+            await FirebaseAuth.instance.signOut();
+            _invalidateRoleScopedProviders();
+            throw FirebaseAuthException(
+              code: 'session-limit-reached',
+              message:
+                  'Active session limit reached. End another session or ask your workspace administrator.',
+            );
+          }
+        }
+
         // ── Email-verified sync (Auth → Firestore, non-blocking) ──────────
         // Reload Auth user to get latest emailVerified from Firebase servers.
         // If Auth says verified but Firestore doesn't, sync it now so the
@@ -416,6 +433,20 @@ class AuthNotifier extends AsyncNotifier<void> {
               .doc(authUser.uid)
               .get();
           final profileData = profile.data();
+          if ((profileData?['role'] as String? ?? '').trim().toLowerCase() !=
+              'super_admin') {
+            try {
+              await ref
+                  .read(sessionManagementNotifierProvider.notifier)
+                  .terminateCurrentSession(authUser.uid);
+            } catch (e, stack) {
+              _logger.w(
+                'Application session termination skipped during sign-out',
+                error: e,
+                stackTrace: stack,
+              );
+            }
+          }
           if ((profileData?['role'] as String? ?? '').trim().toLowerCase() ==
               'super_admin') {
             final workspaceId = profileData?['active_workspace_id'] as String?;
@@ -451,12 +482,20 @@ class AuthNotifier extends AsyncNotifier<void> {
           stackTrace: stack,
         );
       }
+      if (FirebaseAuth.instance.currentUser?.uid != authUser?.uid) {
+        _logger.w('Sign-out skipped because the current account changed');
+        return;
+      }
       if (kIsWeb) {
         try {
           await FirebaseAuth.instance.setPersistence(Persistence.NONE);
         } catch (e) {
           _logger.w('Sign-out persistence reset skipped: $e');
         }
+      }
+      if (FirebaseAuth.instance.currentUser?.uid != authUser?.uid) {
+        _logger.w('Sign-out skipped because the current account changed');
+        return;
       }
       await FirebaseAuth.instance.signOut();
       try {

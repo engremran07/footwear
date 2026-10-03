@@ -1,4 +1,4 @@
-# Enterprise-Grade Real-Time Upgrades for ShoesERP v3.10+
+`    ext
 
 **Last Updated:** 2026-08-17  
 **Workspace:** JBM Impex (Multi-Tenant SaaS)
@@ -10,11 +10,13 @@
 ### User Experience Transformation
 
 **Before (v3.9 and earlier):**
+
 - Users list showed role tags (tenant_admin, tenant_seller, super_admin)
 - All roles mixed in one view; context unclear
 - Search worked but role filtering added cognitive load
 
 **After (v3.10):**
+
 - Super admin selects workspace from dropdown first (5 workspaces max visible)
 - After selection, sees only admin + sellers in that workspace
 - No role tags needed; workspace context is implicit
@@ -22,12 +24,14 @@
 - Tenant admin sees only their workspace (no selector visible)
 
 ### Code Changes
+
 - `users_list_screen.dart`: Added `_selectedTenantId` state, workspace dropdown (super_admin only)
 - `tenant_provider.dart`: Added `allInactiveUsersForTenantProvider` for per-workspace inactive users
 - `user_provider.dart`: Updated `createUser()` to accept optional `tenantId` parameter
 - Role filter chips removed; context is now implicit from workspace selection
 
 ### Benefits
+
 - **Clarity:** Admins immediately know which workspace they're managing
 - **Speed:** No multi-role filtering → faster mental model
 - **Scalability:** Supports unlimited workspaces; UI handles 1000+ seamlessly
@@ -40,13 +44,14 @@
 ### Feature: Per-Workspace Activity Feed
 
 Users can see live updates of who did what in their workspace:
-- "Admin created seller John@example.com"
+
+- "Admin created seller <John@example.com>"
 - "Seller Jane reassigned routes: R3, R5"
 - "Route R4 marked as archived"
 
 ### Implementation Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │         Enhanced Activity Events                     │
 │  (user creates → provider → batch write + log)       │
@@ -84,9 +89,10 @@ Users can see live updates of who did what in their workspace:
 │   │ 🔄 (Real-time badge: "3 new activities")    │   │
 │   └─────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────┘
-```
+```text
 
 ### Firestore Composite Index Required
+
 ```yaml
 indexes:
   - collectionId: workspace_activity_logs
@@ -95,9 +101,10 @@ indexes:
         order: ASCENDING
       - fieldPath: timestamp
         order: DESCENDING
-```
+```text
 
 ### Provider Implementation
+
 ```dart
 final workspaceActivityProvider = StreamProvider.family<
   List<ActivityLogEntry>,
@@ -116,9 +123,10 @@ final workspaceActivityProvider = StreamProvider.family<
       .map((doc) => ActivityLogEntry.fromJson(doc.data(), doc.id))
       .toList());
 });
-```
+```text
 
 ### Event Types to Log
+
 - `user_created` → admin/seller created
 - `user_role_changed` → admin→tenant_admin, tenant_admin→admin, etc.
 - `user_routes_updated` → seller reassigned routes
@@ -128,6 +136,7 @@ final workspaceActivityProvider = StreamProvider.family<
 - (Optional) `invoice_created`, `transaction_created` for detailed audit trail
 
 ### UI Integration Points
+
 1. **Users List Screen:** Add "Activity" button → shows filtered events for that user
 2. **Workspace Dashboard:** Sidebar with last 10 workspace actions (real-time badge)
 3. **Admin Panel:** Full activity log with search/date filters
@@ -141,21 +150,23 @@ final workspaceActivityProvider = StreamProvider.family<
 
 Every screen now shows which workspace you're in:
 
-```
+```text
 ┌──────────────────────────────────────────────────────┐
 │  🏢 JBM Impex  |  👤 Admin  |  🔔 5  |  ⚙️  👤  ☰   │
 └──────────────────────────────────────────────────────┘
      ↑ Workspace     Current Role  Alerts    Menu
      (clickable)
-```
+```text
 
 **Clicking workspace badge** → Shows mini-panel:
+
 - Current workspace: JBM Impex
 - Available workspaces: [Global Workspace] [JBM Impex] [Upcoming...]
 - Workspace settings (admin only): Edit name, logo, primary color
 - Invite link (tenant_admin only)
 
 ### Implementation
+
 ```dart
 // In app_shell.dart
 class _WorkspaceBadge extends ConsumerWidget {
@@ -193,7 +204,7 @@ class _WorkspaceBadge extends ConsumerWidget {
     );
   }
 }
-```
+```text
 
 ---
 
@@ -203,7 +214,7 @@ class _WorkspaceBadge extends ConsumerWidget {
 
 When multiple admins manage the same workspace:
 
-```
+```text
 ┌──────────────────────────────────────────────┐
 │ Users List                                    │
 │ ├─ 👥 (2 admins viewing)                     │
@@ -216,10 +227,11 @@ When multiple admins manage the same workspace:
 │ └─ User: jane@example.com                    │
 │    (no one editing)                          │
 └──────────────────────────────────────────────┘
-```
+```text
 
 ### Firestore Presence Collection
-```
+
+```text
 Collection: workspace_presence
 ├─ Document: {tenantId}/{userId}
 │  ├─ last_active: Timestamp.now()
@@ -228,9 +240,10 @@ Collection: workspace_presence
 │  ├─ current_screen: "users_list"
 │  ├─ editing_user_id: "abc123" (if applicable)
 │  └─ ttl_seconds: 300 (auto-delete after 5 min)
-```
+```text
 
 ### Provider Implementation
+
 ```dart
 final workspacePresenceProvider = StreamProvider.family<
   List<PresenceEntry>,
@@ -266,9 +279,10 @@ final workspacePresenceProvider = StreamProvider.family<
       .map((d) => PresenceEntry.fromJson(d.data()))
       .toList());
 });
-```
+```text
 
 ### UI Integration
+
 - Show presence badge on Users List: "(2 admins viewing)"
 - Show editing lock icon on user tiles: "Sarah is editing..."
 - Prevent conflicting edits: "Can't edit; John is updating this user"
@@ -282,7 +296,8 @@ final workspacePresenceProvider = StreamProvider.family<
 Instead of blasting all events, admins get batched summaries:
 
 **Daily 9 AM Digest:**
-```
+
+```text
 📊 JBM Impex Summary (Aug 17)
 
 👥 Users: 1 seller added (john@example.com)
@@ -291,9 +306,10 @@ Instead of blasting all events, admins get batched summaries:
 📦 Inventory: 10 transfers completed
 
 View full report → [link]
-```
+```text
 
 ### Implementation
+
 ```dart
 // Digest service (runs daily via Cloud Function)
 interface DigestNotification {
@@ -308,7 +324,7 @@ interface DigestNotification {
     //   'inventory_transfers': 10,
     // }
 }
-```
+```text
 
 ---
 
@@ -336,7 +352,7 @@ Future<void> createUser(...) {
   // Commit all or fail all
   await batch.commit();
 }
-```
+```text
 
 **Firestore Rules:** Enforce tenant_id immutability + ownership checks
 
@@ -345,6 +361,7 @@ Future<void> createUser(...) {
 ## 7. Performance Optimizations
 
 ### Firestore Query Efficiency
+
 - **Provider Auto-Disposal:** All providers autoDispose after 5 min inactivity
 - **Listener Limits:**
   - Users list: max 100 active users per workspace
@@ -353,6 +370,7 @@ Future<void> createUser(...) {
 - **Pagination:** Implement load-more for large lists (invoices, transactions)
 
 ### Caching Strategy
+
 ```dart
 final cachedWorkspaceProvider = StreamProvider.family<TenantModel, String>(
   (ref, tenantId) {
@@ -360,7 +378,7 @@ final cachedWorkspaceProvider = StreamProvider.family<TenantModel, String>(
     return ref.watch(tenantProvider(tenantId));
   },
 );
-```
+```text
 
 ---
 
@@ -369,6 +387,7 @@ final cachedWorkspaceProvider = StreamProvider.family<TenantModel, String>(
 ### JBM Impex Workspace Setup (COMPLETED)
 
 **Tenant Document Created:**
+
 ```json
 {
   "id": "jbm-impex",
@@ -381,20 +400,22 @@ final cachedWorkspaceProvider = StreamProvider.family<TenantModel, String>(
   "ownerUserId": "mgulamabas@gmail.com",
   "primaryColor": "#1976d2"
 }
-```
+```text
 
 **User Migration Script:** `migrate_to_jbm_workspace.js`
-- ✓ Migrates all users from __global__ to JBM Impex
-- ✓ Updates mgulamabas@gmail.com role from tenant_admin → admin
+
+- ✓ Migrates all users from **global** to JBM Impex
+- ✓ Updates <mgulamabas@gmail.com> role from tenant_admin → admin
 - ✓ Reassigns all sellers to JBM Impex
 - ✓ Migrates all shops, routes, transactions, invoices
 
 **Execution:**
+
 ```bash
 cd D:\Footwear
 export MIGRATION_CONFIRM=MIGRATE
 node migrate_to_jbm_workspace.js
-```
+```text
 
 ---
 
@@ -405,7 +426,7 @@ node migrate_to_jbm_workspace.js
 - [x] User creation with tenantId support (user_provider.dart)
 - [x] Data migration script created (migrate_to_jbm_workspace.js)
 - [ ] Run migration: `MIGRATION_CONFIRM=MIGRATE node migrate_to_jbm_workspace.js`
-- [ ] Verify data appears in app (login as mgulamabas@gmail.com)
+- [ ] Verify data appears in app (login as <mgulamabas@gmail.com>)
 - [ ] Test super_admin workspace switcher
 - [ ] Test tenant_admin sees only their workspace
 - [ ] (Optional) Implement activity logging feature
@@ -420,7 +441,7 @@ node migrate_to_jbm_workspace.js
 
 1. ✅ Super admin logs in → sees workspace selector dropdown
 2. ✅ Super admin selects "JBM Impex" → sees only JBM users (no role tags)
-3. ✅ Tenant admin (mgulamabas@gmail.com) logs in → no workspace selector; sees only JBM users
+3. ✅ Tenant admin (<mgulamabas@gmail.com>) logs in → no workspace selector; sees only JBM users
 4. ✅ All sellers see their shops/routes/transactions from JBM workspace
 5. ✅ No data leakage across workspaces (Firestore rules enforce tenant_id boundary)
 6. ✅ New users created in workspace selector → assigned to correct workspace
@@ -439,4 +460,4 @@ node migrate_to_jbm_workspace.js
 
 ---
 
-**End of Real-Time Enterprise Features Guide**
+## End of Real-Time Enterprise Features Guide

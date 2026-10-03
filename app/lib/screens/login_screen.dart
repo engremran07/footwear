@@ -33,6 +33,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   int _failCount = 0;
   int _lockoutSeconds = 0;
   Timer? _lockoutTimer;
+  Timer? _slowLoginTimer;
+  String? _loginErrorKey;
+  bool _loginTakingLong = false;
 
   bool get _isLockedOut => _lockoutSeconds > 0;
 
@@ -91,12 +94,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _passC.dispose();
     _emailFocus.dispose();
     _lockoutTimer?.cancel();
+    _slowLoginTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    if (_isLockedOut) return;
+    if (_isLockedOut || ref.read(authNotifierProvider).isLoading) return;
     if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _loginErrorKey = null;
+      _loginTakingLong = false;
+    });
+    _slowLoginTimer?.cancel();
+    _slowLoginTimer = Timer(const Duration(seconds: 12), () {
+      if (!mounted || !ref.read(authNotifierProvider).isLoading) return;
+      setState(() => _loginTakingLong = true);
+    });
 
     try {
       await ref
@@ -119,10 +133,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       _failCount++;
       if (_failCount >= 3) _startLockout();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        errorSnackBar(tr(AppErrorMapper.key(e), ref)),
-      );
+      setState(() {
+        _loginErrorKey = AppErrorMapper.key(e);
+        _loginTakingLong = false;
+      });
+    } finally {
+      _slowLoginTimer?.cancel();
+      _slowLoginTimer = null;
+      if (mounted && _loginTakingLong) {
+        setState(() => _loginTakingLong = false);
+      }
     }
   }
 
@@ -495,6 +515,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   delay: 200.ms,
                   duration: AppTokens.durNormal,
                 ),
+                if (_loginErrorKey != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppTokens.s12),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        tr(_loginErrorKey!, ref),
+                        key: const ValueKey('login-error-message'),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.error,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_loginTakingLong && isLoading)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppTokens.s12),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        tr('login_slow_hint', ref),
+                        key: const ValueKey('login-slow-message'),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: AppTokens.s8),
                 Row(
                   children: [

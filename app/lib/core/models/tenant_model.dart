@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'access_usage_summary.dart';
+
 class TenantModel {
   final String id;
   final String name;
@@ -47,11 +49,11 @@ class TenantModel {
       allowAdminResetOnly: json['allow_admin_reset_only'] as bool? ?? true,
       maxDevicesAllowed: ((json['max_devices_allowed'] as num?) ?? 1)
           .toInt()
-          .clamp(1, 999),
+          .clamp(1, AccessUsageSummary.maximumSlotsPerUser),
       maxActiveSessionsAllowed:
           ((json['max_active_sessions_allowed'] as num?) ?? 1).toInt().clamp(
             1,
-            999,
+            AccessUsageSummary.maximumSlotsPerUser,
           ),
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),

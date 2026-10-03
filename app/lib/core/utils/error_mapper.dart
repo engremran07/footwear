@@ -57,11 +57,17 @@ class AppErrorMapper {
 
     // ── Dart built-in errors ───────────────────────────────────────────
     final msg = error.toString().toLowerCase();
+    if (msg.contains('device-limit-reached')) return 'device_limit_reached';
+    if (msg.contains('session-limit-reached')) return 'session_limit_reached';
     if (msg.contains('google drive') || msg.contains('oauth')) {
       return 'backup_drive_error';
     }
     if (msg.contains('route_has_seller')) return 'route_has_seller';
     if (msg.contains('route_has_shops')) return 'route_has_shops';
+    if (msg.contains('already exists') ||
+        msg.contains('slug already exists')) {
+      return 'err_already_exists';
+    }
     if (msg.contains('no user found')) return 'err_user_not_found';
     if (msg.contains('not authenticated') ||
         msg.contains('sellerid must not be empty') ||

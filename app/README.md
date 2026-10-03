@@ -1,4 +1,4 @@
-﻿# FootWear ERP — Flutter App (v3.9.56+95)
+﻿# FootWear ERP — Flutter App (v3.9.57+96)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
@@ -47,6 +47,7 @@ flutter build web --release
 firebase deploy --only hosting
 
 # Release APK (split-per-ABI binaries for device delivery)
+# Windows: verify at least 3.2 GB free physical RAM before starting Gradle.
 flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
 # Output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 #         build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
@@ -58,8 +59,19 @@ flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=tru
 
 # Install to connected device
 adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/
-adb install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
+adb install --streaming -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
+
+Always check available RAM immediately before an Android release build. If
+less than 3.2 GB is free, reclaim memory and repeat the check before building.
+For phone delivery, build first, copy the matching ABI APK with `adb push`,
+then run `adb install --streaming -r` with the matching host-side APK path so
+ADB streams it to the phone.
+
+Firebase Hosting's CSP must allow `https://www.gstatic.com` in `connect-src`
+for Flutter CanvasKit WASM and `https://fonts.gstatic.com` for web fonts.
+After Hosting changes, load the deployed site in a browser and confirm the
+Flutter UI renders without CSP-blocked engine fetches.
 
 ---
 
@@ -142,6 +154,10 @@ Platform super-admin accounts are provisioned out of band. The client never embe
 | `seller` | Assigned route only — read + create transactions |
 
 Dashboard and inventory suppress transient permission-denied states during auth/profile stream warm-up. Role-scoped providers stay in loading or cached fallback until access is confirmed.
+
+Device/session checks wait for sign-in registration to finish and validate the
+latest active session for this installation. Login failures remain visible in
+the form; attempts pending beyond 12 seconds show a connection/status message.
 
 Workspace business access for platform super-admins expires after 8 hours and remains enforced by Firestore rules. Mutations require a concrete tenant; local admins manage seller accounts only; seller-stock reductions must match a same-batch invoice deduction. Financial corrections preserve prior values, actor, and reason. Exports cursor-page to exhaustion; tenant-admin restore is upsert-only, while selected super-admin restore can prune after upserting. Plaintext legacy backup archives are rejected. Transient token-refresh failures preserve the session, and Firebase initialization failure shows a retry state.
 

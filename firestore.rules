@@ -105,6 +105,74 @@ service cloud.firestore {
       return request.resource.data.size() < 100;
     }
 
+    function validAccessLimit(value) {
+      return value is int && value >= 1 && value <= 10;
+    }
+
+    function validTenantAccessPolicy(data) {
+      return (!('max_devices_allowed' in data) ||
+          validAccessLimit(data.max_devices_allowed)) &&
+        (!('max_active_sessions_allowed' in data) ||
+          validAccessLimit(data.max_active_sessions_allowed));
+    }
+
+    function validAccessSlot(slotId, maxSlots) {
+      return (slotId == 'slot_0' && maxSlots >= 1) ||
+        (slotId == 'slot_1' && maxSlots >= 2) ||
+        (slotId == 'slot_2' && maxSlots >= 3) ||
+        (slotId == 'slot_3' && maxSlots >= 4) ||
+        (slotId == 'slot_4' && maxSlots >= 5) ||
+        (slotId == 'slot_5' && maxSlots >= 6) ||
+        (slotId == 'slot_6' && maxSlots >= 7) ||
+        (slotId == 'slot_7' && maxSlots >= 8) ||
+        (slotId == 'slot_8' && maxSlots >= 9) ||
+        (slotId == 'slot_9' && maxSlots >= 10);
+    }
+
+    function tenantAccessLimit(tenantId, field) {
+      let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
+      let tenant = get(tenantPath).data;
+      let limit = field == 'max_devices_allowed'
+        ? (('max_devices_allowed' in tenant) ? tenant.max_devices_allowed : 1)
+        : (('max_active_sessions_allowed' in tenant)
+          ? tenant.max_active_sessions_allowed
+          : 1);
+      return exists(tenantPath) && tenant.tenant_id == tenantId &&
+        validAccessLimit(limit) ? limit : 0;
+    }
+
+    function canReadAccessRecord(userId, tenantId) {
+      return (isOwnDoc(userId) && isActiveUser() &&
+        currentUserTenantId() == tenantId) ||
+        (isActiveUser() && isAdminForTenant(tenantId));
+    }
+
+    function accessRecordFieldsAreValid(data, userId, tenantId, slotId) {
+      return data.user_id == userId && data.tenant_id == tenantId &&
+        data.slot_id == slotId && data.slot_number is int &&
+        data.slot_number >= 0 && data.slot_number <= 9 &&
+        data.device_id is string && data.device_id.size() >= 8 &&
+        data.device_id.size() <= 128 &&
+        data.brand is string && data.brand.size() <= 80 &&
+        data.model is string && data.model.size() <= 120 &&
+        data.platform is string && data.platform.size() <= 24 &&
+        data.os_version is string && data.os_version.size() <= 80 &&
+        data.app_version is string && data.app_version.size() <= 40;
+    }
+
+    function sessionRecordFieldsAreValid(data, userId, tenantId, slotId) {
+      return data.user_id == userId && data.tenant_id == tenantId &&
+        data.slot_id == slotId && data.slot_number is int &&
+        data.slot_number >= 0 && data.slot_number <= 9 &&
+        data.session_id is string && data.session_id.size() >= 8 &&
+        data.session_id.size() <= 128 &&
+        data.device_id is string && data.device_id.size() >= 8 &&
+        data.device_id.size() <= 128 &&
+        data.device_brand is string && data.device_brand.size() <= 80 &&
+        data.device_model is string && data.device_model.size() <= 120 &&
+        data.platform is string && data.platform.size() <= 24;
+    }
+
     // BUG-02: Sellers may only create cash_in or cash_out transactions.
     // Admin-only types: return, payment, write_off.
     function isValidSellerTransactionType(type) {
@@ -461,6 +529,147 @@ service cloud.firestore {
         isAdminForTenant(resource.data.tenant_id);
     }
 
+    // Device and application-session slots are bounded by the workspace
+    // policy. Slot documents are updated transactionally by the client; rules
+    // enforce the authoritative slot ceiling and ownership on every write.
+    match /users/{userId}/device_registrations/{slotId} {
+      allow get, list: if canReadAccessRecord(userId, resource.data.tenant_id) &&
+        resource.data.user_id == userId;
+      allow create: if isActiveUser() && isOwnDoc(userId) &&
+        request.resource.data.status == 'active' &&
+        accessRecordFieldsAreValid(
+          request.resource.data,
+          userId,
+          currentUserTenantId(),
+          slotId
+        ) &&
+        request.resource.data.slot_number <
+          tenantAccessLimit(currentUserTenantId(), 'max_devices_allowed') &&
+        request.resource.data.registered_at is timestamp &&
+        request.resource.data.registered_at == request.time &&
+        request.resource.data.last_seen_at == request.time &&
+        !('revoked_at' in request.resource.data) &&
+        !('revoked_by' in request.resource.data) && docSizeOk();
+      allow update: if (
+          isActiveUser() && isOwnDoc(userId) &&
+          resource.data.user_id == userId &&
+          resource.data.tenant_id == currentUserTenantId() &&
+          resource.data.status == 'active' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['last_seen_at', 'app_version']) &&
+          request.resource.data.last_seen_at == request.time &&
+          request.resource.data.app_version is string &&
+          request.resource.data.app_version.size() <= 40
+        ) || (
+          isActiveUser() && isAdminForTenant(resource.data.tenant_id) &&
+          resource.data.user_id == userId &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'revoked_at', 'revoked_by']) &&
+          request.resource.data.status == 'revoked' &&
+          request.resource.data.revoked_at == request.time &&
+          request.resource.data.revoked_by == request.auth.uid
+        ) || (
+          isActiveUser() && isOwnDoc(userId) &&
+          resource.data.user_id == userId &&
+          resource.data.tenant_id == currentUserTenantId() &&
+          resource.data.status == 'revoked' &&
+          request.resource.data.status == 'active' &&
+          accessRecordFieldsAreValid(
+            request.resource.data,
+            userId,
+            currentUserTenantId(),
+            slotId
+          ) &&
+          request.resource.data.slot_number <
+            tenantAccessLimit(currentUserTenantId(), 'max_devices_allowed') &&
+          request.resource.data.registered_at == request.time &&
+          request.resource.data.last_seen_at == request.time &&
+          docSizeOk()
+        ) || (
+          isActiveUser() && isOwnDoc(userId) &&
+          resource.data.user_id == userId &&
+          resource.data.tenant_id == currentUserTenantId() &&
+          resource.data.status == 'active' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'revoked_at', 'revoked_by']) &&
+          request.resource.data.status == 'revoked' &&
+          request.resource.data.revoked_at == request.time &&
+          request.resource.data.revoked_by == request.auth.uid
+        );
+      allow delete: if false;
+    }
+
+    match /users/{userId}/sessions/{slotId} {
+      allow get, list: if canReadAccessRecord(userId, resource.data.tenant_id) &&
+        resource.data.user_id == userId;
+      allow create: if isActiveUser() && isOwnDoc(userId) &&
+        request.resource.data.status == 'active' &&
+        sessionRecordFieldsAreValid(
+          request.resource.data,
+          userId,
+          currentUserTenantId(),
+          slotId
+        ) &&
+        request.resource.data.slot_number <
+          tenantAccessLimit(currentUserTenantId(), 'max_active_sessions_allowed') &&
+        request.resource.data.created_at == request.time &&
+        request.resource.data.last_seen_at == request.time &&
+        request.resource.data.expires_at is timestamp &&
+        request.resource.data.expires_at > request.time &&
+        request.resource.data.expires_at <= request.time + duration.value(8, 'h') &&
+        !('revoked_at' in request.resource.data) && docSizeOk();
+      allow update: if (
+          isActiveUser() && isOwnDoc(userId) &&
+          resource.data.user_id == userId &&
+          resource.data.tenant_id == currentUserTenantId() &&
+          resource.data.status == 'active' &&
+          resource.data.expires_at > request.time &&
+          request.resource.data.session_id == resource.data.session_id &&
+          request.resource.data.device_id == resource.data.device_id &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['last_seen_at', 'expires_at']) &&
+          request.resource.data.last_seen_at == request.time &&
+          request.resource.data.expires_at is timestamp &&
+          request.resource.data.expires_at > request.time &&
+          request.resource.data.expires_at <= request.time + duration.value(8, 'h')
+        ) || (
+          isActiveUser() && (isOwnDoc(userId) ||
+            isAdminForTenant(resource.data.tenant_id)) &&
+          resource.data.user_id == userId &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'status', 'revoked_at', 'termination_reason', 'terminated_by'
+            ]) &&
+          request.resource.data.status == 'revoked' &&
+          request.resource.data.revoked_at == request.time &&
+          request.resource.data.terminated_by == request.auth.uid &&
+          request.resource.data.termination_reason is string &&
+          request.resource.data.termination_reason.size() <= 120
+        ) || (
+          isActiveUser() && isOwnDoc(userId) &&
+          resource.data.user_id == userId &&
+          resource.data.tenant_id == currentUserTenantId() &&
+          (resource.data.status == 'revoked' ||
+            resource.data.expires_at <= request.time) &&
+          request.resource.data.status == 'active' &&
+          sessionRecordFieldsAreValid(
+            request.resource.data,
+            userId,
+            currentUserTenantId(),
+            slotId
+          ) &&
+          request.resource.data.slot_number <
+            tenantAccessLimit(currentUserTenantId(), 'max_active_sessions_allowed') &&
+          request.resource.data.created_at == request.time &&
+          request.resource.data.last_seen_at == request.time &&
+          request.resource.data.expires_at is timestamp &&
+          request.resource.data.expires_at > request.time &&
+          request.resource.data.expires_at <= request.time + duration.value(8, 'h') &&
+          docSizeOk()
+        );
+      allow delete: if false;
+    }
+
     // --- tenants -----------------------------------------------------------
     match /tenants/{tenantId} {
       allow read: if canAccessTenant(tenantId);
@@ -473,14 +682,29 @@ service cloud.firestore {
         request.resource.data.created_by == request.auth.uid &&
         request.resource.data.created_at is timestamp &&
         request.resource.data.created_at == request.time &&
+        validTenantAccessPolicy(request.resource.data) &&
         docSizeOk();
-      allow update: if isSuperAdmin() || (
+      allow update: if (isSuperAdmin() && isAdminForTenant(tenantId) &&
+        request.resource.data.tenant_id == tenantId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'slug', 'require_device_pairing', 'allow_admin_reset_only',
+          'max_devices_allowed', 'max_active_sessions_allowed',
+          'owner_user_id', 'updated_at'
+        ]) &&
+        validTenantAccessPolicy(request.resource.data) &&
+        request.resource.data.updated_at == request.time && docSizeOk()) || (
         isTenantAdmin() &&
         resource.data.tenant_id == currentUserTenantId() &&
         request.resource.data.tenant_id == tenantId &&
         request.resource.data.tenant_id == currentUserTenantId() &&
         resource.data.owner_user_id == request.auth.uid &&
         request.resource.data.owner_user_id == resource.data.owner_user_id &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'slug', 'require_device_pairing', 'allow_admin_reset_only',
+          'max_devices_allowed', 'max_active_sessions_allowed', 'updated_at'
+        ]) &&
+        validTenantAccessPolicy(request.resource.data) &&
+        request.resource.data.updated_at == request.time &&
         docSizeOk()
       );
       allow delete: if isSuperAdmin() && tenantId == currentUserTenantId();

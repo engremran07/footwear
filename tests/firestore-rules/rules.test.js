@@ -66,6 +66,23 @@ async function seedUser(uid, role, active = true, extra = {}) {
   });
 }
 
+async function seedTenant({
+  tenantId = 'tenant-1',
+  ownerUserId = 'tenant-admin-uid',
+  maxDevicesAllowed = 2,
+  maxActiveSessionsAllowed = 2,
+} = {}) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('tenants').doc(tenantId).set({
+      tenant_id: tenantId,
+      owner_user_id: ownerUserId,
+      active: true,
+      max_devices_allowed: maxDevicesAllowed,
+      max_active_sessions_allowed: maxActiveSessionsAllowed,
+    });
+  });
+}
+
 async function seedShop(shopId, data = {}) {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await ctx.firestore().collection('customers').doc(shopId).set({
@@ -1009,6 +1026,161 @@ describe('seller inventory quantity controls', () => {
         .collection('seller_inventory')
         .doc('seller-uid_variant-1')
         .update({ quantity_available: -1 }),
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Device and session slot access controls
+// ═══════════════════════════════════════════════════════════════════════════
+describe('device and session slot rules', () => {
+  function deviceData(slotNumber, overrides = {}) {
+    return {
+      user_id: 'seller-uid',
+      tenant_id: 'tenant-1',
+      slot_id: `slot_${slotNumber}`,
+      slot_number: slotNumber,
+      device_id: `installation-${slotNumber}`,
+      brand: 'Samsung',
+      model: 'SM-A576B',
+      platform: 'android',
+      os_version: '16',
+      app_version: 'test',
+      status: 'active',
+      registered_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
+      ...overrides,
+    };
+  }
+
+  function sessionData(slotNumber, overrides = {}) {
+    return {
+      user_id: 'seller-uid',
+      tenant_id: 'tenant-1',
+      slot_id: `slot_${slotNumber}`,
+      slot_number: slotNumber,
+      session_id: `session-${slotNumber}`,
+      device_id: `installation-${slotNumber}`,
+      device_brand: 'Samsung',
+      device_model: 'SM-A576B',
+      platform: 'android',
+      status: 'active',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
+      expires_at: new Date(Date.now() + 60 * 60 * 1000),
+      ...overrides,
+    };
+  }
+
+  async function seedAccessUsers() {
+    await seedTenant();
+    await seedUser('seller-uid', 'seller');
+    await seedUser('other-seller-uid', 'seller');
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+  }
+
+  it('seller can allocate own device and session slots within policy', async () => {
+    await seedAccessUsers();
+    const db = sellerCtx(testEnv).firestore();
+    await assertSucceeds(
+      db.collection('users').doc('seller-uid')
+        .collection('device_registrations').doc('slot_0')
+        .set(deviceData(0)),
+    );
+    await assertSucceeds(
+      db.collection('users').doc('seller-uid')
+        .collection('sessions').doc('slot_0')
+        .set(sessionData(0)),
+    );
+  });
+
+  it('seller cannot allocate beyond the workspace limits', async () => {
+    await seedTenant({ maxDevicesAllowed: 1, maxActiveSessionsAllowed: 1 });
+    await seedUser('seller-uid', 'seller');
+    const db = sellerCtx(testEnv).firestore();
+    await assertFails(
+      db.collection('users').doc('seller-uid')
+        .collection('device_registrations').doc('slot_1')
+        .set(deviceData(1)),
+    );
+    await assertFails(
+      db.collection('users').doc('seller-uid')
+        .collection('sessions').doc('slot_1')
+        .set(sessionData(1)),
+    );
+  });
+
+  it('cannot forge a low slot number in a higher slot document path', async () => {
+    await seedTenant({ maxDevicesAllowed: 1, maxActiveSessionsAllowed: 1 });
+    await seedUser('seller-uid', 'seller');
+    const db = sellerCtx(testEnv).firestore();
+    await assertFails(
+      db.collection('users').doc('seller-uid')
+        .collection('device_registrations').doc('slot_9')
+        .set(deviceData(0, { slot_id: 'slot_9' })),
+    );
+    await assertFails(
+      db.collection('users').doc('seller-uid')
+        .collection('sessions').doc('slot_9')
+        .set(sessionData(0, { slot_id: 'slot_9' })),
+    );
+  });
+
+  it('seller cannot read or write another user access records', async () => {
+    await seedAccessUsers();
+    const db = sellerCtx(testEnv).firestore();
+    const otherDevices = db.collection('users').doc('other-seller-uid')
+      .collection('device_registrations');
+    await assertFails(otherDevices.get());
+    await assertFails(otherDevices.doc('slot_0').set(deviceData(0, {
+      user_id: 'other-seller-uid',
+    })));
+  });
+
+  it('seller cannot change workspace access policy', async () => {
+    await seedAccessUsers();
+    await assertFails(
+      sellerCtx(testEnv).firestore().collection('tenants').doc('tenant-1')
+        .update({ max_devices_allowed: 10 }),
+    );
+  });
+
+  it('workspace owner can update valid limits but not exceed the supported cap', async () => {
+    await seedAccessUsers();
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    await assertSucceeds(
+      db.collection('tenants').doc('tenant-1').update({
+        max_devices_allowed: 3,
+        max_active_sessions_allowed: 4,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      db.collection('tenants').doc('tenant-1').update({
+        max_devices_allowed: 11,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+  });
+
+  it('workspace admin can revoke a device without changing session records', async () => {
+    await seedAccessUsers();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('users').doc('seller-uid')
+        .collection('device_registrations').doc('slot_0').set({
+          ...deviceData(0),
+          registered_at: new Date(),
+          last_seen_at: new Date(),
+        });
+    });
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    await assertSucceeds(
+      db.collection('users').doc('seller-uid')
+        .collection('device_registrations').doc('slot_0').update({
+          status: 'revoked',
+          revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
+          revoked_by: 'tenant-admin-uid',
+        }),
     );
   });
 });

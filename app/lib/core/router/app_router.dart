@@ -25,6 +25,7 @@ import '../../screens/history_screen.dart';
 import '../../screens/notification_center_screen.dart';
 import '../../screens/settings_screen.dart';
 import '../../screens/profile_screen.dart';
+import '../../screens/device_session_security_screen.dart';
 import '../../screens/invoices_list_screen.dart';
 import '../../screens/invoice_detail_screen.dart';
 import '../../screens/create_sale_invoice_screen.dart';
@@ -62,7 +63,8 @@ bool _isAdminOnlyPath(String rawPath) {
 
 bool _isTenantManagementPath(String rawPath) {
   final path = _normalizePath(rawPath);
-  return path == '/tenants';
+  return path == '/tenants' ||
+      RegExp(r'^/tenants/[^/]+/security$').hasMatch(path);
 }
 
 bool _isSellerBlockedPath(String rawPath) {
@@ -406,6 +408,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/tenants',
             pageBuilder: (_, s) => _fadePage(const TenantManagementScreen(), s),
           ),
+          GoRoute(
+            path: '/tenants/:tenantId/security',
+            pageBuilder: (_, s) => _fadePage(
+              DeviceSessionSecurityScreen(
+                tenantId: s.pathParameters['tenantId'],
+              ),
+              s,
+            ),
+          ),
           // History (7-day feed — both admin and seller)
           GoRoute(
             path: '/history',
@@ -421,6 +432,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/profile',
             pageBuilder: (_, s) => _fadePage(const ProfileScreen(), s),
+          ),
+          GoRoute(
+            path: '/profile/security',
+            pageBuilder: (_, s) =>
+                _fadePage(const DeviceSessionSecurityScreen(), s),
           ),
           // About
           GoRoute(

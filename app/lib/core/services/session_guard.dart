@@ -8,8 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../models/user_model.dart';
+import '../../models/session_model.dart';
 import '../constants/collections.dart';
 import '../l10n/app_locale.dart';
+import '../utils/session_access_policy.dart';
+import '../../providers/tenant_provider.dart';
 
 /// Role-aware session security: background lock screen + inactivity timeout.
 ///
@@ -65,6 +68,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   static const bool _enableLifecycleTrace = kDebugMode;
   static const int _maxTraceEvents = 20;
   Timer? _inactivityTimer;
+  Timer? _accessExpiryTimer;
   DateTime? _backgroundedAt;
   DateTime? _sessionStartedAt;
   DateTime? _lastActivityAt;
@@ -95,6 +99,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   void dispose() {
     _lifecycleListener.dispose();
     _inactivityTimer?.cancel();
+    _accessExpiryTimer?.cancel();
     super.dispose();
   }
 
@@ -203,6 +208,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
 
   void _onAppResumed() {
     _trace('lifecycle.resume.start');
+    unawaited(_verifyCurrentAccessSession());
     // Sync email verification: user may have clicked the link while backgrounded.
     // Fire-and-forget — auth_provider handles all error cases internally.
     ref.read(authNotifierProvider.notifier).syncEmailVerification();
@@ -291,6 +297,81 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     );
   }
 
+  Future<void> _verifyCurrentAccessSession() async {
+    final user = ref.read(authUserProvider).value;
+    if (user == null || user.isSuperAdmin || user.tenantId == null) return;
+    final userSessionAge = _sessionStartedAt == null
+        ? null
+        : DateTime.now().difference(_sessionStartedAt!);
+    try {
+      final sessions = await ref.read(userSessionsProvider(user.id).future);
+      if (sessions.isEmpty &&
+          userSessionAge != null &&
+          userSessionAge < const Duration(seconds: 15)) {
+        _trace('applicationSession.check.skipped.pendingRegistration', {
+          'elapsedSec': userSessionAge.inSeconds,
+        });
+        return;
+      }
+      await _enforceCurrentAccessSession(user, sessions);
+    } catch (error) {
+      _trace('applicationSession.check.error', {'error': error.runtimeType});
+    }
+  }
+
+  void _signOutCurrentUser(String userId) {
+    if (ref.read(authNotifierProvider).isLoading ||
+        ref.read(authUserProvider).value?.id != userId) {
+      return;
+    }
+    unawaited(ref.read(authNotifierProvider.notifier).signOut());
+  }
+
+  Future<void> _enforceCurrentAccessSession(
+    UserModel user,
+    List<SessionModel> sessions,
+  ) async {
+    if (ref.read(authNotifierProvider).isLoading) return;
+
+    final installation = await ref.read(
+      currentDeviceInstallationProvider.future,
+    );
+    if (ref.read(authNotifierProvider).isLoading ||
+        ref.read(authUserProvider).value?.id != user.id) {
+      return;
+    }
+    final now = DateTime.now();
+    final currentSession = SessionAccessPolicy.currentForDevice(
+      sessions,
+      deviceId: installation.installationId,
+      now: now,
+      userId: user.id,
+    );
+    if (currentSession == null) {
+      final hasHistoricalDeviceSession = sessions.any(
+        (session) =>
+            session.deviceId == installation.installationId &&
+            session.userId == user.id,
+      );
+      if (hasHistoricalDeviceSession) {
+        _accessExpiryTimer?.cancel();
+        _signOutCurrentUser(user.id);
+      }
+      return;
+    }
+    final expiresAt = currentSession.expiresAt?.toDate();
+    if (expiresAt == null) {
+      _accessExpiryTimer?.cancel();
+      _signOutCurrentUser(user.id);
+      return;
+    }
+    _accessExpiryTimer?.cancel();
+    _accessExpiryTimer = Timer(
+      expiresAt.difference(DateTime.now()),
+      () => _signOutCurrentUser(user.id),
+    );
+  }
+
   // ── Heartbeat ─────────────────────────────────────────────────────────────
 
   void _updateLastActive() {
@@ -344,7 +425,35 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
         _trace('signout.remoteInactiveUser', {'userId': nextUser.id});
         ref.read(authNotifierProvider.notifier).signOut();
       }
+      if (nextUser == null || nextUser.isSuperAdmin) {
+        _accessExpiryTimer?.cancel();
+      }
     });
+
+    ref.listen<AsyncValue<void>>(authNotifierProvider, (previous, next) {
+      if (previous?.isLoading != true || next.isLoading || next.hasError) {
+        return;
+      }
+      final user = ref.read(authUserProvider).value;
+      if (user == null || user.isSuperAdmin || user.tenantId == null) return;
+      ref.invalidate(userSessionsProvider(user.id));
+      unawaited(_verifyCurrentAccessSession());
+    });
+
+    final currentUser = ref.watch(authUserProvider).value;
+    if (currentUser != null &&
+        !currentUser.isSuperAdmin &&
+        currentUser.tenantId != null) {
+      ref.listen<AsyncValue<List<SessionModel>>>(
+        userSessionsProvider(currentUser.id),
+        (previous, next) {
+          final sessions = next.value;
+          if (sessions != null) {
+            unawaited(_enforceCurrentAccessSession(currentUser, sessions));
+          }
+        },
+      );
+    }
 
     return Listener(
       behavior: HitTestBehavior.translucent,

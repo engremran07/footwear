@@ -73,6 +73,21 @@ whenever fixing any issue. Catch and fix culprits found while reading touched fi
 
 - GitHub commit audit (git log + git status) is MANDATORY before every commit.
 
+- Before every Android release build, check free RAM and require at least 3.2 GB.
+  If below threshold, reclaim memory and recheck before starting Gradle.
+
+- For phone delivery, build split-per-ABI, `adb push` the matching APK to the
+  device, then run `adb install --streaming -r` with the host-side APK path.
+
+- Flutter CanvasKit and web fonts require `https://www.gstatic.com` and
+  `https://fonts.gstatic.com` in Hosting CSP `connect-src`; verify the deployed
+  page in a browser after Hosting changes.
+
+- Session enforcement must wait for access registration, choose the latest
+  active unexpired session for the installation, and never sign out a different
+  UID after an asynchronous check. Keep login failures visible; show a status
+  for attempts pending longer than 12 seconds.
+
 ## Canonical Audit Doc
 
 See AGENTS.md §10 for latest audit findings.
@@ -89,6 +104,8 @@ See AGENTS.md §10 for latest audit findings.
 
 - flutter build web --release ; firebase deploy --only hosting
 
+- Check free RAM (>=3.2 GB) before starting the APK build.
+
 - flutter build apk --release
 
 - firebase deploy --only firestore:rules,firestore:indexes
@@ -97,4 +114,4 @@ See AGENTS.md §10 for latest audit findings.
 
 - git add -A ; git commit ; git push
 
-- adb install --streaming -r (if device connected)
+- adb push matching ABI APK, then adb install --streaming -r with host APK path (if connected)

@@ -1,4 +1,5 @@
-# Release Signoff Report: ShoesERP SaaS Migration Phase 3
+`    ext
+
 **Date:** 2026-08-18  
 **Version:** 3.9.47+86  
 **Status:** ✅ **PRODUCTION READY**  
@@ -16,7 +17,7 @@ The final release-readiness phase has been completed with all gating checks pass
 4. ✅ **Web Release Built** — Production artifact deployed to Firebase Hosting
 5. ✅ **APK Release Built** — Split APK variants for all Android architectures
 6. ✅ **Firestore Deployed** — Security rules and indexes live on production
-7. ✅ **Hosting Deployed** — Web app live at https://shoeserp-clean-20260327.web.app
+7. ✅ **Hosting Deployed** — Web app live at <https://shoeserp-clean-20260327.web.app>
 8. ✅ **Device Installation Verified** — APK successfully installed on Android device
 9. ✅ **Git Commit & Push** — Release changes committed to main branch
 
@@ -36,26 +37,28 @@ The final release-readiness phase has been completed with all gating checks pass
 ### Key Fixes Applied
 
 **Device Pairing Async Contract (Line 25, [app/test/unit/core/device_pairing_test.dart](app/test/unit/core/device_pairing_test.dart))**
+
 - ❌ **Was:** `final id = DevicePairing.currentDeviceIdentifier();` (sync call to async function)
 - ✅ **Now:** `final id = await DevicePairing.currentDeviceIdentifier();` (async test, proper await)
 - **Impact:** Device identity contract validated across app_shell, auth_provider, role enforcement
 - **Scope:** Multi-tenant permission boundary enforcement, device-pairing state toggles, tenant-aware role scoping
 
 **Firestore Rules Duplicate Function ([firestore.rules](firestore.rules))**
+
 - ❌ **Was:** Two `function isSuperAdmin()` definitions (lines 38 and 69)
 - ✅ **Now:** Single canonical definition at line 38, duplicate removed
 - **Compilation Status:** `firestore.rules compiled successfully`
 
 ### Code Quality Assurance
 
-```
+```text
 flutter analyze lib --no-pub → EXIT:0
 ✓ No issues found! (ran in 8.7s)
   - 0 errors
   - 0 warnings  
   - 0 hints
   - 0 lints
-```
+```text
 
 ---
 
@@ -72,9 +75,10 @@ flutter analyze lib --no-pub → EXIT:0
 | **Asset Optimization** | Font tree-shaking enabled |
 | **Font Reductions** | CupertinoIcons (99.7%), MaterialIcons (98.8%), FontAwesome (99.3%) |
 | **Firebase Hosting Deployed** | ✅ YES (43 files uploaded) |
-| **Live URL** | https://shoeserp-clean-20260327.web.app |
+| **Live URL** | <https://shoeserp-clean-20260327.web.app> |
 
 **Cache Headers Validated:**
+
 - ✅ Shell files (index.html, flutter.js, main.dart.js, flutter_service_worker.js, version.json, manifest.json): `Cache-Control: no-cache`
 - ✅ Asset files (.css, .svg, .png, .jpg, .jpeg, .gif, .ico, .woff2, .woff, .wasm): `Cache-Control: public, max-age=31536000, immutable`
 
@@ -88,6 +92,7 @@ flutter analyze lib --no-pub → EXIT:0
 | x86_64 | ✅ Built | 34.9 MB | Emulator/x86 devices |
 
 **Build Metadata:**
+
 - **Command:** `flutter build apk --release`
 - **Gradle Task:** `assembleRelease`
 - **Build Duration:** 346.6 seconds
@@ -103,7 +108,7 @@ flutter analyze lib --no-pub → EXIT:0
 
 ### Firestore Rules & Indexes
 
-```
+```text
 firebase deploy --only firestore:rules,firestore:indexes → EXIT:0
 
 ✅ cloud.firestore: rules file firestore.rules compiled successfully
@@ -114,9 +119,10 @@ firebase deploy --only firestore:rules,firestore:indexes → EXIT:0
 
 Project: shoeserp-clean-20260327
 Deploy Time: ~12s
-```
+```text
 
 **Deployed Rules Highlights:**
+
 - Multi-tenant access control enforced via `isAdminForTenant(tenantId)`
 - Role-based permission checks: super_admin, tenant_admin, seller, admin
 - Device pairing integration in auth context
@@ -128,7 +134,7 @@ Deploy Time: ~12s
 
 ### Firebase Hosting
 
-```
+```text
 firebase deploy --only hosting → EXIT:0
 
 ✅ hosting[shoeserp-clean-20260327]: file upload complete (43 files)
@@ -137,9 +143,10 @@ firebase deploy --only hosting → EXIT:0
 
 Hosting URL: https://shoeserp-clean-20260327.web.app
 Deploy Time: ~25s
-```
+```text
 
 **Deployment Validation:**
+
 - ✅ 43 static files uploaded
 - ✅ SPA routing configured (rewrites to /index.html)
 - ✅ Cache headers applied per asset type
@@ -152,26 +159,27 @@ Deploy Time: ~25s
 
 ### Connected Devices Detected
 
-```
+```text
 flutter devices → EXIT:0
 
 ✅ SM A576B (mobile) • R5GL22RGT9V • android-arm64
    ├─ Android 16 (API 36)
    ├─ Windows (desktop)
    └─ Chrome & Edge (web)
-```
+```text
 
 ### APK Installation on Physical Device
 
-```
+```text
 flutter install --release -d R5GL22RGT9V → EXIT:0
 
 ✅ Installing app-release.apk to SM A576B...
 ✅ Uninstalling old version...
 ✅ Installing build\app\outputs\flutter-apk\app-release.apk... (13.5s)
-```
+```text
 
 **Installation Summary:**
+
 - Device: Samsung Galaxy A57 (SM A576B)
 - OS: Android 16 (API 36)
 - Architecture: ARM64
@@ -184,7 +192,7 @@ flutter install --release -d R5GL22RGT9V → EXIT:0
 
 ### Commit Details
 
-```
+```text
 Commit: 3051187
 Branch: main
 Author: GitHub Copilot (Migration Agent)
@@ -201,18 +209,19 @@ fix: resolve device pairing async contract and firestore rules duplicate functio
 - Firebase Hosting deployed at https://shoeserp-clean-20260327.web.app
 - APK release artifacts built: arm64-v8a, armeabi-v7a, universal, x86_64
 - Ready for production release
-```
+```text
 
 ### Push Status
 
-```
+```text
 git push origin main → EXIT:0
 
 To https://github.com/engremran07/footwear.git
    f98aba3..3051187  main -> main
-```
+```text
 
 **Remote Validation:**
+
 - ✅ Commit pushed to GitHub main branch
 - ✅ GitHub Actions workflow triggered (if configured)
 - ✅ No conflicts or rejections
@@ -228,7 +237,7 @@ To https://github.com/engremran07/footwear.git
 - [x] **Firestore Rules Compilation** — No syntax errors, deployed
 - [x] **Web Build Success** — app/build/web produced, 43 assets
 - [x] **APK Build Success** — All 4 ABI variants built, signed
-- [x] **Firebase Hosting Live** — https://shoeserp-clean-20260327.web.app responding
+- [x] **Firebase Hosting Live** — <https://shoeserp-clean-20260327.web.app> responding
 - [x] **Firestore Deployed** — Rules and indexes live on production
 - [x] **Device Installation** — APK installed on physical Android device
 
@@ -250,6 +259,7 @@ To https://github.com/engremran07/footwear.git
 **Contract:** Device identity must be stable, normalized, and enforced across auth, role assignment, and permission checks.
 
 **Implementation Trace:**
+
 1. [app/lib/core/utils/device_pairing.dart](app/lib/core/utils/device_pairing.dart) — `currentDeviceIdentifier()` async method
 2. [app/lib/providers/auth_provider.dart](app/lib/providers/auth_provider.dart) — Device pairing state management, `setDevicePairingState()`, `resetDevicePairing()`
 3. [app/lib/models/user_model.dart](app/lib/models/user_model.dart) — User role enum and normalization
@@ -265,6 +275,7 @@ To https://github.com/engremran07/footwear.git
 **Boundary:** All tenant-owned documents (routes, shops, transactions, invoices, products, inventory) protected by `isAdminForTenant(tenantId)` or role-based seller access.
 
 **Firestore Rules Coverage:**
+
 - ✅ Routes: require admin for tenant or super_admin
 - ✅ Shops: require admin for tenant or seller with assigned route
 - ✅ Transactions: type validation (seller cash_in/cash_out only), seller route/shop access
@@ -278,6 +289,7 @@ To https://github.com/engremran07/footwear.git
 ### Firebase Hosting SPA Configuration
 
 **Setup:**
+
 - Public directory: `app/build/web`
 - Rewrite rule: All non-asset routes rewrite to `/index.html`
 - Cache control: Shell files (no-cache), assets (immutable, 31536000s)
@@ -349,7 +361,7 @@ All previously identified issues have been resolved. The application is producti
 
 ### Generated & Verified
 
-```
+```text
 app/build/web/                          (43 files)
 ├─ index.html                           (SPA entry)
 ├─ flutter.js                           (runtime)
@@ -372,7 +384,7 @@ Firestore Indexes → (default) database (DEPLOYED)
 GitHub Branch → main (PUSHED)
 Git Commit → 3051187 (SIGNED OFF)
 Android Device → SM A576B (INSTALLED)
-```
+```text
 
 ---
 
@@ -410,6 +422,7 @@ Android Device → SM A576B (INSTALLED)
 ### Scope
 
 This release encompasses:
+
 - Device pairing async contract resolution
 - Firestore rules duplicate function fix
 - Multi-tenant SaaS access control validation
@@ -432,6 +445,7 @@ This release encompasses:
 **Status:** ✅ **APPROVED FOR PRODUCTION**
 
 **Constraints:**
+
 - No known critical issues
 - All tests passing
 - Code quality verified
@@ -439,6 +453,7 @@ This release encompasses:
 - Device installation verified
 
 **Next Steps (if required):**
+
 1. Monitor Firebase Hosting and Firestore performance metrics
 2. Observe device telemetry (Crashlytics, Analytics)
 3. Validate multi-user tenant isolation in production
@@ -451,59 +466,67 @@ This release encompasses:
 **Date:** 2026-08-18  
 **Build Version:** 3.9.47+86  
 **Release Commit:** 3051187  
-**Hosting URL:** https://shoeserp-clean-20260327.web.app
+**Hosting URL:** <https://shoeserp-clean-20260327.web.app>
 
 ---
 
 ## Appendix: Command Reference
 
 ### Test Suite
+
 ```bash
 cd app
 flutter test -r expanded
 # Result: EXIT:0 — 449 tests passed
-```
+```text
 
 ### Code Analysis
+
 ```bash
 flutter analyze lib --no-pub
 # Result: EXIT:0 — No issues found
-```
+```text
 
 ### Web Release Build
+
 ```bash
 flutter build web --release
 # Result: EXIT:0 — app/build/web (43 files)
-```
+```text
 
 ### APK Release Build
+
 ```bash
 flutter build apk --release
 # Result: EXIT:0 — 4 ABI variants, 75.8 MB main APK
-```
+```text
 
 ### Firestore Deployment
+
 ```bash
 firebase deploy --only firestore:rules,firestore:indexes
 # Result: EXIT:0 — Rules compiled, indexes deployed
-```
+```text
 
 ### Hosting Deployment
+
 ```bash
 firebase deploy --only hosting
 # Result: EXIT:0 — 43 files deployed to https://shoeserp-clean-20260327.web.app
-```
+```text
 
 ### Device Installation
+
 ```bash
 flutter install --release -d R5GL22RGT9V
 # Result: EXIT:0 — APK installed on SM A576B
-```
+```text
 
 ### Git Commit & Push
+
 ```bash
 git add [files]
 git commit -m "fix: resolve device pairing async contract and firestore rules duplicate function"
 git push origin main
 # Result: EXIT:0 — Commit 3051187 pushed to main
-```
+```text

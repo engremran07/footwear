@@ -94,6 +94,20 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 33. Copilot chat history and request IDs do not merge across GitHub identities through repository changes. Preserve durable decisions, pending tasks, audit IDs, and verification evidence in `SESSION_LOG.md` and the current audit report. On an account/profile switch, read those plus `git status`/`git diff`; never store credentials or full chat transcripts in the repository or claim separate accounts were synchronized.
 34. Keep unscoped super-admin `/settings` platform-only; never read or mutate tenant settings without active workspace support context. Keep About and What's New discoverable for every authenticated role.
 35. Do not block sign-in on full route/shop counter reconciliation or duplicate profile reads. Root super-admin dashboard workspace totals must not wait for a user query when no workspace is selected.
+36. Before every Android release build, check available physical RAM and require
+  at least 3.2 GB free before starting Gradle. If below threshold, reclaim memory
+  and recheck; never begin the build under the threshold. For connected-phone
+  delivery, build split-per-ABI, `adb push` the matching APK to
+  `/sdcard/Download/`, then run `adb install --streaming -r` with the matching
+  host-side APK path so ADB streams it to the device. Firebase Hosting CSP `connect-src` must allow
+  `https://www.gstatic.com` for CanvasKit and `https://fonts.gstatic.com`
+  for Flutter web fonts; verify the deployed page in a browser because a
+  blocked engine fetch produces a blank screen.
+37. Device/session enforcement must not run against stale records while sign-in
+  is registering access. Select the latest active, unexpired session for the
+  current installation, and only sign out the UID that was checked. Keep
+  mapped login failures visible in the form and show a localized status when
+  an attempt remains pending for 12 seconds.
 
 ## Financial Pathways (never mix these)
 
@@ -313,6 +327,9 @@ firebase deploy --only hosting
 # Must quote: Deploy complete!
 
 # 11 — APK build
+$freeRamGB = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB
+Write-Host ("Free RAM before APK build: {0:N2} GB" -f $freeRamGB)
+if ($freeRamGB -lt 3.2) { throw "At least 3.2 GB free RAM is required before starting the APK build." }
 flutter build apk --release
 
 # 12 — Firestore rules + indexes deployed (always, not just on change)
@@ -333,7 +350,7 @@ git push
 # 15 — APK install + final smoke verification
 adb devices
 adb -s <device-id> push "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" /sdcard/Download/
-adb -s <device-id> install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
+adb -s <device-id> install --streaming -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk"
 ```
 
 ## Anti-Bypass Enforcement Matrix
@@ -382,6 +399,10 @@ mandatory. Key checks in brief:
 - git add -A + git commit + git push → quote commit hash + push output
 - If device connected: adb install --streaming -r → Success
 - Verify admin and seller startup for `/` and `/inventory`; transient permission-denied UI during stream warm-up is a regression.
+
+The RAM preflight must run immediately before the APK build. For phone
+delivery, copy the built ABI APK to the device with `adb push`, then use the
+host-side APK path with `adb install --streaming -r` to stream-install it.
 
 ## Security Baseline
 

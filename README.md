@@ -1,4 +1,4 @@
-﻿# FootWear ERP — v3.9.56+95
+﻿# FootWear ERP — v3.9.57+96
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
@@ -8,6 +8,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 > **v3.9.54+93 (2026-10-03)** — Status labels are localized and high-contrast status colors are more legible.
 > **v3.9.55+94 (2026-10-03)** — Platform admins have a scoped Settings hub; About and What's New are discoverable for every role, and About dates render in Arabic and Urdu.
 > **v3.9.56+95 (2026-10-03)** — Platform dashboard no longer waits on a hidden user list; sign-in skips the full route/shop recount and duplicate profile read.
+> **v3.9.57+96 (2026-10-03)** — Account switching ignores stale same-device sessions, and login failures or long attempts are visible.
 
 ---
 
@@ -118,13 +119,26 @@ flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=tru
 #         build/app/outputs/flutter-apk/app-release.apk
 ```
 
+On Windows, check free physical RAM immediately before starting the APK build
+and require at least 3.2 GB. If less is available, reclaim memory and recheck
+before running Gradle.
+
 ### Install the release APK to a connected phone
 
 ```bash
 cd app
 adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/
-adb install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
+adb install --streaming -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
+
+For every connected-phone release, follow this order: RAM preflight, split APK
+build, `adb push` the matching ABI APK to the phone, then streamed install from
+the matching host-side APK path. ADB streams that file to the phone; the
+`install` command does not accept a remote device path as its APK argument.
+Firebase Hosting's Content-Security-Policy must include
+`https://www.gstatic.com` in `connect-src` for Flutter CanvasKit; verify the
+deployed page in a browser to catch blank-screen CSP failures. Also allow
+`https://fonts.gstatic.com` in `connect-src` for Flutter web font fetches.
 
 ### Build web
 
@@ -163,6 +177,11 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 - Platform super-admin accounts cannot be created or promoted from the client. Arbitrary-user Firebase Auth administration is not performed with client-held service-account keys; admins send password-reset email and account owners complete credential changes themselves.
 - `TenantScope` in `app/lib/core/utils/tenant_scope.dart` is the canonical helper for query and write gating.
 - `__global__` is reserved for global/system documents only.
+
+Device/session enforcement waits until access registration finishes, selects the
+latest active unexpired session for the current installation, and never signs
+out a different UID after an asynchronous check. Login failures remain visible
+in the form; attempts pending beyond 12 seconds show a localized status.
 
 ### Tenant Gating Checklist
 
@@ -267,7 +286,7 @@ grep -rn "StateProvider\b" app/lib/ --include="*.dart"
 8. `firebase deploy --only firestore:rules,firestore:indexes` on every signoff, before commit/push is considered complete.
 9. `git log --oneline -5`, `git status --short`, and `git diff --stat HEAD` → confirm only expected local changes remain.
 10. `git add -A`, `git commit -m "type: summary — vX.Y.Z+N"`, and `git push` → quote commit hash and push output.
-11. `adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/` followed by `adb install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk` to install the phone-delivery APK to a connected device when Android delivery is part of the request.
+11. Push the matching ABI APK to `/sdcard/Download/`, then run `adb install --streaming -r` with the host-side APK path when Android delivery is part of the request.
 
 ---
 

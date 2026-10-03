@@ -34,13 +34,16 @@ void main() async {
     );
     firebaseInitialized = true;
 
-    // S-01: Crashlytics — collect in release only (non-blocking)
-    FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
-    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-    PlatformDispatcher.instance.onError = (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-      return true;
-    };
+    // Crashlytics has no web implementation; avoid unhandled platform calls.
+    if (!kIsWeb) {
+      FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+      FlutterError.onError =
+          FirebaseCrashlytics.instance.recordFlutterFatalError;
+      PlatformDispatcher.instance.onError = (error, stack) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        return true;
+      };
+    }
 
     // S-06: App Check is opt-in for release Android APKs.
     // Default remains sideload-friendly unless USE_PLAY_INTEGRITY=true is set.

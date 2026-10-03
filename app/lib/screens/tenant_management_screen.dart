@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/models/tenant_model.dart';
 import '../core/utils/device_pairing.dart';
@@ -41,9 +42,9 @@ class _TenantManagementScreenState
 
   void _showMappedError(Object error) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      errorSnackBar(tr(AppErrorMapper.key(error), ref)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
   }
 
   Future<void> _createOrUpdateTenant({TenantModel? existing}) async {
@@ -55,37 +56,44 @@ class _TenantManagementScreenState
       return;
     }
 
-    final maxDevicesAllowed =
-        int.tryParse(_maxDevicesController.text.trim()) ?? 1;
-    final maxActiveSessionsAllowed =
-        int.tryParse(_maxSessionsController.text.trim()) ?? 1;
-    final notifier = ref.read(tenantManagementNotifierProvider.notifier);
-    if (existing == null) {
-      await notifier.createTenant(
-        name: name,
-        slug: _slugController.text.trim(),
-        requireDevicePairing: _requireDevicePairing,
-        allowAdminResetOnly: _allowAdminResetOnly,
-        maxDevicesAllowed: maxDevicesAllowed,
-        maxActiveSessionsAllowed: maxActiveSessionsAllowed,
-        ownerUserId: _selectedOwnerId,
-      );
-    } else {
-      await notifier.updateTenant(
-        existing.id,
-        name: name,
-        slug: _slugController.text.trim(),
-        requireDevicePairing: _requireDevicePairing,
-        allowAdminResetOnly: _allowAdminResetOnly,
-        maxDevicesAllowed: maxDevicesAllowed,
-        maxActiveSessionsAllowed: maxActiveSessionsAllowed,
-        ownerUserId: _selectedOwnerId,
-      );
-    }
+    setState(() => _isCreating = true);
+    try {
+      final maxDevicesAllowed =
+          int.tryParse(_maxDevicesController.text.trim()) ?? 1;
+      final maxActiveSessionsAllowed =
+          int.tryParse(_maxSessionsController.text.trim()) ?? 1;
+      final notifier = ref.read(tenantManagementNotifierProvider.notifier);
+      if (existing == null) {
+        await notifier.createTenant(
+          name: name,
+          slug: _slugController.text.trim(),
+          requireDevicePairing: _requireDevicePairing,
+          allowAdminResetOnly: _allowAdminResetOnly,
+          maxDevicesAllowed: maxDevicesAllowed,
+          maxActiveSessionsAllowed: maxActiveSessionsAllowed,
+          ownerUserId: _selectedOwnerId,
+        );
+      } else {
+        await notifier.updateTenant(
+          existing.id,
+          name: name,
+          slug: _slugController.text.trim(),
+          requireDevicePairing: _requireDevicePairing,
+          allowAdminResetOnly: _allowAdminResetOnly,
+          maxDevicesAllowed: maxDevicesAllowed,
+          maxActiveSessionsAllowed: maxActiveSessionsAllowed,
+          ownerUserId: _selectedOwnerId,
+        );
+      }
 
-    if (!mounted) return;
-    setState(() => _isCreating = false);
-    Navigator.of(context).pop();
+      if (!mounted) return;
+      setState(() => _isCreating = false);
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isCreating = false);
+      _showMappedError(error);
+    }
   }
 
   Future<void> _resetDevicePairing(UserModel user) async {
@@ -201,114 +209,118 @@ class _TenantManagementScreenState
       _allowAdminResetOnly = true;
       _selectedOwnerId = null;
     }
-    showModalBottomSheet<void>(
+
+    showDialog<void>(
       context: context,
-      isScrollControlled: true,
       builder: (ctx) {
         final ownerUsersAsync = ref.watch(allUsersProvider);
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+
+        return AlertDialog(
+          title: Text(
+            existing == null
+                ? tr('create_workspace', ref)
+                : tr('edit_workspace', ref),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _nameController,
+                    decoration: InputDecoration(
+                      labelText: tr('workspace_name', ref),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _slugController,
+                    decoration: InputDecoration(labelText: tr('slug', ref)),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _maxDevicesController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: tr('max_devices_allowed', ref),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _maxSessionsController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: tr('max_active_sessions_allowed', ref),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile.adaptive(
+                    value: _requireDevicePairing,
+                    onChanged: (value) =>
+                        setState(() => _requireDevicePairing = value),
+                    title: Text(tr('require_device_pairing', ref)),
+                  ),
+                  SwitchListTile.adaptive(
+                    value: _allowAdminResetOnly,
+                    onChanged: (value) =>
+                        setState(() => _allowAdminResetOnly = value),
+                    title: Text(tr('admin_reset_only', ref)),
+                  ),
+                  const SizedBox(height: 12),
+                  ownerUsersAsync.when(
+                    data: (users) {
+                      return DropdownButtonFormField<String>(
+                        initialValue: _selectedOwnerId,
+                        items: [
+                          DropdownMenuItem<String>(
+                            value: null,
+                            child: Text(tr('no_owner', ref)),
+                          ),
+                          ...users.map(
+                            (user) => DropdownMenuItem<String>(
+                              value: user.id,
+                              child: Text(
+                                user.displayName.trim().isEmpty
+                                    ? user.email
+                                    : user.displayName,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _selectedOwnerId = value),
+                        decoration: InputDecoration(labelText: tr('owner', ref)),
+                      );
+                    },
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (_, _) => const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(tr('cancel', ref)),
+            ),
+            FilledButton.icon(
+              onPressed: _isCreating
+                  ? null
+                  : () async {
+                      setState(() => _isCreating = true);
+                      await _createOrUpdateTenant(existing: existing);
+                    },
+              icon: const Icon(Icons.save_alt),
+              label: Text(
                 existing == null
                     ? tr('create_workspace', ref)
-                    : tr('edit_workspace', ref),
-                style: Theme.of(ctx).textTheme.titleLarge,
+                    : tr('save_changes', ref),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: tr('workspace_name', ref),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _slugController,
-                decoration: InputDecoration(labelText: tr('slug', ref)),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _maxDevicesController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: tr('max_devices_allowed', ref),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _maxSessionsController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: tr('max_active_sessions_allowed', ref),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile.adaptive(
-                value: _requireDevicePairing,
-                onChanged: (value) =>
-                    setState(() => _requireDevicePairing = value),
-                title: Text(tr('require_device_pairing', ref)),
-              ),
-              SwitchListTile.adaptive(
-                value: _allowAdminResetOnly,
-                onChanged: (value) =>
-                    setState(() => _allowAdminResetOnly = value),
-                title: Text(tr('admin_reset_only', ref)),
-              ),
-              const SizedBox(height: 12),
-              ownerUsersAsync.when(
-                data: (users) {
-                  return DropdownButtonFormField<String>(
-                    initialValue: _selectedOwnerId,
-                    items: [
-                      DropdownMenuItem<String>(
-                        value: null,
-                        child: Text(tr('no_owner', ref)),
-                      ),
-                      ...users.map(
-                        (user) => DropdownMenuItem<String>(
-                          value: user.id,
-                          child: Text(
-                            user.displayName.trim().isEmpty
-                                ? user.email
-                                : user.displayName,
-                          ),
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) =>
-                        setState(() => _selectedOwnerId = value),
-                    decoration: InputDecoration(labelText: tr('owner', ref)),
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, _) => const SizedBox.shrink(),
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _isCreating
-                    ? null
-                    : () async {
-                        setState(() => _isCreating = true);
-                        await _createOrUpdateTenant(existing: existing);
-                      },
-                icon: const Icon(Icons.save_alt),
-                label: Text(
-                  existing == null
-                      ? tr('create_workspace', ref)
-                      : tr('save_changes', ref),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
@@ -393,6 +405,16 @@ class _TenantManagementScreenState
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),
+                          if (currentUser?.isTenantAdmin == true ||
+                              (currentUser?.isSuperAdmin == true &&
+                                  currentUser?.activeWorkspaceId == tenant.id))
+                            IconButton(
+                              tooltip: tr('security_devices_sessions', ref),
+                              onPressed: () => context.push(
+                                '/tenants/${tenant.id}/security',
+                              ),
+                              icon: const Icon(Icons.phonelink_lock_outlined),
+                            ),
                           if (canEditTenant(tenant))
                             IconButton(
                               onPressed: () =>

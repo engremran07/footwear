@@ -130,6 +130,20 @@ void main() {
   });
 
   group('AppErrorMapper.key — plain Dart errors', () {
+    test('device allocation limit has a specific message', () {
+      expect(
+        AppErrorMapper.key(StateError('device-limit-reached')),
+        equals('device_limit_reached'),
+      );
+    });
+
+    test('session allocation limit has a specific message', () {
+      expect(
+        AppErrorMapper.key(StateError('session-limit-reached')),
+        equals('session_limit_reached'),
+      );
+    });
+
     test('exception containing "socket" → err_network', () {
       expect(
         AppErrorMapper.key(Exception('socket closed')),

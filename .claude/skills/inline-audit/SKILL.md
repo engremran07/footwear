@@ -142,6 +142,9 @@ firebase deploy --only hosting        # quote "Deploy complete!"
 
 # Step 4 — APK build
 
+$freeRamGB = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB
+Write-Host ("Free RAM before APK build: {0:N2} GB" -f $freeRamGB)
+if ($freeRamGB -lt 3.2) { throw "At least 3.2 GB free RAM is required before starting the APK build." }
 flutter build apk --release           # quote file size
 
 # Step 5 — deploy Firestore (ALWAYS, not just on rules change)
@@ -160,12 +163,18 @@ git push                              # quote branch + hash
 
 adb devices
 adb -s <device-id> push "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" /sdcard/Download/
-adb -s <device-id> install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk  # quote "Success"
+adb -s <device-id> install --streaming -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk"  # quote "Success"
 
 ```
 
 Any step skipped = **incomplete session**. Next agent MUST check `git log`
 before starting new work and complete all missing steps first.
+
+The RAM preflight is required immediately before Gradle starts. If free RAM is
+below 3.2 GB, reclaim memory and recheck first. Device delivery order is build,
+`adb push` the matching ABI APK to `/sdcard/Download/`, then use its host-side
+path with `adb install --streaming -r` to stream-install it. The install command
+does not accept a remote device path as its APK argument.
 
 ## Inline Audit Checklist (run mentally on every PR)
 
@@ -189,6 +198,7 @@ before starting new work and complete all missing steps first.
 [ ] allUsersExportProvider used with await .future (not .value ?? [] cache read)
 [ ] Export providers are NOT autoDispose (one-shot Firestore .get() must survive past first microtask)
 [ ] Every ref.read(exportProvider.future) has ref.invalidate() before it for fresh data
+[ ] SessionGuard defers enforcement during sign-in, prefers the latest valid same-device session, and scopes sign-out to the checked UID
 
 ```
 

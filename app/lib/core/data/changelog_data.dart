@@ -28,6 +28,23 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.57',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Switching accounts on one device no longer lets a stale session sign you out, and sign-in failures stay visible.',
+          AppLocale.ar:
+              'لم يعد سجل جلسة قديم يسجّل خروجك عند تبديل الحسابات على الجهاز نفسه، وأصبحت أخطاء تسجيل الدخول واضحة.',
+          AppLocale.ur:
+              'ایک ہی ڈیوائس پر اکاؤنٹس بدلنے پر اب پرانا سیشن آپ کو سائن آؤٹ نہیں کرتا، اور سائن اِن کی خرابی واضح دکھائی دیتی ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.56',
     date: 'October 2026',
     items: [
