@@ -16,6 +16,8 @@ class TenantModel {
   final Timestamp createdAt;
   final Timestamp updatedAt;
   final String? ownerUserId;
+  final Timestamp? archivedAt;
+  final String? archivedBy;
   final String? primaryColor;
   final String? accentColor;
 
@@ -33,6 +35,8 @@ class TenantModel {
     required this.createdAt,
     required this.updatedAt,
     this.ownerUserId,
+    this.archivedAt,
+    this.archivedBy,
     this.primaryColor,
     this.accentColor,
   });
@@ -58,6 +62,8 @@ class TenantModel {
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
       ownerUserId: json['owner_user_id'] as String?,
+      archivedAt: json['archived_at'] as Timestamp?,
+      archivedBy: json['archived_by'] as String?,
       primaryColor: json['primary_color'] as String?,
       accentColor: json['accent_color'] as String?,
     );
@@ -76,6 +82,8 @@ class TenantModel {
     'created_at': createdAt,
     'updated_at': updatedAt,
     'owner_user_id': ownerUserId,
+    if (archivedAt != null) 'archived_at': archivedAt,
+    if (archivedBy != null) 'archived_by': archivedBy,
     'primary_color': primaryColor,
     'accent_color': accentColor,
   };

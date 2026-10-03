@@ -116,17 +116,28 @@ service cloud.firestore {
           validAccessLimit(data.max_active_sessions_allowed));
     }
 
-    function validAccessSlot(slotId, maxSlots) {
-      return (slotId == 'slot_0' && maxSlots >= 1) ||
-        (slotId == 'slot_1' && maxSlots >= 2) ||
-        (slotId == 'slot_2' && maxSlots >= 3) ||
-        (slotId == 'slot_3' && maxSlots >= 4) ||
-        (slotId == 'slot_4' && maxSlots >= 5) ||
-        (slotId == 'slot_5' && maxSlots >= 6) ||
-        (slotId == 'slot_6' && maxSlots >= 7) ||
-        (slotId == 'slot_7' && maxSlots >= 8) ||
-        (slotId == 'slot_8' && maxSlots >= 9) ||
-        (slotId == 'slot_9' && maxSlots >= 10);
+    function validTenantLifecycleTransition(currentData, nextData) {
+      let changed = nextData.diff(currentData).affectedKeys();
+      return !changed.hasAny(['active', 'archived_at', 'archived_by']) ||
+        (nextData.active == false &&
+          nextData.archived_at == request.time &&
+          nextData.archived_by == request.auth.uid) ||
+        (nextData.active == true &&
+          !('archived_at' in nextData) &&
+          !('archived_by' in nextData));
+    }
+
+    function validAccessSlot(slotId, slotNumber, maxSlots) {
+      return (slotId == 'slot_0' && slotNumber == 0 && maxSlots >= 1) ||
+        (slotId == 'slot_1' && slotNumber == 1 && maxSlots >= 2) ||
+        (slotId == 'slot_2' && slotNumber == 2 && maxSlots >= 3) ||
+        (slotId == 'slot_3' && slotNumber == 3 && maxSlots >= 4) ||
+        (slotId == 'slot_4' && slotNumber == 4 && maxSlots >= 5) ||
+        (slotId == 'slot_5' && slotNumber == 5 && maxSlots >= 6) ||
+        (slotId == 'slot_6' && slotNumber == 6 && maxSlots >= 7) ||
+        (slotId == 'slot_7' && slotNumber == 7 && maxSlots >= 8) ||
+        (slotId == 'slot_8' && slotNumber == 8 && maxSlots >= 9) ||
+        (slotId == 'slot_9' && slotNumber == 9 && maxSlots >= 10);
     }
 
     function tenantAccessLimit(tenantId, field) {
@@ -164,6 +175,8 @@ service cloud.firestore {
       return data.user_id == userId && data.tenant_id == tenantId &&
         data.slot_id == slotId && data.slot_number is int &&
         data.slot_number >= 0 && data.slot_number <= 9 &&
+        data.device_slot_id is string &&
+        data.device_slot_id.matches('^slot_[0-9]$') &&
         data.session_id is string && data.session_id.size() >= 8 &&
         data.session_id.size() <= 128 &&
         data.device_id is string && data.device_id.size() >= 8 &&
@@ -171,6 +184,20 @@ service cloud.firestore {
         data.device_brand is string && data.device_brand.size() <= 80 &&
         data.device_model is string && data.device_model.size() <= 120 &&
         data.platform is string && data.platform.size() <= 24;
+    }
+
+    function sessionDeviceIsRegistered(data, userId, tenantId) {
+      let devicePath = /databases/$(database)/documents/users/$(userId)/device_registrations/$(data.device_slot_id);
+      return existsAfter(devicePath) &&
+        getAfter(devicePath).data.user_id == userId &&
+        getAfter(devicePath).data.tenant_id == tenantId &&
+        getAfter(devicePath).data.status == 'active' &&
+        getAfter(devicePath).data.device_id == data.device_id &&
+        validAccessSlot(
+          data.device_slot_id,
+          getAfter(devicePath).data.slot_number,
+          tenantAccessLimit(tenantId, 'max_devices_allowed')
+        );
     }
 
     // BUG-02: Sellers may only create cash_in or cash_out transactions.
@@ -543,8 +570,11 @@ service cloud.firestore {
           currentUserTenantId(),
           slotId
         ) &&
-        request.resource.data.slot_number <
-          tenantAccessLimit(currentUserTenantId(), 'max_devices_allowed') &&
+        validAccessSlot(
+          slotId,
+          request.resource.data.slot_number,
+          tenantAccessLimit(currentUserTenantId(), 'max_devices_allowed')
+        ) &&
         request.resource.data.registered_at is timestamp &&
         request.resource.data.registered_at == request.time &&
         request.resource.data.last_seen_at == request.time &&
@@ -580,8 +610,11 @@ service cloud.firestore {
             currentUserTenantId(),
             slotId
           ) &&
-          request.resource.data.slot_number <
-            tenantAccessLimit(currentUserTenantId(), 'max_devices_allowed') &&
+          validAccessSlot(
+            slotId,
+            request.resource.data.slot_number,
+            tenantAccessLimit(currentUserTenantId(), 'max_devices_allowed')
+          ) &&
           request.resource.data.registered_at == request.time &&
           request.resource.data.last_seen_at == request.time &&
           docSizeOk()
@@ -610,8 +643,16 @@ service cloud.firestore {
           currentUserTenantId(),
           slotId
         ) &&
-        request.resource.data.slot_number <
-          tenantAccessLimit(currentUserTenantId(), 'max_active_sessions_allowed') &&
+        validAccessSlot(
+          slotId,
+          request.resource.data.slot_number,
+          tenantAccessLimit(currentUserTenantId(), 'max_active_sessions_allowed')
+        ) &&
+        sessionDeviceIsRegistered(
+          request.resource.data,
+          userId,
+          currentUserTenantId()
+        ) &&
         request.resource.data.created_at == request.time &&
         request.resource.data.last_seen_at == request.time &&
         request.resource.data.expires_at is timestamp &&
@@ -626,8 +667,16 @@ service cloud.firestore {
           resource.data.expires_at > request.time &&
           request.resource.data.session_id == resource.data.session_id &&
           request.resource.data.device_id == resource.data.device_id &&
+          request.resource.data.device_slot_id is string &&
+          (!('device_slot_id' in resource.data) ||
+            request.resource.data.device_slot_id == resource.data.device_slot_id) &&
+          sessionDeviceIsRegistered(
+            request.resource.data,
+            userId,
+            currentUserTenantId()
+          ) &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['last_seen_at', 'expires_at']) &&
+            .hasOnly(['last_seen_at', 'expires_at', 'device_slot_id']) &&
           request.resource.data.last_seen_at == request.time &&
           request.resource.data.expires_at is timestamp &&
           request.resource.data.expires_at > request.time &&
@@ -658,8 +707,16 @@ service cloud.firestore {
             currentUserTenantId(),
             slotId
           ) &&
-          request.resource.data.slot_number <
-            tenantAccessLimit(currentUserTenantId(), 'max_active_sessions_allowed') &&
+          validAccessSlot(
+            slotId,
+            request.resource.data.slot_number,
+            tenantAccessLimit(currentUserTenantId(), 'max_active_sessions_allowed')
+          ) &&
+          sessionDeviceIsRegistered(
+            request.resource.data,
+            userId,
+            currentUserTenantId()
+          ) &&
           request.resource.data.created_at == request.time &&
           request.resource.data.last_seen_at == request.time &&
           request.resource.data.expires_at is timestamp &&
@@ -689,8 +746,9 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'name', 'slug', 'require_device_pairing', 'allow_admin_reset_only',
           'max_devices_allowed', 'max_active_sessions_allowed',
-          'owner_user_id', 'updated_at'
+          'owner_user_id', 'updated_at', 'active', 'archived_at', 'archived_by'
         ]) &&
+        validTenantLifecycleTransition(resource.data, request.resource.data) &&
         validTenantAccessPolicy(request.resource.data) &&
         request.resource.data.updated_at == request.time && docSizeOk()) || (
         isTenantAdmin() &&

@@ -90,9 +90,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'sign_in_failed': 'Sign in failed',
     'remember_me': 'Remember me',
     'about_us': 'About Us',
-    'platform_settings': 'Platform Settings',
-    'platform_settings_scope':
-        'Select a workspace before opening its business settings.',
     'contact_us': 'Contact Us',
     'app_version': 'App Version',
     'version_info': 'Version Info',
@@ -186,6 +183,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_account_role_invalid':
         'Your account role is unsupported. Contact your workspace administrator.',
     'err_user_disabled': 'This account has been disabled. Contact admin.',
+    'session_limit_reached':
+        'Active session limit reached. End another session or ask your workspace administrator.',
+    'workspace_disabled':
+        'This workspace has been archived. Contact your platform administrator.',
     'err_too_many_requests':
         'Too many attempts. Please wait a moment and try again.',
     'err_email_in_use': 'This email is already registered.',
@@ -336,6 +337,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'bad_debts_report': 'Bad Debts Report',
     'transfer_history': 'Transfer History',
     'settings': 'Settings',
+    'platform_settings': 'Platform Settings',
+    'platform_settings_scope':
+        'Global access is limited to workspace management, profile preferences, About, and What’s New. Business settings require an active support workspace.',
 
     // ── Dashboard ──
     'todays_snapshot': "Today's Snapshot",
@@ -705,7 +709,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'status_unknown': 'Unknown status',
     'slug': 'Slug',
     'max_devices_allowed': 'Max devices allowed',
-    'max_active_sessions_allowed': 'Max active sessions allowed',
     'require_device_pairing': 'Require device pairing',
     'admin_reset_only': 'Admin reset only',
     'no_owner': 'No owner',
@@ -716,54 +719,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'device_pairing_disabled': 'Device pairing disabled',
     'no_workspaces_yet': 'No workspaces yet',
     'authorized_devices': 'Authorized devices',
-    'security_devices_sessions': 'Devices & sessions',
-    'access_security_title': 'Security & devices',
-    'access_workspace_unavailable': 'Workspace access is unavailable',
-    'access_devices': 'Devices',
-    'access_active_sessions': 'Active sessions',
-    'access_allowed': 'Allowed',
-    'access_registered': 'Registered',
-    'access_available': 'Available',
-    'access_active': 'Active',
-    'access_current_device': 'Current device',
-    'access_policy_reduced_notice':
-        'Existing devices and sessions remain visible after a limit is reduced. New allocations are blocked until usage is within the new limit.',
-    'access_no_devices': 'No registered devices',
-    'access_no_sessions': 'No application sessions',
-    'access_user': 'User',
-    'access_device': 'Device',
-    'access_status': 'Status',
-    'access_related_sessions': 'Related sessions',
-    'access_device_revoke_effect':
-        'This removes the device registration only. Associated sessions are not terminated. The device may register again if a slot is available.',
-    'access_device_removed': 'Device registration removed',
-    'access_terminate_session': 'Terminate session',
-    'access_session_terminate_effect':
-        'This closes the supported app session on this device. It does not revoke Firebase tokens; direct access may remain until token expiry.',
-    'access_session_terminated': 'Application session terminated',
-    'access_started': 'Started',
-    'access_unknown_user': 'Unknown user',
-    'access_unknown_device': 'Unknown device',
-    'access_app_version': 'App',
-    'access_registered_at': 'Registered',
-    'access_last_seen': 'Last active',
-    'access_policy_title': 'Device & session policy',
-    'access_policy_devices': 'Maximum registered devices per user',
-    'access_policy_devices_help': '1 to 10 app installations',
-    'access_policy_sessions': 'Maximum active sessions per user',
-    'access_policy_sessions_help': '1 to 10 concurrent app sessions',
-    'access_policy_range': 'Enter a whole number from 1 to 10 for each limit',
-    'access_policy_saved': 'Security policy saved',
-    'access_registry_limit_notice':
-        'Showing up to 200 device and 200 session records for this workspace.',
-    'access_over_limit': 'Over limit by',
-    'access_status_active': 'Active',
-    'access_status_revoked': 'Revoked',
-    'access_status_expired': 'Expired',
-    'device_limit_reached':
-        'Device limit reached. Ask your workspace administrator to remove an unused registration.',
-    'session_limit_reached':
-        'Active session limit reached. End another session or ask your workspace administrator.',
     'no_members_yet': 'No members yet',
     'paired': 'Paired',
     'not_paired': 'Not paired',
@@ -1334,8 +1289,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Login Screen ──
     'login_online': 'Online',
     'login_offline': 'Offline',
-    'login_slow_hint':
-        'Sign-in is taking longer than expected. Check your connection; if it does not finish, return here and try again.',
     'tooltip_show_password': 'Show password',
     'tooltip_hide_password': 'Hide password',
     'login_tagline': 'Route & Distribution ERP',
@@ -1404,7 +1357,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_invoices': 'Invoices',
     'backup_settings': 'Workspace settings',
     'backup_now': 'Backup Now',
+    'backup_create_file': 'Create encrypted backup file',
     'backup_to_google_drive': 'Back up to Google Drive',
+    'restore_from_device': 'Restore from this device',
     'restore_from_google_drive': 'Restore from Google Drive',
     'backup_drive_success': 'Backup uploaded to your Google Drive',
     'backup_drive_none': 'No ShoesERP backups found in your Google Drive',
@@ -1412,6 +1367,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'Google Drive is not configured or authorization was not granted. Contact the administrator.',
     'backup_drive_not_configured':
         'Automatic Google Drive backup is unavailable until this build is configured.',
+    'backup_delete_title': 'Delete backup',
+    'backup_delete_prompt':
+        'Permanently delete %s from Google Drive? This cannot be undone.',
+    'backup_delete_success': 'Google Drive backup deleted',
+    'backup_delete_local_prompt': 'Permanently delete "%s" from this device?',
+    'backup_delete_local_success': 'Device backup deleted',
     'backup_restore_scope_denied':
         'Backup and restore access is limited by your workspace role.',
     'backup_in_progress': 'Creating backup…',
@@ -1420,6 +1381,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_nav_subtitle': 'Backup, restore & auto-schedule',
     'backup_never': 'Never',
     'backup_last_at': 'Last backup: %s',
+    'backup_last_local_at': 'Last file export: %s',
+    'backup_last_drive_at': 'Last Google Drive backup: %s',
     'backup_last_restore_at': 'Last restore: %s',
     'backup_last_restore_by': 'by %s',
     'backup_auto_title': 'Auto-backup',
@@ -1437,6 +1400,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'This will replace data covered by the backup. This action cannot be undone.',
     'backup_restore_merge_warning':
         'Records missing from this backup will remain in the workspace.',
+    'backup_restore_reauth_title': 'Confirm password to restore backup',
+    'backup_restore_reauth_hint':
+        'Enter your account password to continue with this restore.',
+    'backup_restore_reauth_wrong': 'The password is incorrect. Try again.',
     'backup_restore_checksum_ok': '✓ File integrity verified',
     'backup_restore_checksum_fail':
         '✗ Integrity check failed — file may be corrupted or tampered',
@@ -1473,8 +1440,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'sign_in_failed': 'فشل تسجيل الدخول',
     'remember_me': 'تذكرني',
     'about_us': 'من نحن',
-    'platform_settings': 'إعدادات المنصة',
-    'platform_settings_scope': 'اختر مساحة عمل لفتح إعدادات أعمالها.',
     'contact_us': 'اتصل بنا',
     'app_version': 'إصدار التطبيق',
     'version_info': 'معلومات الإصدار',
@@ -1564,6 +1529,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_account_role_invalid':
         'دور الحساب غير مدعوم. تواصل مع مسؤول مساحة العمل.',
     'err_user_disabled': 'تم تعطيل هذا الحساب. تواصل مع المسؤول.',
+    'session_limit_reached':
+        'تم الوصول إلى الحد الأقصى للجلسات النشطة. أنهِ جلسة أخرى أو تواصل مع مسؤول مساحة العمل.',
+    'workspace_disabled': 'تمت أرشفة مساحة العمل هذه. تواصل مع مسؤول المنصة.',
     'err_too_many_requests': 'محاولات كثيرة. انتظر قليلاً وحاول مرة أخرى.',
     'err_email_in_use': 'هذا البريد الإلكتروني مسجل بالفعل.',
     'err_weak_password': 'كلمة المرور ضعيفة. استخدم 8 أحرف على الأقل.',
@@ -1708,6 +1676,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'bad_debts_report': 'تقرير الديون المعدومة',
     'transfer_history': 'سجل التحويلات',
     'settings': 'الإعدادات',
+    'platform_settings': 'إعدادات المنصة',
+    'platform_settings_scope':
+        'يقتصر الوصول العام على إدارة مساحات العمل وتفضيلات الملف الشخصي والنبذة والجديد. تتطلب إعدادات الأعمال مساحة عمل دعم نشطة.',
 
     // ── Dashboard ──
     'todays_snapshot': 'لمحة اليوم',
@@ -2079,7 +2050,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'status_unknown': 'حالة غير معروفة',
     'slug': 'المعرف',
     'max_devices_allowed': 'أقصى عدد للأجهزة المسموح بها',
-    'max_active_sessions_allowed': 'أقصى عدد الجلسات النشطة المسموح بها',
     'require_device_pairing': 'يتطلب اقتران الجهاز',
     'admin_reset_only': 'إعادة تعيين من قبل المشرف فقط',
     'no_owner': 'بدون مالك',
@@ -2090,54 +2060,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'device_pairing_disabled': 'تم تعطيل اقتران الجهاز',
     'no_workspaces_yet': 'لا توجد مساحات بعد',
     'authorized_devices': 'الأجهزة المصرح بها',
-    'security_devices_sessions': 'الأجهزة والجلسات',
-    'access_security_title': 'أمان الأجهزة والجلسات',
-    'access_workspace_unavailable': 'الوصول إلى مساحة العمل غير متاح',
-    'access_devices': 'الأجهزة',
-    'access_active_sessions': 'الجلسات النشطة',
-    'access_allowed': 'المسموح',
-    'access_registered': 'المسجل',
-    'access_available': 'المتاح',
-    'access_active': 'النشط',
-    'access_current_device': 'هذا الجهاز',
-    'access_policy_reduced_notice':
-        'تبقى الأجهزة والجلسات الحالية ظاهرة بعد خفض الحد. يُمنع تسجيل جديد حتى يصبح الاستخدام ضمن الحد الجديد.',
-    'access_no_devices': 'لا توجد أجهزة مسجلة',
-    'access_no_sessions': 'لا توجد جلسات تطبيق',
-    'access_user': 'المستخدم',
-    'access_device': 'الجهاز',
-    'access_status': 'الحالة',
-    'access_related_sessions': 'الجلسات المرتبطة',
-    'access_device_revoke_effect':
-        'يزيل هذا تسجيل الجهاز فقط ولا ينهي جلساته المرتبطة. يمكن للجهاز التسجيل مجدداً إذا توفرت خانة.',
-    'access_device_removed': 'تمت إزالة تسجيل الجهاز',
-    'access_terminate_session': 'إنهاء الجلسة',
-    'access_session_terminate_effect':
-        'ينهي هذا جلسة التطبيق المدعومة على هذا الجهاز. لا تُلغى رموز Firebase، وقد يبقى الوصول المباشر حتى انتهاء الرمز.',
-    'access_session_terminated': 'تم إنهاء جلسة التطبيق',
-    'access_started': 'بدأت',
-    'access_unknown_user': 'مستخدم غير معروف',
-    'access_unknown_device': 'جهاز غير معروف',
-    'access_app_version': 'التطبيق',
-    'access_registered_at': 'تاريخ التسجيل',
-    'access_last_seen': 'آخر نشاط',
-    'access_policy_title': 'سياسة الأجهزة والجلسات',
-    'access_policy_devices': 'الحد الأقصى للأجهزة المسجلة لكل مستخدم',
-    'access_policy_devices_help': 'من 1 إلى 10 تثبيتات للتطبيق',
-    'access_policy_sessions': 'الحد الأقصى للجلسات النشطة لكل مستخدم',
-    'access_policy_sessions_help': 'من 1 إلى 10 جلسات متزامنة',
-    'access_policy_range': 'أدخل عدداً صحيحاً من 1 إلى 10 لكل حد',
-    'access_policy_saved': 'تم حفظ سياسة الأمان',
-    'access_registry_limit_notice':
-        'يُعرض حتى 200 سجل جهاز و200 سجل جلسة لمساحة العمل.',
-    'access_over_limit': 'تجاوز الحد بمقدار',
-    'access_status_active': 'نشط',
-    'access_status_revoked': 'ملغى',
-    'access_status_expired': 'منتهي',
-    'device_limit_reached':
-        'تم بلوغ حد الأجهزة. اطلب من مسؤول مساحة العمل إزالة تسجيل غير مستخدم.',
-    'session_limit_reached':
-        'تم بلوغ حد الجلسات النشطة. أنهِ جلسة أخرى أو تواصل مع مسؤول مساحة العمل.',
     'no_members_yet': 'لا يوجد أعضاء بعد',
     'paired': 'متصل',
     'not_paired': 'غير مقترن',
@@ -2703,8 +2625,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Login Screen ──
     'login_online': 'متصل',
     'login_offline': 'غير متصل',
-    'login_slow_hint':
-        'تسجيل الدخول يستغرق وقتًا أطول من المتوقع. تحقق من اتصالك؛ إذا لم يكتمل، ارجع إلى هنا وحاول مرة أخرى.',
     'tooltip_show_password': 'إظهار كلمة المرور',
     'tooltip_hide_password': 'إخفاء كلمة المرور',
     'login_tagline': 'نظام إدارة المناطق والتوزيع',
@@ -2770,7 +2690,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_invoices': 'الفواتير',
     'backup_settings': 'إعدادات مساحة العمل',
     'backup_now': 'نسخ الآن',
+    'backup_create_file': 'إنشاء ملف نسخة احتياطية مشفر',
     'backup_to_google_drive': 'النسخ الاحتياطي إلى Google Drive',
+    'restore_from_device': 'الاستعادة من هذا الجهاز',
     'restore_from_google_drive': 'الاستعادة من Google Drive',
     'backup_drive_success':
         'تم رفع النسخة الاحتياطية إلى Google Drive الخاص بك',
@@ -2780,6 +2702,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'Google Drive غير مهيأ أو لم تتم الموافقة على التفويض. تواصل مع المسؤول.',
     'backup_drive_not_configured':
         'النسخ التلقائي إلى Google Drive غير متاح حتى يتم إعداد هذا الإصدار.',
+    'backup_delete_title': 'حذف النسخة الاحتياطية',
+    'backup_delete_prompt':
+        'حذف %s نهائياً من Google Drive؟ لا يمكن التراجع عن ذلك.',
+    'backup_delete_success': 'تم حذف نسخة Google Drive الاحتياطية',
+    'backup_delete_local_prompt': 'حذف "%s" نهائياً من هذا الجهاز؟',
+    'backup_delete_local_success': 'تم حذف النسخة الاحتياطية من الجهاز',
     'backup_restore_scope_denied':
         'صلاحية النسخ والاستعادة محدودة حسب دورك في مساحة العمل.',
     'backup_in_progress': 'جارٍ إنشاء النسخة الاحتياطية…',
@@ -2787,6 +2715,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_nav_subtitle': 'نسخ احتياطي، استعادة وجدولة تلقائية',
     'backup_never': 'لا يوجد',
     'backup_last_at': 'آخر نسخة: %s',
+    'backup_last_local_at': 'آخر تصدير للملف: %s',
+    'backup_last_drive_at': 'آخر نسخة احتياطية على Google Drive: %s',
     'backup_last_restore_at': 'آخر استعادة: %s',
     'backup_last_restore_by': 'بواسطة %s',
     'backup_auto_title': 'نسخ احتياطي تلقائي',
@@ -2804,6 +2734,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'ستستبدل هذه العملية البيانات الموجودة في النسخة الاحتياطية. لا يمكن التراجع عن هذا الإجراء.',
     'backup_restore_merge_warning':
         'ستبقى السجلات غير الموجودة في هذه النسخة داخل مساحة العمل.',
+    'backup_restore_reauth_title': 'تأكيد كلمة المرور لاستعادة النسخة',
+    'backup_restore_reauth_hint': 'أدخل كلمة مرور حسابك للمتابعة في الاستعادة.',
+    'backup_restore_reauth_wrong': 'كلمة المرور غير صحيحة. حاول مرة أخرى.',
     'backup_restore_checksum_ok': '✓ تم التحقق من سلامة الملف',
     'backup_restore_checksum_fail':
         '✗ فشل التحقق — قد يكون الملف تالفاً أو معدلاً',
@@ -2840,9 +2773,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'sign_in_failed': 'سائن ان ناکام',
     'remember_me': 'مجھے یاد رکھیں',
     'about_us': 'ہمارے بارے میں',
-    'platform_settings': 'پلیٹ فارم کی ترتیبات',
-    'platform_settings_scope':
-        'کاروباری ترتیبات کھولنے کے لیے ورک اسپیس منتخب کریں۔',
     'contact_us': 'ہم سے رابطہ کریں',
     'app_version': 'ایپ ورژن',
     'version_info': 'ورژن کی معلومات',
@@ -2931,6 +2861,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_account_role_invalid':
         'آپ کے اکاؤنٹ کا کردار معاونت یافتہ نہیں۔ ورک اسپیس منتظم سے رابطہ کریں۔',
     'err_user_disabled': 'یہ اکاؤنٹ غیر فعال ہے۔ ایڈمن سے رابطہ کریں۔',
+    'session_limit_reached':
+        'فعال سیشن کی حد پوری ہو گئی ہے۔ دوسرا سیشن ختم کریں یا اپنے ورک اسپیس منتظم سے رابطہ کریں۔',
+    'workspace_disabled':
+        'یہ ورک اسپیس آرکائیو کر دی گئی ہے۔ پلیٹ فارم ایڈمن سے رابطہ کریں۔',
     'err_too_many_requests':
         'بہت زیادہ کوششیں۔ تھوڑی دیر بعد دوبارہ کوشش کریں۔',
     'err_email_in_use': 'یہ ای میل پہلے سے رجسٹرڈ ہے۔',
@@ -3082,6 +3016,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'bad_debts_report': 'ناقابل وصول قرض رپورٹ',
     'transfer_history': 'منتقلی تاریخ',
     'settings': 'ترتیبات',
+    'platform_settings': 'پلیٹ فارم سیٹنگز',
+    'platform_settings_scope':
+        'عمومی رسائی ورک اسپیس مینجمنٹ، پروفائل ترجیحات، تعارف اور نئی تبدیلیوں تک محدود ہے۔ کاروباری سیٹنگز کے لیے فعال سپورٹ ورک اسپیس ضروری ہے۔',
 
     // ── Dashboard ──
     'todays_snapshot': 'آج کا خلاصہ',
@@ -3456,8 +3393,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'status_unknown': 'نامعلوم حالت',
     'slug': 'سلاگ',
     'max_devices_allowed': 'اجازت دیے گئے ڈیوائسز کی زیادہ سے زیادہ تعداد',
-    'max_active_sessions_allowed':
-        'اجازت دی گئی فعال سیشنز کی زیادہ سے زیادہ تعداد',
     'require_device_pairing': 'ڈیوائس جوڑا ضروری ہے',
     'admin_reset_only': 'صرف ایڈمن دوبارہ سیٹ کر سکتا ہے',
     'no_owner': 'کوئی مالک نہیں',
@@ -3468,54 +3403,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'device_pairing_disabled': 'ڈیوائس جوڑا غیر فعال ہے',
     'no_workspaces_yet': 'ابھی تک کوئی ورک اسپیس نہیں',
     'authorized_devices': 'اجازت یافتہ ڈیوائسز',
-    'security_devices_sessions': 'ڈیوائسز اور سیشنز',
-    'access_security_title': 'ڈیوائس اور سیشن سیکیورٹی',
-    'access_workspace_unavailable': 'ورک اسپیس تک رسائی دستیاب نہیں',
-    'access_devices': 'ڈیوائسز',
-    'access_active_sessions': 'فعال سیشنز',
-    'access_allowed': 'اجازت یافتہ',
-    'access_registered': 'رجسٹرڈ',
-    'access_available': 'دستیاب',
-    'access_active': 'فعال',
-    'access_current_device': 'موجودہ ڈیوائس',
-    'access_policy_reduced_notice':
-        'حد کم ہونے کے بعد موجودہ ڈیوائسز اور سیشنز دکھائی دیتے رہیں گے۔ استعمال نئی حد کے اندر آنے تک نئی رجسٹریشن روکی جائے گی۔',
-    'access_no_devices': 'کوئی ڈیوائس رجسٹرڈ نہیں',
-    'access_no_sessions': 'کوئی ایپ سیشن نہیں',
-    'access_user': 'صارف',
-    'access_device': 'ڈیوائس',
-    'access_status': 'حالت',
-    'access_related_sessions': 'متعلقہ سیشنز',
-    'access_device_revoke_effect':
-        'یہ صرف ڈیوائس رجسٹریشن ہٹاتا ہے، متعلقہ سیشن ختم نہیں کرتا۔ جگہ دستیاب ہو تو ڈیوائس دوبارہ رجسٹر ہو سکتی ہے۔',
-    'access_device_removed': 'ڈیوائس رجسٹریشن ہٹا دی گئی',
-    'access_terminate_session': 'سیشن ختم کریں',
-    'access_session_terminate_effect':
-        'یہ اس ڈیوائس پر معاون ایپ سیشن بند کرتا ہے۔ Firebase ٹوکن منسوخ نہیں ہوتے؛ ٹوکن کی میعاد تک براہ راست رسائی ممکن رہ سکتی ہے۔',
-    'access_session_terminated': 'ایپ سیشن ختم کر دیا گیا',
-    'access_started': 'شروع',
-    'access_unknown_user': 'نامعلوم صارف',
-    'access_unknown_device': 'نامعلوم ڈیوائس',
-    'access_app_version': 'ایپ',
-    'access_registered_at': 'رجسٹرڈ',
-    'access_last_seen': 'آخری سرگرمی',
-    'access_policy_title': 'ڈیوائس اور سیشن پالیسی',
-    'access_policy_devices': 'فی صارف زیادہ سے زیادہ رجسٹرڈ ڈیوائسز',
-    'access_policy_devices_help': 'ایپ کی 1 سے 10 انسٹالیشنز',
-    'access_policy_sessions': 'فی صارف زیادہ سے زیادہ فعال سیشنز',
-    'access_policy_sessions_help': 'ایک وقت میں 1 سے 10 سیشنز',
-    'access_policy_range': 'ہر حد کے لیے 1 سے 10 تک مکمل عدد درج کریں',
-    'access_policy_saved': 'سیکیورٹی پالیسی محفوظ ہو گئی',
-    'access_registry_limit_notice':
-        'اس ورک اسپیس کے لیے زیادہ سے زیادہ 200 ڈیوائس اور 200 سیشن ریکارڈ دکھائے جا رہے ہیں۔',
-    'access_over_limit': 'حد سے زائد',
-    'access_status_active': 'فعال',
-    'access_status_revoked': 'منسوخ',
-    'access_status_expired': 'میعاد ختم',
-    'device_limit_reached':
-        'ڈیوائس حد پوری ہو گئی۔ غیر استعمال شدہ رجسٹریشن ہٹانے کے لیے ورک اسپیس ایڈمن سے رابطہ کریں۔',
-    'session_limit_reached':
-        'فعال سیشن کی حد پوری ہو گئی۔ دوسرا سیشن ختم کریں یا ورک اسپیس ایڈمن سے رابطہ کریں۔',
     'no_members_yet': 'ابھی تک کوئی ممبر نہیں',
     'paired': 'جوڑا لگا',
     'not_paired': 'جوڑا نہیں',
@@ -4086,8 +3973,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Login Screen ──
     'login_online': 'آن لائن',
     'login_offline': 'آف لائن',
-    'login_slow_hint':
-        'سائن اِن میں توقع سے زیادہ وقت لگ رہا ہے۔ اپنا انٹرنیٹ کنکشن چیک کریں؛ اگر مکمل نہ ہو تو یہاں واپس آ کر دوبارہ کوشش کریں۔',
     'tooltip_show_password': 'پاس ورڈ دکھائیں',
     'tooltip_hide_password': 'پاس ورڈ چھپائیں',
     'login_tagline': 'علاقے اور ڈسٹری بیوشن ERP',
@@ -4156,7 +4041,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_invoices': 'انوائسز',
     'backup_settings': 'ورک اسپیس سیٹنگز',
     'backup_now': 'ابھی بیک اپ کریں',
+    'backup_create_file': 'انکرپٹڈ بیک اپ فائل بنائیں',
     'backup_to_google_drive': 'Google Drive پر بیک اپ کریں',
+    'restore_from_device': 'اس ڈیوائس سے ریسٹور کریں',
     'restore_from_google_drive': 'Google Drive سے ریسٹور کریں',
     'backup_drive_success': 'بیک اپ آپ کے Google Drive پر اپ لوڈ ہو گیا',
     'backup_drive_none': 'آپ کے Google Drive میں ShoesERP بیک اپ نہیں ملا',
@@ -4164,6 +4051,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'Google Drive کنفیگر نہیں ہے یا اجازت نہیں دی گئی۔ ایڈمن سے رابطہ کریں۔',
     'backup_drive_not_configured':
         'اس بلڈ کی کنفیگریشن تک Google Drive خودکار بیک اپ دستیاب نہیں ہے۔',
+    'backup_delete_title': 'بیک اپ حذف کریں',
+    'backup_delete_prompt':
+        'Google Drive سے %s مستقل طور پر حذف کریں؟ یہ واپس نہیں ہو سکتا۔',
+    'backup_delete_success': 'Google Drive بیک اپ حذف ہو گیا',
+    'backup_delete_local_prompt': 'اس ڈیوائس سے "%s" مستقل طور پر حذف کریں؟',
+    'backup_delete_local_success': 'ڈیوائس بیک اپ حذف ہو گیا',
     'backup_restore_scope_denied':
         'بیک اپ اور ریسٹور کی اجازت آپ کے ورک اسپیس کردار تک محدود ہے۔',
     'backup_in_progress': 'بیک اپ بنایا جا رہا ہے…',
@@ -4171,6 +4064,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_nav_subtitle': 'بیک اپ، ریسٹور اور خودکار شیڈول',
     'backup_never': 'کبھی نہیں',
     'backup_last_at': 'آخری بیک اپ: %s',
+    'backup_last_local_at': 'آخری فائل ایکسپورٹ: %s',
+    'backup_last_drive_at': 'آخری Google Drive بیک اپ: %s',
     'backup_last_restore_at': 'آخری ریسٹور: %s',
     'backup_last_restore_by': '%s کی طرف سے',
     'backup_auto_title': 'خودکار بیک اپ',
@@ -4188,6 +4083,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'بیک اپ میں شامل ڈیٹا تبدیل ہو جائے گا۔ یہ عمل واپس نہیں ہو سکتا۔',
     'backup_restore_merge_warning':
         'اس بیک اپ میں شامل نہ ہونے والے ریکارڈز ورک اسپیس میں برقرار رہیں گے۔',
+    'backup_restore_reauth_title': 'بیک اپ بحال کرنے کے لیے پاس ورڈ کی تصدیق',
+    'backup_restore_reauth_hint':
+        'بحالی جاری رکھنے کے لیے اپنا اکاؤنٹ پاس ورڈ درج کریں۔',
+    'backup_restore_reauth_wrong': 'پاس ورڈ درست نہیں۔ دوبارہ کوشش کریں۔',
     'backup_restore_checksum_ok': '✓ فائل کی سالمیت تصدیق شدہ',
     'backup_restore_checksum_fail':
         '✗ سالمیت جانچ ناکام — فائل خراب ہو سکتی ہے',

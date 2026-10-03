@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/tenant_scope.dart';
@@ -37,23 +36,6 @@ class DatabaseFlushNotifier extends AsyncNotifier<void> {
       throw ArgumentError(
         'Only super_admin may flush the currently selected workspace',
       );
-    }
-  }
-
-  /// Re-authenticates the current user with their password.
-  /// Returns true if successful.
-  Future<bool> reauthenticate(String password) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.email == null) return false;
-    try {
-      final credential = EmailAuthProvider.credential(
-        email: user.email!,
-        password: password,
-      );
-      await user.reauthenticateWithCredential(credential);
-      return true;
-    } on FirebaseAuthException {
-      return false;
     }
   }
 

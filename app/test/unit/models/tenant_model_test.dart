@@ -17,6 +17,8 @@ void main() {
         createdAt: ts,
         updatedAt: ts,
         ownerUserId: 'owner-1',
+        archivedAt: ts,
+        archivedBy: 'platform-admin-1',
         primaryColor: '#123456',
         accentColor: '#654321',
       );
@@ -30,6 +32,8 @@ void main() {
       expect(restored.plan, original.plan);
       expect(restored.maxDevicesAllowed, original.maxDevicesAllowed);
       expect(restored.ownerUserId, original.ownerUserId);
+      expect(restored.archivedAt, original.archivedAt);
+      expect(restored.archivedBy, original.archivedBy);
       expect(restored.primaryColor, original.primaryColor);
       expect(restored.accentColor, original.accentColor);
     });

@@ -28,74 +28,18 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
-    version: '3.9.57',
+    version: '3.9.58',
     date: 'October 2026',
     items: [
       ChangelogItem(
         emoji: '🔐',
         text: {
           AppLocale.en:
-              'Switching accounts on one device no longer lets a stale session sign you out, and sign-in failures stay visible.',
+              'Encrypted backups now separate file export from Google Drive, and workspace restore and archive actions follow your access scope.',
           AppLocale.ar:
-              'لم يعد سجل جلسة قديم يسجّل خروجك عند تبديل الحسابات على الجهاز نفسه، وأصبحت أخطاء تسجيل الدخول واضحة.',
+              'تفصل النسخ الاحتياطية المشفرة بين تصدير الملف وGoogle Drive، وتلتزم إجراءات الاستعادة والأرشفة بصلاحيات مساحة العمل.',
           AppLocale.ur:
-              'ایک ہی ڈیوائس پر اکاؤنٹس بدلنے پر اب پرانا سیشن آپ کو سائن آؤٹ نہیں کرتا، اور سائن اِن کی خرابی واضح دکھائی دیتی ہے۔',
-        },
-      ),
-    ],
-  ),
-  ChangelogEntry(
-    version: '3.9.56',
-    date: 'October 2026',
-    items: [
-      ChangelogItem(
-        emoji: '⚡',
-        text: {
-          AppLocale.en:
-              'The platform dashboard now shows workspace totals without waiting for a user list that is only needed after selecting a workspace.',
-          AppLocale.ar:
-              'يعرض لوحة المنصة إجماليات مساحات العمل دون انتظار قائمة المستخدمين التي لا تلزم إلا بعد اختيار مساحة عمل.',
-          AppLocale.ur:
-              'پلیٹ فارم ڈیش بورڈ اب ورک اسپیس کے مجموعے دکھانے کے لیے صارف فہرست کا انتظار نہیں کرتا؛ یہ فہرست صرف ورک اسپیس منتخب کرنے کے بعد درکار ہوتی ہے۔',
-        },
-      ),
-      ChangelogItem(
-        emoji: '🚀',
-        text: {
-          AppLocale.en:
-              'Sign-in no longer waits for a full route and shop recount, and it reuses the profile already loaded during authentication.',
-          AppLocale.ar:
-              'لم يعد تسجيل الدخول ينتظر إعادة عدّ المسارات والمتاجر بالكامل، ويعيد استخدام ملف المستخدم الذي تم تحميله أثناء المصادقة.',
-          AppLocale.ur:
-              'سائن ان اب مکمل روٹ اور شاپ کی دوبارہ گنتی کا انتظار نہیں کرتا، اور تصدیق کے دوران لوڈ شدہ پروفائل دوبارہ استعمال کرتا ہے۔',
-        },
-      ),
-    ],
-  ),
-  ChangelogEntry(
-    version: '3.9.55',
-    date: 'October 2026',
-    items: [
-      ChangelogItem(
-        emoji: '⚙️',
-        text: {
-          AppLocale.en:
-              'Platform admins now have a safe Settings hub for workspaces, profile preferences, About, and What’s New. Business settings remain tied to a selected workspace.',
-          AppLocale.ar:
-              'أصبح لدى مسؤولي المنصة مركز إعدادات آمن لمساحات العمل والتفضيلات والنبذة والجديد. تظل إعدادات الأعمال مرتبطة بمساحة عمل محددة.',
-          AppLocale.ur:
-              'پلیٹ فارم ایڈمنز کے لیے ورک اسپیس، پروفائل ترجیحات، تعارف اور نئی تبدیلیوں کا محفوظ سیٹنگز مرکز دستیاب ہے۔ کاروباری سیٹنگز منتخب ورک اسپیس سے منسلک رہتی ہیں۔',
-        },
-      ),
-      ChangelogItem(
-        emoji: 'ℹ️',
-        text: {
-          AppLocale.en:
-              'About is available from app navigation for every role, and its release date now renders in Arabic and Urdu.',
-          AppLocale.ar:
-              'أصبحت صفحة النبذة متاحة من تنقل التطبيق لجميع الأدوار، ويظهر تاريخ الإصدار الآن بالعربية والأردية.',
-          AppLocale.ur:
-              'About صفحہ اب ہر کردار کے لیے ایپ نیویگیشن میں دستیاب ہے، اور ریلیز کی تاریخ عربی اور اردو میں دکھتی ہے۔',
+              'انکرپٹڈ بیک اپ فائل ایکسپورٹ اور Google Drive کو الگ کرتے ہیں، جبکہ بحالی اور آرکائیو آپ کی ورک اسپیس کی اجازت کے مطابق ہوتے ہیں۔',
         },
       ),
     ],

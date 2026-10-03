@@ -659,6 +659,21 @@ class AuthNotifier extends AsyncNotifier<void> {
     await firebaseUser.updatePassword(trimmedNew);
   }
 
+  Future<bool> reauthenticateCurrentUser(String password) async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null || firebaseUser.email == null) return false;
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: firebaseUser.email!,
+        password: password,
+      );
+      await firebaseUser.reauthenticateWithCredential(credential);
+      return true;
+    } on FirebaseAuthException {
+      return false;
+    }
+  }
+
   Future<void> sendOwnVerificationEmail() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {

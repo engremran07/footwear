@@ -99,9 +99,7 @@ class DashboardScreen extends ConsumerWidget {
                         color: AppBrand.warningColor,
                       ),
                       title: Text(
-                        tx.shopName.isNotEmpty
-                          ? tx.shopName
-                          : tr('shop', ref),
+                        tx.shopName.isNotEmpty ? tx.shopName : tr('shop', ref),
                       ),
                       subtitle: Text(
                         '${AppFormatters.dateTime(tx.createdAt)} • '

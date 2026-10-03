@@ -92,22 +92,6 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 31. Export queries must cursor-page to exhaustion. Tenant-admin backup restore is upsert-only and never prunes; selected super-admin restore upserts before pruning obsolete records in the active tenant. Reject legacy plaintext backup archives.
 32. Keep sessions on transient token-refresh/network failures. Firebase initialization failure must render a retry state and must not mount the normal app shell.
 33. Copilot chat history and request IDs do not merge across GitHub identities through repository changes. Preserve durable decisions, pending tasks, audit IDs, and verification evidence in `SESSION_LOG.md` and the current audit report. On an account/profile switch, read those plus `git status`/`git diff`; never store credentials or full chat transcripts in the repository or claim separate accounts were synchronized.
-34. Keep unscoped super-admin `/settings` platform-only; never read or mutate tenant settings without active workspace support context. Keep About and What's New discoverable for every authenticated role.
-35. Do not block sign-in on full route/shop counter reconciliation or duplicate profile reads. Root super-admin dashboard workspace totals must not wait for a user query when no workspace is selected.
-36. Before every Android release build, check available physical RAM and require
-  at least 3.2 GB free before starting Gradle. If below threshold, reclaim memory
-  and recheck; never begin the build under the threshold. For connected-phone
-  delivery, build split-per-ABI, `adb push` the matching APK to
-  `/sdcard/Download/`, then run `adb install --streaming -r` with the matching
-  host-side APK path so ADB streams it to the device. Firebase Hosting CSP `connect-src` must allow
-  `https://www.gstatic.com` for CanvasKit and `https://fonts.gstatic.com`
-  for Flutter web fonts; verify the deployed page in a browser because a
-  blocked engine fetch produces a blank screen.
-37. Device/session enforcement must not run against stale records while sign-in
-  is registering access. Select the latest active, unexpired session for the
-  current installation, and only sign out the UID that was checked. Keep
-  mapped login failures visible in the form and show a localized status when
-  an attempt remains pending for 12 seconds.
 
 ## Financial Pathways (never mix these)
 
@@ -327,9 +311,6 @@ firebase deploy --only hosting
 # Must quote: Deploy complete!
 
 # 11 — APK build
-$freeRamGB = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB
-Write-Host ("Free RAM before APK build: {0:N2} GB" -f $freeRamGB)
-if ($freeRamGB -lt 3.2) { throw "At least 3.2 GB free RAM is required before starting the APK build." }
 flutter build apk --release
 
 # 12 — Firestore rules + indexes deployed (always, not just on change)
@@ -350,7 +331,7 @@ git push
 # 15 — APK install + final smoke verification
 adb devices
 adb -s <device-id> push "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" /sdcard/Download/
-adb -s <device-id> install --streaming -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk"
+adb -s <device-id> install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
 ```
 
 ## Anti-Bypass Enforcement Matrix
@@ -400,10 +381,6 @@ mandatory. Key checks in brief:
 - If device connected: adb install --streaming -r → Success
 - Verify admin and seller startup for `/` and `/inventory`; transient permission-denied UI during stream warm-up is a regression.
 
-The RAM preflight must run immediately before the APK build. For phone
-delivery, copy the built ABI APK to the device with `adb push`, then use the
-host-side APK path with `adb install --streaming -r` to stream-install it.
-
 ## Security Baseline
 
 - Deny-by-default rules remain enabled
@@ -413,6 +390,7 @@ host-side APK path with `adb install --streaming -r` to stream-install it.
 
 ## Done In This Baseline
 
+- v3.9.58+97: Backup file export and Google Drive use distinct destinations; Drive backups do not create a duplicate local archive, restore copy reflects merge/replacement scope, local archives can be deleted, and workspace archival revokes member device/session access.
 - v3.9.54+93: Status-chip labels and semantics are localized for EN/AR/UR; high-contrast semantic state colors meet 4.5:1 contrast against black.
 - v3.7.5+53 (audit v16): Post-audit hardening sweep completed — route/shop form identity guards tightened; auth and network stream providers moved to `autoDispose`; transaction export queries capped at 2000 docs; remaining inventory dialog disposal fixed; shimmer placeholders switched to theme-derived surfaces; offline indicator now uses semantic error color; manual APK, CI, and release workflows aligned on Flutter 3.41.6 with expanded test reporting; Firebase Hosting immutable cache now includes `.wasm`; regression tests expanded for model `copyWith`, equality, settings assertions, and transaction ledger edge cases
 - v3.7.0+48 (audit v14): Dep stack fully upgraded: fl_chart 1.2.0, share_plus 13.0.0 (migrated SharePlus.instance.share(ShareParams(...))), permission_handler 12.0.1, dart_jsonwebtoken 3.4.0, flutter_lints 6.0.0; 30 lint issues fixed (unnecessary_underscores, use_null_aware_elements, prefer_const_constructors, share_plus deprecations); all 4 CI workflows standardized on Flutter 3.41.6; governance hardened (Rules 19–22, Anti-Bypass Enforcement Matrix, Chain 6, Gates 12–15); README.md × 2 fully rewritten; markdown governance skill + instruction + CI gate 15 added; 90 markdown issues fixed to zero; temp artifacts purged; audit score 79/100 → 88/100

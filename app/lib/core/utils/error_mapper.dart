@@ -64,8 +64,7 @@ class AppErrorMapper {
     }
     if (msg.contains('route_has_seller')) return 'route_has_seller';
     if (msg.contains('route_has_shops')) return 'route_has_shops';
-    if (msg.contains('already exists') ||
-        msg.contains('slug already exists')) {
+    if (msg.contains('already exists') || msg.contains('slug already exists')) {
       return 'err_already_exists';
     }
     if (msg.contains('no user found')) return 'err_user_not_found';
@@ -84,6 +83,7 @@ class AppErrorMapper {
     if (msg.contains('no data') || msg.contains('no records')) {
       return 'err_export_no_data';
     }
+    if (msg.contains('workspace-disabled')) return 'workspace_disabled';
     if (msg.contains('pdf') || msg.contains('export failed')) {
       return 'err_pdf_failed';
     }

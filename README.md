@@ -1,4 +1,4 @@
-﻿# FootWear ERP — v3.9.57+96
+﻿# FootWear ERP — v3.9.58+97
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
@@ -6,9 +6,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 > **v3.9.50+89 (2026-08-18)** — Tenant permissions are enforced across business collections, invoice-generated ledger records carry workspace identity, and Google Drive backup configuration is shared by web and Android builds.
 > **v3.9.53+92 (2026-10-03)** — Tenant admins merge encrypted backups into their own workspace; selected platform admins can prune only within their active support workspace. Unsupported roles and workspace-less accounts receive recovery guidance instead of being treated as sellers.
 > **v3.9.54+93 (2026-10-03)** — Status labels are localized and high-contrast status colors are more legible.
-> **v3.9.55+94 (2026-10-03)** — Platform admins have a scoped Settings hub; About and What's New are discoverable for every role, and About dates render in Arabic and Urdu.
-> **v3.9.56+95 (2026-10-03)** — Platform dashboard no longer waits on a hidden user list; sign-in skips the full route/shop recount and duplicate profile read.
-> **v3.9.57+96 (2026-10-03)** — Account switching ignores stale same-device sessions, and login failures or long attempts are visible.
+> **v3.9.58+97 (2026-10-03)** — Encrypted file and Drive backup destinations are explicit, workspace restore matches access scope, local archives can be deleted, and workspace archival revokes member access.
 
 ---
 
@@ -26,8 +24,6 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 - **Reports** — monthly cash flow BarChart, outstanding PieChart, PDF/Excel/image export
 - **User Management** — create/edit admin and seller accounts, soft-delete; password reset by email
 - **Settings** — workspace-scoped company name, logo (base64 ≤50 KB), pairs-per-carton, business preferences, and per-workspace device pairing limits
-- **Platform Settings** — super-admins can open workspace management, profile preferences, About, and What's New without exposing tenant settings outside an active support workspace
-- **About** — available from app navigation to every authenticated role, with localized release dates and What's New
 - **Profile** — name, language, theme and password controls for all users
 
 ### Seller
@@ -119,10 +115,6 @@ flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=tru
 #         build/app/outputs/flutter-apk/app-release.apk
 ```
 
-On Windows, check free physical RAM immediately before starting the APK build
-and require at least 3.2 GB. If less is available, reclaim memory and recheck
-before running Gradle.
-
 ### Install the release APK to a connected phone
 
 ```bash
@@ -130,15 +122,6 @@ cd app
 adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/
 adb install --streaming -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
-
-For every connected-phone release, follow this order: RAM preflight, split APK
-build, `adb push` the matching ABI APK to the phone, then streamed install from
-the matching host-side APK path. ADB streams that file to the phone; the
-`install` command does not accept a remote device path as its APK argument.
-Firebase Hosting's Content-Security-Policy must include
-`https://www.gstatic.com` in `connect-src` for Flutter CanvasKit; verify the
-deployed page in a browser to catch blank-screen CSP failures. Also allow
-`https://fonts.gstatic.com` in `connect-src` for Flutter web font fetches.
 
 ### Build web
 
@@ -173,15 +156,9 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 - Every tenant-scoped business document (`users`, `routes`, `customers`/`shops`, `products`, `seller_inventory`, `transactions`, `invoices`, etc.) must carry `tenant_id`.
 - `tenant_admin` is scoped to a single tenant. `super_admin` is a platform operator and sees workspace metadata globally, but sees no workspace business records by default.
 - Super-admin business support requires selecting one active workspace and entering a reason; the app records access start/end in append-only `platform_access_logs`. Firestore rules enforce the selected workspace regardless of client navigation.
-- Without a selected workspace, super-admin Settings is a platform-only hub; business settings remain available only inside the selected support workspace. About and What's New remain accessible to all roles.
 - Platform super-admin accounts cannot be created or promoted from the client. Arbitrary-user Firebase Auth administration is not performed with client-held service-account keys; admins send password-reset email and account owners complete credential changes themselves.
 - `TenantScope` in `app/lib/core/utils/tenant_scope.dart` is the canonical helper for query and write gating.
 - `__global__` is reserved for global/system documents only.
-
-Device/session enforcement waits until access registration finishes, selects the
-latest active unexpired session for the current installation, and never signs
-out a different UID after an asynchronous check. Login failures remain visible
-in the form; attempts pending beyond 12 seconds show a localized status.
 
 ### Tenant Gating Checklist
 
@@ -286,7 +263,7 @@ grep -rn "StateProvider\b" app/lib/ --include="*.dart"
 8. `firebase deploy --only firestore:rules,firestore:indexes` on every signoff, before commit/push is considered complete.
 9. `git log --oneline -5`, `git status --short`, and `git diff --stat HEAD` → confirm only expected local changes remain.
 10. `git add -A`, `git commit -m "type: summary — vX.Y.Z+N"`, and `git push` → quote commit hash and push output.
-11. Push the matching ABI APK to `/sdcard/Download/`, then run `adb install --streaming -r` with the host-side APK path when Android delivery is part of the request.
+11. `adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/` followed by `adb install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk` to install the phone-delivery APK to a connected device when Android delivery is part of the request.
 
 ---
 

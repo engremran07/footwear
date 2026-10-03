@@ -75,7 +75,19 @@ class LocalBackupFile {
 
   const LocalBackupFile({required this.file, required this.modifiedAt});
 
-  String get name => file.path.split(Platform.pathSeparator).last;
+  String get name =>
+      file.uri.pathSegments.isEmpty ? file.path : file.uri.pathSegments.last;
+
+  bool isStoredIn(Directory directory) =>
+      file.absolute.parent.path.toLowerCase() ==
+      directory.absolute.path.toLowerCase();
+}
+
+enum BackupDestination {
+  userExport,
+  googleDrive;
+
+  bool get savesLocalCopy => this == BackupDestination.userExport;
 }
 
 // ─── Notifier ─────────────────────────────────────────────────────────────────
@@ -141,7 +153,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
     return DateTime.fromMillisecondsSinceEpoch(ms);
   }
 
-  Future<DateTime?> _getLastDriveBackupAt() async {
+  Future<DateTime?> getLastDriveBackupAt() async {
     final key = await _scopedPreferenceKey(_kLastDriveBackupMs);
     final ms = (await _prefs).getInt(key);
     if (ms == null) return null;
@@ -282,6 +294,36 @@ class DatabaseBackupNotifier extends Notifier<void> {
             .toList()
           ..sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
     return files;
+  }
+
+  Future<void> deleteLocalBackup(
+    LocalBackupFile backup, {
+    required String tenantId,
+    required String creatorUid,
+  }) async {
+    final user = await _requireBackupAdministrator();
+    final normalizedTenantId = TenantScope.normalize(tenantId);
+    final normalizedCreatorUid = creatorUid.trim();
+    if (normalizedTenantId == null ||
+        normalizedTenantId != TenantScope.normalize(user.tenantId) ||
+        normalizedCreatorUid != user.id) {
+      throw StateError('Local backup is outside the signed-in user scope');
+    }
+    if (!backup.file.path.endsWith('.shoesbackup') &&
+        !backup.file.path.endsWith('.json')) {
+      throw StateError('Unsupported local backup file type');
+    }
+    final directory = await _backupDir(
+      tenantId: normalizedTenantId,
+      creatorUid: normalizedCreatorUid,
+    );
+    if (!backup.isStoredIn(directory)) {
+      throw StateError('Local backup is outside the permitted folder');
+    }
+    if (!await backup.file.exists()) {
+      throw StateError('Local backup no longer exists');
+    }
+    await backup.file.delete();
   }
 
   Future<String> _saveToLocal(
@@ -549,6 +591,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
   createBackup({
     required Set<String> selected,
     required String encryptionPassword,
+    required BackupDestination destination,
     String? tenantIdOverride,
   }) async {
     final adminUser = await _requireBackupAdministrator();
@@ -557,15 +600,10 @@ class DatabaseBackupNotifier extends Notifier<void> {
     if (selected.isEmpty || !allowedCollections.containsAll(selected)) {
       throw ArgumentError('Selected collections are not allowed for this role');
     }
-    final ownTenantId = TenantScope.normalize(adminUser.tenantId);
-    final requestedTenantId = TenantScope.normalize(tenantIdOverride);
-    final tenantScopeId = ownTenantId;
-    if (tenantScopeId == null) {
-      throw StateError('Select an active workspace before creating a backup');
-    }
-    if (requestedTenantId != null && requestedTenantId != ownTenantId) {
-      throw StateError('Backup workspace must match the active workspace');
-    }
+    final tenantScopeId = BackupScopePolicy.requireSelectedWorkspace(
+      activeWorkspaceId: adminUser.tenantId,
+      requestedWorkspaceId: tenantIdOverride,
+    );
     final data = <String, dynamic>{};
     final counts = <String, int>{};
 
@@ -652,11 +690,10 @@ class DatabaseBackupNotifier extends Notifier<void> {
       passphrase: encryptionPassword,
     );
 
-    await _recordBackupNow();
     final createdAt = DateTime.now().toUtc();
     final fileName =
-      'shoesERP_backup_${createdAt.year}${createdAt.month.toString().padLeft(2, '0')}${createdAt.day.toString().padLeft(2, '0')}_${createdAt.hour.toString().padLeft(2, '0')}${createdAt.minute.toString().padLeft(2, '0')}${createdAt.second.toString().padLeft(2, '0')}_${createdAt.microsecond.toString().padLeft(6, '0')}.shoesbackup';
-    final localPath = kIsWeb
+        'shoesERP_backup_${createdAt.year}${createdAt.month.toString().padLeft(2, '0')}${createdAt.day.toString().padLeft(2, '0')}_${createdAt.hour.toString().padLeft(2, '0')}${createdAt.minute.toString().padLeft(2, '0')}${createdAt.second.toString().padLeft(2, '0')}_${createdAt.microsecond.toString().padLeft(6, '0')}.shoesbackup';
+    final localPath = kIsWeb || !destination.savesLocalCopy
         ? ''
         : await _saveToLocal(
             bytes,
@@ -664,6 +701,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
             creatorUid: adminUser.id,
             fileName: fileName,
           );
+    if (destination.savesLocalCopy) await _recordBackupNow();
     return (
       bytes: bytes,
       localPath: localPath,
@@ -687,13 +725,10 @@ class DatabaseBackupNotifier extends Notifier<void> {
       passphrase: encryptionPassword,
     );
     final preview = verifyBackup(clearBytes);
-    final ownTenantId = TenantScope.normalize(user.tenantId);
-    final tenantId = user.isSuperAdmin
-        ? TenantScope.normalize(tenantIdOverride)
-        : ownTenantId;
-    if (tenantId == null) {
-      throw StateError('Select a workspace before uploading a backup');
-    }
+    final tenantId = BackupScopePolicy.requireSelectedWorkspace(
+      activeWorkspaceId: user.tenantId,
+      requestedWorkspaceId: tenantIdOverride,
+    );
     if (preview.tenantId != tenantId) {
       throw StateError(
         'Backup workspace does not match the selected workspace',
@@ -721,12 +756,10 @@ class DatabaseBackupNotifier extends Notifier<void> {
     String? tenantIdOverride,
   }) async {
     final user = await _requireBackupAdministrator();
-    final tenantId = user.isSuperAdmin
-        ? TenantScope.normalize(tenantIdOverride)
-        : TenantScope.normalize(user.tenantId);
-    if (tenantId == null) {
-      throw StateError('Select a workspace before listing backups');
-    }
+    final tenantId = BackupScopePolicy.requireSelectedWorkspace(
+      activeWorkspaceId: user.tenantId,
+      requestedWorkspaceId: tenantIdOverride,
+    );
     return GoogleDriveBackupService.list(
       tenantId: tenantId,
       scope: BackupScopePolicy.archiveScopeFor(user.role),
@@ -739,19 +772,31 @@ class DatabaseBackupNotifier extends Notifier<void> {
     String? tenantIdOverride,
   }) async {
     final user = await _requireBackupAdministrator();
-    final tenantId = user.isSuperAdmin
-        ? TenantScope.normalize(tenantIdOverride)
-        : TenantScope.normalize(user.tenantId);
-    if (tenantId == null) {
-      throw StateError('Select a workspace before downloading a backup');
-    }
+    final tenantId = BackupScopePolicy.requireSelectedWorkspace(
+      activeWorkspaceId: user.tenantId,
+      requestedWorkspaceId: tenantIdOverride,
+    );
     return GoogleDriveBackupService.download(
       fileId: fileId,
       tenantId: tenantId,
-      scope: BackupScopePolicy.archiveScopeFor(
-        (await ref.read(authUserProvider.future))!.role,
-      ),
+      scope: BackupScopePolicy.archiveScopeFor(user.role),
       createdBy: null,
+    );
+  }
+
+  Future<void> deleteDriveBackup(
+    String fileId, {
+    String? tenantIdOverride,
+  }) async {
+    final user = await _requireBackupAdministrator();
+    final tenantId = BackupScopePolicy.requireSelectedWorkspace(
+      activeWorkspaceId: user.tenantId,
+      requestedWorkspaceId: tenantIdOverride,
+    );
+    await GoogleDriveBackupService.delete(
+      fileId: fileId,
+      tenantId: tenantId,
+      scope: BackupScopePolicy.archiveScopeFor(user.role),
     );
   }
 
@@ -986,7 +1031,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
       );
       if (passphrase == null || passphrase.length < 12) return null;
       final intervalMinutes = await getIntervalMinutes();
-      final lastAt = await _getLastDriveBackupAt();
+      final lastAt = await getLastDriveBackupAt();
       if (lastAt != null &&
           DateTime.now().difference(lastAt).inMinutes < intervalMinutes) {
         return null;
@@ -994,6 +1039,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
       final result = await createBackup(
         selected: BackupScopePolicy.collectionsFor(user.role),
         encryptionPassword: passphrase,
+        destination: BackupDestination.googleDrive,
         tenantIdOverride: tenantId,
       );
       await uploadBackupToDrive(

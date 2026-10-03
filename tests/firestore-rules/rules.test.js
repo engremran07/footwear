@@ -253,6 +253,27 @@ describe('products collection', () => {
     );
   });
 
+  it('seller: cannot read workspace products after the workspace is disabled', async () => {
+    await seedTenant();
+    await seedUser('seller-uid', 'seller');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.collection('products').doc('workspace-disabled-product').set({
+        name: 'Disabled workspace product',
+        tenant_id: 'tenant-1',
+      });
+      await db.collection('tenants').doc('tenant-1').update({ active: false });
+      await db.collection('users').doc('seller-uid').update({ active: false });
+    });
+
+    await assertFails(
+      sellerCtx(testEnv).firestore()
+        .collection('products')
+        .where('tenant_id', '==', 'tenant-1')
+        .get(),
+    );
+  });
+
   it('admin: can write products', async () => {
     await seedUser('admin-uid', 'admin');
     await assertSucceeds(
@@ -1060,6 +1081,7 @@ describe('device and session slot rules', () => {
       slot_id: `slot_${slotNumber}`,
       slot_number: slotNumber,
       session_id: `session-${slotNumber}`,
+      device_slot_id: `slot_${slotNumber}`,
       device_id: `installation-${slotNumber}`,
       device_brand: 'Samsung',
       device_model: 'SM-A576B',
@@ -1126,6 +1148,64 @@ describe('device and session slot rules', () => {
     );
   });
 
+  it('rejects arbitrary document IDs even when the slot number is within policy', async () => {
+    await seedAccessUsers();
+    const db = sellerCtx(testEnv).firestore();
+    await assertFails(
+      db.collection('users').doc('seller-uid')
+        .collection('device_registrations').doc('custom-device-0')
+        .set(deviceData(0, { slot_id: 'custom-device-0' })),
+    );
+    await assertFails(
+      db.collection('users').doc('seller-uid')
+        .collection('sessions').doc('custom-session-0')
+        .set(sessionData(0, { slot_id: 'custom-session-0' })),
+    );
+  });
+
+  it('requires sessions to reference an active device with the same installation ID', async () => {
+    await seedAccessUsers();
+    const db = sellerCtx(testEnv).firestore();
+    const userRef = db.collection('users').doc('seller-uid');
+    await assertFails(
+      userRef.collection('sessions').doc('slot_0').set(sessionData(0)),
+    );
+    await userRef.collection('device_registrations').doc('slot_0')
+      .set(deviceData(0));
+    await assertFails(
+      userRef.collection('sessions').doc('slot_0').set(
+        sessionData(0, { device_id: 'another-installation' }),
+      ),
+    );
+    await assertSucceeds(
+      userRef.collection('sessions').doc('slot_0').set(sessionData(0)),
+    );
+  });
+
+  it('links legacy sessions to their active device on refresh', async () => {
+    await seedAccessUsers();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.collection('users').doc('seller-uid')
+        .collection('device_registrations').doc('slot_0').set(deviceData(0));
+      const legacySession = sessionData(0);
+      delete legacySession.device_slot_id;
+      await db.collection('users').doc('seller-uid')
+        .collection('sessions').doc('slot_0').set(legacySession);
+    });
+
+    const sessionRef = sellerCtx(testEnv).firestore()
+      .collection('users').doc('seller-uid')
+      .collection('sessions').doc('slot_0');
+    await assertSucceeds(
+      sessionRef.update({
+        device_slot_id: 'slot_0',
+        last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
+        expires_at: new Date(Date.now() + 60 * 60 * 1000),
+      }),
+    );
+  });
+
   it('seller cannot read or write another user access records', async () => {
     await seedAccessUsers();
     const db = sellerCtx(testEnv).firestore();
@@ -1163,24 +1243,47 @@ describe('device and session slot rules', () => {
     );
   });
 
-  it('workspace admin can revoke a device without changing session records', async () => {
+  it('workspace admin can revoke a device and related session atomically', async () => {
     await seedAccessUsers();
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await ctx.firestore().collection('users').doc('seller-uid')
+      const db = ctx.firestore();
+      await db.collection('users').doc('seller-uid')
         .collection('device_registrations').doc('slot_0').set({
           ...deviceData(0),
           registered_at: new Date(),
           last_seen_at: new Date(),
         });
+      await db.collection('users').doc('seller-uid')
+        .collection('sessions').doc('slot_0').set({
+          ...sessionData(0),
+          created_at: new Date(),
+          last_seen_at: new Date(),
+          expires_at: new Date(Date.now() + 60 * 60 * 1000),
+        });
     });
     const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
-    await assertSucceeds(
+    const batch = db.batch();
+    batch.update(
       db.collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0').update({
-          status: 'revoked',
-          revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
-          revoked_by: 'tenant-admin-uid',
-        }),
+        .collection('device_registrations').doc('slot_0'),
+      {
+        status: 'revoked',
+        revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
+        revoked_by: 'tenant-admin-uid',
+      },
+    );
+    batch.update(
+      db.collection('users').doc('seller-uid')
+        .collection('sessions').doc('slot_0'),
+      {
+        status: 'revoked',
+        revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
+        termination_reason: 'device_revoked',
+        terminated_by: 'tenant-admin-uid',
+      },
+    );
+    await assertSucceeds(
+      batch.commit(),
     );
   });
 });
@@ -1386,6 +1489,145 @@ describe('platform super-admin workspace isolation', () => {
       db.collection('tenants').doc('tenant-1').update({
         max_devices_allowed: 999,
       }),
+    );
+  });
+
+  it('selected super-admin can archive and restore a workspace', async () => {
+    await seedWorkspace('tenant-1');
+    await seedUser('platform-lifecycle-uid', 'super_admin', true, {
+      active_workspace_id: 'tenant-1',
+      active_workspace_reason: 'Workspace lifecycle maintenance',
+      active_workspace_selected_at: new Date(),
+    });
+    const tenantRef = testEnv.authenticatedContext('platform-lifecycle-uid')
+      .firestore().collection('tenants').doc('tenant-1');
+
+    await assertSucceeds(
+      tenantRef.update({
+        active: false,
+        archived_at: firebase.firestore.FieldValue.serverTimestamp(),
+        archived_by: 'platform-lifecycle-uid',
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+    await assertSucceeds(
+      tenantRef.update({
+        active: true,
+        archived_at: firebase.firestore.FieldValue.delete(),
+        archived_by: firebase.firestore.FieldValue.delete(),
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+  });
+
+  it('unselected super-admin cannot change workspace lifecycle', async () => {
+    await seedWorkspace('tenant-1');
+    await seedUser('platform-unselected-lifecycle-uid', 'super_admin');
+    const tenantRef = testEnv.authenticatedContext(
+      'platform-unselected-lifecycle-uid',
+    ).firestore().collection('tenants').doc('tenant-1');
+    await assertFails(
+      tenantRef.update({
+        active: false,
+        archived_at: firebase.firestore.FieldValue.serverTimestamp(),
+        archived_by: 'platform-unselected-lifecycle-uid',
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+  });
+
+  it('archive revokes tenant users and access records, then restores prior activity', async () => {
+    await seedWorkspace('tenant-1');
+    await seedUser('seller-uid', 'seller');
+    await seedUser('platform-archive-flow-uid', 'super_admin', true, {
+      active_workspace_id: 'tenant-1',
+      active_workspace_reason: 'Archive workspace lifecycle',
+      active_workspace_selected_at: new Date(),
+    });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.collection('products').doc('archive-flow-product').set({
+        name: 'Archive flow product',
+        tenant_id: 'tenant-1',
+      });
+      await db.collection('users').doc('seller-uid')
+        .collection('device_registrations').doc('slot_0').set({
+          user_id: 'seller-uid',
+          tenant_id: 'tenant-1',
+          slot_id: 'slot_0',
+          slot_number: 0,
+          device_id: 'installation-0',
+          status: 'active',
+        });
+      await db.collection('users').doc('seller-uid')
+        .collection('sessions').doc('slot_0').set({
+          user_id: 'seller-uid',
+          tenant_id: 'tenant-1',
+          slot_id: 'slot_0',
+          slot_number: 0,
+          session_id: 'archive-session-0',
+          device_slot_id: 'slot_0',
+          device_id: 'installation-0',
+          status: 'active',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000),
+        });
+    });
+
+    const db = testEnv.authenticatedContext('platform-archive-flow-uid')
+      .firestore();
+    const tenantRef = db.collection('tenants').doc('tenant-1');
+    const sellerRef = db.collection('users').doc('seller-uid');
+    const deviceRef = sellerRef.collection('device_registrations').doc('slot_0');
+    const sessionRef = sellerRef.collection('sessions').doc('slot_0');
+    const archiveBatch = db.batch();
+    archiveBatch.update(tenantRef, {
+      active: false,
+      archived_at: firebase.firestore.FieldValue.serverTimestamp(),
+      archived_by: 'platform-archive-flow-uid',
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    archiveBatch.update(sellerRef, {
+      active: false,
+      workspace_was_active: true,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    archiveBatch.update(deviceRef, {
+      status: 'revoked',
+      revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
+      revoked_by: 'platform-archive-flow-uid',
+    });
+    archiveBatch.update(sessionRef, {
+      status: 'revoked',
+      revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
+      termination_reason: 'workspace_archived',
+      terminated_by: 'platform-archive-flow-uid',
+    });
+    await assertSucceeds(archiveBatch.commit());
+    await assertFails(
+      sellerCtx(testEnv).firestore()
+        .collection('products')
+        .where('tenant_id', '==', 'tenant-1')
+        .get(),
+    );
+
+    const restoreBatch = db.batch();
+    restoreBatch.update(tenantRef, {
+      active: true,
+      archived_at: firebase.firestore.FieldValue.delete(),
+      archived_by: firebase.firestore.FieldValue.delete(),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    restoreBatch.update(sellerRef, {
+      active: true,
+      workspace_was_active: firebase.firestore.FieldValue.delete(),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertSucceeds(restoreBatch.commit());
+    await assertSucceeds(
+      sellerCtx(testEnv).firestore()
+        .collection('products')
+        .where('tenant_id', '==', 'tenant-1')
+        .get(),
     );
   });
 

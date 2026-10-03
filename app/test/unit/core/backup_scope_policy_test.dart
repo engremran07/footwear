@@ -48,4 +48,25 @@ void main() {
       expect(BackupScopePolicy.isPlatformRole('tenant_admin'), isFalse);
     },
   );
+
+  test('backup access is limited to the currently selected workspace', () {
+    expect(
+      BackupScopePolicy.requireSelectedWorkspace(
+        activeWorkspaceId: 'tenant-1',
+        requestedWorkspaceId: 'tenant-1',
+      ),
+      'tenant-1',
+    );
+    expect(
+      () => BackupScopePolicy.requireSelectedWorkspace(
+        activeWorkspaceId: 'tenant-1',
+        requestedWorkspaceId: 'tenant-2',
+      ),
+      throwsStateError,
+    );
+    expect(
+      () => BackupScopePolicy.requireSelectedWorkspace(activeWorkspaceId: null),
+      throwsStateError,
+    );
+  });
 }

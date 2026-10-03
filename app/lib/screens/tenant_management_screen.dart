@@ -196,7 +196,8 @@ class _TenantManagementScreenState
       _nameController.text = existing.name;
       _slugController.text = existing.slug;
       _maxDevicesController.text = existing.maxDevicesAllowed.toString();
-      _maxSessionsController.text = existing.maxActiveSessionsAllowed.toString();
+      _maxSessionsController.text = existing.maxActiveSessionsAllowed
+          .toString();
       _requireDevicePairing = existing.requireDevicePairing;
       _allowAdminResetOnly = existing.allowAdminResetOnly;
       _selectedOwnerId = existing.ownerUserId;
@@ -290,7 +291,9 @@ class _TenantManagementScreenState
                         ],
                         onChanged: (value) =>
                             setState(() => _selectedOwnerId = value),
-                        decoration: InputDecoration(labelText: tr('owner', ref)),
+                        decoration: InputDecoration(
+                          labelText: tr('owner', ref),
+                        ),
                       );
                     },
                     loading: () =>

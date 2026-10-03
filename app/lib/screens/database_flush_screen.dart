@@ -153,8 +153,8 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
                     ? null
                     : () async {
                         final ok = await ref
-                            .read(databaseFlushProvider.notifier)
-                            .reauthenticate(passwordC.text);
+                            .read(authNotifierProvider.notifier)
+                            .reauthenticateCurrentUser(passwordC.text);
                         if (ok) {
                           if (ctx.mounted) Navigator.pop(ctx, true);
                         } else {

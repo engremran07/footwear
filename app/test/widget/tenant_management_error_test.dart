@@ -10,46 +10,51 @@ import 'package:footwear_erp/providers/user_provider.dart';
 import 'package:footwear_erp/screens/tenant_management_screen.dart';
 
 void main() {
-  testWidgets('workspace creation shows mapped error instead of silently failing', (
-    tester,
-  ) async {
-    final user = UserModel(
-      id: 'admin-1',
-      email: 'admin@example.com',
-      displayName: 'Platform Admin',
-      role: UserRole.superAdmin,
-      active: true,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    );
+  testWidgets(
+    'workspace creation shows mapped error instead of silently failing',
+    (tester) async {
+      final user = UserModel(
+        id: 'admin-1',
+        email: 'admin@example.com',
+        displayName: 'Platform Admin',
+        role: UserRole.superAdmin,
+        active: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authUserProvider.overrideWith((ref) => Stream.value(user)),
-          tenantsProvider.overrideWith((ref) => Stream.value(const <TenantModel>[])),
-          allUsersProvider.overrideWith((ref) => Stream.value(const <UserModel>[])),
-          tenantManagementNotifierProvider.overrideWith(
-            () => _ThrowingTenantManagementNotifier(),
-          ),
-        ],
-        child: const MaterialApp(home: TenantManagementScreen()),
-      ),
-    );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(user)),
+            tenantsProvider.overrideWith(
+              (ref) => Stream.value(const <TenantModel>[]),
+            ),
+            allUsersProvider.overrideWith(
+              (ref) => Stream.value(const <UserModel>[]),
+            ),
+            tenantManagementNotifierProvider.overrideWith(
+              () => _ThrowingTenantManagementNotifier(),
+            ),
+          ],
+          child: const MaterialApp(home: TenantManagementScreen()),
+        ),
+      );
 
-    await tester.pump();
-    await tester.tap(find.byIcon(Icons.add_business));
-    await tester.pump();
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.add_business));
+      await tester.pump();
 
-    await tester.enterText(find.byType(TextField).at(0), 'Alpha Workspace');
-    await tester.enterText(find.byType(TextField).at(1), 'alpha');
-    await tester.tap(find.widgetWithText(FilledButton, 'Create workspace'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+      await tester.enterText(find.byType(TextField).at(0), 'Alpha Workspace');
+      await tester.enterText(find.byType(TextField).at(1), 'alpha');
+      await tester.tap(find.widgetWithText(FilledButton, 'Create workspace'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.text('This item already exists.'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.text('This item already exists.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _ThrowingTenantManagementNotifier extends TenantManagementNotifier {

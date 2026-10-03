@@ -7,6 +7,7 @@ class SessionModel {
   final String userId;
   final String tenantId;
   final String deviceId;
+  final String deviceSlotId;
   final String? deviceBrand;
   final String? deviceModel;
   final String platform;
@@ -25,6 +26,7 @@ class SessionModel {
     required this.userId,
     required this.tenantId,
     required this.deviceId,
+    this.deviceSlotId = '',
     this.deviceBrand,
     this.deviceModel,
     required this.platform,
@@ -45,6 +47,7 @@ class SessionModel {
       userId: json['user_id'] as String? ?? '',
       tenantId: json['tenant_id'] as String? ?? '',
       deviceId: json['device_id'] as String? ?? '',
+      deviceSlotId: json['device_slot_id'] as String? ?? '',
       deviceBrand: json['device_brand'] as String?,
       deviceModel: json['device_model'] as String?,
       platform: json['platform'] as String? ?? 'android',
@@ -64,6 +67,7 @@ class SessionModel {
     'user_id': userId,
     'tenant_id': tenantId,
     'device_id': deviceId,
+    'device_slot_id': deviceSlotId,
     'device_brand': deviceBrand,
     'device_model': deviceModel,
     'platform': platform,
@@ -83,6 +87,7 @@ class SessionModel {
     String? userId,
     String? tenantId,
     String? deviceId,
+    String? deviceSlotId,
     String? deviceBrand,
     String? deviceModel,
     String? platform,
@@ -101,6 +106,7 @@ class SessionModel {
       userId: userId ?? this.userId,
       tenantId: tenantId ?? this.tenantId,
       deviceId: deviceId ?? this.deviceId,
+      deviceSlotId: deviceSlotId ?? this.deviceSlotId,
       deviceBrand: deviceBrand ?? this.deviceBrand,
       deviceModel: deviceModel ?? this.deviceModel,
       platform: platform ?? this.platform,

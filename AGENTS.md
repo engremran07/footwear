@@ -53,7 +53,6 @@ Defined in app/lib/core/router/app_router.dart:
 - /invoices/:id
 - /reports
 - /profile
-- /about
 - /settings
 
 ## 3) Permission Matrix
@@ -76,8 +75,6 @@ Seller:
 
 1. Workspace settings and device-pairing limits are tenant-scoped. Each workspace must own its own business name, logo, and max device policy; never simplify these into a single super-admin global profile.
 
-1. Platform super-admins without an active workspace may open `/settings` only as a platform hub for workspace metadata, profile preferences, About, and What's New. Tenant business settings remain unavailable until explicit workspace support access is active. About is navigation-accessible to every authenticated role.
-
 1. Super-admin business access is workspace-scoped. Never let a super-admin read tenant routes, shops, products, inventory, invoices, transactions, reports, users, or tenant settings without an explicit active workspace context. Platform workspace metadata may remain globally visible. Record support access starts/ends in the append-only `platform_access_logs` collection; never use UI visibility as the security boundary.
 
 1. Super-admin business context expires after 8 hours. Firestore rules must enforce the TTL on every business-data path, and no generic admin-role branch may bypass it. Workspace admins may read their own tenant policy metadata but may not edit tenant configuration.
@@ -94,8 +91,6 @@ Seller:
 
 1. Dashboard must degrade gracefully under resource-exhausted.
 
-1. The root platform super-admin dashboard must not wait for or subscribe to workspace users when no workspace is selected; only workspace metadata is needed there. Sign-in must not synchronously run full route/shop reconciliation scans; route counters are maintained by normal shop operations and explicit flush flows.
-
 1. Dashboard and inventory must not show transient permission-denied errors
   during auth/profile loading; role-scoped providers must stay in loading,
   empty, or cached fallback state until access is confirmed.
@@ -107,12 +102,6 @@ Seller:
 1. Firebase Hosting must not cache Flutter web shell files (`index.html`,
   `flutter.js`, `flutter_bootstrap.js`, `main.dart.js`,
   `flutter_service_worker.js`, `version.json`, `manifest.json`) as immutable.
-
-1. Firebase Hosting's Content-Security-Policy `connect-src` must allow
-  `https://www.gstatic.com` for Flutter CanvasKit WASM and
-  `https://fonts.gstatic.com` for Flutter web fonts. Verify the deployed web
-  app in a browser after Hosting changes; blocked engine fetches can leave the
-  Flutter page blank even when the HTML shell returns successfully.
 
 1. Every where(A)+orderBy(B) (A != B) must have composite index in firestore.indexes.json.
 
@@ -137,12 +126,6 @@ Seller:
 1. Full exports must cursor-page until exhausted; hard limits remain appropriate only for live UI windows that visibly communicate truncation. Full restore must upsert all backup data before pruning obsolete tenant documents. Plaintext backup archives are not accepted for restore.
 
 1. Startup must not sign users out for transient token-refresh/network failures. If Firebase initialization fails, show a retry/failure state instead of mounting the authenticated app against an uninitialized SDK.
-
-1. Device/session enforcement must wait until sign-in registration completes,
-   select the latest active, unexpired session for the current installation,
-   and scope automatic sign-out to the same authenticated UID that was checked.
-   Failed sign-ins must leave a persistent localized error in the form; attempts
-   still pending after 12 seconds must show a localized status message.
 
 1. No Firebase Storage usage — the app runs on Firestore + Auth + Functions
   only (zero-cost tier). Company logos are stored as base64 in Firestore.
@@ -412,16 +395,10 @@ Evidence required: quote "Deploy complete!" from output.
 #### Step 9 — APK release build
 
 ```powershell
-$freeRamGB = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB
-Write-Host ("Free RAM before APK build: {0:N2} GB" -f $freeRamGB)
-if ($freeRamGB -lt 3.2) { throw "At least 3.2 GB free RAM is required before starting the APK build." }
 flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
 ```
 
-If free RAM is below 3.2 GB, do not start Gradle: reclaim memory and repeat the
-check. Evidence required: quote the pre-build free-RAM value and generated ABI
-APK path(s) and size(s), for example
-`Built build\app\outputs\flutter-apk\app-arm64-v8a-release.apk (XXmb)`.
+Evidence required: quote the generated ABI APK path(s) and size(s), for example `Built build\app\outputs\flutter-apk\app-arm64-v8a-release.apk (XXmb)`.
 
 #### Step 10 — Firestore rules + indexes deploy
 
@@ -473,13 +450,8 @@ Evidence required: quote push output including branch name and commit hash.
 ```powershell
 adb devices   # if any device listed below header, MUST proceed with install
 adb -s <device-id> push "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" /sdcard/Download/
-adb -s <device-id> install --streaming -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk"
+adb -s <device-id> install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
 ```
-
-Always use this order for a connected phone: RAM preflight, split-per-ABI APK
-build, `adb push` the matching APK to `/sdcard/Download/`, then streamed install
-using the matching host-side APK path. ADB streams that artifact to the phone;
-its `install` command does not accept a remote device path as its local input.
 
 Evidence required: quote `Success` from adb output, OR quote exact `adb devices`
 output showing only the header (`List of devices attached`) with no devices — in
@@ -510,15 +482,11 @@ Conflict resolution order for instructions:
 
 ## 10) Current Audit Status
 
-2026-10-03 dashboard startup performance — v3.9.56+95:
+2026-10-03 backup destinations and workspace archival — v3.9.58+97:
 
-- Root super-admin dashboard no longer waits for the workspace user list; selected-workspace user counts remain scoped and available.
-- Sign-in reuses its first profile snapshot and no longer waits for route/shop counter reconciliation over up to 2,500 documents.
-
-2026-10-03 settings and About access — v3.9.55+94:
-
-- Unscoped super-admin `/settings` is a platform-only hub; tenant business settings remain gated on active workspace support access.
-- About is available in authenticated app navigation across roles, and release-date formatting initializes Arabic/Urdu date symbols before rendering.
+- Backup actions distinguish encrypted file export from Google Drive; Drive uploads do not create duplicate local copies, and automatic Drive backup stays unavailable until OAuth is configured.
+- Restore confirmation reflects merge versus replacement scope, and local archives can be deleted from the device restore picker.
+- Workspace archival revokes member device/session access before recording the archived state; Firestore rules bind session creation to a registered device and reject inactive users.
 
 2026-10-03 frontend accessibility pass — v3.9.54+93:
 

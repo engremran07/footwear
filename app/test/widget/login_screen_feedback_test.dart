@@ -27,7 +27,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'user@example.com');
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      'user@example.com',
+    );
     await tester.enterText(find.byType(TextFormField).at(1), 'password');
     await tester.tap(find.byType(FilledButton));
     await tester.pump();

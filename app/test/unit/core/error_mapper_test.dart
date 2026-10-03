@@ -130,6 +130,13 @@ void main() {
   });
 
   group('AppErrorMapper.key — plain Dart errors', () {
+    test('archived workspace has a specific sign-in message', () {
+      expect(
+        AppErrorMapper.key(StateError('workspace-disabled')),
+        equals('workspace_disabled'),
+      );
+    });
+
     test('device allocation limit has a specific message', () {
       expect(
         AppErrorMapper.key(StateError('device-limit-reached')),

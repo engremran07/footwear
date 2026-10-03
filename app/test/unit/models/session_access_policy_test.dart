@@ -29,28 +29,31 @@ void main() {
       );
     }
 
-    test('prefers a valid session over a stale revoked record for same device', () {
-      final active = session(
-        id: 'active-slot',
-        status: 'active',
-        lastSeenAt: now,
-        expiresAt: now.add(const Duration(hours: 1)),
-      );
-      final revoked = session(
-        id: 'revoked-slot',
-        status: 'revoked',
-        lastSeenAt: now.subtract(const Duration(days: 1)),
-        expiresAt: now.add(const Duration(hours: 1)),
-      );
+    test(
+      'prefers a valid session over a stale revoked record for same device',
+      () {
+        final active = session(
+          id: 'active-slot',
+          status: 'active',
+          lastSeenAt: now,
+          expiresAt: now.add(const Duration(hours: 1)),
+        );
+        final revoked = session(
+          id: 'revoked-slot',
+          status: 'revoked',
+          lastSeenAt: now.subtract(const Duration(days: 1)),
+          expiresAt: now.add(const Duration(hours: 1)),
+        );
 
-      final selected = SessionAccessPolicy.currentForDevice(
-        [revoked, active],
-        deviceId: 'device-a',
-        now: now,
-      );
+        final selected = SessionAccessPolicy.currentForDevice(
+          [revoked, active],
+          deviceId: 'device-a',
+          now: now,
+        );
 
-      expect(selected?.id, 'active-slot');
-    });
+        expect(selected?.id, 'active-slot');
+      },
+    );
 
     test('chooses the most recently seen active session', () {
       final older = session(

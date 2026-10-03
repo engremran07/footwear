@@ -7,23 +7,12 @@ Most recent first.
 
 ---
 
-## [3.9.56+95] — 2026-10-03 — Faster dashboard and sign-in
+## [3.9.58+97] — 2026-10-03 — Backup destinations and workspace archival
 
 ### Changed
 
-- Root platform dashboards no longer wait for a workspace user list that is not displayed until a workspace is selected.
-- Sign-in no longer waits for full route/shop counter reconciliation or reads the same user profile twice.
-
-## [3.9.55+94] — 2026-10-03 — Platform settings and About access
-
-### Added
-
-- Platform super-admins can open a safe Settings hub for workspaces, profile preferences, About, and What's New without reading tenant settings.
-- About is available from app navigation for every authenticated role.
-
-### Fixed
-
-- Arabic and Urdu About pages no longer fail while formatting the release date before locale symbols are initialized.
+- Backup export and Google Drive uploads are separate actions; Drive uploads no longer create a duplicate local archive.
+- Restore confirmation reflects merge or replacement scope, local archives can be deleted, and workspace archival revokes member device/session access before recording the archived state.
 
 ## [3.9.54+93] — 2026-10-03 — Accessible status labels
 

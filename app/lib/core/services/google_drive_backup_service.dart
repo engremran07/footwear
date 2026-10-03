@@ -210,11 +210,59 @@ class GoogleDriveBackupService {
   }) async {
     if (fileId.trim().isEmpty) throw ArgumentError('fileId must not be empty');
     final authHeaders = await _headers();
+    await _fetchScopedMetadata(
+      fileId,
+      headers: authHeaders,
+      tenantId: tenantId,
+      scope: scope,
+      createdBy: createdBy,
+    );
+    final response = await http.get(
+      Uri.parse('$_driveFilesUri/${Uri.encodeComponent(fileId)}?alt=media'),
+      headers: authHeaders,
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError('Google Drive download failed (${response.statusCode})');
+    }
+    return response.bodyBytes;
+  }
+
+  static Future<void> delete({
+    required String fileId,
+    required String tenantId,
+    required String scope,
+    String? createdBy,
+  }) async {
+    if (fileId.trim().isEmpty) throw ArgumentError('fileId must not be empty');
+    final authHeaders = await _headers();
+    await _fetchScopedMetadata(
+      fileId,
+      headers: authHeaders,
+      tenantId: tenantId,
+      scope: scope,
+      createdBy: createdBy,
+    );
+    final response = await http.delete(
+      Uri.parse('$_driveFilesUri/${Uri.encodeComponent(fileId)}'),
+      headers: authHeaders,
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError('Google Drive delete failed (${response.statusCode})');
+    }
+  }
+
+  static Future<Map<String, dynamic>> _fetchScopedMetadata(
+    String fileId, {
+    required Map<String, String> headers,
+    required String tenantId,
+    required String scope,
+    String? createdBy,
+  }) async {
     final metadataResponse = await http.get(
       Uri.parse(
         '$_driveFilesUri/${Uri.encodeComponent(fileId)}?fields=id,appProperties,trashed',
       ),
-      headers: authHeaders,
+      headers: headers,
     );
     if (metadataResponse.statusCode < 200 ||
         metadataResponse.statusCode >= 300) {
@@ -232,14 +280,7 @@ class GoogleDriveBackupService {
         (createdBy != null && properties['created_by'] != createdBy)) {
       throw StateError('Google Drive backup is outside the permitted scope');
     }
-    final response = await http.get(
-      Uri.parse('$_driveFilesUri/${Uri.encodeComponent(fileId)}?alt=media'),
-      headers: authHeaders,
-    );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError('Google Drive download failed (${response.statusCode})');
-    }
-    return response.bodyBytes;
+    return metadata;
   }
 
   static GoogleDriveBackupFile _fileFromJson(Map<String, dynamic> json) {

@@ -155,9 +155,9 @@ void main() {
           ],
           child: MaterialApp(
             builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: const TextScaler.linear(2.5),
-              ),
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(2.5)),
               child: child!,
             ),
             home: const BootstrapProfileScreen(),
@@ -230,7 +230,9 @@ void main() {
       expect(find.textContaining('Total Routes'), findsNothing);
     });
 
-    testWidgets('dashboard load failures expose a retry action', (tester) async {
+    testWidgets('dashboard load failures expose a retry action', (
+      tester,
+    ) async {
       final superAdmin = UserModel(
         id: 'sa',
         email: 'global@example.com',

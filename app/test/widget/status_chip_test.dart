@@ -77,18 +77,26 @@ void main() {
     final buttonStyle = theme.filledButtonTheme.style!;
     final buttonForeground = buttonStyle.foregroundColor!.resolve({})!;
     final buttonBackground = buttonStyle.backgroundColor!.resolve({})!;
-    final linkColor = theme.textButtonTheme.style!.foregroundColor!.resolve({})!;
+    final linkColor = theme.textButtonTheme.style!.foregroundColor!.resolve(
+      {},
+    )!;
     final statusColor = AppTheme.statusColor(
       'rejected',
       mode: AppThemeMode.dark,
     );
 
-    expect(_contrastRatio(buttonForeground, buttonBackground),
-        greaterThanOrEqualTo(4.5));
-    expect(_contrastRatio(linkColor, theme.scaffoldBackgroundColor),
-        greaterThanOrEqualTo(4.5));
-    expect(_contrastRatio(statusColor, AppTheme.arcticDarkBg),
-        greaterThanOrEqualTo(4.5));
+    expect(
+      _contrastRatio(buttonForeground, buttonBackground),
+      greaterThanOrEqualTo(4.5),
+    );
+    expect(
+      _contrastRatio(linkColor, theme.scaffoldBackgroundColor),
+      greaterThanOrEqualTo(4.5),
+    );
+    expect(
+      _contrastRatio(statusColor, AppTheme.arcticDarkBg),
+      greaterThanOrEqualTo(4.5),
+    );
   });
 }
 

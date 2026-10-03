@@ -14,7 +14,6 @@ import '../core/utils/tenant_scope.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/database_backup_provider.dart';
-import '../providers/database_flush_provider.dart';
 import '../providers/tenant_provider.dart';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -38,9 +37,11 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   // ── prefs state ───────────────────────────────────────────────────────────
   bool _autoEnabled = false;
   int _intervalMinutes = 1440;
-  DateTime? _lastBackupAt;
+  DateTime? _lastLocalBackupAt;
+  DateTime? _lastDriveBackupAt;
   DateTime? _lastRestoreAt;
   String? _lastRestoreBy;
+  String? _preferencesErrorKey;
 
   // ── collection selection ──────────────────────────────────────────────────
   final Set<String> _selected = {};
@@ -54,14 +55,16 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   }
 
   Future<void> _loadPrefs() async {
-    final n = ref.read(databaseBackupProvider.notifier);
-    final user = await ref.read(authUserProvider.future);
-    final auto = await n.getAutoEnabled();
-    final interval = await n.getIntervalMinutes();
-    final lastBackup = await n.getLastBackupAt();
-    final lastRestore = await n.getLastRestoreAt();
-    final lastRestoreBy = await n.getLastRestoreBy();
-    if (mounted) {
+    try {
+      final n = ref.read(databaseBackupProvider.notifier);
+      final user = await ref.read(authUserProvider.future);
+      final auto = await n.getAutoEnabled();
+      final interval = await n.getIntervalMinutes();
+      final lastLocalBackup = await n.getLastBackupAt();
+      final lastDriveBackup = await n.getLastDriveBackupAt();
+      final lastRestore = await n.getLastRestoreAt();
+      final lastRestoreBy = await n.getLastRestoreBy();
+      if (!mounted) return;
       _selected
         ..clear()
         ..addAll(
@@ -72,12 +75,44 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       setState(() {
         _autoEnabled = auto;
         _intervalMinutes = interval;
-        _lastBackupAt = lastBackup;
+        _lastLocalBackupAt = lastLocalBackup;
+        _lastDriveBackupAt = lastDriveBackup;
         _lastRestoreAt = lastRestore;
         _lastRestoreBy = lastRestoreBy;
+        _preferencesErrorKey = null;
+        _loadingPrefs = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _preferencesErrorKey = AppErrorMapper.key(error);
         _loadingPrefs = false;
       });
     }
+  }
+
+  void _showMappedError(Object error) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+  }
+
+  Future<UserModel?> _readCurrentUser() async {
+    try {
+      return await ref.read(authUserProvider.future);
+    } catch (error) {
+      _showMappedError(error);
+      return null;
+    }
+  }
+
+  Future<void> _retryLoadPrefs() async {
+    setState(() {
+      _loadingPrefs = true;
+      _preferencesErrorKey = null;
+    });
+    await _loadPrefs();
   }
 
   String _fmt(DateTime dt) => _dateFmt.format(dt.toLocal());
@@ -156,7 +191,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
 
   Future<void> _doBackup() async {
     if (_selected.isEmpty) return;
-    final user = await ref.read(authUserProvider.future);
+    final user = await _readCurrentUser();
     if (user == null || !user.canCreateWorkspaceBackup) return;
     final workspaceId = _workspaceIdFor(user);
     final passphrase = await _requestBackupPassphrase(confirmPassphrase: true);
@@ -168,11 +203,12 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
           .createBackup(
             selected: Set.unmodifiable(_selected),
             encryptionPassword: passphrase,
+            destination: BackupDestination.userExport,
             tenantIdOverride: workspaceId,
           );
       if (!mounted) return;
       setState(() {
-        _lastBackupAt = DateTime.now();
+        _lastLocalBackupAt = DateTime.now();
         _loading = false;
       });
       await shareFile(
@@ -184,18 +220,16 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
+      _showMappedError(e);
     }
   }
 
   Future<void> _doDriveBackup() async {
     if (_selected.isEmpty) return;
-    final user = await ref.read(authUserProvider.future);
+    final user = await _readCurrentUser();
     if (user == null || !user.canCreateWorkspaceBackup) return;
     final workspaceId = _workspaceIdFor(user);
-    final passphrase = await _requestBackupPassphrase(confirmPassphrase: false);
+    final passphrase = await _requestBackupPassphrase(confirmPassphrase: true);
     if (passphrase == null || !mounted) return;
     setState(() => _loading = true);
     try {
@@ -203,6 +237,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       final result = await notifier.createBackup(
         selected: Set.unmodifiable(_selected),
         encryptionPassword: passphrase,
+        destination: BackupDestination.googleDrive,
         tenantIdOverride: workspaceId,
       );
       await notifier.uploadBackupToDrive(
@@ -213,7 +248,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _lastBackupAt = DateTime.now();
+        _lastDriveBackupAt = DateTime.now();
         _loading = false;
       });
       ScaffoldMessenger.of(
@@ -222,14 +257,12 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
+      _showMappedError(e);
     }
   }
 
   Future<void> _pickAndRestoreFromDrive() async {
-    final user = await ref.read(authUserProvider.future);
+    final user = await _readCurrentUser();
     if (!mounted) return;
     if (user == null || !user.active) {
       ScaffoldMessenger.of(
@@ -258,7 +291,29 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       final picked = await showModalBottomSheet<GoogleDriveBackupFile>(
         context: context,
         isScrollControlled: true,
-        builder: (_) => _DriveFilePickerSheet(files: files, fmtDate: _fmt),
+        builder: (_) => _BackupArchivePickerSheet<GoogleDriveBackupFile>(
+          title: tr('restore_from_google_drive', ref),
+          emptyMessage: tr('backup_drive_none', ref),
+          entries: [
+            for (final file in files)
+              _BackupArchiveEntry(
+                value: file,
+                id: file.id,
+                name: file.name,
+                details: [
+                  if (file.createdAt != null) _fmt(file.createdAt!.toLocal()),
+                  if (file.size > 0) '${(file.size / 1024).round()} KB',
+                ].join(' · '),
+                icon: Icons.cloud_outlined,
+              ),
+          ],
+          onDelete: (file) => ref
+              .read(databaseBackupProvider.notifier)
+              .deleteDriveBackup(file.id, tenantIdOverride: workspaceId),
+          deletePrompt: (name) =>
+              tr('backup_delete_prompt', ref).replaceAll('%s', name),
+          deleteSuccessMessage: tr('backup_delete_success', ref),
+        ),
       );
       if (picked == null || !mounted) return;
       final bytes = await ref
@@ -315,7 +370,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   // ── Restore ────────────────────────────────────────────────────────────────
 
   Future<void> _pickAndRestore() async {
-    final user = await ref.read(authUserProvider.future);
+    final user = await _readCurrentUser();
     if (!mounted) return;
     if (user == null || !user.active) {
       ScaffoldMessenger.of(
@@ -336,9 +391,15 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       ).showSnackBar(warningSnackBar(tr('select_workspace', ref)));
       return;
     }
-    final backups = await ref
-        .read(databaseBackupProvider.notifier)
-        .listLocalBackups(tenantId: workspaceId, creatorUid: user.id);
+    final List<LocalBackupFile> backups;
+    try {
+      backups = await ref
+          .read(databaseBackupProvider.notifier)
+          .listLocalBackups(tenantId: workspaceId, creatorUid: user.id);
+    } catch (error) {
+      _showMappedError(error);
+      return;
+    }
     if (!mounted) return;
 
     if (backups.isEmpty) {
@@ -352,7 +413,31 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     final picked = await showModalBottomSheet<LocalBackupFile>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _BackupFilePickerSheet(backups: backups, fmtDate: _fmt),
+      builder: (_) => _BackupArchivePickerSheet<LocalBackupFile>(
+        title: tr('backup_pick_file', ref),
+        emptyMessage: tr('backup_no_local', ref),
+        entries: [
+          for (final backup in backups)
+            _BackupArchiveEntry(
+              value: backup,
+              id: backup.file.path,
+              name: backup.name,
+              details:
+                  '${_fmt(backup.modifiedAt)} · ${(backup.file.lengthSync() / 1024).round()} KB',
+              icon: Icons.insert_drive_file_outlined,
+            ),
+        ],
+        onDelete: (backup) => ref
+            .read(databaseBackupProvider.notifier)
+            .deleteLocalBackup(
+              backup,
+              tenantId: workspaceId,
+              creatorUid: user.id,
+            ),
+        deletePrompt: (name) =>
+            tr('backup_delete_local_prompt', ref).replaceAll('%s', name),
+        deleteSuccessMessage: tr('backup_delete_local_success', ref),
+      ),
     );
     if (picked == null || !mounted) return;
 
@@ -420,6 +505,9 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     bool mergeRestore = false,
   }) {
     final checksumOk = preview.checksumOk;
+    final warningKey = mergeRestore
+        ? 'backup_restore_merge_warning'
+        : 'backup_restore_warning';
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -448,7 +536,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        tr('backup_restore_warning', ref),
+                        tr(warningKey, ref),
                         style: const TextStyle(
                           color: AppBrand.errorColor,
                           fontSize: 12,
@@ -459,13 +547,6 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              if (mergeRestore) ...[
-                Text(
-                  tr('backup_restore_merge_warning', ref),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 12),
-              ],
               // Metadata
               Text(
                 tr(
@@ -558,12 +639,12 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     );
   }
 
-  Future<bool?> _showPasswordCountdownDialog() {
+  Future<bool?> _showPasswordCountdownDialog() async {
     final passwordC = TextEditingController();
     int countdown = 10;
     String? errorText;
 
-    return showDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
@@ -574,7 +655,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
             });
           }
           return AlertDialog(
-            title: Text(tr('flush_password_title', ref)),
+            title: Text(tr('backup_restore_reauth_title', ref)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -582,7 +663,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                   controller: passwordC,
                   obscureText: true,
                   decoration: InputDecoration(
-                    hintText: tr('flush_password_hint', ref),
+                    hintText: tr('backup_restore_reauth_hint', ref),
                     errorText: errorText,
                     prefixIcon: const Icon(Icons.lock_outline),
                   ),
@@ -614,13 +695,16 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                     ? null
                     : () async {
                         final ok = await ref
-                            .read(databaseFlushProvider.notifier)
-                            .reauthenticate(passwordC.text);
+                            .read(authNotifierProvider.notifier)
+                            .reauthenticateCurrentUser(passwordC.text);
                         if (ok) {
                           if (ctx.mounted) Navigator.pop(ctx, true);
                         } else {
                           setS(
-                            () => errorText = tr('flush_password_wrong', ref),
+                            () => errorText = tr(
+                              'backup_restore_reauth_wrong',
+                              ref,
+                            ),
                           );
                         }
                       },
@@ -631,43 +715,51 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
         },
       ),
     );
+    passwordC.dispose();
+    return result;
   }
 
   // ── Auto-backup prefs ──────────────────────────────────────────────────────
 
   Future<void> _setAutoEnabled(bool value) async {
-    if (value) {
-      if (!GoogleDriveBackupService.isConfigured) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(errorSnackBar(tr('backup_drive_not_configured', ref)));
+    try {
+      if (value) {
+        if (!GoogleDriveBackupService.isConfigured) {
+          _showMappedError(
+            StateError('Automatic Google Drive backup is not configured'),
+          );
+          return;
         }
-        return;
+        final passphrase = await _requestBackupPassphrase(
+          confirmPassphrase: true,
+        );
+        if (passphrase == null || !mounted) return;
+        await ref
+            .read(databaseBackupProvider.notifier)
+            .rememberAutoBackupPassphrase(passphrase);
       }
-      final passphrase = await _requestBackupPassphrase(
-        confirmPassphrase: true,
-      );
-      if (passphrase == null || !mounted) return;
-      await ref
-          .read(databaseBackupProvider.notifier)
-          .rememberAutoBackupPassphrase(passphrase);
+      if (!value) {
+        await ref
+            .read(databaseBackupProvider.notifier)
+            .clearAutoBackupPassphrase();
+      }
+      await ref.read(databaseBackupProvider.notifier).setAutoEnabled(value);
+      if (mounted) setState(() => _autoEnabled = value);
+    } catch (error) {
+      _showMappedError(error);
     }
-    await ref.read(databaseBackupProvider.notifier).setAutoEnabled(value);
-    if (!value) {
-      await ref
-          .read(databaseBackupProvider.notifier)
-          .clearAutoBackupPassphrase();
-    }
-    setState(() => _autoEnabled = value);
   }
 
   Future<void> _setInterval(int days) async {
-    final minutes = days * 24 * 60;
-    await ref.read(databaseBackupProvider.notifier).setIntervalMinutes(minutes);
-    setState(() {
-      _intervalMinutes = minutes;
-    });
+    try {
+      final minutes = days * 24 * 60;
+      await ref
+          .read(databaseBackupProvider.notifier)
+          .setIntervalMinutes(minutes);
+      if (mounted) setState(() => _intervalMinutes = minutes);
+    } catch (error) {
+      _showMappedError(error);
+    }
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -677,14 +769,15 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     final user = ref.watch(authUserProvider).value;
     final tenants = ref.watch(tenantsProvider).value ?? const [];
     final activeTenantId = TenantScope.normalize(user?.tenantId);
+    final hasSelectedWorkspace = activeTenantId != null;
     final activeTenantMatches = tenants
         .where((tenant) => tenant.id == activeTenantId)
         .toList();
     final activeTenantName = activeTenantId == null
-      ? tr('select_workspace', ref)
-      : activeTenantMatches.isEmpty
-      ? tr('workspace_name_unavailable', ref)
-      : activeTenantMatches.first.name;
+        ? tr('select_workspace', ref)
+        : activeTenantMatches.isEmpty
+        ? tr('workspace_name_unavailable', ref)
+        : activeTenantMatches.first.name;
     final canUseBackup =
         user?.active == true && user?.canCreateWorkspaceBackup == true;
 
@@ -709,17 +802,34 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                 )
               : _loadingPrefs
               ? const Center(child: CircularProgressIndicator())
+              : _preferencesErrorKey != null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(tr(_preferencesErrorKey!, ref)),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: _retryLoadPrefs,
+                        icon: const Icon(Icons.refresh),
+                        label: Text(tr('retry', ref)),
+                      ),
+                    ],
+                  ),
+                )
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                   children: [
                     // ── Status Card ──────────────────────────────────
                     _StatusCard(
-                      lastBackupAt: _lastBackupAt,
+                      lastLocalBackupAt: _lastLocalBackupAt,
+                      lastDriveBackupAt: _lastDriveBackupAt,
                       lastRestoreAt: _lastRestoreAt,
                       lastRestoreBy: _lastRestoreBy,
                       fmt: _fmt,
                       never: tr('backup_never', ref),
-                      lastAtTemplate: tr('backup_last_at', ref),
+                      lastLocalAtTemplate: tr('backup_last_local_at', ref),
+                      lastDriveAtTemplate: tr('backup_last_drive_at', ref),
                       lastRestoreAtTemplate: tr('backup_last_restore_at', ref),
                       lastRestoreByTemplate: tr('backup_last_restore_by', ref),
                     ),
@@ -737,7 +847,9 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                     ],
 
                     // ── Auto-backup Card ─────────────────────────────
-                    if (user?.canRunAutomaticWorkspaceBackup == true && !kIsWeb)
+                    if (user?.canRunAutomaticWorkspaceBackup == true &&
+                        !kIsWeb &&
+                        GoogleDriveBackupService.isConfigured)
                       Card(
                         child: Padding(
                           padding: const EdgeInsets.all(4),
@@ -751,11 +863,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                                       : AppBrand.stockColor,
                                 ),
                                 title: Text(tr('backup_auto_title', ref)),
-                                subtitle: Text(
-                                  GoogleDriveBackupService.isConfigured
-                                      ? tr('backup_auto_subtitle', ref)
-                                      : tr('backup_drive_not_configured', ref),
-                                ),
+                                subtitle: Text(tr('backup_auto_subtitle', ref)),
                                 value: _autoEnabled,
                                 onChanged: GoogleDriveBackupService.isConfigured
                                     ? _setAutoEnabled
@@ -856,7 +964,10 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
 
                     // ── Backup Now ───────────────────────────────────
                     FilledButton.icon(
-                      onPressed: _loading ? null : _doBackup,
+                      onPressed:
+                          _loading || _selected.isEmpty || !hasSelectedWorkspace
+                          ? null
+                          : _doBackup,
                       icon: _loading
                           ? const SizedBox(
                               width: 18,
@@ -870,7 +981,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                       label: Text(
                         _loading
                             ? tr('backup_in_progress', ref)
-                            : tr('backup_now', ref),
+                            : tr('backup_create_file', ref),
                       ),
                       style: FilledButton.styleFrom(
                         backgroundColor: AppBrand.primaryColor,
@@ -880,7 +991,9 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                     const SizedBox(height: 10),
                     OutlinedButton.icon(
                       onPressed:
-                          _loading || !GoogleDriveBackupService.isConfigured
+                          _loading ||
+                              !hasSelectedWorkspace ||
+                              !GoogleDriveBackupService.isConfigured
                           ? null
                           : _doDriveBackup,
                       icon: const Icon(Icons.cloud_upload_outlined),
@@ -936,7 +1049,9 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                       const SizedBox(height: 12),
                       if (!kIsWeb)
                         OutlinedButton.icon(
-                          onPressed: _restoring ? null : _pickAndRestore,
+                          onPressed: _restoring || !hasSelectedWorkspace
+                              ? null
+                              : _pickAndRestore,
                           icon: _restoring
                               ? const SizedBox(
                                   width: 18,
@@ -952,7 +1067,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                           label: Text(
                             _restoring
                                 ? tr('backup_restore_in_progress', ref)
-                                : tr('backup_restore', ref),
+                                : tr('restore_from_device', ref),
                             style: const TextStyle(color: AppBrand.errorColor),
                           ),
                           style: OutlinedButton.styleFrom(
@@ -965,6 +1080,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                         OutlinedButton.icon(
                           onPressed:
                               _restoring ||
+                                  !hasSelectedWorkspace ||
                                   !GoogleDriveBackupService.isConfigured
                               ? null
                               : _pickAndRestoreFromDrive,
@@ -1023,31 +1139,39 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
 // ─── Sub-widgets ──────────────────────────────────────────────────────────────
 
 class _StatusCard extends StatelessWidget {
-  final DateTime? lastBackupAt;
+  final DateTime? lastLocalBackupAt;
+  final DateTime? lastDriveBackupAt;
   final DateTime? lastRestoreAt;
   final String? lastRestoreBy;
   final String Function(DateTime) fmt;
   final String never;
-  final String lastAtTemplate;
+  final String lastLocalAtTemplate;
+  final String lastDriveAtTemplate;
   final String lastRestoreAtTemplate;
   final String lastRestoreByTemplate;
 
   const _StatusCard({
-    required this.lastBackupAt,
+    required this.lastLocalBackupAt,
+    required this.lastDriveBackupAt,
     required this.lastRestoreAt,
     required this.lastRestoreBy,
     required this.fmt,
     required this.never,
-    required this.lastAtTemplate,
+    required this.lastLocalAtTemplate,
+    required this.lastDriveAtTemplate,
     required this.lastRestoreAtTemplate,
     required this.lastRestoreByTemplate,
   });
 
   @override
   Widget build(BuildContext context) {
-    final backupLabel = lastAtTemplate.replaceAll(
+    final localBackupLabel = lastLocalAtTemplate.replaceAll(
       '%s',
-      lastBackupAt != null ? fmt(lastBackupAt!) : never,
+      lastLocalBackupAt != null ? fmt(lastLocalBackupAt!) : never,
+    );
+    final driveBackupLabel = lastDriveAtTemplate.replaceAll(
+      '%s',
+      lastDriveBackupAt != null ? fmt(lastDriveBackupAt!) : never,
     );
 
     String restoreLabel;
@@ -1070,11 +1194,19 @@ class _StatusCard extends StatelessWidget {
         child: Column(
           children: [
             _StatusRow(
-              icon: Icons.cloud_done_outlined,
-              color: lastBackupAt != null
+              icon: Icons.save_outlined,
+              color: lastLocalBackupAt != null
                   ? AppBrand.successColor
                   : AppBrand.stockColor,
-              label: backupLabel,
+              label: localBackupLabel,
+            ),
+            const SizedBox(height: 10),
+            _StatusRow(
+              icon: Icons.cloud_done_outlined,
+              color: lastDriveBackupAt != null
+                  ? AppBrand.successColor
+                  : AppBrand.stockColor,
+              label: driveBackupLabel,
             ),
             const SizedBox(height: 10),
             _StatusRow(
@@ -1147,96 +1279,164 @@ class _CollectionTile extends ConsumerWidget {
   }
 }
 
-class _BackupFilePickerSheet extends StatelessWidget {
-  final List<LocalBackupFile> backups;
-  final String Function(DateTime) fmtDate;
+class _BackupArchiveEntry<T> {
+  final T value;
+  final String id;
+  final String name;
+  final String details;
+  final IconData icon;
 
-  const _BackupFilePickerSheet({required this.backups, required this.fmtDate});
+  const _BackupArchiveEntry({
+    required this.value,
+    required this.id,
+    required this.name,
+    required this.details,
+    required this.icon,
+  });
+}
+
+class _BackupArchivePickerSheet<T> extends ConsumerStatefulWidget {
+  final String title;
+  final String emptyMessage;
+  final List<_BackupArchiveEntry<T>> entries;
+  final Future<void> Function(T) onDelete;
+  final String Function(String) deletePrompt;
+  final String deleteSuccessMessage;
+
+  const _BackupArchivePickerSheet({
+    required this.title,
+    required this.emptyMessage,
+    required this.entries,
+    required this.onDelete,
+    required this.deletePrompt,
+    required this.deleteSuccessMessage,
+  });
+
+  @override
+  ConsumerState<_BackupArchivePickerSheet<T>> createState() =>
+      _BackupArchivePickerSheetState<T>();
+}
+
+class _BackupArchivePickerSheetState<T>
+    extends ConsumerState<_BackupArchivePickerSheet<T>> {
+  late final List<_BackupArchiveEntry<T>> _entries = List.of(widget.entries);
+  final Set<String> _deletingIds = {};
+
+  Future<void> _confirmDelete(_BackupArchiveEntry<T> entry) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('backup_delete_title', ref)),
+        content: Text(widget.deletePrompt(entry.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(tr('cancel', ref)),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_outline),
+            label: Text(tr('delete', ref)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deletingIds.add(entry.id));
+    try {
+      await widget.onDelete(entry.value);
+      if (!mounted) return;
+      setState(
+        () => _entries.removeWhere((candidate) => candidate.id == entry.id),
+      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(successSnackBar(widget.deleteSuccessMessage));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+    } finally {
+      if (mounted) setState(() => _deletingIds.remove(entry.id));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer(
-      builder: (ctx, ref, _) => DraggableScrollableSheet(
+    return SafeArea(
+      child: DraggableScrollableSheet(
         initialChildSize: 0.55,
         maxChildSize: 0.9,
         minChildSize: 0.3,
         expand: false,
-        builder: (_, scrollC) => Column(
+        builder: (context, scrollController) => Column(
           children: [
             const SizedBox(height: 8),
             Container(
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[400],
+                color: Theme.of(context).colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                tr('backup_pick_file', ref),
-                style: Theme.of(
-                  ctx,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
+            Text(
+              widget.title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const Divider(),
             Expanded(
-              child: ListView.builder(
-                controller: scrollC,
-                itemCount: backups.length,
-                itemBuilder: (_, i) {
-                  final f = backups[i];
-                  final sizeKb = (f.file.lengthSync() / 1024).toStringAsFixed(
-                    0,
-                  );
-                  return ListTile(
-                    leading: const Icon(Icons.insert_drive_file_outlined),
-                    title: Text(f.name, style: const TextStyle(fontSize: 13)),
-                    subtitle: Text(
-                      '${fmtDate(f.modifiedAt)} · ${sizeKb}KB',
-                      style: const TextStyle(fontSize: 11),
+              child: _entries.isEmpty
+                  ? Center(child: Text(widget.emptyMessage))
+                  : ListView.builder(
+                      controller: scrollController,
+                      itemCount: _entries.length,
+                      itemBuilder: (context, index) {
+                        final entry = _entries[index];
+                        final deleting = _deletingIds.contains(entry.id);
+                        return ListTile(
+                          leading: Icon(entry.icon),
+                          title: Text(entry.name),
+                          subtitle: Text(entry.details),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: tr('backup_restore_proceed', ref),
+                                onPressed: deleting
+                                    ? null
+                                    : () => Navigator.pop(context, entry.value),
+                                icon: const Icon(Icons.restore_outlined),
+                              ),
+                              IconButton(
+                                tooltip: tr('delete', ref),
+                                onPressed: deleting
+                                    ? null
+                                    : () => _confirmDelete(entry),
+                                icon: deleting
+                                    ? const SizedBox.square(
+                                        dimension: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.delete_outline),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
-                    trailing: FilledButton.tonal(
-                      onPressed: () => Navigator.pop(ctx, f),
-                      child: Text(tr('backup_restore_proceed', ref)),
-                    ),
-                  );
-                },
-              ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _DriveFilePickerSheet extends StatelessWidget {
-  final List<GoogleDriveBackupFile> files;
-  final String Function(DateTime) fmtDate;
-
-  const _DriveFilePickerSheet({required this.files, required this.fmtDate});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: ListView.builder(
-        shrinkWrap: true,
-        itemCount: files.length,
-        itemBuilder: (_, index) {
-          final file = files[index];
-          return ListTile(
-            leading: const Icon(Icons.cloud_outlined),
-            title: Text(file.name),
-            subtitle: Text(
-              file.createdAt != null ? fmtDate(file.createdAt!.toLocal()) : '',
-            ),
-            onTap: () => Navigator.pop(context, file),
-          );
-        },
       ),
     );
   }

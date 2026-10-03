@@ -254,7 +254,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final currentLocale = ref.watch(appLocaleProvider);
     final isOnline = ref.watch(isOnlineProvider);
     final isWide =
-      MediaQuery.sizeOf(context).width >= AppTokens.breakpointNavigationRail;
+        MediaQuery.sizeOf(context).width >= AppTokens.breakpointNavigationRail;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
