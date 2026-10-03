@@ -10,6 +10,7 @@ class TenantModel {
   final bool requireDevicePairing;
   final bool allowAdminResetOnly;
   final int maxDevicesAllowed;
+  final int maxActiveSessionsAllowed;
   final Timestamp createdAt;
   final Timestamp updatedAt;
   final String? ownerUserId;
@@ -26,6 +27,7 @@ class TenantModel {
     this.requireDevicePairing = false,
     this.allowAdminResetOnly = true,
     this.maxDevicesAllowed = 1,
+    this.maxActiveSessionsAllowed = 1,
     required this.createdAt,
     required this.updatedAt,
     this.ownerUserId,
@@ -46,6 +48,11 @@ class TenantModel {
       maxDevicesAllowed: ((json['max_devices_allowed'] as num?) ?? 1)
           .toInt()
           .clamp(1, 999),
+      maxActiveSessionsAllowed:
+          ((json['max_active_sessions_allowed'] as num?) ?? 1).toInt().clamp(
+            1,
+            999,
+          ),
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
       ownerUserId: json['owner_user_id'] as String?,
@@ -63,6 +70,7 @@ class TenantModel {
     'require_device_pairing': requireDevicePairing,
     'allow_admin_reset_only': allowAdminResetOnly,
     'max_devices_allowed': maxDevicesAllowed,
+    'max_active_sessions_allowed': maxActiveSessionsAllowed,
     'created_at': createdAt,
     'updated_at': updatedAt,
     'owner_user_id': ownerUserId,

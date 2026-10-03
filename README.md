@@ -1,4 +1,4 @@
-﻿# FootWear ERP — v3.9.55+94
+﻿# FootWear ERP — v3.9.56+95
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
@@ -7,6 +7,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 > **v3.9.53+92 (2026-10-03)** — Tenant admins merge encrypted backups into their own workspace; selected platform admins can prune only within their active support workspace. Unsupported roles and workspace-less accounts receive recovery guidance instead of being treated as sellers.
 > **v3.9.54+93 (2026-10-03)** — Status labels are localized and high-contrast status colors are more legible.
 > **v3.9.55+94 (2026-10-03)** — Platform admins have a scoped Settings hub; About and What's New are discoverable for every role, and About dates render in Arabic and Urdu.
+> **v3.9.56+95 (2026-10-03)** — Platform dashboard no longer waits on a hidden user list; sign-in skips the full route/shop recount and duplicate profile read.
 
 ---
 

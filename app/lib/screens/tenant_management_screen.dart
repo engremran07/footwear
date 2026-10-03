@@ -24,6 +24,7 @@ class _TenantManagementScreenState
   final _nameController = TextEditingController();
   final _slugController = TextEditingController();
   final _maxDevicesController = TextEditingController(text: '1');
+  final _maxSessionsController = TextEditingController(text: '1');
   bool _requireDevicePairing = false;
   bool _allowAdminResetOnly = true;
   String? _selectedOwnerId;
@@ -34,6 +35,7 @@ class _TenantManagementScreenState
     _nameController.dispose();
     _slugController.dispose();
     _maxDevicesController.dispose();
+    _maxSessionsController.dispose();
     super.dispose();
   }
 
@@ -55,6 +57,8 @@ class _TenantManagementScreenState
 
     final maxDevicesAllowed =
         int.tryParse(_maxDevicesController.text.trim()) ?? 1;
+    final maxActiveSessionsAllowed =
+        int.tryParse(_maxSessionsController.text.trim()) ?? 1;
     final notifier = ref.read(tenantManagementNotifierProvider.notifier);
     if (existing == null) {
       await notifier.createTenant(
@@ -63,6 +67,7 @@ class _TenantManagementScreenState
         requireDevicePairing: _requireDevicePairing,
         allowAdminResetOnly: _allowAdminResetOnly,
         maxDevicesAllowed: maxDevicesAllowed,
+        maxActiveSessionsAllowed: maxActiveSessionsAllowed,
         ownerUserId: _selectedOwnerId,
       );
     } else {
@@ -73,6 +78,7 @@ class _TenantManagementScreenState
         requireDevicePairing: _requireDevicePairing,
         allowAdminResetOnly: _allowAdminResetOnly,
         maxDevicesAllowed: maxDevicesAllowed,
+        maxActiveSessionsAllowed: maxActiveSessionsAllowed,
         ownerUserId: _selectedOwnerId,
       );
     }
@@ -182,6 +188,7 @@ class _TenantManagementScreenState
       _nameController.text = existing.name;
       _slugController.text = existing.slug;
       _maxDevicesController.text = existing.maxDevicesAllowed.toString();
+      _maxSessionsController.text = existing.maxActiveSessionsAllowed.toString();
       _requireDevicePairing = existing.requireDevicePairing;
       _allowAdminResetOnly = existing.allowAdminResetOnly;
       _selectedOwnerId = existing.ownerUserId;
@@ -189,6 +196,7 @@ class _TenantManagementScreenState
       _nameController.clear();
       _slugController.clear();
       _maxDevicesController.text = '1';
+      _maxSessionsController.text = '1';
       _requireDevicePairing = false;
       _allowAdminResetOnly = true;
       _selectedOwnerId = null;
@@ -232,6 +240,14 @@ class _TenantManagementScreenState
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: tr('max_devices_allowed', ref),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _maxSessionsController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: tr('max_active_sessions_allowed', ref),
                 ),
               ),
               const SizedBox(height: 12),

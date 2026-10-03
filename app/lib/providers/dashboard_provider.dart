@@ -102,14 +102,14 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
   final AsyncValue<List<ShopModel>> shops;
   if (user.isSuperAdmin) {
     final workspaces = ref.watch(tenantsProvider);
-    final users = ref.watch(allUsersProvider);
-    if (workspaces.isLoading || users.isLoading) {
+    final users = user.tenantId == null ? null : ref.watch(allUsersProvider);
+    if (workspaces.isLoading || (users?.isLoading ?? false)) {
       final cached = ref.read(_lastGoodDashboardStatsProvider);
       return cached != null ? AsyncData(cached) : const AsyncLoading();
     }
 
     final workspaceList = workspaces.value ?? const <dynamic>[];
-    final userList = users.value ?? const <UserModel>[];
+    final userList = users?.value ?? const <UserModel>[];
     final activeWorkspaces = workspaceList
         .where((w) => w.active == true)
         .length;

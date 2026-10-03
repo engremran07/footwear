@@ -1,4 +1,4 @@
-﻿# FootWear ERP — Flutter App (v3.9.55+94)
+﻿# FootWear ERP — Flutter App (v3.9.56+95)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
@@ -7,6 +7,8 @@ Mobile-first Android + Web ERP for footwear distribution. Admins manage products
 Workspace backup restore is tenant-scoped. Tenant admins merge encrypted backup records into their own workspace without deleting records missing from the archive; selected platform super-admins retain replacement/pruning access for the active support workspace. Unsupported role values are blocked from business navigation and show localized recovery guidance.
 
 Status chips display localized text and use high-contrast state colors when that theme is selected.
+
+Platform dashboard workspace totals load independently of scoped user counts. Sign-in does not run full route/shop reconciliation scans before returning.
 
 ---
 

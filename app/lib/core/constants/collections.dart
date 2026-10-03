@@ -27,6 +27,9 @@ class Collections {
   static const invoices = 'invoices';
   static const settings = 'settings';
   static const tenants = 'tenants';
+  static const sessions = 'sessions';
+  static const deviceRegistrations = 'device_registrations';
+  static const auditLogs = 'audit_logs';
 
   /// In-app notification feed — written by providers after financial events.
   static const notifications = 'notifications';

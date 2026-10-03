@@ -12,8 +12,8 @@ class AppBrand {
   static const String logoAsset = 'assets/images/app_icon.png';
 
   // ─── Version ─────────────────────────────────────────────────────────────
-  static const String appVersion = '3.9.55';
-  static const String buildNumber = '94';
+  static const String appVersion = '3.9.56';
+  static const String buildNumber = '95';
   static const String versionDisplay = 'v$appVersion+$buildNumber';
   static const String releaseDateIso = '2026-10-03';
 

@@ -28,6 +28,34 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.56',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '⚡',
+        text: {
+          AppLocale.en:
+              'The platform dashboard now shows workspace totals without waiting for a user list that is only needed after selecting a workspace.',
+          AppLocale.ar:
+              'يعرض لوحة المنصة إجماليات مساحات العمل دون انتظار قائمة المستخدمين التي لا تلزم إلا بعد اختيار مساحة عمل.',
+          AppLocale.ur:
+              'پلیٹ فارم ڈیش بورڈ اب ورک اسپیس کے مجموعے دکھانے کے لیے صارف فہرست کا انتظار نہیں کرتا؛ یہ فہرست صرف ورک اسپیس منتخب کرنے کے بعد درکار ہوتی ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🚀',
+        text: {
+          AppLocale.en:
+              'Sign-in no longer waits for a full route and shop recount, and it reuses the profile already loaded during authentication.',
+          AppLocale.ar:
+              'لم يعد تسجيل الدخول ينتظر إعادة عدّ المسارات والمتاجر بالكامل، ويعيد استخدام ملف المستخدم الذي تم تحميله أثناء المصادقة.',
+          AppLocale.ur:
+              'سائن ان اب مکمل روٹ اور شاپ کی دوبارہ گنتی کا انتظار نہیں کرتا، اور تصدیق کے دوران لوڈ شدہ پروفائل دوبارہ استعمال کرتا ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.55',
     date: 'October 2026',
     items: [

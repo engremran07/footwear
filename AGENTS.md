@@ -94,6 +94,8 @@ Seller:
 
 1. Dashboard must degrade gracefully under resource-exhausted.
 
+1. The root platform super-admin dashboard must not wait for or subscribe to workspace users when no workspace is selected; only workspace metadata is needed there. Sign-in must not synchronously run full route/shop reconciliation scans; route counters are maintained by normal shop operations and explicit flush flows.
+
 1. Dashboard and inventory must not show transient permission-denied errors
   during auth/profile loading; role-scoped providers must stay in loading,
   empty, or cached fallback state until access is confirmed.
@@ -484,6 +486,11 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-10-03 dashboard startup performance — v3.9.56+95:
+
+- Root super-admin dashboard no longer waits for the workspace user list; selected-workspace user counts remain scoped and available.
+- Sign-in reuses its first profile snapshot and no longer waits for route/shop counter reconciliation over up to 2,500 documents.
 
 2026-10-03 settings and About access — v3.9.55+94:
 

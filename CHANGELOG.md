@@ -7,6 +7,13 @@ Most recent first.
 
 ---
 
+## [3.9.56+95] — 2026-10-03 — Faster dashboard and sign-in
+
+### Changed
+
+- Root platform dashboards no longer wait for a workspace user list that is not displayed until a workspace is selected.
+- Sign-in no longer waits for full route/shop counter reconciliation or reads the same user profile twice.
+
 ## [3.9.55+94] — 2026-10-03 — Platform settings and About access
 
 ### Added

@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../core/constants/collections.dart';
 import '../core/models/tenant_model.dart';
 import '../core/utils/tenant_scope.dart';
+import '../models/session_model.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
 
@@ -152,6 +154,35 @@ final allInactiveUsersForTenantProvider =
           );
     });
 
+final userSessionsProvider = StreamProvider.family<List<SessionModel>, String>(
+  (ref, userId) {
+    final currentUser = ref.watch(authUserProvider).value;
+    if (currentUser == null) return const Stream<List<SessionModel>>.empty();
+
+    return FirebaseFirestore.instance
+        .collection(Collections.sessions)
+        .where('user_id', isEqualTo: userId)
+        .orderBy('last_seen_at', descending: true)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((doc) => SessionModel.fromJson(doc.data(), doc.id))
+              .toList(),
+        );
+  },
+);
+
+final activeSessionCountProvider = StreamProvider.family<int, String>(
+  (ref, userId) {
+    return FirebaseFirestore.instance
+        .collection(Collections.sessions)
+        .where('user_id', isEqualTo: userId)
+        .where('status', isEqualTo: 'active')
+        .snapshots()
+        .map((snap) => snap.docs.length);
+  },
+);
+
 class TenantManagementNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
@@ -170,17 +201,22 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
     required bool requireDevicePairing,
     required bool allowAdminResetOnly,
     required int maxDevicesAllowed,
+    required int maxActiveSessionsAllowed,
     String? ownerUserId,
   }) async {
     final actingUser = await ref.read(authUserProvider.future);
     if (actingUser == null || !actingUser.active || !actingUser.isSuperAdmin) {
       throw StateError('Active platform super-admin access is required');
     }
+
     final tenantSlug = slug.trim().isEmpty
         ? _slugify(name)
         : slug.trim().toLowerCase();
     if (name.trim().isEmpty) throw ArgumentError('Workspace name is required');
+
     final normalizedLimit = maxDevicesAllowed.clamp(1, 999);
+    final normalizedSessionLimit = maxActiveSessionsAllowed.clamp(1, 999);
+
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final docId = tenantSlug.isEmpty
@@ -189,6 +225,7 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
       final db = FirebaseFirestore.instance;
       final tenantRef = db.collection(Collections.tenants).doc(docId);
       final settingsRef = db.collection(Collections.settings).doc(docId);
+
       await db.runTransaction<void>((transaction) async {
         final tenantSnapshot = await transaction.get(tenantRef);
         final settingsSnapshot = await transaction.get(settingsRef);
@@ -198,6 +235,7 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
         if (settingsSnapshot.exists) {
           throw StateError('Workspace settings already exist: $docId');
         }
+
         transaction.set(tenantRef, {
           'name': name.trim(),
           'slug': tenantSlug,
@@ -208,10 +246,12 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
           'require_device_pairing': requireDevicePairing,
           'allow_admin_reset_only': allowAdminResetOnly,
           'max_devices_allowed': normalizedLimit,
+          'max_active_sessions_allowed': normalizedSessionLimit,
           'created_at': FieldValue.serverTimestamp(),
           'updated_at': FieldValue.serverTimestamp(),
           'owner_user_id': ownerUserId,
         });
+
         transaction.set(settingsRef, {
           'tenant_id': docId,
           'company_name': name.trim(),
@@ -232,9 +272,12 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
     required bool requireDevicePairing,
     required bool allowAdminResetOnly,
     required int maxDevicesAllowed,
+    required int maxActiveSessionsAllowed,
     String? ownerUserId,
   }) async {
     final normalizedLimit = maxDevicesAllowed.clamp(1, 999);
+    final normalizedSessionLimit = maxActiveSessionsAllowed.clamp(1, 999);
+
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       await FirebaseFirestore.instance
@@ -247,6 +290,7 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
             'require_device_pairing': requireDevicePairing,
             'allow_admin_reset_only': allowAdminResetOnly,
             'max_devices_allowed': normalizedLimit,
+            'max_active_sessions_allowed': normalizedSessionLimit,
             'owner_user_id': ownerUserId,
             'updated_at': Timestamp.now(),
           }, SetOptions(merge: true));
@@ -254,7 +298,83 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
   }
 }
 
+class SessionManagementNotifier extends AsyncNotifier<void> {
+  @override
+  Future<void> build() async {}
+
+  Future<void> terminateSession(String sessionId, {String? reason}) async {
+    final currentUser = await ref.read(authUserProvider.future);
+    if (currentUser == null) {
+      throw StateError('Not authenticated');
+    }
+
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final sessionRef = FirebaseFirestore.instance
+          .collection(Collections.sessions)
+          .doc(sessionId);
+      final snapshot = await sessionRef.get();
+      if (!snapshot.exists) {
+        throw StateError('Session not found');
+      }
+
+      final data = snapshot.data() ?? <String, dynamic>{};
+      final ownerUserId = data['user_id'] as String? ?? '';
+      final tenantId = data['tenant_id'] as String? ?? '';
+      final isPrivileged = currentUser.isSuperAdmin || currentUser.isAdmin;
+      final isOwner = currentUser.id == ownerUserId;
+      if (!isPrivileged && !isOwner) {
+        throw StateError('Permission denied');
+      }
+      if (!isPrivileged && currentUser.tenantId != tenantId) {
+        throw StateError('Tenant mismatch');
+      }
+
+      await sessionRef.update({
+        'status': 'revoked',
+        'revoked_at': Timestamp.now(),
+        'termination_reason': reason ?? 'terminated_by_admin',
+        'last_seen_at': Timestamp.now(),
+      });
+    });
+  }
+
+  Future<void> registerSession({
+    required String userId,
+    required String tenantId,
+    required String deviceId,
+    required String deviceBrand,
+    required String deviceModel,
+    required String platform,
+  }) async {
+    final sessionRef = FirebaseFirestore.instance
+        .collection(Collections.sessions)
+        .doc();
+
+    await sessionRef.set({
+      'user_id': userId,
+      'tenant_id': tenantId,
+      'device_id': deviceId,
+      'device_brand': deviceBrand,
+      'device_model': deviceModel,
+      'platform': platform,
+      'status': 'active',
+      'created_at': Timestamp.now(),
+      'last_seen_at': Timestamp.now(),
+      'expires_at': Timestamp.fromDate(
+        DateTime.now().add(const Duration(hours: 8)),
+      ),
+      'is_current_device': true,
+    }, SetOptions(merge: true));
+  }
+}
+
 final tenantManagementNotifierProvider =
     AsyncNotifierProvider<TenantManagementNotifier, void>(
       TenantManagementNotifier.new,
+    );
+
+final sessionManagementNotifierProvider =
+    AsyncNotifierProvider<SessionManagementNotifier, void>(
+      SessionManagementNotifier.new,
     );

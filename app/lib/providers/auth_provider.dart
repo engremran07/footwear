@@ -79,45 +79,6 @@ class AuthNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
-  Future<void> _runPostSignInSelfHeal({
-    required String uid,
-    required String role,
-    required String? tenantId,
-  }) async {
-    final normalizedRole = role.trim().toLowerCase();
-    if (!isPrivilegedRoleName(normalizedRole)) return;
-
-    try {
-      final settingsDocId = TenantScope.normalize(tenantId);
-      if (settingsDocId != null) {
-        final settingsRef = FirebaseFirestore.instance
-            .collection(Collections.settings)
-            .doc(settingsDocId);
-        final settingsSnap = await settingsRef.get();
-        if (!settingsSnap.exists) {
-          await settingsRef.set({
-            'company_name': 'My Business',
-            'currency': 'SAR',
-            'pairs_per_carton': 12,
-            'require_admin_approval_for_seller_transaction_edits': false,
-            'tenant_id': settingsDocId,
-            'updated_at': Timestamp.now(),
-          }, SetOptions(merge: true));
-        }
-      }
-    } catch (e) {
-      _logger.w('Post-sign-in settings self-heal skipped: $e');
-    }
-
-    try {
-      await ref
-          .read(routeNotifierProvider.notifier)
-          .reconcileRouteShopCounters();
-    } catch (e) {
-      _logger.w('Post-sign-in route counter self-heal skipped: $e');
-    }
-  }
-
   void _invalidateRoleScopedProviders() {
     // Invalidate only the role-scoped providers that need to reset on sign-out.
     // Listing all 28 providers was causing 28 concurrent Firestore listener
@@ -226,8 +187,7 @@ class AuthNotifier extends AsyncNotifier<void> {
           );
         }
 
-        final refreshedDoc = await usersRef.doc(uid).get();
-        final userData = refreshedDoc.data();
+        final userData = userDoc.data();
         final isActive = userData?['active'] == true;
         final normalizedRole = normalizeRoleName(
           userData?['role'] as String? ?? '',
@@ -265,12 +225,6 @@ class AuthNotifier extends AsyncNotifier<void> {
             message: 'User account is inactive',
           );
         }
-
-        await _runPostSignInSelfHeal(
-          uid: uid,
-          role: normalizedRole,
-          tenantId: tenantId,
-        );
 
         // ── Email-verified sync (Auth → Firestore, non-blocking) ──────────
         // Reload Auth user to get latest emailVerified from Firebase servers.
