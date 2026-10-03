@@ -44,7 +44,10 @@ void main() {
         final tenantUser = seller.copyWith(tenantId: 'tenant-42');
 
         expect(settingsDocumentIdForUser(tenantUser), 'tenant-42');
-        expect(settingsDocumentIdForUser(null), TenantScope.globalTenantId);
+        expect(
+          settingsDocumentIdForUser(null),
+          TenantScope.noActiveWorkspaceId,
+        );
       },
     );
   });
@@ -66,6 +69,28 @@ void main() {
             (error) => error.message,
             'message',
             contains('Admin privileges required'),
+          ),
+        ),
+      );
+    });
+
+    test('save rejects oversized logo data before writing settings', () async {
+      final admin = seller.copyWith(role: UserRole.admin, tenantId: 'tenant-1');
+      final container = containerWithUser(admin);
+      addTearDown(container.dispose);
+      final authSub = keepAuthAlive(container);
+      addTearDown(authSub.close);
+      await container.read(authUserProvider.future);
+
+      await expectLater(
+        container.read(settingsNotifierProvider.notifier).save({
+          'logo_base64': List<String>.filled(50 * 1024 + 1, 'a').join(),
+        }),
+        throwsA(
+          isA<ArgumentError>().having(
+            (error) => error.message,
+            'message',
+            contains('50 KB'),
           ),
         ),
       );

@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design/app_tokens.dart';
+import '../core/l10n/app_locale.dart';
 
 /// Material 3 SearchBar with debounced filtering, clear button, keyboard dismiss.
-class AppSearchBar extends StatefulWidget {
+class AppSearchBar extends ConsumerStatefulWidget {
   final String hintText;
   final ValueChanged<String> onChanged;
   final Duration debounceDuration;
@@ -19,10 +21,10 @@ class AppSearchBar extends StatefulWidget {
   });
 
   @override
-  State<AppSearchBar> createState() => _AppSearchBarState();
+  ConsumerState<AppSearchBar> createState() => _AppSearchBarState();
 }
 
-class _AppSearchBarState extends State<AppSearchBar> {
+class _AppSearchBarState extends ConsumerState<AppSearchBar> {
   late final TextEditingController _controller;
   Timer? _debounce;
 
@@ -64,7 +66,7 @@ class _AppSearchBarState extends State<AppSearchBar> {
           suffixIcon: _controller.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, size: AppTokens.iconSizeSM),
-                  tooltip: 'Clear search',
+                  tooltip: tr('clear_search', ref),
                   onPressed: () {
                     _controller.clear();
                     widget.onChanged('');

@@ -49,4 +49,41 @@ void main() {
       );
     }
   });
+
+  test(
+    'does not retain unscoped composite indexes for tenant business data',
+    () {
+      final indexFile = File(
+        '${Directory.current.path}/../firestore.indexes.json',
+      );
+      final root =
+          jsonDecode(indexFile.readAsStringSync()) as Map<String, dynamic>;
+      final indexes = (root['indexes'] as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      const tenantCollections = {
+        'users',
+        'products',
+        'product_variants',
+        'seller_inventory',
+        'inventory_transactions',
+        'routes',
+        'customers',
+        'transactions',
+        'invoices',
+        'notifications',
+      };
+      final unscoped = indexes.where((index) {
+        if (!tenantCollections.contains(index['collectionGroup'])) return false;
+        final fields = (index['fields'] as List<dynamic>)
+            .cast<Map<String, dynamic>>();
+        return !fields.any((field) => field['fieldPath'] == 'tenant_id');
+      }).toList();
+
+      expect(
+        unscoped,
+        isEmpty,
+        reason: 'Tenant-owned query indexes must begin with tenant_id.',
+      );
+    },
+  );
 }

@@ -14,6 +14,11 @@ void main() {
       expect(AppErrorMapper.key(e), equals('err_invalid_credentials'));
     });
 
+    test('invalid-login-credentials → err_invalid_credentials', () {
+      final e = FirebaseAuthException(code: 'invalid-login-credentials');
+      expect(AppErrorMapper.key(e), equals('err_invalid_credentials'));
+    });
+
     test('user-not-found → err_user_not_found', () {
       final e = FirebaseAuthException(code: 'user-not-found');
       expect(AppErrorMapper.key(e), equals('err_user_not_found'));
@@ -22,6 +27,18 @@ void main() {
     test('user-disabled → err_user_disabled', () {
       final e = FirebaseAuthException(code: 'user-disabled');
       expect(AppErrorMapper.key(e), equals('err_user_disabled'));
+    });
+
+    test('unassigned workspace → localized workspace assignment error', () {
+      final e = FirebaseAuthException(
+        code: 'account-not-assigned-to-workspace',
+      );
+      expect(AppErrorMapper.key(e), equals('err_account_not_assigned'));
+    });
+
+    test('unsupported user role → localized account-role error', () {
+      final e = FirebaseAuthException(code: 'invalid-user-role');
+      expect(AppErrorMapper.key(e), equals('err_account_role_invalid'));
     });
 
     test('too-many-requests → err_too_many_requests', () {
@@ -95,6 +112,15 @@ void main() {
     test('unauthenticated → err_unauthenticated', () {
       final e = FirebaseException(plugin: 'firestore', code: 'unauthenticated');
       expect(AppErrorMapper.key(e), equals('err_unauthenticated'));
+    });
+
+    test('failed-precondition without index context is not mislabeled', () {
+      final e = FirebaseException(
+        plugin: 'firestore',
+        code: 'failed-precondition',
+        message: 'Transaction precondition failed',
+      );
+      expect(AppErrorMapper.key(e), equals('err_firebase_generic'));
     });
 
     test('unknown code → err_firebase_generic', () {

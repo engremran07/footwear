@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import '../core/design/app_tokens.dart';
+import '../core/l10n/app_locale.dart';
 
 /// Returns a theme-aware placeholder color for shimmer shapes.
 /// Light mode: surface container. Dark mode: elevated surface container.
@@ -21,7 +23,7 @@ Color _shimmerHighlightColor(BuildContext context) =>
 
 /// A shimmer placeholder widget for loading states.
 /// Uses the shimmer package for smooth, consistent loading animations.
-class ShimmerLoading extends StatelessWidget {
+class ShimmerLoading extends ConsumerWidget {
   final int itemCount;
   final bool showLeadingCircle;
 
@@ -41,24 +43,27 @@ class ShimmerLoading extends StatelessWidget {
   static Widget grid({int count = 6}) => _ShimmerGrid(count: count);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final baseColor = _shimmerBaseColor(context);
     final highlightColor = _shimmerHighlightColor(context);
 
     return Semantics(
-      label: 'Loading data, please wait',
+      label: tr('loading', ref),
       child: ExcludeSemantics(
-        child: Shimmer.fromColors(
-          baseColor: baseColor,
-          highlightColor: highlightColor,
-          child: ListView.builder(
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: itemCount,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.s16,
-              vertical: AppTokens.s8,
+        child: TickerMode(
+          enabled: !MediaQuery.disableAnimationsOf(context),
+          child: Shimmer.fromColors(
+            baseColor: baseColor,
+            highlightColor: highlightColor,
+            child: ListView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: itemCount,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTokens.s16,
+                vertical: AppTokens.s8,
+              ),
+              itemBuilder: (_, i) => _ShimmerTile(showCircle: showLeadingCircle),
             ),
-            itemBuilder: (_, i) => _ShimmerTile(showCircle: showLeadingCircle),
           ),
         ),
       ),
@@ -109,33 +114,36 @@ class _ShimmerTile extends StatelessWidget {
   }
 }
 
-class _ShimmerCards extends StatelessWidget {
+class _ShimmerCards extends ConsumerWidget {
   final int count;
   const _ShimmerCards({required this.count});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Semantics(
-      label: 'Loading statistics',
+      label: tr('loading', ref),
       child: ExcludeSemantics(
-        child: Shimmer.fromColors(
-          baseColor: _shimmerBaseColor(context),
-          highlightColor: _shimmerHighlightColor(context),
-          child: GridView.builder(
-            physics: const NeverScrollableScrollPhysics(),
-            shrinkWrap: true,
-            padding: const EdgeInsets.all(AppTokens.s16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: AppTokens.s12,
-              crossAxisSpacing: AppTokens.s12,
-              childAspectRatio: 1.6,
-            ),
-            itemCount: count,
-            itemBuilder: (_, _) => Container(
-              decoration: BoxDecoration(
-                color: _placeholderColor(context),
-                borderRadius: AppTokens.brMD,
+        child: TickerMode(
+          enabled: !MediaQuery.disableAnimationsOf(context),
+          child: Shimmer.fromColors(
+            baseColor: _shimmerBaseColor(context),
+            highlightColor: _shimmerHighlightColor(context),
+            child: GridView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(AppTokens.s16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: AppTokens.s12,
+                crossAxisSpacing: AppTokens.s12,
+                childAspectRatio: 1.6,
+              ),
+              itemCount: count,
+              itemBuilder: (_, _) => Container(
+                decoration: BoxDecoration(
+                  color: _placeholderColor(context),
+                  borderRadius: AppTokens.brMD,
+                ),
               ),
             ),
           ),
@@ -145,38 +153,41 @@ class _ShimmerCards extends StatelessWidget {
   }
 }
 
-class _ShimmerDetail extends StatelessWidget {
+class _ShimmerDetail extends ConsumerWidget {
   const _ShimmerDetail();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Semantics(
-      label: 'Loading details',
+      label: tr('loading', ref),
       child: ExcludeSemantics(
-        child: Shimmer.fromColors(
-          baseColor: _shimmerBaseColor(context),
-          highlightColor: _shimmerHighlightColor(context),
-          child: Padding(
-            padding: const EdgeInsets.all(AppTokens.s16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 24,
-                  width: 200,
-                  color: _placeholderColor(context),
-                ),
-                const SizedBox(height: AppTokens.s16),
-                Container(height: 14, color: _placeholderColor(context)),
-                const SizedBox(height: AppTokens.s8),
-                Container(
-                  height: 14,
-                  width: 250,
-                  color: _placeholderColor(context),
-                ),
-                const SizedBox(height: AppTokens.s24),
-                Container(height: 120, color: _placeholderColor(context)),
-              ],
+        child: TickerMode(
+          enabled: !MediaQuery.disableAnimationsOf(context),
+          child: Shimmer.fromColors(
+            baseColor: _shimmerBaseColor(context),
+            highlightColor: _shimmerHighlightColor(context),
+            child: Padding(
+              padding: const EdgeInsets.all(AppTokens.s16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 24,
+                    width: 200,
+                    color: _placeholderColor(context),
+                  ),
+                  const SizedBox(height: AppTokens.s16),
+                  Container(height: 14, color: _placeholderColor(context)),
+                  const SizedBox(height: AppTokens.s8),
+                  Container(
+                    height: 14,
+                    width: 250,
+                    color: _placeholderColor(context),
+                  ),
+                  const SizedBox(height: AppTokens.s24),
+                  Container(height: 120, color: _placeholderColor(context)),
+                ],
+              ),
             ),
           ),
         ),
@@ -185,33 +196,36 @@ class _ShimmerDetail extends StatelessWidget {
   }
 }
 
-class _ShimmerGrid extends StatelessWidget {
+class _ShimmerGrid extends ConsumerWidget {
   final int count;
   const _ShimmerGrid({required this.count});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Semantics(
-      label: 'Loading items',
+      label: tr('loading', ref),
       child: ExcludeSemantics(
-        child: Shimmer.fromColors(
-          baseColor: _shimmerBaseColor(context),
-          highlightColor: _shimmerHighlightColor(context),
-          child: GridView.builder(
-            physics: const NeverScrollableScrollPhysics(),
-            shrinkWrap: true,
-            padding: const EdgeInsets.all(AppTokens.s16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: AppTokens.s12,
-              crossAxisSpacing: AppTokens.s12,
-              childAspectRatio: 0.75,
-            ),
-            itemCount: count,
-            itemBuilder: (_, _) => Container(
-              decoration: BoxDecoration(
-                color: _placeholderColor(context),
-                borderRadius: AppTokens.brMD,
+        child: TickerMode(
+          enabled: !MediaQuery.disableAnimationsOf(context),
+          child: Shimmer.fromColors(
+            baseColor: _shimmerBaseColor(context),
+            highlightColor: _shimmerHighlightColor(context),
+            child: GridView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(AppTokens.s16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: AppTokens.s12,
+                crossAxisSpacing: AppTokens.s12,
+                childAspectRatio: 0.75,
+              ),
+              itemCount: count,
+              itemBuilder: (_, _) => Container(
+                decoration: BoxDecoration(
+                  color: _placeholderColor(context),
+                  borderRadius: AppTokens.brMD,
+                ),
               ),
             ),
           ),

@@ -17,10 +17,13 @@ class AppErrorMapper {
     if (error is FirebaseAuthException) {
       return switch (error.code) {
         'invalid-credential' ||
+        'invalid-login-credentials' ||
         'wrong-password' ||
         'INVALID_LOGIN_CREDENTIALS' => 'err_invalid_credentials',
         'user-not-found' => 'err_user_not_found',
         'user-disabled' => 'err_user_disabled',
+        'account-not-assigned-to-workspace' => 'err_account_not_assigned',
+        'invalid-user-role' => 'err_account_role_invalid',
         'too-many-requests' => 'err_too_many_requests',
         'email-already-in-use' => 'err_email_in_use',
         'weak-password' => 'err_weak_password',
@@ -33,6 +36,12 @@ class AppErrorMapper {
     }
     // ── Firebase Storage + Firestore errors ───────────────────────────
     if (error is FirebaseException) {
+      if (error.code == 'failed-precondition') {
+        final message = error.message?.toLowerCase() ?? '';
+        return message.contains('index')
+            ? 'err_index_missing'
+            : 'err_firebase_generic';
+      }
       return switch (error.code) {
         'permission-denied' || 'unauthorized' => 'err_permission_denied',
         'not-found' || 'object-not-found' => 'err_not_found',
@@ -42,7 +51,6 @@ class AppErrorMapper {
         'cancelled' => 'err_cancelled',
         'deadline-exceeded' => 'err_timeout',
         'unauthenticated' => 'err_unauthenticated',
-        'failed-precondition' => 'err_index_missing',
         _ => 'err_firebase_generic',
       };
     }

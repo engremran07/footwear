@@ -134,9 +134,8 @@ class RouteNotifier extends AsyncNotifier<void> {
     final currentUser = await ref.read(authUserProvider.future);
     final authUser = FirebaseAuth.instance.currentUser;
     if (authUser == null || currentUser == null || !currentUser.active) return;
-    final tenantId =
-        TenantScope.normalize(currentUser.tenantId) ??
-        TenantScope.globalTenantId;
+    final tenantId = TenantScope.normalize(currentUser.tenantId);
+    if (tenantId == null) return;
 
     final db = FirebaseFirestore.instance;
     final me = await db.collection(Collections.users).doc(authUser.uid).get();
@@ -198,9 +197,7 @@ class RouteNotifier extends AsyncNotifier<void> {
     if (currentUser == null || !currentUser.active) {
       throw StateError('An active user profile is required');
     }
-    final tenantId =
-        TenantScope.normalize(currentUser.tenantId) ??
-        TenantScope.globalTenantId;
+    final tenantId = TenantScope.requireTenant(currentUser.tenantId);
     final routeRef = db.collection(Collections.routes).doc();
     final routeName = data['name'] as String? ?? '';
     final currency = data['currency'] as String? ?? 'SAR';
@@ -270,9 +267,7 @@ class RouteNotifier extends AsyncNotifier<void> {
           data['name'] as String? ??
           currentRoute.data()?['name'] as String? ??
           '';
-      final tenantId =
-          TenantScope.normalize(currentUser.tenantId) ??
-          TenantScope.globalTenantId;
+      final tenantId = TenantScope.requireTenant(currentUser.tenantId);
       final currency =
           data['currency'] as String? ??
           currentRoute.data()?['currency'] as String? ??
@@ -348,9 +343,8 @@ class RouteNotifier extends AsyncNotifier<void> {
     if (!isPrivilegedRoleName(role)) {
       throw StateError('Only admin can delete routes');
     }
-    final tenantId =
-        TenantScope.normalize(me.data()?['tenant_id'] as String?) ??
-        TenantScope.globalTenantId;
+    final currentUser = await ref.read(authUserProvider.future);
+    final tenantId = TenantScope.requireTenant(currentUser?.tenantId);
 
     // Check for assigned sellers
     final routeDoc = await db.collection(Collections.routes).doc(id).get();

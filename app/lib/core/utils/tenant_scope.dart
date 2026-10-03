@@ -17,6 +17,14 @@ class TenantScope {
     return value;
   }
 
+  static String requireTenant(String? tenantId) {
+    final normalized = normalize(tenantId);
+    if (normalized == null) {
+      throw StateError('An active workspace is required for this operation');
+    }
+    return normalized;
+  }
+
   static Map<String, dynamic> applyToData(
     Map<String, dynamic> data, {
     String? tenantId,

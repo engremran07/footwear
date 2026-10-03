@@ -42,12 +42,21 @@ class GoogleDriveBackupService {
   static const _driveFilesUri = 'https://www.googleapis.com/drive/v3/files';
   static Future<void>? _initializeFuture;
 
+  static bool get isConfigured => kIsWeb
+      ? _configuredValue('GOOGLE_DRIVE_CLIENT_ID') != null
+      : _configuredValue('GOOGLE_DRIVE_SERVER_CLIENT_ID') != null;
+
   static Future<void> _initialize() {
     final clientId = _configuredValue('GOOGLE_DRIVE_CLIENT_ID');
     final serverClientId = _configuredValue('GOOGLE_DRIVE_SERVER_CLIENT_ID');
     if (kIsWeb && clientId == null) {
       throw StateError(
         'Google Drive web OAuth is not configured. Set GOOGLE_DRIVE_CLIENT_ID.',
+      );
+    }
+    if (!kIsWeb && serverClientId == null) {
+      throw StateError(
+        'Google Drive Android OAuth is not configured. Set GOOGLE_DRIVE_SERVER_CLIENT_ID.',
       );
     }
     return _initializeFuture ??= GoogleSignIn.instance.initialize(
@@ -152,12 +161,14 @@ class GoogleDriveBackupService {
 
   static Future<List<GoogleDriveBackupFile>> list({
     required String tenantId,
+    required String scope,
     String? createdBy,
   }) async {
     final authHeaders = await _headers();
     final filters = <String>[
       "appProperties has { key='shoeserp' and value='true' }",
       "appProperties has { key='tenant_id' and value='${_escapeQueryValue(tenantId)}' }",
+      "appProperties has { key='scope' and value='${_escapeQueryValue(scope)}' }",
       'trashed=false',
     ];
     if (createdBy != null && createdBy.trim().isNotEmpty) {
@@ -165,23 +176,36 @@ class GoogleDriveBackupService {
         "appProperties has { key='created_by' and value='${_escapeQueryValue(createdBy)}' }",
       );
     }
-    final query = Uri.encodeQueryComponent(filters.join(' and '));
-    final response = await http.get(
-      Uri.parse(
-        '$_driveFilesUri?q=$query&orderBy=createdTime%20desc&fields=files(id,name,createdTime,size,appProperties)',
-      ),
-      headers: authHeaders,
-    );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError('Google Drive listing failed (${response.statusCode})');
-    }
-    final files = (jsonDecode(response.body)['files'] as List<dynamic>? ?? []);
-    return files.whereType<Map<String, dynamic>>().map(_fileFromJson).toList();
+    final files = <GoogleDriveBackupFile>[];
+    String? pageToken;
+    do {
+      final uri = Uri.https('www.googleapis.com', '/drive/v3/files', {
+        'q': filters.join(' and '),
+        'orderBy': 'createdTime desc',
+        'pageSize': '1000',
+        'fields': 'nextPageToken,files(id,name,createdTime,size,appProperties)',
+        'pageToken': ?pageToken,
+      });
+      final response = await http.get(uri, headers: authHeaders);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError(
+          'Google Drive listing failed (${response.statusCode})',
+        );
+      }
+      final result = jsonDecode(response.body) as Map<String, dynamic>;
+      final pageFiles = result['files'] as List<dynamic>? ?? const [];
+      files.addAll(
+        pageFiles.whereType<Map<String, dynamic>>().map(_fileFromJson),
+      );
+      pageToken = result['nextPageToken'] as String?;
+    } while (pageToken != null && pageToken.isNotEmpty);
+    return files;
   }
 
   static Future<Uint8List> download({
     required String fileId,
     required String tenantId,
+    required String scope,
     String? createdBy,
   }) async {
     if (fileId.trim().isEmpty) throw ArgumentError('fileId must not be empty');
@@ -204,6 +228,7 @@ class GoogleDriveBackupService {
     if (metadata['trashed'] == true ||
         properties['shoeserp'] != 'true' ||
         properties['tenant_id'] != tenantId ||
+        properties['scope'] != scope ||
         (createdBy != null && properties['created_by'] != createdBy)) {
       throw StateError('Google Drive backup is outside the permitted scope');
     }

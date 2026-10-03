@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/dashboard_provider.dart';
+import 'package:footwear_erp/screens/bootstrap_profile_screen.dart';
 import 'package:footwear_erp/screens/dashboard_screen.dart';
 import 'package:footwear_erp/screens/database_flush_screen.dart';
 import 'package:footwear_erp/widgets/app_shell.dart';
@@ -91,6 +92,83 @@ void main() {
       expect(find.byType(NavigationBar), findsNothing);
     });
 
+    testWidgets('unsupported account role shows recovery guidance', (
+      tester,
+    ) async {
+      final unsupportedUser = UserModel(
+        id: 'unknown-role-user',
+        email: 'user@example.com',
+        displayName: 'User',
+        role: UserRole.unknown,
+        active: true,
+        tenantId: 'tenant-1',
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authStateProvider.overrideWith((ref) => Stream.value(null)),
+            authUserProvider.overrideWith(
+              (ref) => Stream.value(unsupportedUser),
+            ),
+          ],
+          child: const MaterialApp(home: BootstrapProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('This account role is not supported.'), findsOneWidget);
+      expect(
+        find.textContaining('must correct this account role'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('bootstrap recovery content survives large text on a phone', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 420);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final unsupportedUser = UserModel(
+        id: 'unknown-role-user',
+        email: 'user@example.com',
+        displayName: 'User',
+        role: UserRole.unknown,
+        active: true,
+        tenantId: 'tenant-1',
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authStateProvider.overrideWith((ref) => Stream.value(null)),
+            authUserProvider.overrideWith(
+              (ref) => Stream.value(unsupportedUser),
+            ),
+          ],
+          child: MaterialApp(
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: const TextScaler.linear(2.5),
+              ),
+              child: child!,
+            ),
+            home: const BootstrapProfileScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('tenant admins are blocked from the flush screen', (
       tester,
     ) async {
@@ -150,6 +228,36 @@ void main() {
 
       expect(find.text('Workspaces'), findsOneWidget);
       expect(find.textContaining('Total Routes'), findsNothing);
+    });
+
+    testWidgets('dashboard load failures expose a retry action', (tester) async {
+      final superAdmin = UserModel(
+        id: 'sa',
+        email: 'global@example.com',
+        displayName: 'Global Admin',
+        role: UserRole.superAdmin,
+        active: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(superAdmin)),
+            dashboardStatsProvider.overrideWith(
+              (ref) => AsyncError<DashboardStats>(
+                StateError('network unavailable'),
+                StackTrace.current,
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: DashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Retry'), findsOneWidget);
     });
   });
 }

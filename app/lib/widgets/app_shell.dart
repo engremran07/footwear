@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,10 +13,12 @@ import '../providers/route_provider.dart';
 import '../providers/shop_provider.dart';
 import '../models/user_model.dart';
 import '../core/constants/app_brand.dart';
+import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/services/permissions_service.dart';
 import '../core/utils/role_utils.dart';
 import '../core/theme/app_theme.dart';
+import '../core/utils/error_mapper.dart';
 import '../core/utils/snack_helper.dart';
 import '../providers/changelog_provider.dart';
 import '../providers/database_backup_provider.dart';
@@ -56,12 +62,21 @@ class _AppShellState extends ConsumerState<AppShell>
     with SingleTickerProviderStateMixin {
   late final AnimationController _drawerCtrl;
   late final Animation<double> _drawerAnim;
+  late final AppLifecycleListener _lifecycleListener;
+  Timer? _autoBackupTimer;
   bool _isDrawerOpen = false;
   DateTime? _lastBackPress; // F-03: double-back-to-exit tracking
 
   @override
   void initState() {
     super.initState();
+    _lifecycleListener = AppLifecycleListener(
+      onResume: () => unawaited(_checkAutoBackup()),
+    );
+    _autoBackupTimer = Timer.periodic(
+      const Duration(hours: 6),
+      (_) => unawaited(_checkAutoBackup()),
+    );
     _drawerCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 280),
@@ -81,13 +96,21 @@ class _AppShellState extends ConsumerState<AppShell>
 
   @override
   void dispose() {
+    _lifecycleListener.dispose();
+    _autoBackupTimer?.cancel();
     _drawerCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _checkAutoBackup() async {
     if (!mounted) return;
-    await ref.read(databaseBackupProvider.notifier).checkAndAutoBackup();
+    try {
+      await ref.read(databaseBackupProvider.notifier).checkAndAutoBackup();
+    } catch (error, stackTrace) {
+      if (!kIsWeb) {
+        FirebaseCrashlytics.instance.recordError(error, stackTrace);
+      }
+    }
   }
 
   Future<void> _checkAndShowChangelog() async {
@@ -213,10 +236,7 @@ class _AppShellState extends ConsumerState<AppShell>
     if (user == null) return [];
     if (user.isSuperAdmin && user.tenantId == null) {
       return AppShell._navItems
-          .where(
-            (e) =>
-              e.route == '/' || e.route == '/tenants',
-          )
+          .where((e) => e.route == '/' || e.route == '/tenants')
           .toList();
     }
     if (user.isSeller) {
@@ -289,42 +309,61 @@ class _AppShellState extends ConsumerState<AppShell>
     return idx < 0 ? 0 : idx;
   }
 
-  Widget _workspaceAccessBanner(UserModel user) {
+  Widget _workspaceContextBanner(UserModel user) {
     final tenantId = user.tenantId;
-    if (!user.isSuperAdmin || tenantId == null) return const SizedBox.shrink();
-    final tenant = ref.watch(tenantProvider(tenantId)).value;
+    if (tenantId == null || (!user.isSuperAdmin && !user.isTenantAdmin)) {
+      return const SizedBox.shrink();
+    }
+    final tenantName = ref.watch(tenantProvider(tenantId)).when(
+      data: (tenant) => tenant?.name ?? tr('workspace_name_unavailable', ref),
+      loading: () => tr('loading', ref),
+      error: (_, _) => tr('workspace_name_unavailable', ref),
+    );
+    final hasSupportAccess = user.isSuperAdmin;
+    final reason = user.activeWorkspaceReason?.trim();
     return Material(
-      color: AppBrand.warningColor.withAlpha(18),
+      color: hasSupportAccess
+          ? AppBrand.warningColor.withAlpha(18)
+          : Theme.of(context).colorScheme.surfaceContainerHighest,
       child: Padding(
         padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
         child: Row(
           children: [
-            const Icon(Icons.admin_panel_settings_outlined, size: 20),
+            Icon(
+              hasSupportAccess
+                  ? Icons.admin_panel_settings_outlined
+                  : Icons.domain_outlined,
+              size: 20,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                '${tr('workspace_access_active', ref)}: ${tenant?.name ?? tenantId} · ${user.activeWorkspaceReason ?? ''}',
+                hasSupportAccess
+                    ? '${tr('workspace_access_active', ref)}: $tenantName${reason?.isNotEmpty == true ? ' · $reason' : ''}'
+                    : '${tr('workspaces', ref)}: $tenantName',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
-            TextButton(
-              onPressed: () async {
-                try {
-                  await ref
-                      .read(authNotifierProvider.notifier)
-                      .endWorkspaceAccess();
-                } catch (error) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text(error.toString())));
+            if (hasSupportAccess)
+              TextButton(
+                onPressed: () async {
+                  try {
+                    await ref
+                        .read(authNotifierProvider.notifier)
+                        .endWorkspaceAccess();
+                  } catch (error) {
+                    if (mounted) {
+                      final key = AppErrorMapper.key(error);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        errorSnackBar(tr(key, ref)),
+                      );
+                    }
                   }
-                }
-              },
-              child: Text(tr('end_workspace_access', ref)),
-            ),
+                },
+                child: Text(tr('end_workspace_access', ref)),
+              ),
           ],
         ),
       ),
@@ -334,7 +373,8 @@ class _AppShellState extends ConsumerState<AppShell>
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).value;
-    final isWide = MediaQuery.of(context).size.width >= 720;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isWide = screenWidth >= AppTokens.breakpointNavigationRail;
     final isOnline = ref.watch(isOnlineProvider).value ?? true;
     final currentLocation = GoRouterState.of(context).uri.path;
     final unreadCount = (user?.isAdmin ?? false)
@@ -386,7 +426,8 @@ class _AppShellState extends ConsumerState<AppShell>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _ScrollableNavRail(
-                extended: MediaQuery.of(context).size.width >= 1024,
+                extended:
+                  screenWidth >= AppTokens.breakpointExtendedNavigationRail,
                 selectedIndex: _selectedIndex(navItems, currentLocation),
                 items: navItems,
                 onItem: (i) => context.go(navItems[i].route),
@@ -399,12 +440,22 @@ class _AppShellState extends ConsumerState<AppShell>
               ),
               const VerticalDivider(thickness: 1, width: 1),
               Expanded(
-                child: Column(
-                  children: [
-                    if (user?.isSuperAdmin == true && user?.tenantId != null)
-                      _workspaceAccessBanner(user!),
-                    Expanded(child: widget.child),
-                  ],
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: AppTokens.contentMaxWidth,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Column(
+                        children: [
+                          if (user?.tenantId != null)
+                            _workspaceContextBanner(user!),
+                          Expanded(child: widget.child),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -532,9 +583,8 @@ class _AppShellState extends ConsumerState<AppShell>
                           ),
                           body: Column(
                             children: [
-                              if (user?.isSuperAdmin == true &&
-                                  user?.tenantId != null)
-                                _workspaceAccessBanner(user!),
+                              if (user?.tenantId != null)
+                                _workspaceContextBanner(user!),
                               Expanded(
                                 child: GestureDetector(
                                   onTap: _isDrawerOpen ? _closeDrawer : null,
@@ -982,7 +1032,6 @@ class _ArcticNavItemState extends State<_ArcticNavItem>
                         ? FontWeight.w700
                         : FontWeight.normal,
                     color: color,
-                    letterSpacing: widget.isSelected ? 0.2 : 0,
                   ),
                   child: Text(
                     widget.item.label,
@@ -1481,6 +1530,7 @@ class _RoleBadge extends ConsumerWidget {
         tr('role_super_admin', ref),
         AppBrand.adminRoleColor,
       ),
+      UserRole.unknown => (tr('role_unknown', ref), AppBrand.stockColor),
     };
     return Container(
       padding: EdgeInsets.symmetric(

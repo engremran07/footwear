@@ -63,8 +63,8 @@ class BackupCipher {
     }
   }
 
-  /// Decrypts current encrypted archives and accepts legacy plaintext JSON
-  /// snapshots so existing user backups remain recoverable.
+  /// Decrypts authenticated encrypted archives. Plaintext legacy snapshots
+  /// are rejected because their embedded checksum is not an authenticity check.
   static Future<Uint8List> decrypt({
     required List<int> archiveBytes,
     required String passphrase,
@@ -74,9 +74,6 @@ class BackupCipher {
       throw const FormatException('Backup archive is not a JSON object');
     }
     if (parsed['format'] != format) {
-      if (parsed['metadata'] is Map<String, dynamic>) {
-        return Uint8List.fromList(archiveBytes);
-      }
       throw const FormatException('Unsupported backup archive format');
     }
 

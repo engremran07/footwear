@@ -251,9 +251,7 @@ class ShopNotifier extends AsyncNotifier<void> {
     if (uid.isEmpty || currentUser == null || !currentUser.active) {
       throw StateError('An active user profile is required');
     }
-    final tenantId =
-        TenantScope.normalize(currentUser.tenantId) ??
-        TenantScope.globalTenantId;
+    final tenantId = TenantScope.requireTenant(currentUser.tenantId);
     // Pre-generate doc ID so retries on network failure are idempotent
     // (using add() can create a duplicate if the first write succeeds but
     // the ACK is lost and the SDK retries the request).
@@ -322,11 +320,9 @@ class ShopNotifier extends AsyncNotifier<void> {
     }
 
     final db = FirebaseFirestore.instance;
-    final tenantId =
-        TenantScope.normalize(
-          (await ref.read(authUserProvider.future))?.tenantId,
-        ) ??
-        TenantScope.globalTenantId;
+    final tenantId = TenantScope.requireTenant(
+      (await ref.read(authUserProvider.future))?.tenantId,
+    );
     final shopDoc = await db
         .collection(Collections.customers)
         .doc(shopId)
@@ -381,11 +377,9 @@ class ShopNotifier extends AsyncNotifier<void> {
     }
 
     final db = FirebaseFirestore.instance;
-    final tenantId =
-        TenantScope.normalize(
-          (await ref.read(authUserProvider.future))?.tenantId,
-        ) ??
-        TenantScope.globalTenantId;
+    final tenantId = TenantScope.requireTenant(
+      (await ref.read(authUserProvider.future))?.tenantId,
+    );
     final shopDoc = await db
         .collection(Collections.customers)
         .doc(shopId)

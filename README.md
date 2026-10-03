@@ -1,9 +1,11 @@
-﻿# FootWear ERP — v3.9.50+89
+﻿# FootWear ERP — v3.9.54+93
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
 > **v3.7.5+53 (2026-04-15)** — Current baseline includes the post-audit hardening pass: provider admin guards, invoice and rules validation tightening, export query caps, model `copyWith`/equality cleanup, theme-safe shimmer, and workflow normalization on Flutter 3.41.6 with expanded test reporting.
 > **v3.9.50+89 (2026-08-18)** — Tenant permissions are enforced across business collections, invoice-generated ledger records carry workspace identity, and Google Drive backup configuration is shared by web and Android builds.
+> **v3.9.53+92 (2026-10-03)** — Tenant admins merge encrypted backups into their own workspace; selected platform admins can prune only within their active support workspace. Unsupported roles and workspace-less accounts receive recovery guidance instead of being treated as sellers.
+> **v3.9.54+93 (2026-10-03)** — Status labels are localized and high-contrast status colors are more legible.
 
 ---
 
@@ -168,6 +170,15 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 7. Ensure providers select current user tenant context from `authUserProvider` and do not leak cross-tenant streams.
 8. Document new tenant-scoped collections and any tenant gating rule changes in both this README and `MASTER_BLUEPRINT.md`.
 9. Prefer evolving the canonical governance files already in the repo instead of creating additional markdown artifacts for each follow-up pass.
+
+### Verified Runtime Invariants
+
+- Mutations require a concrete tenant; missing tenant identity is an error, never a `__global__` fallback. Unassigned users contact their workspace administrator instead of self-provisioning.
+- Super-admin business access expires after 8 hours and remains enforced by Firestore rules. Legacy admins manage seller profiles; workspace-admin role changes require an active super-admin support context.
+- Seller stock reductions must match exact same-batch invoice deductions. Warehouse stock movements and returns append tenant-scoped inventory audit records atomically.
+- Financial corrections preserve prior values, actor, and a correction reason; invoice-linked transactions are corrected through invoice void/credit-note flows.
+- Exports page to exhaustion. Tenant-admin restore is upsert-only; selected super-admin restore upserts before pruning obsolete documents. Plaintext legacy archives are rejected.
+- Transient token-refresh failures do not sign users out. If Firebase initialization fails, the app shows a retry state rather than opening an unusable shell.
 
 ---
 

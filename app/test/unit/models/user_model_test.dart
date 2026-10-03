@@ -13,9 +13,10 @@ void main() {
           UserRole.seller,
           UserRole.tenantAdmin,
           UserRole.superAdmin,
+          UserRole.unknown,
         ]),
       );
-      expect(UserRole.values.length, 4);
+      expect(UserRole.values.length, 5);
     });
   });
 
@@ -35,6 +36,68 @@ void main() {
         );
       },
     );
+
+    test(
+      'only tenant admins and super admins can restore workspace backups',
+      () {
+        UserModel userForRole(UserRole role) => UserModel(
+          id: 'user-id',
+          email: 'user@example.com',
+          displayName: 'Test User',
+          role: role,
+          active: true,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        );
+
+        expect(
+          userForRole(UserRole.tenantAdmin).canRestoreWorkspaceBackup,
+          isTrue,
+        );
+        expect(
+          userForRole(UserRole.superAdmin).canRestoreWorkspaceBackup,
+          isTrue,
+        );
+        expect(userForRole(UserRole.admin).canRestoreWorkspaceBackup, isFalse);
+        expect(userForRole(UserRole.seller).canRestoreWorkspaceBackup, isFalse);
+        expect(
+          userForRole(UserRole.tenantAdmin).canPruneWorkspaceBackup,
+          isFalse,
+        );
+        expect(
+          userForRole(UserRole.superAdmin).canPruneWorkspaceBackup,
+          isTrue,
+        );
+      },
+    );
+
+    test('seller and legacy admin cannot create workspace backups', () {
+      UserModel userForRole(UserRole role) => UserModel(
+        id: 'user-id',
+        email: 'user@example.com',
+        displayName: 'Test User',
+        role: role,
+        active: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+
+      expect(
+        userForRole(UserRole.tenantAdmin).canCreateWorkspaceBackup,
+        isTrue,
+      );
+      expect(userForRole(UserRole.superAdmin).canCreateWorkspaceBackup, isTrue);
+      expect(userForRole(UserRole.seller).canCreateWorkspaceBackup, isFalse);
+      expect(userForRole(UserRole.admin).canCreateWorkspaceBackup, isFalse);
+      expect(
+        userForRole(UserRole.tenantAdmin).canRunAutomaticWorkspaceBackup,
+        isTrue,
+      );
+      expect(
+        userForRole(UserRole.superAdmin).canRunAutomaticWorkspaceBackup,
+        isFalse,
+      );
+    });
 
     test('super admins manage both workspaces and user accounts', () {
       expect(
@@ -116,9 +179,11 @@ void main() {
       expect(scoped.activeWorkspaceReason, 'Customer support investigation');
     });
 
-    test('unknown role defaults to seller', () {
+    test('unknown role remains blocked instead of defaulting to seller', () {
       final m = UserModel.fromJson({...baseJson, 'role': 'xyz'}, 'uid4');
-      expect(m.role, UserRole.seller);
+      expect(m.role, UserRole.unknown);
+      expect(m.isRoleRecognized, isFalse);
+      expect(m.isSeller, isFalse);
     });
 
     test('missing fields use defaults', () {

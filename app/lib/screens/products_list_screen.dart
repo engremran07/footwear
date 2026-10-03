@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
-import '../core/utils/error_mapper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../widgets/app_pull_refresh.dart';
 import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
 
 class ProductsListScreen extends ConsumerStatefulWidget {
@@ -36,8 +36,11 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
           Expanded(
             child: productsAsync.when(
               loading: () => const ShimmerLoading(),
-              error: (e, _) =>
-                  Center(child: Text(tr(AppErrorMapper.key(e), ref))),
+              error: (e, _) => mappedErrorState(
+                error: e,
+                ref: ref,
+                onRetry: () => ref.invalidate(productsProvider),
+              ),
               data: (products) {
                 final filtered = _search.isEmpty
                     ? products
@@ -57,7 +60,7 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                 return AppPullRefresh(
                   onRefresh: () async {
                     ref.invalidate(productsProvider);
-                    await Future.delayed(const Duration(milliseconds: 300));
+                    await ref.read(productsProvider.future);
                   },
                   child: ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),

@@ -253,6 +253,13 @@ class _InvoiceBody extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     final date = invoice.createdAt.toDate();
     final dateStr = AppFormatters.dateOnly(date);
+    final statusLabel = switch (invoice.status) {
+      InvoiceModel.statusPaid => tr('paid', ref),
+      InvoiceModel.statusIssued => tr('issued', ref),
+      InvoiceModel.statusPartial => tr('partial', ref),
+      InvoiceModel.statusVoid => tr('void', ref),
+      _ => tr('status_unknown', ref),
+    };
 
     Color statusColor;
     switch (invoice.status) {
@@ -301,7 +308,7 @@ class _InvoiceBody extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        invoice.status.toUpperCase(),
+                        statusLabel,
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -323,9 +330,9 @@ class _InvoiceBody extends ConsumerWidget {
                 const Divider(height: 24),
                 _InfoRow(
                   label: tr('shop', ref),
-                  value: invoice.shopName.isNotEmpty
+                    value: invoice.shopName.isNotEmpty
                       ? invoice.shopName
-                      : invoice.shopName,
+                      : tr('shop', ref),
                 ),
                 _InfoRow(label: tr('date', ref), value: dateStr),
                 if (invoice.linkedInvoiceId != null &&

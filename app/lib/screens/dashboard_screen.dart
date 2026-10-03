@@ -24,6 +24,7 @@ import '../models/shop_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
 import '../widgets/app_section_header.dart';
+import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/stat_card.dart';
 
@@ -32,11 +33,12 @@ Widget _buildDashboardAsyncError(
   WidgetRef ref,
   Object error, {
   Widget? fallback,
+  VoidCallback? onRetry,
 }) {
   if (AppErrorMapper.isPermissionOrAuthError(error)) {
     return fallback ?? ShimmerLoading.cards();
   }
-  return Center(child: Text(tr(AppErrorMapper.key(error), ref)));
+  return mappedErrorState(error: error, ref: ref, onRetry: onRetry);
 }
 
 TextStyle _userNameStyle(BuildContext context, WidgetRef ref) {
@@ -97,7 +99,9 @@ class DashboardScreen extends ConsumerWidget {
                         color: AppBrand.warningColor,
                       ),
                       title: Text(
-                        tx.shopName.isNotEmpty ? tx.shopName : tx.shopId,
+                        tx.shopName.isNotEmpty
+                          ? tx.shopName
+                          : tr('shop', ref),
                       ),
                       subtitle: Text(
                         '${AppFormatters.dateTime(tx.createdAt)} • '
@@ -322,7 +326,12 @@ class DashboardScreen extends ConsumerWidget {
             ).screenEntry();
           },
           loading: () => ShimmerLoading.cards(),
-          error: (e, _) => _buildDashboardAsyncError(context, ref, e),
+          error: (e, _) => _buildDashboardAsyncError(
+            context,
+            ref,
+            e,
+            onRetry: () => ref.invalidate(dashboardStatsProvider),
+          ),
         ),
       ),
     );
@@ -440,7 +449,12 @@ class _SuperAdminDashboard extends ConsumerWidget {
             );
           },
           loading: () => ShimmerLoading.cards(),
-          error: (e, _) => _buildDashboardAsyncError(context, ref, e),
+          error: (e, _) => _buildDashboardAsyncError(
+            context,
+            ref,
+            e,
+            onRetry: () => ref.invalidate(dashboardStatsProvider),
+          ),
         ),
       ),
     );
@@ -479,16 +493,22 @@ class _SellerDashboard extends ConsumerWidget {
     if (routesAsync.hasError &&
         !AppErrorMapper.isPermissionOrAuthError(routesAsync.error!)) {
       return Scaffold(
-        body: Center(
-          child: Text(tr(AppErrorMapper.key(routesAsync.error!), ref)),
+        body: _buildDashboardAsyncError(
+          context,
+          ref,
+          routesAsync.error!,
+          onRetry: () => ref.invalidate(routesBySellerProvider(user.id)),
         ),
       );
     }
     if (shopsAsync.hasError &&
         !AppErrorMapper.isPermissionOrAuthError(shopsAsync.error!)) {
       return Scaffold(
-        body: Center(
-          child: Text(tr(AppErrorMapper.key(shopsAsync.error!), ref)),
+        body: _buildDashboardAsyncError(
+          context,
+          ref,
+          shopsAsync.error!,
+          onRetry: () => ref.invalidate(sellerAllShopsProvider),
         ),
       );
     }

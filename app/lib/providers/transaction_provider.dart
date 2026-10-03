@@ -1,12 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/firestore_pagination.dart';
 import '../core/utils/notification_writer.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/transaction_model.dart';
 import 'auth_provider.dart';
-
-const _kExportQueryLimit = 2000;
 
 // =============================================================================
 // TransactionProvider — all shop ledger writes go through this notifier.
@@ -275,13 +274,13 @@ final shopTransactionsExportProvider =
         FirebaseFirestore.instance.collection(Collections.transactions),
         tenantId: tenantId,
       );
-      final snap = await query
-          .where('shop_id', isEqualTo: normalizedShopId)
-          .orderBy('created_at', descending: true)
-          .limit(_kExportQueryLimit)
-          .get();
+      final docs = await fetchAllQueryDocuments(
+        query
+            .where('shop_id', isEqualTo: normalizedShopId)
+            .orderBy('created_at', descending: true),
+      );
 
-      final txs = snap.docs
+      final txs = docs
           .where((d) => d.data()['deleted'] != true)
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList();
@@ -311,12 +310,12 @@ final routeTransactionsExportProvider =
         FirebaseFirestore.instance.collection(Collections.transactions),
         tenantId: tenantId,
       );
-      final snap = await query
-          .where('route_id', isEqualTo: normalizedId)
-          .orderBy('created_at', descending: true)
-          .limit(_kExportQueryLimit)
-          .get();
-      final txs = snap.docs
+      final docs = await fetchAllQueryDocuments(
+        query
+            .where('route_id', isEqualTo: normalizedId)
+            .orderBy('created_at', descending: true),
+      );
+      final txs = docs
           .where((d) => d.data()['deleted'] != true)
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList();
@@ -337,11 +336,10 @@ final allTransactionsExportProvider = FutureProvider<List<TransactionModel>>((
     FirebaseFirestore.instance.collection(Collections.transactions),
     tenantId: tenantId,
   );
-  final snap = await query
-      .orderBy('created_at', descending: true)
-      .limit(_kExportQueryLimit)
-      .get();
-  final txs = snap.docs
+  final docs = await fetchAllQueryDocuments(
+    query.orderBy('created_at', descending: true),
+  );
+  final txs = docs
       .where((d) => d.data()['deleted'] != true)
       .map((d) => TransactionModel.fromJson(d.data(), d.id))
       .toList();
@@ -366,12 +364,12 @@ final sellerTransactionsExportProvider =
         FirebaseFirestore.instance.collection(Collections.transactions),
         tenantId: tenantId,
       );
-      final snap = await query
-          .where('created_by', isEqualTo: normalizedId)
-          .orderBy('created_at', descending: true)
-          .limit(_kExportQueryLimit)
-          .get();
-      final txs = snap.docs
+      final docs = await fetchAllQueryDocuments(
+        query
+            .where('created_by', isEqualTo: normalizedId)
+            .orderBy('created_at', descending: true),
+      );
+      final txs = docs
           .where((d) => d.data()['deleted'] != true)
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList();
@@ -387,7 +385,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
   Future<String> _currentTenantId() async {
     final user = await ref.read(authUserProvider.future);
-    return TenantScope.normalize(user?.tenantId) ?? TenantScope.globalTenantId;
+    return TenantScope.requireTenant(user?.tenantId);
   }
 
   @override
@@ -410,6 +408,9 @@ class TransactionNotifier extends AsyncNotifier<void> {
     required FirebaseFirestore db,
     required String txId,
     required String? shopId,
+    required Map<String, dynamic> sourceData,
+    required String actorId,
+    required String reason,
     required double oldAmount,
     required String oldType,
     required double newAmount,
@@ -419,9 +420,19 @@ class TransactionNotifier extends AsyncNotifier<void> {
     Timestamp? transactionDate,
     Map<String, dynamic> extraTxFields = const <String, dynamic>{},
   }) {
+    final historyEntry = <String, dynamic>{
+      'previous_amount': oldAmount,
+      'previous_type': oldType,
+      'previous_created_at': sourceData['created_at'],
+      'previous_description': sourceData['description'] ?? '',
+      'changed_by': actorId,
+      'reason': reason.trim(),
+      'changed_at': Timestamp.now(),
+    };
     final updatePayload = <String, dynamic>{
       'amount': newAmount,
       'type': newType,
+      'edit_history': FieldValue.arrayUnion([historyEntry]),
       ...extraTxFields,
       'updated_at': Timestamp.now(),
     };
@@ -602,8 +613,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
         !user.assignedRouteIds.contains(normalizedRouteId)) {
       throw StateError('Route access has been revoked');
     }
-    final tenantId =
-        TenantScope.normalize(user.tenantId) ?? TenantScope.globalTenantId;
+    final tenantId = TenantScope.requireTenant(user.tenantId);
     var restored = 0;
 
     await _runWriteGuard(() async {
@@ -659,124 +669,6 @@ class TransactionNotifier extends AsyncNotifier<void> {
       }
     });
     return restored;
-  }
-
-  /// Creates a seller-side sale transaction WITHOUT going through invoicing.
-  /// NOTE: Prefer InvoiceNotifier.createSaleInvoice() for all new sales that
-  /// involve stock deduction from seller_inventory.
-  Future<void> createSellerSale({
-    required String routeId,
-    required String shopId,
-    required String shopName,
-    required double amount,
-    String? description,
-    String? saleType,
-    required List<TransactionItem> items,
-    required Map<String, int> sellerInventoryDeductions,
-    required String createdBy,
-    String? idempotencyKey,
-    Timestamp? transactionDate,
-  }) async {
-    await _runWriteGuard(() async {
-      final normalizedCreatedBy = createdBy.trim();
-      if (normalizedCreatedBy.isEmpty) {
-        throw ArgumentError('createdBy must not be empty');
-      }
-      if (shopId.trim().isEmpty) {
-        throw ArgumentError('shopId must not be empty');
-      }
-      if (amount <= 0) {
-        throw ArgumentError('Transaction amount must be greater than 0');
-      }
-
-      final db = FirebaseFirestore.instance;
-      final batch = db.batch();
-      final tenantId = await _currentTenantId();
-
-      final normalizedKey = idempotencyKey?.trim();
-      if (normalizedKey != null && normalizedKey.isNotEmpty) {
-        final existing = await db
-            .collection(Collections.transactions)
-            .where('tenant_id', isEqualTo: tenantId)
-            .where('idempotency_key', isEqualTo: normalizedKey)
-            .limit(1)
-            .get();
-        if (existing.docs.isNotEmpty) {
-          return;
-        }
-      }
-
-      final txRef = db.collection(Collections.transactions).doc();
-      batch.set(txRef, {
-        'shop_id': shopId,
-        'shop_name': shopName,
-        'route_id': routeId,
-        'tenant_id': tenantId,
-        'type': 'cash_out',
-        'sale_type': saleType ?? 'cash',
-        'amount': amount,
-        'description': description,
-        'items': items.map((e) => e.toJson()).toList(),
-        'created_by': normalizedCreatedBy,
-        'created_at': transactionDate ?? Timestamp.now(),
-        'deleted': false, // DI-01: required for isNotEqualTo filter
-        if (normalizedKey != null && normalizedKey.isNotEmpty)
-          'idempotency_key': normalizedKey,
-      });
-
-      // Shop owes more
-      batch.update(db.collection(Collections.customers).doc(shopId), {
-        'balance': FieldValue.increment(amount),
-        'updated_at': Timestamp.now(),
-        'last_transaction_at': transactionDate ?? Timestamp.now(),
-        'last_transaction_type': 'cash_out',
-        'last_transaction_amount': amount,
-        'last_transaction_id': txRef.id,
-      });
-
-      // Deduct from seller_inventory docs
-      for (final entry in sellerInventoryDeductions.entries) {
-        if (entry.value > 0) {
-          batch.update(
-            db.collection(Collections.sellerInventory).doc(entry.key),
-            {
-              'quantity_available': FieldValue.increment(-entry.value),
-              'updated_at': Timestamp.now(),
-            },
-          );
-        }
-      }
-
-      await _commit(batch);
-
-      // Best-effort notification for admin feed (non-critical, fire-and-forget).
-      // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
-      try {
-        final appUser = await ref.read(authUserProvider.future);
-        if (appUser != null && appUser.isSeller) {
-          await writeRateLimitedNotification(
-            db: db,
-            actorUid: appUser.id,
-            data: {
-              'type': 'transaction',
-              'shop_id': shopId,
-              'shop_name': shopName,
-              'route_id': routeId,
-              'seller_id': normalizedCreatedBy,
-              'seller_name': appUser.displayName,
-              'amount': amount,
-              'transaction_type': 'cash_out',
-              'ref_id': txRef.id,
-              'target_role': 'admin',
-              'read': false,
-              'tenant_id': appUser.tenantId,
-            },
-          );
-        }
-      } catch (_) {
-        /* best-effort only — non-critical */
-      }
-    });
   }
 
   /// Seller-safe annotation: updates only the [description] field.
@@ -911,6 +803,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
     required String oldType,
     required double newAmount,
     required String newType,
+    required String reason,
     String? description,
     String? saleType,
     Timestamp? transactionDate,
@@ -934,16 +827,52 @@ class TransactionNotifier extends AsyncNotifier<void> {
           'Invalid transaction type "$newType". Allowed: ${allowedTypes.join(', ')}',
         );
       }
+      if (reason.trim().length < 10) {
+        throw ArgumentError('Correction reason must be at least 10 characters');
+      }
 
+      final user = await ref.read(authUserProvider.future);
+      if (user == null || !user.active || !user.isAdmin) {
+        throw StateError('Admin privileges required');
+      }
+      final tenantId = TenantScope.requireTenant(user.tenantId);
       final db = FirebaseFirestore.instance;
+      final transactionRef = db
+          .collection(Collections.transactions)
+          .doc(txId.trim());
+      final transactionSnapshot = await transactionRef.get();
+      if (!transactionSnapshot.exists) {
+        throw StateError('Transaction not found');
+      }
+      final sourceData = transactionSnapshot.data()!;
+      if (sourceData['tenant_id'] != tenantId) {
+        throw StateError('Transaction is outside the active workspace');
+      }
+      final linkedInvoiceId = (sourceData['invoice_id'] as String?)?.trim();
+      if (linkedInvoiceId != null && linkedInvoiceId.isNotEmpty) {
+        throw StateError(
+          'Invoice-linked transactions cannot be edited. Void or credit the invoice instead.',
+        );
+      }
+      final storedAmount = (sourceData['amount'] as num?)?.toDouble() ?? 0;
+      final storedType = (sourceData['type'] as String?) ?? '';
+      if (storedAmount != oldAmount || storedType != oldType) {
+        throw StateError(
+          'Transaction changed. Refresh and retry the correction.',
+        );
+      }
+
       final batch = db.batch();
       _stageTransactionUpdate(
         batch: batch,
         db: db,
         txId: txId,
-        shopId: shopId,
-        oldAmount: oldAmount,
-        oldType: oldType,
+        shopId: (sourceData['shop_id'] as String?)?.trim() ?? shopId,
+        sourceData: sourceData,
+        actorId: user.id,
+        reason: reason,
+        oldAmount: storedAmount,
+        oldType: storedType,
         newAmount: newAmount,
         newType: newType,
         description: description,
@@ -1009,10 +938,10 @@ class TransactionNotifier extends AsyncNotifier<void> {
     }
 
     final currentUser = await ref.read(authUserProvider.future);
-    final tenantId = TenantScope.normalize(currentUser?.tenantId);
+    final tenantId = TenantScope.requireTenant(currentUser?.tenantId);
     final settingsDoc = await db
         .collection(Collections.settings)
-        .doc(tenantId ?? TenantScope.globalTenantId)
+        .doc(tenantId)
         .get();
     final requireApproval =
         (settingsDoc
@@ -1116,6 +1045,9 @@ class TransactionNotifier extends AsyncNotifier<void> {
       db: db,
       txId: txId,
       shopId: (data['shop_id'] as String?)?.trim(),
+      sourceData: data,
+      actorId: reviewerId.trim(),
+      reason: 'Approved seller transaction edit request',
       oldAmount: oldAmount,
       oldType: oldType,
       newAmount: newAmount,

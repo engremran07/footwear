@@ -84,6 +84,14 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 23. Never store or ship service-account credentials. Arbitrary-user Auth administration belongs in a trusted backend; the client may not create/promote super-admins or mutate another user's Auth credentials.
 24. Platform super-admins may read workspace metadata globally, but every business-data operation must be scoped to the selected workspace and an auditable support reason. No selection means no business records.
 25. Super-admin business-context selection and exit events are append-only in `platform_access_logs`. Never create/promote platform super-admin accounts or mutate another user's Auth credentials from client code. Never store service-account credentials in Firestore, backups, APKs, or web builds.
+26. Super-admin business context expires after 8 hours in Firestore rules. Workspace admins can read their tenant policy, but only tenant admins/platform operators may update workspace configuration.
+27. Require a concrete tenant for every new business write via `TenantScope.requireTenant`; never replace missing tenant identity with `__global__`. Unassigned users must not be silently self-healed into a shared tenant.
+28. Local admins manage seller profiles only. Workspace-admin role changes require an active platform super-admin workspace context.
+29. Seller stock decrements must match a same-batch sale invoice's exact `seller_inventory_deductions` entry. Every warehouse stock mutation requires an atomic tenant-scoped inventory audit row.
+30. Admin financial corrections append the prior amount/type/date, actor, and a reason of at least 10 characters to `edit_history`; invoice-linked transaction amounts/types/dates are immutable outside void/credit-note flows.
+31. Export queries must cursor-page to exhaustion. Tenant-admin backup restore is upsert-only and never prunes; selected super-admin restore upserts before pruning obsolete records in the active tenant. Reject legacy plaintext backup archives.
+32. Keep sessions on transient token-refresh/network failures. Firebase initialization failure must render a retry state and must not mount the normal app shell.
+33. Copilot chat history and request IDs do not merge across GitHub identities through repository changes. Preserve durable decisions, pending tasks, audit IDs, and verification evidence in `SESSION_LOG.md` and the current audit report. On an account/profile switch, read those plus `git status`/`git diff`; never store credentials or full chat transcripts in the repository or claim separate accounts were synchronized.
 
 ## Financial Pathways (never mix these)
 
@@ -382,6 +390,7 @@ mandatory. Key checks in brief:
 
 ## Done In This Baseline
 
+- v3.9.54+93: Status-chip labels and semantics are localized for EN/AR/UR; high-contrast semantic state colors meet 4.5:1 contrast against black.
 - v3.7.5+53 (audit v16): Post-audit hardening sweep completed — route/shop form identity guards tightened; auth and network stream providers moved to `autoDispose`; transaction export queries capped at 2000 docs; remaining inventory dialog disposal fixed; shimmer placeholders switched to theme-derived surfaces; offline indicator now uses semantic error color; manual APK, CI, and release workflows aligned on Flutter 3.41.6 with expanded test reporting; Firebase Hosting immutable cache now includes `.wasm`; regression tests expanded for model `copyWith`, equality, settings assertions, and transaction ledger edge cases
 - v3.7.0+48 (audit v14): Dep stack fully upgraded: fl_chart 1.2.0, share_plus 13.0.0 (migrated SharePlus.instance.share(ShareParams(...))), permission_handler 12.0.1, dart_jsonwebtoken 3.4.0, flutter_lints 6.0.0; 30 lint issues fixed (unnecessary_underscores, use_null_aware_elements, prefer_const_constructors, share_plus deprecations); all 4 CI workflows standardized on Flutter 3.41.6; governance hardened (Rules 19–22, Anti-Bypass Enforcement Matrix, Chain 6, Gates 12–15); README.md × 2 fully rewritten; markdown governance skill + instruction + CI gate 15 added; 90 markdown issues fixed to zero; temp artifacts purged; audit score 79/100 → 88/100
 - v3.5.0+43 (audit v13): Governance layer (REGRESSION_REGISTRY.md, SESSION_LOG.md, MASTER_BLUEPRINT.md, CHANGELOG.md, AUDIT_REPORT_FOOTWEAR_ERP.md), CI/CD hardened (Flutter 3.29.2 pinned, timeouts, --coverage, 11 hygiene gates, APK size gate), 15 hardcoded Colors.* eliminated in 6 screens (RR-011), widget_test.dart placeholder replaced (RR-013), Firestore rules emulator test scaffold

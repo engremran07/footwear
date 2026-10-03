@@ -237,7 +237,13 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                                     child: Text(
                                       routesLoading
                                           ? tr('loading', ref)
-                                          : _routeId!,
+                                        : _routeNumber != null
+                                        ? tr('dashboard_route_number', ref)
+                                          .replaceAll(
+                                            '%s',
+                                            '$_routeNumber',
+                                          )
+                                        : tr('route_unavailable', ref),
                                     ),
                                   ),
                                 ]

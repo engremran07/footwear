@@ -19,6 +19,7 @@ import '../providers/settings_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/error_state.dart';
 import '../widgets/export_sheet.dart';
 import '../widgets/shimmer_loading.dart';
 
@@ -32,12 +33,19 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   String _search = '';
   int _adminTab = 0; // 0 = warehouse, 1 = personal seller stock
 
-  Widget _buildAsyncError(Object error, {Widget? fallback}) {
+  Widget _buildAsyncError(
+    Object error, {
+    Widget? fallback,
+    VoidCallback? onRetry,
+  }) {
     if (AppErrorMapper.isPermissionOrAuthError(error)) {
       return fallback ??
-          const EmptyState(icon: Icons.lock_outline, message: '');
+          EmptyState(
+            icon: Icons.lock_outline,
+            message: tr('no_data', ref),
+          );
     }
-    return Center(child: Text(tr(AppErrorMapper.key(error), ref)));
+    return mappedErrorState(error: error, ref: ref, onRetry: onRetry);
   }
 
   void _showAddStockDialog(ProductVariantModel variant, int ppc) {
@@ -413,7 +421,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         );
       },
       loading: () => const ShimmerLoading(),
-      error: (e, st) => _buildAsyncError(e),
+      error: (e, st) => _buildAsyncError(
+        e,
+        onRetry: () => ref.invalidate(allVariantsProvider),
+      ),
     );
   }
 
@@ -498,7 +509,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         );
       },
       loading: () => const ShimmerLoading(),
-      error: (e, st) => _buildAsyncError(e),
+      error: (e, st) => _buildAsyncError(
+        e,
+        onRetry: () => ref.invalidate(sellerInventoryProvider(currentUser.id)),
+      ),
     );
   }
 
@@ -682,6 +696,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         fallback: const Center(
                           child: CircularProgressIndicator(),
                         ),
+                        onRetry: () {
+                          if (user?.isAdmin == true) {
+                            cRef.invalidate(allInventoryTransactionsProvider);
+                          } else {
+                            cRef.invalidate(
+                              sellerInventoryTransactionsProvider(
+                                user?.id ?? '',
+                              ),
+                            );
+                          }
+                        },
                       ),
                     ),
                   ),
@@ -759,6 +784,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         fallback: const Center(
                           child: CircularProgressIndicator(),
                         ),
+                        onRetry: () => cRef.invalidate(allVariantsProvider),
                       ),
                     ),
                   ),

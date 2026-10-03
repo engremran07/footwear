@@ -12,12 +12,24 @@ import 'auth_provider.dart';
 
 String settingsDocumentIdForUser(UserModel? currentUser) {
   final tenantId = TenantScope.normalize(currentUser?.tenantId);
-  return tenantId ?? TenantScope.globalTenantId;
+  return tenantId ?? TenantScope.noActiveWorkspaceId;
 }
 
 final settingsProvider = StreamProvider<SettingsModel>((ref) {
   final currentUser = ref.watch(authUserProvider).value;
   final settingsDocId = settingsDocumentIdForUser(currentUser);
+  if (settingsDocId == TenantScope.noActiveWorkspaceId) {
+    return Stream.value(
+      SettingsModel(
+        tenantId: settingsDocId,
+        companyName: 'My Business',
+        currency: 'SAR',
+        pairsPerCarton: 12,
+        requireAdminApprovalForSellerTransactionEdits: false,
+        updatedAt: Timestamp.now(),
+      ),
+    );
+  }
 
   return FirebaseFirestore.instance
       .collection(Collections.settings)
@@ -75,10 +87,12 @@ class SettingsNotifier extends AsyncNotifier<void> {
 
   Future<void> save(Map<String, dynamic> data) async {
     await _requireAdmin();
-    final currentUser = ref.read(authUserProvider).value;
-    final tenantId =
-        TenantScope.normalize(currentUser?.tenantId) ??
-        TenantScope.globalTenantId;
+    final logoBase64 = data['logo_base64'];
+    if (logoBase64 is String && utf8.encode(logoBase64).length > 50 * 1024) {
+      throw ArgumentError('Encoded logo must not exceed 50 KB');
+    }
+    final currentUser = await ref.read(authUserProvider.future);
+    final tenantId = TenantScope.requireTenant(currentUser?.tenantId);
     await FirebaseFirestore.instance
         .collection(Collections.settings)
         .doc(tenantId)

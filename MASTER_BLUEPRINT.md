@@ -1,7 +1,7 @@
 # ShoesERP Master Blueprint
 
-**Version:** v3.7.5+53  
-**Last updated:** 2026-04-15 — Post-audit hardening pass  
+**Version:** v3.9.53+92
+**Last updated:** 2026-10-03 — Tenant restore and forensic audit pass
 **Purpose:** Architecture handoff document — living reference for structure, conventions, and runtime contracts.
 
 ---
@@ -213,7 +213,7 @@ Defined in `app/lib/core/router/app_router.dart`. Auth guard redirects unauthent
 
 | ID | Risk | Mitigation | Unblocked by |
 |----|------|-----------|--------------|
-| RR-001 | RSA private key in Flutter heap | Admin flow still secure; key is in server-side admin_identity_service; documented P0 | Blaze tier upgrade |
+| RR-001 | Historical service-account credential exposure | Closed 2026-09-26: key revoked, Firestore credential removed, backup sanitized, client Auth signing path removed. Continue to exclude the credential from history/artifacts. | Closed; trusted backend required only if arbitrary-user Auth administration returns |
 | RR-002 | Float currency arithmetic | ±0.01 epsilon tolerance in invoice provider | Accounting sprint |
 | RR-003 | Lock overlay tap-to-dismiss | Sessions still expire; 8h hard cutoff applies | local_auth sprint |
 | RR-004 | Hard pagination caps | 150 tx / 500 shops is sufficient for current scale | Scale sprint |
@@ -224,9 +224,9 @@ Defined in `app/lib/core/router/app_router.dart`. Auth guard redirects unauthent
 
 | Field | Current | File |
 |-------|---------|------|
-| `appVersion` | `3.7.5` | `app/lib/core/constants/app_brand.dart` |
-| `buildNumber` | `53` | `app/lib/core/constants/app_brand.dart` |
-| `version` | `3.7.5+53` | `app/pubspec.yaml` |
+| `appVersion` | `3.9.53` | `app/lib/core/constants/app_brand.dart` |
+| `buildNumber` | `92` | `app/lib/core/constants/app_brand.dart` |
+| `version` | `3.9.53+92` | `app/pubspec.yaml` |
 
 Both files **must stay in sync** before every release. Bump both together.
 

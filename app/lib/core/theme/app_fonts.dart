@@ -86,7 +86,7 @@ class AppFonts {
       fontSize: fontSize,
       fontWeight: FontWeight.w800,
       color: color,
-    ).copyWith(letterSpacing: 0.2);
+    );
   }
 
   /// Build a full TextTheme for the locale.

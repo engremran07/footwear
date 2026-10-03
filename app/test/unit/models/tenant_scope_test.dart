@@ -8,6 +8,12 @@ void main() {
       expect(TenantScope.normalize(null), isNull);
     });
 
+    test('requires a tenant for write operations', () {
+      expect(TenantScope.requireTenant(' tenant-1 '), 'tenant-1');
+      expect(() => TenantScope.requireTenant(null), throwsStateError);
+      expect(() => TenantScope.requireTenant('  '), throwsStateError);
+    });
+
     test('applies tenant_id to data payloads', () {
       final data = TenantScope.applyToData({
         'name': 'Demo',

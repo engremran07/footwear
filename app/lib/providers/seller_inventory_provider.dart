@@ -3,11 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/role_utils.dart';
+import '../core/utils/firestore_pagination.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/seller_inventory_model.dart';
 import 'auth_provider.dart';
-
-const _kExportQueryLimit = 2000;
 
 final sellerInventoryProvider = StreamProvider.autoDispose
     .family<List<SellerInventoryModel>, String>((ref, sellerId) {
@@ -97,12 +96,12 @@ final sellerInventoryExportProvider =
         FirebaseFirestore.instance.collection(Collections.sellerInventory),
         tenantId: tenantId,
       );
-      final snap = await query
-          .where('seller_id', isEqualTo: sellerId.trim())
-          .where('active', isEqualTo: true)
-          .limit(_kExportQueryLimit)
-          .get();
-      return snap.docs
+      final docs = await fetchAllQueryDocuments(
+        query
+            .where('seller_id', isEqualTo: sellerId.trim())
+            .where('active', isEqualTo: true),
+      );
+      return docs
           .map((d) => SellerInventoryModel.fromJson(d.data(), d.id))
           .toList();
     });
@@ -122,19 +121,6 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
     if (!isPrivilegedRoleName(role)) {
       throw StateError('Only admin can return stock to warehouse');
     }
-  }
-
-  /// Deducts [qty] pairs from a single seller_inventory document.
-  Future<void> deductStock(String docId, int qty) async {
-    if (docId.trim().isEmpty) throw ArgumentError('docId must not be empty');
-    if (qty <= 0) throw ArgumentError('qty must be greater than 0');
-    await FirebaseFirestore.instance
-        .collection(Collections.sellerInventory)
-        .doc(docId)
-        .update({
-          'quantity_available': FieldValue.increment(-qty),
-          'updated_at': Timestamp.now(),
-        });
   }
 
   /// Returns [qty] pairs of a seller inventory item back to the warehouse.
@@ -160,46 +146,88 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
     if (variantId.trim().isEmpty) {
       throw ArgumentError('variantId must not be empty');
     }
+    if (sellerId.trim().isEmpty) {
+      throw ArgumentError('sellerId must not be empty');
+    }
+    if (productId.trim().isEmpty) {
+      throw ArgumentError('productId must not be empty');
+    }
     if (qty <= 0) throw ArgumentError('qty must be greater than 0');
     final normalizedCreatedBy = createdBy.trim();
     if (normalizedCreatedBy.isEmpty) {
       throw ArgumentError('createdBy must not be empty');
     }
+    final currentUser = await ref.read(authUserProvider.future);
+    final tenantId = TenantScope.normalize(currentUser?.tenantId);
+    if (tenantId == null) {
+      throw StateError('An active workspace is required to return stock');
+    }
+    if (FirebaseAuth.instance.currentUser?.uid != normalizedCreatedBy) {
+      throw ArgumentError('createdBy must match the authenticated user');
+    }
 
+    final normalizedSellerId = sellerId.trim();
     final db = FirebaseFirestore.instance;
-    final batch = db.batch();
-
-    // Deduct from seller inventory
-    batch.update(
-      db.collection(Collections.sellerInventory).doc(sellerInventoryDocId),
-      {
-        'quantity_available': FieldValue.increment(-qty),
-        'updated_at': Timestamp.now(),
-      },
-    );
-
-    // Increment warehouse stock (Firestore rules allow seller to *increase* quantity_available)
-    batch.update(db.collection(Collections.productVariants).doc(variantId), {
-      'quantity_available': FieldValue.increment(qty),
-      'updated_at': Timestamp.now(),
-    });
-
-    // Audit log in inventory_transactions
+    final sellerInventoryRef = db
+        .collection(Collections.sellerInventory)
+        .doc(sellerInventoryDocId);
+    final variantRef = db
+        .collection(Collections.productVariants)
+        .doc(variantId);
     final auditRef = db.collection(Collections.inventoryTransactions).doc();
-    batch.set(auditRef, {
-      'type': 'return_to_warehouse',
-      'seller_id': sellerId,
-      'seller_name': sellerName,
-      'variant_id': variantId,
-      'variant_name': variantName,
-      'product_id': productId,
-      'quantity': qty,
-      'notes': notes,
-      'created_by': normalizedCreatedBy,
-      'created_at': Timestamp.now(),
-    });
 
-    await batch.commit();
+    await db.runTransaction<void>((transaction) async {
+      final sellerSnapshot = await transaction.get(sellerInventoryRef);
+      final variantSnapshot = await transaction.get(variantRef);
+      if (!sellerSnapshot.exists || !variantSnapshot.exists) {
+        throw StateError('Stock record was not found');
+      }
+      final sellerData = sellerSnapshot.data()!;
+      final variantData = variantSnapshot.data()!;
+      final availableSellerQty =
+          (sellerData['quantity_available'] as num?)?.toInt() ?? 0;
+      if (TenantScope.normalize(sellerData['tenant_id'] as String?) !=
+              tenantId ||
+          TenantScope.normalize(variantData['tenant_id'] as String?) !=
+              tenantId ||
+          sellerData['seller_id'] != normalizedSellerId ||
+          sellerData['variant_id'] != variantId ||
+          sellerData['product_id'] != productId) {
+        throw StateError('Stock records do not match the active workspace');
+      }
+      if (availableSellerQty < qty) {
+        throw ArgumentError('Cannot return more stock than the seller has');
+      }
+
+      final warehouseQty =
+          (variantData['quantity_available'] as num?)?.toInt() ?? 0;
+      final now = Timestamp.now();
+      transaction.update(sellerInventoryRef, {
+        'quantity_available': availableSellerQty - qty,
+        'updated_at': now,
+      });
+      transaction.update(variantRef, {
+        'quantity_available': warehouseQty + qty,
+        'updated_at': now,
+      });
+      transaction.set(auditRef, {
+        'type': 'return_to_warehouse',
+        'seller_id': normalizedSellerId,
+        'seller_name': sellerName,
+        'variant_id': variantId,
+        'variant_name': variantName,
+        'product_id': productId,
+        'quantity': qty,
+        'seller_previous_quantity': availableSellerQty,
+        'seller_new_quantity': availableSellerQty - qty,
+        'warehouse_previous_quantity': warehouseQty,
+        'warehouse_new_quantity': warehouseQty + qty,
+        'notes': notes,
+        'created_by': normalizedCreatedBy,
+        'created_at': now,
+        'tenant_id': tenantId,
+      });
+    });
   }
 }
 

@@ -8,6 +8,8 @@
 // future changes cause these tests to fail loudly.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:footwear_erp/providers/invoice_provider.dart';
 
 // ── pure-logic helpers mirroring createSaleInvoice guards ─────────────────
 
@@ -45,6 +47,35 @@ bool isInvoiceMathValid({
 // ── tests ──────────────────────────────────────────────────────────────────
 
 void main() {
+  test('provider rejects stock sales without inventory deductions', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final notifier = container.read(invoiceNotifierProvider.notifier);
+
+    await expectLater(
+      notifier.createSaleInvoice(
+        shopId: 'shop-1',
+        shopName: 'Shop',
+        routeId: 'route-1',
+        sellerId: 'seller-1',
+        sellerName: 'Seller',
+        items: const [
+          {'variant_id': 'variant-1', 'qty': 1, 'unit_price': 100},
+        ],
+        subtotal: 100,
+        total: 100,
+        createdBy: 'seller-1',
+      ),
+      throwsA(
+        isA<ArgumentError>().having(
+          (error) => error.message,
+          'message',
+          contains('stock deduction'),
+        ),
+      ),
+    );
+  });
+
   group('createSaleInvoice — sale amount guard', () {
     test('fails when sale amount is zero', () {
       expect(validateSaleAmount(saleAmount: 0), 'sale_amount_required');

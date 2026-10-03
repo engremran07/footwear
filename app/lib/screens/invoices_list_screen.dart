@@ -98,8 +98,14 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
                 }
                 return AppPullRefresh(
                   onRefresh: () async {
-                    ref.invalidate(roleAwareInvoicesProvider);
-                    await Future.delayed(const Duration(milliseconds: 300));
+                    if (user?.isAdmin == true) {
+                      ref.invalidate(allInvoicesProvider);
+                      await ref.read(allInvoicesProvider.future);
+                    } else if (user != null) {
+                      final provider = sellerInvoicesProvider(user.id);
+                      ref.invalidate(provider);
+                      await ref.read(provider.future);
+                    }
                   },
                   child: ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),

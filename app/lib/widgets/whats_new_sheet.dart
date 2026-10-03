@@ -238,7 +238,6 @@ class _EntrySection extends StatelessWidget {
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: cs.onPrimary,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
                     ),
                   ),
                 ),

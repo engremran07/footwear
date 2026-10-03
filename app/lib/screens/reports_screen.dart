@@ -10,7 +10,6 @@ import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
-import '../models/route_model.dart';
 import '../models/shop_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
@@ -152,11 +151,13 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final shops = user.isAdmin
-        ? ref.read(shopsProvider).value ?? <ShopModel>[]
+      final shops = user.isAdmin
+        ? await ref.read(shopsProvider.future)
         : (user.assignedRouteIds.isNotEmpty
-              ? ref.read(sellerAllShopsProvider).value ?? <ShopModel>[]
-              : <ShopModel>[]);
+            ? await ref.read(sellerAllShopsProvider.future)
+            : <ShopModel>[]);
+      if (!context.mounted) return;
+    if (!context.mounted) return;
     if (shops.isEmpty) {
       _showNoData(context, ref);
       return;
@@ -170,9 +171,12 @@ class ReportsScreen extends ConsumerWidget {
       tr('city', ref),
       triCol('balance'),
     ];
+    final reportRoutes = user.isAdmin
+        ? await ref.read(routesProvider.future)
+        : await ref.read(routesBySellerProvider(user.id).future);
+    if (!context.mounted) return;
     final routeCurrencyMap = <String, String>{
-      for (final r in ref.read(routesProvider).value ?? <RouteModel>[])
-        r.id: r.currency,
+      for (final route in reportRoutes) route.id: route.currency,
     };
     final rows = shops
         .map(
@@ -210,23 +214,30 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final rows = user.isAdmin
-        ? (ref.read(allVariantsProvider).value ?? [])
-              .map(
-                (v) => [
-                  v.variantName,
-                  AppFormatters.stock(v.quantityAvailable, ppc),
-                ],
-              )
-              .toList()
-        : (ref.read(sellerInventoryProvider(user.id)).value ?? [])
-              .map(
-                (v) => [
-                  v.variantName,
-                  AppFormatters.stock(v.quantityAvailable, ppc),
-                ],
-              )
-              .toList();
+    late final List<List<dynamic>> rows;
+    if (user.isAdmin) {
+      final variants = await ref.read(allVariantsProvider.future);
+      if (!context.mounted) return;
+      rows = variants
+          .map(
+            (item) => <dynamic>[
+              item.variantName,
+              AppFormatters.stock(item.quantityAvailable, ppc),
+            ],
+          )
+          .toList();
+    } else {
+      final inventory = await ref.read(sellerInventoryProvider(user.id).future);
+      if (!context.mounted) return;
+      rows = inventory
+          .map(
+            (item) => <dynamic>[
+              item.variantName,
+              AppFormatters.stock(item.quantityAvailable, ppc),
+            ],
+          )
+          .toList();
+    }
     if (rows.isEmpty) {
       if (!context.mounted) return;
       _showNoData(context, ref);
@@ -341,16 +352,15 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final shops = user.isAdmin
-        ? ref.read(outstandingShopsProvider).value ?? <ShopModel>[]
+      final shops = user.isAdmin
+        ? await ref.read(outstandingShopsProvider.future)
         : (user.assignedRouteIds.isNotEmpty
-              ? ref
-                        .read(sellerAllShopsProvider)
-                        .value
-                        ?.where((s) => s.balance > 0)
-                        .toList() ??
-                    <ShopModel>[]
-              : <ShopModel>[]);
+          ? (await ref.read(sellerAllShopsProvider.future))
+              .where((shop) => shop.balance > 0)
+              .toList()
+          : <ShopModel>[]);
+      if (!context.mounted) return;
+      if (!context.mounted) return;
     if (shops.isEmpty) {
       _showNoData(context, ref);
       return;
@@ -362,9 +372,12 @@ class ReportsScreen extends ConsumerWidget {
       triCol('phone'),
       triCol('balance'),
     ];
+    final reportRoutes = user.isAdmin
+        ? await ref.read(routesProvider.future)
+        : await ref.read(routesBySellerProvider(user.id).future);
+    if (!context.mounted) return;
     final routeCurrencyMap2 = <String, String>{
-      for (final r in ref.read(routesProvider).value ?? <RouteModel>[])
-        r.id: r.currency,
+      for (final route in reportRoutes) route.id: route.currency,
     };
     final rows = shops
         .map(
@@ -396,11 +409,13 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final shops = user.isAdmin
-        ? ref.read(shopsProvider).value ?? <ShopModel>[]
+      final shops = user.isAdmin
+        ? await ref.read(shopsProvider.future)
         : (user.assignedRouteIds.isNotEmpty
-              ? ref.read(sellerAllShopsProvider).value ?? <ShopModel>[]
-              : <ShopModel>[]);
+            ? await ref.read(sellerAllShopsProvider.future)
+            : <ShopModel>[]);
+      if (!context.mounted) return;
+    if (!context.mounted) return;
     final badDebtShops = shops.where((s) => s.badDebt).toList();
     if (badDebtShops.isEmpty) {
       _showNoData(context, ref);
@@ -413,9 +428,12 @@ class ReportsScreen extends ConsumerWidget {
       triCol('bad_debt_amount'),
       triCol('date'),
     ];
+    final reportRoutes = user.isAdmin
+        ? await ref.read(routesProvider.future)
+        : await ref.read(routesBySellerProvider(user.id).future);
+    if (!context.mounted) return;
     final routeCurrencyMap3 = <String, String>{
-      for (final r in ref.read(routesProvider).value ?? <RouteModel>[])
-        r.id: r.currency,
+      for (final route in reportRoutes) route.id: route.currency,
     };
     final rows = badDebtShops
         .map(
@@ -682,10 +700,11 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       final user = await ref.read(authUserProvider.future);
       if (!context.mounted) return;
       final shops = user?.isAdmin == true
-          ? ref.read(shopsProvider).value ?? <ShopModel>[]
+          ? await ref.read(shopsProvider.future)
           : (user?.assignedRouteIds.isNotEmpty == true
-                ? ref.read(sellerAllShopsProvider).value ?? <ShopModel>[]
-                : <ShopModel>[]);
+            ? await ref.read(sellerAllShopsProvider.future)
+            : <ShopModel>[]);
+      if (!context.mounted) return;
       final shop = shops.firstWhere((s) => s.id == _selectedShopId);
 
       ref.invalidate(shopTransactionsExportProvider(_selectedShopId!));
@@ -904,7 +923,8 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       );
 
       // Shops are already loaded for the admin UI â€” safe to read from cache.
-      final allShops = ref.read(shopsProvider).value ?? <ShopModel>[];
+      final allShops = await ref.read(shopsProvider.future);
+      if (!context.mounted) return;
 
       // Build per-customer summary.
       // allTxs is already filtered to this seller by sellerTransactionsExportProvider.
@@ -949,9 +969,12 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
 
       final settings = await ref.read(settingsProvider.future);
       final labels = _labels(ref);
-      final sellerRouteCurrency = seller.assignedRouteIds.isNotEmpty
-          ? ref.read(routeCurrencyProvider(seller.assignedRouteIds.first))
-          : 'SAR';
+        final routes = await ref.read(routesProvider.future);
+        if (!context.mounted) return;
+        final sellerRoute = routes
+          .where((route) => seller.assignedRouteIds.contains(route.id))
+          .firstOrNull;
+        final sellerRouteCurrency = sellerRoute?.currency ?? 'SAR';
       if (!context.mounted) return;
       ExportSheet.show(
         // ignore: use_build_context_synchronously
@@ -983,12 +1006,8 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
         ),
         pdfBytesBuilder: () {
           // Resolve route UID â†’ display name so PDF never shows raw IDs
-          final routes = ref.read(routesProvider).value ?? <RouteModel>[];
-          final routeMatch = routes.where(
-            (r) => seller.assignedRouteIds.contains(r.id),
-          );
-          final routeDisplayName = routeMatch.isNotEmpty
-              ? '${routeMatch.first.routeNumber} Â· ${routeMatch.first.name}'
+          final routeDisplayName = sellerRoute != null
+              ? '${sellerRoute.routeNumber} · ${sellerRoute.name}'
               : '';
           return buildPdfSellerReport(
             sellerName: seller.displayName,

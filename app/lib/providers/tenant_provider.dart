@@ -172,32 +172,56 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
     required int maxDevicesAllowed,
     String? ownerUserId,
   }) async {
+    final actingUser = await ref.read(authUserProvider.future);
+    if (actingUser == null || !actingUser.active || !actingUser.isSuperAdmin) {
+      throw StateError('Active platform super-admin access is required');
+    }
     final tenantSlug = slug.trim().isEmpty
         ? _slugify(name)
         : slug.trim().toLowerCase();
+    if (name.trim().isEmpty) throw ArgumentError('Workspace name is required');
     final normalizedLimit = maxDevicesAllowed.clamp(1, 999);
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final now = Timestamp.now();
       final docId = tenantSlug.isEmpty
-          ? 'workspace-${now.millisecondsSinceEpoch}'
+          ? 'workspace-${DateTime.now().millisecondsSinceEpoch}'
           : tenantSlug;
-      await FirebaseFirestore.instance
-          .collection(Collections.tenants)
-          .doc(docId)
-          .set({
-            'name': name.trim(),
-            'slug': tenantSlug,
-            'tenant_id': docId,
-            'active': true,
-            'is_trial': false,
-            'require_device_pairing': requireDevicePairing,
-            'allow_admin_reset_only': allowAdminResetOnly,
-            'max_devices_allowed': normalizedLimit,
-            'created_at': now,
-            'updated_at': now,
-            'owner_user_id': ownerUserId,
-          }, SetOptions(merge: true));
+      final db = FirebaseFirestore.instance;
+      final tenantRef = db.collection(Collections.tenants).doc(docId);
+      final settingsRef = db.collection(Collections.settings).doc(docId);
+      await db.runTransaction<void>((transaction) async {
+        final tenantSnapshot = await transaction.get(tenantRef);
+        final settingsSnapshot = await transaction.get(settingsRef);
+        if (tenantSnapshot.exists) {
+          throw StateError('Workspace slug already exists: $docId');
+        }
+        if (settingsSnapshot.exists) {
+          throw StateError('Workspace settings already exist: $docId');
+        }
+        transaction.set(tenantRef, {
+          'name': name.trim(),
+          'slug': tenantSlug,
+          'tenant_id': docId,
+          'created_by': actingUser.id,
+          'active': true,
+          'is_trial': false,
+          'require_device_pairing': requireDevicePairing,
+          'allow_admin_reset_only': allowAdminResetOnly,
+          'max_devices_allowed': normalizedLimit,
+          'created_at': FieldValue.serverTimestamp(),
+          'updated_at': FieldValue.serverTimestamp(),
+          'owner_user_id': ownerUserId,
+        });
+        transaction.set(settingsRef, {
+          'tenant_id': docId,
+          'company_name': name.trim(),
+          'currency': 'SAR',
+          'pairs_per_carton': 12,
+          'require_admin_approval_for_seller_transaction_edits': false,
+          'last_invoice_number': 0,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      });
     });
   }
 

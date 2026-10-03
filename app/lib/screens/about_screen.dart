@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/utils/share_helper.dart';
 import '../core/constants/app_brand.dart';
@@ -23,6 +24,7 @@ class AboutScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final localeCode = ref.watch(appLocaleProvider).locale.languageCode;
 
     return Scaffold(
       body: ListView(
@@ -55,7 +57,7 @@ class AboutScreen extends ConsumerWidget {
                 _VersionBadge(cs: cs),
                 const SizedBox(height: 8),
                 Text(
-                  AppBrand.aboutDescription,
+                  tr('about_description', ref),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
@@ -86,12 +88,14 @@ class AboutScreen extends ConsumerWidget {
           _InfoTile(
             icon: Icons.calendar_today_outlined,
             label: tr('release_date', ref),
-            value: 'April 6, 2026',
+            value: DateFormat.yMMMMd(localeCode).format(
+              DateTime.parse(AppBrand.releaseDateIso),
+            ),
           ),
           _InfoTile(
             icon: Icons.cloud_outlined,
             label: tr('platform', ref),
-            value: 'Firebase Spark — Firestore + Auth',
+            value: tr('platform_value', ref),
           ),
           _InfoTile(
             icon: Icons.new_releases_outlined,
@@ -198,7 +202,7 @@ class AboutScreen extends ConsumerWidget {
           const SizedBox(height: 32),
           Center(
             child: Text(
-              '© 2026 ${AppBrand.companyName}. All rights reserved.',
+              tr('copyright_notice', ref).replaceAll('%s', AppBrand.companyName),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: cs.onSurfaceVariant,
               ),
@@ -293,7 +297,6 @@ class _VersionBadge extends StatelessWidget {
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: AppBrand.primaryColor,
-          letterSpacing: 0.3,
         ),
       ),
     );
@@ -317,7 +320,6 @@ class _SectionHeader extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w700,
           color: cs.primary,
-          letterSpacing: 0.8,
         ),
       ),
     );

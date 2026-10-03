@@ -9,7 +9,9 @@ void main() {
   ) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: Scaffold(body: AppOnlineIndicator(isOnline: true)),
+        home: Scaffold(
+          body: AppOnlineIndicator(isOnline: true, semanticLabel: 'Online'),
+        ),
       ),
     );
 
@@ -27,7 +29,12 @@ void main() {
       MaterialApp(
         home: Builder(
           builder: (context) =>
-              const Scaffold(body: AppOnlineIndicator(isOnline: false)),
+              const Scaffold(
+                body: AppOnlineIndicator(
+                  isOnline: false,
+                  semanticLabel: 'Offline',
+                ),
+              ),
         ),
       ),
     );

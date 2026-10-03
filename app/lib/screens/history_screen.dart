@@ -14,6 +14,7 @@ import '../providers/history_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
 
 // =============================================================================
@@ -70,7 +71,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         onRefresh: _onRefresh,
         child: txAsync.when(
           loading: () => const ShimmerLoading(),
-          error: (e, _) => _HistoryErrorView(error: e),
+          error: (e, _) => _HistoryErrorView(error: e, onRetry: _onRefresh),
           data: (txs) {
             if (txs.isEmpty) {
               return _emptyView(context);
@@ -211,7 +212,6 @@ class _DayHeader extends ConsumerWidget {
         display,
         style: theme.textTheme.labelLarge?.copyWith(
           color: theme.colorScheme.primary,
-          letterSpacing: 0.5,
         ),
       ),
     );
@@ -310,7 +310,9 @@ class _HistoryTile extends ConsumerWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            tx.shopName.isNotEmpty ? tx.shopName : tx.shopId,
+                            tx.shopName.isNotEmpty
+                              ? tx.shopName
+                              : tr('shop', ref),
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
@@ -460,27 +462,15 @@ class _SmallBadge extends StatelessWidget {
 
 class _HistoryErrorView extends ConsumerWidget {
   final Object error;
-  const _HistoryErrorView({required this.error});
+  final VoidCallback onRetry;
+  const _HistoryErrorView({required this.error, required this.onRetry});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTokens.s32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
-            const SizedBox(height: AppTokens.s12),
-            Text(
-              tr('error', ref),
-              style: theme.textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+    return mappedErrorState(
+      error: error,
+      ref: ref,
+      onRetry: onRetry,
     );
   }
 }

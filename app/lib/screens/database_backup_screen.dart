@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -6,6 +7,7 @@ import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/services/google_drive_backup_service.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/backup_scope_policy.dart';
 import '../core/utils/share_helper.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/utils/tenant_scope.dart';
@@ -41,14 +43,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   String? _lastRestoreBy;
 
   // ── collection selection ──────────────────────────────────────────────────
-  final Set<String> _selected = {
-    'routes',
-    'shops',
-    'products',
-    'inventory',
-    'transactions',
-    'invoices',
-  };
+  final Set<String> _selected = {};
 
   static final _dateFmt = DateFormat('MMM d, y \'at\' h:mm a');
 
@@ -60,12 +55,20 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
 
   Future<void> _loadPrefs() async {
     final n = ref.read(databaseBackupProvider.notifier);
+    final user = await ref.read(authUserProvider.future);
     final auto = await n.getAutoEnabled();
     final interval = await n.getIntervalMinutes();
     final lastBackup = await n.getLastBackupAt();
     final lastRestore = await n.getLastRestoreAt();
     final lastRestoreBy = await n.getLastRestoreBy();
     if (mounted) {
+      _selected
+        ..clear()
+        ..addAll(
+          user == null
+              ? const <String>{}
+              : BackupScopePolicy.collectionsFor(user.role),
+        );
       setState(() {
         _autoEnabled = auto;
         _intervalMinutes = interval;
@@ -154,7 +157,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   Future<void> _doBackup() async {
     if (_selected.isEmpty) return;
     final user = await ref.read(authUserProvider.future);
-    if (user == null) return;
+    if (user == null || !user.canCreateWorkspaceBackup) return;
     final workspaceId = _workspaceIdFor(user);
     final passphrase = await _requestBackupPassphrase(confirmPassphrase: true);
     if (passphrase == null || !mounted) return;
@@ -172,10 +175,9 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
         _lastBackupAt = DateTime.now();
         _loading = false;
       });
-      final fileName = result.localPath.split('/').last.split('\\').last;
       await shareFile(
         bytes: result.bytes,
-        fileName: fileName,
+        fileName: result.fileName,
         mimeType: 'application/json',
         text: tr('backup_share_text', ref),
       );
@@ -191,7 +193,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   Future<void> _doDriveBackup() async {
     if (_selected.isEmpty) return;
     final user = await ref.read(authUserProvider.future);
-    if (user == null) return;
+    if (user == null || !user.canCreateWorkspaceBackup) return;
     final workspaceId = _workspaceIdFor(user);
     final passphrase = await _requestBackupPassphrase(confirmPassphrase: false);
     if (passphrase == null || !mounted) return;
@@ -205,7 +207,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       );
       await notifier.uploadBackupToDrive(
         bytes: result.bytes,
-        fileName: result.localPath.split('/').last.split('\\').last,
+        fileName: result.fileName,
         encryptionPassword: passphrase,
         tenantIdOverride: workspaceId,
       );
@@ -235,16 +237,11 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       ).showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
       return;
     }
-    if (!user.isSuperAdmin && !user.isSeller) {
+    if (!user.canRestoreWorkspaceBackup) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
       return;
-    }
-    String? selectedRouteId;
-    if (user.isSeller) {
-      selectedRouteId = await _chooseRestoreRoute(user);
-      if (selectedRouteId == null || !mounted) return;
     }
     final workspaceId = _workspaceIdFor(user);
     try {
@@ -261,16 +258,28 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       final picked = await showModalBottomSheet<GoogleDriveBackupFile>(
         context: context,
         isScrollControlled: true,
-        builder: (_) => _DriveFilePickerSheet(files: files),
+        builder: (_) => _DriveFilePickerSheet(files: files, fmtDate: _fmt),
       );
       if (picked == null || !mounted) return;
       final bytes = await ref
           .read(databaseBackupProvider.notifier)
           .downloadDriveBackup(picked.id, tenantIdOverride: workspaceId);
-      final preview = ref
+      final passphrase = await _requestBackupPassphrase(
+        confirmPassphrase: false,
+      );
+      if (passphrase == null || !mounted) return;
+      final preview = await ref
           .read(databaseBackupProvider.notifier)
-          .verifyBackup(bytes);
-      if (!mounted || await _showPreviewDialog(preview) != true) return;
+          .decryptAndVerifyBackup(archiveBytes: bytes, passphrase: passphrase);
+      if (!mounted ||
+          await _showPreviewDialog(
+                preview,
+                mergeRestore:
+                    user.isTenantAdmin || preview.scope == 'platform_metadata',
+              ) !=
+              true) {
+        return;
+      }
       if (!mounted || await _showPasswordCountdownDialog() != true) return;
       final adminName = user.displayName.trim().isNotEmpty
           ? user.displayName
@@ -278,11 +287,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       setState(() => _restoring = true);
       final count = await ref
           .read(databaseBackupProvider.notifier)
-          .restoreFromBackup(
-            preview,
-            adminName: adminName,
-            routeId: selectedRouteId,
-          );
+          .restoreFromBackup(preview, adminName: adminName);
       if (!mounted) return;
       setState(() {
         _restoring = false;
@@ -301,27 +306,6 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
         context,
       ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
     }
-  }
-
-  Future<String?> _chooseRestoreRoute(UserModel user) {
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: Text(tr('select_route', ref)),
-        children: [
-          for (var i = 0; i < user.assignedRouteIds.length; i++)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(ctx, user.assignedRouteIds[i]),
-              child: Text(
-                user.assignedRouteNames.length > i &&
-                        user.assignedRouteNames[i].trim().isNotEmpty
-                    ? user.assignedRouteNames[i]
-                    : user.assignedRouteIds[i],
-              ),
-            ),
-        ],
-      ),
-    );
   }
 
   String? _workspaceIdFor(UserModel user) {
@@ -339,24 +323,22 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
       return;
     }
-    if (!user.isSuperAdmin && !user.isSeller) {
+    if (!user.canRestoreWorkspaceBackup) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
       return;
     }
-    String? selectedRouteId;
-    if (user.isSeller) {
-      selectedRouteId = await _chooseRestoreRoute(user);
-      if (selectedRouteId == null || !mounted) return;
-    }
     final workspaceId = _workspaceIdFor(user);
+    if (workspaceId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(warningSnackBar(tr('select_workspace', ref)));
+      return;
+    }
     final backups = await ref
         .read(databaseBackupProvider.notifier)
-        .listLocalBackups(
-          tenantId: workspaceId ?? TenantScope.globalTenantId,
-          creatorUid: user.id,
-        );
+        .listLocalBackups(tenantId: workspaceId, creatorUid: user.id);
     if (!mounted) return;
 
     if (backups.isEmpty) {
@@ -374,11 +356,16 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     );
     if (picked == null || !mounted) return;
 
-    // 2 — verify the file
+    final passphrase = await _requestBackupPassphrase(confirmPassphrase: false);
+    if (passphrase == null || !mounted) return;
+
+    // 2 — decrypt and verify the file
     BackupPreview preview;
     try {
       final bytes = await picked.file.readAsBytes();
-      preview = ref.read(databaseBackupProvider.notifier).verifyBackup(bytes);
+      preview = await ref
+          .read(databaseBackupProvider.notifier)
+          .decryptAndVerifyBackup(archiveBytes: bytes, passphrase: passphrase);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -388,7 +375,10 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     }
 
     // 3 — show preview + confirm
-    final confirmed = await _showPreviewDialog(preview);
+    final confirmed = await _showPreviewDialog(
+      preview,
+      mergeRestore: user.isTenantAdmin || preview.scope == 'platform_metadata',
+    );
     if (confirmed != true || !mounted) return;
 
     // 4 — re-auth + countdown
@@ -404,11 +394,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     try {
       final count = await ref
           .read(databaseBackupProvider.notifier)
-          .restoreFromBackup(
-            preview,
-            adminName: adminName,
-            routeId: selectedRouteId,
-          );
+          .restoreFromBackup(preview, adminName: adminName);
       if (!mounted) return;
       setState(() {
         _restoring = false;
@@ -429,7 +415,10 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     }
   }
 
-  Future<bool?> _showPreviewDialog(BackupPreview preview) {
+  Future<bool?> _showPreviewDialog(
+    BackupPreview preview, {
+    bool mergeRestore = false,
+  }) {
     final checksumOk = preview.checksumOk;
     return showDialog<bool>(
       context: context,
@@ -470,6 +459,13 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              if (mergeRestore) ...[
+                Text(
+                  tr('backup_restore_merge_warning', ref),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+              ],
               // Metadata
               Text(
                 tr(
@@ -640,15 +636,35 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   // ── Auto-backup prefs ──────────────────────────────────────────────────────
 
   Future<void> _setAutoEnabled(bool value) async {
+    if (value) {
+      if (!GoogleDriveBackupService.isConfigured) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(errorSnackBar(tr('backup_drive_not_configured', ref)));
+        }
+        return;
+      }
+      final passphrase = await _requestBackupPassphrase(
+        confirmPassphrase: true,
+      );
+      if (passphrase == null || !mounted) return;
+      await ref
+          .read(databaseBackupProvider.notifier)
+          .rememberAutoBackupPassphrase(passphrase);
+    }
     await ref.read(databaseBackupProvider.notifier).setAutoEnabled(value);
+    if (!value) {
+      await ref
+          .read(databaseBackupProvider.notifier)
+          .clearAutoBackupPassphrase();
+    }
     setState(() => _autoEnabled = value);
   }
 
   Future<void> _setInterval(int days) async {
     final minutes = days * 24 * 60;
-    await ref
-        .read(databaseBackupProvider.notifier)
-        .setIntervalMinutes(minutes);
+    await ref.read(databaseBackupProvider.notifier).setIntervalMinutes(minutes);
     setState(() {
       _intervalMinutes = minutes;
     });
@@ -664,10 +680,13 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     final activeTenantMatches = tenants
         .where((tenant) => tenant.id == activeTenantId)
         .toList();
-    final activeTenantName = activeTenantMatches.isEmpty
-        ? activeTenantId
-        : activeTenantMatches.first.name;
-    final isActive = user?.active ?? false;
+    final activeTenantName = activeTenantId == null
+      ? tr('select_workspace', ref)
+      : activeTenantMatches.isEmpty
+      ? tr('workspace_name_unavailable', ref)
+      : activeTenantMatches.first.name;
+    final canUseBackup =
+        user?.active == true && user?.canCreateWorkspaceBackup == true;
 
     return Stack(
       children: [
@@ -677,7 +696,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
             backgroundColor: AppBrand.primaryColor,
             foregroundColor: AppBrand.onPrimary,
           ),
-          body: !isActive
+          body: !canUseBackup
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -711,79 +730,92 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                         child: ListTile(
                           leading: const Icon(Icons.domain_outlined),
                           title: Text(tr('workspace_access_active', ref)),
-                          subtitle: Text(activeTenantName ?? ''),
+                          subtitle: Text(activeTenantName),
                         ),
                       ),
                       const SizedBox(height: 16),
                     ],
 
                     // ── Auto-backup Card ─────────────────────────────
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Column(
-                          children: [
-                            SwitchListTile(
-                              secondary: Icon(
-                                Icons.schedule,
-                                color: _autoEnabled
-                                    ? AppBrand.primaryColor
-                                    : AppBrand.stockColor,
-                              ),
-                              title: Text(tr('backup_auto_title', ref)),
-                              subtitle: Text(tr('backup_auto_subtitle', ref)),
-                              value: _autoEnabled,
-                              onChanged: _setAutoEnabled,
-                            ),
-                            if (_autoEnabled) ...[
-                              const Divider(
-                                height: 1,
-                                indent: 16,
-                                endIndent: 16,
-                              ),
-                              ListTile(
-                                title: Text(tr('backup_interval', ref)),
-                                trailing: DropdownButton<int>(
-                                  value: (_intervalMinutes / 24 / 60)
-                                      .round()
-                                      .clamp(1, 30),
-                                  underline: const SizedBox.shrink(),
-                                  onChanged: (v) {
-                                    if (v != null) _setInterval(v);
-                                  },
-                                  items: [
-                                    DropdownMenuItem(
-                                      value: 1,
-                                      child: Text(tr('backup_interval_1', ref)),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 3,
-                                      child: Text(tr('backup_interval_3', ref)),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 7,
-                                      child: Text(tr('backup_interval_7', ref)),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 14,
-                                      child: Text(
-                                        tr('backup_interval_14', ref),
-                                      ),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 30,
-                                      child: Text(
-                                        tr('backup_interval_30', ref),
-                                      ),
-                                    ),
-                                  ],
+                    if (user?.canRunAutomaticWorkspaceBackup == true && !kIsWeb)
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Column(
+                            children: [
+                              SwitchListTile(
+                                secondary: Icon(
+                                  Icons.schedule,
+                                  color: _autoEnabled
+                                      ? AppBrand.primaryColor
+                                      : AppBrand.stockColor,
                                 ),
+                                title: Text(tr('backup_auto_title', ref)),
+                                subtitle: Text(
+                                  GoogleDriveBackupService.isConfigured
+                                      ? tr('backup_auto_subtitle', ref)
+                                      : tr('backup_drive_not_configured', ref),
+                                ),
+                                value: _autoEnabled,
+                                onChanged: GoogleDriveBackupService.isConfigured
+                                    ? _setAutoEnabled
+                                    : null,
                               ),
+                              if (_autoEnabled) ...[
+                                const Divider(
+                                  height: 1,
+                                  indent: 16,
+                                  endIndent: 16,
+                                ),
+                                ListTile(
+                                  title: Text(tr('backup_interval', ref)),
+                                  trailing: DropdownButton<int>(
+                                    value: (_intervalMinutes / 24 / 60)
+                                        .round()
+                                        .clamp(1, 30),
+                                    underline: const SizedBox.shrink(),
+                                    onChanged: (v) {
+                                      if (v != null) _setInterval(v);
+                                    },
+                                    items: [
+                                      DropdownMenuItem(
+                                        value: 1,
+                                        child: Text(
+                                          tr('backup_interval_1', ref),
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 3,
+                                        child: Text(
+                                          tr('backup_interval_3', ref),
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 7,
+                                        child: Text(
+                                          tr('backup_interval_7', ref),
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 14,
+                                        child: Text(
+                                          tr('backup_interval_14', ref),
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 30,
+                                        child: Text(
+                                          tr('backup_interval_30', ref),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
-                    ),
                     const SizedBox(height: 16),
 
                     // ── Collections ──────────────────────────────────
@@ -796,47 +828,26 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
                               child: Text(
-                                tr('backup_subtitle', ref),
+                                tr(
+                                  user!.isSuperAdmin
+                                      ? 'backup_platform_metadata_subtitle'
+                                      : 'backup_workspace_backup_subtitle',
+                                  ref,
+                                ),
                                 style: Theme.of(context).textTheme.labelSmall
                                     ?.copyWith(color: AppBrand.stockColor),
                               ),
                             ),
-                            _CollectionTile(
-                              collectionKey: 'routes',
-                              labelKey: 'backup_routes',
-                              selected: _selected,
-                              onChanged: (fn) => setState(fn),
-                            ),
-                            _CollectionTile(
-                              collectionKey: 'shops',
-                              labelKey: 'backup_shops',
-                              selected: _selected,
-                              onChanged: (fn) => setState(fn),
-                            ),
-                            _CollectionTile(
-                              collectionKey: 'products',
-                              labelKey: 'backup_products',
-                              selected: _selected,
-                              onChanged: (fn) => setState(fn),
-                            ),
-                            _CollectionTile(
-                              collectionKey: 'inventory',
-                              labelKey: 'backup_inventory',
-                              selected: _selected,
-                              onChanged: (fn) => setState(fn),
-                            ),
-                            _CollectionTile(
-                              collectionKey: 'transactions',
-                              labelKey: 'backup_transactions',
-                              selected: _selected,
-                              onChanged: (fn) => setState(fn),
-                            ),
-                            _CollectionTile(
-                              collectionKey: 'invoices',
-                              labelKey: 'backup_invoices',
-                              selected: _selected,
-                              onChanged: (fn) => setState(fn),
-                            ),
+                            for (final collectionKey
+                                in BackupScopePolicy.collectionsFor(user.role))
+                              _CollectionTile(
+                                collectionKey: collectionKey,
+                                labelKey: _backupCollectionLabelKey(
+                                  collectionKey,
+                                ),
+                                selected: _selected,
+                                onChanged: (fn) => setState(fn),
+                              ),
                           ],
                         ),
                       ),
@@ -868,17 +879,28 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                     ),
                     const SizedBox(height: 10),
                     OutlinedButton.icon(
-                      onPressed: _loading ? null : _doDriveBackup,
+                      onPressed:
+                          _loading || !GoogleDriveBackupService.isConfigured
+                          ? null
+                          : _doDriveBackup,
                       icon: const Icon(Icons.cloud_upload_outlined),
                       label: Text(tr('backup_to_google_drive', ref)),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(48),
                       ),
                     ),
+                    if (!GoogleDriveBackupService.isConfigured)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          tr('backup_drive_not_configured', ref),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppBrand.warningColor),
+                        ),
+                      ),
                     const SizedBox(height: 32),
 
-                    if (user?.isSuperAdmin == true ||
-                        user?.isSeller == true) ...[
+                    if (user.canRestoreWorkspaceBackup) ...[
                       // ── Restore section ──────────────────────────────
                       const Divider(),
                       const SizedBox(height: 8),
@@ -912,35 +934,38 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        onPressed: _restoring ? null : _pickAndRestore,
-                        icon: _restoring
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                      if (!kIsWeb)
+                        OutlinedButton.icon(
+                          onPressed: _restoring ? null : _pickAndRestore,
+                          icon: _restoring
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.folder_open_outlined,
+                                  color: AppBrand.errorColor,
                                 ),
-                              )
-                            : const Icon(
-                                Icons.folder_open_outlined,
-                                color: AppBrand.errorColor,
-                              ),
-                        label: Text(
-                          _restoring
-                              ? tr('backup_restore_in_progress', ref)
-                              : tr('backup_restore', ref),
-                          style: const TextStyle(color: AppBrand.errorColor),
+                          label: Text(
+                            _restoring
+                                ? tr('backup_restore_in_progress', ref)
+                                : tr('backup_restore', ref),
+                            style: const TextStyle(color: AppBrand.errorColor),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppBrand.errorColor),
+                            minimumSize: const Size.fromHeight(48),
+                          ),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppBrand.errorColor),
-                          minimumSize: const Size.fromHeight(48),
-                        ),
-                      ),
-                      if (user?.active == true) ...[
+                      if (user.active) ...[
                         const SizedBox(height: 10),
                         OutlinedButton.icon(
-                          onPressed: _restoring
+                          onPressed:
+                              _restoring ||
+                                  !GoogleDriveBackupService.isConfigured
                               ? null
                               : _pickAndRestoreFromDrive,
                           icon: const Icon(Icons.cloud_download_outlined),
@@ -951,22 +976,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                         ),
                       ],
                       const SizedBox(height: 8),
-                      Text(
-                        'For cross-device or emergency recovery, use dev_restore.js '
-                        'with Firebase Admin SDK.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppBrand.stockColor,
-                        ),
-                      ),
                     ],
-                    if (user?.isAdmin == true && user?.isSuperAdmin != true)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 24),
-                        child: Text(
-                          tr('backup_restore_scope_denied', ref),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
                   ],
                 ),
         ),
@@ -994,6 +1004,20 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       ],
     );
   }
+
+  String _backupCollectionLabelKey(String collectionKey) =>
+      switch (collectionKey) {
+        'workspaces' => 'backup_workspaces',
+        'users' => 'backup_users',
+        'routes' => 'backup_routes',
+        'shops' => 'backup_shops',
+        'products' => 'backup_products',
+        'inventory' => 'backup_inventory',
+        'transactions' => 'backup_transactions',
+        'invoices' => 'backup_invoices',
+        'settings' => 'backup_settings',
+        _ => 'backup_title',
+      };
 }
 
 // ─── Sub-widgets ──────────────────────────────────────────────────────────────
@@ -1192,8 +1216,9 @@ class _BackupFilePickerSheet extends StatelessWidget {
 
 class _DriveFilePickerSheet extends StatelessWidget {
   final List<GoogleDriveBackupFile> files;
+  final String Function(DateTime) fmtDate;
 
-  const _DriveFilePickerSheet({required this.files});
+  const _DriveFilePickerSheet({required this.files, required this.fmtDate});
 
   @override
   Widget build(BuildContext context) {
@@ -1206,7 +1231,9 @@ class _DriveFilePickerSheet extends StatelessWidget {
           return ListTile(
             leading: const Icon(Icons.cloud_outlined),
             title: Text(file.name),
-            subtitle: Text(file.createdAt?.toLocal().toString() ?? ''),
+            subtitle: Text(
+              file.createdAt != null ? fmtDate(file.createdAt!.toLocal()) : '',
+            ),
             onTap: () => Navigator.pop(context, file),
           );
         },

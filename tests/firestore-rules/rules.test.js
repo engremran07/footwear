@@ -154,6 +154,42 @@ describe('users collection', () => {
     );
   });
 
+  it('admin: cannot create a tenant administrator', async () => {
+    await seedUser('admin-uid', 'admin');
+    await assertFails(
+      adminCtx(testEnv).firestore().collection('users').doc('new-tenant-admin').set({
+        role: 'tenant_admin',
+        active: true,
+        display_name: 'New Workspace Admin',
+        email: 'workspace-admin@test.com',
+        tenant_id: 'tenant-1',
+        created_by: 'admin-uid',
+      }),
+    );
+  });
+
+  it('admin: cannot promote a seller to tenant administrator', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedUser('target-uid', 'seller');
+    await assertFails(
+      adminCtx(testEnv).firestore().collection('users').doc('target-uid').update({
+        role: 'tenant_admin',
+        updated_at: new Date(),
+      }),
+    );
+  });
+
+  it('admin: cannot deactivate a tenant administrator', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await assertFails(
+      adminCtx(testEnv).firestore().collection('users').doc('tenant-admin-uid').update({
+        active: false,
+        updated_at: new Date(),
+      }),
+    );
+  });
+
   it('seller: cannot create user doc', async () => {
     await seedUser('seller-uid', 'seller');
     await assertFails(
@@ -398,6 +434,7 @@ describe('customers collection', () => {
       last_transaction_id: 'tx-mismatch',
     });
     await assertFails(batch.commit());
+
   });
 });
 
@@ -438,6 +475,88 @@ describe('invoices collection', () => {
         .where('tenant_id', '==', 'tenant-1')
         .get(),
     );
+  });
+
+  it('admin: cannot create a credit note for a missing original invoice', async () => {
+    await seedUser('admin-uid', 'admin');
+    await assertFails(
+      adminCtx(testEnv).firestore().collection('invoices').doc('credit-missing').set({
+        tenant_id: 'tenant-1',
+        type: 'credit_note',
+        linked_invoice_id: 'missing-original',
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        items: [{ variant_id: 'variant-1', qty: 1, unit_price: 50 }],
+        subtotal: 50,
+        discount: 0,
+        total: 50,
+        amount_received: 0,
+      }),
+    );
+  });
+
+  it('admin: can create a linked credit note without exceeding original total', async () => {
+    await seedUser('admin-uid', 'admin');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('invoices').doc('original-sale').set({
+        tenant_id: 'tenant-1',
+        shop_id: 'shop-1',
+        type: 'sale',
+        status: 'issued',
+        total: 100,
+        credit_note_total: 0,
+      });
+    });
+    const db = adminCtx(testEnv).firestore();
+    const batch = db.batch();
+    batch.update(db.collection('invoices').doc('original-sale'), {
+      credit_note_total: 40,
+    });
+    batch.set(db.collection('invoices').doc('credit-valid'), {
+      tenant_id: 'tenant-1',
+      type: 'credit_note',
+      linked_invoice_id: 'original-sale',
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      items: [{ variant_id: 'variant-1', qty: 1, unit_price: 40 }],
+      subtotal: 40,
+      discount: 0,
+      total: 40,
+      amount_received: 0,
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('admin: cannot cumulatively credit more than the original total', async () => {
+    await seedUser('admin-uid', 'admin');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('invoices').doc('original-sale').set({
+        tenant_id: 'tenant-1',
+        shop_id: 'shop-1',
+        type: 'sale',
+        status: 'issued',
+        total: 100,
+        credit_note_total: 80,
+      });
+    });
+    const db = adminCtx(testEnv).firestore();
+    const batch = db.batch();
+    batch.update(db.collection('invoices').doc('original-sale'), {
+      credit_note_total: 110,
+    });
+    batch.set(db.collection('invoices').doc('credit-over-limit'), {
+      tenant_id: 'tenant-1',
+      type: 'credit_note',
+      linked_invoice_id: 'original-sale',
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      items: [{ variant_id: 'variant-1', qty: 1, unit_price: 30 }],
+      subtotal: 30,
+      discount: 0,
+      total: 30,
+      amount_received: 0,
+    });
+    await assertFails(batch.commit());
   });
 
   it('seller: cannot create invoice with empty items list', async () => {
@@ -569,6 +688,7 @@ describe('invoices collection', () => {
       last_transaction_id: saleRef.id,
     });
     await assertFails(batch.commit());
+
   });
 });
 
@@ -643,6 +763,70 @@ describe('tenant destructive operations', () => {
 // 7. transactions collection
 // ═══════════════════════════════════════════════════════════════════════════
 describe('transactions collection', () => {
+  it('admin: cannot overwrite financial fields without an edit history entry', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedTransaction('tx-admin-edit', {
+      created_at: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    await assertFails(
+      adminCtx(testEnv).firestore()
+        .collection('transactions')
+        .doc('tx-admin-edit')
+        .update({ amount: 120, updated_at: new Date() }),
+    );
+  });
+
+  it('admin: can correct financial fields with a matching append-only history entry', async () => {
+    await seedUser('admin-uid', 'admin');
+    const createdAt = new Date('2026-01-01T00:00:00.000Z');
+    await seedTransaction('tx-admin-edit-history', {
+      created_at: createdAt,
+      description: 'Original entry',
+    });
+    await assertSucceeds(
+      adminCtx(testEnv).firestore()
+        .collection('transactions')
+        .doc('tx-admin-edit-history')
+        .update({
+          amount: 120,
+          updated_at: new Date(),
+          edit_history: [{
+            previous_amount: 100,
+            previous_type: 'cash_in',
+            previous_created_at: createdAt,
+            previous_description: 'Original entry',
+            changed_by: 'admin-uid',
+            reason: 'Receipt amount correction',
+            changed_at: new Date(),
+          }],
+        }),
+    );
+  });
+
+  it('seller: cannot create a transaction with a foreign or missing tenant', async () => {
+    await seedUser('seller-uid', 'seller');
+    await seedShop('shop-1');
+    const db = sellerCtx(testEnv).firestore();
+
+    for (const [index, tenantId] of [
+      ['foreign', 'tenant-2'],
+      ['null', null],
+      ['missing', undefined],
+    ]) {
+      const data = {
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        created_by: 'seller-uid',
+        amount: 25,
+        type: 'cash_in',
+        ...(tenantId === undefined ? {} : { tenant_id: tenantId }),
+      };
+      await assertFails(
+        db.collection('transactions').doc(`tx-invalid-tenant-${index}`).set(data),
+      );
+    }
+  });
+
   it('seller: cannot delete transactions', async () => {
     await seedUser('seller-uid', 'seller');
     // Seed a transaction doc first
@@ -751,7 +935,182 @@ describe('transactions collection', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // 7. inventory_transactions collection
 // ═══════════════════════════════════════════════════════════════════════════
+describe('seller inventory quantity controls', () => {
+  async function seedSellerInventory() {
+    await seedUser('seller-uid', 'seller');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('seller_inventory').doc('seller-uid_variant-1').set({
+        seller_id: 'seller-uid',
+        tenant_id: 'tenant-1',
+        quantity_available: 20,
+        active: true,
+      });
+    });
+  }
+
+  it('seller: cannot increase own stock', async () => {
+    await seedSellerInventory();
+    await assertFails(
+      sellerCtx(testEnv).firestore()
+        .collection('seller_inventory')
+        .doc('seller-uid_variant-1')
+        .update({ quantity_available: 9999 }),
+    );
+  });
+
+  it('seller: can decrease own stock for a sale', async () => {
+    await seedSellerInventory();
+    await seedShop('shop-1');
+    const db = sellerCtx(testEnv).firestore();
+    const batch = db.batch();
+    batch.update(db.collection('seller_inventory').doc('seller-uid_variant-1'), {
+      quantity_available: 12,
+      last_sale_invoice_id: 'sale-linked-stock',
+    });
+    batch.set(db.collection('invoices').doc('sale-linked-stock'), {
+      tenant_id: 'tenant-1',
+      created_by: 'seller-uid',
+      seller_id: 'seller-uid',
+      type: 'sale',
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      items: [{ variant_id: 'variant-1', qty: 8, unit_price: 10 }],
+      subtotal: 80,
+      discount: 0,
+      total: 80,
+      amount_received: 0,
+      seller_inventory_deductions: { 'seller-uid_variant-1': 8 },
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('seller: cannot silently decrease stock without a matching invoice', async () => {
+    await seedSellerInventory();
+    await assertFails(
+      sellerCtx(testEnv).firestore()
+        .collection('seller_inventory')
+        .doc('seller-uid_variant-1')
+        .update({ quantity_available: 12 }),
+    );
+  });
+
+  it('admin: cannot set seller inventory below zero', async () => {
+    await seedUser('admin-uid', 'admin');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('seller_inventory').doc('seller-uid_variant-1').set({
+        seller_id: 'seller-uid',
+        tenant_id: 'tenant-1',
+        quantity_available: 4,
+        active: true,
+      });
+    });
+    await assertFails(
+      adminCtx(testEnv).firestore()
+        .collection('seller_inventory')
+        .doc('seller-uid_variant-1')
+        .update({ quantity_available: -1 }),
+    );
+  });
+});
+
 describe('inventory_transactions collection', () => {
+  it('admin: cannot create a stock audit row without tenant identity', async () => {
+    await seedUser('admin-uid', 'admin');
+    await assertFails(
+      adminCtx(testEnv).firestore().collection('inventory_transactions').doc('it-missing-tenant').set({
+        type: 'stock_adjustment',
+        seller_id: '',
+        seller_name: 'warehouse',
+        product_id: 'product-1',
+        variant_id: 'variant-1',
+        variant_name: 'Size 40',
+        quantity: 5,
+        direction: 'in',
+        created_by: 'admin-uid',
+        created_at: new Date(),
+      }),
+    );
+  });
+
+  it('admin: can transfer stock when every written document carries its tenant', async () => {
+    await seedUser('admin-uid', 'admin');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('product_variants').doc('variant-1').set({
+        tenant_id: 'tenant-1',
+        quantity_available: 20,
+        product_id: 'product-1',
+        variant_name: 'Size 40',
+      });
+    });
+    const db = adminCtx(testEnv).firestore();
+    const batch = db.batch();
+    batch.update(db.collection('product_variants').doc('variant-1'), {
+      quantity_available: 8,
+    });
+    batch.set(db.collection('seller_inventory').doc('seller-uid_variant-1'), {
+      seller_id: 'seller-uid',
+      seller_name: 'Seller',
+      product_id: 'product-1',
+      variant_id: 'variant-1',
+      variant_name: 'Size 40',
+      quantity_available: 12,
+      active: true,
+      tenant_id: 'tenant-1',
+    });
+    batch.set(db.collection('inventory_transactions').doc('transfer-1'), {
+      type: 'transfer_out',
+      seller_id: 'seller-uid',
+      seller_name: 'Seller',
+      product_id: 'product-1',
+      variant_id: 'variant-1',
+      variant_name: 'Size 40',
+      quantity: 12,
+      created_by: 'admin-uid',
+      created_at: new Date(),
+      tenant_id: 'tenant-1',
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('admin: can return seller stock when the audit row carries its tenant', async () => {
+    await seedUser('admin-uid', 'admin');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.collection('product_variants').doc('variant-1').set({
+        tenant_id: 'tenant-1',
+        quantity_available: 5,
+        product_id: 'product-1',
+        variant_name: 'Size 40',
+      });
+      await db.collection('seller_inventory').doc('seller-uid_variant-1').set({
+        tenant_id: 'tenant-1',
+        seller_id: 'seller-uid',
+        quantity_available: 12,
+      });
+    });
+    const db = adminCtx(testEnv).firestore();
+    const batch = db.batch();
+    batch.update(db.collection('seller_inventory').doc('seller-uid_variant-1'), {
+      quantity_available: 0,
+    });
+    batch.update(db.collection('product_variants').doc('variant-1'), {
+      quantity_available: 17,
+    });
+    batch.set(db.collection('inventory_transactions').doc('return-1'), {
+      type: 'return_to_warehouse',
+      seller_id: 'seller-uid',
+      seller_name: 'Seller',
+      product_id: 'product-1',
+      variant_id: 'variant-1',
+      variant_name: 'Size 40',
+      quantity: 12,
+      created_by: 'admin-uid',
+      created_at: new Date(),
+      tenant_id: 'tenant-1',
+    });
+    await assertSucceeds(batch.commit());
+  });
+
   it('seller: cannot create inventory transaction with invalid type', async () => {
     await seedUser('seller-uid', 'seller');
     await assertFails(
@@ -846,6 +1205,18 @@ describe('platform super-admin workspace isolation', () => {
     });
   }
 
+  it('legacy workspace admin can read own tenant policy but cannot edit it', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedWorkspace('tenant-1');
+    const db = adminCtx(testEnv).firestore();
+    await assertSucceeds(db.collection('tenants').doc('tenant-1').get());
+    await assertFails(
+      db.collection('tenants').doc('tenant-1').update({
+        max_devices_allowed: 999,
+      }),
+    );
+  });
+
   async function seedBusinessCollections(tenantIds) {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
@@ -876,6 +1247,116 @@ describe('platform super-admin workspace isolation', () => {
       );
     }
     await assertFails(db.collection('settings').doc('tenant-1').get());
+  });
+
+  it('super-admin can atomically create a workspace and its settings', async () => {
+    await seedUser('platform-create-workspace-uid', 'super_admin');
+    const db = testEnv.authenticatedContext('platform-create-workspace-uid').firestore();
+    const batch = db.batch();
+    const tenantRef = db.collection('tenants').doc('tenant-new');
+    batch.set(tenantRef, {
+      name: 'New Workspace',
+      slug: 'tenant-new',
+      tenant_id: 'tenant-new',
+      created_by: 'platform-create-workspace-uid',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      active: true,
+    });
+    batch.set(db.collection('settings').doc('tenant-new'), {
+      tenant_id: 'tenant-new',
+      company_name: 'New Workspace',
+      currency: 'SAR',
+      pairs_per_carton: 12,
+      last_invoice_number: 0,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('workspace selection rejects the client payload extra access-log id', async () => {
+    await seedWorkspace('tenant-a');
+    await seedUser('platform-select-payload-uid', 'super_admin');
+    const db = testEnv.authenticatedContext('platform-select-payload-uid').firestore();
+    const batch = db.batch();
+    const logRef = db.collection('platform_access_logs').doc('start-log');
+    batch.update(db.collection('users').doc('platform-select-payload-uid'), {
+      active_workspace_id: 'tenant-a',
+      active_workspace_reason: 'Support ticket investigation',
+      active_workspace_selected_at: firebase.firestore.FieldValue.serverTimestamp(),
+      active_workspace_access_log_id: logRef.id,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.set(logRef, {
+      actor_user_id: 'platform-select-payload-uid',
+      workspace_id: 'tenant-a',
+      event_type: 'workspace_access_started',
+      reason: 'Support ticket investigation',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertFails(batch.commit());
+
+    const allowedBatch = db.batch();
+    const allowedLogRef = db.collection('platform_access_logs').doc('start-log-allowed');
+    allowedBatch.update(db.collection('users').doc('platform-select-payload-uid'), {
+      active_workspace_id: 'tenant-a',
+      active_workspace_reason: 'Support ticket investigation',
+      active_workspace_selected_at: firebase.firestore.FieldValue.serverTimestamp(),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    allowedBatch.set(allowedLogRef, {
+      actor_user_id: 'platform-select-payload-uid',
+      workspace_id: 'tenant-a',
+      event_type: 'workspace_access_started',
+      reason: 'Support ticket investigation',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertSucceeds(allowedBatch.commit());
+  });
+
+  it('workspace exit rejects the client payload extra access-log fields', async () => {
+    await seedWorkspace('tenant-a');
+    await seedUser('platform-exit-payload-uid', 'super_admin', true, {
+      active_workspace_id: 'tenant-a',
+      active_workspace_reason: 'Support ticket investigation',
+      active_workspace_selected_at: new Date(),
+      active_workspace_access_log_id: 'start-log',
+    });
+    const db = testEnv.authenticatedContext('platform-exit-payload-uid').firestore();
+    const batch = db.batch();
+    const logRef = db.collection('platform_access_logs').doc('end-log');
+    batch.update(db.collection('users').doc('platform-exit-payload-uid'), {
+      active_workspace_id: firebase.firestore.FieldValue.delete(),
+      active_workspace_reason: firebase.firestore.FieldValue.delete(),
+      active_workspace_selected_at: firebase.firestore.FieldValue.delete(),
+      active_workspace_access_log_id: firebase.firestore.FieldValue.delete(),
+      last_workspace_access_log_id: logRef.id,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.set(logRef, {
+      actor_user_id: 'platform-exit-payload-uid',
+      workspace_id: 'tenant-a',
+      event_type: 'workspace_access_ended',
+      reason: 'Support ticket investigation',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertFails(batch.commit());
+
+    const allowedBatch = db.batch();
+    const allowedLogRef = db.collection('platform_access_logs').doc('end-log-allowed');
+    allowedBatch.update(db.collection('users').doc('platform-exit-payload-uid'), {
+      active_workspace_id: firebase.firestore.FieldValue.delete(),
+      active_workspace_reason: firebase.firestore.FieldValue.delete(),
+      active_workspace_selected_at: firebase.firestore.FieldValue.delete(),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    allowedBatch.set(allowedLogRef, {
+      actor_user_id: 'platform-exit-payload-uid',
+      workspace_id: 'tenant-a',
+      event_type: 'workspace_access_ended',
+      reason: 'Support ticket investigation',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertSucceeds(allowedBatch.commit());
   });
 
   it('selected super-admin is limited to the selected tenant', async () => {
@@ -925,6 +1406,23 @@ describe('platform super-admin workspace isolation', () => {
         .firestore()
         .collection('products')
         .where('tenant_id', '==', 'tenant-b')
+        .get(),
+    );
+  });
+
+  it('expired workspace selection cannot read tenant business data', async () => {
+    await seedWorkspace('tenant-a');
+    await seedBusinessCollections(['tenant-a']);
+    await seedUser('platform-expired-uid', 'super_admin', true, {
+      active_workspace_id: 'tenant-a',
+      active_workspace_reason: 'Support ticket investigation',
+      active_workspace_selected_at: new Date(Date.now() - 9 * 60 * 60 * 1000),
+    });
+    await assertFails(
+      testEnv.authenticatedContext('platform-expired-uid')
+        .firestore()
+        .collection('products')
+        .where('tenant_id', '==', 'tenant-a')
         .get(),
     );
   });

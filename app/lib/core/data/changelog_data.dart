@@ -28,6 +28,117 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.54',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '♿',
+        text: {
+          AppLocale.en:
+              'Status labels now follow your language, and high-contrast colors are easier to read.',
+          AppLocale.ar:
+              'تظهر تسميات الحالات بلغتك، وأصبحت ألوان التباين العالي أسهل للقراءة.',
+          AppLocale.ur:
+              'اسٹیٹس لیبل اب آپ کی زبان میں دکھتے ہیں، اور ہائی کنٹراسٹ رنگ پڑھنے میں آسان ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧭',
+        text: {
+          AppLocale.en:
+              'Workspace identity, status labels, search controls, About details, and loading announcements now respect your language. Your language choice is remembered.',
+          AppLocale.ar:
+              'تعرض هوية مساحة العمل والحالات والبحث ومعلومات التطبيق وإعلانات التحميل بلغتك. يُحفظ اختيار اللغة.',
+          AppLocale.ur:
+              'ورک اسپیس، اسٹیٹس، تلاش، ایپ کی معلومات اور لوڈنگ پیغامات اب آپ کی زبان میں ہیں۔ زبان کا انتخاب محفوظ رہتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔄',
+        text: {
+          AppLocale.en:
+              'List refresh and report export now wait for current data, and history or notification errors provide a retry action.',
+          AppLocale.ar:
+              'ينتظر تحديث القوائم وتصدير التقارير البيانات الحالية، وتوفر أخطاء السجل والإشعارات خيار إعادة المحاولة.',
+          AppLocale.ur:
+              'فہرست ریفریش اور رپورٹ ایکسپورٹ اب تازہ ڈیٹا کا انتظار کرتے ہیں، اور ہسٹری یا نوٹیفکیشن کی خرابی میں دوبارہ کوشش دستیاب ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '☁️',
+        text: {
+          AppLocale.en:
+              'Drive backup files keep distinct timestamps, and the backup picker shows dates in your locale.',
+          AppLocale.ar:
+              'تحمل ملفات نسخ Drive توقيتات مميزة، ويعرض منتقي النسخ التواريخ وفق لغتك.',
+          AppLocale.ur:
+              'Drive بیک اپ فائلوں کے اوقات الگ رہتے ہیں، اور بیک اپ فہرست تاریخیں آپ کی زبان میں دکھاتی ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.9.53',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Workspace admins can restore encrypted business backups into their own workspace. Records absent from the backup remain; selected platform admins can prune only in that workspace.',
+          AppLocale.ar:
+              'يمكن لمسؤولي مساحة العمل استعادة نسخ بيانات العمل المشفرة إلى مساحة عملهم. تبقى السجلات غير الموجودة في النسخة، ويمكن لمسؤول المنصة حذف الزائد في المساحة المحددة فقط.',
+          AppLocale.ur:
+              'ورک اسپیس ایڈمن اپنے ورک اسپیس میں انکرپٹڈ کاروباری بیک اپ بحال کر سکتے ہیں۔ بیک اپ میں نہ ہونے والے ریکارڈ برقرار رہتے ہیں؛ پلیٹ فارم ایڈمن صرف منتخب ورک اسپیس میں اضافی ریکارڈ حذف کر سکتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🛡️',
+        text: {
+          AppLocale.en:
+              'Platform backups include only the selected workspace profile and its users. Workspace backups exclude user and seller account profiles.',
+          AppLocale.ar:
+              'تتضمن نسخ المنصة مساحة العمل المحددة ومستخدميها فقط، بينما تستبعد نسخ مساحة العمل ملفات حسابات المستخدمين والبائعين.',
+          AppLocale.ur:
+              'پلیٹ فارم بیک اپ میں صرف منتخب ورک اسپیس اور اس کے صارفین شامل ہیں؛ ورک اسپیس بیک اپ میں صارف اور سیلر اکاؤنٹ پروفائل شامل نہیں ہوتے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '⏱️',
+        text: {
+          AppLocale.en:
+              'Tenant-admin Drive backups run at your chosen interval when the Android app is opened or resumed. Seller accounts cannot start backups.',
+          AppLocale.ar:
+              'تعمل نسخ Drive لمسؤول مساحة العمل حسب الفاصل الزمني المختار عند فتح تطبيق Android أو استئنافه. لا يمكن لحسابات البائعين بدء النسخ.',
+          AppLocale.ur:
+              'ٹیننٹ ایڈمن کے Drive بیک اپ منتخب وقفے کے مطابق Android ایپ کھولنے یا دوبارہ فعال ہونے پر چلتے ہیں۔ سیلر بیک اپ شروع نہیں کر سکتے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📦',
+        text: {
+          AppLocale.en:
+              'Stock transfers, adjustments, and returns now keep workspace inventory and movement history together. Unknown roles are blocked with recovery guidance.',
+          AppLocale.ar:
+              'تحافظ تحويلات المخزون وتسوياته ومرتجعاته على ارتباط المخزون بسجل الحركة. تُحظر الأدوار غير المعروفة مع إرشادات للاستعادة.',
+          AppLocale.ur:
+              'اسٹاک کی منتقلی، ایڈجسٹمنٹ اور واپسی اب انوینٹری اور حرکت کی تاریخ کو ورک اسپیس میں اکٹھا رکھتی ہیں۔ نامعلوم کردار بلاک ہوتے ہیں اور رہنمائی دکھائی جاتی ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📶',
+        text: {
+          AppLocale.en:
+              'Temporary network problems no longer sign you out, and startup offers a retry if Firebase cannot initialize.',
+          AppLocale.ar:
+              'لا تؤدي مشكلات الشبكة المؤقتة إلى تسجيل خروجك، ويعرض بدء التشغيل خيار إعادة المحاولة عند تعذر تهيئة Firebase.',
+          AppLocale.ur:
+              'عارضی نیٹ ورک مسائل اب سائن آؤٹ نہیں کرتے، اور Firebase شروع نہ ہو تو دوبارہ کوشش کا اختیار ملتا ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.52',
     date: 'September 2026',
     items: [

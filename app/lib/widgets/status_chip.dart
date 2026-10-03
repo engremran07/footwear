@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design/app_tokens.dart';
+import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
+import '../providers/theme_preference_provider.dart';
 
 enum StatusChipSize { sm, md, lg }
 
-class StatusChip extends StatelessWidget {
+class StatusChip extends ConsumerWidget {
   final String status;
   final StatusChipSize size;
 
@@ -65,14 +68,50 @@ class StatusChip extends StatelessWidget {
     ),
   };
 
-  String _readableStatus(String s) => s.replaceAll('_', ' ').toUpperCase();
+  String _statusLabel(String value, WidgetRef ref) {
+    final key = switch (value.toLowerCase()) {
+      'complete' => 'completed',
+      'pending_approval' => 'pending_admin_approval',
+      'ready_for_shipment' => 'mark_ready_shipment',
+      'received' => 'stock_received',
+      'active' ||
+      'approved' ||
+      'cancelled' ||
+      'credit_note' ||
+      'delivered' ||
+      'draft' ||
+      'in_production' ||
+      'in_transit' ||
+      'issued' ||
+      'paid' ||
+      'partial' ||
+      'pending' ||
+      'processing' ||
+      'qc_issues' ||
+      'qc_passed' ||
+      'qc_pending' ||
+      'rejected' ||
+      'reserved' ||
+      'sent' ||
+      'shipped' ||
+      'stock_issue' ||
+      'void' => value.toLowerCase(),
+      _ => 'unknown_status_chip',
+    };
+    return tr(key, ref);
+  }
 
   @override
-  Widget build(BuildContext context) {
-    final color = AppTheme.statusColor(status);
-    final readable = _readableStatus(status);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(themePreferenceProvider);
+    final color = AppTheme.statusColor(
+      status,
+      mode: mode,
+      brightness: Theme.of(context).brightness,
+    );
+    final readable = _statusLabel(status, ref);
     return Semantics(
-      label: 'Status: $readable',
+      label: '${tr('status', ref)}: $readable',
       child: AnimatedSwitcher(
         duration: AppTokens.durNormal,
         child: Container(
@@ -94,7 +133,6 @@ class StatusChip extends StatelessWidget {
                   fontSize: _fontSize(),
                   fontWeight: FontWeight.w600,
                   color: color,
-                  letterSpacing: 0.5,
                 ),
               ),
             ],

@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/models/tenant_model.dart';
 import '../core/utils/device_pairing.dart';
+import '../core/utils/error_mapper.dart';
+import '../core/utils/snack_helper.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/tenant_provider.dart';
 import '../providers/user_provider.dart';
+import '../widgets/error_state.dart';
 
 class TenantManagementScreen extends ConsumerStatefulWidget {
   const TenantManagementScreen({super.key});
@@ -32,6 +35,13 @@ class _TenantManagementScreenState
     _slugController.dispose();
     _maxDevicesController.dispose();
     super.dispose();
+  }
+
+  void _showMappedError(Object error) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      errorSnackBar(tr(AppErrorMapper.key(error), ref)),
+    );
   }
 
   Future<void> _createOrUpdateTenant({TenantModel? existing}) async {
@@ -85,10 +95,7 @@ class _TenantManagementScreenState
         ),
       );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      _showMappedError(e);
     }
   }
 
@@ -99,11 +106,7 @@ class _TenantManagementScreenState
       try {
         await ref.read(authNotifierProvider.notifier).endWorkspaceAccess();
       } catch (error) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(error.toString())));
-        }
+        _showMappedError(error);
       }
       return;
     }
@@ -144,11 +147,7 @@ class _TenantManagementScreenState
           .read(authNotifierProvider.notifier)
           .selectWorkspace(workspaceId: tenant.id, reason: reason);
     } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
+      _showMappedError(error);
     }
   }
 
@@ -174,10 +173,7 @@ class _TenantManagementScreenState
         ),
       );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      _showMappedError(e);
     }
   }
 
@@ -486,7 +482,13 @@ class _TenantManagementScreenState
                                 );
                               },
                               loading: () => const LinearProgressIndicator(),
-                              error: (error, _) => Text(error.toString()),
+                              error: (error, _) => mappedErrorState(
+                                error: error,
+                                ref: ref,
+                                onRetry: () => ref.invalidate(
+                                  tenantUsersProvider(tenant.id),
+                                ),
+                              ),
                             );
                           },
                         ),
@@ -498,7 +500,11 @@ class _TenantManagementScreenState
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Text(error.toString())),
+        error: (error, _) => mappedErrorState(
+          error: error,
+          ref: ref,
+          onRetry: () => ref.invalidate(tenantsProvider),
+        ),
       ),
     );
   }

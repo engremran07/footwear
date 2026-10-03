@@ -10,6 +10,7 @@ import '../models/notification_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/notification_provider.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
 
 // =============================================================================
@@ -83,7 +84,11 @@ class NotificationCenterScreen extends ConsumerWidget {
       ),
       body: notifAsync.when(
         loading: () => const ShimmerLoading(),
-        error: (e, _) => _ErrorView(error: e),
+        error: (e, _) => mappedErrorState(
+          error: e,
+          ref: ref,
+          onRetry: () => ref.invalidate(notificationsProvider),
+        ),
         data: (notifications) {
           if (notifications.isEmpty) {
             return EmptyState(
@@ -226,7 +231,6 @@ class _DayHeader extends ConsumerWidget {
         display,
         style: theme.textTheme.labelLarge?.copyWith(
           color: theme.colorScheme.primary,
-          letterSpacing: 0.5,
         ),
       ),
     );
@@ -313,7 +317,9 @@ class _NotificationTile extends ConsumerWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            n.shopName.isNotEmpty ? n.shopName : n.shopId,
+                            n.shopName.isNotEmpty
+                                ? n.shopName
+                                : tr('shop', ref),
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: isUnread
                                   ? FontWeight.w700
@@ -393,34 +399,5 @@ class _NotificationTile extends ConsumerWidget {
     }
     // Navigate to the shop.
     context.push('/shops/${n.shopId}');
-  }
-}
-
-// ─── Error view ───────────────────────────────────────────────────────────────
-
-class _ErrorView extends ConsumerWidget {
-  final Object error;
-  const _ErrorView({required this.error});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTokens.s32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
-            const SizedBox(height: AppTokens.s12),
-            Text(
-              tr('error', ref),
-              style: theme.textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

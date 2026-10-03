@@ -77,6 +77,12 @@ Seller:
 
 1. Super-admin business access is workspace-scoped. Never let a super-admin read tenant routes, shops, products, inventory, invoices, transactions, reports, users, or tenant settings without an explicit active workspace context. Platform workspace metadata may remain globally visible. Record support access starts/ends in the append-only `platform_access_logs` collection; never use UI visibility as the security boundary.
 
+1. Super-admin business context expires after 8 hours. Firestore rules must enforce the TTL on every business-data path, and no generic admin-role branch may bypass it. Workspace admins may read their own tenant policy metadata but may not edit tenant configuration.
+
+1. New business writes must require a concrete tenant via `TenantScope.requireTenant`; `__global__` is never a missing-tenant fallback. Unassigned non-platform users must be stopped at sign-in with an actionable message, not silently provisioned into a shared workspace.
+
+1. Legacy `admin`/`manager` users may manage seller accounts only. Creating or changing workspace-admin roles is reserved to an active super-admin workspace context; tenant admins cannot promote roles or deactivate peer administrators.
+
 1. Service-account credentials must never be stored in Firestore, backups, client code, or APK/web defines. Arbitrary-user Firebase Auth administration requires a trusted backend; client code must use owner-controlled Firebase Auth flows. Never create/promote super-admin accounts from the client.
 
 1. Do not invent collections; use constants only.
@@ -112,6 +118,14 @@ Seller:
 1. Provider methods that write security-relevant fields (for example
   created_by, route_id, shop_id) must validate non-empty identifiers before
   committing batched writes.
+
+1. Seller inventory may only decrease in the same batch as a sale invoice whose `seller_inventory_deductions` map matches the exact quantity delta. Warehouse transfers, adjustments, and returns must atomically update stock and append tenant-scoped `inventory_transactions` records.
+
+1. Financial transaction corrections must preserve the previous amount/type/date in an append-only `edit_history` entry with actor and a reason of at least 10 characters. Invoice-linked ledger rows are corrected only by void/credit-note flows.
+
+1. Full exports must cursor-page until exhausted; hard limits remain appropriate only for live UI windows that visibly communicate truncation. Full restore must upsert all backup data before pruning obsolete tenant documents. Plaintext backup archives are not accepted for restore.
+
+1. Startup must not sign users out for transient token-refresh/network failures. If Firebase initialization fails, show a retry/failure state instead of mounting the authenticated app against an uninitialized SDK.
 
 1. No Firebase Storage usage — the app runs on Firestore + Auth + Functions
   only (zero-cost tier). Company logos are stored as base64 in Firestore.
@@ -202,6 +216,8 @@ Seller:
   carry forward automatically. If a prior task is no longer relevant, mark it
   explicitly as "dropped — reason: ..." rather than silently removing it.
 
+1. **AI account/session continuity is repository-backed, not account-merged.** Copilot chat history and request IDs are not portable between GitHub identities by a repository change. Persist durable decisions, pending work, audit IDs, and exact verification evidence in `SESSION_LOG.md` and the current audit report; on account/profile changes, read those files plus `git status`/`git diff` before continuing. Never store credentials or full chat transcripts in the repo, and do not claim cloud session sync merged separate accounts.
+
 1. **Vibe Debugging Discipline is mandatory for all bug fixes.** Before
   writing any fix code, the agent MUST: (a) read the FULL execution path
   from screen → provider → Firestore/builder, (b) grep ALL instances of the
@@ -237,7 +253,7 @@ Seller:
 ### Google Drive OAuth and tenant backup contract
 
 - Drive backup uses the least-privilege `drive.file` scope and must be filtered by the authenticated Firebase user and workspace.
-- Tenant admins may back up and restore their own workspace; sellers may back up only assigned-route data and restore only their own transactions for a route that is currently assigned.
+- Tenant admins may back up and merge-restore their own workspace; they do not prune records absent from a backup. A selected super-admin may replace/prune only the active workspace. Sellers may back up assigned-route data and restore only their own transactions for a route that is currently assigned.
 - Super admins must select a concrete workspace before backup or restore; a global all-workspace client snapshot is forbidden.
 - Web builds require `GOOGLE_DRIVE_CLIENT_ID`; Android builds require the matching web `GOOGLE_DRIVE_SERVER_CLIENT_ID` and a registered Android OAuth client for package `footwear.pk.com`.
 - The release keystore SHA-1 must be registered in Firebase/Google Cloud before Google Sign-In can authorize Drive on the APK.
@@ -465,6 +481,13 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-10-03 frontend accessibility pass — v3.9.54+93:
+
+- Status chips now render translated status text and localized screen-reader labels for EN/AR/UR. Unknown values use a localized fallback.
+- High-contrast semantic status colors were raised to at least 4.5:1 against black and are applied only in high-contrast mode.
+- Python workspace default is `C:\Python314\python.exe` (Python 3.14.2); Pylance reports it as the selected environment.
+- Focused status-chip and locale-parity tests pass. Live visual verification remains blocked: no Android device is connected, and the local Flutter web debug VM exited with an out-of-memory error before rendering.
 
 2026-09-26 security remediation — v3.9.52+91:
 

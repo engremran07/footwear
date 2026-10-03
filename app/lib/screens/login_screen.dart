@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_brand.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/utils/error_mapper.dart';
 import '../core/utils/snack_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/network_provider.dart';
@@ -119,27 +120,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _failCount++;
       if (_failCount >= 3) _startLockout();
 
-      String errorMessage = tr('err_auth_generic', ref);
-
-      if (e is FirebaseAuthException) {
-        errorMessage = switch (e.code) {
-          'user-not-found' => tr('err_user_not_found', ref),
-          'wrong-password' => tr('err_invalid_credentials', ref),
-          'invalid-credential' => tr('err_invalid_credentials', ref),
-          'invalid-login-credentials' => tr('err_invalid_credentials', ref),
-          'invalid-email' => tr('err_invalid_email', ref),
-          'user-disabled' => tr('err_user_disabled', ref),
-          'too-many-requests' => tr('err_too_many_requests', ref),
-          'network-request-failed' => tr('err_network', ref),
-          'operation-not-allowed' => tr('err_operation_not_allowed', ref),
-          'requires-recent-login' => tr('err_requires_recent_login', ref),
-          _ => '${tr('err_auth_generic', ref)}: ${e.message}',
-        };
-      } else if (e.toString().contains('No user found')) {
-        errorMessage = tr('err_user_not_found', ref);
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(errorMessage));
+      ScaffoldMessenger.of(context).showSnackBar(
+        errorSnackBar(tr(AppErrorMapper.key(e), ref)),
+      );
     }
   }
 
@@ -162,13 +145,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (!dialogContext.mounted) return;
         Navigator.of(dialogContext).pop();
         if (mounted) {
-          final errorMessage = switch (e.code) {
-            'user-not-found' => tr('err_user_not_found', ref),
-            'invalid-email' => tr('err_invalid_email', ref),
-            'too-many-requests' => tr('err_too_many_requests', ref),
-            'network-request-failed' => tr('err_network', ref),
-            _ => e.message ?? tr('err_auth_generic', ref),
-          };
+          final errorMessage = tr(AppErrorMapper.key(e), ref);
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(errorSnackBar(errorMessage));
@@ -256,7 +233,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final cs = theme.colorScheme;
     final currentLocale = ref.watch(appLocaleProvider);
     final isOnline = ref.watch(isOnlineProvider);
-    final isWide = MediaQuery.sizeOf(context).width > 720;
+    final isWide =
+      MediaQuery.sizeOf(context).width >= AppTokens.breakpointNavigationRail;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -410,12 +388,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       data: (online) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AppOnlineIndicator(isOnline: online),
+          AppOnlineIndicator(
+            isOnline: online,
+            semanticLabel: tr('login_online', ref),
+          ),
           const SizedBox(width: AppTokens.s4),
-          Text(
-            online ? tr('login_online', ref) : tr('login_offline', ref),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: online ? AppBrand.successColor : AppBrand.stockColor,
+          ExcludeSemantics(
+            child: Text(
+              online ? tr('login_online', ref) : tr('login_offline', ref),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: online ? AppBrand.successColor : AppBrand.stockColor,
+              ),
             ),
           ),
         ],
@@ -424,12 +407,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       error: (_, _) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const AppOnlineIndicator(isOnline: false),
+          AppOnlineIndicator(
+            isOnline: false,
+            semanticLabel: tr('login_offline', ref),
+          ),
           const SizedBox(width: AppTokens.s4),
-          Text(
-            tr('login_offline', ref),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.outline,
+          ExcludeSemantics(
+            child: Text(
+              tr('login_offline', ref),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
             ),
           ),
         ],

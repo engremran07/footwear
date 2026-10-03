@@ -192,8 +192,10 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'Platform super-admin accounts require trusted out-of-band provisioning.',
         );
       }
-      if (actingUser.isTenantAdmin && normalizedRole != 'seller') {
-        throw StateError('Workspace admins can create seller accounts only');
+      if (!actingUser.isSuperAdmin && normalizedRole != 'seller') {
+        throw StateError(
+          'Only a selected platform super-admin can create workspace administrators',
+        );
       }
       if (normalizedRole == 'seller' && assignedRouteIds.isEmpty) {
         throw ArgumentError(
@@ -211,16 +213,10 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         );
       }
 
-      // Use provided tenantId or fall back to current user's tenant
-      final effectiveTenantId =
-          TenantScope.normalize(tenantId) ??
-          TenantScope.normalize(actingUser.tenantId) ??
-          TenantScope.globalTenantId;
-      if (actingUser.isTenantAdmin &&
-          effectiveTenantId != TenantScope.normalize(actingUser.tenantId)) {
-        throw StateError(
-          'Workspace users must belong to the current workspace',
-        );
+      final effectiveTenantId = TenantScope.requireTenant(actingUser.tenantId);
+      final requestedTenantId = TenantScope.normalize(tenantId);
+      if (requestedTenantId != null && requestedTenantId != effectiveTenantId) {
+        throw StateError('Users must belong to the active workspace');
       }
 
       // Use a secondary FirebaseApp so the admin stays signed in
@@ -332,11 +328,13 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       }
     }
 
-    if (actingUser.isTenantAdmin) {
-      if (updateData.containsKey('role') ||
-          updateData.containsKey('tenant_id')) {
-        throw StateError('Workspace admins cannot change role or workspace');
-      }
+    if (!actingUser.isSuperAdmin && updateData.containsKey('role')) {
+      throw StateError(
+        'Only a selected platform super-admin can change workspace roles',
+      );
+    }
+    if (!actingUser.isSuperAdmin && updateData.containsKey('tenant_id')) {
+      throw StateError('Workspace administrators cannot change workspace');
     }
 
     final hasRoleUpdate = updateData.containsKey('role');

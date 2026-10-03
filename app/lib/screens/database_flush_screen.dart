@@ -276,7 +276,9 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
                 child: ListTile(
                   leading: const Icon(Icons.domain_outlined),
                   title: Text(tr('flush_select_workspace', ref)),
-                  subtitle: Text(tenant?.name ?? tenantId),
+                  subtitle: Text(
+                    tenant?.name ?? tr('workspace_name_unavailable', ref),
+                  ),
                 ),
               ),
 

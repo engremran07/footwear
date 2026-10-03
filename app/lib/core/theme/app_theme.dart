@@ -19,13 +19,13 @@ class AppTheme {
   static const Color seedColor = AppBrand.arcticSeedColor;
 
   // ── Dark Mode Colors (deep navy arctic feel) ──
-  static const Color arcticBlue = AppBrand.primaryColor;
+  static const Color arcticBlue = Color(0xFF0099CC);
   static const Color arcticDarkBg = Color(0xFF0A0E1A);
   static const Color arcticSurface = Color(0xFF111827);
   static const Color arcticCard = Color(0xFF1A2332);
-  static const Color arcticSuccess = AppBrand.successColor;
-  static const Color arcticError = AppBrand.errorColor;
-  static const Color arcticWarning = AppBrand.warningColor;
+  static const Color arcticSuccess = Color(0xFF81C784);
+  static const Color arcticError = Color(0xFFFF8A80);
+  static const Color arcticWarning = Color(0xFFFFD54F);
   static const Color arcticPending = Color(0xFFFFD740);
   static const Color arcticTextPrimary = Color(0xFFE2E8F0);
   static const Color arcticTextSecondary = Color(0xFF94A3B8);
@@ -52,10 +52,10 @@ class AppTheme {
   static const Color hcTextPrimary = Color(0xFFFFFFFF);
   static const Color hcTextSecondary = Color(0xFFE0E0E0);
   static const Color hcDivider = Color(0xFFFFD600);
-  static const Color hcBlue = AppBrand.primaryColor;
-  static const Color hcSuccess = AppBrand.successColor;
-  static const Color hcError = AppBrand.errorColor;
-  static const Color hcWarning = AppBrand.warningColor;
+  static const Color hcBlue = Color(0xFF80D8FF);
+  static const Color hcSuccess = Color(0xFF81C784);
+  static const Color hcError = Color(0xFFFF8A80);
+  static const Color hcWarning = Color(0xFFFFD54F);
   static const Color hcPending = Color(0xFFFFD600);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -893,9 +893,13 @@ class AppTheme {
           surface: hcSurface,
         ).copyWith(
           primary: hcBlue,
-          secondary: AppBrand.secondaryColor,
-          tertiary: AppBrand.tertiaryColor,
+          secondary: hcWarning,
+          tertiary: hcSuccess,
           error: hcError,
+          onPrimary: hcBg,
+          onSecondary: hcBg,
+          onTertiary: hcBg,
+          onError: hcBg,
           onSurface: hcTextPrimary,
         );
 
@@ -1357,7 +1361,15 @@ class AppTheme {
   // ═══════════════════════════════════════════════════════════════════════════
   //  STATUS CHIP COLOURS
   // ═══════════════════════════════════════════════════════════════════════════
-  static Color statusColor(String status) {
+  static Color statusColor(
+    String status, {
+    AppThemeMode mode = AppThemeMode.auto,
+    Brightness brightness = Brightness.light,
+  }) {
+    final highContrast = mode == AppThemeMode.highContrast;
+    final dark =
+        mode == AppThemeMode.dark ||
+        (mode == AppThemeMode.auto && brightness == Brightness.dark);
     switch (status.toLowerCase()) {
       case 'active':
       case 'complete':
@@ -1365,18 +1377,30 @@ class AppTheme {
       case 'approved':
       case 'paid':
       case 'qc_passed':
-        return AppBrand.successColor;
+        return highContrast
+            ? hcSuccess
+            : dark
+            ? arcticSuccess
+            : AppBrand.successColor;
       case 'pending':
       case 'draft':
       case 'in_production':
       case 'qc_pending':
       case 'pending_approval':
-        return AppBrand.warningColor;
+        return highContrast
+            ? hcWarning
+            : dark
+            ? arcticWarning
+            : AppBrand.warningColor;
       case 'rejected':
       case 'cancelled':
       case 'qc_issues':
       case 'stock_issue':
-        return AppBrand.errorColor;
+        return highContrast
+            ? hcError
+            : dark
+            ? arcticError
+            : AppBrand.errorColor;
       case 'processing':
       case 'reserved':
       case 'shipped':
@@ -1384,19 +1408,47 @@ class AppTheme {
       case 'in_transit':
       case 'assigned_to_seller':
       case 'issued':
-        return AppBrand.primaryColor;
+        return highContrast
+            ? hcBlue
+            : dark
+            ? arcticBlue
+            : AppBrand.primaryColor;
       case 'partial':
-        return AppBrand.warningColor;
+        return highContrast
+            ? hcWarning
+            : dark
+            ? arcticWarning
+            : AppBrand.warningColor;
       case 'void':
-        return AppBrand.errorColor;
+        return highContrast
+            ? hcError
+            : dark
+            ? arcticError
+            : AppBrand.errorColor;
       case 'credit_note':
-        return AppBrand.successColor;
+        return highContrast
+            ? hcSuccess
+            : dark
+            ? arcticSuccess
+            : AppBrand.successColor;
       case 'ready_for_shipment':
-        return AppBrand.primaryColor;
+        return highContrast
+            ? hcBlue
+            : dark
+            ? arcticBlue
+            : AppBrand.primaryColor;
       case 'received':
-        return AppBrand.successColor;
+        return highContrast
+            ? hcSuccess
+            : dark
+            ? arcticSuccess
+            : AppBrand.successColor;
       default:
-        return AppBrand.secondaryColor;
+        return highContrast
+            ? hcTextSecondary
+            : dark
+            ? arcticTextSecondary
+            : AppBrand.secondaryColor;
     }
   }
 }

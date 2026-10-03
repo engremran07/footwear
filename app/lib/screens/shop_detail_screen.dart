@@ -76,6 +76,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
 
     final amountC = TextEditingController(text: tx.amount.toStringAsFixed(2));
     final descC = TextEditingController(text: tx.description ?? '');
+    final reasonC = TextEditingController();
     String txType = tx.type;
     String saleType = tx.saleType ?? 'cash';
     DateTime selectedDate = tx.createdAt.toDate();
@@ -140,6 +141,16 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              TextField(
+                controller: reasonC,
+                decoration: InputDecoration(
+                  labelText: tr('reason', ref),
+                  prefixIcon: const Icon(Icons.fact_check_outlined),
+                ),
+                minLines: 1,
+                maxLines: 2,
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -196,6 +207,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       amountC.text,
                     );
                     if (newAmount == null || newAmount <= 0) return;
+                    if (reasonC.text.trim().length < 10) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        warningSnackBar(tr('reason_required', ref)),
+                      );
+                      return;
+                    }
                     if (!_transactionGuard.tryStart()) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         infoSnackBar(tr('action_in_progress', ref)),
@@ -212,6 +229,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             oldType: tx.type,
                             newAmount: newAmount,
                             newType: txType,
+                            reason: reasonC.text.trim(),
                             description: descC.text.trim().isEmpty
                                 ? null
                                 : descC.text.trim(),
@@ -240,6 +258,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     ).whenComplete(() {
       amountC.dispose();
       descC.dispose();
+      reasonC.dispose();
     });
   }
 

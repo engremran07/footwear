@@ -1,5 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+const _kAppLocaleKey = 'app_locale';
 
 /// Supported app locales.
 enum AppLocale {
@@ -19,10 +24,43 @@ final appLocaleProvider = NotifierProvider<AppLocaleNotifier, AppLocale>(
 );
 
 class AppLocaleNotifier extends Notifier<AppLocale> {
-  @override
-  AppLocale build() => AppLocale.en;
+  bool _loadStarted = false;
+  bool _userSelectedLocale = false;
 
-  void set(AppLocale locale) => state = locale;
+  @override
+  AppLocale build() {
+    if (!_loadStarted) {
+      _loadStarted = true;
+      unawaited(_loadSavedLocale());
+    }
+    return AppLocale.en;
+  }
+
+  Future<void> _loadSavedLocale() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_userSelectedLocale) return;
+      final savedCode = prefs.getString(_kAppLocaleKey);
+      final savedLocale = AppLocale.values.firstWhere(
+        (locale) => locale.locale.languageCode == savedCode,
+        orElse: () => AppLocale.en,
+      );
+      if (savedLocale != state) state = savedLocale;
+    } catch (error) {
+      debugPrint('[L10N] Could not restore locale preference: $error');
+    }
+  }
+
+  Future<void> set(AppLocale locale) async {
+    _userSelectedLocale = true;
+    state = locale;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kAppLocaleKey, locale.locale.languageCode);
+    } catch (error) {
+      debugPrint('[L10N] Could not persist locale preference: $error');
+    }
+  }
 }
 
 /// Translation lookup shortcut.
@@ -58,6 +96,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'build_number': 'Build Number',
     'release_date': 'Release Date',
     'platform': 'Platform',
+    'about_description':
+        'A workspace-based ERP for footwear distribution, route sales, inventory and reporting.',
+    'platform_value': 'Firebase Spark — Firestore and Auth',
+    'copyright_notice': '© %s. All rights reserved.',
     'legal': 'Legal',
     'open_source_licenses': 'Open Source License',
     'copied': 'Copied to clipboard',
@@ -71,6 +113,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'create': 'Create',
     'close': 'Close',
     'search': 'Search',
+    'clear_search': 'Clear search',
     'loading': 'Loading…',
     'error': 'Error',
     'no_data': 'No data',
@@ -135,6 +178,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Error Messages (mapped by AppErrorMapper) ──
     'err_invalid_credentials': 'Incorrect email or password. Please try again.',
     'err_user_not_found': 'No account found with these details.',
+    'err_account_not_assigned':
+        'Your account is not assigned to a workspace. Contact your administrator.',
+    'err_account_role_invalid':
+        'Your account role is unsupported. Contact your workspace administrator.',
     'err_user_disabled': 'This account has been disabled. Contact admin.',
     'err_too_many_requests':
         'Too many attempts. Please wait a moment and try again.',
@@ -152,6 +199,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_resource_exhausted': 'Service limit reached. Please try again later.',
     'err_service_unavailable':
         'Service temporarily unavailable. Try again shortly.',
+    'err_firebase_init_title': 'Service could not start',
+    'err_firebase_init_body':
+        'The app could not connect to its services. Check your connection and retry.',
     'err_cancelled': 'Operation was cancelled.',
     'err_timeout': 'Request timed out. Please try again.',
     'err_unauthenticated': 'You are not signed in. Please sign in first.',
@@ -356,9 +406,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'new_order': 'New Order',
     'customer': 'Shop',
     'status': 'Status',
+    'unknown_status_chip': 'Unknown status',
     'total': 'Total',
     'pending': 'Pending',
+    'draft': 'Draft',
     'processing': 'Processing',
+    'in_production': 'In production',
+    'in_transit': 'In transit',
     'shipped': 'Shipped',
     'delivered': 'Delivered',
     'cancelled': 'Cancelled',
@@ -420,6 +474,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'reference': 'Reference',
     'approved': 'Approved',
     'rejected': 'Rejected',
+    'qc_passed': 'Quality check passed',
+    'qc_pending': 'Quality check pending',
+    'qc_issues': 'Quality check issues',
+    'stock_issue': 'Stock issue',
+    'reserved': 'Reserved',
+    'sent': 'Sent',
+    'assigned_to_seller': 'Assigned to seller',
     'add_transaction': 'Add Transaction',
     'pnl_category': 'P&L Category',
     'reference_description': 'Reference / Description',
@@ -446,6 +507,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'dispose': 'Dispose',
     'disposed': 'Disposed',
     'reason': 'Reason',
+    'reason_required': 'Enter a correction reason of at least 10 characters.',
     'disposed_successfully': 'Item marked as disposed',
 
     // ── P&L ──
@@ -629,11 +691,15 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'role_seller': 'Seller — sales & shops',
     'role_tenant_admin': 'Workspace Admin — workspace access',
     'role_super_admin': 'Super Admin — global access',
+    'role_unknown': 'Unsupported role',
     'workspaces': 'Workspaces',
     'create_workspace': 'Create workspace',
     'edit_workspace': 'Edit workspace',
     'workspace_name': 'Workspace name',
+    'workspace_name_unavailable': 'Workspace name unavailable',
     'workspace_name_required': 'Workspace name is required',
+    'route_unavailable': 'Selected route unavailable',
+    'status_unknown': 'Unknown status',
     'slug': 'Slug',
     'max_devices_allowed': 'Max devices allowed',
     'require_device_pairing': 'Require device pairing',
@@ -1158,17 +1224,16 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'profile_security': 'Security',
 
     // ── Bootstrap Profile Screen ──
-    'bootstrap_title': 'Bootstrap Admin Profile',
+    'bootstrap_title': 'Workspace profile required',
     'bootstrap_sign_out': 'Sign out',
     'bootstrap_missing_profile':
-        'Account signed in, but user profile is missing.',
+        'This sign-in does not have an assigned workspace profile.',
+    'bootstrap_invalid_role_title': 'This account role is not supported.',
     'bootstrap_signed_in_as': 'Signed in as: %s',
     'bootstrap_instructions':
-        'Use this one-time action to create users/{uid} with admin role when no admin profile exists yet.',
-    'bootstrap_not_eligible':
-        'This account is not eligible for bootstrap. Sign in with an email-based account to continue.',
-    'bootstrap_create_btn': 'Create Admin Profile',
-    'msg_admin_profile_created': 'Admin profile created successfully.',
+        'Your sign-in is valid, but a workspace profile has not been provisioned for this account. Contact your workspace administrator to request access.',
+    'bootstrap_invalid_role_instructions':
+        'A workspace administrator must correct this account role before it can access business data. Sign out and contact support.',
 
     // ── Shop Detail Screen ──
     'tooltip_edit_customer': 'Edit shop',
@@ -1270,14 +1335,20 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Backup ──
     'backup_title': 'Backup Data',
-    'backup_subtitle':
-        'Export a full snapshot to Google Drive or email. An extra copy in case of accidental data wipe.',
+    'backup_subtitle': 'Choose records allowed by your workspace role.',
+    'backup_platform_metadata_subtitle':
+        'Only the selected workspace profile and its user profiles are included. Business records are excluded.',
+    'backup_workspace_backup_subtitle':
+        'Includes workspace business data. User and seller account profiles are excluded.',
+    'backup_workspaces': 'Selected workspace profile',
+    'backup_users': 'Workspace user profiles',
     'backup_routes': 'Routes',
     'backup_shops': 'Shops',
     'backup_products': 'Products & Variants',
     'backup_inventory': 'Inventory & Transfers',
     'backup_transactions': 'Transactions',
     'backup_invoices': 'Invoices',
+    'backup_settings': 'Workspace settings',
     'backup_now': 'Backup Now',
     'backup_to_google_drive': 'Back up to Google Drive',
     'restore_from_google_drive': 'Restore from Google Drive',
@@ -1285,8 +1356,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_drive_none': 'No ShoesERP backups found in your Google Drive',
     'backup_drive_error':
         'Google Drive is not configured or authorization was not granted. Contact the administrator.',
+    'backup_drive_not_configured':
+        'Automatic Google Drive backup is unavailable until this build is configured.',
     'backup_restore_scope_denied':
-        'Restore is limited to your workspace and currently assigned routes',
+        'Backup and restore access is limited by your workspace role.',
     'backup_in_progress': 'Creating backup…',
     'backup_share_text':
         'ShoesERP data backup — save to Google Drive for safekeeping',
@@ -1305,9 +1378,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_interval_30': 'Monthly',
     'backup_restore': 'Restore from Backup',
     'backup_restore_subtitle':
-        'Select a saved backup to overwrite all current data',
+        'Select a saved backup to restore its data into this workspace',
     'backup_restore_warning':
-        'This will permanently overwrite ALL current data. This action cannot be undone.',
+        'This will replace data covered by the backup. This action cannot be undone.',
+    'backup_restore_merge_warning':
+        'Records missing from this backup will remain in the workspace.',
     'backup_restore_checksum_ok': '✓ File integrity verified',
     'backup_restore_checksum_fail':
         '✗ Integrity check failed — file may be corrupted or tampered',
@@ -1350,6 +1425,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'build_number': 'رقم البناء',
     'release_date': 'تاريخ الإصدار',
     'platform': 'المنصة',
+    'about_description':
+        'نظام مؤسسي لمساحات العمل لتوزيع الأحذية ومبيعات المسارات والمخزون والتقارير.',
+    'platform_value': 'Firebase Spark — Firestore وAuth',
+    'copyright_notice': '© %s. جميع الحقوق محفوظة.',
     'legal': 'قانوني',
     'open_source_licenses': 'ترخيص المصدر المفتوح',
     'copied': 'تم النسخ إلى الحافظة',
@@ -1363,6 +1442,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'create': 'إنشاء',
     'close': 'إغلاق',
     'search': 'بحث',
+    'clear_search': 'مسح البحث',
     'loading': 'جارٍ التحميل…',
     'error': 'خطأ',
     'no_data': 'لا توجد بيانات',
@@ -1424,6 +1504,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_invalid_credentials':
         'البريد الإلكتروني أو كلمة المرور غير صحيحة. حاول مرة أخرى.',
     'err_user_not_found': 'لم يتم العثور على حساب بهذه البيانات.',
+    'err_account_not_assigned': 'حسابك غير مرتبط بمساحة عمل. تواصل مع المسؤول.',
+    'err_account_role_invalid':
+        'دور الحساب غير مدعوم. تواصل مع مسؤول مساحة العمل.',
     'err_user_disabled': 'تم تعطيل هذا الحساب. تواصل مع المسؤول.',
     'err_too_many_requests': 'محاولات كثيرة. انتظر قليلاً وحاول مرة أخرى.',
     'err_email_in_use': 'هذا البريد الإلكتروني مسجل بالفعل.',
@@ -1438,6 +1521,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_already_exists': 'هذا العنصر موجود بالفعل.',
     'err_resource_exhausted': 'تم الوصول للحد الأقصى. حاول لاحقاً.',
     'err_service_unavailable': 'الخدمة غير متوفرة مؤقتاً. حاول بعد قليل.',
+    'err_firebase_init_title': 'تعذر بدء الخدمة',
+    'err_firebase_init_body':
+        'تعذر اتصال التطبيق بالخدمات. تحقق من الاتصال ثم أعد المحاولة.',
     'err_cancelled': 'تم إلغاء العملية.',
     'err_timeout': 'انتهت مهلة الطلب. حاول مرة أخرى.',
     'err_unauthenticated': 'لم يتم تسجيل الدخول. الرجاء تسجيل الدخول أولاً.',
@@ -1639,9 +1725,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'new_order': 'طلب جديد',
     'customer': 'المحل',
     'status': 'الحالة',
+    'unknown_status_chip': 'حالة غير معروفة',
     'total': 'الإجمالي',
     'pending': 'قيد الانتظار',
+    'draft': 'مسودة',
     'processing': 'قيد المعالجة',
+    'in_production': 'قيد الإنتاج',
+    'in_transit': 'في الطريق',
     'shipped': 'تم الشحن',
     'delivered': 'تم التسليم',
     'cancelled': 'ملغي',
@@ -1703,6 +1793,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'reference': 'المرجع',
     'approved': 'موافق عليه',
     'rejected': 'مرفوض',
+    'qc_passed': 'اجتاز فحص الجودة',
+    'qc_pending': 'فحص الجودة معلق',
+    'qc_issues': 'مشكلات في فحص الجودة',
+    'stock_issue': 'مشكلة في المخزون',
+    'reserved': 'محجوز',
+    'sent': 'تم الإرسال',
+    'assigned_to_seller': 'تم التعيين للبائع',
     'add_transaction': 'إضافة معاملة',
     'pnl_category': 'فئة الأرباح والخسائر',
     'reference_description': 'المرجع / الوصف',
@@ -1729,6 +1826,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'dispose': 'التخلص',
     'disposed': 'تم التخلص',
     'reason': 'السبب',
+    'reason_required': 'أدخل سببًا للتصحيح لا يقل عن 10 أحرف.',
     'disposed_successfully': 'تم تعليم العنصر كمتخلص منه',
 
     // ── P&L ──
@@ -1914,11 +2012,15 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'role_seller': 'بائع — المبيعات والمتاجر',
     'role_tenant_admin': 'مدير مساحة العمل — وصول مساحة العمل',
     'role_super_admin': 'المشرف الأعلى — وصول عام',
+    'role_unknown': 'دور غير مدعوم',
     'workspaces': 'المساحات',
     'create_workspace': 'إنشاء مساحة',
     'edit_workspace': 'تعديل المساحة',
     'workspace_name': 'اسم المساحة',
+    'workspace_name_unavailable': 'اسم مساحة العمل غير متاح',
     'workspace_name_required': 'اسم المساحة مطلوب',
+    'route_unavailable': 'المسار المحدد غير متاح',
+    'status_unknown': 'حالة غير معروفة',
     'slug': 'المعرف',
     'max_devices_allowed': 'أقصى عدد للأجهزة المسموح بها',
     'require_device_pairing': 'يتطلب اقتران الجهاز',
@@ -2439,16 +2541,15 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'profile_security': 'الأمان',
 
     // ── Bootstrap Profile Screen ──
-    'bootstrap_title': 'تهيئة ملف المدير',
+    'bootstrap_title': 'ملف مساحة العمل مطلوب',
     'bootstrap_sign_out': 'تسجيل الخروج',
-    'bootstrap_missing_profile': 'تم تسجيل الدخول ولكن ملف المستخدم مفقود.',
+    'bootstrap_missing_profile': 'لا توجد مساحة عمل مخصصة لهذا الحساب.',
+    'bootstrap_invalid_role_title': 'دور هذا الحساب غير مدعوم.',
     'bootstrap_signed_in_as': 'مسجّل الدخول كـ: %s',
     'bootstrap_instructions':
-        'استخدم هذا الإجراء لمرة واحدة لإنشاء users/{uid} بدور المدير عندما لا يوجد ملف مدير بعد.',
-    'bootstrap_not_eligible':
-        'هذا الحساب غير مؤهل للتهيئة. سجّل الدخول بحساب يعتمد على البريد الإلكتروني للمتابعة.',
-    'bootstrap_create_btn': 'إنشاء ملف المدير',
-    'msg_admin_profile_created': 'تم إنشاء ملف المدير بنجاح.',
+        'تم تسجيل الدخول، لكن لم يتم إعداد ملف مساحة عمل لهذا الحساب. تواصل مع مسؤول مساحة العمل لطلب الوصول.',
+    'bootstrap_invalid_role_instructions':
+        'يجب على مسؤول مساحة العمل تصحيح دور الحساب قبل الوصول إلى بيانات العمل. سجّل الخروج وتواصل مع الدعم.',
 
     // ── Shop Detail Screen ──
     'tooltip_edit_customer': 'تعديل المحل',
@@ -2547,14 +2648,20 @@ const Map<AppLocale, Map<String, String>> _translations = {
 
     // ── Backup ──
     'backup_title': 'نسخ احتياطي للبيانات',
-    'backup_subtitle':
-        'تصدير لقطة كاملة إلى Google Drive أو البريد الإلكتروني. نسخة إضافية في حال حذف البيانات عن طريق الخطأ.',
+    'backup_subtitle': 'اختر السجلات المسموح بها حسب دورك في مساحة العمل.',
+    'backup_platform_metadata_subtitle':
+        'تتضمن النسخة مساحة العمل المحددة وملفات مستخدميها فقط، ولا تتضمن سجلات العمل.',
+    'backup_workspace_backup_subtitle':
+        'تتضمن بيانات العمل لمساحة العمل، ولا تتضمن ملفات حسابات المستخدمين أو البائعين.',
+    'backup_workspaces': 'ملف مساحة العمل المحددة',
+    'backup_users': 'ملفات مستخدمي مساحة العمل',
     'backup_routes': 'المسارات',
     'backup_shops': 'المحلات',
     'backup_products': 'المنتجات والمتغيرات',
     'backup_inventory': 'المخزون والتحويلات',
     'backup_transactions': 'المعاملات',
     'backup_invoices': 'الفواتير',
+    'backup_settings': 'إعدادات مساحة العمل',
     'backup_now': 'نسخ الآن',
     'backup_to_google_drive': 'النسخ الاحتياطي إلى Google Drive',
     'restore_from_google_drive': 'الاستعادة من Google Drive',
@@ -2564,8 +2671,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'لا توجد نسخ ShoesERP احتياطية في Google Drive الخاص بك',
     'backup_drive_error':
         'Google Drive غير مهيأ أو لم تتم الموافقة على التفويض. تواصل مع المسؤول.',
+    'backup_drive_not_configured':
+        'النسخ التلقائي إلى Google Drive غير متاح حتى يتم إعداد هذا الإصدار.',
     'backup_restore_scope_denied':
-        'الاستعادة محدودة بمساحة عملك والمسارات المعيّنة لك حالياً',
+        'صلاحية النسخ والاستعادة محدودة حسب دورك في مساحة العمل.',
     'backup_in_progress': 'جارٍ إنشاء النسخة الاحتياطية…',
     'backup_share_text': 'نسخة احتياطية من بيانات ShoesERP',
     'backup_nav_subtitle': 'نسخ احتياطي، استعادة وجدولة تلقائية',
@@ -2583,9 +2692,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_interval_30': 'شهرياً',
     'backup_restore': 'استعادة من نسخة احتياطية',
     'backup_restore_subtitle':
-        'اختر نسخة محفوظة لاستبدال جميع البيانات الحالية',
+        'اختر نسخة محفوظة لاستعادة بياناتها إلى مساحة العمل هذه',
     'backup_restore_warning':
-        'سيتم استبدال جميع البيانات الحالية نهائياً. لا يمكن التراجع عن هذا الإجراء.',
+        'ستستبدل هذه العملية البيانات الموجودة في النسخة الاحتياطية. لا يمكن التراجع عن هذا الإجراء.',
+    'backup_restore_merge_warning':
+        'ستبقى السجلات غير الموجودة في هذه النسخة داخل مساحة العمل.',
     'backup_restore_checksum_ok': '✓ تم التحقق من سلامة الملف',
     'backup_restore_checksum_fail':
         '✗ فشل التحقق — قد يكون الملف تالفاً أو معدلاً',
@@ -2628,6 +2739,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'build_number': 'بلڈ نمبر',
     'release_date': 'ریلیز کی تاریخ',
     'platform': 'پلیٹ فارم',
+    'about_description':
+        'جوتوں کی تقسیم، روٹ سیلز، انوینٹری اور رپورٹس کے لیے ورک اسپیس پر مبنی ERP۔',
+    'platform_value': 'Firebase Spark — Firestore اور Auth',
+    'copyright_notice': '© %s. جملہ حقوق محفوظ ہیں۔',
     'legal': 'قانونی',
     'open_source_licenses': 'اوپن سورس لائسنس',
     'copied': 'کلپ بورڈ پر کاپی کی گئی',
@@ -2641,6 +2756,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'create': 'بنائیں',
     'close': 'بند کریں',
     'search': 'تلاش',
+    'clear_search': 'تلاش صاف کریں',
     'loading': 'لوڈ ہو رہا ہے…',
     'error': 'خرابی',
     'no_data': 'کوئی ڈیٹا نہیں',
@@ -2700,6 +2816,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── غلطی کے پیغامات ──
     'err_invalid_credentials': 'غلط ای میل یا پاسورڈ۔ دوبارہ کوشش کریں۔',
     'err_user_not_found': 'ان تفصیلات سے کوئی اکاؤنٹ نہیں ملا۔',
+    'err_account_not_assigned':
+        'آپ کا اکاؤنٹ کسی ورک اسپیس سے منسلک نہیں۔ منتظم سے رابطہ کریں۔',
+    'err_account_role_invalid':
+        'آپ کے اکاؤنٹ کا کردار معاونت یافتہ نہیں۔ ورک اسپیس منتظم سے رابطہ کریں۔',
     'err_user_disabled': 'یہ اکاؤنٹ غیر فعال ہے۔ ایڈمن سے رابطہ کریں۔',
     'err_too_many_requests':
         'بہت زیادہ کوششیں۔ تھوڑی دیر بعد دوبارہ کوشش کریں۔',
@@ -2716,6 +2836,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_resource_exhausted': 'سروس کی حد پوری ہو گئی۔ بعد میں کوشش کریں۔',
     'err_service_unavailable':
         'سروس عارضی طور پر دستیاب نہیں۔ تھوڑی دیر بعد کوشش کریں۔',
+    'err_firebase_init_title': 'سروس شروع نہیں ہو سکی',
+    'err_firebase_init_body':
+        'ایپ سروسز سے منسلک نہیں ہو سکی۔ کنکشن چیک کر کے دوبارہ کوشش کریں۔',
     'err_cancelled': 'عمل منسوخ کر دیا گیا۔',
     'err_timeout': 'درخواست کا وقت ختم۔ دوبارہ کوشش کریں۔',
     'err_unauthenticated': 'سائن ان نہیں ہیں۔ پہلے سائن ان کریں۔',
@@ -2922,9 +3045,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'new_order': 'نیا آرڈر',
     'customer': 'صارف',
     'status': 'حالت',
+    'unknown_status_chip': 'نامعلوم حالت',
     'total': 'کل',
     'pending': 'زیر التوا',
+    'draft': 'مسودہ',
     'processing': 'پروسیسنگ',
+    'in_production': 'پیداوار میں',
+    'in_transit': 'راستے میں',
     'shipped': 'بھیج دیا گیا',
     'delivered': 'پہنچا دیا گیا',
     'cancelled': 'منسوخ',
@@ -2986,6 +3113,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'reference': 'حوالہ',
     'approved': 'منظور شدہ',
     'rejected': 'مسترد',
+    'qc_passed': 'کوالٹی چیک پاس',
+    'qc_pending': 'کوالٹی چیک زیر التوا',
+    'qc_issues': 'کوالٹی چیک کے مسائل',
+    'stock_issue': 'اسٹاک کا مسئلہ',
+    'reserved': 'محفوظ',
+    'sent': 'بھیجا گیا',
+    'assigned_to_seller': 'سیلر کو تفویض',
     'add_transaction': 'لین دین شامل کریں',
     'pnl_category': 'نفع نقصان زمرہ',
     'reference_description': 'حوالہ / تفصیل',
@@ -3012,6 +3146,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'dispose': 'ٹھکانے لگائیں',
     'disposed': 'ٹھکانے لگایا گیا',
     'reason': 'وجہ',
+    'reason_required': 'کم از کم 10 حروف پر مشتمل اصلاح کی وجہ درج کریں۔',
     'disposed_successfully': 'آئٹم کو ٹھکانے لگایا گیا نشان زد کیا',
 
     // ── P&L ──
@@ -3200,11 +3335,15 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'role_seller': 'سیلر — فروخت اور دکانیں',
     'role_tenant_admin': 'ورک اسپیس ایڈمن — ورک اسپیس رسائی',
     'role_super_admin': 'سپر ایڈمن — عالمی رسائی',
+    'role_unknown': 'غیر معاون کردار',
     'workspaces': 'ورک اسپیسز',
     'create_workspace': 'ورک اسپیس بنائیں',
     'edit_workspace': 'ورک اسپیس میں ترمیم',
     'workspace_name': 'ورک اسپیس کا نام',
+    'workspace_name_unavailable': 'ورک اسپیس کا نام دستیاب نہیں',
     'workspace_name_required': 'ورک اسپیس کا نام ضروری ہے',
+    'route_unavailable': 'منتخب کردہ روٹ دستیاب نہیں',
+    'status_unknown': 'نامعلوم حالت',
     'slug': 'سلاگ',
     'max_devices_allowed': 'اجازت دیے گئے ڈیوائسز کی زیادہ سے زیادہ تعداد',
     'require_device_pairing': 'ڈیوائس جوڑا ضروری ہے',
@@ -3729,17 +3868,16 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'profile_security': 'سیکیورٹی',
 
     // ── Bootstrap Profile Screen ──
-    'bootstrap_title': 'ایڈمن پروفائل بوٹسٹریپ',
+    'bootstrap_title': 'ورک اسپیس پروفائل درکار ہے',
     'bootstrap_sign_out': 'سائن آؤٹ',
     'bootstrap_missing_profile':
-        'اکاؤنٹ سائن ان ہے لیکن صارف پروفائل موجود نہیں۔',
+        'اس اکاؤنٹ کے لیے کوئی ورک اسپیس مقرر نہیں ہے۔',
+    'bootstrap_invalid_role_title': 'اس اکاؤنٹ کا کردار معاونت یافتہ نہیں۔',
     'bootstrap_signed_in_as': 'بطور سائن ان: %s',
     'bootstrap_instructions':
-        'یہ ایک بار کی کارروائی ہے users/{uid} کو ایڈمن رول کے ساتھ بنانے کے لیے جب ابھی تک کوئی ایڈمن پروفائل موجود نہ ہو۔',
-    'bootstrap_not_eligible':
-        'یہ اکاؤنٹ بوٹسٹریپ کے اہل نہیں۔ جاری رکھنے کے لیے ای میل والے اکاؤنٹ سے سائن ان کریں۔',
-    'bootstrap_create_btn': 'ایڈمن پروفائل بنائیں',
-    'msg_admin_profile_created': 'ایڈمن پروفائل کامیابی سے بن گیا۔',
+        'آپ سائن اِن ہیں، لیکن اس اکاؤنٹ کے لیے ورک اسپیس پروفائل نہیں بنایا گیا۔ رسائی کے لیے اپنے ورک اسپیس منتظم سے رابطہ کریں۔',
+    'bootstrap_invalid_role_instructions':
+        'کاروباری ڈیٹا تک رسائی سے پہلے ورک اسپیس منتظم کو اکاؤنٹ کا کردار درست کرنا ہوگا۔ سائن آؤٹ کر کے سپورٹ سے رابطہ کریں۔',
 
     // ── Shop Detail Screen ──
     'tooltip_edit_customer': 'دکان میں ترمیم',
@@ -3841,13 +3979,20 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Backup ──
     'backup_title': 'ڈیٹا بیک اپ',
     'backup_subtitle':
-        'Google Drive یا ای میل پر مکمل اسنیپ شاٹ ایکسپورٹ کریں۔ اتفاقی ڈیٹا وائپ کی صورت میں اضافی کاپی۔',
+        'اپنے ورک اسپیس کردار کے مطابق اجازت یافتہ ریکارڈ منتخب کریں۔',
+    'backup_platform_metadata_subtitle':
+        'صرف منتخب ورک اسپیس اور اس کے صارف پروفائل شامل ہوں گے۔ کاروباری ریکارڈ شامل نہیں ہوں گے۔',
+    'backup_workspace_backup_subtitle':
+        'ورک اسپیس کا کاروباری ڈیٹا شامل ہوگا؛ صارف اور سیلر اکاؤنٹ پروفائل شامل نہیں ہوں گے۔',
+    'backup_workspaces': 'منتخب ورک اسپیس پروفائل',
+    'backup_users': 'ورک اسپیس صارف پروفائلز',
     'backup_routes': 'روٹس',
     'backup_shops': 'دکانیں',
     'backup_products': 'پروڈکٹس اور ویرینٹس',
     'backup_inventory': 'انوینٹری اور ٹرانسفرز',
     'backup_transactions': 'ٹرانزیکشنز',
     'backup_invoices': 'انوائسز',
+    'backup_settings': 'ورک اسپیس سیٹنگز',
     'backup_now': 'ابھی بیک اپ کریں',
     'backup_to_google_drive': 'Google Drive پر بیک اپ کریں',
     'restore_from_google_drive': 'Google Drive سے ریسٹور کریں',
@@ -3855,8 +4000,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_drive_none': 'آپ کے Google Drive میں ShoesERP بیک اپ نہیں ملا',
     'backup_drive_error':
         'Google Drive کنفیگر نہیں ہے یا اجازت نہیں دی گئی۔ ایڈمن سے رابطہ کریں۔',
+    'backup_drive_not_configured':
+        'اس بلڈ کی کنفیگریشن تک Google Drive خودکار بیک اپ دستیاب نہیں ہے۔',
     'backup_restore_scope_denied':
-        'ری اسٹور صرف آپ کی ورک اسپیس اور موجودہ مقررہ روٹس تک محدود ہے',
+        'بیک اپ اور ریسٹور کی اجازت آپ کے ورک اسپیس کردار تک محدود ہے۔',
     'backup_in_progress': 'بیک اپ بنایا جا رہا ہے…',
     'backup_share_text': 'ShoesERP ڈیٹا بیک اپ',
     'backup_nav_subtitle': 'بیک اپ، ریسٹور اور خودکار شیڈول',
@@ -3873,9 +4020,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_interval_14': 'ہر 2 ہفتے',
     'backup_interval_30': 'مہینہ وار',
     'backup_restore': 'بیک اپ سے ریسٹور',
-    'backup_restore_subtitle': 'موجودہ بیک اپ منتخب کریں',
+    'backup_restore_subtitle':
+        'اس ورک اسپیس میں ڈیٹا بحال کرنے کے لیے بیک اپ منتخب کریں',
     'backup_restore_warning':
-        'یہ تمام موجودہ ڈیٹا ہمیشہ کے لیے واپس کر دے گا۔ یہ عمل واپس نہیں ہو سکتا۔',
+        'بیک اپ میں شامل ڈیٹا تبدیل ہو جائے گا۔ یہ عمل واپس نہیں ہو سکتا۔',
+    'backup_restore_merge_warning':
+        'اس بیک اپ میں شامل نہ ہونے والے ریکارڈز ورک اسپیس میں برقرار رہیں گے۔',
     'backup_restore_checksum_ok': '✓ فائل کی سالمیت تصدیق شدہ',
     'backup_restore_checksum_fail':
         '✗ سالمیت جانچ ناکام — فائل خراب ہو سکتی ہے',

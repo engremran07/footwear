@@ -15,6 +15,7 @@ import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 
 import '../widgets/confirm_dialog.dart';
+import '../widgets/error_state.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -85,6 +86,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
     settingsAsync.whenData((_) => _loadSettings());
+    if (!_settingsLoaded) {
+      return Scaffold(
+        body: settingsAsync.when(
+          data: (_) => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => mappedErrorState(
+            error: error,
+            ref: ref,
+            onRetry: () => ref.invalidate(settingsProvider),
+          ),
+        ),
+      );
+    }
 
     return PopScope(
       canPop: !_isDirty,

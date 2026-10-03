@@ -185,9 +185,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    successSnackBar(
-                      tr('email_change_verification_sent', ref),
-                    ),
+                    successSnackBar(tr('email_change_verification_sent', ref)),
                   );
                 }
               } catch (error) {
@@ -418,7 +416,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             alignment: AlignmentDirectional.centerStart,
                             child: TextButton.icon(
                               onPressed: () async {
-                                final messenger = ScaffoldMessenger.maybeOf(context);
+                                final messenger = ScaffoldMessenger.maybeOf(
+                                  context,
+                                );
                                 try {
                                   await ref
                                       .read(authNotifierProvider.notifier)
@@ -426,8 +426,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   if (!mounted || messenger == null) return;
                                   messenger.showSnackBar(
                                     successSnackBar(
-                                      tr('msg_verification_sent', ref)
-                                          .replaceAll('%s', currentUser.email),
+                                      tr(
+                                        'msg_verification_sent',
+                                        ref,
+                                      ).replaceAll('%s', currentUser.email),
                                     ),
                                   );
                                 } catch (error) {

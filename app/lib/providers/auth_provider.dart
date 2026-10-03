@@ -88,21 +88,22 @@ class AuthNotifier extends AsyncNotifier<void> {
     if (!isPrivilegedRoleName(normalizedRole)) return;
 
     try {
-      final settingsDocId =
-          TenantScope.normalize(tenantId) ?? TenantScope.globalTenantId;
-      final settingsRef = FirebaseFirestore.instance
-          .collection(Collections.settings)
-          .doc(settingsDocId);
-      final settingsSnap = await settingsRef.get();
-      if (!settingsSnap.exists) {
-        await settingsRef.set({
-          'company_name': 'My Business',
-          'currency': 'SAR',
-          'pairs_per_carton': 12,
-          'require_admin_approval_for_seller_transaction_edits': false,
-          'tenant_id': settingsDocId,
-          'updated_at': Timestamp.now(),
-        }, SetOptions(merge: true));
+      final settingsDocId = TenantScope.normalize(tenantId);
+      if (settingsDocId != null) {
+        final settingsRef = FirebaseFirestore.instance
+            .collection(Collections.settings)
+            .doc(settingsDocId);
+        final settingsSnap = await settingsRef.get();
+        if (!settingsSnap.exists) {
+          await settingsRef.set({
+            'company_name': 'My Business',
+            'currency': 'SAR',
+            'pairs_per_carton': 12,
+            'require_admin_approval_for_seller_transaction_edits': false,
+            'tenant_id': settingsDocId,
+            'updated_at': Timestamp.now(),
+          }, SetOptions(merge: true));
+        }
       }
     } catch (e) {
       _logger.w('Post-sign-in settings self-heal skipped: $e');
@@ -228,32 +229,33 @@ class AuthNotifier extends AsyncNotifier<void> {
         final refreshedDoc = await usersRef.doc(uid).get();
         final userData = refreshedDoc.data();
         final isActive = userData?['active'] == true;
-        final normalizedRole = (userData?['role'] as String? ?? '').trim();
+        final normalizedRole = normalizeRoleName(
+          userData?['role'] as String? ?? '',
+        );
+        if (normalizedRole == 'unknown') {
+          await FirebaseAuth.instance.signOut();
+          _invalidateRoleScopedProviders();
+          throw FirebaseAuthException(
+            code: 'invalid-user-role',
+            message:
+                'This account has an unsupported role. Contact your administrator.',
+          );
+        }
 
-        // P1-5 FIX: Check role BEFORE tenant_id self-heal. Super admin must
-        // never carry a tenant_id (it's tenant-independent everywhere else).
-        // For non-super_admin roles, ensure tenant_id is set to __global__ if null.
-        final isSuperAdmin = normalizedRole.toLowerCase() == 'super_admin';
+        // Tenant assignment is provisioned by a workspace administrator, never
+        // inferred from a client sign-in.
+        final isSuperAdmin = normalizedRole == 'super_admin';
         String? tenantId;
         if (!isSuperAdmin) {
           tenantId = TenantScope.normalize(userData?['tenant_id'] as String?);
           if (tenantId == null) {
-            tenantId = TenantScope.globalTenantId;
-            await usersRef.doc(uid).set({
-              'tenant_id': tenantId,
-              'updated_at': Timestamp.now(),
-            }, SetOptions(merge: true));
-          }
-        } else {
-          // Super admin: ensure no tenant_id is set by deleting it if present.
-          // Use FieldValue.delete() so it won't be re-stamped.
-          if (userData?['tenant_id'] != null) {
-            await usersRef.doc(uid).set({
-              'role': 'super_admin',
-              'tenant_id': FieldValue.delete(),
-              'active': true,
-              'updated_at': Timestamp.now(),
-            }, SetOptions(merge: true));
+            await FirebaseAuth.instance.signOut();
+            _invalidateRoleScopedProviders();
+            throw FirebaseAuthException(
+              code: 'account-not-assigned-to-workspace',
+              message:
+                  'Your account is not assigned to a workspace. Contact your administrator.',
+            );
           }
         }
         if (!isActive) {
@@ -453,43 +455,47 @@ class AuthNotifier extends AsyncNotifier<void> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final authUser = FirebaseAuth.instance.currentUser;
-      if (authUser != null) {
-        final profile = await FirebaseFirestore.instance
-            .collection(Collections.users)
-            .doc(authUser.uid)
-            .get();
-        final profileData = profile.data();
-        if ((profileData?['role'] as String? ?? '').trim().toLowerCase() ==
-            'super_admin') {
-          final workspaceId = profileData?['active_workspace_id'] as String?;
-          final reason = profileData?['active_workspace_reason'] as String?;
-          final now = Timestamp.now();
-          final batch = FirebaseFirestore.instance.batch();
-          final accessLogRef = workspaceId != null && reason != null
-              ? FirebaseFirestore.instance
-                    .collection(Collections.platformAccessLogs)
-                    .doc()
-              : null;
-          batch.update(profile.reference, {
-            'active_workspace_id': FieldValue.delete(),
-            'active_workspace_reason': FieldValue.delete(),
-            'active_workspace_selected_at': FieldValue.delete(),
-            'active_workspace_access_log_id': FieldValue.delete(),
-            if (accessLogRef != null)
-              'last_workspace_access_log_id': accessLogRef.id,
-            'updated_at': now,
-          });
-          if (accessLogRef != null) {
-            batch.set(accessLogRef, {
-              'actor_user_id': authUser.uid,
-              'workspace_id': workspaceId,
-              'event_type': 'workspace_access_ended',
-              'reason': reason,
-              'created_at': FieldValue.serverTimestamp(),
+      try {
+        if (authUser != null) {
+          final profile = await FirebaseFirestore.instance
+              .collection(Collections.users)
+              .doc(authUser.uid)
+              .get();
+          final profileData = profile.data();
+          if ((profileData?['role'] as String? ?? '').trim().toLowerCase() ==
+              'super_admin') {
+            final workspaceId = profileData?['active_workspace_id'] as String?;
+            final reason = profileData?['active_workspace_reason'] as String?;
+            final batch = FirebaseFirestore.instance.batch();
+            final accessLogRef = workspaceId != null && reason != null
+                ? FirebaseFirestore.instance
+                      .collection(Collections.platformAccessLogs)
+                      .doc()
+                : null;
+            batch.update(profile.reference, {
+              'active_workspace_id': FieldValue.delete(),
+              'active_workspace_reason': FieldValue.delete(),
+              'active_workspace_selected_at': FieldValue.delete(),
+              'updated_at': Timestamp.now(),
             });
+            if (accessLogRef != null) {
+              batch.set(accessLogRef, {
+                'actor_user_id': authUser.uid,
+                'workspace_id': workspaceId,
+                'event_type': 'workspace_access_ended',
+                'reason': reason,
+                'created_at': FieldValue.serverTimestamp(),
+              });
+            }
+            await batch.commit();
           }
-          await batch.commit();
         }
+      } catch (e, stack) {
+        _logger.e(
+          'Workspace exit audit failed during sign-out',
+          error: e,
+          stackTrace: stack,
+        );
       }
       if (kIsWeb) {
         try {
@@ -544,7 +550,6 @@ class AuthNotifier extends AsyncNotifier<void> {
       'active_workspace_id': normalizedId,
       'active_workspace_reason': normalizedReason,
       'active_workspace_selected_at': FieldValue.serverTimestamp(),
-      'active_workspace_access_log_id': accessLogRef.id,
       'updated_at': FieldValue.serverTimestamp(),
     });
     batch.set(accessLogRef, {
@@ -576,9 +581,6 @@ class AuthNotifier extends AsyncNotifier<void> {
         'active_workspace_id': FieldValue.delete(),
         'active_workspace_reason': FieldValue.delete(),
         'active_workspace_selected_at': FieldValue.delete(),
-        'active_workspace_access_log_id': FieldValue.delete(),
-        if (accessLogRef != null)
-          'last_workspace_access_log_id': accessLogRef.id,
         'updated_at': FieldValue.serverTimestamp(),
       },
     );

@@ -79,8 +79,8 @@ CustomTransitionPage<void> _fadePage(Widget child, GoRouterState state) {
   return CustomTransitionPage<void>(
     key: state.pageKey,
     child: child,
-    transitionDuration: const Duration(milliseconds: 300),
-    reverseTransitionDuration: const Duration(milliseconds: 250),
+    transitionDuration: const Duration(milliseconds: 140),
+    reverseTransitionDuration: const Duration(milliseconds: 120),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       final fadeIn = CurvedAnimation(parent: animation, curve: Curves.easeOut);
       final scaleIn = CurvedAnimation(
@@ -90,7 +90,7 @@ CustomTransitionPage<void> _fadePage(Widget child, GoRouterState state) {
       return FadeTransition(
         opacity: fadeIn,
         child: ScaleTransition(
-          scale: Tween<double>(begin: 0.92, end: 1.0).animate(scaleIn),
+          scale: Tween<double>(begin: 0.97, end: 1.0).animate(scaleIn),
           child: child,
         ),
       );
@@ -103,11 +103,11 @@ CustomTransitionPage<void> _slidePage(Widget child, GoRouterState state) {
   return CustomTransitionPage<void>(
     key: state.pageKey,
     child: child,
-    transitionDuration: const Duration(milliseconds: 320),
-    reverseTransitionDuration: const Duration(milliseconds: 250),
+    transitionDuration: const Duration(milliseconds: 160),
+    reverseTransitionDuration: const Duration(milliseconds: 120),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       final slideIn =
-          Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(
+          Tween<Offset>(begin: const Offset(0, 0.03), end: Offset.zero).animate(
             CurvedAnimation(parent: animation, curve: Curves.fastOutSlowIn),
           );
       final fadeIn = CurvedAnimation(parent: animation, curve: Curves.easeOut);
@@ -143,7 +143,9 @@ class RouterNotifier extends ChangeNotifier {
       final authRelevantChanged =
           prevUser?.id != nextUser?.id ||
           prevUser?.role != nextUser?.role ||
-          prevUser?.active != nextUser?.active;
+          prevUser?.active != nextUser?.active ||
+          prevUser?.tenantId != nextUser?.tenantId ||
+          prevUser?.activeWorkspaceId != nextUser?.activeWorkspaceId;
       if (authRelevantChanged || prev?.isLoading != next.isLoading) {
         _scheduleNotify();
       }
@@ -180,12 +182,30 @@ class RouterNotifier extends ChangeNotifier {
 
     if (!appUser.active) return '/login';
 
+    if (!appUser.isRoleRecognized) {
+      return isBootstrapRoute ? null : '/bootstrap-profile';
+    }
+
+    if (state.matchedLocation == '/settings/backup' &&
+        !appUser.canCreateWorkspaceBackup) {
+      return '/';
+    }
+
+    if (!appUser.isSuperAdmin && appUser.tenantId == null) {
+      return isBootstrapRoute ? null : '/bootstrap-profile';
+    }
+
     if (isLoginRoute || isBootstrapRoute) return '/';
 
     if (appUser.isSuperAdmin &&
         appUser.tenantId == null &&
         _isTenantBusinessPath(state.matchedLocation)) {
       return '/tenants';
+    }
+
+    if (state.matchedLocation == '/settings/backup' &&
+        !appUser.canCreateWorkspaceBackup) {
+      return '/';
     }
 
     if (_isTenantManagementPath(state.matchedLocation) &&

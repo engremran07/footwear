@@ -77,4 +77,7 @@ class AppTokens {
   static const double breakpointMobile = 600;
   static const double breakpointTablet = 900;
   static const double breakpointDesktop = 1200;
+  static const double breakpointNavigationRail = 720;
+  static const double breakpointExtendedNavigationRail = 1024;
+  static const double contentMaxWidth = 1600;
 }

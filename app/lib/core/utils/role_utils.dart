@@ -1,44 +1,13 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 import '../../models/user_model.dart';
+import 'role_names.dart';
 
-/// P1-8 FIX: Normalize role name with explicit defaulting and Vibe Debt logging.
 String normalizeRoleName(String role) {
-  if (role.isEmpty) {
-    debugPrint(
-      '[VIB] P1-8 Signal: Empty role string in normalizeRoleName; defaulting to seller',
-    );
-    return 'seller';
+  final canonical = canonicalRoleName(role);
+  if (canonical == 'unknown') {
+    debugPrint('[SEC] Unsupported account role; access remains blocked');
   }
-
-  final normalized = role.trim().toLowerCase();
-
-  if (normalized.isEmpty) {
-    debugPrint(
-      '[VIB] P1-8 Signal: Whitespace-only role string in normalizeRoleName; defaulting to seller',
-    );
-    return 'seller';
-  }
-
-  switch (normalized) {
-    case 'manager':
-    case 'admin':
-      return 'admin';
-    case 'tenant_admin':
-    case 'tenant-admin':
-    case 'tenantadmin':
-      return 'tenant_admin';
-    case 'super_admin':
-    case 'super-admin':
-    case 'superadmin':
-      return 'super_admin';
-    case 'seller':
-      return 'seller';
-    default:
-      debugPrint(
-        '[VIB] P1-8 Signal: Unknown role "$role" in normalizeRoleName; defaulting to seller',
-      );
-      return 'seller';
-  }
+  return canonical;
 }
 
 bool canManageUserAccountsRole(String role) {
@@ -71,6 +40,8 @@ String roleValueFromUserRole(UserRole role) {
       return 'tenant_admin';
     case UserRole.superAdmin:
       return 'super_admin';
+    case UserRole.unknown:
+      return 'unknown';
   }
 }
 
@@ -84,7 +55,9 @@ String roleLabelKeyFromRoleValue(String roleValue) {
       return 'role_tenant_admin';
     case 'super_admin':
       return 'role_super_admin';
+    case 'unknown':
+      return 'role_unknown';
     default:
-      return 'lbl_seller';
+      return 'role_unknown';
   }
 }

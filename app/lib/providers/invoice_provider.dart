@@ -248,12 +248,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
   /// duplicate numbers.
   Future<String> _nextInvoiceNumber() async {
     final db = FirebaseFirestore.instance;
-    final tenantId = TenantScope.normalize(
+    final tenantId = TenantScope.requireTenant(
       (await ref.read(authUserProvider.future))?.tenantId,
     );
-    final settingsRef = db
-        .collection(Collections.settings)
-        .doc(tenantId ?? TenantScope.globalTenantId);
+    final settingsRef = db.collection(Collections.settings).doc(tenantId);
     final next = await db.runTransaction<int>((txn) async {
       final doc = await txn.get(settingsRef);
       final currentNum = (doc.data()?['last_invoice_number'] as int?) ?? 0;
@@ -306,6 +304,14 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
     if (items.isEmpty) {
       throw ArgumentError('At least one item is required');
+    }
+    if (sellerInventoryDeductions.isEmpty ||
+        sellerInventoryDeductions.entries.any(
+          (entry) => entry.key.trim().isEmpty || entry.value <= 0,
+        )) {
+      throw ArgumentError(
+        'A stock sale requires positive seller inventory stock deductions',
+      );
     }
     if (subtotal <= 0) {
       throw ArgumentError('subtotal must be greater than 0');
@@ -505,6 +511,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             .update(db.collection(Collections.sellerInventory).doc(entry.key), {
               'quantity_available': FieldValue.increment(-entry.value),
               'updated_at': now,
+              'last_sale_invoice_id': invRef.id,
             });
       }
     }
@@ -585,31 +592,38 @@ class InvoiceNotifier extends AsyncNotifier<void> {
 
     final db = FirebaseFirestore.instance;
     final tenantId = await _requireTenantId();
-    // I-12: 30-day time-lock on credit note creation
-    if (normalizedLinkedInvoiceId.isNotEmpty) {
-      final origSnap = await db
-          .collection(Collections.invoices)
-          .doc(normalizedLinkedInvoiceId)
-          .get();
-      if (origSnap.exists) {
-        final origStatus = origSnap.data()?['status'] as String? ?? '';
-        if (origStatus == InvoiceModel.statusVoid) {
-          throw ArgumentError(
-            'Cannot create a credit note against a voided invoice',
-          );
-        }
-        final origCreatedAt = origSnap.data()?['created_at'] as Timestamp?;
-        if (origCreatedAt != null) {
-          final ageInDays = DateTime.now()
-              .difference(origCreatedAt.toDate())
-              .inDays;
-          if (ageInDays > 30) {
-            throw ArgumentError(
-              'Credit notes must be created within 30 days of the original invoice',
-            );
-          }
-        }
-      }
+    // I-12: validate the original sale and enforce cumulative credit limits.
+    final origSnap = await db
+        .collection(Collections.invoices)
+        .doc(normalizedLinkedInvoiceId)
+        .get();
+    if (!origSnap.exists) {
+      throw ArgumentError('Original invoice does not exist');
+    }
+    final original = origSnap.data()!;
+    if (original['tenant_id'] != tenantId ||
+        original['shop_id'] != shopId ||
+        original['type'] != InvoiceModel.typeSale) {
+      throw ArgumentError(
+        'Original invoice does not match this shop and workspace',
+      );
+    }
+    if (original['status'] == InvoiceModel.statusVoid) {
+      throw ArgumentError(
+        'Cannot create a credit note against a voided invoice',
+      );
+    }
+    final originalCreatedAt = original['created_at'] as Timestamp?;
+    if (originalCreatedAt == null) {
+      throw ArgumentError('Original invoice has no creation timestamp');
+    }
+    final ageInDays = DateTime.now()
+        .difference(originalCreatedAt.toDate())
+        .inDays;
+    if (ageInDays > 30) {
+      throw ArgumentError(
+        'Credit notes must be created within 30 days of the original invoice',
+      );
     }
 
     final normalizedKey = idempotencyKey?.trim();
@@ -628,9 +642,23 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       }
     }
 
+    final creditedTotal =
+        (original['credit_note_total'] as num?)?.toDouble() ?? 0;
+    final originalTotal = (original['total'] as num?)?.toDouble() ?? 0;
+    if (creditedTotal + total > originalTotal + 0.01) {
+      throw ArgumentError(
+        'Credit notes cannot exceed the original invoice total',
+      );
+    }
+
     final invoiceNumber = await _nextInvoiceNumber();
     final batch = db.batch();
     final now = Timestamp.now();
+
+    batch.update(origSnap.reference, {
+      'credit_note_total': FieldValue.increment(total),
+      'updated_at': FieldValue.serverTimestamp(),
+    });
 
     final invRef = db.collection(Collections.invoices).doc();
     batch.set(invRef, {

@@ -15,16 +15,18 @@ import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
 import '../core/services/google_drive_backup_service.dart';
 import '../core/utils/backup_cipher.dart';
+import '../core/utils/backup_scope_policy.dart';
+import '../core/utils/firestore_pagination.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
-import 'transaction_provider.dart';
 
 // ─── SharedPreferences keys ──────────────────────────────────────────────────
 const _kAutoEnabled = 'backup_auto_enabled';
 const _kIntervalMinutes = 'backup_interval_minutes';
 const _kLegacyIntervalDays = 'backup_interval_days';
 const _kLastBackupMs = 'backup_last_ms';
+const _kLastDriveBackupMs = 'backup_last_drive_ms';
 const _kLastRestoreMs = 'backup_last_restore_ms';
 const _kLastRestoreBy = 'backup_last_restore_by';
 const _backupSecretStorage = FlutterSecureStorage();
@@ -34,8 +36,7 @@ const _backupSecretStorage = FlutterSecureStorage();
 /// P1-12 FIX: Derive per-tenant settings doc ID from user profile.
 /// Matches the pattern used in settings_provider.dart.
 String _settingsDocumentIdForCurrentUser(UserModel? currentUser) {
-  final tenantId = TenantScope.normalize(currentUser?.tenantId);
-  return tenantId ?? TenantScope.globalTenantId;
+  return TenantScope.requireTenant(currentUser?.tenantId);
 }
 
 // ─── Data classes ─────────────────────────────────────────────────────────────
@@ -80,6 +81,8 @@ class LocalBackupFile {
 // ─── Notifier ─────────────────────────────────────────────────────────────────
 
 class DatabaseBackupNotifier extends Notifier<void> {
+  bool _autoBackupInProgress = false;
+
   @override
   void build() {}
 
@@ -88,6 +91,19 @@ class DatabaseBackupNotifier extends Notifier<void> {
   // ─── Preferences ───────────────────────────────────────────────────────────
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
+
+  Future<UserModel> _requireBackupAdministrator({
+    bool automatic = false,
+  }) async {
+    final user = await ref.read(authUserProvider.future);
+    if (user == null ||
+        !user.active ||
+        !user.canCreateWorkspaceBackup ||
+        (automatic && !user.canRunAutomaticWorkspaceBackup)) {
+      throw StateError('An active workspace administrator is required');
+    }
+    return user;
+  }
 
   String _scopeSegment(String value) =>
       base64Url.encode(utf8.encode(value)).replaceAll('=', '');
@@ -125,6 +141,13 @@ class DatabaseBackupNotifier extends Notifier<void> {
     return DateTime.fromMillisecondsSinceEpoch(ms);
   }
 
+  Future<DateTime?> _getLastDriveBackupAt() async {
+    final key = await _scopedPreferenceKey(_kLastDriveBackupMs);
+    final ms = (await _prefs).getInt(key);
+    if (ms == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
   Future<DateTime?> getLastRestoreAt() async {
     final key = await _scopedPreferenceKey(_kLastRestoreMs);
     final ms = (await _prefs).getInt(key);
@@ -138,11 +161,16 @@ class DatabaseBackupNotifier extends Notifier<void> {
   }
 
   Future<void> setAutoEnabled(bool value) async {
+    await _requireBackupAdministrator(automatic: true);
+    if (value && (kIsWeb || !GoogleDriveBackupService.isConfigured)) {
+      throw StateError('Automatic Google Drive backup is not configured');
+    }
     final key = await _scopedPreferenceKey(_kAutoEnabled);
     await (await _prefs).setBool(key, value);
   }
 
   Future<void> setIntervalMinutes(int minutes) async {
+    await _requireBackupAdministrator(automatic: true);
     if (minutes < 15) {
       throw ArgumentError('Backup interval must be >= 15 minutes');
     }
@@ -161,10 +189,15 @@ class DatabaseBackupNotifier extends Notifier<void> {
         'Backup passphrase must contain at least 12 characters',
       );
     }
-    final user = await ref.read(authUserProvider.future);
-    final tenantId = TenantScope.normalize(user?.tenantId);
-    if (user == null || !user.active || !user.isAdmin || tenantId == null) {
-      throw StateError('An active workspace administrator is required');
+    final user = await _requireBackupAdministrator(automatic: true);
+    if (!GoogleDriveBackupService.isConfigured) {
+      throw StateError('Google Drive OAuth is not configured for this build');
+    }
+    final tenantId = TenantScope.normalize(user.tenantId);
+    if (tenantId == null) {
+      throw StateError(
+        'Select an active workspace before enabling auto-backup',
+      );
     }
     await _backupSecretStorage.write(
       key: _securePassphraseKey(tenantId, user.id),
@@ -173,9 +206,9 @@ class DatabaseBackupNotifier extends Notifier<void> {
   }
 
   Future<void> clearAutoBackupPassphrase() async {
-    final user = await ref.read(authUserProvider.future);
-    final tenantId = TenantScope.normalize(user?.tenantId);
-    if (user == null || tenantId == null || kIsWeb) return;
+    final user = await _requireBackupAdministrator(automatic: true);
+    final tenantId = TenantScope.normalize(user.tenantId);
+    if (tenantId == null || kIsWeb) return;
     await _backupSecretStorage.delete(
       key: _securePassphraseKey(tenantId, user.id),
     );
@@ -183,6 +216,11 @@ class DatabaseBackupNotifier extends Notifier<void> {
 
   Future<void> _recordBackupNow() async {
     final key = await _scopedPreferenceKey(_kLastBackupMs);
+    await (await _prefs).setInt(key, DateTime.now().millisecondsSinceEpoch);
+  }
+
+  Future<void> _recordDriveBackupNow() async {
+    final key = await _scopedPreferenceKey(_kLastDriveBackupMs);
     await (await _prefs).setInt(key, DateTime.now().millisecondsSinceEpoch);
   }
 
@@ -250,17 +288,13 @@ class DatabaseBackupNotifier extends Notifier<void> {
     Uint8List bytes, {
     required String tenantId,
     required String creatorUid,
+    required String fileName,
   }) async {
     final dir = await _backupDir(tenantId: tenantId, creatorUid: creatorUid);
-    final ts = DateTime.now().toUtc();
-    final name =
-        'shoesERP_backup_${ts.year}${_p(ts.month)}${_p(ts.day)}_${_p(ts.hour)}${_p(ts.minute)}${_p(ts.second)}.shoesbackup';
-    final file = File('${dir.path}/$name');
+    final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(bytes);
     return file.path;
   }
-
-  String _p(int n) => n.toString().padLeft(2, '0');
 
   // ─── Checksum ──────────────────────────────────────────────────────────────
 
@@ -403,35 +437,6 @@ class DatabaseBackupNotifier extends Notifier<void> {
 
   // ─── Firestore write helpers ───────────────────────────────────────────────
 
-  Future<int> _deleteCollection(
-    String path,
-    UserModel user,
-    String tenantScopeId,
-  ) async {
-    final activeTenantId = TenantScope.normalize(user.tenantId);
-    if (!user.isSuperAdmin || activeTenantId != tenantScopeId) {
-      throw StateError(
-        'Full workspace replacement requires the active super-admin workspace',
-      );
-    }
-    var deleted = 0;
-    while (true) {
-      final query = TenantScope.applyToQuery(
-        _db.collection(path),
-        tenantId: tenantScopeId,
-      );
-      final snap = await query.limit(400).get();
-      if (snap.docs.isEmpty) break;
-      final batch = _db.batch();
-      for (final doc in snap.docs) {
-        batch.delete(doc.reference);
-      }
-      await batch.commit();
-      deleted += snap.docs.length;
-    }
-    return deleted;
-  }
-
   Future<int> _writeCollection(
     String path,
     List<dynamic> docs, {
@@ -457,6 +462,73 @@ class DatabaseBackupNotifier extends Notifier<void> {
     return docs.length;
   }
 
+  Future<int> _writePlatformUsers(
+    List<dynamic> docs, {
+    required UserModel actor,
+    required String tenantId,
+  }) async {
+    for (var start = 0; start < docs.length; start += 100) {
+      final batch = _db.batch();
+      final end = (start + 100).clamp(0, docs.length);
+      for (var index = start; index < end; index++) {
+        final raw = Map<String, dynamic>.from(docs[index] as Map);
+        final id = raw.remove('__id') as String;
+        final data = _restoreTypes(raw) as Map<String, dynamic>;
+        if (!TenantScope.matchesTenant(data, tenantId)) {
+          throw StateError('Backup contains a user from another workspace');
+        }
+        final role = (data['role'] as String? ?? '')
+            .trim()
+            .toLowerCase()
+            .replaceAll('-', '_');
+        if (role == 'super_admin' || role == 'superadmin') {
+          throw StateError('Platform super-admin profiles cannot be restored');
+        }
+        if (role == 'seller' &&
+            (data['assigned_route_ids'] as List<dynamic>? ?? const [])
+                .isEmpty) {
+          throw StateError('A seller profile must have an assigned route');
+        }
+
+        final reference = _db.collection(Collections.users).doc(id);
+        final existing = await reference.get();
+        if (!existing.exists) data['created_by'] = actor.id;
+        batch.set(reference, data, SetOptions(merge: true));
+      }
+      await batch.commit();
+    }
+    return docs.length;
+  }
+
+  Future<int> _deleteObsoleteTenantDocuments(
+    String path,
+    List<dynamic> docs,
+    String tenantId,
+  ) async {
+    final replacementIds = <String>{
+      for (final raw in docs) (raw as Map<String, dynamic>)['__id'] as String,
+    };
+
+    final existing = await fetchAllQueryDocuments(
+      TenantScope.applyToQuery(
+        _db.collection(path),
+        tenantId: tenantId,
+      ).orderBy(FieldPath.documentId),
+    );
+    final obsolete = existing
+        .where((document) => !replacementIds.contains(document.id))
+        .toList();
+    for (var i = 0; i < obsolete.length; i += 400) {
+      final batch = _db.batch();
+      final end = (i + 400).clamp(0, obsolete.length);
+      for (final document in obsolete.sublist(i, end)) {
+        batch.delete(document.reference);
+      }
+      await batch.commit();
+    }
+    return obsolete.length;
+  }
+
   // ─── Public API ────────────────────────────────────────────────────────────
 
   /// Creates a backup of [selected] collections.
@@ -467,6 +539,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
     ({
       Uint8List bytes,
       String localPath,
+      String fileName,
       String tenantId,
       String checksum,
       String scope,
@@ -478,13 +551,15 @@ class DatabaseBackupNotifier extends Notifier<void> {
     required String encryptionPassword,
     String? tenantIdOverride,
   }) async {
-    final adminUser = await ref.read(authUserProvider.future);
-    if (adminUser == null || !adminUser.active) {
-      throw StateError('An active user is required to create a backup');
+    final adminUser = await _requireBackupAdministrator();
+    final backupScope = BackupScopePolicy.scopeFor(adminUser.role);
+    final allowedCollections = BackupScopePolicy.collectionsFor(adminUser.role);
+    if (selected.isEmpty || !allowedCollections.containsAll(selected)) {
+      throw ArgumentError('Selected collections are not allowed for this role');
     }
     final ownTenantId = TenantScope.normalize(adminUser.tenantId);
     final requestedTenantId = TenantScope.normalize(tenantIdOverride);
-    final tenantScopeId = adminUser.isSuperAdmin ? ownTenantId : ownTenantId;
+    final tenantScopeId = ownTenantId;
     if (tenantScopeId == null) {
       throw StateError('Select an active workspace before creating a backup');
     }
@@ -500,27 +575,55 @@ class DatabaseBackupNotifier extends Notifier<void> {
       counts[key] = docs.length;
     }
 
-    if (selected.contains('routes')) await read('routes', Collections.routes);
-    if (selected.contains('shops')) await read('shops', Collections.shops);
-    if (selected.contains('products')) {
-      await read('products', Collections.products);
-      await read('product_variants', Collections.productVariants);
-    }
-    if (selected.contains('inventory')) {
-      await read('seller_inventory', Collections.sellerInventory);
-      await read('inventory_transactions', Collections.inventoryTransactions);
-    }
-    if (selected.contains('transactions')) {
-      await read('transactions', Collections.transactions);
-    }
-    if (selected.contains('invoices')) {
-      await read('invoices', Collections.invoices);
-    }
-    if (!adminUser.isSeller && selected.contains('users')) {
-      await read('users', Collections.users);
-    }
-    if (!adminUser.isSeller && selected.contains('settings')) {
-      await read('settings', Collections.settings);
+    if (backupScope == BackupScope.platformMetadata) {
+      if (selected.contains('workspaces')) {
+        final workspace = await _db
+            .collection(Collections.tenants)
+            .doc(tenantScopeId)
+            .get();
+        if (!workspace.exists) {
+          throw StateError('The selected workspace no longer exists');
+        }
+        data['workspaces'] = [
+          {
+            '__id': workspace.id,
+            ..._sanitize(workspace.data()!) as Map<String, dynamic>,
+          },
+        ];
+        counts['workspaces'] = 1;
+      }
+      if (selected.contains('users')) {
+        await read('users', Collections.users);
+        final workspaceUsers = (data['users'] as List<dynamic>).where((
+          document,
+        ) {
+          final role =
+              (document as Map<String, dynamic>)['role'] as String? ?? '';
+          return !BackupScopePolicy.isPlatformRole(role);
+        }).toList();
+        data['users'] = workspaceUsers;
+        counts['users'] = workspaceUsers.length;
+      }
+    } else {
+      if (selected.contains('routes')) await read('routes', Collections.routes);
+      if (selected.contains('shops')) await read('shops', Collections.shops);
+      if (selected.contains('products')) {
+        await read('products', Collections.products);
+        await read('product_variants', Collections.productVariants);
+      }
+      if (selected.contains('inventory')) {
+        await read('seller_inventory', Collections.sellerInventory);
+        await read('inventory_transactions', Collections.inventoryTransactions);
+      }
+      if (selected.contains('transactions')) {
+        await read('transactions', Collections.transactions);
+      }
+      if (selected.contains('invoices')) {
+        await read('invoices', Collections.invoices);
+      }
+      if (selected.contains('settings')) {
+        await read('settings', Collections.settings);
+      }
     }
 
     // Compute checksum BEFORE wrapping in metadata.
@@ -534,10 +637,8 @@ class DatabaseBackupNotifier extends Notifier<void> {
         'created_at': DateTime.now().toUtc().toIso8601String(),
         'created_by_uid': adminUser.id,
         'tenant_id': tenantScopeId,
-        'scope': adminUser.isSeller ? 'seller_routes' : 'workspace',
-        'route_ids': adminUser.isSeller
-            ? List<String>.from(adminUser.assignedRouteIds)
-            : const <String>[],
+        'scope': BackupScopePolicy.archiveScopeFor(adminUser.role),
+        'route_ids': const <String>[],
         'record_counts': counts,
         'checksum': checksum,
       },
@@ -552,20 +653,25 @@ class DatabaseBackupNotifier extends Notifier<void> {
     );
 
     await _recordBackupNow();
-    final localPath = await _saveToLocal(
-      bytes,
-      tenantId: tenantScopeId,
-      creatorUid: adminUser.id,
-    );
+    final createdAt = DateTime.now().toUtc();
+    final fileName =
+      'shoesERP_backup_${createdAt.year}${createdAt.month.toString().padLeft(2, '0')}${createdAt.day.toString().padLeft(2, '0')}_${createdAt.hour.toString().padLeft(2, '0')}${createdAt.minute.toString().padLeft(2, '0')}${createdAt.second.toString().padLeft(2, '0')}_${createdAt.microsecond.toString().padLeft(6, '0')}.shoesbackup';
+    final localPath = kIsWeb
+        ? ''
+        : await _saveToLocal(
+            bytes,
+            tenantId: tenantScopeId,
+            creatorUid: adminUser.id,
+            fileName: fileName,
+          );
     return (
       bytes: bytes,
       localPath: localPath,
+      fileName: fileName,
       tenantId: tenantScopeId,
       checksum: checksum,
-      scope: adminUser.isSeller ? 'seller_routes' : 'workspace',
-      routeIds: adminUser.isSeller
-          ? List<String>.from(adminUser.assignedRouteIds)
-          : const <String>[],
+      scope: BackupScopePolicy.archiveScopeFor(adminUser.role),
+      routeIds: const <String>[],
     );
   }
 
@@ -575,10 +681,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
     required String encryptionPassword,
     String? tenantIdOverride,
   }) async {
-    final user = await ref.read(authUserProvider.future);
-    if (user == null || !user.active) {
-      throw StateError('An active user is required for Google Drive backup');
-    }
+    final user = await _requireBackupAdministrator();
     final clearBytes = await BackupCipher.decrypt(
       archiveBytes: bytes,
       passphrase: encryptionPassword,
@@ -596,26 +699,28 @@ class DatabaseBackupNotifier extends Notifier<void> {
         'Backup workspace does not match the selected workspace',
       );
     }
+    if (preview.scope != BackupScopePolicy.archiveScopeFor(user.role)) {
+      throw StateError('Backup content does not match this account role');
+    }
     final checksum = preview.rawData.isEmpty ? '' : _checksum(preview.rawData);
-    return GoogleDriveBackupService.upload(
+    final uploaded = await GoogleDriveBackupService.upload(
       bytes: bytes,
       fileName: fileName,
       tenantId: tenantId,
       createdBy: user.id,
       checksum: checksum,
-      scope: user.isSeller ? 'seller_routes' : 'workspace',
-      routeIds: user.isSeller ? user.assignedRouteIds : const <String>[],
+      scope: preview.scope,
+      routeIds: const <String>[],
       formatVersion: BackupCipher.formatVersion,
     );
+    await _recordDriveBackupNow();
+    return uploaded;
   }
 
   Future<List<GoogleDriveBackupFile>> listDriveBackups({
     String? tenantIdOverride,
   }) async {
-    final user = await ref.read(authUserProvider.future);
-    if (user == null || !user.active) {
-      throw StateError('An active user is required for Google Drive backup');
-    }
+    final user = await _requireBackupAdministrator();
     final tenantId = user.isSuperAdmin
         ? TenantScope.normalize(tenantIdOverride)
         : TenantScope.normalize(user.tenantId);
@@ -624,7 +729,8 @@ class DatabaseBackupNotifier extends Notifier<void> {
     }
     return GoogleDriveBackupService.list(
       tenantId: tenantId,
-      createdBy: user.isSeller ? user.id : null,
+      scope: BackupScopePolicy.archiveScopeFor(user.role),
+      createdBy: null,
     );
   }
 
@@ -632,10 +738,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
     String fileId, {
     String? tenantIdOverride,
   }) async {
-    final user = await ref.read(authUserProvider.future);
-    if (user == null || !user.active) {
-      throw StateError('An active user is required for Google Drive restore');
-    }
+    final user = await _requireBackupAdministrator();
     final tenantId = user.isSuperAdmin
         ? TenantScope.normalize(tenantIdOverride)
         : TenantScope.normalize(user.tenantId);
@@ -645,7 +748,10 @@ class DatabaseBackupNotifier extends Notifier<void> {
     return GoogleDriveBackupService.download(
       fileId: fileId,
       tenantId: tenantId,
-      createdBy: user.isSeller ? user.id : null,
+      scope: BackupScopePolicy.archiveScopeFor(
+        (await ref.read(authUserProvider.future))!.role,
+      ),
+      createdBy: null,
     );
   }
 
@@ -690,6 +796,17 @@ class DatabaseBackupNotifier extends Notifier<void> {
     );
   }
 
+  Future<BackupPreview> decryptAndVerifyBackup({
+    required Uint8List archiveBytes,
+    required String passphrase,
+  }) async {
+    final clearBytes = await BackupCipher.decrypt(
+      archiveBytes: archiveBytes,
+      passphrase: passphrase,
+    );
+    return verifyBackup(clearBytes);
+  }
+
   /// Executes a restore from a verified [BackupPreview].
   ///
   /// ONLY call after the admin has confirmed via preview + password dialog.
@@ -697,52 +814,15 @@ class DatabaseBackupNotifier extends Notifier<void> {
   Future<int> restoreFromBackup(
     BackupPreview preview, {
     required String adminName,
-    String? routeId,
   }) async {
     final user = await ref.read(authUserProvider.future);
-    if (user == null || !user.active) {
+    if (user == null || !user.active || !user.canRestoreWorkspaceBackup) {
       throw StateError('An active user is required for restore');
     }
     if (!preview.checksumOk) {
       throw const FormatException('Backup checksum verification failed');
     }
     final currentTenantId = TenantScope.normalize(user.tenantId);
-    if (user.isSeller) {
-      final selectedRouteId = routeId?.trim() ?? '';
-      if (preview.scope != 'seller_routes' || selectedRouteId.isEmpty) {
-        throw StateError('Seller restore requires a route-scoped backup');
-      }
-      if (!preview.routeIds.contains(selectedRouteId) ||
-          !user.assignedRouteIds.contains(selectedRouteId)) {
-        throw StateError('Route access has been revoked');
-      }
-      final rawTransactions = preview.rawData['transactions'];
-      if (rawTransactions is! List) return 0;
-      final documents = rawTransactions
-          .whereType<Map<String, dynamic>>()
-          .map((doc) => _restoreTypes(doc) as Map<String, dynamic>)
-          .toList();
-      final restored = await ref
-          .read(transactionNotifierProvider.notifier)
-          .restoreSellerRouteTransactions(
-            routeId: selectedRouteId,
-            documents: documents,
-          );
-      await _recordRestoreNow(
-        user,
-        user.displayName.trim().isNotEmpty ? user.displayName : adminName,
-      );
-      return restored;
-    }
-    if (!user.isSuperAdmin) {
-      throw StateError(
-        'Full workspace replacement requires a platform super-admin. '
-        'Contact the platform administrator to request a restore.',
-      );
-    }
-    if (preview.scope != 'workspace') {
-      throw StateError('Full restore requires a workspace backup');
-    }
     if (preview.tenantId == TenantScope.globalTenantId) {
       throw StateError('A concrete workspace is required for full restore');
     }
@@ -751,11 +831,85 @@ class DatabaseBackupNotifier extends Notifier<void> {
         'Select the backup workspace as the active support workspace before restoring',
       );
     }
+
+    if (user.isSuperAdmin && preview.scope == 'platform_metadata') {
+      const allowed = BackupScopePolicy.platformMetadataCollections;
+      if (preview.rawData.keys.any((key) => !allowed.contains(key))) {
+        throw StateError(
+          'Platform backups may contain only workspace metadata and users',
+        );
+      }
+      for (final docs in preview.rawData.values) {
+        if (docs is! List) {
+          throw StateError('Platform backup collection data must be a list');
+        }
+        for (final rawDoc in docs) {
+          if (rawDoc is! Map<String, dynamic>) {
+            throw StateError('Platform backup contains an invalid record');
+          }
+          final documentId = rawDoc['__id'];
+          if (documentId is! String || documentId.trim().isEmpty) {
+            throw StateError('Platform backup contains a record without an ID');
+          }
+          if (!TenantScope.matchesTenant(rawDoc, preview.tenantId)) {
+            throw StateError('Platform backup contains another workspace');
+          }
+        }
+      }
+
+      var restored = 0;
+      final workspaces = preview.rawData['workspaces'];
+      if (workspaces != null) {
+        final workspaceDocs = workspaces as List<dynamic>;
+        if (workspaceDocs.any(
+          (doc) => (doc as Map<String, dynamic>)['__id'] != preview.tenantId,
+        )) {
+          throw StateError('Platform backup workspace ID does not match');
+        }
+        restored += await _writeCollection(
+          Collections.tenants,
+          workspaceDocs,
+          merge: true,
+        );
+      }
+      final users = preview.rawData['users'];
+      if (users != null) {
+        restored += await _writePlatformUsers(
+          users as List<dynamic>,
+          actor: user,
+          tenantId: preview.tenantId,
+        );
+      }
+      await _recordRestoreNow(user, adminName);
+      return restored;
+    }
+
+    if (preview.scope != 'workspace' ||
+        (!user.isTenantAdmin && !user.isSuperAdmin)) {
+      throw StateError(
+        'Workspace data restore is not permitted for this backup',
+      );
+    }
+    const allowedWorkspaceCollections =
+        BackupScopePolicy.workspaceBusinessCollections;
+    if (preview.rawData.keys.any(
+      (key) => !allowedWorkspaceCollections.contains(key),
+    )) {
+      throw StateError('Workspace backup contains unsupported collections');
+    }
     for (final docs in preview.rawData.values) {
-      if (docs is! List) continue;
+      if (docs is! List) {
+        throw StateError('Workspace backup collection data must be a list');
+      }
       for (final rawDoc in docs) {
-        if (rawDoc is Map<String, dynamic> &&
-            !TenantScope.matchesTenant(rawDoc, preview.tenantId)) {
+        if (rawDoc is! Map<String, dynamic>) {
+          throw StateError('Workspace backup contains an invalid record');
+        }
+        final documentId = rawDoc['__id'];
+        if (documentId is! String || documentId.trim().isEmpty) {
+          throw StateError('Workspace backup contains a record without an ID');
+        }
+        if (!TenantScope.matchesTenant(rawDoc, preview.tenantId)) {
           throw StateError('Backup contains another workspace');
         }
       }
@@ -770,17 +924,28 @@ class DatabaseBackupNotifier extends Notifier<void> {
       'inventory_transactions': Collections.inventoryTransactions,
       'transactions': Collections.transactions,
       'invoices': Collections.invoices,
+      'settings': Collections.settings,
     };
 
     var totalRestored = 0;
     for (final entry in collectionMap.entries) {
       final docs = preview.rawData[entry.key];
       if (docs == null) continue;
-      await _deleteCollection(entry.value, user, preview.tenantId);
       totalRestored += await _writeCollection(
         entry.value,
         docs as List<dynamic>,
       );
+    }
+    if (user.canPruneWorkspaceBackup) {
+      for (final entry in collectionMap.entries) {
+        final docs = preview.rawData[entry.key];
+        if (docs == null) continue;
+        await _deleteObsoleteTenantDocuments(
+          entry.value,
+          docs as List<dynamic>,
+          preview.tenantId,
+        );
+      }
     }
 
     await _recordRestoreNow(user, adminName);
@@ -793,6 +958,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
     ({
       Uint8List bytes,
       String localPath,
+      String fileName,
       String tenantId,
       String checksum,
       String scope,
@@ -800,44 +966,46 @@ class DatabaseBackupNotifier extends Notifier<void> {
     })?
   >
   checkAndAutoBackup() async {
-    final user = await ref.read(authUserProvider.future);
-    if (user == null || !user.active || kIsWeb) return null;
-    final enabled = await getAutoEnabled();
-    if (!enabled) return null;
-    final tenantId = TenantScope.normalize(user.tenantId);
-    if (tenantId == null) return null;
-    final passphrase = await _backupSecretStorage.read(
-      key: _securePassphraseKey(tenantId, user.id),
-    );
-    if (passphrase == null || passphrase.length < 12) return null;
-    if (kIsWeb) return null;
-    final intervalMinutes = await getIntervalMinutes();
-    final lastAt = await getLastBackupAt();
-    if (lastAt != null &&
-        DateTime.now().difference(lastAt).inMinutes < intervalMinutes) {
-      return null;
+    if (_autoBackupInProgress) return null;
+    _autoBackupInProgress = true;
+    try {
+      final user = await ref.read(authUserProvider.future);
+      if (user == null ||
+          !user.active ||
+          !user.canRunAutomaticWorkspaceBackup ||
+          kIsWeb ||
+          !GoogleDriveBackupService.isConfigured) {
+        return null;
+      }
+      final enabled = await getAutoEnabled();
+      if (!enabled) return null;
+      final tenantId = TenantScope.normalize(user.tenantId);
+      if (tenantId == null) return null;
+      final passphrase = await _backupSecretStorage.read(
+        key: _securePassphraseKey(tenantId, user.id),
+      );
+      if (passphrase == null || passphrase.length < 12) return null;
+      final intervalMinutes = await getIntervalMinutes();
+      final lastAt = await _getLastDriveBackupAt();
+      if (lastAt != null &&
+          DateTime.now().difference(lastAt).inMinutes < intervalMinutes) {
+        return null;
+      }
+      final result = await createBackup(
+        selected: BackupScopePolicy.collectionsFor(user.role),
+        encryptionPassword: passphrase,
+        tenantIdOverride: tenantId,
+      );
+      await uploadBackupToDrive(
+        bytes: result.bytes,
+        fileName: result.fileName,
+        tenantIdOverride: result.tenantId,
+        encryptionPassword: passphrase,
+      );
+      return result;
+    } finally {
+      _autoBackupInProgress = false;
     }
-    final result = await createBackup(
-      selected: const {
-        'routes',
-        'shops',
-        'products',
-        'inventory',
-        'transactions',
-        'invoices',
-        'users',
-        'settings',
-      },
-      encryptionPassword: passphrase,
-      tenantIdOverride: tenantId,
-    );
-    await uploadBackupToDrive(
-      bytes: result.bytes,
-      fileName: result.localPath.split(Platform.pathSeparator).last,
-      tenantIdOverride: result.tenantId,
-      encryptionPassword: passphrase,
-    );
-    return result;
   }
 }
 

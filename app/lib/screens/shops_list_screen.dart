@@ -471,10 +471,15 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
                 return AppPullRefresh(
                   onRefresh: () async {
-                    // sellerAllShopsProvider is a live Firestore stream —
-                    // it auto-updates; invalidating it forces a cold-start
-                    // reload that shows the full shimmer unnecessarily.
-                    await Future.delayed(const Duration(milliseconds: 300));
+                    if (isSeller && sellerRouteIds.isNotEmpty) {
+                      ref.invalidate(sellerAllShopsProvider);
+                      await ref.read(sellerAllShopsProvider.future);
+                    } else {
+                      ref.invalidate(shopsProvider);
+                      await ref.read(shopsProvider.future);
+                    }
+                    ref.invalidate(shopsAnalyticsTransactionsProvider);
+                    await ref.read(shopsAnalyticsTransactionsProvider.future);
                   },
                   child: ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),

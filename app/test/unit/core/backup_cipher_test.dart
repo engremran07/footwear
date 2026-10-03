@@ -62,13 +62,13 @@ void main() {
       );
     });
 
-    test('accepts legacy plaintext JSON archives', () async {
+    test('rejects legacy plaintext JSON archives', () async {
       final legacy = Uint8List.fromList(
         utf8.encode(jsonEncode({'metadata': {}, 'shops': []})),
       );
-      expect(
-        await BackupCipher.decrypt(archiveBytes: legacy, passphrase: ''),
-        orderedEquals(legacy),
+      await expectLater(
+        BackupCipher.decrypt(archiveBytes: legacy, passphrase: ''),
+        throwsA(isA<FormatException>()),
       );
     });
 

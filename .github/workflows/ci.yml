@@ -12,6 +12,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  firestore-rules:
+    name: Firestore Rules Emulator Tests
+    uses: ./.github/workflows/firestore-rules-tests.yml
+
   analyse:
     name: Flutter Analyze + Format
     runs-on: ubuntu-latest
@@ -121,18 +125,33 @@ jobs:
           with open('app/lib/core/l10n/app_locale.dart', 'r', encoding='utf-8') as f:
               content = f.read()
 
-          # Split into language blocks (rough split by the locale map boundaries)
-          blocks = re.split(r"case 'en':|case 'ar':|case 'ur':", content)
-          if len(blocks) < 4:
+            def locale_block(locale, next_locale=None):
+              start = f"AppLocale.{locale}: {{"
+              start_index = content.find(start)
+              if start_index < 0:
+                return None
+              body_start = start_index + len(start)
+              if next_locale is not None:
+                end_index = content.find(f"AppLocale.{next_locale}: {{", body_start)
+              else:
+                end_index = content.find("\n};", body_start)
+              if end_index < 0:
+                return None
+              return content[body_start:end_index]
+
+            en_block = locale_block('en', 'ar')
+            ar_block = locale_block('ar', 'ur')
+            ur_block = locale_block('ur')
+            if en_block is None or ar_block is None or ur_block is None:
               print('❌ Could not parse 3 language blocks')
               sys.exit(1)
 
           def extract_keys(block):
-              return set(re.findall(r"'([a-z][a-z0-9_]+)':", block))
+              return set(re.findall(r"^\s*'([a-z][a-z0-9_]+)'\s*:", block, re.MULTILINE))
 
-          en_keys = extract_keys(blocks[1])
-          ar_keys = extract_keys(blocks[2])
-          ur_keys = extract_keys(blocks[3])
+            en_keys = extract_keys(en_block)
+            ar_keys = extract_keys(ar_block)
+            ur_keys = extract_keys(ur_block)
 
           missing_ar = en_keys - ar_keys
           missing_ur = en_keys - ur_keys
@@ -260,7 +279,7 @@ jobs:
             exit 1
           fi
           # Validate indexes JSON is parseable
-          python3 -c "import json,sys; json.load(open('firestore.indexes.json'))" || {
+          python3 -c "import json; json.load(open('firestore.indexes.json', encoding='utf-8-sig'))" || {
             echo "❌ firestore.indexes.json is not valid JSON"
             exit 1
           }
@@ -281,3 +300,13 @@ jobs:
             exit 1
           fi
           echo "✅ No temp artifacts in tracked files"
+
+      - name: Gate 18 — No tracked node_modules
+        run: |
+          FOUND=$(git ls-files | grep -E '(^|/)node_modules/' || true)
+          if [ -n "$FOUND" ]; then
+            echo "❌ node_modules must not be tracked by git:"
+            echo "$FOUND" | head -20
+            exit 1
+          fi
+          echo "✅ No tracked node_modules"

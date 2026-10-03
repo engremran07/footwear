@@ -12,21 +12,16 @@ class AppBrand {
   static const String logoAsset = 'assets/images/app_icon.png';
 
   // ─── Version ─────────────────────────────────────────────────────────────
-  static const String appVersion = '3.9.52';
-  static const String buildNumber = '91';
+  static const String appVersion = '3.9.54';
+  static const String buildNumber = '93';
   static const String versionDisplay = 'v$appVersion+$buildNumber';
+  static const String releaseDateIso = '2026-10-03';
 
   // ─── Contact / About ─────────────────────────────────────────────────────
   static const String contactEmail = 'engremran89@gmail.com';
   static const String contactPhonePrimary = '+923067863310';
   static const String contactPhoneSecondary = '+966530421571';
   static const String websiteUrl = 'https://shoeserp-clean-20260327.web.app/';
-  static const String aboutDescription =
-      'FootWear is a comprehensive enterprise resource planning system '
-      'designed for footwear distribution businesses in Saudi Arabia. '
-      'It manages inventory, orders, payroll, quality control, '
-      'and financial reporting for KSA warehouse operations.';
-
   // ─── Arctic Palette ──────────────────────────────────────────────────────
   // Seed drives Material 3 tone generation; override specific roles below.
   static const Color arcticSeedColor = Color(0xFF0288D1); // Arctic Sky Blue

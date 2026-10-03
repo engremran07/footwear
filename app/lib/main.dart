@@ -9,11 +9,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app.dart';
+import 'core/l10n/app_locale.dart';
 import 'firebase_options.dart';
+import 'core/utils/auth_refresh_policy.dart';
 import 'providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  var firebaseInitialized = false;
 
   // Edge-to-edge: draw behind system bars so zoom drawer fills full screen
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -29,6 +32,7 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    firebaseInitialized = true;
 
     // S-01: Crashlytics — collect in release only (non-blocking)
     FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
@@ -71,6 +75,11 @@ void main() async {
     debugPrint('Firebase init failed: $e');
   }
 
+  if (!firebaseInitialized) {
+    runApp(const ProviderScope(child: _FirebaseInitializationFailureApp()));
+    return;
+  }
+
   runApp(const ProviderScope(child: FootwearErpApp()));
 
   // Post-first-frame: refresh token if user is remembered.
@@ -79,15 +88,77 @@ void main() async {
   });
 }
 
+class _FirebaseInitializationFailureApp extends ConsumerWidget {
+  const _FirebaseInitializationFailureApp();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.cloud_off_outlined,
+                    size: 44,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    tr('err_firebase_init_title', ref),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    tr('err_firebase_init_body', ref),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: () {
+                      main();
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: Text(tr('retry', ref)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 Future<void> _deferredTokenRefresh() async {
+  final bool rememberMe;
   try {
     final prefs = await SharedPreferences.getInstance();
-    final rememberMe = prefs.getBool(rememberMePrefKey) ?? true;
-    if (rememberMe && FirebaseAuth.instance.currentUser != null) {
-      await FirebaseAuth.instance.currentUser!.getIdToken(true);
+    rememberMe = prefs.getBool(rememberMePrefKey) ?? true;
+  } catch (e, stack) {
+    if (!kIsWeb) FirebaseCrashlytics.instance.recordError(e, stack);
+    return;
+  }
+  if (!rememberMe) return;
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  try {
+    await user.getIdToken(true);
+  } on FirebaseAuthException catch (e, stack) {
+    if (shouldSignOutAfterAuthRefreshFailure(e.code)) {
+      await FirebaseAuth.instance.signOut();
+    } else if (!kIsWeb) {
+      FirebaseCrashlytics.instance.recordError(e, stack);
     }
   } catch (e, stack) {
-    FirebaseCrashlytics.instance.recordError(e, stack);
-    await FirebaseAuth.instance.signOut();
+    if (!kIsWeb) FirebaseCrashlytics.instance.recordError(e, stack);
   }
 }

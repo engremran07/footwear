@@ -139,13 +139,15 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                 return AppPullRefresh(
                   onRefresh: () async {
                     if (_showInactive) {
-                      ref.invalidate(
-                        allInactiveUsersForTenantProvider(tenantId),
-                      );
+                      final provider =
+                          allInactiveUsersForTenantProvider(tenantId);
+                      ref.invalidate(provider);
+                      await ref.read(provider.future);
                     } else {
-                      ref.invalidate(tenantUsersProvider(tenantId));
+                      final provider = tenantUsersProvider(tenantId);
+                      ref.invalidate(provider);
+                      await ref.read(provider.future);
                     }
-                    await Future.delayed(const Duration(milliseconds: 300));
                   },
                   child: ListView.builder(
                     itemCount: filtered.length,

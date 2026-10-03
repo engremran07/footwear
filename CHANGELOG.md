@@ -7,6 +7,38 @@ Most recent first.
 
 ---
 
+## [3.9.54+93] — 2026-10-03 — Accessible status labels
+
+### Changed
+
+- Status chips now show localized labels and screen-reader context in English, Arabic, and Urdu.
+- High-contrast status colors now meet 4.5:1 contrast against the black surface.
+
+## [3.9.53+92] — 2026-10-03 — Workspace restore authorization
+
+### Added
+
+- Tenant admins can restore encrypted backups into their own workspace. Records absent from the archive are retained; only a selected super-admin can prune obsolete workspace records.
+- Firestore Rules Emulator tests are reusable from CI, deploy-web, and release workflows.
+- Tenant-scoped stock transfers, adjustments, returns, and financial writes now carry workspace identity and matching audit/ledger records.
+
+### Fixed
+
+- Restore controls and provider authorization now agree with the tenant-scoped role policy.
+- The restore preview explains when a tenant-admin restore will merge without deleting absent records, in English, Arabic, and Urdu.
+- Temporary token-refresh failures no longer force sign-out; Firebase initialization failures show a retry state instead of mounting the app shell.
+- Workspace assignment, stock, backup and transaction rules reject cross-tenant writes; plaintext backup restore is rejected.
+- Unsupported or missing role values are blocked from the seller UI and receive localized recovery guidance.
+
+### Repository hygiene
+
+- Removed tracked root `node_modules` and generated Flutter test-output files; CI runs the Firestore rules emulator suite.
+
+### Verification
+
+- Firestore Rules Emulator suite: 70 passing.
+- Focused user-role tests: 24 passing; `flutter analyze lib --no-pub` clean.
+
 ## [3.8.2+71] — 2026-04-19 — Backup hardening + deprecation cleanup
 
 ### Added

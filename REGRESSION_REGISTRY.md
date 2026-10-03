@@ -1,7 +1,7 @@
 # ShoesERP Regression Registry
 
 **Maintained by:** Autonomous AI agent system (88-agent governance pack v2.0)  
-**Last updated:** 2026-04-17 — Entry By name resolution fix / v3.7.11+59  
+**Last updated:** 2026-10-03 — Forensic audit and workspace restore / v3.9.53+92
 **Purpose:** Single source of truth for known regressions, deferred risks, and process improvements.
 
 ---
@@ -39,7 +39,7 @@
 | PI-002 | Financial | Replace `double` monetary arithmetic with integer-pence representation. Eliminates RR-002. Requires migration script for all Firestore `balance`,`amount` fields. | P0 on next accounting sprint |
 | PI-003 | UX/Security | Implement `local_auth` biometric/PIN re-authentication for admin lock screen overlay. Eliminates RR-003. | P1 on next auth sprint |
 | PI-004 | Performance | Replace hard pagination caps with cursor-based pagination (`startAfterDocument`). Required for routes >500 shops or sellers >150 transactions. Eliminates RR-004. | P1 on scale sprint |
-| PI-005 | Testing | Add Firebase Rules Emulator tests (`tests/firestore-rules/`) for permission matrix. Track seller write boundaries + admin-only paths. | P2 — ongoing |
+| PI-005 | Testing | Expand Firebase Rules Emulator tests for permission matrix and client payload boundaries. | P2 — reusable suite wired to CI/deploy/release; 70 tests passing, coverage expansion remains ongoing |
 | PI-006 | Observability | Integrate Crashlytics custom keys for `user_id`, `role`, `app_version` to correlate crashes with user context. | P2 |
 
 ---

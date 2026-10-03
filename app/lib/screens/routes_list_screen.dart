@@ -38,10 +38,12 @@ class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
             onRefresh: () async {
               if (isAdmin) {
                 ref.invalidate(routesProvider);
+                await ref.read(routesProvider.future);
               } else {
-                ref.invalidate(routesBySellerProvider(user?.id ?? ''));
+                final provider = routesBySellerProvider(user?.id ?? '');
+                ref.invalidate(provider);
+                await ref.read(provider.future);
               }
-              await Future.delayed(const Duration(milliseconds: 300));
             },
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),

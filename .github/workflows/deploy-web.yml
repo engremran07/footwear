@@ -9,8 +9,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  firestore-rules:
+    name: Firestore Rules Emulator Tests
+    uses: ./.github/workflows/firestore-rules-tests.yml
+
   deploy:
     name: Build & Deploy to Firebase Hosting
+    needs: firestore-rules
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -54,10 +59,14 @@ jobs:
           GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
           GOOGLE_DRIVE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_SERVER_CLIENT_ID }}
         run: |
-          test -n "$GOOGLE_DRIVE_CLIENT_ID" || { echo "Missing GOOGLE_DRIVE_CLIENT_ID secret"; exit 1; }
-          cd app && flutter build web --release \
-            --dart-define=GOOGLE_DRIVE_CLIENT_ID="$GOOGLE_DRIVE_CLIENT_ID" \
-            --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID"
+          if [ -z "$GOOGLE_DRIVE_CLIENT_ID" ]; then
+            echo "::warning::Google Drive OAuth is not configured; local encrypted backups remain available, but Drive backup is disabled."
+            cd app && flutter build web --release
+          else
+            cd app && flutter build web --release \
+              --dart-define=GOOGLE_DRIVE_CLIENT_ID="$GOOGLE_DRIVE_CLIENT_ID" \
+              --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID"
+          fi
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0

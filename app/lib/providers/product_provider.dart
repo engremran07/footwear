@@ -121,9 +121,9 @@ class ProductNotifier extends AsyncNotifier<void> {
 
   Future<String> createProduct(Map<String, dynamic> data) async {
     await _requireAdmin();
-    final tenantId =
-        TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
-        TenantScope.globalTenantId;
+    final tenantId = TenantScope.requireTenant(
+      (await ref.read(authUserProvider.future))?.tenantId,
+    );
     // enforce HTTPS for product image URLs
     final imageUrl = data['image_url'] as String? ?? '';
     if (imageUrl.isNotEmpty && !imageUrl.startsWith('https://')) {
@@ -141,9 +141,9 @@ class ProductNotifier extends AsyncNotifier<void> {
 
   Future<void> updateProduct(String id, Map<String, dynamic> data) async {
     await _requireAdmin();
-    final tenantId =
-        TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
-        TenantScope.globalTenantId;
+    final tenantId = TenantScope.requireTenant(
+      (await ref.read(authUserProvider.future))?.tenantId,
+    );
     // enforce HTTPS for product image URLs on update
     final imageUrl = data['image_url'] as String? ?? '';
     if (imageUrl.isNotEmpty && !imageUrl.startsWith('https://')) {
@@ -168,9 +168,9 @@ class ProductNotifier extends AsyncNotifier<void> {
 
   Future<void> createVariant(Map<String, dynamic> data) async {
     await _requireAdmin();
-    final tenantId =
-        TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
-        TenantScope.globalTenantId;
+    final tenantId = TenantScope.requireTenant(
+      (await ref.read(authUserProvider.future))?.tenantId,
+    );
     await FirebaseFirestore.instance
         .collection(Collections.productVariants)
         .add({
@@ -183,9 +183,9 @@ class ProductNotifier extends AsyncNotifier<void> {
 
   Future<void> updateVariant(String id, Map<String, dynamic> data) async {
     await _requireAdmin();
-    final tenantId =
-        TenantScope.normalize(ref.read(authUserProvider).value?.tenantId) ??
-        TenantScope.globalTenantId;
+    final tenantId = TenantScope.requireTenant(
+      (await ref.read(authUserProvider.future))?.tenantId,
+    );
     await FirebaseFirestore.instance
         .collection(Collections.productVariants)
         .doc(id)
@@ -213,8 +213,13 @@ class ProductNotifier extends AsyncNotifier<void> {
     final db = FirebaseFirestore.instance;
     final now = Timestamp.now();
     final adminId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final currentUser = await ref.read(authUserProvider.future);
+    final tenantId = TenantScope.normalize(currentUser?.tenantId);
     if (adminId.trim().isEmpty) {
       throw StateError('Not authenticated');
+    }
+    if (tenantId == null) {
+      throw StateError('An active workspace is required to adjust stock');
     }
 
     await db.runTransaction<void>((txn) async {
@@ -251,26 +256,82 @@ class ProductNotifier extends AsyncNotifier<void> {
         'notes': 'manual_adjustment',
         'created_by': adminId,
         'created_at': now,
+        'tenant_id': tenantId,
       });
     });
   }
 
   Future<void> batchAdjustStock(Map<String, int> updates) async {
     if (updates.isEmpty) return;
-
-    final batch = FirebaseFirestore.instance.batch();
-    final collRef = FirebaseFirestore.instance.collection(
-      Collections.productVariants,
-    );
-
-    for (final entry in updates.entries) {
-      batch.update(collRef.doc(entry.key), {
-        'quantity_available': FieldValue.increment(entry.value),
-        'updated_at': Timestamp.now(),
-      });
+    await _requireAdmin();
+    final currentUser = await ref.read(authUserProvider.future);
+    final tenantId = TenantScope.normalize(currentUser?.tenantId);
+    final adminId = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
+    if (tenantId == null) {
+      throw StateError('An active workspace is required to adjust stock');
+    }
+    if (adminId.isEmpty) throw StateError('Not authenticated');
+    if (updates.length > 250) {
+      throw ArgumentError(
+        'A stock adjustment can include at most 250 variants',
+      );
+    }
+    if (updates.keys.any((id) => id.trim().isEmpty)) {
+      throw ArgumentError('variantId must not be empty');
     }
 
-    await batch.commit();
+    final db = FirebaseFirestore.instance;
+    final entries = updates.entries.toList();
+    final variantRefs = entries.map(
+      (entry) => db.collection(Collections.productVariants).doc(entry.key),
+    );
+    await db.runTransaction<void>((txn) async {
+      final snapshots = <DocumentSnapshot<Map<String, dynamic>>>[];
+      for (final ref in variantRefs) {
+        snapshots.add(await txn.get(ref));
+      }
+      final now = Timestamp.now();
+      for (var index = 0; index < snapshots.length; index++) {
+        final snapshot = snapshots[index];
+        final entry = entries[index];
+        if (!snapshot.exists) {
+          throw ArgumentError('Variant not found: ${entry.key}');
+        }
+        final currentQty =
+            (snapshot.data()?['quantity_available'] as num?)?.toInt() ?? 0;
+        if (currentQty + entry.value < 0) {
+          throw ArgumentError('Stock cannot be negative');
+        }
+      }
+
+      for (var index = 0; index < snapshots.length; index++) {
+        final snapshot = snapshots[index];
+        final entry = entries[index];
+        if (entry.value == 0) continue;
+        final data = snapshot.data()!;
+        final currentQty = (data['quantity_available'] as num?)?.toInt() ?? 0;
+        txn.update(snapshot.reference, {
+          'quantity_available': currentQty + entry.value,
+          'updated_at': now,
+        });
+        txn.set(db.collection(Collections.inventoryTransactions).doc(), {
+          'type': 'stock_adjustment',
+          'seller_id': '',
+          'seller_name': 'warehouse',
+          'product_id': (data['product_id'] as String?) ?? '',
+          'variant_id': entry.key,
+          'variant_name': (data['variant_name'] as String?) ?? '',
+          'quantity': entry.value.abs(),
+          'direction': entry.value > 0 ? 'in' : 'out',
+          'previous_quantity': currentQty,
+          'new_quantity': currentQty + entry.value,
+          'notes': 'manual_adjustment',
+          'created_by': adminId,
+          'created_at': now,
+          'tenant_id': tenantId,
+        });
+      }
+    });
   }
 
   /// Transfers stock from warehouse to a seller.
@@ -296,6 +357,14 @@ class ProductNotifier extends AsyncNotifier<void> {
     }
     if (quantity <= 0) {
       throw ArgumentError('quantity must be positive');
+    }
+    final currentUser = await ref.read(authUserProvider.future);
+    final tenantId = TenantScope.normalize(currentUser?.tenantId);
+    if (tenantId == null) {
+      throw StateError('An active workspace is required to transfer stock');
+    }
+    if (FirebaseAuth.instance.currentUser?.uid != normalizedAdminId) {
+      throw ArgumentError('adminId must match the authenticated user');
     }
     final db = FirebaseFirestore.instance;
     final now = Timestamp.now();
@@ -334,6 +403,7 @@ class ProductNotifier extends AsyncNotifier<void> {
         'variant_name': variantName,
         'quantity_available': sellerCurrent + quantity,
         'active': true,
+        'tenant_id': tenantId,
         'created_at': sellerSnap.exists
             ? (sellerSnap.data()?['created_at'] ?? now)
             : now,
@@ -353,6 +423,7 @@ class ProductNotifier extends AsyncNotifier<void> {
         'notes': null,
         'created_by': normalizedAdminId,
         'created_at': now,
+        'tenant_id': tenantId,
       });
     });
   }

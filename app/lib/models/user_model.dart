@@ -1,43 +1,22 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
+import '../core/utils/role_names.dart';
 
-enum UserRole { admin, seller, tenantAdmin, superAdmin }
+enum UserRole { admin, seller, tenantAdmin, superAdmin, unknown }
 
-/// P1-8 FIX: Convert role string to UserRole enum with explicit defaulting and logging.
-/// Vibe Debt Signal: empty or null role strings should be logged to surface data quality issues.
-UserRole _roleFromString(String s) {
-  if (s.isEmpty) {
-    debugPrint('[VIB] P1-8 Signal: Empty role string; defaulting to seller');
-    return UserRole.seller;
-  }
-
-  final role = s.trim().toLowerCase();
-
-  if (role.isEmpty) {
-    debugPrint(
-      '[VIB] P1-8 Signal: Whitespace-only role string; defaulting to seller',
-    );
-    return UserRole.seller;
-  }
-
-  switch (role) {
+UserRole _roleFromString(String value) {
+  switch (canonicalRoleName(value)) {
     case 'admin':
-    case 'manager':
       return UserRole.admin;
     case 'tenant_admin':
-    case 'tenant-admin':
-    case 'tenantadmin':
       return UserRole.tenantAdmin;
     case 'super_admin':
-    case 'super-admin':
-    case 'superadmin':
       return UserRole.superAdmin;
     case 'seller':
       return UserRole.seller;
     default:
-      // Unknown role: log and default to seller (safest)
-      debugPrint('[VIB] P1-8 Signal: Unknown role "$s"; defaulting to seller');
-      return UserRole.seller;
+      debugPrint('[SEC] Unsupported account role; access remains blocked');
+      return UserRole.unknown;
   }
 }
 
@@ -51,6 +30,8 @@ String _roleToString(UserRole r) {
       return 'tenant_admin';
     case UserRole.superAdmin:
       return 'super_admin';
+    case UserRole.unknown:
+      return 'unknown';
   }
 }
 
@@ -105,6 +86,11 @@ class UserModel {
   bool get isSeller => role == UserRole.seller;
   bool get isTenantAdmin => role == UserRole.tenantAdmin;
   bool get isSuperAdmin => role == UserRole.superAdmin;
+  bool get isRoleRecognized => role != UserRole.unknown;
+  bool get canCreateWorkspaceBackup => isTenantAdmin || isSuperAdmin;
+  bool get canRunAutomaticWorkspaceBackup => isTenantAdmin;
+  bool get canRestoreWorkspaceBackup => isTenantAdmin || isSuperAdmin;
+  bool get canPruneWorkspaceBackup => isSuperAdmin;
   String? get tenantId => isSuperAdmin ? activeWorkspaceId : _tenantId;
 
   /// True for any user who can carry vehicle (seller) inventory.
@@ -128,7 +114,7 @@ class UserModel {
         rawRouteNames?.cast<String>().toList() ?? const <String>[];
     final pairedDeviceIds = rawPairedDevices.cast<String>().toList();
 
-    final role = _roleFromString(json['role'] as String? ?? 'seller');
+    final role = _roleFromString(json['role'] as String? ?? '');
     return UserModel(
       id: docId,
       email: json['email'] as String? ?? '',

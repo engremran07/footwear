@@ -1,8 +1,12 @@
-﻿# FootWear ERP — Flutter App (v3.9.50+89)
+﻿# FootWear ERP — Flutter App (v3.9.54+93)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
 > **v3.7.5+53 (2026-04-15)** — Current app baseline includes the post-audit hardening pass: stricter provider guards, tighter invoice and Firestore validation, export query caps, model utility cleanup, theme-safe loading widgets, and workflow normalization on Flutter 3.41.6 with expanded test reporting.
+
+Workspace backup restore is tenant-scoped. Tenant admins merge encrypted backup records into their own workspace without deleting records missing from the archive; selected platform super-admins retain replacement/pruning access for the active support workspace. Unsupported role values are blocked from business navigation and show localized recovery guidance.
+
+Status chips display localized text and use high-contrast state colors when that theme is selected.
 
 ---
 
@@ -133,6 +137,8 @@ Platform super-admin accounts are provisioned out of band. The client never embe
 | `seller` | Assigned route only — read + create transactions |
 
 Dashboard and inventory suppress transient permission-denied states during auth/profile stream warm-up. Role-scoped providers stay in loading or cached fallback until access is confirmed.
+
+Workspace business access for platform super-admins expires after 8 hours and remains enforced by Firestore rules. Mutations require a concrete tenant; local admins manage seller accounts only; seller-stock reductions must match a same-batch invoice deduction. Financial corrections preserve prior values, actor, and reason. Exports cursor-page to exhaustion; tenant-admin restore is upsert-only, while selected super-admin restore can prune after upserting. Plaintext legacy backup archives are rejected. Transient token-refresh failures preserve the session, and Firebase initialization failure shows a retry state.
 
 ---
 
