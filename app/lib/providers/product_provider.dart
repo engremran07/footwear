@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/firestore_pagination.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/product_model.dart';
@@ -101,6 +102,31 @@ final allVariantsProvider =
         return variants;
       });
     });
+
+/// Complete active warehouse-variant dataset for explicit report exports.
+/// The live inventory stream remains bounded for interactive screens.
+final allVariantsExportProvider = FutureProvider<List<ProductVariantModel>>((
+  ref,
+) async {
+  final user = await ref.read(authUserProvider.future);
+  if (user == null || !user.active || !user.isAdmin) {
+    return const <ProductVariantModel>[];
+  }
+  final tenantId = TenantScope.normalize(user.tenantId);
+  if (tenantId == null) return const <ProductVariantModel>[];
+  final query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.productVariants),
+    tenantId: tenantId,
+  ).where('active', isEqualTo: true);
+  final documents = await fetchAllQueryDocuments(query);
+  final variants = documents
+      .map((document) => ProductVariantModel.fromJson(document.data(), document.id))
+      .toList();
+  variants.sort(
+    (a, b) => a.variantName.toLowerCase().compareTo(b.variantName.toLowerCase()),
+  );
+  return variants;
+});
 
 class ProductNotifier extends AsyncNotifier<void> {
   @override

@@ -12,16 +12,16 @@ import '../providers/settings_provider.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
 
-String _stockLabel(int qty, int ppc) {
-  if (qty <= 0) return '0 prs';
+String _stockLabel(int qty, int ppc, WidgetRef ref) {
+  if (qty <= 0) return '0 ${tr('pairs', ref)}';
   final cartons = qty ~/ ppc;
   final rem1 = qty % ppc;
   final dozens = rem1 ~/ 12;
   final pairs = rem1 % 12;
   final parts = <String>[];
-  if (cartons > 0) parts.add('$cartons ctn');
-  if (dozens > 0) parts.add('$dozens dz');
-  if (pairs > 0 || parts.isEmpty) parts.add('$pairs prs');
+  if (cartons > 0) parts.add('$cartons ${tr('cartons', ref)}');
+  if (dozens > 0) parts.add('$dozens ${tr('lbl_cartons', ref)}');
+  if (pairs > 0 || parts.isEmpty) parts.add('$pairs ${tr('pairs', ref)}');
   return parts.join(' ');
 }
 
@@ -63,7 +63,8 @@ class ProductDetailScreen extends ConsumerWidget {
                     IconButton(
                       icon: const Icon(Icons.share),
                       tooltip: tr('share_product', ref),
-                      onPressed: () {
+                      onPressed: variantsAsync.hasValue
+                          ? () {
                         final variants = variantsAsync.value ?? [];
                         final ppc = settings?.pairsPerCarton ?? 12;
                         final totalStock = variants.fold<int>(
@@ -79,21 +80,22 @@ class ProductDetailScreen extends ConsumerWidget {
                             '${tr('total_variants', ref)}: ${variants.length}',
                           )
                           ..writeln(
-                            '${tr('stock_pairs', ref)}: ${_stockLabel(totalStock, ppc)}',
+                            '${tr('stock_pairs', ref)}: ${_stockLabel(totalStock, ppc, ref)}',
                           );
                         for (final v in variants) {
                           buf.writeln(
-                            '  ${v.variantName}: ${_stockLabel(v.quantityAvailable, ppc)}',
+                            '  ${v.variantName}: ${_stockLabel(v.quantityAvailable, ppc, ref)}',
                           );
                         }
                         shareText(buf.toString());
                         HapticFeedback.lightImpact();
-                      },
+                      }
+                          : null,
                     ),
                     if (user?.isAdmin == true)
                       IconButton(
                         icon: const Icon(Icons.edit),
-                        tooltip: 'Edit product',
+                        tooltip: tr('edit_product', ref),
                         onPressed: () =>
                             context.push('/products/$productId/edit'),
                       ),
@@ -168,7 +170,7 @@ class ProductDetailScreen extends ConsumerWidget {
                             _PStatChip(
                               icon: Icons.inventory,
                               label: tr('stock_pairs', ref),
-                              value: _stockLabel(totalStock, ppc),
+                              value: _stockLabel(totalStock, ppc, ref),
                               color: cs.primary,
                             ),
                             _PStatChip(
@@ -268,6 +270,7 @@ class ProductDetailScreen extends ConsumerWidget {
                                   _stockLabel(
                                     v.quantityAvailable,
                                     settings?.pairsPerCarton ?? 12,
+                                    ref,
                                   ),
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,

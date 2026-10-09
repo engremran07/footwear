@@ -106,21 +106,25 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
   // Cache normalized haystack per shop ID to avoid re-computing on every
   // keystroke for every shop in the list.
-  final Map<String, String> _haystackCache = {};
+  final Map<String, ({String source, String normalized})> _haystackCache = {};
 
   String _shopHaystack(ShopModel s) {
-    return _haystackCache.putIfAbsent(s.id, () {
-      return [
-        s.name,
-        s.phone ?? '',
-        s.area ?? '',
-        s.city ?? '',
-        s.address ?? '',
-        s.contactName ?? '',
-        'r${s.routeNumber}',
-        '${s.routeNumber}',
-      ].map(_normalizeSearchText).join(' ');
-    });
+    final source = [
+      s.name,
+      s.phone ?? '',
+      s.area ?? '',
+      s.city ?? '',
+      s.address ?? '',
+      s.contactName ?? '',
+      'r${s.routeNumber}',
+      '${s.routeNumber}',
+    ].join(' ');
+    final cached = _haystackCache[s.id];
+    if (cached?.source == source) return cached!.normalized;
+
+    final normalized = _normalizeSearchText(source);
+    _haystackCache[s.id] = (source: source, normalized: normalized);
+    return normalized;
   }
 
   bool _matchesSearch(ShopModel s, String q) {
@@ -225,9 +229,11 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                       ),
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () => context.go('/shops'),
-                    child: const Icon(
+                  IconButton(
+                    tooltip: tr('clear', ref),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => context.go('/shops'),
+                    icon: const Icon(
                       Icons.close,
                       size: 16,
                       color: AppBrand.warningColor,
@@ -350,7 +356,34 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                 );
               },
               loading: () => const SizedBox.shrink(),
-              error: (_, _) => const SizedBox.shrink(),
+              error: (error, _) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        tr(AppErrorMapper.key(error), ref),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: tr('retry', ref),
+                      icon: const Icon(Icons.refresh),
+                      onPressed: () {
+                        if (user?.isAdmin == true) {
+                          ref.invalidate(routesProvider);
+                        } else if (user != null) {
+                          ref.invalidate(routesBySellerProvider(user.id));
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
             ),
           // Stats strip — derived from the live shop list
           if (scopedStatsShops != null && flowByShop != null)
@@ -432,9 +465,61 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                 }
 
                 if (filtered.isEmpty) {
-                  return EmptyState(
-                    icon: Icons.store,
-                    message: tr('no_shops', ref),
+                  final hasFilters =
+                      _search.isNotEmpty ||
+                      _filter != _ShopQuickFilter.collective ||
+                      _selectedRouteId != null ||
+                      filterCurrency != null;
+                  return AppPullRefresh(
+                    onRefresh: () async {
+                      if (isSeller && sellerRouteIds.isNotEmpty) {
+                        ref.invalidate(sellerAllShopsProvider);
+                        await ref.read(sellerAllShopsProvider.future);
+                      } else {
+                        ref.invalidate(shopsProvider);
+                        await ref.read(shopsProvider.future);
+                      }
+                      ref.invalidate(shopsAnalyticsTransactionsProvider);
+                      await ref.read(shopsAnalyticsTransactionsProvider.future);
+                    },
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.sizeOf(context).height * 0.45,
+                          child: EmptyState(
+                            icon: hasFilters ? Icons.search_off : Icons.store,
+                            message: hasFilters
+                                ? tr(
+                                    _search.isNotEmpty
+                                        ? 'no_results'
+                                        : 'msg_no_shops_found',
+                                    ref,
+                                  )
+                                : tr('no_shops', ref),
+                            actionLabel: hasFilters
+                                ? tr(
+                                    _search.isNotEmpty ? 'clear_search' : 'clear',
+                                    ref,
+                                  )
+                                : null,
+                            onAction: hasFilters
+                                ? () {
+                                    if (filterCurrency != null) {
+                                      context.go('/shops');
+                                      return;
+                                    }
+                                    setState(() {
+                                      _search = '';
+                                      _filter = _ShopQuickFilter.collective;
+                                      _selectedRouteId = null;
+                                    });
+                                  }
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 }
 
@@ -530,6 +615,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
   void _exportAllShops(List<ShopModel> shops, List<RouteModel> routes) {
     final routeMap = {for (final r in routes) r.id: r};
+    final fallbackCurrency = ref.read(settingsProvider).value?.currency ?? 'SAR';
     final headers = [
       triCol('name'),
       triCol('route'),
@@ -544,7 +630,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         r != null ? '${r.routeNumber} · ${r.name}' : '-',
         s.phone ?? '-',
         s.area ?? '-',
-        s.balance,
+        AppFormatters.currency(s.balance, r?.currency ?? fallbackCurrency),
       ];
     }).toList();
     ExportSheet.show(
@@ -559,6 +645,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
   void _exportPerRoute(List<ShopModel> shops, List<RouteModel> routes) {
     final routeMap = {for (final r in routes) r.id: r};
+    final fallbackCurrency = ref.read(settingsProvider).value?.currency ?? 'SAR';
     final sorted = List.of(routes)
       ..sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
 
@@ -583,7 +670,12 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       // Insert route header as a separator row
       allRows.add(['── ${r.routeNumber} · ${r.name} ──', '', '', '']);
       for (final s in items) {
-        allRows.add([s.name, s.phone ?? '-', s.area ?? '-', s.balance]);
+        allRows.add([
+          s.name,
+          s.phone ?? '-',
+          s.area ?? '-',
+          AppFormatters.currency(s.balance, r.currency),
+        ]);
       }
     }
 
@@ -595,7 +687,12 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     if (unassigned.isNotEmpty) {
       allRows.add(['── ${tr('shops_unassigned', ref)} ──', '', '', '']);
       for (final s in unassigned) {
-        allRows.add([s.name, s.phone ?? '-', s.area ?? '-', s.balance]);
+        allRows.add([
+          s.name,
+          s.phone ?? '-',
+          s.area ?? '-',
+          AppFormatters.currency(s.balance, fallbackCurrency),
+        ]);
       }
     }
 
@@ -767,6 +864,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
               shopName: shop.name,
               routeLabel: '${route.routeNumber} · ${route.name}',
               openingBalance: shop.balance - netTx,
+              currency: route.currency,
               transactions: shopTxs,
             ),
           );
@@ -786,6 +884,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
             shopName: shop.name,
             routeLabel: tr('shops_unassigned', ref),
             openingBalance: shop.balance - netTx,
+            currency: settings.currency,
             transactions: shopTxs,
           ),
         );
@@ -820,6 +919,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       final excelHeaders = [
         triCol('name'),
         triCol('route'),
+        triCol('currency'),
         triCol('date'),
         triCol('description'),
         triCol('debit'),
@@ -832,6 +932,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
           excelRows.add([
             section.shopName,
             section.routeLabel,
+            section.currency,
             AppFormatters.dateOnly(tx.createdAt.toDate()),
             tx.description ?? '',
             isDebit ? tx.amount.toStringAsFixed(2) : '',

@@ -13,6 +13,7 @@ import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/error_state.dart';
 
 class RouteFormScreen extends ConsumerStatefulWidget {
   final String? routeId;
@@ -67,6 +68,14 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
     bool saved = false;
     try {
       final user = await ref.read(authUserProvider.future);
+      if (user?.isAdmin != true) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
+        }
+        return;
+      }
       final createdBy = user?.id.trim() ?? '';
       final Map<String, dynamic> data = {
         'name': AppSanitizer.name(_nameC.text),
@@ -131,7 +140,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
 
-    final sellers = ref.watch(sellersProvider).value ?? [];
+    final sellersAsync = ref.watch(sellersProvider);
     final cs = Theme.of(context).colorScheme;
 
     return PopScope(
@@ -192,31 +201,47 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 8),
-                  if (sellers.isEmpty)
-                    Text(
-                      tr('no_sellers', ref),
-                      style: TextStyle(color: cs.outline),
-                    )
-                  else
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: sellers.map((s) {
-                        final selected = _selectedSellerIds.contains(s.id);
-                        return FilterChip(
-                          label: Text(
-                            s.displayName,
-                            style: AppFonts.userName(
-                              ref.watch(appLocaleProvider).locale.languageCode,
-                              fontSize: 13,
-                              color: cs.onSurface,
-                            ),
-                          ),
-                          selected: selected,
-                          onSelected: (_) => _toggleSeller(s.id, s.displayName),
-                        );
-                      }).toList(),
+                  sellersAsync.when(
+                    loading: () => const LinearProgressIndicator(),
+                    error: (error, _) => mappedErrorState(
+                      error: error,
+                      ref: ref,
+                      onRetry: () => ref.invalidate(sellersProvider),
                     ),
+                    data: (sellers) {
+                      if (sellers.isEmpty) {
+                        return Text(
+                          tr('no_sellers', ref),
+                          style: TextStyle(color: cs.outline),
+                        );
+                      }
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: sellers.map((seller) {
+                          final selected = _selectedSellerIds.contains(
+                            seller.id,
+                          );
+                          return FilterChip(
+                            label: Text(
+                              seller.displayName,
+                              style: AppFonts.userName(
+                                ref
+                                    .watch(appLocaleProvider)
+                                    .locale
+                                    .languageCode,
+                                fontSize: 13,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            selected: selected,
+                            onSelected: (_) =>
+                                _toggleSeller(seller.id, seller.displayName),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,

@@ -323,9 +323,7 @@ class _AppShellState extends ConsumerState<AppShell>
 
   Widget _workspaceContextBanner(UserModel user) {
     final tenantId = user.tenantId;
-    if (tenantId == null || (!user.isSuperAdmin && !user.isTenantAdmin)) {
-      return const SizedBox.shrink();
-    }
+    if (tenantId == null) return const SizedBox.shrink();
     final tenantName = ref
         .watch(tenantProvider(tenantId))
         .when(

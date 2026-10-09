@@ -1078,6 +1078,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'select_at_least_one_item': 'Select at least one item',
     'sale_amount': 'Sale Amount',
     'amount_received': 'Amount Received',
+    'invoice_payment_exceeds_total':
+        'Amount received cannot exceed this invoice total.',
     'outstanding_amount': 'Outstanding Amount',
     'subtotal': 'Subtotal',
     'discount': 'Discount',
@@ -1182,6 +1184,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'settings_company_logo': 'Company Logo',
     'settings_logo_specs':
         'PDF reports · PNG/JPG · max 800×400 px · max 300 KB',
+    'settings_invalid_pairs_per_carton':
+        'Pairs per carton must be a positive whole number.',
+    'settings_logo_image_too_large':
+        'Image is %s. Use a simpler image or reduce dimensions to 256×256 px.',
+    'settings_logo_encoded_too_large':
+        'Encoded logo is %s, which exceeds the 50 KB limit.',
     'lbl_preview': 'Preview · %s',
     'settings_uploading_pct': 'Uploading… %s%%',
     'settings_uploading': 'Uploading…',
@@ -2414,6 +2422,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'select_at_least_one_item': 'اختر عنصرًا واحدًا على الأقل',
     'sale_amount': 'مبلغ البيع',
     'amount_received': 'المبلغ المستلم',
+    'invoice_payment_exceeds_total':
+        'لا يمكن أن يتجاوز المبلغ المستلم إجمالي هذه الفاتورة.',
     'outstanding_amount': 'المبلغ المستحق',
     'subtotal': 'الإجمالي الفرعي',
     'discount': 'الخصم',
@@ -2519,6 +2529,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'settings_company_logo': 'شعار الشركة',
     'settings_logo_specs':
         'تقارير PDF · PNG/JPG · بحد أقصى 800×400 بكسل · 300 كيلوبايت',
+    'settings_invalid_pairs_per_carton':
+        'يجب أن يكون عدد الأزواج في الكرتون رقمًا صحيحًا موجبًا.',
+    'settings_logo_image_too_large':
+        'حجم الصورة %s. استخدم صورة أبسط أو قلّل الأبعاد إلى 256×256 بكسل.',
+    'settings_logo_encoded_too_large':
+        'حجم الشعار المشفّر %s ويتجاوز الحد الأقصى البالغ 50 كيلوبايت.',
     'lbl_preview': 'معاينة · %s',
     'settings_uploading_pct': 'جارٍ الرفع… %s%%',
     'settings_uploading': 'جارٍ الرفع…',
@@ -3760,6 +3776,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'select_at_least_one_item': 'کم از کم ایک آئٹم منتخب کریں',
     'sale_amount': 'فروخت کی رقم',
     'amount_received': 'وصول شدہ رقم',
+    'invoice_payment_exceeds_total':
+        'وصول شدہ رقم اس رسید کی کل رقم سے زیادہ نہیں ہو سکتی۔',
     'outstanding_amount': 'واجب الادا رقم',
     'subtotal': 'ذیلی کل',
     'discount': 'رعایت',
@@ -3865,6 +3883,12 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'settings_company_logo': 'کمپنی لوگو',
     'settings_logo_specs':
         'PDF رپورٹس · PNG/JPG · زیادہ سے زیادہ 800×400 px · 300 KB',
+    'settings_invalid_pairs_per_carton':
+        'فی کارٹن جوڑوں کی تعداد مثبت مکمل عدد ہونی چاہیے۔',
+    'settings_logo_image_too_large':
+        'تصویر کا سائز %s ہے۔ آسان تصویر استعمال کریں یا سائز 256×256 px تک کم کریں۔',
+    'settings_logo_encoded_too_large':
+        'انکوڈ شدہ لوگو کا سائز %s ہے، جو 50 KB کی حد سے زیادہ ہے۔',
     'lbl_preview': 'پیش نظارہ · %s',
     'settings_uploading_pct': 'اپلوڈ ہو رہا ہے… %s%%',
     'settings_uploading': 'اپلوڈ ہو رہا ہے…',

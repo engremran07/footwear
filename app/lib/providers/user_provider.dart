@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/firestore_pagination.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
 import '../firebase_options.dart';
@@ -59,8 +60,8 @@ final allUsersExportProvider = FutureProvider<List<UserModel>>((ref) async {
     FirebaseFirestore.instance.collection(Collections.users),
     tenantId: tenantId,
   );
-  final snap = await query.limit(200).get();
-  return snap.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList();
+  final docs = await fetchAllQueryDocuments(query);
+  return docs.map((document) => UserModel.fromJson(document.data(), document.id)).toList();
 });
 
 final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {

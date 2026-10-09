@@ -159,6 +159,11 @@ final invoiceByIdProvider = StreamProvider.autoDispose
           });
     });
 
+bool amountReceivedExceedsInvoiceTotal({
+  required double amountReceived,
+  required double total,
+}) => amountReceived > total;
+
 class InvoiceNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
@@ -271,9 +276,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
   /// Creates a sale invoice with atomic customer balance update and stock deduction.
   ///
   /// Payment scenarios handled via [amountReceived]:
-  /// - 0 â†’ full credit (status: issued)
-  /// - > 0 and < total â†’ partial payment (status: partial)
-  /// - >= total â†’ full payment (status: paid); excess reduces old balance
+  /// - 0: full credit (status: issued)
+  /// - > 0 and < total: partial payment (status: partial)
+  /// - == total: full payment (status: paid); excess is rejected
   Future<String> createSaleInvoice({
     required String shopId,
     required String shopName,
@@ -327,7 +332,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
     // FI-11: amountReceived cannot exceed the invoice total; doing so would
     // over-credit the customer and corrupt the ledger.
-    if (amountReceived > total) {
+    if (amountReceivedExceedsInvoiceTotal(
+      amountReceived: amountReceived,
+      total: total,
+    )) {
       throw ArgumentError(
         'amountReceived (${amountReceived.toStringAsFixed(2)}) '
         'cannot exceed invoice total (${total.toStringAsFixed(2)})',
@@ -488,9 +496,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       });
     }
 
-    // Customer balance: net change = sale total âˆ’ amount received
-    // e.g. sale 5000, received 2000 â†’ balance +3000
-    // e.g. sale 5000, received 8000 â†’ balance âˆ’3000 (pays off old debt)
+    // Customer balance increases by the unpaid portion of this sale.
     if (shopId.isNotEmpty) {
       final balanceDelta = total - amountReceived;
       batch.update(db.collection(Collections.shops).doc(shopId), {

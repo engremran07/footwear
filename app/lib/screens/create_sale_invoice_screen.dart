@@ -319,8 +319,10 @@ class _CreateSaleInvoiceScreenState
                               ? IconButton(
                                   icon: const Icon(Icons.close, size: 18),
                                   tooltip: tr('clear', ref),
-                                  onPressed: () =>
-                                      setState(() => _selectedShop = null),
+                                  onPressed: () => setState(() {
+                                    _selectedShop = null;
+                                    _isDirty = true;
+                                  }),
                                 )
                               : const Icon(Icons.arrow_drop_down),
                         ),
@@ -370,6 +372,8 @@ class _CreateSaleInvoiceScreenState
                     final maxDozens = item.quantityAvailable ~/ ppc;
                     final dozens = _selectedQtys[item.id] ?? 0;
                     final extraPairs = _selectedExtraPairs[item.id] ?? 0;
+                    final maxExtraPairs = (item.quantityAvailable - dozens * ppc)
+                      .clamp(0, ppc - 1);
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: Padding(
@@ -410,6 +414,7 @@ class _CreateSaleInvoiceScreenState
                                       ? null
                                       : () => setState(() {
                                           _selectedQtys[item.id] = dozens - 1;
+                                          _isDirty = true;
                                           if (dozens - 1 == 0) {
                                             _selectedExtraPairs.remove(item.id);
                                           }
@@ -434,10 +439,10 @@ class _CreateSaleInvoiceScreenState
                                   tooltip: tr('tooltip_increase_qty', ref),
                                   onPressed: dozens >= maxDozens
                                       ? null
-                                      : () => setState(
-                                          () => _selectedQtys[item.id] =
-                                              dozens + 1,
-                                        ),
+                                      : () => setState(() {
+                                          _selectedQtys[item.id] = dozens + 1;
+                                          _isDirty = true;
+                                        }),
                                 ),
                               ],
                             ),
@@ -460,10 +465,11 @@ class _CreateSaleInvoiceScreenState
                                     tooltip: tr('tooltip_decrease_qty', ref),
                                     onPressed: extraPairs <= 0
                                         ? null
-                                        : () => setState(
-                                            () => _selectedExtraPairs[item.id] =
-                                                extraPairs - 1,
-                                          ),
+                                        : () => setState(() {
+                                            _selectedExtraPairs[item.id] =
+                                                extraPairs - 1;
+                                            _isDirty = true;
+                                          }),
                                   ),
                                   SizedBox(
                                     width: 32,
@@ -480,12 +486,13 @@ class _CreateSaleInvoiceScreenState
                                     ),
                                     tooltip: tr('tooltip_increase_qty', ref),
                                     // max extra pairs = ppc - 1 (a full dozen would be a new dozen)
-                                    onPressed: extraPairs >= ppc - 1
+                                    onPressed: extraPairs >= maxExtraPairs
                                         ? null
-                                        : () => setState(
-                                            () => _selectedExtraPairs[item.id] =
-                                                extraPairs + 1,
-                                          ),
+                                        : () => setState(() {
+                                            _selectedExtraPairs[item.id] =
+                                                extraPairs + 1;
+                                            _isDirty = true;
+                                          }),
                                   ),
                                 ],
                               ),
@@ -581,6 +588,9 @@ class _CreateSaleInvoiceScreenState
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _submit(context),
                   inputFormatters: [AppInputFormatters.maxLength(300)],
+                  onChanged: (_) {
+                    if (!_isDirty) setState(() => _isDirty = true);
+                  },
                 ),
               ],
             ),
@@ -785,16 +795,33 @@ class _CreateSaleInvoiceScreenState
       builder: (_) => _ShopPickerSheet(shops: shops),
     );
     if (selected != null) {
-      setState(() => _selectedShop = selected);
+      setState(() {
+        _selectedShop = selected;
+        _isDirty = true;
+      });
     }
   }
 
   Future<void> _submit(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
-    final user = await ref.read(authUserProvider.future);
+    final UserModel? user;
+    try {
+      user = await ref.read(authUserProvider.future);
+    } catch (error) {
+      if (mounted) {
+        final key = AppErrorMapper.key(error);
+        messenger.showSnackBar(errorSnackBar(tr(key, ref)));
+      }
+      return;
+    }
     if (!mounted) return;
-    if (user == null) return;
+    if (user == null) {
+      messenger.showSnackBar(
+        errorSnackBar(tr('err_unauthenticated', ref)),
+      );
+      return;
+    }
     final isOnline = ref.read(isOnlineProvider).value ?? true;
     if (!isOnline) {
       HapticFeedback.vibrate();
@@ -849,6 +876,16 @@ class _CreateSaleInvoiceScreenState
     final total = _invoiceTotal;
     final items = _buildInvoiceItems(inventoryList, saleAmount, ppc);
     final amountReceived = _amountReceived;
+    if (amountReceivedExceedsInvoiceTotal(
+      amountReceived: amountReceived,
+      total: total,
+    )) {
+      HapticFeedback.vibrate();
+      messenger.showSnackBar(
+        warningSnackBar(tr('invoice_payment_exceeds_total', ref)),
+      );
+      return;
+    }
     final invoiceFingerprint = _currentInvoiceFingerprint(deductions);
     if (_pendingInvoiceFingerprint != invoiceFingerprint ||
         _pendingInvoiceIdempotencyKey == null) {

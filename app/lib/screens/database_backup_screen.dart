@@ -305,6 +305,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                   if (file.size > 0) '${(file.size / 1024).round()} KB',
                 ].join(' · '),
                 icon: Icons.cloud_outlined,
+                canRestore: file.encrypted,
               ),
           ],
           onDelete: (file) => ref
@@ -425,6 +426,7 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
               details:
                   '${_fmt(backup.modifiedAt)} · ${(backup.file.lengthSync() / 1024).round()} KB',
               icon: Icons.insert_drive_file_outlined,
+              canRestore: backup.file.path.toLowerCase().endsWith('.shoesbackup'),
             ),
         ],
         onDelete: (backup) => ref
@@ -969,12 +971,12 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                           ? null
                           : _doBackup,
                       icon: _loading
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.onPrimary,
                               ),
                             )
                           : const Icon(Icons.backup_outlined),
@@ -1101,16 +1103,22 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
         if (_restoring)
           Positioned.fill(
             child: ColoredBox(
-              color: Colors.black54,
+              color: Theme.of(
+                context,
+              ).colorScheme.scrim.withValues(alpha: 0.58),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircularProgressIndicator(color: Colors.white),
+                    CircularProgressIndicator(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       tr('backup_restore_in_progress', ref),
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
                     ),
                   ],
                 ),
@@ -1285,6 +1293,7 @@ class _BackupArchiveEntry<T> {
   final String name;
   final String details;
   final IconData icon;
+  final bool canRestore;
 
   const _BackupArchiveEntry({
     required this.value,
@@ -1292,6 +1301,7 @@ class _BackupArchiveEntry<T> {
     required this.name,
     required this.details,
     required this.icon,
+    required this.canRestore,
   });
 }
 
@@ -1409,8 +1419,13 @@ class _BackupArchivePickerSheetState<T>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                tooltip: tr('backup_restore_proceed', ref),
-                                onPressed: deleting
+                                tooltip: tr(
+                                  entry.canRestore
+                                      ? 'backup_restore_proceed'
+                                      : 'backup_restore_invalid',
+                                  ref,
+                                ),
+                                onPressed: deleting || !entry.canRestore
                                     ? null
                                     : () => Navigator.pop(context, entry.value),
                                 icon: const Icon(Icons.restore_outlined),

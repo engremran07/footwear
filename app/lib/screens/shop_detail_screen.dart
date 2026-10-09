@@ -11,10 +11,12 @@ import '../core/utils/action_guard.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/input_formatters.dart';
 import '../core/utils/name_resolver.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
+import '../models/settings_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
@@ -63,8 +65,18 @@ class ShopDetailScreen extends ConsumerStatefulWidget {
 class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   final ActionGuard _transactionGuard = ActionGuard();
 
-  void _showEditTransactionDialog(TransactionModel tx) {
-    final user = ref.read(authUserProvider).value;
+  Future<void> _showEditTransactionDialog(TransactionModel tx) async {
+    final UserModel? user;
+    try {
+      user = await ref.read(authUserProvider.future);
+    } catch (error) {
+      if (mounted) {
+        final key = AppErrorMapper.key(error);
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
+      }
+      return;
+    }
+    if (!mounted) return;
     final isAdmin = user?.isAdmin == true;
 
     // Sellers can edit cash_in/cash_out; update may require admin approval
@@ -130,6 +142,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                   labelText: tr('amount', ref),
                   prefixIcon: const Icon(Icons.currency_exchange),
                 ),
+                inputFormatters: [AppInputFormatters.amountFormatter],
                 autofocus: true,
               ),
               const SizedBox(height: 12),
@@ -272,7 +285,16 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       return;
     }
 
-    final settings = await ref.read(settingsProvider.future);
+    final SettingsModel settings;
+    try {
+      settings = await ref.read(settingsProvider.future);
+    } catch (error) {
+      if (mounted) {
+        final key = AppErrorMapper.key(error);
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
+      }
+      return;
+    }
     if (!mounted) return;
     final requireApproval =
         settings.requireAdminApprovalForSellerTransactionEdits;
@@ -335,6 +357,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     labelText: tr('amount', ref),
                     prefixIcon: const Icon(Icons.currency_exchange),
                   ),
+                  inputFormatters: [AppInputFormatters.amountFormatter],
                   autofocus: true,
                 ),
               ],
@@ -666,9 +689,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       );
                       return;
                     }
-                    final amount = double.tryParse(amountC.text.trim());
+                    final amount = AppFormatters.parseAmountText(amountC.text);
                     if (amount == null || amount <= 0) {
                       _transactionGuard.finish();
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        warningSnackBar(tr('must_be_greater_zero', ref)),
+                      );
                       return;
                     }
                     final shop = ref
@@ -678,8 +704,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                       _transactionGuard.finish();
                       return;
                     }
-                    final user = await ref.read(authUserProvider.future);
                     try {
+                      final user = await ref.read(authUserProvider.future);
+                      if (user == null) throw StateError('Not authenticated');
                       await ref
                           .read(transactionNotifierProvider.notifier)
                           .create(
@@ -687,14 +714,14 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             shopName: shop.name,
                             routeId: shop.routeId.isNotEmpty
                                 ? shop.routeId
-                                : (user?.assignedRouteIds.firstOrNull ?? ''),
+                              : (user.assignedRouteIds.firstOrNull ?? ''),
                             type: type,
                             saleType: saleType,
                             amount: amount,
                             description: descC.text.trim().isEmpty
                                 ? null
                                 : descC.text.trim(),
-                            createdBy: user?.id ?? '',
+                            createdBy: user.id,
                             transactionDate: Timestamp.fromDate(selectedDate),
                           );
                       if (ctx.mounted) Navigator.pop(ctx);
@@ -875,6 +902,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                 (s, t) => s + t.balanceImpact,
                               );
                               final openingBalance = shop.balance - netTx;
+                              final accountCurrency = ref.read(
+                                routeCurrencyProvider(shop.routeId),
+                              );
                               final labels = trilingualLabels(<String, String>{
                                 for (final k in const [
                                   'date',
@@ -914,9 +944,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                         _transactionTypeLabel(t),
                                         AppFormatters.currency(
                                           t.amount,
-                                          ref.read(
-                                            routeCurrencyProvider(shop.routeId),
-                                          ),
+                                          accountCurrency,
                                         ),
                                         t.description ?? '',
                                       ],
@@ -942,7 +970,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                       : null,
                                   labels: labels,
                                   locale: locale,
-                                  currency: settings.currency,
+                                  currency: accountCurrency,
                                   logoBytes: settings.logoBytes,
                                 ),
                               );
@@ -1104,7 +1132,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                           final totalIn = txs
                                               .where(
                                                 (t) =>
-                                                    !t.deleted && !t.isCashOut,
+                                                    !t.deleted &&
+                                                    (t.isCashIn || t.isPayment),
                                               )
                                               .fold(
                                                 0.0,
@@ -1533,7 +1562,7 @@ class _TransactionTile extends ConsumerWidget {
             Text(tx.description!, maxLines: 1, overflow: TextOverflow.ellipsis),
           if (tx.hasItems)
             Text(
-              'Items: ${AppFormatters.stock(totalQty, ppc)}',
+              '${tr('items', ref)}: ${AppFormatters.stock(totalQty, ppc)}',
               style: TextStyle(
                 fontSize: 11,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,

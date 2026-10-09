@@ -55,6 +55,39 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('closing a pending password reset dialog is safe', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final resetRequest = Completer<void>();
+    final notifier = _DelayedPasswordResetNotifier(resetRequest);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authNotifierProvider.overrideWith(() => notifier),
+          isOnlineProvider.overrideWith((ref) => Stream.value(true)),
+        ],
+        child: const MaterialApp(home: LoginScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Forgot Password?'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).last, 'user@example.com');
+    await tester.tap(find.text('Send Password Reset Email'));
+    await tester.pump();
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    resetRequest.complete();
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _DelayedAuthNotifier extends AuthNotifier {
@@ -77,4 +110,13 @@ class _DelayedAuthNotifier extends AuthNotifier {
       rethrow;
     }
   }
+}
+
+class _DelayedPasswordResetNotifier extends AuthNotifier {
+  _DelayedPasswordResetNotifier(this.result);
+
+  final Completer<void> result;
+
+  @override
+  Future<void> sendPasswordReset(String emailAddress) => result.future;
 }

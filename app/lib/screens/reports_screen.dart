@@ -28,10 +28,27 @@ import '../widgets/error_state.dart';
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
 
+  String _transactionTypeLabel(TransactionModel transaction, WidgetRef ref) {
+    return switch (transaction.type) {
+      TransactionModel.typeCashIn => tr('cash_in', ref),
+      TransactionModel.typeCashOut => tr('cash_out', ref),
+      TransactionModel.typeReturn => tr('return', ref),
+      TransactionModel.typePayment => tr('payment', ref),
+      TransactionModel.typeWriteOff => tr('write_off', ref),
+      _ => tr('status_unknown', ref),
+    };
+  }
+
   void _showNoData(BuildContext context, WidgetRef ref) {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(infoSnackBar(tr('no_data', ref)));
+  }
+
+  Future<Map<String, String>> _loadRouteCurrencies(WidgetRef ref) async {
+    ref.invalidate(routesExportProvider);
+    final routes = await ref.read(routesExportProvider.future);
+    return {for (final route in routes) route.id: route.currency};
   }
 
   @override
@@ -120,7 +137,7 @@ class ReportsScreen extends ConsumerWidget {
           _ExportCard(
             icon: Icons.inventory_2,
             title: tr('inventory_report', ref),
-            onExport: () => _exportInventory(context, ref, ppc),
+            onExport: () => _exportInventory(context, ref),
           ),
           _ExportCard(
             icon: Icons.receipt_long,
@@ -151,12 +168,9 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-      final shops = user.isAdmin
-        ? await ref.read(shopsProvider.future)
-        : (user.assignedRouteIds.isNotEmpty
-            ? await ref.read(sellerAllShopsProvider.future)
-            : <ShopModel>[]);
-      if (!context.mounted) return;
+    ref.invalidate(shopsExportProvider);
+    final shops = await ref.read(shopsExportProvider.future);
+    if (!context.mounted) return;
     if (!context.mounted) return;
     if (shops.isEmpty) {
       _showNoData(context, ref);
@@ -170,14 +184,11 @@ class ReportsScreen extends ConsumerWidget {
       triCol('area'),
       tr('city', ref),
       triCol('balance'),
+      tr('currency', ref),
     ];
-    final reportRoutes = user.isAdmin
-        ? await ref.read(routesProvider.future)
-        : await ref.read(routesBySellerProvider(user.id).future);
     if (!context.mounted) return;
-    final routeCurrencyMap = <String, String>{
-      for (final route in reportRoutes) route.id: route.currency,
-    };
+    final routeCurrencyMap = await _loadRouteCurrencies(ref);
+    if (!context.mounted) return;
     final rows = shops
         .map(
           (s) => [
@@ -186,10 +197,8 @@ class ReportsScreen extends ConsumerWidget {
             s.phone ?? '',
             s.area ?? '',
             s.city ?? '',
-            AppFormatters.currency(
-              s.balance,
-              routeCurrencyMap[s.routeId] ?? 'SAR',
-            ),
+            s.balance,
+            routeCurrencyMap[s.routeId] ?? 'SAR',
           ],
         )
         .toList();
@@ -206,7 +215,6 @@ class ReportsScreen extends ConsumerWidget {
   Future<void> _exportInventory(
     BuildContext context,
     WidgetRef ref,
-    int ppc,
   ) async {
     final user = await ref.read(authUserProvider.future);
     if (!context.mounted) return;
@@ -216,24 +224,28 @@ class ReportsScreen extends ConsumerWidget {
     }
     late final List<List<dynamic>> rows;
     if (user.isAdmin) {
-      final variants = await ref.read(allVariantsProvider.future);
+      ref.invalidate(allVariantsExportProvider);
+      final variants = await ref.read(allVariantsExportProvider.future);
       if (!context.mounted) return;
       rows = variants
           .map(
             (item) => <dynamic>[
               item.variantName,
-              AppFormatters.stock(item.quantityAvailable, ppc),
+              item.quantityAvailable,
             ],
           )
           .toList();
     } else {
-      final inventory = await ref.read(sellerInventoryProvider(user.id).future);
+      ref.invalidate(sellerInventoryExportProvider(user.id));
+      final inventory = await ref.read(
+        sellerInventoryExportProvider(user.id).future,
+      );
       if (!context.mounted) return;
       rows = inventory
           .map(
             (item) => <dynamic>[
               item.variantName,
-              AppFormatters.stock(item.quantityAvailable, ppc),
+              item.quantityAvailable,
             ],
           )
           .toList();
@@ -271,12 +283,15 @@ class ReportsScreen extends ConsumerWidget {
         _showNoData(context, ref);
         return;
       }
+      final routeCurrencies = await _loadRouteCurrencies(ref);
+      if (!context.mounted) return;
       final title = tr('transactions_report', ref);
       final headers = [
         triCol('date'),
         triCol('shop_name'),
         triCol('type'),
         triCol('amount'),
+        tr('currency', ref),
         triCol('description'),
       ];
       final sortedTxs = [...txs]
@@ -286,8 +301,9 @@ class ReportsScreen extends ConsumerWidget {
             (t) => [
               AppFormatters.dateTime(t.createdAt),
               t.shopName,
-              t.type == 'cash_in' ? tr('cash_in', ref) : tr('cash_out', ref),
-              AppFormatters.currency(t.amount),
+              _transactionTypeLabel(t, ref),
+              t.amount,
+              routeCurrencies[t.routeId] ?? 'SAR',
               t.description ?? '',
             ],
           )
@@ -313,12 +329,15 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
+    final routeCurrencies = await _loadRouteCurrencies(ref);
+    if (!context.mounted) return;
     final title = tr('transactions_report', ref);
     final headers = [
       triCol('date'),
       triCol('shop_name'),
       triCol('type'),
       triCol('amount'),
+      tr('currency', ref),
       triCol('description'),
     ];
     final sortedTxs = [...txs]
@@ -328,8 +347,9 @@ class ReportsScreen extends ConsumerWidget {
           (t) => [
             AppFormatters.dateTime(t.createdAt),
             t.shopName,
-            t.type == 'cash_in' ? tr('cash_in', ref) : tr('cash_out', ref),
-            AppFormatters.currency(t.amount),
+            _transactionTypeLabel(t, ref),
+            t.amount,
+            routeCurrencies[t.routeId] ?? 'SAR',
             t.description ?? '',
           ],
         )
@@ -352,15 +372,15 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-      final shops = user.isAdmin
+    final shops = user.isAdmin
         ? await ref.read(outstandingShopsProvider.future)
         : (user.assignedRouteIds.isNotEmpty
-          ? (await ref.read(sellerAllShopsProvider.future))
-              .where((shop) => shop.balance > 0)
-              .toList()
-          : <ShopModel>[]);
-      if (!context.mounted) return;
-      if (!context.mounted) return;
+              ? (await ref.read(
+                  sellerAllShopsProvider.future,
+                )).where((shop) => shop.balance > 0).toList()
+              : <ShopModel>[]);
+    if (!context.mounted) return;
+    if (!context.mounted) return;
     if (shops.isEmpty) {
       _showNoData(context, ref);
       return;
@@ -409,12 +429,12 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-      final shops = user.isAdmin
+    final shops = user.isAdmin
         ? await ref.read(shopsProvider.future)
         : (user.assignedRouteIds.isNotEmpty
-            ? await ref.read(sellerAllShopsProvider.future)
-            : <ShopModel>[]);
-      if (!context.mounted) return;
+              ? await ref.read(sellerAllShopsProvider.future)
+              : <ShopModel>[]);
+    if (!context.mounted) return;
     if (!context.mounted) return;
     final badDebtShops = shops.where((s) => s.badDebt).toList();
     if (badDebtShops.isEmpty) {
@@ -522,7 +542,17 @@ class _OutstandingTopDebtors extends ConsumerWidget {
 
     return shopsAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
+      error: (error, _) => mappedErrorState(
+        error: error,
+        ref: ref,
+        onRetry: () {
+          if (user?.isAdmin == true) {
+            ref.invalidate(shopsProvider);
+          } else {
+            ref.invalidate(sellerAllShopsProvider);
+          }
+        },
+      ),
       data: (shops) {
         final withDebt = shops.where((s) => s.balance > 0).toList()
           ..sort((a, b) => b.balance.compareTo(a.balance));
@@ -553,7 +583,7 @@ class _OutstandingTopDebtors extends ConsumerWidget {
                       ? shop.balance / maxBalance
                       : 0.0;
                   return Material(
-                    color: Colors.transparent,
+                    color: cs.surface.withValues(alpha: 0),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(10),
                       onTap: () => context.push('/shops/${shop.id}'),
@@ -702,8 +732,8 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       final shops = user?.isAdmin == true
           ? await ref.read(shopsProvider.future)
           : (user?.assignedRouteIds.isNotEmpty == true
-            ? await ref.read(sellerAllShopsProvider.future)
-            : <ShopModel>[]);
+                ? await ref.read(sellerAllShopsProvider.future)
+                : <ShopModel>[]);
       if (!context.mounted) return;
       final shop = shops.firstWhere((s) => s.id == _selectedShopId);
 
@@ -815,8 +845,8 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
             const SizedBox(height: 10),
             shopsAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (e, _) => mappedErrorState(
-                error: e,
+              error: (error, _) => mappedErrorState(
+                error: error,
                 ref: ref,
                 onRetry: () {
                   if (user?.isAdmin == true) {
@@ -835,10 +865,14 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
                 ),
                 items: shops
                     .map(
-                      (s) => DropdownMenuItem(value: s.id, child: Text(s.name)),
+                      (shop) => DropdownMenuItem(
+                        value: shop.id,
+                        child: Text(shop.name),
+                      ),
                     )
                     .toList(),
-                onChanged: (v) => setState(() => _selectedShopId = v),
+                onChanged: (value) =>
+                    setState(() => _selectedShopId = value),
               ),
             ),
             const SizedBox(height: 10),
@@ -969,12 +1003,12 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
 
       final settings = await ref.read(settingsProvider.future);
       final labels = _labels(ref);
-        final routes = await ref.read(routesProvider.future);
-        if (!context.mounted) return;
-        final sellerRoute = routes
+      final routes = await ref.read(routesProvider.future);
+      if (!context.mounted) return;
+      final sellerRoute = routes
           .where((route) => seller.assignedRouteIds.contains(route.id))
           .firstOrNull;
-        final sellerRouteCurrency = sellerRoute?.currency ?? 'SAR';
+      final sellerRouteCurrency = sellerRoute?.currency ?? 'SAR';
       if (!context.mounted) return;
       ExportSheet.show(
         // ignore: use_build_context_synchronously

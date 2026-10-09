@@ -18,6 +18,20 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/error_state.dart';
 import '../widgets/whats_new_sheet.dart';
 
+Future<bool> _requireAdminSettingsAccess(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final user = await ref.read(authUserProvider.future);
+  if (user?.isAdmin == true) return true;
+  if (context.mounted) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
+  }
+  return false;
+}
+
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
   @override
@@ -30,6 +44,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _requireAdminApprovalForSellerTransactionEdits = false;
   bool _settingsLoaded = false;
   bool _isDirty = false;
+  bool _savingSettings = false;
 
   @override
   void dispose() {
@@ -111,10 +126,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _saveSettings() async {
+    if (_savingSettings) return;
+    setState(() => _savingSettings = true);
     try {
+      if (!await _requireAdminSettingsAccess(context, ref)) return;
+      final pairsPerCarton = int.tryParse(_ppcC.text.trim());
+      if (pairsPerCarton == null || pairsPerCarton <= 0) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            warningSnackBar(tr('settings_invalid_pairs_per_carton', ref)),
+          );
+        }
+        return;
+      }
       await ref.read(settingsNotifierProvider.notifier).save({
         'company_name': _companyC.text.trim(),
-        'pairs_per_carton': int.tryParse(_ppcC.text.trim()) ?? 12,
+        'pairs_per_carton': pairsPerCarton,
         'require_admin_approval_for_seller_transaction_edits':
             _requireAdminApprovalForSellerTransactionEdits,
       });
@@ -129,19 +156,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         final key = AppErrorMapper.key(e);
         ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
+    } finally {
+      if (mounted) setState(() => _savingSettings = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = ref.watch(authUserProvider).value;
-    if (currentUser?.isSuperAdmin == true &&
-        currentUser?.activeWorkspaceId == null) {
+    final authAsync = ref.watch(authUserProvider);
+    if (authAsync.isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (authAsync.hasError) {
+      return Scaffold(
+        body: mappedErrorState(
+          error: authAsync.error!,
+          ref: ref,
+          onRetry: () => ref.invalidate(authUserProvider),
+        ),
+      );
+    }
+    final currentUser = authAsync.value;
+    if (currentUser == null) {
+      return Scaffold(
+        body: Center(child: Text(tr('permission_denied', ref))),
+      );
+    }
+    if (currentUser.isSuperAdmin && currentUser.activeWorkspaceId == null) {
       return _buildPlatformSettingsHub();
     }
 
     final settingsAsync = ref.watch(settingsProvider);
-    if (currentUser != null && !currentUser.isAdmin) {
+    if (!currentUser.isAdmin) {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
     settingsAsync.whenData((_) => _loadSettings());
@@ -226,8 +274,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _saveSettings,
-                        child: Text(tr('save', ref)),
+                        onPressed: _savingSettings ? null : _saveSettings,
+                        child: _savingSettings
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(tr('save', ref)),
                       ),
                     ),
                   ],
@@ -236,7 +292,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 16),
             // Company Logo (admin only)
-            if (currentUser?.isAdmin == true) ...[
+            if (currentUser.isAdmin) ...[
               const _LogoCard(),
               const SizedBox(height: 16),
             ],
@@ -380,8 +436,10 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           warningSnackBar(
-            'Image is ${_fmtBytes(bytes.lengthInBytes)} â€” too large. '
-            'Use a simpler image or reduce dimensions to 256Ã—256 px.',
+            tr(
+              'settings_logo_image_too_large',
+              ref,
+            ).replaceAll('%s', _fmtBytes(bytes.lengthInBytes)),
           ),
         );
       }
@@ -403,6 +461,7 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
     });
 
     try {
+      if (!await _requireAdminSettingsAccess(context, ref)) return;
       // Encode bytes as Base64 and store directly in Firestore.
       // The settingsProvider real-time stream propagates the new logo to every
       // connected device instantly â€” no Firebase Storage or CDN involved.
@@ -413,7 +472,10 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             warningSnackBar(
-              'Encoded logo is ${_fmtBytes(encoded.length)} â€” exceeds 50 KB limit.',
+              tr(
+                'settings_logo_encoded_too_large',
+                ref,
+              ).replaceAll('%s', _fmtBytes(encoded.length)),
             ),
           );
         }
@@ -459,9 +521,10 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
       title: tr('confirm_remove_logo', ref),
       message: tr('confirm_remove_logo_msg', ref),
     );
-    if (confirmed != true) return;
+    if (!mounted || confirmed != true) return;
     setState(() => _uploading = true);
     try {
+      if (!await _requireAdminSettingsAccess(context, ref)) return;
       await ref.read(settingsNotifierProvider.notifier).deleteLogo();
       if (mounted) {
         ScaffoldMessenger.of(

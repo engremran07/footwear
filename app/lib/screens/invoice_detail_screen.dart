@@ -146,13 +146,15 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         return;
       }
       try {
+        final user = await ref.read(authUserProvider.future);
+        if (user == null) throw StateError('Not authenticated');
         await ref
             .read(invoiceNotifierProvider.notifier)
             .voidInvoice(
               invoiceId: inv.id,
               total: inv.total,
               type: inv.type,
-              createdBy: ref.read(authStateProvider).value?.uid ?? '',
+              createdBy: user.id,
               refundMode: refundMode,
             );
       } catch (e) {
@@ -176,12 +178,14 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         return;
       }
       try {
+        final user = await ref.read(authUserProvider.future);
+        if (user == null) throw StateError('Not authenticated');
         await ref
             .read(invoiceNotifierProvider.notifier)
             .markAsPaid(
               invoiceId: inv.id,
               routeId: inv.routeId,
-              createdBy: ref.read(authStateProvider).value?.uid ?? '',
+              createdBy: user.id,
             );
       } catch (e) {
         if (actionContext.mounted) {

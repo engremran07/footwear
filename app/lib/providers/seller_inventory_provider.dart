@@ -90,7 +90,11 @@ final sellerInventoryExportProvider =
     ) async {
       if (sellerId.trim().isEmpty) return const <SellerInventoryModel>[];
       final user = await ref.read(authUserProvider.future);
-      if (user == null || !user.isAdmin) return const <SellerInventoryModel>[];
+      if (user == null ||
+          !user.active ||
+          (!user.isAdmin && (!user.isSeller || user.id != sellerId.trim()))) {
+        return const <SellerInventoryModel>[];
+      }
       final tenantId = TenantScope.normalize(user.tenantId);
       final query = TenantScope.applyToQuery(
         FirebaseFirestore.instance.collection(Collections.sellerInventory),

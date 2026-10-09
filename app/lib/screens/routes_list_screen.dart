@@ -32,7 +32,30 @@ class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
       body: routesAsync.when(
         data: (routes) {
           if (routes.isEmpty) {
-            return EmptyState(icon: Icons.route, message: tr('no_routes', ref));
+            return AppPullRefresh(
+              onRefresh: () async {
+                if (isAdmin) {
+                  ref.invalidate(routesProvider);
+                  await ref.read(routesProvider.future);
+                } else {
+                  final provider = routesBySellerProvider(user?.id ?? '');
+                  ref.invalidate(provider);
+                  await ref.read(provider.future);
+                }
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).height * 0.55,
+                    child: EmptyState(
+                      icon: Icons.route,
+                      message: tr('no_routes', ref),
+                    ),
+                  ),
+                ],
+              ),
+            );
           }
           return AppPullRefresh(
             onRefresh: () async {

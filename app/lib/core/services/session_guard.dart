@@ -300,19 +300,8 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   Future<void> _verifyCurrentAccessSession() async {
     final user = ref.read(authUserProvider).value;
     if (user == null || user.isSuperAdmin || user.tenantId == null) return;
-    final userSessionAge = _sessionStartedAt == null
-        ? null
-        : DateTime.now().difference(_sessionStartedAt!);
     try {
       final sessions = await ref.read(userSessionsProvider(user.id).future);
-      if (sessions.isEmpty &&
-          userSessionAge != null &&
-          userSessionAge < const Duration(seconds: 15)) {
-        _trace('applicationSession.check.skipped.pendingRegistration', {
-          'elapsedSec': userSessionAge.inSeconds,
-        });
-        return;
-      }
       await _enforceCurrentAccessSession(user, sessions);
     } catch (error) {
       _trace('applicationSession.check.error', {'error': error.runtimeType});
@@ -348,6 +337,26 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
       userId: user.id,
     );
     if (currentSession == null) {
+      final sessionAge = _sessionStartedAt == null
+          ? null
+          : now.difference(_sessionStartedAt!);
+      if (SessionAccessPolicy.shouldDeferMissingSessionEnforcement(
+        sessionAge: sessionAge,
+      )) {
+        final remaining =
+            SessionAccessPolicy.accessRegistrationGracePeriod - sessionAge!;
+        _trace('applicationSession.check.deferred.pendingRegistration', {
+          'elapsedSec': sessionAge.inSeconds,
+          'remainingSec': remaining.inSeconds,
+        });
+        _accessExpiryTimer?.cancel();
+        _accessExpiryTimer = Timer(remaining, () {
+          if (mounted && ref.read(authUserProvider).value?.id == user.id) {
+            unawaited(_verifyCurrentAccessSession());
+          }
+        });
+        return;
+      }
       final hasHistoricalDeviceSession = sessions.any(
         (session) =>
             session.deviceId == installation.installationId &&

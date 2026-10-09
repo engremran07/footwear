@@ -12,7 +12,7 @@ import '../providers/route_provider.dart';
 /// The phone string is normalised via [normalizeWhatsAppPhone] before launching,
 /// so local formats (Pakistan 03xx, Saudi 05xx) are handled automatically.
 /// The button is hidden when [phone] is null or blank.
-class WhatsAppIconButton extends StatelessWidget {
+class WhatsAppIconButton extends ConsumerWidget {
   final String? phone;
   final String? message;
   final double iconSize;
@@ -25,7 +25,7 @@ class WhatsAppIconButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final raw = phone;
     if (raw == null || raw.trim().isEmpty) return const SizedBox.shrink();
 
@@ -33,7 +33,7 @@ class WhatsAppIconButton extends StatelessWidget {
     if (!isValidWhatsAppPhone(normalized)) return const SizedBox.shrink();
 
     return IconButton(
-      tooltip: 'WhatsApp',
+      tooltip: tr('whatsapp_open_chat', ref),
       iconSize: iconSize,
       icon: const _WhatsAppIcon(),
       onPressed: () => openWhatsApp(phone: normalized, message: message ?? ''),
@@ -66,7 +66,7 @@ class WhatsAppShopCtaButton extends ConsumerWidget {
     if (!isValidWhatsAppPhone(normalized)) return const SizedBox.shrink();
 
     return IconButton(
-      tooltip: 'WhatsApp',
+      tooltip: tr('whatsapp_open_chat', ref),
       iconSize: iconSize,
       icon: const _WhatsAppIcon(),
       onPressed: () => _showCtaSheet(context, ref, normalized),

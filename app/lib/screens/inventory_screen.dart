@@ -38,13 +38,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     Widget? fallback,
     VoidCallback? onRetry,
   }) {
-    if (AppErrorMapper.isPermissionOrAuthError(error)) {
-      return fallback ??
-          EmptyState(
-            icon: Icons.lock_outline,
-            message: tr('no_data', ref),
-          );
-    }
     return mappedErrorState(error: error, ref: ref, onRetry: onRetry);
   }
 
@@ -174,8 +167,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
     final currentUser = ref.watch(authUserProvider).value;
-    if (currentUser == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    final authOperation = ref.watch(authNotifierProvider);
+    if (currentUser == null || authOperation.isLoading) {
+      return Scaffold(body: ShimmerLoading.cards());
     }
     final isAdmin = currentUser.isAdmin;
     final warehouseVariants = ref.watch(allVariantsProvider);
@@ -244,7 +238,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     },
                   ),
                   loading: () => const SizedBox.shrink(),
-                  error: (_, _) => const SizedBox.shrink(),
+                  error: (error, _) => IconButton(
+                    icon: const Icon(Icons.warning_amber_outlined),
+                    tooltip: tr(AppErrorMapper.key(error), ref),
+                    onPressed: () => ref.invalidate(settingsProvider),
+                  ),
                 ),
               ],
             ),
@@ -518,6 +516,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
   void _showReturnToWarehouseDialog(SellerInventoryModel item, int ppc) {
     final qtyC = TextEditingController(text: '1');
+    var isSubmitting = false;
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -552,7 +551,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
+              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
               child: Text(tr('cancel', ref)),
             ),
             ElevatedButton(
@@ -560,49 +559,61 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 backgroundColor: AppTheme.warningBg(Theme.of(ctx).colorScheme),
                 foregroundColor: AppTheme.warningFg(Theme.of(ctx).colorScheme),
               ),
-              onPressed: () async {
-                final qty = int.tryParse(qtyC.text.trim()) ?? 0;
-                if (qty <= 0 || qty > item.quantityAvailable) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    warningSnackBar(tr('msg_invalid_quantity', ref)),
-                  );
-                  return;
-                }
-                final user = await ref.read(authUserProvider.future);
-                try {
-                  await ref
-                      .read(sellerInventoryNotifierProvider.notifier)
-                      .returnToWarehouse(
-                        sellerInventoryDocId: item.id,
-                        variantId: item.variantId,
-                        qty: qty,
-                        sellerId: item.sellerId,
-                        sellerName: item.sellerName,
-                        variantName: item.variantName,
-                        productId: item.productId,
-                        createdBy: user!.id,
-                      );
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      successSnackBar(
-                        tr(
-                          'msg_returned_stock',
-                          ref,
-                        ).replaceAll('%s', AppFormatters.stock(qty, ppc)),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (ctx.mounted) {
-                    final key = AppErrorMapper.key(e);
-                    ScaffoldMessenger.of(
-                      ctx,
-                    ).showSnackBar(errorSnackBar(tr(key, ref)));
-                  }
-                }
-              },
-              child: Text(tr('lbl_return', ref)),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      final qty = int.tryParse(qtyC.text.trim()) ?? 0;
+                      if (qty <= 0 || qty > item.quantityAvailable) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          warningSnackBar(tr('msg_invalid_quantity', ref)),
+                        );
+                        return;
+                      }
+                      setS(() => isSubmitting = true);
+                      try {
+                        final user = await ref.read(authUserProvider.future);
+                        if (user == null) throw StateError('Not authenticated');
+                        await ref
+                            .read(sellerInventoryNotifierProvider.notifier)
+                            .returnToWarehouse(
+                              sellerInventoryDocId: item.id,
+                              variantId: item.variantId,
+                              qty: qty,
+                              sellerId: item.sellerId,
+                              sellerName: item.sellerName,
+                              variantName: item.variantName,
+                              productId: item.productId,
+                              createdBy: user.id,
+                            );
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            successSnackBar(
+                              tr(
+                                'msg_returned_stock',
+                                ref,
+                              ).replaceAll('%s', AppFormatters.stock(qty, ppc)),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          final key = AppErrorMapper.key(e);
+                          ScaffoldMessenger.of(
+                            ctx,
+                          ).showSnackBar(errorSnackBar(tr(key, ref)));
+                        }
+                      } finally {
+                        if (ctx.mounted) setS(() => isSubmitting = false);
+                      }
+                    },
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(tr('lbl_return', ref)),
             ),
           ],
         ),

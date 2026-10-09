@@ -521,12 +521,14 @@ class _DatabaseFlushScreenState extends ConsumerState<DatabaseFlushScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircularProgressIndicator(color: Colors.white),
+                    CircularProgressIndicator(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       tr('flush_in_progress', ref),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),

@@ -358,7 +358,11 @@ final sellerTransactionsExportProvider =
       final normalizedId = sellerId.trim();
       if (normalizedId.isEmpty) return const <TransactionModel>[];
       final user = await ref.read(authUserProvider.future);
-      if (user == null || !user.isAdmin) return const <TransactionModel>[];
+      if (user == null ||
+          !user.active ||
+          (!user.isAdmin && (!user.isSeller || user.id != normalizedId))) {
+        return const <TransactionModel>[];
+      }
       final tenantId = TenantScope.normalize(user.tenantId);
       final query = TenantScope.applyToQuery(
         FirebaseFirestore.instance.collection(Collections.transactions),

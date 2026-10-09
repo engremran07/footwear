@@ -17,6 +17,7 @@ import '../models/transaction_model.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
+import '../widgets/app_pull_refresh.dart';
 import '../widgets/whatsapp_button.dart';
 
 class RouteDetailScreen extends ConsumerWidget {
@@ -232,9 +233,23 @@ class RouteDetailScreen extends ConsumerWidget {
                 child: shopsAsync.when(
                   data: (shops) {
                     if (shops.isEmpty) {
-                      return EmptyState(
-                        icon: Icons.store,
-                        message: tr('no_shops', ref),
+                      return AppPullRefresh(
+                        onRefresh: () async {
+                          ref.invalidate(shopsByRouteProvider(routeId));
+                          await ref.read(shopsByRouteProvider(routeId).future);
+                        },
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.sizeOf(context).height * 0.45,
+                              child: EmptyState(
+                                icon: Icons.store,
+                                message: tr('no_shops', ref),
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     }
                     // Pre-compute last tx per shop from analytics (fallback

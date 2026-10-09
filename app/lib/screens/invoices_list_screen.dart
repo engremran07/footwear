@@ -233,11 +233,13 @@ class _InvoiceStatsStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
-    final sales = invoices.where((i) => i.isSale).toList();
+    final sales = invoices.where((i) => i.isSale && !i.isVoid).toList();
     final totalSales = sales.fold(0.0, (sum, i) => sum + i.total);
-    final paid = sales.where((i) => i.status == InvoiceModel.statusPaid);
-    final paidAmount = paid.fold(0.0, (sum, i) => sum + i.total);
-    final outstanding = totalSales - paidAmount;
+    final paidAmount = sales.fold(0.0, (sum, i) => sum + i.amountReceived);
+    final outstanding = sales.fold(
+      0.0,
+      (sum, i) => sum + i.outstandingAmount,
+    );
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),

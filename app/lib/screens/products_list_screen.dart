@@ -52,9 +52,32 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                           )
                           .toList();
                 if (filtered.isEmpty) {
-                  return EmptyState(
-                    icon: Icons.inventory_2,
-                    message: tr('no_products', ref),
+                  final hasSearch = _search.isNotEmpty;
+                  return AppPullRefresh(
+                    onRefresh: () async {
+                      ref.invalidate(productsProvider);
+                      await ref.read(productsProvider.future);
+                    },
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.sizeOf(context).height * 0.45,
+                          child: EmptyState(
+                            icon: Icons.inventory_2,
+                            message: tr(
+                              hasSearch ? 'no_data' : 'no_products',
+                              ref,
+                            ),
+                            secondaryActionLabel:
+                                hasSearch ? tr('clear_search', ref) : null,
+                            onSecondaryAction: hasSearch
+                                ? () => setState(() => _search = '')
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 }
                 return AppPullRefresh(

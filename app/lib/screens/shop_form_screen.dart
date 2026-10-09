@@ -96,6 +96,19 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     setState(() => _saving = true);
     bool saved = false;
     try {
+      final user = await ref.read(authUserProvider.future);
+      if (!mounted) return;
+      final canManageRoute =
+          user != null &&
+          user.active &&
+          (user.isAdmin ||
+              (user.isSeller && user.assignedRouteIds.contains(_routeId)));
+      if (!canManageRoute) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
+        return;
+      }
       final data = {
         'name': AppSanitizer.name(_nameC.text),
         'route_id': _routeId,
@@ -237,13 +250,12 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                                     child: Text(
                                       routesLoading
                                           ? tr('loading', ref)
-                                        : _routeNumber != null
-                                        ? tr('dashboard_route_number', ref)
-                                          .replaceAll(
-                                            '%s',
-                                            '$_routeNumber',
-                                          )
-                                        : tr('route_unavailable', ref),
+                                          : _routeNumber != null
+                                          ? tr(
+                                              'dashboard_route_number',
+                                              ref,
+                                            ).replaceAll('%s', '$_routeNumber')
+                                          : tr('route_unavailable', ref),
                                     ),
                                   ),
                                 ]

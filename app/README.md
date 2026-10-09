@@ -1,4 +1,4 @@
-﻿# FootWear ERP — Flutter App (v3.9.58+97)
+﻿# FootWear ERP — Flutter App (v3.9.59+98)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
@@ -9,6 +9,7 @@ Workspace backup restore is tenant-scoped. Tenant admins merge encrypted backup 
 Status chips display localized text and use high-contrast state colors when that theme is selected.
 
 Encrypted backup export and Google Drive upload are separate actions; Drive uploads do not create duplicate local archives. Restore behavior follows workspace scope, and local backup files can be deleted from the device restore picker. Workspace archival revokes member access records before the workspace is marked archived.
+Workspace-admin and seller sign-in registers device access through tenant/user-scoped queries and links each application session to its registered device slot. Workspace create/edit failures remain visible in the form, and the workspace list tolerates temporary auth-profile loading.
 
 ---
 

@@ -8,7 +8,6 @@ import '../core/design/app_animations.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_fonts.dart';
-import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
@@ -32,12 +31,8 @@ Widget _buildDashboardAsyncError(
   BuildContext context,
   WidgetRef ref,
   Object error, {
-  Widget? fallback,
   VoidCallback? onRetry,
 }) {
-  if (AppErrorMapper.isPermissionOrAuthError(error)) {
-    return fallback ?? ShimmerLoading.cards();
-  }
   return mappedErrorState(error: error, ref: ref, onRetry: onRetry);
 }
 
@@ -126,8 +121,9 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authUserProvider).value;
-    if (user == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    final authOperation = ref.watch(authNotifierProvider);
+    if (user == null || authOperation.isLoading) {
+      return Scaffold(body: ShimmerLoading.cards());
     }
     if (user.isSuperAdmin) {
       return _SuperAdminDashboard(user: user);
@@ -479,17 +475,14 @@ class _SellerDashboard extends ConsumerWidget {
     );
 
     // Stale-while-revalidate gate: shimmer only on cold start (loading, no data
-    // yet, and no error). If a provider enters AsyncError (e.g. App Check
-    // PERMISSION_DENIED during debug warm-up), fall through to the error
-    // handler below — never show shimmer indefinitely on error.
+    // yet, and no error). Permission errors are suppressed only while sign-in
+    // is still registering the session; settled failures use the retry state.
     if ((!routesAsync.hasValue && !routesAsync.hasError) ||
         (!shopsAsync.hasValue && !shopsAsync.hasError)) {
       return Scaffold(body: ShimmerLoading.cards());
     }
 
-    // Degrade gracefully on error (permission errors during auth warm-up are silent).
-    if (routesAsync.hasError &&
-        !AppErrorMapper.isPermissionOrAuthError(routesAsync.error!)) {
+    if (routesAsync.hasError) {
       return Scaffold(
         body: _buildDashboardAsyncError(
           context,
@@ -499,8 +492,7 @@ class _SellerDashboard extends ConsumerWidget {
         ),
       );
     }
-    if (shopsAsync.hasError &&
-        !AppErrorMapper.isPermissionOrAuthError(shopsAsync.error!)) {
+    if (shopsAsync.hasError) {
       return Scaffold(
         body: _buildDashboardAsyncError(
           context,
@@ -511,8 +503,7 @@ class _SellerDashboard extends ConsumerWidget {
       );
     }
 
-    // Extract data. After the gate above, hasValue=true OR hasError=true with
-    // a permission error (treated as empty). Use .value ?? [] for safety.
+    // Use cached values during a transient access-registration failure.
     final routes = routesAsync.value ?? const [];
     final shops = shopsAsync.value ?? const [];
     // Inventory: use .value if loaded, 0 while still loading — stat grid

@@ -14,6 +14,7 @@ import 'package:footwear_erp/screens/database_backup_screen.dart';
 void main() {
   late Directory archiveDirectory;
   late LocalBackupFile archive;
+  late LocalBackupFile legacyArchive;
   late _FakeDatabaseBackupNotifier backupNotifier;
 
   setUp(() async {
@@ -21,7 +22,16 @@ void main() {
     final file = File('${archiveDirectory.path}/test.shoesbackup');
     await file.writeAsBytes([1, 2, 3]);
     archive = LocalBackupFile(file: file, modifiedAt: DateTime.utc(2026));
-    backupNotifier = _FakeDatabaseBackupNotifier(archive);
+    final legacyFile = File('${archiveDirectory.path}/legacy.json');
+    await legacyFile.writeAsString('{"metadata":{},"shops":[]}');
+    legacyArchive = LocalBackupFile(
+      file: legacyFile,
+      modifiedAt: DateTime.utc(2026),
+    );
+    backupNotifier = _FakeDatabaseBackupNotifier(
+      archive,
+      additionalArchives: [legacyArchive],
+    );
   });
 
   tearDown(() async {
@@ -77,8 +87,22 @@ void main() {
     await tester.tap(find.text('Restore from this device'));
     await tester.pumpAndSettle();
     expect(find.text('test.shoesbackup'), findsOneWidget);
+    expect(find.text('legacy.json'), findsOneWidget);
+    final legacyTile = find.ancestor(
+      of: find.text('legacy.json'),
+      matching: find.byType(ListTile),
+    );
+    expect(
+      tester
+          .widgetList<IconButton>(
+            find.descendant(of: legacyTile, matching: find.byType(IconButton)),
+          )
+          .first
+          .onPressed,
+      isNull,
+    );
 
-    await tester.tap(find.byTooltip('Delete'));
+    await tester.tap(find.byTooltip('Delete').first);
     await tester.pumpAndSettle();
     expect(
       find.text('Permanently delete "test.shoesbackup" from this device?'),
@@ -135,10 +159,14 @@ void main() {
 
 class _FakeDatabaseBackupNotifier extends DatabaseBackupNotifier {
   final LocalBackupFile archive;
+  final List<LocalBackupFile> additionalArchives;
   bool deleted = false;
   bool listed = false;
 
-  _FakeDatabaseBackupNotifier(this.archive);
+  _FakeDatabaseBackupNotifier(
+    this.archive, {
+    this.additionalArchives = const [],
+  });
 
   @override
   void build() {}
@@ -167,7 +195,7 @@ class _FakeDatabaseBackupNotifier extends DatabaseBackupNotifier {
     required String creatorUid,
   }) async {
     listed = true;
-    return [archive];
+    return [archive, ...additionalArchives];
   }
 
   @override

@@ -3,6 +3,12 @@ import '../../models/session_model.dart';
 class SessionAccessPolicy {
   const SessionAccessPolicy._();
 
+  static const accessRegistrationGracePeriod = Duration(seconds: 15);
+
+  static bool shouldDeferMissingSessionEnforcement({
+    required Duration? sessionAge,
+  }) => sessionAge != null && sessionAge < accessRegistrationGracePeriod;
+
   static SessionModel? currentForDevice(
     Iterable<SessionModel> sessions, {
     required String deviceId,

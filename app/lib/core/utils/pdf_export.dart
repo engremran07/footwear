@@ -144,6 +144,25 @@ void _requireLabelKeys(
   }
 }
 
+String pdfCurrencyLabel(AppLocale locale, String currency) {
+  final normalized = currency.trim().toUpperCase();
+  if (locale == AppLocale.ar) {
+    return switch (normalized) {
+      'SAR' => 'ريال',
+      'PKR' => 'روبية',
+      _ => normalized,
+    };
+  }
+  if (locale == AppLocale.ur) {
+    return switch (normalized) {
+      'SAR' => 'ریال',
+      'PKR' => 'روپے',
+      _ => normalized,
+    };
+  }
+  return normalized;
+}
+
 /// Centralised locale → font/direction/currency configuration for all PDF
 /// builders. Eliminates the previously 5× duplicated inline computation.
 ///
@@ -182,11 +201,7 @@ class _PdfLocaleConfig {
       // characters) in Naskh style. Always primary for PDF rendering.
       primaryFont: fonts.arabic,
       ff: <pw.Font>[fonts.urdu],
-      currencyStr: locale == AppLocale.ar
-          ? 'ريال'
-          : locale == AppLocale.ur
-          ? 'ریال'
-          : currency,
+        currencyStr: pdfCurrencyLabel(locale, currency),
     );
   }
 
@@ -359,6 +374,41 @@ String _fmtAmtC(double v, String currency) => currency.isEmpty
     ? v.toStringAsFixed(2)
     : '${v.toStringAsFixed(2)} $currency';
 
+class LedgerSummary {
+  final double totalDebit;
+  final double totalCredit;
+  final double closingBalance;
+
+  const LedgerSummary({
+    required this.totalDebit,
+    required this.totalCredit,
+    required this.closingBalance,
+  });
+}
+
+LedgerSummary calculateLedgerSummary({
+  required double openingBalance,
+  required Iterable<TransactionModel> transactions,
+}) {
+  var balance = openingBalance;
+  var totalDebit = 0.0;
+  var totalCredit = 0.0;
+  for (final transaction in transactions) {
+    final impact = transaction.balanceImpact;
+    balance += impact;
+    if (impact > 0) {
+      totalDebit += impact;
+    } else if (impact < 0) {
+      totalCredit -= impact;
+    }
+  }
+  return LedgerSummary(
+    totalDebit: totalDebit,
+    totalCredit: totalCredit,
+    closingBalance: balance,
+  );
+}
+
 /// Builds a CA-grade customer account statement PDF with running balance,
 /// summary totals, and optional Entry By column.
 ///
@@ -388,8 +438,6 @@ Future<Uint8List> buildPdfLedger({
     'debit',
     'credit',
     'running_balance',
-    'cash_in',
-    'cash_out',
     'net_payable',
     'total_entries',
     'page',
@@ -416,9 +464,11 @@ Future<Uint8List> buildPdfLedger({
     }) => lc.ts(size: size, fw: fw, color: color);
 
     // ── build ledger rows ──
-    double balance = openingBalance;
-    double totalCashIn = 0;
-    double totalCashOut = 0;
+    final summary = calculateLedgerSummary(
+      openingBalance: openingBalance,
+      transactions: transactions,
+    );
+    var balance = openingBalance;
     final int entryCount = transactions.length;
 
     final rows = <_LedgerRow>[];
@@ -451,35 +501,19 @@ Future<Uint8List> buildPdfLedger({
       final mode = tx.saleType ?? '';
       final entryBy = showEntryBy ? (entryByMap[tx.createdBy] ?? '—') : '';
 
-      if (tx.isCashOut) {
-        balance += tx.amount;
-        totalCashOut += tx.amount;
-        rows.add(
-          _LedgerRow(
-            date: _fmtDate(date),
-            desc: desc,
-            entryBy: entryBy,
-            mode: mode,
-            cashIn: 0,
-            cashOut: tx.amount,
-            balance: balance,
-          ),
-        );
-      } else {
-        balance -= tx.amount;
-        totalCashIn += tx.amount;
-        rows.add(
-          _LedgerRow(
-            date: _fmtDate(date),
-            desc: desc,
-            entryBy: entryBy,
-            mode: mode,
-            cashIn: tx.amount,
-            cashOut: 0,
-            balance: balance,
-          ),
-        );
-      }
+      final impact = tx.balanceImpact;
+      balance += impact;
+      rows.add(
+        _LedgerRow(
+          date: _fmtDate(date),
+          desc: desc,
+          entryBy: entryBy,
+          mode: mode,
+          cashIn: impact < 0 ? -impact : 0,
+          cashOut: impact > 0 ? impact : 0,
+          balance: balance,
+        ),
+      );
     }
 
     // ── column widths (portrait A4 usable ≈ 539 pt) ──
@@ -632,8 +666,8 @@ Future<Uint8List> buildPdfLedger({
                   child: pw.Row(
                     children: [
                       _summaryCell(
-                        label: labels['cash_in'] ?? 'Total Cash In',
-                        value: _fmtAmtC(totalCashIn, currencyStr),
+                        label: labels['credit'] ?? 'Credit',
+                        value: _fmtAmtC(summary.totalCredit, currencyStr),
                         color: PdfColors.green800,
                         primaryFont: primaryFont,
                         ff: ff,
@@ -644,8 +678,8 @@ Future<Uint8List> buildPdfLedger({
                         color: PdfColors.blue100,
                       ),
                       _summaryCell(
-                        label: labels['cash_out'] ?? 'Total Cash Out',
-                        value: _fmtAmtC(totalCashOut, currencyStr),
+                        label: labels['debit'] ?? 'Debit',
+                        value: _fmtAmtC(summary.totalDebit, currencyStr),
                         color: PdfColors.red800,
                         primaryFont: primaryFont,
                         ff: ff,
@@ -657,7 +691,10 @@ Future<Uint8List> buildPdfLedger({
                       ),
                       _summaryCell(
                         label: labels['net_payable'] ?? 'Final Balance',
-                        value: _fmtAmtC(balance.abs(), currencyStr),
+                        value: _fmtAmtC(
+                          summary.closingBalance.abs(),
+                          currencyStr,
+                        ),
                         color: balance > 0
                             ? PdfColors.red800
                             : PdfColors.green800,
@@ -774,7 +811,7 @@ Future<Uint8List> buildPdfLedger({
                     vertical: 5,
                   ),
                   child: pw.Text(
-                    _fmtAmtC(balance, currencyStr),
+                    _fmtAmtC(summary.closingBalance, currencyStr),
                     style: pw.TextStyle(
                       fontSize: 9,
                       fontWeight: pw.FontWeight.bold,
@@ -1670,6 +1707,7 @@ class MultiShopLedgerSection {
 
   /// Pre-computed opening balance (= shop.balance − net of [transactions]).
   final double openingBalance;
+  final String currency;
 
   final List<TransactionModel> transactions;
 
@@ -1677,6 +1715,7 @@ class MultiShopLedgerSection {
     required this.shopName,
     required this.routeLabel,
     required this.openingBalance,
+    this.currency = 'SAR',
     required this.transactions,
   });
 }
@@ -1753,7 +1792,13 @@ Future<Uint8List> buildPdfMultiShopLedger({
     final align = lc.align;
     final primaryFont = lc.primaryFont;
     final ff = lc.ff;
-    final currencyStr = lc.currencyStr;
+    final fallbackCurrency = currency.trim().isEmpty
+        ? 'SAR'
+        : currency.trim().toUpperCase();
+    String sectionCurrency(MultiShopLedgerSection section) {
+      final normalized = section.currency.trim().toUpperCase();
+      return normalized.isEmpty ? fallbackCurrency : normalized;
+    }
     pw.TextStyle ts({
       double size = 9,
       pw.FontWeight fw = pw.FontWeight.normal,
@@ -1801,27 +1846,34 @@ Future<Uint8List> buildPdfMultiShopLedger({
 
     // ── Pre-compute per-section totals ───────────────────────────────────────
     final sectionFinals = <double>[];
-    final sectionTotalIn = <double>[];
-    final sectionTotalOut = <double>[];
+    final sectionTotalCredit = <double>[];
+    final sectionTotalDebit = <double>[];
+    final balanceByCurrency = <String, double>{};
     for (final sec in sections) {
-      var bal = sec.openingBalance;
-      var tIn = 0.0;
-      var tOut = 0.0;
-      for (final tx in sec.transactions) {
-        final impact = tx.balanceImpact; // 0 for unknown types — safe
-        bal += impact;
-        if (impact > 0) {
-          tOut += impact; // positive impact = cash_out = debit (shop owes more)
-        } else if (impact < 0) {
-          tIn -= impact; // negative impact = cash_in/return/payment = credit
-        }
-        // write_off (impact == 0) and unknown types: excluded from In/Out totals
-      }
-      sectionFinals.add(bal);
-      sectionTotalIn.add(tIn);
-      sectionTotalOut.add(tOut);
+      final currencyCode = sectionCurrency(sec);
+      final summary = calculateLedgerSummary(
+        openingBalance: sec.openingBalance,
+        transactions: sec.transactions,
+      );
+      sectionFinals.add(summary.closingBalance);
+      sectionTotalCredit.add(summary.totalCredit);
+      sectionTotalDebit.add(summary.totalDebit);
+      balanceByCurrency.update(
+        currencyCode,
+        (value) => value + summary.closingBalance,
+        ifAbsent: () => summary.closingBalance,
+      );
     }
-    final grandBalance = sectionFinals.fold(0.0, (s, b) => s + b);
+    final balanceSummary = balanceByCurrency.isEmpty
+        ? _fmtAmtC(0, pdfCurrencyLabel(locale, fallbackCurrency))
+        : balanceByCurrency.entries
+              .map(
+                (entry) => _fmtAmtC(
+                  entry.value,
+                  pdfCurrencyLabel(locale, entry.key),
+                ),
+              )
+              .join(' / ');
     final totalShops = sections.length;
 
     // ── Cover section with natural, renderer-managed pagination ─────────────
@@ -1830,8 +1882,10 @@ Future<Uint8List> buildPdfMultiShopLedger({
     for (var si = 0; si < sections.length; si++) {
       final sec = sections[si];
       final finalBal = sectionFinals[si];
-      final tIn = sectionTotalIn[si];
-      final tOut = sectionTotalOut[si];
+      final totalCredit = sectionTotalCredit[si];
+      final totalDebit = sectionTotalDebit[si];
+      final currencyCode = sectionCurrency(sec);
+      final currencyLabel = pdfCurrencyLabel(locale, currencyCode);
       final bg = si % 2 == 0 ? PdfColors.white : PdfColors.grey50;
 
       if (sec.routeLabel.trim().isNotEmpty &&
@@ -1888,23 +1942,23 @@ Future<Uint8List> buildPdfMultiShopLedger({
                 ff,
               ),
               _coverCell(
-                _fmtAmtC(tOut, currencyStr),
+                _fmtAmtC(totalDebit, currencyLabel),
                 caW,
                 _amountDir,
                 primaryFont,
                 ff,
-                color: tOut > 0 ? PdfColors.red800 : null,
+                color: totalDebit > 0 ? PdfColors.red800 : null,
               ),
               _coverCell(
-                _fmtAmtC(tIn, currencyStr),
+                _fmtAmtC(totalCredit, currencyLabel),
                 caW,
                 _amountDir,
                 primaryFont,
                 ff,
-                color: tIn > 0 ? PdfColors.green800 : null,
+                color: totalCredit > 0 ? PdfColors.green800 : null,
               ),
               _coverCell(
-                _fmtAmtC(finalBal, currencyStr),
+                _fmtAmtC(finalBal, currencyLabel),
                 cbW,
                 _amountDir,
                 primaryFont,
@@ -2010,10 +2064,8 @@ Future<Uint8List> buildPdfMultiShopLedger({
                     ),
                     _summaryCell(
                       label: labels['net_payable'] ?? 'Total Outstanding',
-                      value: _fmtAmtC(grandBalance.abs(), currencyStr),
-                      color: grandBalance >= 0
-                          ? PdfColors.red800
-                          : PdfColors.green800,
+                      value: balanceSummary,
+                      color: PdfColors.blue800,
                       primaryFont: primaryFont,
                       ff: ff,
                       isBold: true,
@@ -2099,8 +2151,10 @@ Future<Uint8List> buildPdfMultiShopLedger({
     for (var si = 0; si < sections.length; si++) {
       final sec = sections[si];
       final finalBal = sectionFinals[si];
-      final tIn = sectionTotalIn[si];
-      final tOut = sectionTotalOut[si];
+      final totalCredit = sectionTotalCredit[si];
+      final totalDebit = sectionTotalDebit[si];
+      final currencyCode = sectionCurrency(sec);
+      final currencyLabel = pdfCurrencyLabel(locale, currencyCode);
 
       // Build ledger rows for this shop
       var balance = sec.openingBalance;
@@ -2236,8 +2290,8 @@ Future<Uint8List> buildPdfMultiShopLedger({
                   child: pw.Row(
                     children: [
                       _summaryCell(
-                        label: labels['cash_in'] ?? 'Cash In',
-                        value: _fmtAmtC(tIn, currencyStr),
+                        label: labels['credit'] ?? 'Credit',
+                        value: _fmtAmtC(totalCredit, currencyLabel),
                         color: PdfColors.green800,
                         primaryFont: primaryFont,
                         ff: ff,
@@ -2248,8 +2302,8 @@ Future<Uint8List> buildPdfMultiShopLedger({
                         color: PdfColors.blue100,
                       ),
                       _summaryCell(
-                        label: labels['cash_out'] ?? 'Cash Out',
-                        value: _fmtAmtC(tOut, currencyStr),
+                        label: labels['debit'] ?? 'Debit',
+                        value: _fmtAmtC(totalDebit, currencyLabel),
                         color: PdfColors.red800,
                         primaryFont: primaryFont,
                         ff: ff,
@@ -2261,7 +2315,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                       ),
                       _summaryCell(
                         label: labels['net_payable'] ?? 'Balance',
-                        value: _fmtAmtC(finalBal.abs(), currencyStr),
+                        value: _fmtAmtC(finalBal.abs(), currencyLabel),
                         color: finalBal >= 0
                             ? PdfColors.red800
                             : PdfColors.green800,
@@ -2345,7 +2399,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                 primaryFont,
                 ff,
                 showEntryBy,
-                currencyStr,
+                currencyLabel,
               );
             }),
             // final balance placed as flow item so it will not clip rows
@@ -2395,7 +2449,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                       vertical: 5,
                     ),
                     child: pw.Text(
-                      _fmtAmtC(finalBal, currencyStr),
+                      _fmtAmtC(finalBal, currencyLabel),
                       style: pw.TextStyle(
                         fontSize: 9,
                         fontWeight: pw.FontWeight.bold,

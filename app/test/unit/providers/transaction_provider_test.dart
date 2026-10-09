@@ -122,7 +122,7 @@ void main() {
     });
 
     test(
-      'sellerTransactionsExportProvider returns empty for seller (non-admin)',
+      'sellerTransactionsExportProvider returns empty for another seller',
       () async {
         final container = containerWithUser(seller);
         addTearDown(container.dispose);
@@ -131,7 +131,7 @@ void main() {
         await container.read(authUserProvider.future);
 
         final result = await container.read(
-          sellerTransactionsExportProvider('seller-1').future,
+          sellerTransactionsExportProvider('seller-2').future,
         );
 
         expect(result, isEmpty);

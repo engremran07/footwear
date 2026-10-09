@@ -22,18 +22,6 @@ String? validateSaleAmount({required double saleAmount}) {
   return null;
 }
 
-/// Validates amount received vs invoice total.
-/// Returns an error message, or null if valid.
-String? validateAmountReceived({
-  required double amountReceived,
-  required double total,
-}) {
-  if (amountReceived > total) {
-    return 'amountReceived cannot exceed invoice total';
-  }
-  return null;
-}
-
 /// Validates invoice math invariant: total ≈ subtotal − discount (±0.01).
 bool isInvoiceMathValid({
   required double total,
@@ -92,28 +80,37 @@ void main() {
 
   group('createSaleInvoice — amountReceived guard', () {
     test('passes when amountReceived equals total (fully paid)', () {
-      expect(validateAmountReceived(amountReceived: 1000, total: 1000), isNull);
+      expect(
+        amountReceivedExceedsInvoiceTotal(amountReceived: 1000, total: 1000),
+        isFalse,
+      );
     });
 
     test('passes when amountReceived is zero (unpaid)', () {
-      expect(validateAmountReceived(amountReceived: 0, total: 1000), isNull);
+      expect(
+        amountReceivedExceedsInvoiceTotal(amountReceived: 0, total: 1000),
+        isFalse,
+      );
     });
 
     test('passes when amountReceived is partial', () {
-      expect(validateAmountReceived(amountReceived: 400, total: 1000), isNull);
+      expect(
+        amountReceivedExceedsInvoiceTotal(amountReceived: 400, total: 1000),
+        isFalse,
+      );
     });
 
     test('fails when amountReceived exceeds total by 1 paisa', () {
       expect(
-        validateAmountReceived(amountReceived: 1000.01, total: 1000),
-        isNotNull,
+        amountReceivedExceedsInvoiceTotal(amountReceived: 1000.01, total: 1000),
+        isTrue,
       );
     });
 
     test('fails when amountReceived is far above total', () {
       expect(
-        validateAmountReceived(amountReceived: 9999, total: 1000),
-        isNotNull,
+        amountReceivedExceedsInvoiceTotal(amountReceived: 9999, total: 1000),
+        isTrue,
       );
     });
   });

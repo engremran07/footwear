@@ -50,9 +50,9 @@ class _TenantManagementScreenState
   Future<void> _createOrUpdateTenant({TenantModel? existing}) async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('workspace_name_required', ref))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(errorSnackBar(tr('workspace_name_required', ref)));
       return;
     }
 
@@ -102,10 +102,8 @@ class _TenantManagementScreenState
       await authNotifier.resetDevicePairing(user.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${tr('device_pairing_reset', ref)} ${user.displayName}',
-          ),
+        successSnackBar(
+          '${tr('device_pairing_reset', ref)} ${user.displayName}',
         ),
       );
     } catch (e) {
@@ -178,12 +176,10 @@ class _TenantManagementScreenState
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            enabled
-                ? tr('device_pairing_enabled', ref)
-                : tr('device_pairing_disabled', ref),
-          ),
+        successSnackBar(
+          enabled
+              ? tr('device_pairing_enabled', ref)
+              : tr('device_pairing_disabled', ref),
         ),
       );
     } catch (e) {
@@ -298,7 +294,11 @@ class _TenantManagementScreenState
                     },
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
-                    error: (_, _) => const SizedBox.shrink(),
+                    error: (error, _) => mappedErrorState(
+                      error: error,
+                      ref: ref,
+                      onRetry: () => ref.invalidate(allUsersProvider),
+                    ),
                   ),
                 ],
               ),
@@ -463,8 +463,9 @@ class _TenantManagementScreenState
                         ),
                       ],
                       const SizedBox(height: 12),
-                      if (!currentUser!.isSuperAdmin ||
-                          currentUser.activeWorkspaceId == tenant.id)
+                      if (currentUser != null &&
+                          (!currentUser.isSuperAdmin ||
+                              currentUser.activeWorkspaceId == tenant.id))
                         Consumer(
                           builder: (context, ref, child) {
                             final usersAsync = ref.watch(

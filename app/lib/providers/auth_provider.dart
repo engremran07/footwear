@@ -104,12 +104,16 @@ class AuthNotifier extends AsyncNotifier<void> {
     ref.invalidate(sellerInvoicesProvider);
     ref.invalidate(sellersProvider);
     ref.invalidate(allVariantsProvider);
+    ref.invalidate(allVariantsExportProvider);
     // A§4-R17: admin-only providers must be invalidated to prevent data leak
     // across sessions (e.g. admin logs out, seller logs in on same device).
     ref.invalidate(routesProvider);
+    ref.invalidate(routesExportProvider);
     ref.invalidate(shopsProvider);
+    ref.invalidate(shopsExportProvider);
     ref.invalidate(allUsersProvider);
     ref.invalidate(inactiveUsersProvider);
+    ref.invalidate(allUsersExportProvider);
     ref.invalidate(adminAllSellerInventoryProvider);
     ref.invalidate(
       sellerInventoryProvider,
@@ -232,14 +236,10 @@ class AuthNotifier extends AsyncNotifier<void> {
             await ref
                 .read(sessionManagementNotifierProvider.notifier)
                 .registerCurrentAccess(userId: uid, tenantId: tenantId);
-          } catch (error) {
+          } catch (error, stackTrace) {
             await FirebaseAuth.instance.signOut();
             _invalidateRoleScopedProviders();
-            throw FirebaseAuthException(
-              code: 'session-limit-reached',
-              message:
-                  'Active session limit reached. End another session or ask your workspace administrator.',
-            );
+            Error.throwWithStackTrace(error, stackTrace);
           }
         }
 

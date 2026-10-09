@@ -147,20 +147,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _showForgotPassword() async {
-    final emailController = TextEditingController(text: _emailC.text.trim());
+    var resetEmail = _emailC.text.trim();
     final formKey = GlobalKey<FormState>();
     bool sent = false;
+    bool sending = false;
 
     Future<void> submitReset(
       StateSetter setDlgState,
       BuildContext dialogContext,
     ) async {
-      if (!formKey.currentState!.validate()) return;
+      if (sending || !formKey.currentState!.validate()) return;
+      setDlgState(() => sending = true);
       try {
         await ref
             .read(authNotifierProvider.notifier)
-            .sendPasswordReset(emailController.text.trim());
-        setDlgState(() => sent = true);
+            .sendPasswordReset(resetEmail.trim());
+        if (!dialogContext.mounted) return;
+        setDlgState(() {
+          sent = true;
+          sending = false;
+        });
       } on FirebaseAuthException catch (e) {
         if (!dialogContext.mounted) return;
         Navigator.of(dialogContext).pop();
@@ -194,14 +200,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Text(tr('enter_email_to_reset', ref)),
                 const SizedBox(height: 16),
                 TextFormField(
-                  controller: emailController,
+                  initialValue: resetEmail,
+                  onChanged: (value) => resetEmail = value,
                   decoration: InputDecoration(
                     labelText: tr('email', ref),
                     prefixIcon: const Icon(Icons.email_outlined),
                   ),
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.done,
-                  autofocus: emailController.text.isEmpty,
+                  autofocus: resetEmail.isEmpty,
                   validator: (v) => (v == null || !v.trim().contains('@'))
                       ? tr('err_invalid_email', ref)
                       : null,
@@ -230,8 +237,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: Text(tr('cancel', ref)),
                   ),
                   FilledButton(
-                    onPressed: () => submitReset(setDlgState, ctx),
-                    child: Text(tr('send_reset_email', ref)),
+                    onPressed: sending
+                        ? null
+                        : () => submitReset(setDlgState, ctx),
+                    child: sending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(tr('send_reset_email', ref)),
                   ),
                 ],
         ),
@@ -243,7 +258,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context,
       ).showSnackBar(successSnackBar(tr('reset_email_sent', ref)));
     }
-    emailController.dispose();
   }
 
   @override
@@ -256,12 +270,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isWide =
         MediaQuery.sizeOf(context).width >= AppTokens.breakpointNavigationRail;
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: SafeArea(
-        child: isWide
-            ? _wideLayout(theme, cs, currentLocale, isOnline, isLoading)
-            : _narrowLayout(theme, cs, currentLocale, isOnline, isLoading),
+    final isDark = theme.brightness == Brightness.dark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      key: const ValueKey('login-system-ui'),
+      value: SystemUiOverlayStyle(
+        statusBarColor: cs.surface.withValues(alpha: 0),
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      ),
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: SafeArea(
+          child: isWide
+              ? _wideLayout(theme, cs, currentLocale, isOnline, isLoading)
+              : _narrowLayout(theme, cs, currentLocale, isOnline, isLoading),
+        ),
       ),
     );
   }
@@ -546,14 +568,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 const SizedBox(height: AppTokens.s8),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _remember,
-                      onChanged: (v) => setState(() => _remember = v!),
-                    ),
-                    Text(tr('remember_me', ref)),
-                  ],
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: _remember,
+                  onChanged: (value) {
+                    if (value != null) setState(() => _remember = value);
+                  },
+                  title: Text(tr('remember_me', ref)),
                 ),
                 const SizedBox(height: AppTokens.s24),
                 SizedBox(

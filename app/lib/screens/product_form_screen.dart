@@ -47,24 +47,25 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     if (!_formKey.currentState!.validate()) {
       HapticFeedback.vibrate();
-      return;
-    }
-
-    final user = await ref.read(authUserProvider.future);
-    if (user?.isAdmin != true) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
-      }
       return;
     }
 
     setState(() => _saving = true);
     bool saved = false;
     try {
+      final user = await ref.read(authUserProvider.future);
+      if (user?.isAdmin != true) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
+        }
+        return;
+      }
+
       final data = {'name': AppSanitizer.name(_nameC.text)};
       final notifier = ref.read(productNotifierProvider.notifier);
       if (isEdit) {

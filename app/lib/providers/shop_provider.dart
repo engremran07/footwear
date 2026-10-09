@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/firestore_pagination.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/shop_model.dart';
@@ -85,6 +86,48 @@ final shopsByRouteProvider = StreamProvider.autoDispose
             return shops;
           });
     });
+
+/// Complete role-scoped shop dataset for explicit report/export actions.
+/// Live UI providers remain windowed; this query cursor-pages to exhaustion.
+final shopsExportProvider = FutureProvider<List<ShopModel>>((ref) async {
+  final user = await ref.read(authUserProvider.future);
+  if (user == null || !user.active) return const <ShopModel>[];
+  final tenantId = TenantScope.normalize(user.tenantId);
+  if (tenantId == null) return const <ShopModel>[];
+
+  final baseQuery = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.shops),
+    tenantId: tenantId,
+  );
+  final queryParts = <Query<Map<String, dynamic>>>[];
+  if (user.isAdmin) {
+    queryParts.add(baseQuery.where('active', isEqualTo: true));
+  } else if (user.isSeller) {
+    final routeIds = user.assignedRouteIds.toSet().toList();
+    for (var offset = 0; offset < routeIds.length; offset += 30) {
+      final end = (offset + 30).clamp(0, routeIds.length);
+      queryParts.add(
+        baseQuery
+            .where('route_id', whereIn: routeIds.sublist(offset, end))
+            .where('active', isEqualTo: true),
+      );
+    }
+  } else {
+    return const <ShopModel>[];
+  }
+
+  final documentsById = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+  for (final query in queryParts) {
+    for (final document in await fetchAllQueryDocuments(query)) {
+      documentsById[document.id] = document;
+    }
+  }
+  final shops = documentsById.values
+      .map((document) => ShopModel.fromJson(document.data(), document.id))
+      .toList();
+  shops.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  return shops;
+});
 
 /// Seller multi-route: merges shops from all assigned routes into one list.
 final sellerAllShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((

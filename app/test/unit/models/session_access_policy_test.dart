@@ -7,6 +7,27 @@ void main() {
   group('SessionAccessPolicy.currentForDevice', () {
     final now = DateTime.utc(2026, 10, 3, 12);
 
+    test('defers missing-session enforcement during access registration', () {
+      expect(
+        SessionAccessPolicy.shouldDeferMissingSessionEnforcement(
+          sessionAge: const Duration(seconds: 3),
+        ),
+        isTrue,
+      );
+      expect(
+        SessionAccessPolicy.shouldDeferMissingSessionEnforcement(
+          sessionAge: const Duration(seconds: 15),
+        ),
+        isFalse,
+      );
+      expect(
+        SessionAccessPolicy.shouldDeferMissingSessionEnforcement(
+          sessionAge: null,
+        ),
+        isFalse,
+      );
+    });
+
     SessionModel session({
       required String id,
       required String status,

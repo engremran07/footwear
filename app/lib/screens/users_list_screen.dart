@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
@@ -7,6 +8,7 @@ import '../core/utils/error_mapper.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/utils/tenant_scope.dart';
+import '../models/route_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
@@ -53,10 +55,21 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     if (!canViewUserAccounts) {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
+    if (currentUser.isSuperAdmin && currentUser.activeWorkspaceId == null) {
+      return Scaffold(
+        body: EmptyState(
+          icon: Icons.apartment_outlined,
+          message: tr('select_workspace', ref),
+          actionLabel: tr('workspaces', ref),
+          onAction: () => context.go('/tenants'),
+        ),
+      );
+    }
 
     final tenantId =
         TenantScope.normalize(currentUser.tenantId) ??
         TenantScope.noActiveWorkspaceId;
+    final routes = ref.watch(routesProvider).value ?? const <RouteModel>[];
 
     // ── Users for selected workspace ────────────────────────────────────
     final usersAsync = _showInactive
@@ -65,7 +78,11 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateUserDialog(tenantId),
+        onPressed: () => _showCreateUserDialog(
+          tenantId,
+          routes,
+          canAssignWorkspaceRoles: currentUser.isSuperAdmin,
+        ),
         icon: const Icon(Icons.person_add),
         label: Text(tr('new_user', ref)),
         tooltip: tr('new_user', ref),
@@ -139,8 +156,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                 return AppPullRefresh(
                   onRefresh: () async {
                     if (_showInactive) {
-                      final provider =
-                          allInactiveUsersForTenantProvider(tenantId);
+                      final provider = allInactiveUsersForTenantProvider(
+                        tenantId,
+                      );
                       ref.invalidate(provider);
                       await ref.read(provider.future);
                     } else {
@@ -156,8 +174,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     itemBuilder: (_, i) => _showInactive
                         ? _InactiveUserTile(
                             user: filtered[i],
-                            onReactivate: () =>
-                                _confirmReactivateUser(filtered[i]),
+                            onReactivate:
+                                currentUser.isSuperAdmin || !filtered[i].isAdmin
+                                ? () => _confirmReactivateUser(filtered[i])
+                                : null,
                             onSendReset: () =>
                                 _sendResetEmailForUser(filtered[i]),
                             onHardDelete: currentUser.isSuperAdmin
@@ -167,12 +187,19 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         : _UserTile(
                             user: filtered[i],
                             currentUser: currentUser,
-                            onEdit: () =>
-                                _showEditUserDialog(filtered[i], tenantId),
-                            onDelete: () => _confirmDeleteUser(filtered[i]),
-                            onToggle: (v) => ref
-                                .read(userManagementNotifierProvider.notifier)
-                                .toggleActive(filtered[i].id, v),
+                            onEdit:
+                                currentUser.isSuperAdmin || !filtered[i].isAdmin
+                                ? () => _showEditUserDialog(
+                                    filtered[i],
+                                    tenantId,
+                                    routes,
+                                  )
+                                : null,
+                            onDelete:
+                                !currentUser.isSuperAdmin && filtered[i].isAdmin
+                                ? null
+                                : () => _confirmDeleteUser(filtered[i]),
+                            onToggle: (v) => _toggleUserActive(filtered[i], v),
                           ).listEntry(i),
                   ),
                 );
@@ -184,9 +211,36 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     );
   }
 
+  Future<void> _toggleUserActive(UserModel user, bool active) async {
+    try {
+      final me = await ref.read(authUserProvider.future);
+      if (!mounted) return;
+      if (me == null ||
+          !me.active ||
+          !me.isAdmin ||
+          (!me.isSuperAdmin && user.isAdmin)) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
+        return;
+      }
+      await ref
+          .read(userManagementNotifierProvider.notifier)
+          .toggleActive(user.id, active);
+    } catch (e) {
+      if (!mounted) return;
+      final key = AppErrorMapper.key(e);
+      ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
+    }
+  }
+
   // ── Create user dialog ───────────────────────────────────────────────────
 
-  void _showCreateUserDialog(String tenantId) {
+  void _showCreateUserDialog(
+    String tenantId,
+    List<RouteModel> routes, {
+    required bool canAssignWorkspaceRoles,
+  }) {
     final emailC = TextEditingController();
     final passC = TextEditingController();
     final nameC = TextEditingController();
@@ -198,7 +252,6 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          final routes = ref.watch(routesProvider).value ?? [];
           return AlertDialog(
             title: Text(tr('new_user', ref)),
             content: SingleChildScrollView(
@@ -228,18 +281,20 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     initialValue: role,
                     decoration: InputDecoration(labelText: tr('role', ref)),
                     items: [
-                      DropdownMenuItem(
-                        value: 'admin',
-                        child: Text(tr('lbl_admin', ref)),
-                      ),
+                      if (canAssignWorkspaceRoles)
+                        DropdownMenuItem(
+                          value: 'admin',
+                          child: Text(tr('lbl_admin', ref)),
+                        ),
                       DropdownMenuItem(
                         value: 'seller',
                         child: Text(tr('lbl_seller', ref)),
                       ),
-                      DropdownMenuItem(
-                        value: 'tenant_admin',
-                        child: Text(tr('role_tenant_admin', ref)),
-                      ),
+                      if (canAssignWorkspaceRoles)
+                        DropdownMenuItem(
+                          value: 'tenant_admin',
+                          child: Text(tr('role_tenant_admin', ref)),
+                        ),
                     ],
                     onChanged: (v) => setS(() {
                       role = v ?? 'seller';
@@ -354,12 +409,18 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
   // ── Edit user dialog ─────────────────────────────────────────────────────
 
-  void _showEditUserDialog(UserModel user, String tenantId) {
+  Future<void> _showEditUserDialog(
+    UserModel user,
+    String tenantId,
+    List<RouteModel> routes,
+  ) async {
+    final currentUser = await ref.read(authUserProvider.future);
+    if (!mounted || currentUser == null) return;
     final nameC = TextEditingController(text: user.displayName);
     final emailC = TextEditingController(text: user.email);
     String role = roleValueFromUserRole(user.role);
-    final currentUser = ref.read(authUserProvider).value;
-    final isSelf = currentUser?.id == user.id;
+    final isSelf = currentUser.id == user.id;
+    final canChangeRole = currentUser.isSuperAdmin && !isSelf;
     final selectedRouteIds = List<String>.from(user.assignedRouteIds);
     final selectedRouteNames = List<String>.from(user.assignedRouteNames);
     final oldRouteIds = List<String>.from(user.assignedRouteIds);
@@ -368,7 +429,6 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          final routes = ref.watch(routesProvider).value ?? [];
           return AlertDialog(
             title: Text(tr('edit_user', ref)),
             content: SingleChildScrollView(
@@ -433,7 +493,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                   ),
                   const Divider(height: 16),
                   // ── Role ──
-                  if (isSelf)
+                  if (!canChangeRole)
                     TextField(
                       enabled: false,
                       decoration: InputDecoration(
@@ -537,7 +597,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       'assigned_route_ids': selectedRouteIds,
                       'assigned_route_names': selectedRouteNames,
                     };
-                    if (!isSelf) {
+                    if (canChangeRole) {
                       profileUpdate['role'] = role;
                     }
                     await notifier.updateUser(
@@ -773,8 +833,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 class _UserTile extends ConsumerWidget {
   final UserModel user;
   final UserModel? currentUser;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
   final ValueChanged<bool> onToggle;
 
   const _UserTile({
@@ -788,6 +848,7 @@ class _UserTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isSelf = user.id == currentUser?.id;
+    final canManageTarget = currentUser?.isSuperAdmin == true || !user.isAdmin;
     final roleColor = user.isAdmin
         ? AppBrand.adminRoleColor
         : AppBrand.sellerRoleColor;
@@ -899,19 +960,20 @@ class _UserTile extends ConsumerWidget {
                 ],
                 const Spacer(),
                 // Edit
-                Tooltip(
-                  message: 'Edit',
-                  child: IconButton(
-                    icon: const Icon(Icons.edit, size: 18),
-                    onPressed: onEdit,
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                  ),
-                ),
-                // Delete (only sellers, not self)
-                if (!isSelf && !user.isAdmin)
+                if (canManageTarget && onEdit != null)
                   Tooltip(
-                    message: 'Delete',
+                    message: tr('edit', ref),
+                    child: IconButton(
+                      icon: const Icon(Icons.edit, size: 18),
+                      onPressed: onEdit,
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                // Delete (only sellers, not self)
+                if (!isSelf && canManageTarget && onDelete != null)
+                  Tooltip(
+                    message: tr('delete', ref),
                     child: IconButton(
                       icon: const Icon(
                         Icons.delete,
@@ -924,16 +986,14 @@ class _UserTile extends ConsumerWidget {
                     ),
                   ),
                 // Active toggle (not self)
-                SizedBox(
-                  width: 44,
-                  height: 28,
-                  child: FittedBox(
-                    child: Switch(
-                      value: user.active,
-                      onChanged: isSelf ? null : onToggle,
+                if (!isSelf && canManageTarget)
+                  SizedBox(
+                    width: 44,
+                    height: 28,
+                    child: FittedBox(
+                      child: Switch(value: user.active, onChanged: onToggle),
                     ),
                   ),
-                ),
               ],
             ),
           ],
@@ -947,7 +1007,7 @@ class _UserTile extends ConsumerWidget {
 
 class _InactiveUserTile extends ConsumerWidget {
   final UserModel user;
-  final VoidCallback onReactivate;
+  final VoidCallback? onReactivate;
   final VoidCallback onSendReset;
   final VoidCallback? onHardDelete;
 
@@ -1036,21 +1096,22 @@ class _InactiveUserTile extends ConsumerWidget {
               ),
             ),
             // Reactivate
-            Tooltip(
-              message: 'Reactivate',
-              child: IconButton(
-                icon: const Icon(
-                  Icons.person_add_alt_1,
-                  size: 20,
-                  color: AppBrand.successColor,
+            if (onReactivate != null)
+              Tooltip(
+                message: tr('reactivate', ref),
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.person_add_alt_1,
+                    size: 20,
+                    color: AppBrand.successColor,
+                  ),
+                  onPressed: onReactivate,
+                  visualDensity: VisualDensity.compact,
                 ),
-                onPressed: onReactivate,
-                visualDensity: VisualDensity.compact,
               ),
-            ),
             // Hard delete
             Tooltip(
-              message: 'Send Reset Email',
+              message: tr('send_password_reset', ref),
               child: IconButton(
                 icon: const Icon(
                   Icons.lock_reset,
@@ -1063,7 +1124,7 @@ class _InactiveUserTile extends ConsumerWidget {
             ),
             if (onHardDelete != null)
               Tooltip(
-                message: 'Permanently Delete',
+                message: tr('hard_delete_user', ref),
                 child: IconButton(
                   icon: const Icon(
                     Icons.delete_forever,

@@ -41,7 +41,7 @@ class _ThemeModeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Material(
-      color: Colors.transparent,
+      color: cs.surface.withValues(alpha: 0),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
@@ -111,6 +111,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _nameC = TextEditingController();
   bool _isDirty = false;
+  bool _savingName = false;
 
   @override
   void dispose() {
@@ -119,12 +120,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _saveName() async {
-    final me = await ref.read(authUserProvider.future);
-    if (me == null) return;
-    final name = AppSanitizer.name(_nameC.text);
-    if (name.isEmpty || name == me.displayName) return;
+    if (_savingName) return;
+    setState(() => _savingName = true);
 
     try {
+      final me = await ref.read(authUserProvider.future);
+      if (me == null) throw StateError('Not authenticated');
+      final name = AppSanitizer.name(_nameC.text);
+      if (name.isEmpty || name == me.displayName) return;
+
       await ref.read(userManagementNotifierProvider.notifier).updateUser(
         me.id,
         {'display_name': name},
@@ -141,6 +145,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         final key = AppErrorMapper.key(e);
         ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
+    } finally {
+      if (mounted) setState(() => _savingName = false);
     }
   }
 
@@ -394,8 +400,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          onPressed: _saveName,
-                          child: Text(tr('save', ref)),
+                          onPressed: _savingName ? null : _saveName,
+                          child: _savingName
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(tr('save', ref)),
                         ),
                       ),
                       if (currentUser != null) ...[

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/firestore_pagination.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/route_model.dart';
@@ -32,6 +33,33 @@ final routesProvider = StreamProvider.autoDispose<List<RouteModel>>((ref) {
     routes.sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
     return routes;
   });
+});
+
+/// Complete role-scoped route dataset for explicit report/export actions.
+/// Live UI providers remain windowed; this query cursor-pages to exhaustion.
+final routesExportProvider = FutureProvider<List<RouteModel>>((ref) async {
+  final user = await ref.read(authUserProvider.future);
+  if (user == null || !user.active) return const <RouteModel>[];
+  final tenantId = TenantScope.normalize(user.tenantId);
+  if (tenantId == null) return const <RouteModel>[];
+
+  var query = TenantScope.applyToQuery(
+    FirebaseFirestore.instance.collection(Collections.routes),
+    tenantId: tenantId,
+  ).where('active', isEqualTo: true);
+  if (!user.isAdmin) {
+    if (!user.isSeller || user.assignedRouteIds.isEmpty) {
+      return const <RouteModel>[];
+    }
+    query = query.where('assigned_seller_ids', arrayContains: user.id);
+  }
+
+  final documents = await fetchAllQueryDocuments(query);
+  final routes = documents
+      .map((document) => RouteModel.fromJson(document.data(), document.id))
+      .toList();
+  routes.sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
+  return routes;
 });
 
 final routeDetailProvider = StreamProvider.autoDispose
@@ -197,6 +225,9 @@ class RouteNotifier extends AsyncNotifier<void> {
     if (currentUser == null || !currentUser.active) {
       throw StateError('An active user profile is required');
     }
+    if (!currentUser.isAdmin) {
+      throw StateError('Only admin can create routes');
+    }
     final tenantId = TenantScope.requireTenant(currentUser.tenantId);
     final routeRef = db.collection(Collections.routes).doc();
     final routeName = data['name'] as String? ?? '';
@@ -255,6 +286,9 @@ class RouteNotifier extends AsyncNotifier<void> {
     final currentUser = await ref.read(authUserProvider.future);
     if (currentUser == null || !currentUser.active) {
       throw StateError('An active user profile is required');
+    }
+    if (!currentUser.isAdmin) {
+      throw StateError('Only admin can update routes');
     }
     final routeRef = db.collection(Collections.routes).doc(id);
     await db.runTransaction<void>((txn) async {

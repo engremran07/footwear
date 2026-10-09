@@ -28,6 +28,34 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.59',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Workspace administrators and sellers can sign in without stale device records ending the session.',
+          AppLocale.ar:
+              'يمكن لمسؤولي مساحات العمل والبائعين تسجيل الدخول دون أن تنهي سجلات الأجهزة القديمة الجلسة.',
+          AppLocale.ur:
+              'ورک اسپیس ایڈمن اور سیلر پرانے ڈیوائس ریکارڈز کی وجہ سے سیشن ختم ہوئے بغیر سائن اِن کر سکتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧭',
+        text: {
+          AppLocale.en:
+              'Workspace setup now keeps localized errors visible, and the sign-in screen uses readable system-bar icons.',
+          AppLocale.ar:
+              'تعرض إعدادات مساحة العمل الأخطاء بلغتك، وتستخدم شاشة الدخول أيقونات واضحة لشريط النظام.',
+          AppLocale.ur:
+              'ورک اسپیس سیٹ اپ اب مقامی زبان میں خرابی دکھاتا ہے، اور سائن اِن اسکرین پر سسٹم بار کے آئیکنز واضح ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.58',
     date: 'October 2026',
     items: [

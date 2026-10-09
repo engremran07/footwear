@@ -151,7 +151,7 @@ class AboutScreen extends ConsumerWidget {
                 ),
               ),
               _ActionButton(
-                tooltip: 'WhatsApp',
+                tooltip: tr('whatsapp_open_chat', ref),
                 icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
                 backgroundColor: const Color(0xFFE9F9EF),
                 foregroundColor: const Color(0xFF128C7E),
@@ -175,7 +175,7 @@ class AboutScreen extends ConsumerWidget {
                 ),
               ),
               _ActionButton(
-                tooltip: 'WhatsApp',
+                tooltip: tr('whatsapp_open_chat', ref),
                 icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
                 backgroundColor: const Color(0xFFE9F9EF),
                 foregroundColor: const Color(0xFF128C7E),
