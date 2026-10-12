@@ -334,7 +334,7 @@ class _InvoiceBody extends ConsumerWidget {
                 const Divider(height: 24),
                 _InfoRow(
                   label: tr('shop', ref),
-                    value: invoice.shopName.isNotEmpty
+                  value: invoice.shopName.isNotEmpty
                       ? invoice.shopName
                       : tr('shop', ref),
                 ),

@@ -6,6 +6,28 @@
 
 ---
 
+## SESSION-012 — 2026-10-10 — v3.9.60+99 / Authentication, sessions, device pairing, and carried-over export audit
+
+**Agent:** GitHub Copilot
+**Baseline:** v3.9.59+98 (`6e6e03b`); pre-existing frontend/export audit edits preserved.
+**Trigger:** Validate and implement all findings from the authentication, session, and device-pairing master audit; continue unfinished prior-account tasks; build, deploy, install, commit, and push.
+
+### Work Performed
+
+- Kept registration failures on `/login`, persisted mapped error feedback, and restricted retry lockout to credential failures. Removed the forced ID-token refresh listener loop; account reload now runs on resume and signs out only on terminal account failures.
+- Allowed active members to read their own workspace policy and empty access slots; added collection-group list rules and tenant indexes; tolerated legacy tenant documents without duplicate `tenant_id`; raised the expiry ceiling to 12 hours while client session duration remains 7h50m.
+- Added pending/approved device pairing, atomic device/session removal, irreversible administrator block, owner reset-policy enforcement, stale device recovery after 30 days, five-minute session warning/renewal, and clock-skew reporting.
+- Added owner-scoped platform sessions for super-admins, separate from tenant business sessions. Documented the Spark limitation: Firestore Rules cannot bind ordinary data requests to a client session ID.
+- Removed retired per-user pairing fields, APIs, UI, rule allowlists, and utilities. Completed the pending transaction-report export review; admin and seller exports use full one-shot role-scoped providers and flat rows, so the generic table PDF is the correct output.
+- Preserved pre-existing screen/export changes from the previous session and completed the version/changelog/document synchronization for v3.9.60+99.
+
+### Verification
+
+- Firestore Rules Emulator: 95 passing.
+- Focused Flutter auth/session/policy/localization/login tests: 18 passing.
+- `flutter analyze lib --no-pub`: exact evidence pending final release run.
+- Web/APK builds, Hosting/Firestore deployment, device installation, commit, and push: pending.
+
 ## SESSION-011 — 2026-04-12 — v3.5.2+45 / Shop creation race fix + full commit + audit
 
 **Agent:** GitHub Copilot (Claude Sonnet 4.6) — 88-agent governance pack v2.0

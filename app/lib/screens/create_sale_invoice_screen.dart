@@ -372,8 +372,11 @@ class _CreateSaleInvoiceScreenState
                     final maxDozens = item.quantityAvailable ~/ ppc;
                     final dozens = _selectedQtys[item.id] ?? 0;
                     final extraPairs = _selectedExtraPairs[item.id] ?? 0;
-                    final maxExtraPairs = (item.quantityAvailable - dozens * ppc)
-                      .clamp(0, ppc - 1);
+                    final maxExtraPairs =
+                        (item.quantityAvailable - dozens * ppc).clamp(
+                          0,
+                          ppc - 1,
+                        );
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: Padding(
@@ -817,9 +820,7 @@ class _CreateSaleInvoiceScreenState
     }
     if (!mounted) return;
     if (user == null) {
-      messenger.showSnackBar(
-        errorSnackBar(tr('err_unauthenticated', ref)),
-      );
+      messenger.showSnackBar(errorSnackBar(tr('err_unauthenticated', ref)));
       return;
     }
     final isOnline = ref.read(isOnlineProvider).value ?? true;

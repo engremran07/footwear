@@ -44,10 +44,6 @@ class UserModel {
   final String? _tenantId;
   final String? activeWorkspaceId;
   final String? activeWorkspaceReason;
-  final bool devicePairingEnabled;
-  final String? devicePairingId;
-  final List<String> pairedDeviceIds;
-  final String? devicePairingResetBy;
 
   /// Multi-route assignment (many-to-many). Each seller can serve multiple routes.
   final List<String> assignedRouteIds;
@@ -67,10 +63,6 @@ class UserModel {
     String? tenantId,
     this.activeWorkspaceId,
     this.activeWorkspaceReason,
-    this.devicePairingEnabled = false,
-    this.devicePairingId,
-    this.pairedDeviceIds = const [],
-    this.devicePairingResetBy,
     this.assignedRouteIds = const [],
     this.assignedRouteNames = const [],
     required this.active,
@@ -103,16 +95,9 @@ class UserModel {
   factory UserModel.fromJson(Map<String, dynamic> json, String docId) {
     final rawRouteIds = json['assigned_route_ids'] as List<dynamic>?;
     final rawRouteNames = json['assigned_route_names'] as List<dynamic>?;
-    final rawPairedDevices =
-        json['device_pairing_ids'] as List<dynamic>? ??
-        ((json['device_pairing_id'] == null)
-            ? const <dynamic>[]
-            : <dynamic>[json['device_pairing_id']]);
-
     final routeIds = rawRouteIds?.cast<String>().toList() ?? const <String>[];
     final routeNames =
         rawRouteNames?.cast<String>().toList() ?? const <String>[];
-    final pairedDeviceIds = rawPairedDevices.cast<String>().toList();
 
     final role = _roleFromString(json['role'] as String? ?? '');
     return UserModel(
@@ -128,10 +113,6 @@ class UserModel {
       activeWorkspaceReason: role == UserRole.superAdmin
           ? json['active_workspace_reason'] as String?
           : null,
-      devicePairingEnabled: json['device_pairing_enabled'] as bool? ?? false,
-      devicePairingId: json['device_pairing_id'] as String?,
-      pairedDeviceIds: pairedDeviceIds,
-      devicePairingResetBy: json['device_pairing_reset_by'] as String?,
       assignedRouteIds: routeIds,
       assignedRouteNames: routeNames,
       active: json['active'] as bool? ?? true,
@@ -150,10 +131,6 @@ class UserModel {
     if (activeWorkspaceId != null) 'active_workspace_id': activeWorkspaceId,
     if (activeWorkspaceReason != null)
       'active_workspace_reason': activeWorkspaceReason,
-    'device_pairing_enabled': devicePairingEnabled,
-    'device_pairing_id': devicePairingId,
-    'device_pairing_ids': pairedDeviceIds,
-    'device_pairing_reset_by': devicePairingResetBy,
     'assigned_route_ids': assignedRouteIds,
     'assigned_route_names': assignedRouteNames,
     'active': active,
@@ -171,10 +148,6 @@ class UserModel {
     String? tenantId,
     String? activeWorkspaceId,
     String? activeWorkspaceReason,
-    bool? devicePairingEnabled,
-    String? devicePairingId,
-    List<String>? pairedDeviceIds,
-    String? devicePairingResetBy,
     List<String>? assignedRouteIds,
     List<String>? assignedRouteNames,
     bool? active,
@@ -192,10 +165,6 @@ class UserModel {
       activeWorkspaceId: activeWorkspaceId ?? this.activeWorkspaceId,
       activeWorkspaceReason:
           activeWorkspaceReason ?? this.activeWorkspaceReason,
-      devicePairingEnabled: devicePairingEnabled ?? this.devicePairingEnabled,
-      devicePairingId: devicePairingId ?? this.devicePairingId,
-      pairedDeviceIds: pairedDeviceIds ?? this.pairedDeviceIds,
-      devicePairingResetBy: devicePairingResetBy ?? this.devicePairingResetBy,
       assignedRouteIds: assignedRouteIds ?? this.assignedRouteIds,
       assignedRouteNames: assignedRouteNames ?? this.assignedRouteNames,
       active: active ?? this.active,

@@ -28,6 +28,34 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.60',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Sign-in now waits for device registration and keeps clear guidance on screen when access cannot be registered.',
+          AppLocale.ar:
+              'ينتظر تسجيل الدخول اكتمال تسجيل الجهاز، ويعرض إرشادات واضحة عند تعذر تسجيل الوصول.',
+          AppLocale.ur:
+              'سائن اِن اب ڈیوائس رجسٹریشن مکمل ہونے کا انتظار کرتا ہے اور رسائی رجسٹر نہ ہونے پر واضح رہنمائی دکھاتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📱',
+        text: {
+          AppLocale.en:
+              'Workspace device approvals and session controls are clearer, with recovery for old devices and separate platform-operator sessions.',
+          AppLocale.ar:
+              'أصبحت الموافقة على أجهزة مساحة العمل وإدارة الجلسات أوضح، مع استعادة الأجهزة القديمة وفصل جلسات مشرف المنصة.',
+          AppLocale.ur:
+              'ورک اسپیس ڈیوائس منظوری اور سیشن کنٹرول واضح ہیں، پرانی ڈیوائسز کی بحالی اور پلیٹ فارم آپریٹر کے الگ سیشنز کے ساتھ۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.59',
     date: 'October 2026',
     items: [

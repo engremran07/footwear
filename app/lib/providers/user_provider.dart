@@ -61,7 +61,9 @@ final allUsersExportProvider = FutureProvider<List<UserModel>>((ref) async {
     tenantId: tenantId,
   );
   final docs = await fetchAllQueryDocuments(query);
-  return docs.map((document) => UserModel.fromJson(document.data(), document.id)).toList();
+  return docs
+      .map((document) => UserModel.fromJson(document.data(), document.id))
+      .toList();
 });
 
 final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {

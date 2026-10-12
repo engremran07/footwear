@@ -13,7 +13,7 @@ This repository is a route/seller distribution ERP.
 - New tenant-scoped users should carry a tenant_id and device pairing metadata where applicable, and must not cross tenant boundaries in rules or providers
 - Each workspace owns its own settings document and device-pairing policy; no super-admin-only global settings override is allowed for tenant branding or pairing limits
 - Canonical collections:
-  - users
+  - users (subcollections: `sessions`, `device_registrations`, `platform_sessions`)
   - products
   - product_variants
   - seller_inventory
@@ -130,6 +130,14 @@ Seller:
 1. No Firebase Storage usage — the app runs on Firestore + Auth + Functions
   only (zero-cost tier). Company logos are stored as base64 in Firestore.
   Product images use external HTTP URLs. Do not introduce firebase_storage.
+
+1. **Device sessions are client-enforced under the current Spark architecture.**
+  Slot registration, expiry, pairing, and revocation provide device/seat
+  controls, but Firestore Rules cannot bind an ordinary Firebase Auth request
+  to an active device-session ID. Do not claim that revoking a session blocks
+  direct Firestore requests. App Check attests app/device integrity but does
+  not replace session authorization; server enforcement requires trusted claims
+  or another authenticated backend.
 
 1. Any provider that reads admin-only data (e.g. `allTransactionsProvider`,
   `allInvoicesProvider`, `adminAllSellerInventoryProvider`) MUST be added to
@@ -481,6 +489,24 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-10-10 authentication, sessions, and device pairing — v3.9.60+99:
+
+- Login stays on `/login` until access registration completes, retains mapped failures, and counts only credential failures toward retry lockout.
+- Active members can read their own workspace policy and missing access slots. Workspace registry collection-group reads have tenant-scoped rules and field indexes; legacy tenant records may omit the redundant `tenant_id`.
+- Session checks use server-sourced records, renew while foregrounded and on resume, warn five minutes before expiry, detect device clock skew, and recover device registrations inactive for 30 days. New workspace defaults are three devices and two sessions.
+- Pairing now follows pending/approved device slots. Workspace administrators can approve, remove, block, or reset devices; removal and related active-session revocation are atomic. Legacy per-user pairing fields and controls were removed.
+- Super-admin login sessions use owner-scoped `users/{uid}/platform_sessions`, separate from tenant business sessions. Session enforcement remains client-side under the Spark architecture; it is not a Firestore authorization boundary.
+- Firestore Rules Emulator: 95 passing. Focused Flutter auth/session/localization tests: 18 passing. Full release build/deploy/install and signoff remain pending.
+
+2026-10-03 workspace login and frontend recovery — v3.9.59+98:
+
+- Seller and workspace-admin login had a shared access-registration failure: the client read unallocated slot documents, while rules evaluate tenant fields on existing documents; the session stream was also unfiltered, and session writes omitted the paired `device_slot_id` required by the existing rules.
+- Client access reads now query by `tenant_id` and `user_id`, transactionally refresh existing slots, create missing slots, and write the device-slot link. Rules and authorization semantics are unchanged.
+- Registration errors retain their original mapped cause instead of being mislabeled as session-limit failures. A 15-second registration grace in `SessionGuard` prevents stale initial snapshots from signing out the current UID before registration settles.
+- Workspace cards tolerate a temporarily unavailable auth profile; create/update failures remain visible; the owner selector uses the shared retryable error state; login status-bar icon contrast follows the active theme.
+- Emulator tests cover the missing-slot denial and scoped-query allowance. Phone logs captured Firestore permission failures and the app returning to login; a post-fix authenticated login and workspace creation still require owner-entered credentials for visual verification.
+- Broad UI audit: see `AUDIT_REPORT_FOOTWEAR_ERP.md`; unresolved multi-role, multi-theme, RTL, large-text, tablet, and performance profiling items are explicitly marked there.
 
 2026-10-03 backup destinations and workspace archival — v3.9.58+97:
 

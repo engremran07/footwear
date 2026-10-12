@@ -13,8 +13,15 @@ void main() {
 
   test('terminal account and token failures sign out', () {
     expect(shouldSignOutAfterAuthRefreshFailure('user-disabled'), isTrue);
-    expect(shouldSignOutAfterAuthRefreshFailure('user-token-expired'), isTrue);
+    expect(shouldSignOutAfterAuthRefreshFailure('user-token-expired'), isFalse);
     expect(shouldSignOutAfterAuthRefreshFailure('user-not-found'), isTrue);
     expect(shouldSignOutAfterAuthRefreshFailure('invalid-user-token'), isTrue);
+  });
+
+  test('only credential errors contribute to login lockout', () {
+    expect(isCredentialSignInFailure('invalid-credential'), isTrue);
+    expect(isCredentialSignInFailure('WRONG-PASSWORD'), isTrue);
+    expect(isCredentialSignInFailure('permission-denied'), isFalse);
+    expect(isCredentialSignInFailure('network-request-failed'), isFalse);
   });
 }

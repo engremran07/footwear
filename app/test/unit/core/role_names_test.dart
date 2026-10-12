@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/core/utils/role_names.dart';
+import 'package:footwear_erp/core/utils/role_utils.dart';
 
 void main() {
   test('canonicalizes accepted legacy and tenant-aware roles', () {
@@ -12,5 +13,12 @@ void main() {
   test('keeps unknown and empty role values explicit', () {
     expect(canonicalRoleName('workspace_owner'), 'unknown');
     expect(canonicalRoleName('  '), 'unknown');
+  });
+
+  test('workspace security management is limited to super admins', () {
+    expect(canManageWorkspaceRole('tenant_admin'), isFalse);
+    expect(canManageWorkspaceRole('super_admin'), isTrue);
+    expect(canManageWorkspaceRole('admin'), isFalse);
+    expect(canManageWorkspaceRole('seller'), isFalse);
   });
 }

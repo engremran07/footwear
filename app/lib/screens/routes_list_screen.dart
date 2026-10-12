@@ -149,8 +149,10 @@ class _RouteTile extends ConsumerWidget {
                 ),
                 const SizedBox(width: 4),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: route.currency == 'PKR'
                         ? cs.tertiaryContainer

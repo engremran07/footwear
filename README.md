@@ -1,4 +1,4 @@
-﻿# FootWear ERP — v3.9.58+97
+﻿# FootWear ERP — v3.9.60+99
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
@@ -7,6 +7,8 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 > **v3.9.53+92 (2026-10-03)** — Tenant admins merge encrypted backups into their own workspace; selected platform admins can prune only within their active support workspace. Unsupported roles and workspace-less accounts receive recovery guidance instead of being treated as sellers.
 > **v3.9.54+93 (2026-10-03)** — Status labels are localized and high-contrast status colors are more legible.
 > **v3.9.58+97 (2026-10-03)** — Encrypted file and Drive backup destinations are explicit, workspace restore matches access scope, local archives can be deleted, and workspace archival revokes member access.
+> **v3.9.59+98 (2026-10-03)** — Workspace-admin and seller sign-in now use scoped device-session records; workspace setup errors remain visible, and login system-bar contrast follows the active theme.
+> **v3.9.60+99 (2026-10-10)** — Sign-in waits for access registration; device pairing, renewal, stale-device recovery, and platform-operator sessions have explicit controls. Session records remain client-enforced under the Spark architecture.
 
 ---
 

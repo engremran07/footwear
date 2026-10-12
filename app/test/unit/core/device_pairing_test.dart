@@ -1,30 +1,30 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:footwear_erp/core/utils/device_pairing.dart';
+import 'package:footwear_erp/core/services/device_installation.dart';
 
 void main() {
-  group('DevicePairing', () {
-    test('sanitize normalizes device IDs consistently', () {
-      expect(
-        DevicePairing.sanitize(' Android-ABC:123 '),
-        equals('android-abc:123'),
+  group('DeviceInstallationMetadata', () {
+    test('displayName combines non-empty brand and model', () {
+      const metadata = DeviceInstallationMetadata(
+        installationId: 'installation-123',
+        brand: 'Samsung',
+        model: 'Galaxy A14',
+        platform: 'android',
+        osVersion: '16',
+        appVersion: 'test',
       );
+      expect(metadata.displayName, 'Samsung Galaxy A14');
     });
 
-    test('matches accepts equivalent device IDs regardless of casing', () {
-      expect(DevicePairing.matches('android:abc123', 'ANDROID:ABC123'), isTrue);
-    });
-
-    test('matches rejects mismatched identifiers', () {
-      expect(
-        DevicePairing.matches('android:abc123', 'android:def456'),
-        isFalse,
+    test('displayName tolerates missing device labels', () {
+      const metadata = DeviceInstallationMetadata(
+        installationId: 'installation-123',
+        brand: ' ',
+        model: 'Browser',
+        platform: 'web',
+        osVersion: '',
+        appVersion: 'test',
       );
-    });
-
-    test('returns a non-empty stable device identifier', () async {
-      final id = await DevicePairing.currentDeviceIdentifier();
-      expect(id, isNotEmpty);
-      expect(DevicePairing.sanitize(id), equals(id));
+      expect(metadata.displayName, 'Browser');
     });
   });
 }

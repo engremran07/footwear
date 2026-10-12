@@ -165,9 +165,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final authAsync = ref.watch(authUserProvider);
     if (authAsync.isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (authAsync.hasError) {
       return Scaffold(
@@ -180,9 +178,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
     final currentUser = authAsync.value;
     if (currentUser == null) {
-      return Scaffold(
-        body: Center(child: Text(tr('permission_denied', ref))),
-      );
+      return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
     if (currentUser.isSuperAdmin && currentUser.activeWorkspaceId == null) {
       return _buildPlatformSettingsHub();

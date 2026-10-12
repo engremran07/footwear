@@ -144,12 +144,35 @@ service cloud.firestore {
       let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
       let tenant = get(tenantPath).data;
       let limit = field == 'max_devices_allowed'
-        ? (('max_devices_allowed' in tenant) ? tenant.max_devices_allowed : 1)
+        ? (('max_devices_allowed' in tenant) ? tenant.max_devices_allowed : 3)
         : (('max_active_sessions_allowed' in tenant)
           ? tenant.max_active_sessions_allowed
-          : 1);
-      return exists(tenantPath) && tenant.tenant_id == tenantId &&
+          : 2);
+      return exists(tenantPath) &&
+        (!('tenant_id' in tenant) || tenant.tenant_id == tenantId) &&
         validAccessLimit(limit) ? limit : 0;
+    }
+
+    function tenantRequiresDevicePairing(tenantId) {
+      let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
+      let tenant = get(tenantPath).data;
+      return exists(tenantPath) &&
+        ('require_device_pairing' in tenant) &&
+        tenant.require_device_pairing == true;
+    }
+
+    function tenantAllowsSelfDeviceReset(tenantId) {
+      let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
+      let tenant = get(tenantPath).data;
+      return exists(tenantPath) &&
+        ('allow_admin_reset_only' in tenant) &&
+        tenant.allow_admin_reset_only == false;
+    }
+
+    function deviceRegistrationIsStale(data) {
+      return data.status == 'active' &&
+        data.last_seen_at is timestamp &&
+        data.last_seen_at <= request.time - duration.value(30, 'd');
     }
 
     function canReadAccessRecord(userId, tenantId) {
@@ -537,7 +560,7 @@ service cloud.firestore {
           // active status, route assignment) within their tenant, but cannot change
           // role or tenant_id (which remain admin/super_admin only).
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['display_name', 'phone', 'active', 'assigned_route_ids', 'assigned_route_names', 'device_pairing_enabled', 'device_pairing_id', 'device_pairing_reset_by', 'updated_at']) &&
+            .hasOnly(['display_name', 'phone', 'active', 'assigned_route_ids', 'assigned_route_names', 'updated_at']) &&
           docSizeOk()
         ) ||
         (
@@ -548,7 +571,7 @@ service cloud.firestore {
           isSellerRole(resource.data.role) &&
           request.resource.data.tenant_id == resource.data.tenant_id &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['display_name', 'phone', 'active', 'assigned_route_ids', 'assigned_route_names', 'device_pairing_enabled', 'device_pairing_id', 'device_pairing_reset_by', 'updated_at']) &&
+            .hasOnly(['display_name', 'phone', 'active', 'assigned_route_ids', 'assigned_route_names', 'updated_at']) &&
           docSizeOk()
         )
       );
@@ -560,10 +583,17 @@ service cloud.firestore {
     // policy. Slot documents are updated transactionally by the client; rules
     // enforce the authoritative slot ceiling and ownership on every write.
     match /users/{userId}/device_registrations/{slotId} {
-      allow get, list: if canReadAccessRecord(userId, resource.data.tenant_id) &&
+      allow get: if (isOwnDoc(userId) && isActiveUser() &&
+          currentUserTenantId() == userDoc().data.tenant_id) ||
+        (canReadAccessRecord(userId, resource.data.tenant_id) &&
+          resource.data.user_id == userId);
+      allow list: if canReadAccessRecord(userId, resource.data.tenant_id) &&
         resource.data.user_id == userId;
       allow create: if isActiveUser() && isOwnDoc(userId) &&
-        request.resource.data.status == 'active' &&
+        ((request.resource.data.status == 'active' &&
+            !tenantRequiresDevicePairing(currentUserTenantId())) ||
+          (request.resource.data.status == 'pending' &&
+            tenantRequiresDevicePairing(currentUserTenantId()))) &&
         accessRecordFieldsAreValid(
           request.resource.data,
           userId,
@@ -595,15 +625,65 @@ service cloud.firestore {
           resource.data.user_id == userId &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'revoked_at', 'revoked_by']) &&
-          request.resource.data.status == 'revoked' &&
+          request.resource.data.status in ['revoked', 'blocked'] &&
           request.resource.data.revoked_at == request.time &&
           request.resource.data.revoked_by == request.auth.uid
+        ) || (
+          isActiveUser() && isAdminForTenant(resource.data.tenant_id) &&
+          resource.data.user_id == userId &&
+          resource.data.status == 'revoked' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'status', 'registered_at', 'last_seen_at', 'approved_at',
+              'approved_by'
+            ]) &&
+          request.resource.data.status == 'active' &&
+          request.resource.data.registered_at == request.time &&
+          request.resource.data.last_seen_at == request.time &&
+          request.resource.data.approved_at == request.time &&
+          request.resource.data.approved_by == request.auth.uid
+        ) || (
+          isActiveUser() && isOwnDoc(userId) &&
+          resource.data.user_id == userId &&
+          resource.data.tenant_id == currentUserTenantId() &&
+          deviceRegistrationIsStale(resource.data) &&
+          ((request.resource.data.status == 'active' &&
+              !tenantRequiresDevicePairing(currentUserTenantId())) ||
+            (request.resource.data.status == 'pending' &&
+              tenantRequiresDevicePairing(currentUserTenantId()))) &&
+          accessRecordFieldsAreValid(
+            request.resource.data,
+            userId,
+            currentUserTenantId(),
+            slotId
+          ) &&
+          validAccessSlot(
+            slotId,
+            request.resource.data.slot_number,
+            tenantAccessLimit(currentUserTenantId(), 'max_devices_allowed')
+          ) &&
+          request.resource.data.registered_at == request.time &&
+          request.resource.data.last_seen_at == request.time &&
+          !('revoked_at' in request.resource.data) &&
+          !('revoked_by' in request.resource.data) && docSizeOk()
+        ) || (
+          isActiveUser() && isAdminForTenant(resource.data.tenant_id) &&
+          resource.data.user_id == userId &&
+          resource.data.status == 'pending' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'approved_at', 'approved_by']) &&
+          request.resource.data.status == 'active' &&
+          request.resource.data.approved_at == request.time &&
+          request.resource.data.approved_by == request.auth.uid
         ) || (
           isActiveUser() && isOwnDoc(userId) &&
           resource.data.user_id == userId &&
           resource.data.tenant_id == currentUserTenantId() &&
           resource.data.status == 'revoked' &&
-          request.resource.data.status == 'active' &&
+          tenantAllowsSelfDeviceReset(currentUserTenantId()) &&
+          request.resource.data.status ==
+            (tenantRequiresDevicePairing(currentUserTenantId())
+              ? 'pending' : 'active') &&
           accessRecordFieldsAreValid(
             request.resource.data,
             userId,
@@ -623,6 +703,7 @@ service cloud.firestore {
           resource.data.user_id == userId &&
           resource.data.tenant_id == currentUserTenantId() &&
           resource.data.status == 'active' &&
+          tenantAllowsSelfDeviceReset(currentUserTenantId()) &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'revoked_at', 'revoked_by']) &&
           request.resource.data.status == 'revoked' &&
@@ -633,7 +714,11 @@ service cloud.firestore {
     }
 
     match /users/{userId}/sessions/{slotId} {
-      allow get, list: if canReadAccessRecord(userId, resource.data.tenant_id) &&
+      allow get: if (isOwnDoc(userId) && isActiveUser() &&
+          currentUserTenantId() == userDoc().data.tenant_id) ||
+        (canReadAccessRecord(userId, resource.data.tenant_id) &&
+          resource.data.user_id == userId);
+      allow list: if canReadAccessRecord(userId, resource.data.tenant_id) &&
         resource.data.user_id == userId;
       allow create: if isActiveUser() && isOwnDoc(userId) &&
         request.resource.data.status == 'active' &&
@@ -657,7 +742,7 @@ service cloud.firestore {
         request.resource.data.last_seen_at == request.time &&
         request.resource.data.expires_at is timestamp &&
         request.resource.data.expires_at > request.time &&
-        request.resource.data.expires_at <= request.time + duration.value(8, 'h') &&
+        request.resource.data.expires_at <= request.time + duration.value(12, 'h') &&
         !('revoked_at' in request.resource.data) && docSizeOk();
       allow update: if (
           isActiveUser() && isOwnDoc(userId) &&
@@ -680,7 +765,7 @@ service cloud.firestore {
           request.resource.data.last_seen_at == request.time &&
           request.resource.data.expires_at is timestamp &&
           request.resource.data.expires_at > request.time &&
-          request.resource.data.expires_at <= request.time + duration.value(8, 'h')
+          request.resource.data.expires_at <= request.time + duration.value(12, 'h')
         ) || (
           isActiveUser() && (isOwnDoc(userId) ||
             isAdminForTenant(resource.data.tenant_id)) &&
@@ -721,15 +806,67 @@ service cloud.firestore {
           request.resource.data.last_seen_at == request.time &&
           request.resource.data.expires_at is timestamp &&
           request.resource.data.expires_at > request.time &&
-          request.resource.data.expires_at <= request.time + duration.value(8, 'h') &&
+          request.resource.data.expires_at <= request.time + duration.value(12, 'h') &&
           docSizeOk()
         );
       allow delete: if false;
     }
 
+    // Platform operators have no tenant by default. Their own session records
+    // stay separate from tenant device/session registries and business scope.
+    match /users/{userId}/platform_sessions/{sessionId} {
+      allow get, list: if isOwnDoc(userId) && isSuperAdmin();
+      allow create: if isOwnDoc(userId) && isSuperAdmin() &&
+        request.resource.data.user_id == userId &&
+        request.resource.data.session_id is string &&
+        request.resource.data.session_id.size() >= 8 &&
+        request.resource.data.device_id is string &&
+        request.resource.data.device_id.size() >= 8 &&
+        request.resource.data.status == 'active' &&
+        request.resource.data.created_at == request.time &&
+        request.resource.data.last_seen_at == request.time &&
+        request.resource.data.expires_at is timestamp &&
+        request.resource.data.expires_at > request.time &&
+        request.resource.data.expires_at <= request.time + duration.value(12, 'h') &&
+        docSizeOk();
+      allow update: if isOwnDoc(userId) && isSuperAdmin() &&
+        resource.data.user_id == userId &&
+        resource.data.session_id == request.resource.data.session_id &&
+        resource.data.device_id == request.resource.data.device_id &&
+        ((resource.data.status == 'active' &&
+            request.resource.data.status == 'active' &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['last_seen_at', 'expires_at']) &&
+            request.resource.data.last_seen_at == request.time &&
+            request.resource.data.expires_at is timestamp &&
+            request.resource.data.expires_at > request.time &&
+            request.resource.data.expires_at <= request.time + duration.value(12, 'h')) ||
+          (resource.data.status == 'active' &&
+            request.resource.data.status == 'revoked' &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'revoked_at', 'terminated_by']) &&
+            request.resource.data.revoked_at == request.time &&
+            request.resource.data.terminated_by == request.auth.uid));
+      allow delete: if false;
+    }
+
+    // Collection-group registry queries require an explicit recursive list
+    // rule; the per-user matches above remain the boundary for direct reads.
+    match /{path=**}/device_registrations/{slotId} {
+      allow list: if isActiveUser() &&
+        isAdminForTenant(resource.data.tenant_id);
+    }
+
+    match /{path=**}/sessions/{slotId} {
+      allow list: if isActiveUser() &&
+        isAdminForTenant(resource.data.tenant_id);
+    }
+
     // --- tenants -----------------------------------------------------------
     match /tenants/{tenantId} {
-      allow read: if canAccessTenant(tenantId);
+      allow get: if canAccessTenant(tenantId) ||
+        (isActiveUser() && !isSuperAdminRole(getUserRole()) &&
+          currentUserTenantId() == tenantId);
       allow list: if isSuperAdmin() || (
         isTenantAdmin() &&
         resource.data.tenant_id == currentUserTenantId()

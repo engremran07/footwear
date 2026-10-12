@@ -7,6 +7,23 @@ void main() {
   group('SessionAccessPolicy.currentForDevice', () {
     final now = DateTime.utc(2026, 10, 3, 12);
 
+    test('detects clock skew beyond the configured five-minute tolerance', () {
+      expect(
+        SessionAccessPolicy.isClockSkewed(
+          deviceNow: now.add(const Duration(minutes: 4)),
+          serverNow: now,
+        ),
+        isFalse,
+      );
+      expect(
+        SessionAccessPolicy.isClockSkewed(
+          deviceNow: now.subtract(const Duration(minutes: 6)),
+          serverNow: now,
+        ),
+        isTrue,
+      );
+    });
+
     test('defers missing-session enforcement during access registration', () {
       expect(
         SessionAccessPolicy.shouldDeferMissingSessionEnforcement(

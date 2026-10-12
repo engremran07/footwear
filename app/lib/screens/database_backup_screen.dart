@@ -426,7 +426,9 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
               details:
                   '${_fmt(backup.modifiedAt)} · ${(backup.file.lengthSync() / 1024).round()} KB',
               icon: Icons.insert_drive_file_outlined,
-              canRestore: backup.file.path.toLowerCase().endsWith('.shoesbackup'),
+              canRestore: backup.file.path.toLowerCase().endsWith(
+                '.shoesbackup',
+              ),
             ),
         ],
         onDelete: (backup) => ref

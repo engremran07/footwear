@@ -65,31 +65,31 @@ class ProductDetailScreen extends ConsumerWidget {
                       tooltip: tr('share_product', ref),
                       onPressed: variantsAsync.hasValue
                           ? () {
-                        final variants = variantsAsync.value ?? [];
-                        final ppc = settings?.pairsPerCarton ?? 12;
-                        final totalStock = variants.fold<int>(
-                          0,
-                          (s, v) => s + v.quantityAvailable,
-                        );
-                        final buf = StringBuffer()
-                          ..writeln(product.name)
-                          ..writeln(
-                            '${tr('category', ref)}: ${product.category}',
-                          )
-                          ..writeln(
-                            '${tr('total_variants', ref)}: ${variants.length}',
-                          )
-                          ..writeln(
-                            '${tr('stock_pairs', ref)}: ${_stockLabel(totalStock, ppc, ref)}',
-                          );
-                        for (final v in variants) {
-                          buf.writeln(
-                            '  ${v.variantName}: ${_stockLabel(v.quantityAvailable, ppc, ref)}',
-                          );
-                        }
-                        shareText(buf.toString());
-                        HapticFeedback.lightImpact();
-                      }
+                              final variants = variantsAsync.value ?? [];
+                              final ppc = settings?.pairsPerCarton ?? 12;
+                              final totalStock = variants.fold<int>(
+                                0,
+                                (s, v) => s + v.quantityAvailable,
+                              );
+                              final buf = StringBuffer()
+                                ..writeln(product.name)
+                                ..writeln(
+                                  '${tr('category', ref)}: ${product.category}',
+                                )
+                                ..writeln(
+                                  '${tr('total_variants', ref)}: ${variants.length}',
+                                )
+                                ..writeln(
+                                  '${tr('stock_pairs', ref)}: ${_stockLabel(totalStock, ppc, ref)}',
+                                );
+                              for (final v in variants) {
+                                buf.writeln(
+                                  '  ${v.variantName}: ${_stockLabel(v.quantityAvailable, ppc, ref)}',
+                                );
+                              }
+                              shareText(buf.toString());
+                              HapticFeedback.lightImpact();
+                            }
                           : null,
                     ),
                     if (user?.isAdmin == true)

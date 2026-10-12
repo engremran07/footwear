@@ -21,9 +21,7 @@ void main() {
       ProviderScope(
         overrides: [
           authUserProvider.overrideWith((ref) => Stream.value(null)),
-          roleAwareInvoicesProvider.overrideWith(
-            (ref) => AsyncData(invoices),
-          ),
+          roleAwareInvoicesProvider.overrideWith((ref) => AsyncData(invoices)),
         ],
         child: const MaterialApp(home: InvoicesListScreen()),
       ),

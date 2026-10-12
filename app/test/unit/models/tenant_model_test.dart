@@ -48,7 +48,8 @@ void main() {
       expect(m.active, isTrue);
       expect(m.isTrial, isFalse);
       expect(m.plan, isNull);
-      expect(m.maxDevicesAllowed, 1);
+      expect(m.maxDevicesAllowed, 3);
+      expect(m.maxActiveSessionsAllowed, 2);
     });
   });
 }

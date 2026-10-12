@@ -1,16 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/constants/collections.dart';
 import '../core/models/access_usage_summary.dart';
 import '../core/models/tenant_model.dart';
 import '../core/services/device_installation.dart';
+import '../core/utils/session_access_policy.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/device_registration_model.dart';
 import '../models/session_model.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
+
+final logger = Logger();
 
 final tenantsProvider = StreamProvider.autoDispose<List<TenantModel>>((ref) {
   final currentUser = ref.watch(authUserProvider).value;
@@ -44,14 +49,15 @@ final tenantsProvider = StreamProvider.autoDispose<List<TenantModel>>((ref) {
       );
 });
 
-final tenantProvider = StreamProvider.family<TenantModel?, String>((
+final tenantProvider = StreamProvider.autoDispose.family<TenantModel?, String>((
   ref,
   tenantId,
 ) {
   final currentUser = ref.watch(authUserProvider).value;
-  if (currentUser == null) return const Stream<TenantModel?>.empty();
+  if (currentUser == null) return Stream.value(null);
 
   if (currentUser.isSuperAdmin) {
+    if (currentUser.activeWorkspaceId != tenantId) return Stream.value(null);
     return FirebaseFirestore.instance
         .collection(Collections.tenants)
         .doc(tenantId)
@@ -62,9 +68,10 @@ final tenantProvider = StreamProvider.family<TenantModel?, String>((
         });
   }
 
-  if (!currentUser.isTenantAdmin) return const Stream<TenantModel?>.empty();
   final tenantIdForUser = TenantScope.normalize(currentUser.tenantId);
-  if (tenantIdForUser != tenantId) return const Stream<TenantModel?>.empty();
+  if (!currentUser.active || tenantIdForUser != tenantId) {
+    return Stream.value(null);
+  }
 
   return FirebaseFirestore.instance
       .collection(Collections.tenants)
@@ -87,6 +94,9 @@ final tenantUsersProvider = StreamProvider.family<List<UserModel>, String>((
   if (currentUser == null) return const Stream<List<UserModel>>.empty();
 
   if (currentUser.isSuperAdmin) {
+    if (currentUser.activeWorkspaceId != tenantId) {
+      return Stream.value(const <UserModel>[]);
+    }
     return FirebaseFirestore.instance
         .collection(Collections.users)
         .where('tenant_id', isEqualTo: tenantId)
@@ -124,6 +134,9 @@ final allInactiveUsersForTenantProvider =
       if (currentUser == null) return const Stream<List<UserModel>>.empty();
 
       if (currentUser.isSuperAdmin) {
+        if (currentUser.activeWorkspaceId != tenantId) {
+          return Stream.value(const <UserModel>[]);
+        }
         return FirebaseFirestore.instance
             .collection(Collections.users)
             .where('tenant_id', isEqualTo: tenantId)
@@ -158,37 +171,62 @@ final allInactiveUsersForTenantProvider =
           );
     });
 
-final userSessionsProvider = StreamProvider.family<List<SessionModel>, String>((
-  ref,
-  userId,
-) {
-  final currentUser = ref.watch(authUserProvider).value;
-  final tenantId = TenantScope.normalize(currentUser?.tenantId);
-  if (currentUser == null || tenantId == null) {
-    return const Stream<List<SessionModel>>.empty();
-  }
-
-  return FirebaseFirestore.instance
-      .collection(Collections.users)
-      .doc(userId)
-      .collection(Collections.sessions)
-      .where('tenant_id', isEqualTo: tenantId)
-      .where('user_id', isEqualTo: userId)
-      .limit(AccessUsageSummary.maximumSlotsPerUser)
-      .snapshots()
-      .map(
-        (snap) => snap.docs
-            .map((doc) => SessionModel.fromJson(doc.data(), doc.id))
-            .toList(),
+final userSessionsProvider = StreamProvider.autoDispose
+    .family<List<SessionModel>, String>((ref, userId) {
+      final (currentUserId, currentTenantId) = ref.watch(
+        authUserProvider.select(
+          (userState) => (
+            userState.value?.id,
+            TenantScope.normalize(userState.value?.tenantId),
+          ),
+        ),
       );
-});
+      if (currentUserId == null || currentTenantId == null) {
+        return Stream.value(const <SessionModel>[]);
+      }
 
-final deviceRegistrationsProvider =
-    StreamProvider.family<List<DeviceRegistrationModel>, String>((ref, userId) {
+      return FirebaseFirestore.instance
+          .collection(Collections.users)
+          .doc(userId)
+          .collection(Collections.sessions)
+          .where('tenant_id', isEqualTo: currentTenantId)
+          .where('user_id', isEqualTo: userId)
+          .limit(AccessUsageSummary.maximumSlotsPerUser)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((doc) => SessionModel.fromJson(doc.data(), doc.id))
+                .toList(),
+          );
+    });
+
+final platformSessionsProvider = StreamProvider.autoDispose<List<SessionModel>>(
+  (ref) {
+    final user = ref.watch(authUserProvider).value;
+    if (user == null || !user.isSuperAdmin || !user.active) {
+      return Stream.value(const <SessionModel>[]);
+    }
+    return FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(user.id)
+        .collection(Collections.platformSessions)
+        .where('user_id', isEqualTo: user.id)
+        .limit(20)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => SessionModel.fromJson(doc.data(), doc.id))
+              .toList(),
+        );
+  },
+);
+
+final deviceRegistrationsProvider = StreamProvider.autoDispose
+    .family<List<DeviceRegistrationModel>, String>((ref, userId) {
       final currentUser = ref.watch(authUserProvider).value;
       final tenantId = TenantScope.normalize(currentUser?.tenantId);
       if (currentUser == null || tenantId == null) {
-        return const Stream<List<DeviceRegistrationModel>>.empty();
+        return Stream.value(const <DeviceRegistrationModel>[]);
       }
       return FirebaseFirestore.instance
           .collection(Collections.users)
@@ -431,11 +469,23 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
+  Future<UserModel?> _currentProfileFor(String userId) async {
+    if (FirebaseAuth.instance.currentUser?.uid != userId) return null;
+    final profile = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(userId)
+        .get(const GetOptions(source: Source.server));
+    if (FirebaseAuth.instance.currentUser?.uid != userId || !profile.exists) {
+      return null;
+    }
+    return UserModel.fromJson(profile.data()!, profile.id);
+  }
+
   Future<SessionModel> registerCurrentAccess({
     required String userId,
     required String tenantId,
   }) async {
-    final currentUser = await ref.read(authUserProvider.future);
+    final currentUser = await _currentProfileFor(userId);
     final tenantMatches =
         currentUser != null &&
         (currentUser.isSuperAdmin
@@ -465,16 +515,20 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
 
     state = const AsyncLoading();
     try {
-      final deviceRecords = await userRef
-        .collection(Collections.deviceRegistrations)
-        .where('tenant_id', isEqualTo: tenantId)
-        .where('user_id', isEqualTo: userId)
-        .get();
-      final sessionRecords = await userRef
-        .collection(Collections.sessions)
-        .where('tenant_id', isEqualTo: tenantId)
-        .where('user_id', isEqualTo: userId)
-        .get();
+      final records = await Future.wait([
+        userRef
+            .collection(Collections.deviceRegistrations)
+            .where('tenant_id', isEqualTo: tenantId)
+            .where('user_id', isEqualTo: userId)
+            .get(),
+        userRef
+            .collection(Collections.sessions)
+            .where('tenant_id', isEqualTo: tenantId)
+            .where('user_id', isEqualTo: userId)
+            .get(),
+      ]);
+      final deviceRecords = records[0];
+      final sessionRecords = records[1];
       final session = await db.runTransaction<SessionModel>((
         transaction,
       ) async {
@@ -496,7 +550,17 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
               AccessUsageSummary.maximumSlotsPerUser,
               null,
             );
-        for (final snapshot in deviceRecords.docs) {
+        final deviceReads = await Future.wait(
+          deviceRecords.docs.map(
+            (snapshot) => transaction.get(snapshot.reference),
+          ),
+        );
+        for (
+          var recordIndex = 0;
+          recordIndex < deviceRecords.docs.length;
+          recordIndex++
+        ) {
+          final snapshot = deviceRecords.docs[recordIndex];
           final slotNumber = (snapshot.data()['slot_number'] as num?)?.toInt();
           if (slotNumber == null ||
               slotNumber < 0 ||
@@ -504,11 +568,19 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
               snapshot.id != 'slot_$slotNumber') {
             continue;
           }
-          deviceSnapshots[slotNumber] = await transaction.get(
-            snapshot.reference,
-          );
+          deviceSnapshots[slotNumber] = deviceReads[recordIndex];
         }
-        for (final snapshot in sessionRecords.docs) {
+        final sessionReads = await Future.wait(
+          sessionRecords.docs.map(
+            (snapshot) => transaction.get(snapshot.reference),
+          ),
+        );
+        for (
+          var recordIndex = 0;
+          recordIndex < sessionRecords.docs.length;
+          recordIndex++
+        ) {
+          final snapshot = sessionRecords.docs[recordIndex];
           final slotNumber = (snapshot.data()['slot_number'] as num?)?.toInt();
           if (slotNumber == null ||
               slotNumber < 0 ||
@@ -516,34 +588,80 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
               snapshot.id != 'slot_$slotNumber') {
             continue;
           }
-          sessionSnapshots[slotNumber] = await transaction.get(
-            snapshot.reference,
-          );
+          sessionSnapshots[slotNumber] = sessionReads[recordIndex];
         }
 
         final now = DateTime.now();
-        final activeDevices = deviceSnapshots
-            .where((snapshot) => snapshot?.data()?['status'] == 'active')
-            .toList();
+        final staleDeviceCutoff = now.subtract(const Duration(days: 30));
+        final occupiedDevices = deviceSnapshots.where((snapshot) {
+          final data = snapshot?.data();
+          if (data?['status'] == 'pending') return true;
+          if (data?['status'] != 'active') return false;
+          final lastSeenAt = data?['last_seen_at'];
+          return lastSeenAt is! Timestamp ||
+              lastSeenAt.toDate().isAfter(staleDeviceCutoff);
+        }).toList();
         final existingDeviceIndex = deviceSnapshots.indexWhere(
           (snapshot) =>
               snapshot?.data()?['status'] == 'active' &&
               snapshot?.data()?['device_id'] == metadata.installationId,
         );
+        final pendingDeviceIndex = deviceSnapshots.indexWhere(
+          (snapshot) =>
+              snapshot?.data()?['status'] == 'pending' &&
+              snapshot?.data()?['device_id'] == metadata.installationId,
+        );
+        if (pendingDeviceIndex >= 0) {
+          return _pendingSession(
+            userId,
+            tenantId,
+            metadata,
+            pendingDeviceIndex,
+          );
+        }
+        final blockedDeviceIndex = deviceSnapshots.indexWhere(
+          (snapshot) =>
+              snapshot?.data()?['status'] == 'blocked' &&
+              snapshot?.data()?['device_id'] == metadata.installationId,
+        );
+        if (blockedDeviceIndex >= 0) throw StateError('device-blocked');
+        final revokedDeviceIndex = deviceSnapshots.indexWhere(
+          (snapshot) =>
+              snapshot?.data()?['status'] == 'revoked' &&
+              snapshot?.data()?['device_id'] == metadata.installationId,
+        );
+        if (revokedDeviceIndex >= 0 && tenant.allowAdminResetOnly) {
+          throw StateError('device-admin-reset-required');
+        }
+        final staleDeviceIndex = deviceSnapshots.indexWhere((snapshot) {
+          final data = snapshot?.data();
+          final lastSeenAt = data?['last_seen_at'];
+          return data?['status'] == 'active' &&
+              lastSeenAt is Timestamp &&
+              !lastSeenAt.toDate().isAfter(staleDeviceCutoff);
+        });
         final deviceIndex = existingDeviceIndex >= 0
             ? existingDeviceIndex
+            : revokedDeviceIndex >= 0
+            ? revokedDeviceIndex
+            : staleDeviceIndex >= 0
+            ? staleDeviceIndex
             : _firstReusableDeviceSlot(
                 deviceSnapshots,
                 tenant.maxDevicesAllowed,
+                now: now,
+                allowRevoked: !tenant.allowAdminResetOnly,
               );
         if (existingDeviceIndex < 0 &&
-            (activeDevices.length >= tenant.maxDevicesAllowed ||
+            (occupiedDevices.length >= tenant.maxDevicesAllowed ||
                 deviceIndex < 0)) {
           throw StateError('device-limit-reached');
         }
 
         final deviceRef = deviceRefs[deviceIndex];
         final deviceSnapshot = deviceSnapshots[deviceIndex];
+        final requiresApproval =
+            tenant.requireDevicePairing && existingDeviceIndex < 0;
         final deviceData = {
           'user_id': userId,
           'tenant_id': tenantId,
@@ -555,12 +673,19 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
           'platform': metadata.platform,
           'os_version': metadata.osVersion,
           'app_version': metadata.appVersion,
-          'status': 'active',
+          'status': requiresApproval ? 'pending' : 'active',
           'last_seen_at': FieldValue.serverTimestamp(),
         };
+        final isStaleDevice =
+            deviceSnapshot?.data()?['status'] == 'active' &&
+            (deviceSnapshot?.data()?['last_seen_at'] is Timestamp) &&
+            !(deviceSnapshot!.data()!['last_seen_at'] as Timestamp)
+                .toDate()
+                .isAfter(staleDeviceCutoff);
         if (deviceSnapshot == null ||
             !deviceSnapshot.exists ||
-            deviceSnapshot.data()?['status'] != 'active') {
+            deviceSnapshot.data()?['status'] != 'active' ||
+            isStaleDevice) {
           transaction.set(deviceRef, {
             ...deviceData,
             'registered_at': FieldValue.serverTimestamp(),
@@ -570,6 +695,10 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
             'last_seen_at': FieldValue.serverTimestamp(),
             'app_version': metadata.appVersion,
           });
+        }
+
+        if (requiresApproval) {
+          return _pendingSession(userId, tenantId, metadata, deviceIndex);
         }
 
         final activeSessions = <int>[];
@@ -638,12 +767,134 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
           'created_at': priorSession?['created_at'] ?? Timestamp.now(),
         }, sessionRef.id);
       });
+      if (session.status != 'pending') {
+        final committedDevice = await deviceRefs[session.slotNumber].get(
+          const GetOptions(source: Source.server),
+        );
+        final serverSeenAt = committedDevice.data()?['last_seen_at'];
+        if (serverSeenAt is Timestamp &&
+            SessionAccessPolicy.isClockSkewed(
+              deviceNow: DateTime.now(),
+              serverNow: serverSeenAt.toDate(),
+            )) {
+          try {
+            await terminateCurrentSession(userId);
+          } catch (cleanupError) {
+            logger.w('Clock-skew session rollback failed: $cleanupError');
+          }
+          throw StateError('device-clock-skew');
+        }
+      }
       state = const AsyncData(null);
       return session;
     } catch (error, stack) {
       state = AsyncError(error, stack);
       rethrow;
     }
+  }
+
+  Future<SessionModel> registerPlatformSession({required String userId}) async {
+    final user = await _currentProfileFor(userId);
+    if (user == null ||
+        !user.active ||
+        !user.isSuperAdmin ||
+        user.id != userId) {
+      throw StateError('Active platform access is required.');
+    }
+    final metadata = await DeviceInstallation.current();
+    final userRef = FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(userId);
+    final collection = userRef.collection(Collections.platformSessions);
+    final activeSessions = await collection
+        .where('user_id', isEqualTo: userId)
+        .limit(20)
+        .get(const GetOptions(source: Source.server));
+    final existingCandidates = activeSessions.docs.where(
+      (doc) =>
+          doc.data()['device_id'] == metadata.installationId &&
+          doc.data()['status'] == 'active',
+    );
+    final existing = existingCandidates.isEmpty
+        ? null
+        : existingCandidates.first;
+    final sessionRef = existing?.reference ?? collection.doc(const Uuid().v4());
+    final now = DateTime.now();
+    final sessionId =
+        existing?.data()['session_id'] as String? ?? const Uuid().v4();
+    final sessionData = {
+      'user_id': userId,
+      'session_id': sessionId,
+      'device_id': metadata.installationId,
+      'device_brand': metadata.brand,
+      'device_model': metadata.model,
+      'platform': metadata.platform,
+      'status': 'active',
+      'last_seen_at': FieldValue.serverTimestamp(),
+      'expires_at': Timestamp.fromDate(
+        now.add(const Duration(hours: 7, minutes: 50)),
+      ),
+    };
+    if (existing == null) {
+      await sessionRef.set({
+        ...sessionData,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+    } else {
+      await sessionRef.update({
+        'last_seen_at': FieldValue.serverTimestamp(),
+        'expires_at': sessionData['expires_at'],
+      });
+    }
+    return SessionModel.fromJson({
+      ...sessionData,
+      'tenant_id': 'platform',
+      'created_at': existing?.data()['created_at'] ?? Timestamp.now(),
+    }, sessionRef.id);
+  }
+
+  Future<void> terminatePlatformSession(String userId, String sessionId) async {
+    final user = await ref.read(authUserProvider.future);
+    if (user == null ||
+        !user.active ||
+        !user.isSuperAdmin ||
+        user.id != userId) {
+      throw StateError('Active platform access is required.');
+    }
+    final sessionRef = FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(userId)
+        .collection(Collections.platformSessions)
+        .doc(sessionId);
+    final session = await sessionRef.get();
+    if (!session.exists || session.data()?['user_id'] != userId) {
+      throw StateError('Platform session not found.');
+    }
+    await sessionRef.update({
+      'status': 'revoked',
+      'revoked_at': FieldValue.serverTimestamp(),
+      'terminated_by': user.id,
+    });
+  }
+
+  Future<void> terminateCurrentPlatformSession(String userId) async {
+    final user = await ref.read(authUserProvider.future);
+    if (user == null || user.id != userId || !user.isSuperAdmin) return;
+    final metadata = await DeviceInstallation.current();
+    final sessions = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(userId)
+        .collection(Collections.platformSessions)
+        .where('user_id', isEqualTo: userId)
+        .limit(20)
+        .get(const GetOptions(source: Source.server));
+    final currentSession = sessions.docs.where(
+      (doc) =>
+          doc.data()['device_id'] == metadata.installationId &&
+          doc.data()['status'] == 'active',
+    );
+    if (currentSession.isEmpty) return;
+    await terminatePlatformSession(userId, currentSession.first.id);
   }
 
   Future<void> terminateSession(
@@ -681,7 +932,7 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
     });
   }
 
-  Future<void> revokeDevice(String userId, String slotId) async {
+  Future<void> approveDevice(String userId, String slotId) async {
     final currentUser = await ref.read(authUserProvider.future);
     if (currentUser == null || !currentUser.active) {
       throw StateError('Not authenticated');
@@ -696,18 +947,124 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
       snapshot.data() ?? <String, dynamic>{},
       snapshot.id,
     );
-    final isOwner = currentUser.id == userId;
     final isWorkspaceAdmin = currentUser.isSuperAdmin
         ? currentUser.activeWorkspaceId == device.tenantId
         : (currentUser.isAdmin || currentUser.isTenantAdmin) &&
               currentUser.tenantId == device.tenantId;
-    if (!snapshot.exists || (!isOwner && !isWorkspaceAdmin)) {
+    if (!snapshot.exists || !isWorkspaceAdmin || device.status != 'pending') {
       throw StateError('Permission denied');
     }
     await deviceRef.update({
-      'status': 'revoked',
-      'revoked_at': FieldValue.serverTimestamp(),
-      'revoked_by': currentUser.id,
+      'status': 'active',
+      'approved_at': FieldValue.serverTimestamp(),
+      'approved_by': currentUser.id,
+    });
+  }
+
+  Future<void> revokeDevice(String userId, String slotId) =>
+      _setDeviceAccess(userId, slotId, block: false);
+
+  Future<void> blockDevice(String userId, String slotId) =>
+      _setDeviceAccess(userId, slotId, block: true);
+
+  Future<void> _setDeviceAccess(
+    String userId,
+    String slotId, {
+    required bool block,
+  }) async {
+    final currentUser = await ref.read(authUserProvider.future);
+    if (currentUser == null || !currentUser.active) {
+      throw StateError('Not authenticated');
+    }
+    final db = FirebaseFirestore.instance;
+    final userRef = db.collection(Collections.users).doc(userId);
+    final deviceRef = userRef
+        .collection(Collections.deviceRegistrations)
+        .doc(slotId);
+    final sessionRefs = List.generate(
+      AccessUsageSummary.maximumSlotsPerUser,
+      (index) => userRef.collection(Collections.sessions).doc('slot_$index'),
+    );
+    await db.runTransaction<void>((transaction) async {
+      final snapshots = await Future.wait([
+        transaction.get(deviceRef),
+        ...sessionRefs.map(transaction.get),
+      ]);
+      final deviceSnapshot = snapshots.first;
+      if (!deviceSnapshot.exists) throw StateError('Device not found');
+      final device = DeviceRegistrationModel.fromJson(
+        deviceSnapshot.data() ?? <String, dynamic>{},
+        deviceSnapshot.id,
+      );
+      final isOwner = currentUser.id == userId;
+      final isWorkspaceAdmin = currentUser.isSuperAdmin
+          ? currentUser.activeWorkspaceId == device.tenantId
+          : (currentUser.isAdmin || currentUser.isTenantAdmin) &&
+                currentUser.tenantId == device.tenantId;
+      if (!isOwner && !isWorkspaceAdmin) {
+        throw StateError('Permission denied');
+      }
+      if (isOwner && !isWorkspaceAdmin) {
+        final tenant = await transaction.get(
+          db.collection(Collections.tenants).doc(device.tenantId),
+        );
+        if (tenant.data()?['allow_admin_reset_only'] != false) {
+          throw StateError('device-admin-reset-required');
+        }
+      }
+      if (block && !isWorkspaceAdmin) throw StateError('Permission denied');
+      final nextStatus = block ? 'blocked' : 'revoked';
+      transaction.update(deviceRef, {
+        'status': nextStatus,
+        'revoked_at': FieldValue.serverTimestamp(),
+        'revoked_by': currentUser.id,
+      });
+      for (var index = 1; index < snapshots.length; index++) {
+        final sessionSnapshot = snapshots[index];
+        final data = sessionSnapshot.data();
+        if (!sessionSnapshot.exists ||
+            data?['device_id'] != device.deviceId ||
+            data?['status'] != 'active') {
+          continue;
+        }
+        transaction.update(sessionRefs[index - 1], {
+          'status': 'revoked',
+          'revoked_at': FieldValue.serverTimestamp(),
+          'termination_reason': block ? 'device_blocked' : 'device_removed',
+          'terminated_by': currentUser.id,
+        });
+      }
+    });
+  }
+
+  Future<void> resetDevice(String userId, String slotId) async {
+    final currentUser = await ref.read(authUserProvider.future);
+    if (currentUser == null || !currentUser.active) {
+      throw StateError('Not authenticated');
+    }
+    final deviceRef = FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(userId)
+        .collection(Collections.deviceRegistrations)
+        .doc(slotId);
+    final snapshot = await deviceRef.get();
+    final device = DeviceRegistrationModel.fromJson(
+      snapshot.data() ?? <String, dynamic>{},
+      snapshot.id,
+    );
+    final canReset = currentUser.isSuperAdmin
+        ? currentUser.activeWorkspaceId == device.tenantId
+        : (currentUser.isAdmin || currentUser.isTenantAdmin) &&
+              currentUser.tenantId == device.tenantId;
+    if (!snapshot.exists || !canReset || device.status != 'revoked') {
+      throw StateError('Permission denied');
+    }
+    await deviceRef.update({
+      'status': 'active',
+      'registered_at': FieldValue.serverTimestamp(),
+      'last_seen_at': FieldValue.serverTimestamp(),
+      'approved_at': FieldValue.serverTimestamp(),
+      'approved_by': currentUser.id,
     });
   }
 
@@ -733,13 +1090,44 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
 
   int _firstReusableDeviceSlot(
     List<DocumentSnapshot<Map<String, dynamic>>?> snapshots,
-    int maxSlots,
-  ) {
+    int maxSlots, {
+    required DateTime now,
+    required bool allowRevoked,
+  }) {
     for (var index = 0; index < maxSlots; index++) {
       final data = snapshots[index]?.data();
-      if (data == null || data['status'] != 'active') return index;
+      final lastSeenAt = data?['last_seen_at'];
+      if (data == null ||
+          data['status'] == null ||
+          (allowRevoked && data['status'] == 'revoked') ||
+          (data['status'] == 'active' &&
+              lastSeenAt is Timestamp &&
+              !lastSeenAt.toDate().isAfter(
+                now.subtract(const Duration(days: 30)),
+              ))) {
+        return index;
+      }
     }
     return -1;
+  }
+
+  SessionModel _pendingSession(
+    String userId,
+    String tenantId,
+    DeviceInstallationMetadata metadata,
+    int slotNumber,
+  ) {
+    final timestamp = Timestamp.now();
+    return SessionModel(
+      id: 'pending',
+      userId: userId,
+      tenantId: tenantId,
+      deviceId: metadata.installationId,
+      platform: metadata.platform,
+      status: 'pending',
+      createdAt: timestamp,
+      lastSeenAt: timestamp,
+    );
   }
 
   int _firstReusableSessionSlot(

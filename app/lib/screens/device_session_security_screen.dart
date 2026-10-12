@@ -14,18 +14,34 @@ import '../providers/tenant_provider.dart';
 import '../models/user_model.dart';
 import '../widgets/error_state.dart';
 
-class DeviceSessionSecurityScreen extends ConsumerWidget {
+class DeviceSessionSecurityScreen extends ConsumerStatefulWidget {
   final String? tenantId;
 
   const DeviceSessionSecurityScreen({super.key, this.tenantId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DeviceSessionSecurityScreen> createState() =>
+      _DeviceSessionSecurityScreenState();
+}
+
+class _DeviceSessionSecurityScreenState
+    extends ConsumerState<DeviceSessionSecurityScreen> {
+  final _searchController = TextEditingController();
+  String _registrySearch = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(tr('access_security_title', ref))),
-      body: tenantId == null
+      body: widget.tenantId == null
           ? _buildUserView(context, ref)
-          : _buildAdminView(context, ref, tenantId!),
+          : _buildAdminView(context, ref, widget.tenantId!),
     );
   }
 
@@ -33,7 +49,11 @@ class DeviceSessionSecurityScreen extends ConsumerWidget {
     final userState = ref.watch(authUserProvider);
     return userState.when(
       data: (user) {
-        if (user == null || user.tenantId == null) {
+        if (user == null) {
+          return Center(child: Text(tr('access_workspace_unavailable', ref)));
+        }
+        if (user.isSuperAdmin) return _buildPlatformUsage(context, ref, user);
+        if (user.tenantId == null) {
           return Center(child: Text(tr('access_workspace_unavailable', ref)));
         }
         final tenantState = ref.watch(tenantProvider(user.tenantId!));
@@ -85,6 +105,51 @@ class DeviceSessionSecurityScreen extends ConsumerWidget {
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => mappedErrorState(error: error, ref: ref),
+    );
+  }
+
+  Widget _buildPlatformUsage(
+    BuildContext context,
+    WidgetRef ref,
+    UserModel user,
+  ) {
+    final sessionsState = ref.watch(platformSessionsProvider);
+    final installationId = ref
+        .watch(currentDeviceInstallationProvider)
+        .value
+        ?.installationId;
+    return sessionsState.when(
+      data: (sessions) {
+        if (sessions.isEmpty) {
+          return Center(child: Text(tr('access_no_sessions', ref)));
+        }
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(
+              tr('platform_sessions_title', ref),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            for (final session in sessions)
+              _SessionCard(
+                session: session,
+                isCurrent: session.deviceId == installationId,
+                userName: user.displayName,
+                onTerminate: session.status == 'active'
+                    ? () => _terminatePlatformSession(context, ref, session)
+                    : null,
+                ref: ref,
+              ),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => mappedErrorState(
+        error: error,
+        ref: ref,
+        onRetry: () => ref.invalidate(platformSessionsProvider),
+      ),
     );
   }
 
@@ -169,15 +234,19 @@ class DeviceSessionSecurityScreen extends ConsumerWidget {
                         (session.expiresAt?.toDate().isAfter(now) ?? false),
                   )
                   .length,
-              onRevoke: () => _revokeDevice(
-                context,
-                ref,
-                device,
-                userName: user.displayName,
-                relatedSessionCount: sessions
-                    .where((session) => session.deviceId == device.deviceId)
-                    .length,
-              ),
+              onRevoke: tenant.allowAdminResetOnly
+                  ? null
+                  : () => _revokeDevice(
+                      context,
+                      ref,
+                      device,
+                      userName: user.displayName,
+                      relatedSessionCount: sessions
+                          .where(
+                            (session) => session.deviceId == device.deviceId,
+                          )
+                          .length,
+                    ),
               ref: ref,
             ),
         const SizedBox(height: 20),
@@ -245,9 +314,47 @@ class DeviceSessionSecurityScreen extends ConsumerWidget {
                 ? user.email
                 : user.displayName,
         };
+        final query = _registrySearch.trim().toLowerCase();
+        final filteredDevices = devices.where((device) {
+          final userName = userNames[device.userId] ?? '';
+          return query.isEmpty ||
+              device.displayName.toLowerCase().contains(query) ||
+              userName.toLowerCase().contains(query) ||
+              device.platform.toLowerCase().contains(query);
+        }).toList();
+        final filteredSessions = sessions.where((session) {
+          final userName = userNames[session.userId] ?? '';
+          final deviceName =
+              '${session.deviceBrand ?? ''} ${session.deviceModel ?? ''}';
+          return query.isEmpty ||
+              userName.toLowerCase().contains(query) ||
+              deviceName.toLowerCase().contains(query) ||
+              session.platform.toLowerCase().contains(query);
+        }).toList();
 
         return Column(
           children: [
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 4),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _registrySearch = value),
+                decoration: InputDecoration(
+                  labelText: tr('access_registry_search', ref),
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _registrySearch.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: tr('clear', ref),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _registrySearch = '');
+                          },
+                          icon: const Icon(Icons.clear),
+                        ),
+                ),
+              ),
+            ),
             _WorkspacePolicyEditor(tenant: tenant, canEdit: canEditPolicy),
             if (devices.length >= 200 || sessions.length >= 200)
               Padding(
@@ -274,8 +381,8 @@ class DeviceSessionSecurityScreen extends ConsumerWidget {
                           _adminDeviceList(
                             context,
                             ref,
-                            devices,
-                            sessions,
+                            filteredDevices,
+                            filteredSessions,
                             userNames,
                             currentUser?.id,
                             installationId,
@@ -355,6 +462,39 @@ class DeviceSessionSecurityScreen extends ConsumerWidget {
                   relatedSessionCount: relatedSessions.length,
                 )
               : null,
+          onApprove: device.status == 'pending'
+              ? () => _manageDevice(
+                  context,
+                  ref,
+                  device,
+                  titleKey: 'access_approve_device',
+                  successKey: 'access_device_approved',
+                  operation: (notifier) =>
+                      notifier.approveDevice(device.userId, device.id),
+                )
+              : null,
+          onBlock: device.status == 'active'
+              ? () => _manageDevice(
+                  context,
+                  ref,
+                  device,
+                  titleKey: 'access_block_device',
+                  successKey: 'access_device_blocked',
+                  operation: (notifier) =>
+                      notifier.blockDevice(device.userId, device.id),
+                )
+              : null,
+          onReset: device.status == 'revoked'
+              ? () => _manageDevice(
+                  context,
+                  ref,
+                  device,
+                  titleKey: 'access_reset_device',
+                  successKey: 'access_device_reset',
+                  operation: (notifier) =>
+                      notifier.resetDevice(device.userId, device.id),
+                )
+              : null,
           ref: ref,
         );
       },
@@ -432,6 +572,38 @@ class DeviceSessionSecurityScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _manageDevice(
+    BuildContext context,
+    WidgetRef ref,
+    DeviceRegistrationModel device, {
+    required String titleKey,
+    required String successKey,
+    required Future<void> Function(SessionManagementNotifier notifier)
+    operation,
+  }) async {
+    final confirmed = await _confirmAction(
+      context,
+      title: tr(titleKey, ref),
+      details:
+          '${tr('access_device', ref)}: ${device.displayName}\n${tr('access_user', ref)}: ${device.userId}',
+      ref: ref,
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await operation(ref.read(sessionManagementNotifierProvider.notifier));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(successSnackBar(tr(successKey, ref)));
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+      }
+    }
+  }
+
   Future<void> _terminateSession(
     BuildContext context,
     WidgetRef ref,
@@ -459,6 +631,39 @@ class DeviceSessionSecurityScreen extends ConsumerWidget {
             session.id,
             reason: 'admin_terminated',
           );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(successSnackBar(tr('access_session_terminated', ref)));
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+      }
+    }
+  }
+
+  Future<void> _terminatePlatformSession(
+    BuildContext context,
+    WidgetRef ref,
+    SessionModel session,
+  ) async {
+    final confirmed = await _confirmAction(
+      context,
+      title: tr('access_terminate_session', ref),
+      details: [
+        '${tr('access_device', ref)}: ${[session.deviceBrand, session.deviceModel].whereType<String>().where((value) => value.isNotEmpty).join(' ')}',
+        '${tr('access_status', ref)}: ${_statusLabel(session.status, ref)}',
+        '${tr('access_started', ref)}: ${_formatDate(context, session.createdAt.toDate())}',
+      ].join('\n'),
+      ref: ref,
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref
+          .read(sessionManagementNotifierProvider.notifier)
+          .terminatePlatformSession(session.userId, session.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -745,6 +950,9 @@ class _DeviceCard extends StatelessWidget {
   final bool isCurrent;
   final int activeSessionCount;
   final VoidCallback? onRevoke;
+  final VoidCallback? onApprove;
+  final VoidCallback? onBlock;
+  final VoidCallback? onReset;
   final WidgetRef ref;
 
   const _DeviceCard({
@@ -753,6 +961,9 @@ class _DeviceCard extends StatelessWidget {
     required this.activeSessionCount,
     required this.onRevoke,
     required this.ref,
+    this.onApprove,
+    this.onBlock,
+    this.onReset,
     this.userName,
   });
 
@@ -786,15 +997,40 @@ class _DeviceCard extends StatelessWidget {
             Text('${tr('access_related_sessions', ref)}: $activeSessionCount'),
           ],
         ),
-        trailing: onRevoke == null
-            ? _StatusChip(status: device.status, ref: ref)
-            : Tooltip(
-                message: tr('access_remove_device', ref),
-                child: IconButton(
-                  onPressed: onRevoke,
-                  icon: const Icon(Icons.phonelink_erase_outlined),
-                ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (onApprove != null)
+              IconButton(
+                tooltip: tr('access_approve_device', ref),
+                onPressed: onApprove,
+                icon: const Icon(Icons.check_circle_outline),
               ),
+            if (onReset != null)
+              IconButton(
+                tooltip: tr('access_reset_device', ref),
+                onPressed: onReset,
+                icon: const Icon(Icons.lock_reset_outlined),
+              ),
+            if (onBlock != null)
+              IconButton(
+                tooltip: tr('access_block_device', ref),
+                onPressed: onBlock,
+                icon: const Icon(Icons.block_outlined),
+              ),
+            if (onRevoke != null)
+              IconButton(
+                tooltip: tr('access_remove_device', ref),
+                onPressed: onRevoke,
+                icon: const Icon(Icons.phonelink_erase_outlined),
+              ),
+            if (onApprove == null &&
+                onReset == null &&
+                onBlock == null &&
+                onRevoke == null)
+              _StatusChip(status: device.status, ref: ref),
+          ],
+        ),
         isThreeLine: true,
       ),
     );
@@ -878,7 +1114,9 @@ class _StatusChip extends StatelessWidget {
 
 String _statusLabel(String status, WidgetRef ref) => switch (status) {
   'active' => tr('access_status_active', ref),
+  'pending' => tr('access_status_pending', ref),
   'revoked' => tr('access_status_revoked', ref),
+  'blocked' => tr('access_status_blocked', ref),
   'expired' => tr('access_status_expired', ref),
   _ => tr('status_unknown', ref),
 };

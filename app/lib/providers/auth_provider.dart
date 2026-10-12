@@ -7,7 +7,7 @@ import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
-import '../core/utils/device_pairing.dart';
+import '../core/utils/auth_refresh_policy.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
 import 'tenant_provider.dart';
@@ -35,26 +35,6 @@ final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
 
 final authStateProvider = StreamProvider.autoDispose<User?>((ref) {
   return ref.watch(firebaseAuthProvider).authStateChanges();
-});
-
-/// Monitors idToken refresh events to detect when Firebase Console disables
-/// an account (3-way sync Path 3). On each token refresh the Firebase SDK
-/// returns a FirebaseAuthException(code: 'user-disabled') if the account has
-/// been disabled server-side, which we map to a forced sign-out.
-final authTokenGuardProvider = StreamProvider.autoDispose<void>((ref) async* {
-  await for (final user in FirebaseAuth.instance.idTokenChanges()) {
-    if (user == null) continue;
-    try {
-      await user.getIdToken(true); // force server round-trip
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-disabled' || e.code == 'user-token-expired') {
-        // Account was disabled in Firebase Console — sign out immediately
-        ref.read(authNotifierProvider.notifier).signOut();
-      }
-    } catch (e) {
-      _logger.w('Auth token guard skipped: $e');
-    }
-  }
 });
 
 final authUserProvider = StreamProvider.autoDispose<UserModel?>((ref) {
@@ -231,12 +211,47 @@ class AuthNotifier extends AsyncNotifier<void> {
           );
         }
 
-        if (!isSuperAdmin && tenantId != null) {
+        if (isSuperAdmin) {
           try {
             await ref
                 .read(sessionManagementNotifierProvider.notifier)
-                .registerCurrentAccess(userId: uid, tenantId: tenantId);
+                .registerPlatformSession(userId: uid);
           } catch (error, stackTrace) {
+            try {
+              await ref
+                  .read(sessionManagementNotifierProvider.notifier)
+                  .terminateCurrentPlatformSession(uid);
+            } catch (cleanupError, cleanupStack) {
+              _logger.w(
+                'Platform access rollback skipped after registration failure',
+                error: cleanupError,
+                stackTrace: cleanupStack,
+              );
+            }
+            await FirebaseAuth.instance.signOut();
+            _invalidateRoleScopedProviders();
+            Error.throwWithStackTrace(error, stackTrace);
+          }
+        } else if (tenantId != null) {
+          try {
+            final access = await ref
+                .read(sessionManagementNotifierProvider.notifier)
+                .registerCurrentAccess(userId: uid, tenantId: tenantId);
+            if (access.status == 'pending') {
+              throw StateError('device-pairing-pending');
+            }
+          } catch (error, stackTrace) {
+            try {
+              await ref
+                  .read(sessionManagementNotifierProvider.notifier)
+                  .terminateCurrentSession(uid);
+            } catch (cleanupError, cleanupStack) {
+              _logger.w(
+                'Application access rollback skipped after registration failure',
+                error: cleanupError,
+                stackTrace: cleanupStack,
+              );
+            }
             await FirebaseAuth.instance.signOut();
             _invalidateRoleScopedProviders();
             Error.throwWithStackTrace(error, stackTrace);
@@ -307,119 +322,32 @@ class AuthNotifier extends AsyncNotifier<void> {
     }
   }
 
-  Future<void> setDevicePairingState(
-    String targetUserId, {
-    required bool enabled,
-    String? pairingId,
-  }) async {
-    final authUser = FirebaseAuth.instance.currentUser;
-    if (authUser == null) {
-      throw StateError('Not authenticated');
-    }
-
-    final actorDoc = await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(authUser.uid)
-        .get();
-    final actorData = actorDoc.data();
-    final actorRole = (actorData?['role'] as String? ?? '').trim();
-    if (!isPrivilegedRoleName(actorRole)) {
-      throw StateError('Only admin or super admin can manage device pairing');
-    }
-
-    final targetDoc = await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(targetUserId)
-        .get();
-    final targetData = targetDoc.data();
-    final tenantId =
-        (targetData?['tenant_id'] as String?) ??
-        (actorData?['tenant_id'] as String?);
-    final tenantDoc = tenantId == null || tenantId.isEmpty
-        ? null
-        : await FirebaseFirestore.instance
-              .collection(Collections.tenants)
-              .doc(tenantId)
-              .get();
-    final tenantData = tenantDoc?.data();
-    final maxDevicesAllowed =
-        ((tenantData?['max_devices_allowed'] as num?) ?? 1).toInt().clamp(
-          1,
-          999,
-        );
-    final existingPairings =
-        (targetData?['device_pairing_ids'] as List<dynamic>?)
-            ?.whereType<String>()
-            .toList() ??
-        <String>[];
-
-    if (enabled) {
-      final normalizedPairingId =
-          pairingId ??
-          await DevicePairing.generate(
-            await DevicePairing.currentDeviceIdentifier(),
-            targetUserId,
-          );
-      final alreadyPaired = existingPairings.contains(normalizedPairingId);
-      if (!alreadyPaired && existingPairings.length >= maxDevicesAllowed) {
-        throw StateError(
-          'Workspace device limit reached ($maxDevicesAllowed).',
+  Future<void> verifyAuthAccountOnResume() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final checkedUid = user.uid;
+    try {
+      await user.reload();
+    } on FirebaseAuthException catch (error, stackTrace) {
+      if (FirebaseAuth.instance.currentUser?.uid != checkedUid) return;
+      if (shouldSignOutAfterAuthRefreshFailure(error.code)) {
+        _logger.w('Signing out disabled or missing account: ${error.code}');
+        await FirebaseAuth.instance.signOut();
+        _invalidateRoleScopedProviders();
+      } else {
+        _logger.w(
+          'Auth account verification deferred: ${error.code}',
+          error: error,
+          stackTrace: stackTrace,
         );
       }
-      final nextPairings = alreadyPaired
-          ? existingPairings
-          : [...existingPairings, normalizedPairingId];
-      await FirebaseFirestore.instance
-          .collection(Collections.users)
-          .doc(targetUserId)
-          .set({
-            'device_pairing_enabled': true,
-            'device_pairing_id': normalizedPairingId,
-            'device_pairing_ids': nextPairings,
-            'device_pairing_reset_by': null,
-            'updated_at': Timestamp.now(),
-          }, SetOptions(merge: true));
-      return;
+    } catch (error, stackTrace) {
+      _logger.w(
+        'Auth account verification deferred',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
-
-    final nextPairings = <String>[];
-    await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(targetUserId)
-        .set({
-          'device_pairing_enabled': false,
-          'device_pairing_id': null,
-          'device_pairing_ids': nextPairings,
-          'device_pairing_reset_by': authUser.uid,
-          'updated_at': Timestamp.now(),
-        }, SetOptions(merge: true));
-  }
-
-  Future<void> resetDevicePairing(String targetUserId) async {
-    final authUser = FirebaseAuth.instance.currentUser;
-    if (authUser == null) {
-      throw StateError('Not authenticated');
-    }
-
-    final actorDoc = await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(authUser.uid)
-        .get();
-    final actorData = actorDoc.data();
-    final actorRole = (actorData?['role'] as String? ?? '').trim();
-    if (!isPrivilegedRoleName(actorRole)) {
-      throw StateError('Only admin or super admin can reset device pairing');
-    }
-
-    await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(targetUserId)
-        .set({
-          'device_pairing_enabled': false,
-          'device_pairing_id': null,
-          'device_pairing_reset_by': authUser.uid,
-          'updated_at': Timestamp.now(),
-        }, SetOptions(merge: true));
   }
 
   Future<void> signOut() async {
@@ -433,8 +361,20 @@ class AuthNotifier extends AsyncNotifier<void> {
               .doc(authUser.uid)
               .get();
           final profileData = profile.data();
-          if ((profileData?['role'] as String? ?? '').trim().toLowerCase() !=
+          if ((profileData?['role'] as String? ?? '').trim().toLowerCase() ==
               'super_admin') {
+            try {
+              await ref
+                  .read(sessionManagementNotifierProvider.notifier)
+                  .terminateCurrentPlatformSession(authUser.uid);
+            } catch (e, stack) {
+              _logger.w(
+                'Platform session termination skipped during sign-out',
+                error: e,
+                stackTrace: stack,
+              );
+            }
+          } else {
             try {
               await ref
                   .read(sessionManagementNotifierProvider.notifier)

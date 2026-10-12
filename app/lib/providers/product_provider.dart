@@ -120,10 +120,14 @@ final allVariantsExportProvider = FutureProvider<List<ProductVariantModel>>((
   ).where('active', isEqualTo: true);
   final documents = await fetchAllQueryDocuments(query);
   final variants = documents
-      .map((document) => ProductVariantModel.fromJson(document.data(), document.id))
+      .map(
+        (document) =>
+            ProductVariantModel.fromJson(document.data(), document.id),
+      )
       .toList();
   variants.sort(
-    (a, b) => a.variantName.toLowerCase().compareTo(b.variantName.toLowerCase()),
+    (a, b) =>
+        a.variantName.toLowerCase().compareTo(b.variantName.toLowerCase()),
   );
   return variants;
 });

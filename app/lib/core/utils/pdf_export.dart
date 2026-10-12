@@ -201,7 +201,7 @@ class _PdfLocaleConfig {
       // characters) in Naskh style. Always primary for PDF rendering.
       primaryFont: fonts.arabic,
       ff: <pw.Font>[fonts.urdu],
-        currencyStr: pdfCurrencyLabel(locale, currency),
+      currencyStr: pdfCurrencyLabel(locale, currency),
     );
   }
 
@@ -1799,6 +1799,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
       final normalized = section.currency.trim().toUpperCase();
       return normalized.isEmpty ? fallbackCurrency : normalized;
     }
+
     pw.TextStyle ts({
       double size = 9,
       pw.FontWeight fw = pw.FontWeight.normal,
@@ -1868,10 +1869,8 @@ Future<Uint8List> buildPdfMultiShopLedger({
         ? _fmtAmtC(0, pdfCurrencyLabel(locale, fallbackCurrency))
         : balanceByCurrency.entries
               .map(
-                (entry) => _fmtAmtC(
-                  entry.value,
-                  pdfCurrencyLabel(locale, entry.key),
-                ),
+                (entry) =>
+                    _fmtAmtC(entry.value, pdfCurrencyLabel(locale, entry.key)),
               )
               .join(' / ');
     final totalShops = sections.length;

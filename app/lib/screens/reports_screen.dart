@@ -212,10 +212,7 @@ class ReportsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _exportInventory(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
+  Future<void> _exportInventory(BuildContext context, WidgetRef ref) async {
     final user = await ref.read(authUserProvider.future);
     if (!context.mounted) return;
     if (user == null) {
@@ -228,12 +225,7 @@ class ReportsScreen extends ConsumerWidget {
       final variants = await ref.read(allVariantsExportProvider.future);
       if (!context.mounted) return;
       rows = variants
-          .map(
-            (item) => <dynamic>[
-              item.variantName,
-              item.quantityAvailable,
-            ],
-          )
+          .map((item) => <dynamic>[item.variantName, item.quantityAvailable])
           .toList();
     } else {
       ref.invalidate(sellerInventoryExportProvider(user.id));
@@ -242,12 +234,7 @@ class ReportsScreen extends ConsumerWidget {
       );
       if (!context.mounted) return;
       rows = inventory
-          .map(
-            (item) => <dynamic>[
-              item.variantName,
-              item.quantityAvailable,
-            ],
-          )
+          .map((item) => <dynamic>[item.variantName, item.quantityAvailable])
           .toList();
     }
     if (rows.isEmpty) {
@@ -871,8 +858,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
                       ),
                     )
                     .toList(),
-                onChanged: (value) =>
-                    setState(() => _selectedShopId = value),
+                onChanged: (value) => setState(() => _selectedShopId = value),
               ),
             ),
             const SizedBox(height: 10),

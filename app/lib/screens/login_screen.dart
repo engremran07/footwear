@@ -10,6 +10,7 @@ import '../core/constants/app_brand.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/auth_refresh_policy.dart';
 import '../core/utils/snack_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/network_provider.dart';
@@ -131,8 +132,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      _failCount++;
-      if (_failCount >= 3) _startLockout();
+      if (e is FirebaseAuthException && isCredentialSignInFailure(e.code)) {
+        _failCount++;
+        if (_failCount >= 3) _startLockout();
+      }
       setState(() {
         _loginErrorKey = AppErrorMapper.key(e);
         _loginTakingLong = false;
@@ -468,6 +471,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Widget _loginForm(ThemeData theme, ColorScheme cs, bool isLoading) {
+    final authError = ref.watch(authNotifierProvider).error;
+    final visibleErrorKey =
+        _loginErrorKey ??
+        (authError == null ? null : AppErrorMapper.key(authError));
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -537,13 +544,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   delay: 200.ms,
                   duration: AppTokens.durNormal,
                 ),
-                if (_loginErrorKey != null)
+                if (visibleErrorKey != null)
                   Padding(
                     padding: const EdgeInsets.only(top: AppTokens.s12),
                     child: Semantics(
                       liveRegion: true,
                       child: Text(
-                        tr(_loginErrorKey!, ref),
+                        tr(visibleErrorKey, ref),
                         key: const ValueKey('login-error-message'),
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(

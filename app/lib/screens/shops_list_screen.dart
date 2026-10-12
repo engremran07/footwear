@@ -499,7 +499,9 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                                 : tr('no_shops', ref),
                             actionLabel: hasFilters
                                 ? tr(
-                                    _search.isNotEmpty ? 'clear_search' : 'clear',
+                                    _search.isNotEmpty
+                                        ? 'clear_search'
+                                        : 'clear',
                                     ref,
                                   )
                                 : null,
@@ -615,7 +617,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
   void _exportAllShops(List<ShopModel> shops, List<RouteModel> routes) {
     final routeMap = {for (final r in routes) r.id: r};
-    final fallbackCurrency = ref.read(settingsProvider).value?.currency ?? 'SAR';
+    final fallbackCurrency =
+        ref.read(settingsProvider).value?.currency ?? 'SAR';
     final headers = [
       triCol('name'),
       triCol('route'),
@@ -645,7 +648,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
   void _exportPerRoute(List<ShopModel> shops, List<RouteModel> routes) {
     final routeMap = {for (final r in routes) r.id: r};
-    final fallbackCurrency = ref.read(settingsProvider).value?.currency ?? 'SAR';
+    final fallbackCurrency =
+        ref.read(settingsProvider).value?.currency ?? 'SAR';
     final sorted = List.of(routes)
       ..sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
 

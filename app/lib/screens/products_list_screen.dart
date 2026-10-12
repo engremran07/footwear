@@ -69,8 +69,9 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                               hasSearch ? 'no_data' : 'no_products',
                               ref,
                             ),
-                            secondaryActionLabel:
-                                hasSearch ? tr('clear_search', ref) : null,
+                            secondaryActionLabel: hasSearch
+                                ? tr('clear_search', ref)
+                                : null,
                             onSecondaryAction: hasSearch
                                 ? () => setState(() => _search = '')
                                 : null,

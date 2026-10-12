@@ -3,10 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/models/tenant_model.dart';
-import '../core/utils/device_pairing.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/snack_helper.dart';
-import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/tenant_provider.dart';
 import '../providers/user_provider.dart';
@@ -24,8 +22,8 @@ class _TenantManagementScreenState
     extends ConsumerState<TenantManagementScreen> {
   final _nameController = TextEditingController();
   final _slugController = TextEditingController();
-  final _maxDevicesController = TextEditingController(text: '1');
-  final _maxSessionsController = TextEditingController(text: '1');
+  final _maxDevicesController = TextEditingController(text: '3');
+  final _maxSessionsController = TextEditingController(text: '2');
   bool _requireDevicePairing = false;
   bool _allowAdminResetOnly = true;
   String? _selectedOwnerId;
@@ -96,21 +94,6 @@ class _TenantManagementScreenState
     }
   }
 
-  Future<void> _resetDevicePairing(UserModel user) async {
-    final authNotifier = ref.read(authNotifierProvider.notifier);
-    try {
-      await authNotifier.resetDevicePairing(user.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        successSnackBar(
-          '${tr('device_pairing_reset', ref)} ${user.displayName}',
-        ),
-      );
-    } catch (e) {
-      _showMappedError(e);
-    }
-  }
-
   Future<void> _changeWorkspaceAccess(TenantModel tenant) async {
     final currentUser = await ref.read(authUserProvider.future);
     if (!mounted || currentUser == null || !currentUser.isSuperAdmin) return;
@@ -163,30 +146,6 @@ class _TenantManagementScreenState
     }
   }
 
-  Future<void> _toggleDevicePairing(UserModel user, bool enabled) async {
-    final authNotifier = ref.read(authNotifierProvider.notifier);
-    try {
-      final devicePairingId = enabled
-          ? await DevicePairing.generate(user.devicePairingId, user.id)
-          : null;
-      await authNotifier.setDevicePairingState(
-        user.id,
-        enabled: enabled,
-        pairingId: devicePairingId,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        successSnackBar(
-          enabled
-              ? tr('device_pairing_enabled', ref)
-              : tr('device_pairing_disabled', ref),
-        ),
-      );
-    } catch (e) {
-      _showMappedError(e);
-    }
-  }
-
   void _openCreateSheet({TenantModel? existing}) {
     if (existing != null) {
       _nameController.text = existing.name;
@@ -200,8 +159,8 @@ class _TenantManagementScreenState
     } else {
       _nameController.clear();
       _slugController.clear();
-      _maxDevicesController.text = '1';
-      _maxSessionsController.text = '1';
+      _maxDevicesController.text = '3';
+      _maxSessionsController.text = '2';
       _requireDevicePairing = false;
       _allowAdminResetOnly = true;
       _selectedOwnerId = null;
@@ -462,78 +421,6 @@ class _TenantManagementScreenState
                           ),
                         ),
                       ],
-                      const SizedBox(height: 12),
-                      if (currentUser != null &&
-                          (!currentUser.isSuperAdmin ||
-                              currentUser.activeWorkspaceId == tenant.id))
-                        Consumer(
-                          builder: (context, ref, child) {
-                            final usersAsync = ref.watch(
-                              tenantUsersProvider(tenant.id),
-                            );
-                            return usersAsync.when(
-                              data: (users) {
-                                if (users.isEmpty) {
-                                  return Text(tr('no_members_yet', ref));
-                                }
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      tr('authorized_devices', ref),
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleSmall,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    for (final user in users)
-                                      ListTile(
-                                        contentPadding: EdgeInsets.zero,
-                                        title: Text(
-                                          user.displayName.isEmpty
-                                              ? user.email
-                                              : user.displayName,
-                                        ),
-                                        subtitle: Text(
-                                          user.devicePairingEnabled
-                                              ? '${tr('paired', ref)}: ${user.devicePairingId ?? 'active'}'
-                                              : tr('not_paired', ref),
-                                        ),
-                                        trailing: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Switch.adaptive(
-                                              value: user.devicePairingEnabled,
-                                              onChanged: (enabled) =>
-                                                  _toggleDevicePairing(
-                                                    user,
-                                                    enabled,
-                                                  ),
-                                            ),
-                                            IconButton(
-                                              onPressed: () =>
-                                                  _resetDevicePairing(user),
-                                              icon: const Icon(
-                                                Icons.lock_reset,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                  ],
-                                );
-                              },
-                              loading: () => const LinearProgressIndicator(),
-                              error: (error, _) => mappedErrorState(
-                                error: error,
-                                ref: ref,
-                                onRetry: () => ref.invalidate(
-                                  tenantUsersProvider(tenant.id),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
                     ],
                   ),
                 ),

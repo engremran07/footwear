@@ -152,6 +152,12 @@ class RouterNotifier extends ChangeNotifier {
         _scheduleNotify();
       }
     });
+    _ref.listen<AsyncValue<void>>(authNotifierProvider, (prev, next) {
+      if (prev?.isLoading != next.isLoading ||
+          prev?.hasError != next.hasError) {
+        _scheduleNotify();
+      }
+    });
   }
 
   void _scheduleNotify() {
@@ -169,6 +175,10 @@ class RouterNotifier extends ChangeNotifier {
     final isLoggedIn = _ref.read(authStateProvider).value != null;
     final isLoginRoute = state.matchedLocation == '/login';
     final isBootstrapRoute = state.matchedLocation == '/bootstrap-profile';
+
+    if (isLoggedIn && _ref.read(authNotifierProvider).isLoading) {
+      return isLoginRoute ? null : '/login';
+    }
 
     if (!isLoggedIn && !isLoginRoute) return '/login';
     if (!isLoggedIn) return null;

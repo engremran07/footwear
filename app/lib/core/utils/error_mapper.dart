@@ -59,6 +59,15 @@ class AppErrorMapper {
     final msg = error.toString().toLowerCase();
     if (msg.contains('device-limit-reached')) return 'device_limit_reached';
     if (msg.contains('session-limit-reached')) return 'session_limit_reached';
+    if (msg.contains('device-pairing-pending')) return 'device_pairing_pending';
+    if (msg.contains('device-blocked')) return 'device_blocked';
+    if (msg.contains('device-admin-reset-required')) {
+      return 'device_admin_reset_required';
+    }
+    if (msg.contains('device-clock-skew')) return 'device_clock_skew';
+    if (msg.contains('workspace policy unavailable')) {
+      return 'workspace_policy_unavailable';
+    }
     if (msg.contains('google drive') || msg.contains('oauth')) {
       return 'backup_drive_error';
     }

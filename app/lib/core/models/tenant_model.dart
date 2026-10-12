@@ -30,8 +30,8 @@ class TenantModel {
     this.isTrial = false,
     this.requireDevicePairing = false,
     this.allowAdminResetOnly = true,
-    this.maxDevicesAllowed = 1,
-    this.maxActiveSessionsAllowed = 1,
+    this.maxDevicesAllowed = 3,
+    this.maxActiveSessionsAllowed = 2,
     required this.createdAt,
     required this.updatedAt,
     this.ownerUserId,
@@ -51,11 +51,11 @@ class TenantModel {
       isTrial: json['is_trial'] as bool? ?? false,
       requireDevicePairing: json['require_device_pairing'] as bool? ?? false,
       allowAdminResetOnly: json['allow_admin_reset_only'] as bool? ?? true,
-      maxDevicesAllowed: ((json['max_devices_allowed'] as num?) ?? 1)
+      maxDevicesAllowed: ((json['max_devices_allowed'] as num?) ?? 3)
           .toInt()
           .clamp(1, AccessUsageSummary.maximumSlotsPerUser),
       maxActiveSessionsAllowed:
-          ((json['max_active_sessions_allowed'] as num?) ?? 1).toInt().clamp(
+          ((json['max_active_sessions_allowed'] as num?) ?? 2).toInt().clamp(
             1,
             AccessUsageSummary.maximumSlotsPerUser,
           ),

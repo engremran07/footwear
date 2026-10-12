@@ -714,7 +714,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             shopName: shop.name,
                             routeId: shop.routeId.isNotEmpty
                                 ? shop.routeId
-                              : (user.assignedRouteIds.firstOrNull ?? ''),
+                                : (user.assignedRouteIds.firstOrNull ?? ''),
                             type: type,
                             saleType: saleType,
                             amount: amount,

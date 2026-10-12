@@ -5,6 +5,13 @@ class SessionAccessPolicy {
 
   static const accessRegistrationGracePeriod = Duration(seconds: 15);
 
+  static const deviceClockSkewTolerance = Duration(minutes: 5);
+
+  static bool isClockSkewed({
+    required DateTime deviceNow,
+    required DateTime serverNow,
+  }) => deviceNow.difference(serverNow).abs() > deviceClockSkewTolerance;
+
   static bool shouldDeferMissingSessionEnforcement({
     required Duration? sessionAge,
   }) => sessionAge != null && sessionAge < accessRegistrationGracePeriod;

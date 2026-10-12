@@ -92,8 +92,8 @@ void main() {
   app_online_indicator_widget.main();
   product_form_screen_widget.main();
   auth_submit_feedback_widget.main();
-    invoice_list_summary_widget.main();
-    users_list_workspace_context_widget.main();
-    route_form_seller_load_widget.main();
-    settings_profile_error_widget.main();
+  invoice_list_summary_widget.main();
+  users_list_workspace_context_widget.main();
+  route_form_seller_load_widget.main();
+  settings_profile_error_widget.main();
 }

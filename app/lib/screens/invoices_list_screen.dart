@@ -236,10 +236,7 @@ class _InvoiceStatsStrip extends ConsumerWidget {
     final sales = invoices.where((i) => i.isSale && !i.isVoid).toList();
     final totalSales = sales.fold(0.0, (sum, i) => sum + i.total);
     final paidAmount = sales.fold(0.0, (sum, i) => sum + i.amountReceived);
-    final outstanding = sales.fold(
-      0.0,
-      (sum, i) => sum + i.outstandingAmount,
-    );
+    final outstanding = sales.fold(0.0, (sum, i) => sum + i.outstandingAmount);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),

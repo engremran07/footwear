@@ -7,6 +7,34 @@ Most recent first.
 
 ---
 
+## [3.9.60+99] — 2026-10-10 — Authentication and device-session hardening
+
+### Fixed
+
+- Login waits for access registration, preserves mapped failures, and applies retry lockout only to credential failures.
+- Workspace members can read their own access policy and missing slots; registry queries are tenant-scoped and indexed.
+- Pairing uses pending approval; administrators can remove, block, or reset device access, with active sessions revoked atomically.
+- Sessions renew in the foreground, warn five minutes before expiry, detect clock drift, and recover registrations unseen for 30 days.
+- Super-admin sessions are separate from tenant sessions. Firestore session limits remain client-enforced under Spark.
+
+### Verification
+
+- Firestore Rules Emulator: 95 passing.
+- Focused Flutter auth, policy, locale, and login-feedback tests: 18 passing.
+- Full release gates: pending.
+
+## [3.9.59+98] — 2026-10-03 — Workspace sign-in and setup recovery
+
+### Fixed
+
+- Workspace administrators and sellers now register device/session access through tenant- and user-scoped queries, include the paired device slot, and preserve accurate localized sign-in errors.
+- Workspace management no longer force-unwraps an unavailable profile, hides owner-list errors, or closes the create/edit dialog after a failed write.
+- Login system-bar icons now follow the active theme for readable contrast.
+
+### Verification
+
+- Firestore emulator coverage exercises denied missing-slot reads and permitted scoped session queries; production rules were not changed.
+
 ## [3.9.58+97] — 2026-10-03 — Backup destinations and workspace archival
 
 ### Changed
