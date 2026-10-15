@@ -35,7 +35,7 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 7. Any where+orderBy query requires index entry when fields differ.
 8. Keep role handling canonical and normalized (trim/lowercase in app writes).
    Tenant-aware roles (tenant_admin, super_admin) must be treated as privileged roles and must carry a tenant_id in new documents and in the user profile.
-   Each workspace owns its own settings and device-pairing limits; branding and pairing limits are scoped to the tenant, not a super-admin global profile.
+  Each workspace owns its business settings and seller device/session limits. Workspace admins may change only seller caps in their workspace. A separate `settings/platform_access_policy` controls shared workspace-admin caps across all workspaces and is super-admin-only. Super-admin platform sessions use their own two-device/one-active-session slots.
 9. Keep admin-only write enforcement in submit methods (screen-level defense in depth).
 10. Validate required identity fields (for example created_by/route_id/shop_id) before provider writes.
 11. No Firebase Storage — company logos stored as base64 in Firestore, product images use external HTTP URLs. Do not add firebase_storage dependency.
@@ -84,7 +84,7 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 23. Never store or ship service-account credentials. Arbitrary-user Auth administration belongs in a trusted backend; the client may not create/promote super-admins or mutate another user's Auth credentials.
 24. Platform super-admins may read workspace metadata globally, but every business-data operation must be scoped to the selected workspace and an auditable support reason. No selection means no business records.
 25. Super-admin business-context selection and exit events are append-only in `platform_access_logs`. Never create/promote platform super-admin accounts or mutate another user's Auth credentials from client code. Never store service-account credentials in Firestore, backups, APKs, or web builds.
-26. Super-admin business context expires after 8 hours in Firestore rules. Workspace admins can read their tenant policy, but only tenant admins/platform operators may update workspace configuration.
+26. Super-admin business context expires after 8 hours in Firestore rules. Workspace admins may update only their workspace seller access caps; pairing mode, workspace lifecycle, and other tenant configuration remain platform-controlled.
 27. Require a concrete tenant for every new business write via `TenantScope.requireTenant`; never replace missing tenant identity with `__global__`. Unassigned users must not be silently self-healed into a shared tenant.
 28. Local admins manage seller profiles only. Workspace-admin role changes require an active platform super-admin workspace context.
 29. Seller stock decrements must match a same-batch sale invoice's exact `seller_inventory_deductions` entry. Every warehouse stock mutation requires an atomic tenant-scoped inventory audit row.
@@ -96,25 +96,37 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 ## Financial Pathways (never mix these)
 
 ```text
-Pathway 1: SALE WITH STOCK
+Pathway 1: STOCK SALE
   → CreateSaleInvoiceScreen → InvoiceNotifier.createSaleInvoice()
   → Invoice + cash_out tx + optional cash_in tx + seller_inventory deduction
      (all in one atomic batch)
-  → USE WHEN: new goods delivered to shop, stock deduction required
+  → USE WHEN: new goods are delivered and seller inventory must decrease
 
-Pathway 2: CASH COLLECTION (old debt, no new goods)
+Pathway 2: NON-STOCK SALE
+  → CreateSaleInvoiceScreen → InvoiceNotifier.createSaleInvoice(fulfillmentMode: non_stock)
+  → Invoice + cash_out tx + optional cash_in tx + shop balance update
+  → No inventory deduction; catalog variants and quantities remain on the invoice
+  → Allowed only when the workspace setting enables non-stock invoices
+
+Pathway 3: CASH RECEIPT INVOICE (old debt, no new goods)
+  → CreateSaleInvoiceScreen → InvoiceNotifier.createCashReceipt()
+  → Receipt invoice + cash_in tx + receipt sequence + shop.balance reduction
+     (all in one tenant-scoped Firestore transaction)
+  → No stock movement; receipt number and workspace header are snapshotted
+
+Pathway 4: LEDGER-ONLY CASH COLLECTION (no receipt document)
   → ShopDetailScreen → TransactionNotifier.create(type: 'cash_in')
   → Cash_in ledger entry ONLY. No invoice. No stock movement.
-  → USE WHEN: collecting outstanding balance, no new delivery
+  → USE WHEN: recording a payment without issuing a receipt invoice
 
 VOID / RETURN:
   → InvoiceNotifier.voidInvoice() — admin only
-  → Returns stock to inventory (seller_inventory or warehouse)
+  → Returns stock only for stock-backed invoices
   → Two refund modes: cashRefund (cheque/cash paid back) or creditBalance (deduct from balance)
   → Issues ONE reversal transaction (return tx). Cash refund adds a second cash_out tx.
 
-NEVER create an invoice for cash-only collection.
-NEVER create a standalone transaction for a new stock sale (always through invoice).
+NEVER create a sale invoice for cash-only collection.
+NEVER create a standalone transaction for a new goods sale (always through invoice).
 ```
 
 ## shop.balance Single Pipeline (non-negotiable)
@@ -390,6 +402,8 @@ mandatory. Key checks in brief:
 
 ## Done In This Baseline
 
+- v3.9.75+102: Fixed the post-registration timestamp sentinel cast behind super-admin sign-in failure; tenant sessions now validate the actual paired device slot, registration grace and queued checks protect login races, automatic sign-out is UID-scoped, and renewal cannot reactivate revoked sessions. Workspace-admin limits are shared/platform-configured, seller limits remain workspace-configurable, and platform sessions are separate. Invoice voids are atomic and balanced; receipt sequence Rules are enforced; invoice PDFs localize receipts and paginate. Android versionCode was raised above the connected device's installed package code for a data-preserving update.
+- v3.9.61+100: Stock, tenant-enabled non-stock, and cash-receipt invoice modes; workspace-owned bilingual invoice headers snapshotted into PDFs; atomic per-workspace receipt numbering and balance writes; receipt rules and non-stock void inventory guard.
 - v3.9.60+99: Login waits for registration and preserves errors; credential-only lockout, member policy/missing-slot reads, scoped registry queries, real pending device approval, atomic remove/block/reset, 30-day stale recovery, clock-skew feedback, foreground renewal/warning, and separate super-admin sessions. Session records are client-enforced only under the Spark architecture; they are not a Firestore authorization boundary.
 - v3.9.59+98: Tenant/seller sign-in uses tenant/user-scoped access-record queries and links sessions to registered device slots; registration failures preserve their localized cause. Workspace management handles transient null profiles and visible write/owner-list errors; login system-bar contrast follows theme. Firestore rules were not changed.
 - v3.9.58+97: Backup file export and Google Drive use distinct destinations; Drive backups do not create a duplicate local archive, restore copy reflects merge/replacement scope, local archives can be deleted, and workspace archival revokes member device/session access.

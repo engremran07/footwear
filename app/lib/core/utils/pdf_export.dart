@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:isolate';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -8,6 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../l10n/app_locale.dart';
 import '../../models/transaction_model.dart';
 import '../../models/invoice_model.dart';
+import '../../models/settings_model.dart';
 
 /// Runs [computation] in an isolate on native platforms,
 /// or inline on web (which doesn't support Isolate.run).
@@ -368,6 +370,12 @@ Future<Uint8List> buildPdfTable({
 
 String _fmtDate(DateTime d) =>
     '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+PdfColor _invoiceAccentColor(String value) => switch (value.toUpperCase()) {
+  '#1F4E79' => PdfColors.blue800,
+  '#315C4C' => PdfColors.green800,
+  _ => PdfColors.black,
+};
 
 String _fmtAmt(double v) => v.toStringAsFixed(2);
 String _fmtAmtC(double v, String currency) => currency.isEmpty
@@ -1369,9 +1377,30 @@ Future<Uint8List> generateInvoicePdf({
   String currency = 'SAR',
   AppLocale locale = AppLocale.en,
   Uint8List? logoBytes,
+  InvoiceHeaderConfig? header,
 }) async {
   await _ensureFontBytes();
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
+  final headerConfig = invoice.headerSnapshot.isNotEmpty
+      ? InvoiceHeaderConfig.fromJson(invoice.headerSnapshot)
+      : header ?? const InvoiceHeaderConfig();
+  final savedCompanyName =
+      (invoice.headerSnapshot['company_name'] as String?)?.trim() ?? '';
+  final displayCompanyName = headerConfig.nameEn.trim().isNotEmpty
+      ? headerConfig.nameEn.trim()
+      : savedCompanyName.isNotEmpty
+      ? savedCompanyName
+      : companyName;
+  var effectiveLogoBytes = logoBytes;
+  if (invoice.headerSnapshot.isNotEmpty) {
+    final savedLogo = invoice.headerSnapshot['logo_base64'] as String?;
+    try {
+      effectiveLogoBytes = savedLogo == null ? null : base64Decode(savedLogo);
+    } catch (_) {
+      effectiveLogoBytes = null;
+    }
+  }
+  final accentColor = _invoiceAccentColor(headerConfig.accentColor);
   final lblSubtotal = trRead('subtotal', locale);
   final lblDiscount = trRead('discount', locale);
   final lblNotes = trRead('notes', locale);
@@ -1387,6 +1416,27 @@ Future<Uint8List> generateInvoicePdf({
   final lblTotal = trRead('total', locale);
   final lblReference = trRead('reference', locale);
   final lblVoid = trRead('void', locale);
+  final lblReceivedFrom = trRead('received_from', locale);
+  final lblReceipt = trRead('cash_receipt', locale);
+  final lblAmountReceived = trRead('amount_received', locale);
+  final lblPaymentMethod = trRead('payment_method', locale);
+  final lblPaymentReference = trRead('payment_reference', locale);
+  final lblBalanceBefore = trRead('balance_before', locale);
+  final lblBalanceAfter = trRead('balance_after', locale);
+  final lblPhone = trRead('phone', locale);
+  final lblEmail = trRead('email', locale);
+  final lblTaxNumber = trRead('tax_registration_number', locale);
+  final lblCommercialRegistration = trRead(
+    'commercial_registration_number',
+    locale,
+  );
+  final lblPrintDate = trRead('print_date', locale);
+  final paymentMethodLabel = switch (invoice.paymentMethod) {
+    'cash' => trRead('payment_method_cash', locale),
+    'bank_transfer' => trRead('payment_method_bank_transfer', locale),
+    'cheque' => trRead('payment_method_cheque', locale),
+    _ => null,
+  };
   return _pdfCompute(() {
     final fonts = _fontsFromBytes(aB, uB);
     final lc = _PdfLocaleConfig(
@@ -1407,209 +1457,416 @@ Future<Uint8List> generateInvoicePdf({
 
     final date = invoice.createdAt.toDate();
     final dateStr = _fmtDate(date);
-    final isCreditNote = invoice.type != InvoiceModel.typeSale;
-    final docTitle = isCreditNote ? lblCreditNote : lblInvoiceTitle;
+    final isCashReceipt = invoice.isCashReceipt;
+    final isCreditNote = invoice.isCreditNote || invoice.isReturn;
+    final docTitle = isCashReceipt
+        ? lblReceipt
+        : isCreditNote
+        ? lblCreditNote
+        : invoice.isNonStockSale
+        ? trRead('invoice_non_stock_mode', locale)
+        : lblInvoiceTitle;
+    final printAt = DateTime.now();
+    final printDateTime =
+        '${_fmtDate(printAt)} ${printAt.hour.toString().padLeft(2, '0')}:${printAt.minute.toString().padLeft(2, '0')}';
 
     final pdf = _buildDocument(primaryFont, ff);
 
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 24),
         textDirection: dir,
-        build: (ctx) => pw.Column(
-          crossAxisAlignment: align,
+        footer: (ctx) => pw.Column(
+          mainAxisSize: pw.MainAxisSize.min,
           children: [
-            // Header
+            pw.Divider(thickness: 0.5, color: PdfColors.grey400),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.center,
-                  children: [
-                    if (logoBytes != null) ...[
-                      pw.Image(
-                        pw.MemoryImage(logoBytes),
-                        height: 36,
-                        fit: pw.BoxFit.contain,
-                      ),
-                      pw.SizedBox(width: 8),
-                    ],
-                    pw.Column(
-                      crossAxisAlignment: align,
-                      children: [
-                        pw.Text(
-                          _s(companyName),
-                          style: ts(size: 16, fw: pw.FontWeight.bold),
-                          textDirection: _cellDir(companyName, dir),
-                        ),
-                        pw.Text(
-                          docTitle,
-                          style: ts(
-                            size: 13,
-                            fw: pw.FontWeight.bold,
-                            color: isCreditNote
-                                ? PdfColors.green800
-                                : PdfColors.blue800,
-                          ),
-                          textDirection: dir,
-                        ),
-                      ],
-                    ),
-                  ],
+                pw.Text(
+                  '${_s(displayCompanyName)} • $dateStr',
+                  style: ts(size: 7, color: PdfColors.grey500),
+                  textDirection: _cellDir(displayCompanyName, dir),
                 ),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
-                  children: [
-                    pw.Text(
-                      '# ${invoice.invoiceNumber}',
-                      style: ts(size: 12, fw: pw.FontWeight.bold),
-                      textDirection: dir,
-                    ),
-                    pw.Text(
-                      '$lblDate: $dateStr',
-                      style: ts(size: 9, color: PdfColors.grey700),
-                      textDirection: dir,
-                    ),
-                    if (invoice.status == 'void')
-                      pw.Text(
-                        lblVoid.toUpperCase(),
-                        style: ts(
-                          size: 14,
-                          fw: pw.FontWeight.bold,
-                          color: PdfColors.red,
-                        ),
-                      ),
-                  ],
+                pw.Text(
+                  '$lblPrintDate: $printDateTime  |  ${trRead('page_x_of_y', locale).replaceAll('%1', '${ctx.pageNumber}').replaceAll('%2', '${ctx.pagesCount}')}',
+                  style: ts(size: 7, color: PdfColors.grey600),
+                  textDirection: dir,
                 ),
               ],
             ),
-            pw.Divider(thickness: 1.5, color: PdfColors.blue800),
-            pw.SizedBox(height: 10),
+          ],
+        ),
+        build: (ctx) => [
+          // Workspace-owned bilingual business header.
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.grey100,
+              border: pw.Border.all(color: accentColor, width: 1),
+            ),
+            child: () {
+              pw.Widget brandColumn(bool rtl) {
+                final columnAlign = rtl
+                    ? pw.CrossAxisAlignment.end
+                    : pw.CrossAxisAlignment.start;
+                final brandDirection = rtl
+                    ? pw.TextDirection.rtl
+                    : pw.TextDirection.ltr;
+                final primaryName = rtl
+                    ? (locale == AppLocale.ur
+                          ? headerConfig.nameUr
+                          : headerConfig.nameAr)
+                    : displayCompanyName;
+                final secondaryName = rtl && locale != AppLocale.ur
+                    ? headerConfig.nameUr
+                    : '';
+                final subtitle = rtl
+                    ? (locale == AppLocale.ur
+                          ? headerConfig.subtitleUr
+                          : headerConfig.subtitleAr)
+                    : headerConfig.subtitleEn;
+                final address = rtl
+                    ? (locale == AppLocale.ur
+                          ? headerConfig.addressUr
+                          : headerConfig.addressAr)
+                    : headerConfig.addressEn;
+                final lines = <pw.Widget>[];
+                if (primaryName.trim().isNotEmpty) {
+                  lines.add(
+                    pw.Text(
+                      _s(primaryName),
+                      style: ts(size: 13, fw: pw.FontWeight.bold),
+                      textDirection: _cellDir(primaryName, brandDirection),
+                      textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
+                    ),
+                  );
+                }
+                if (secondaryName.trim().isNotEmpty) {
+                  lines.add(
+                    pw.Text(
+                      _s(secondaryName),
+                      style: ts(size: 10, fw: pw.FontWeight.bold),
+                      textDirection: pw.TextDirection.rtl,
+                      textAlign: pw.TextAlign.right,
+                    ),
+                  );
+                }
+                if (headerConfig.visibleFields.contains('subtitle') &&
+                    subtitle.trim().isNotEmpty) {
+                  lines.add(
+                    pw.Text(
+                      _s(subtitle),
+                      style: ts(size: 8),
+                      textDirection: _cellDir(subtitle, brandDirection),
+                      textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
+                    ),
+                  );
+                }
+                if (headerConfig.visibleFields.contains('address') &&
+                    address.trim().isNotEmpty) {
+                  lines.add(
+                    pw.Text(
+                      _s(address),
+                      style: ts(size: 8),
+                      textDirection: _cellDir(address, brandDirection),
+                      textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
+                    ),
+                  );
+                }
+                for (final field in [
+                  if (headerConfig.visibleFields.contains('phone') &&
+                      headerConfig.phone.trim().isNotEmpty)
+                    '$lblPhone: ${_s(headerConfig.phone)}',
+                  if (headerConfig.visibleFields.contains('email') &&
+                      headerConfig.email.trim().isNotEmpty)
+                    '$lblEmail: ${_s(headerConfig.email)}',
+                  if (headerConfig.visibleFields.contains('tax_number') &&
+                      headerConfig.taxNumber.trim().isNotEmpty)
+                    '$lblTaxNumber: ${_s(headerConfig.taxNumber)}',
+                  if (headerConfig.visibleFields.contains(
+                        'commercial_registration_number',
+                      ) &&
+                      headerConfig.commercialRegistrationNumber
+                          .trim()
+                          .isNotEmpty)
+                    '$lblCommercialRegistration: ${_s(headerConfig.commercialRegistrationNumber)}',
+                ]) {
+                  lines.add(
+                    pw.Text(
+                      field,
+                      style: ts(size: 7, color: PdfColors.grey800),
+                      textDirection: _cellDir(field, brandDirection),
+                      textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
+                    ),
+                  );
+                }
+                return pw.Column(
+                  crossAxisAlignment: columnAlign,
+                  children: lines,
+                );
+              }
 
-            // Customer info
-            pw.Container(
-              width: double.infinity,
-              padding: const pw.EdgeInsets.all(10),
-              decoration: pw.BoxDecoration(
-                color: PdfColors.grey100,
-                border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
-                borderRadius: pw.BorderRadius.circular(4),
-              ),
-              child: pw.Column(
-                crossAxisAlignment: align,
+              final metadata = pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
                   pw.Text(
-                    '$lblShop: ${_s(invoice.shopName)}',
-                    style: ts(size: 10, fw: pw.FontWeight.bold),
-                    textDirection: _cellDir(invoice.shopName, dir),
-                  ),
-                ],
-              ),
-            ),
-            pw.SizedBox(height: 14),
-
-            // Items table
-            if (invoice.items.isNotEmpty)
-              pw.Table(
-                border: pw.TableBorder.all(
-                  color: PdfColors.grey400,
-                  width: 0.5,
-                ),
-                columnWidths: {
-                  0: const pw.FlexColumnWidth(3),
-                  1: const pw.FlexColumnWidth(1.5),
-                  2: const pw.FlexColumnWidth(1.5),
-                  3: const pw.FlexColumnWidth(1),
-                  4: const pw.FlexColumnWidth(2),
-                  5: const pw.FlexColumnWidth(2),
-                },
-                children: [
-                  // header row
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(
-                      color: PdfColors.blue800,
+                    docTitle,
+                    style: ts(
+                      size: 12,
+                      fw: pw.FontWeight.bold,
+                      color: isCreditNote ? PdfColors.green800 : accentColor,
                     ),
-                    children:
-                        [
-                              lblItem,
-                              lblSize,
-                              lblColor,
-                              lblQty,
-                              lblUnitPrice,
-                              lblTotal,
-                            ]
-                            .map(
-                              (h) => pw.Padding(
-                                padding: const pw.EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 5,
-                                ),
-                                child: pw.Text(
-                                  h,
-                                  style: pw.TextStyle(
-                                    fontSize: 8,
-                                    fontWeight: pw.FontWeight.bold,
-                                    color: PdfColors.white,
-                                    font: primaryFont,
-                                    fontFallback: ff,
-                                  ),
-                                  textAlign: pw.TextAlign.center,
-                                  textDirection: dir,
-                                ),
-                              ),
-                            )
-                            .toList(),
+                    textAlign: pw.TextAlign.center,
+                    textDirection: dir,
                   ),
-                  // data rows
-                  ...invoice.items.asMap().entries.map((e) {
-                    final i = e.key;
-                    final item = e.value;
-                    final bg = i % 2 == 0 ? PdfColors.white : PdfColors.grey50;
-                    final cells = [
-                      _s(item.productName), // ISSUE-014: sanitize user input
-                      _s(item.size),
-                      _s(item.color),
-                      item.qty.toString(),
-                      _fmtAmt(item.unitPrice),
-                      _fmtAmt(item.subtotal),
-                    ];
-                    return pw.TableRow(
-                      decoration: pw.BoxDecoration(color: bg),
-                      children: cells
+                  pw.Text(
+                    invoice.invoiceNumber,
+                    style: ts(size: 11, fw: pw.FontWeight.bold),
+                    textAlign: pw.TextAlign.center,
+                    textDirection: dir,
+                  ),
+                  pw.Text(
+                    '$lblDate: $dateStr',
+                    style: ts(size: 8, color: PdfColors.grey700),
+                    textAlign: pw.TextAlign.center,
+                    textDirection: dir,
+                  ),
+                  if (invoice.status == 'void')
+                    pw.Text(
+                      lblVoid.toUpperCase(),
+                      style: ts(
+                        size: 12,
+                        fw: pw.FontWeight.bold,
+                        color: PdfColors.red,
+                      ),
+                    ),
+                ],
+              );
+
+              if (headerConfig.template == 'centered') {
+                return pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    if (effectiveLogoBytes != null &&
+                        headerConfig.visibleFields.contains('logo')) ...[
+                      pw.Image(
+                        pw.MemoryImage(effectiveLogoBytes),
+                        height: 38,
+                        fit: pw.BoxFit.contain,
+                      ),
+                      pw.SizedBox(height: 4),
+                    ],
+                    brandColumn(false),
+                    brandColumn(true),
+                    pw.SizedBox(height: 6),
+                    metadata,
+                  ],
+                );
+              }
+
+              final compact = headerConfig.template == 'compact';
+              return pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  if (effectiveLogoBytes != null &&
+                      headerConfig.visibleFields.contains('logo')) ...[
+                    pw.Image(
+                      pw.MemoryImage(effectiveLogoBytes),
+                      height: compact ? 28 : 36,
+                      fit: pw.BoxFit.contain,
+                    ),
+                    pw.SizedBox(width: 6),
+                  ],
+                  pw.Expanded(flex: 3, child: brandColumn(false)),
+                  pw.SizedBox(width: 6),
+                  pw.Expanded(flex: 2, child: metadata),
+                  pw.SizedBox(width: 6),
+                  pw.Expanded(flex: 3, child: brandColumn(true)),
+                ],
+              );
+            }(),
+          ),
+          pw.SizedBox(height: 10),
+
+          // Customer or receipt payer details.
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.grey100,
+              border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+              borderRadius: pw.BorderRadius.circular(4),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: align,
+              children: [
+                pw.Text(
+                  '${isCashReceipt ? lblReceivedFrom : lblShop}: ${_s(invoice.shopName)}',
+                  style: ts(size: 10, fw: pw.FontWeight.bold),
+                  textDirection: _cellDir(invoice.shopName, dir),
+                ),
+                if (isCashReceipt && paymentMethodLabel != null)
+                  pw.Text(
+                    '$lblPaymentMethod: $paymentMethodLabel',
+                    style: ts(size: 8),
+                    textDirection: dir,
+                  ),
+                if (isCashReceipt && invoice.paymentReference != null)
+                  pw.Text(
+                    '$lblPaymentReference: ${_s(invoice.paymentReference!)}',
+                    style: ts(size: 8),
+                    textDirection: dir,
+                  ),
+                if (isCashReceipt && invoice.shopBalanceBefore != null)
+                  pw.Text(
+                    '$lblBalanceBefore: ${_fmtAmtC(invoice.shopBalanceBefore!, currency)}',
+                    style: ts(size: 8),
+                    textDirection: dir,
+                  ),
+                if (isCashReceipt && invoice.shopBalanceAfter != null)
+                  pw.Text(
+                    '$lblBalanceAfter: ${_fmtAmtC(invoice.shopBalanceAfter!, currency)}',
+                    style: ts(size: 8, fw: pw.FontWeight.bold),
+                    textDirection: dir,
+                  ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 14),
+
+          // Items table
+          if (invoice.items.isNotEmpty)
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+              columnWidths: invoice.isNonStockSale
+                  ? {
+                      0: const pw.FlexColumnWidth(4),
+                      1: const pw.FlexColumnWidth(1),
+                      2: const pw.FlexColumnWidth(2),
+                      3: const pw.FlexColumnWidth(2),
+                    }
+                  : {
+                      0: const pw.FlexColumnWidth(3),
+                      1: const pw.FlexColumnWidth(1.5),
+                      2: const pw.FlexColumnWidth(1.5),
+                      3: const pw.FlexColumnWidth(1),
+                      4: const pw.FlexColumnWidth(2),
+                      5: const pw.FlexColumnWidth(2),
+                    },
+              children: [
+                // header row
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: accentColor),
+                  children:
+                      (invoice.isNonStockSale
+                              ? [lblItem, lblQty, lblUnitPrice, lblTotal]
+                              : [
+                                  lblItem,
+                                  lblSize,
+                                  lblColor,
+                                  lblQty,
+                                  lblUnitPrice,
+                                  lblTotal,
+                                ])
                           .map(
-                            (c) => pw.Padding(
+                            (h) => pw.Padding(
                               padding: const pw.EdgeInsets.symmetric(
                                 horizontal: 4,
-                                vertical: 4,
+                                vertical: 5,
                               ),
                               child: pw.Text(
-                                c,
+                                h,
                                 style: pw.TextStyle(
                                   fontSize: 8,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColors.white,
                                   font: primaryFont,
                                   fontFallback: ff,
                                 ),
                                 textAlign: pw.TextAlign.center,
-                                textDirection: _cellDir(c, dir),
+                                textDirection: dir,
                               ),
                             ),
                           )
                           .toList(),
-                    );
-                  }),
-                ],
-              ),
-            pw.SizedBox(height: 14),
+                ),
+                // data rows
+                ...invoice.items.asMap().entries.map((e) {
+                  final i = e.key;
+                  final item = e.value;
+                  final bg = i % 2 == 0 ? PdfColors.white : PdfColors.grey50;
+                  final cells = invoice.isNonStockSale
+                      ? [
+                          _s(item.productName),
+                          item.qty.toString(),
+                          _fmtAmt(item.unitPrice),
+                          _fmtAmt(item.subtotal),
+                        ]
+                      : [
+                          _s(
+                            item.productName,
+                          ), // ISSUE-014: sanitize user input
+                          _s(item.size),
+                          _s(item.color),
+                          item.qty.toString(),
+                          _fmtAmt(item.unitPrice),
+                          _fmtAmt(item.subtotal),
+                        ];
+                  return pw.TableRow(
+                    decoration: pw.BoxDecoration(color: bg),
+                    children: cells
+                        .map(
+                          (c) => pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 4,
+                            ),
+                            child: pw.Text(
+                              c,
+                              style: pw.TextStyle(
+                                fontSize: 8,
+                                font: primaryFont,
+                                fontFallback: ff,
+                              ),
+                              textAlign: pw.TextAlign.center,
+                              textDirection: _cellDir(c, dir),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  );
+                }),
+              ],
+            ),
+          pw.SizedBox(height: 14),
 
-            // Totals
-            pw.Align(
-              alignment: pw.Alignment.centerRight,
-              child: pw.Container(
-                width: 200,
-                child: pw.Column(
-                  children: [
+          // Totals
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Container(
+              width: 200,
+              child: pw.Column(
+                children: [
+                  if (isCashReceipt)
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text(
+                          lblAmountReceived,
+                          style: ts(size: 10, fw: pw.FontWeight.bold),
+                          textDirection: dir,
+                        ),
+                        pw.Text(
+                          _fmtAmt(invoice.total),
+                          style: ts(size: 10, fw: pw.FontWeight.bold),
+                          textDirection: _amountDir,
+                        ),
+                      ],
+                    )
+                  else
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
@@ -1625,24 +1882,25 @@ Future<Uint8List> generateInvoicePdf({
                         ),
                       ],
                     ),
-                    if (invoice.discount > 0) ...[
-                      pw.SizedBox(height: 2),
-                      pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                        children: [
-                          pw.Text(
-                            lblDiscount,
-                            style: ts(size: 9, color: PdfColors.green700),
-                            textDirection: dir,
-                          ),
-                          pw.Text(
-                            '-${_fmtAmt(invoice.discount)}',
-                            style: ts(size: 9, color: PdfColors.green700),
-                            textDirection: _amountDir,
-                          ),
-                        ],
-                      ),
-                    ],
+                  if (!isCashReceipt && invoice.discount > 0) ...[
+                    pw.SizedBox(height: 2),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text(
+                          lblDiscount,
+                          style: ts(size: 9, color: PdfColors.green700),
+                          textDirection: dir,
+                        ),
+                        pw.Text(
+                          '-${_fmtAmt(invoice.discount)}',
+                          style: ts(size: 9, color: PdfColors.green700),
+                          textDirection: _amountDir,
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (!isCashReceipt) ...[
                     pw.Divider(thickness: 0.5),
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -1660,33 +1918,26 @@ Future<Uint8List> generateInvoicePdf({
                       ],
                     ),
                   ],
-                ),
+                ],
               ),
             ),
-            pw.SizedBox(height: 14),
+          ),
+          pw.SizedBox(height: 14),
 
-            if (invoice.notes != null && invoice.notes!.isNotEmpty) ...[
-              pw.Text('$lblNotes:', style: ts(size: 9, fw: pw.FontWeight.bold)),
-              pw.Text(_s(invoice.notes!), style: ts(size: 9)),
-              pw.SizedBox(height: 8),
-            ],
+          if (invoice.notes != null && invoice.notes!.isNotEmpty) ...[
+            pw.Text('$lblNotes:', style: ts(size: 9, fw: pw.FontWeight.bold)),
+            pw.Text(_s(invoice.notes!), style: ts(size: 9)),
+            pw.SizedBox(height: 8),
+          ],
 
-            if (invoice.linkedInvoiceId != null &&
-                invoice.linkedInvoiceId!.isNotEmpty) ...[
-              pw.Text(
-                '$lblReference: ${_s(invoice.linkedInvoiceId!)}', // ISSUE-036
-                style: ts(size: 8, color: PdfColors.grey600),
-              ),
-            ],
-
-            pw.Spacer(),
-            pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+          if (invoice.linkedInvoiceId != null &&
+              invoice.linkedInvoiceId!.isNotEmpty) ...[
             pw.Text(
-              '${_s(companyName)} • $dateStr',
-              style: ts(size: 7, color: PdfColors.grey500),
+              '$lblReference: ${_s(invoice.linkedInvoiceId!)}', // ISSUE-036
+              style: ts(size: 8, color: PdfColors.grey600),
             ),
           ],
-        ),
+        ],
       ),
     );
 

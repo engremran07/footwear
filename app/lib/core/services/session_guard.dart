@@ -74,7 +74,10 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
   Timer? _accessExpiryTimer;
   Timer? _accessWarningTimer;
   Timer? _renewalTimer;
+  Timer? _queuedAccessCheckTimer;
   bool _accessCheckInProgress = false;
+  bool _accessCheckQueued = false;
+  int _accessCheckGeneration = 0;
   DateTime? _backgroundedAt;
   DateTime? _sessionStartedAt;
   DateTime? _lastActivityAt;
@@ -108,6 +111,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     _accessExpiryTimer?.cancel();
     _accessWarningTimer?.cancel();
     _renewalTimer?.cancel();
+    _queuedAccessCheckTimer?.cancel();
     super.dispose();
   }
 
@@ -201,7 +205,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     final auth = ref.read(authStateProvider).value;
     if (auth != null) {
       _trace('signout.inactivity');
-      ref.read(authNotifierProvider.notifier).signOut();
+      _signOutCurrentUser(auth.uid);
     }
   }
 
@@ -240,7 +244,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
         final auth = ref.read(authStateProvider).value;
         if (auth != null) {
           _trace('signout.backgroundTimeout');
-          ref.read(authNotifierProvider.notifier).signOut();
+          _signOutCurrentUser(auth.uid);
           _backgroundedAt = null;
           return;
         }
@@ -257,6 +261,8 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     }
     _backgroundedAt = null;
     _checkAdminSessionExpiry();
+    final resumedUser = ref.read(authUserProvider).value;
+    if (resumedUser != null) _startSessionRenewal(resumedUser);
     if (!_isLocked) _maybeStartInactivityTimer();
     _trace('lifecycle.resume.end');
   }
@@ -279,7 +285,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     // Hard cutoff
     if (elapsed >= widget.adminSessionMax) {
       _trace('signout.adminSessionMax', {'elapsedMin': elapsed.inMinutes});
-      ref.read(authNotifierProvider.notifier).signOut();
+      _signOutCurrentUser(user.id);
       return;
     }
     // Warn 30 min before ceiling — show once per session
@@ -309,17 +315,51 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     );
   }
 
+  bool _deferMissingAccessEnforcement(String userId) {
+    final startedAt = _sessionStartedAt;
+    if (startedAt == null) return false;
+    final sessionAge = DateTime.now().difference(startedAt);
+    if (!SessionAccessPolicy.shouldDeferMissingSessionEnforcement(
+      sessionAge: sessionAge,
+    )) {
+      return false;
+    }
+
+    _accessCheckQueued = false;
+    _queuedAccessCheckTimer?.cancel();
+    _queuedAccessCheckTimer = Timer(
+      SessionAccessPolicy.accessRegistrationGracePeriod - sessionAge,
+      () {
+        if (mounted && ref.read(authUserProvider).value?.id == userId) {
+          unawaited(_verifyCurrentAccessSession());
+        }
+      },
+    );
+    _trace('access.missing.deferred', {'userId': userId});
+    return true;
+  }
+
   Future<void> _verifyCurrentAccessSession() async {
-    if (_accessCheckInProgress) return;
-    final user = ref.read(authUserProvider).value;
-    if (user?.isSuperAdmin == true) {
-      await _verifyCurrentPlatformSession(user!);
+    if (ref.read(authNotifierProvider).isLoading) {
+      _accessCheckQueued = true;
       return;
     }
-    final tenantId = TenantScope.normalize(user?.tenantId);
-    if (user == null || tenantId == null) return;
+    if (_accessCheckInProgress) {
+      _accessCheckQueued = true;
+      return;
+    }
+    _accessCheckQueued = false;
     _accessCheckInProgress = true;
+    final checkGeneration = _accessCheckGeneration;
+    final user = ref.read(authUserProvider).value;
     try {
+      if (user == null) return;
+      if (user.isSuperAdmin) {
+        await _verifyCurrentPlatformSession(user, checkGeneration);
+        return;
+      }
+      final tenantId = TenantScope.normalize(user.tenantId);
+      if (tenantId == null) return;
       final userRef = FirebaseFirestore.instance
           .collection(Collections.users)
           .doc(user.id);
@@ -338,17 +378,39 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
             .get(const GetOptions(source: Source.server)),
       ]);
       if (ref.read(authUserProvider).value?.id != user.id) return;
+      if (SessionAccessPolicy.shouldDiscardStaleAccessCheck(
+            checkGeneration: checkGeneration,
+            currentGeneration: _accessCheckGeneration,
+          ) ||
+          ref.read(authNotifierProvider).isLoading) {
+        _accessCheckQueued = true;
+        return;
+      }
       final sessions = records[0].docs
           .map((doc) => SessionModel.fromJson(doc.data(), doc.id))
           .toList();
       final devices = records[1].docs
           .map((doc) => DeviceRegistrationModel.fromJson(doc.data(), doc.id))
           .toList();
-      await _enforceCurrentAccessSession(user, sessions, devices);
+      await _enforceCurrentAccessSession(
+        user,
+        sessions,
+        devices,
+        checkGeneration: checkGeneration,
+      );
     } catch (error) {
       _trace('applicationSession.check.error', {'error': error.runtimeType});
     } finally {
       _accessCheckInProgress = false;
+      if (_accessCheckQueued &&
+          mounted &&
+          !ref.read(authNotifierProvider).isLoading) {
+        _accessCheckQueued = false;
+        _queuedAccessCheckTimer?.cancel();
+        _queuedAccessCheckTimer = Timer(Duration.zero, () {
+          if (mounted) unawaited(_verifyCurrentAccessSession());
+        });
+      }
     }
   }
 
@@ -360,11 +422,15 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
       if (user.isSuperAdmin) {
         await ref
             .read(sessionManagementNotifierProvider.notifier)
-            .registerPlatformSession(userId: user.id);
+            .registerPlatformSession(userId: user.id, isRenewal: true);
       } else if (user.tenantId != null) {
         await ref
             .read(sessionManagementNotifierProvider.notifier)
-            .registerCurrentAccess(userId: user.id, tenantId: user.tenantId!);
+            .registerCurrentAccess(
+              userId: user.id,
+              tenantId: user.tenantId!,
+              isRenewal: true,
+            );
       } else {
         return;
       }
@@ -372,7 +438,9 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     } catch (error) {
       _trace('applicationSession.renew.error', {'error': error.runtimeType});
       if (error.toString().contains('device-blocked') ||
-          error.toString().contains('device-admin-reset-required')) {
+          error.toString().contains('device-admin-reset-required') ||
+          error.toString().contains('device-session-revoked') ||
+          error.toString().contains('session-revoked')) {
         _signOutCurrentUser(user.id);
       }
     }
@@ -388,84 +456,86 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     });
   }
 
-  Future<void> _verifyCurrentPlatformSession(UserModel user) async {
-    if (_accessCheckInProgress || ref.read(authNotifierProvider).isLoading) {
+  Future<void> _verifyCurrentPlatformSession(
+    UserModel user,
+    int checkGeneration,
+  ) async {
+    final installation = await ref.read(
+      currentDeviceInstallationProvider.future,
+    );
+    final snapshot = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(user.id)
+        .collection(Collections.platformSessions)
+        .where('user_id', isEqualTo: user.id)
+        .limit(20)
+        .get(const GetOptions(source: Source.server));
+    if (ref.read(authUserProvider).value?.id != user.id) return;
+    if (SessionAccessPolicy.shouldDiscardStaleAccessCheck(
+          checkGeneration: checkGeneration,
+          currentGeneration: _accessCheckGeneration,
+        ) ||
+        ref.read(authNotifierProvider).isLoading) {
+      _accessCheckQueued = true;
       return;
     }
-    _accessCheckInProgress = true;
-    try {
-      final installation = await ref.read(
-        currentDeviceInstallationProvider.future,
-      );
-      final snapshot = await FirebaseFirestore.instance
-          .collection(Collections.users)
-          .doc(user.id)
-          .collection(Collections.platformSessions)
-          .where('user_id', isEqualTo: user.id)
-          .limit(20)
-          .get(const GetOptions(source: Source.server));
-      if (ref.read(authUserProvider).value?.id != user.id) return;
-      final sessions = snapshot.docs
-          .map((doc) => SessionModel.fromJson(doc.data(), doc.id))
-          .toList();
-      final currentSession = SessionAccessPolicy.currentForDevice(
-        sessions,
-        deviceId: installation.installationId,
-        now: DateTime.now(),
-        userId: user.id,
-      );
-      if (currentSession == null) {
-        if (sessions.any(
-          (session) =>
-              session.deviceId == installation.installationId &&
-              session.status == 'revoked',
-        )) {
-          _signOutCurrentUser(user.id);
-        } else {
-          unawaited(_renewCurrentAccessSession());
-        }
-        return;
-      }
-      final expiresAt = currentSession.expiresAt?.toDate();
-      if (expiresAt == null) {
+    final sessions = snapshot.docs
+        .map((doc) => SessionModel.fromJson(doc.data(), doc.id))
+        .toList();
+    final currentSession = SessionAccessPolicy.currentForDevice(
+      sessions,
+      deviceId: installation.installationId,
+      now: DateTime.now(),
+      userId: user.id,
+    );
+    if (currentSession == null) {
+      if (_deferMissingAccessEnforcement(user.id)) return;
+      if (sessions.any(
+        (session) =>
+            session.deviceId == installation.installationId &&
+            session.status == 'revoked',
+      )) {
         _signOutCurrentUser(user.id);
-        return;
+      } else {
+        unawaited(_renewCurrentAccessSession());
       }
-      _accessExpiryTimer?.cancel();
-      _accessWarningTimer?.cancel();
-      final warningDelay = expiresAt
-          .subtract(const Duration(minutes: 5))
-          .difference(DateTime.now());
-      if (warningDelay > Duration.zero) {
-        _accessWarningTimer = Timer(
-          warningDelay,
-          () => _showAccessExpiryWarning(user.id),
-        );
-      }
-      _accessExpiryTimer = Timer(
-        expiresAt.difference(DateTime.now()),
-        () => _signOutCurrentUser(user.id),
-      );
-    } catch (error) {
-      _trace('platformSession.check.error', {'error': error.runtimeType});
-    } finally {
-      _accessCheckInProgress = false;
+      return;
     }
+    final expiresAt = currentSession.expiresAt?.toDate();
+    if (expiresAt == null) {
+      _signOutCurrentUser(user.id);
+      return;
+    }
+    _accessExpiryTimer?.cancel();
+    _accessWarningTimer?.cancel();
+    final warningDelay = expiresAt
+        .subtract(const Duration(minutes: 5))
+        .difference(DateTime.now());
+    if (warningDelay > Duration.zero) {
+      _accessWarningTimer = Timer(
+        warningDelay,
+        () => _showAccessExpiryWarning(user.id),
+      );
+    }
+    _accessExpiryTimer = Timer(
+      expiresAt.difference(DateTime.now()),
+      () => _signOutCurrentUser(user.id),
+    );
   }
 
   void _signOutCurrentUser(String userId) {
-    if (ref.read(authNotifierProvider).isLoading ||
-        ref.read(authUserProvider).value?.id != userId) {
-      return;
-    }
-    unawaited(ref.read(authNotifierProvider.notifier).signOut());
+    if (ref.read(authNotifierProvider).isLoading) return;
+    unawaited(
+      ref.read(authNotifierProvider.notifier).signOut(expectedUid: userId),
+    );
   }
 
   Future<void> _enforceCurrentAccessSession(
     UserModel user,
     List<SessionModel> sessions,
-    List<DeviceRegistrationModel> devices,
-  ) async {
+    List<DeviceRegistrationModel> devices, {
+    required int checkGeneration,
+  }) async {
     if (ref.read(authNotifierProvider).isLoading) return;
 
     final installation = await ref.read(
@@ -473,6 +543,13 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     );
     if (ref.read(authNotifierProvider).isLoading ||
         ref.read(authUserProvider).value?.id != user.id) {
+      return;
+    }
+    if (SessionAccessPolicy.shouldDiscardStaleAccessCheck(
+      checkGeneration: checkGeneration,
+      currentGeneration: _accessCheckGeneration,
+    )) {
+      _accessCheckQueued = true;
       return;
     }
     final now = DateTime.now();
@@ -483,6 +560,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
       userId: user.id,
     );
     if (currentSession == null) {
+      if (_deferMissingAccessEnforcement(user.id)) return;
       final deviceIsBlocked = devices.any(
         (device) =>
             device.deviceId == installation.installationId &&
@@ -537,7 +615,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
           TextButton(
             onPressed: () {
               Navigator.pop(dialogContext);
-              unawaited(ref.read(authNotifierProvider.notifier).signOut());
+              _signOutCurrentUser(userId);
             },
             child: Text(tr('sign_out', ref)),
           ),
@@ -584,7 +662,16 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     ref.listen<AsyncValue<UserModel?>>(authUserProvider, (prev, next) {
       final prevUser = prev?.value;
       final nextUser = next.value;
-      if (prevUser?.id != nextUser?.id && nextUser != null) {
+      if (nextUser != null &&
+          SessionAccessPolicy.shouldResetSessionContext(
+            previousUserId: prevUser?.id,
+            nextUserId: nextUser.id,
+            previousRole: prevUser?.role.name,
+            nextRole: nextUser.role.name,
+            previousTenantId: prevUser?.tenantId,
+            nextTenantId: nextUser.tenantId,
+          )) {
+        _accessCheckGeneration++;
         _sessionStartedAt = DateTime.now();
         _lastActiveWriteAt = null;
         _warningShown = false;
@@ -594,6 +681,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
         _startSessionRenewal(nextUser);
         unawaited(_verifyCurrentAccessSession());
       }
+      if (prevUser?.id != nextUser?.id) _accessCheckGeneration++;
       // Clear lock overlay on sign-out so it doesn't bleed onto the login screen.
       if (nextUser == null && _isLocked) {
         _isLocked = false;
@@ -603,7 +691,7 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
       // Force logout if user's active flag cleared remotely
       if (nextUser != null && !nextUser.active) {
         _trace('signout.remoteInactiveUser', {'userId': nextUser.id});
-        ref.read(authNotifierProvider.notifier).signOut();
+        _signOutCurrentUser(nextUser.id);
       }
       if (nextUser == null) {
         _accessExpiryTimer?.cancel();
@@ -613,7 +701,16 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
     });
 
     ref.listen<AsyncValue<void>>(authNotifierProvider, (previous, next) {
-      if (previous?.isLoading != true || next.isLoading || next.hasError) {
+      if (previous?.isLoading != true && next.isLoading) {
+        _accessCheckGeneration++;
+        return;
+      }
+      if (previous?.isLoading != true || next.isLoading) {
+        return;
+      }
+      _accessCheckGeneration++;
+      if (next.hasError) {
+        _accessCheckQueued = false;
         return;
       }
       final user = ref.read(authUserProvider).value;

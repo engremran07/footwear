@@ -11,7 +11,7 @@ This repository is a route/seller distribution ERP.
 - Tenant-aware roles tenant_admin and super_admin are now supported and must be treated as privileged, tenant-scoped roles in app and rules
 - Super-admin is a platform operator, not a global business-data reader. By default it may access workspace metadata only; client business data requires an explicit `active_workspace_id`, a support reason of at least 10 characters, and an append-only `platform_access_logs` event. Access ends by clearing the active workspace context.
 - New tenant-scoped users should carry a tenant_id and device pairing metadata where applicable, and must not cross tenant boundaries in rules or providers
-- Each workspace owns its own settings document and device-pairing policy; no super-admin-only global settings override is allowed for tenant branding or pairing limits
+- Each workspace owns its business settings and seller device/session limits. Workspace-admin limits use a separate platform policy, and super-admin platform sessions use their own fixed slots.
 - Canonical collections:
   - users (subcollections: `sessions`, `device_registrations`, `platform_sessions`)
   - products
@@ -73,11 +73,11 @@ Seller:
 
 1. Role alignment is mandatory in all three layers: app/lib/models/user_model.dart, firestore.rules, and provider write guards on security-critical fields.
 
-1. Workspace settings and device-pairing limits are tenant-scoped. Each workspace must own its own business name, logo, and max device policy; never simplify these into a single super-admin global profile.
+1. Workspace branding and seller device/session limits are tenant-scoped. Workspace admins may configure seller caps only within their workspace. One separate `settings/platform_access_policy` record controls the shared workspace-admin cap across workspaces; only a super-admin may edit it. Super-admin devices and sessions are platform-only and do not consume tenant pairing slots.
 
 1. Super-admin business access is workspace-scoped. Never let a super-admin read tenant routes, shops, products, inventory, invoices, transactions, reports, users, or tenant settings without an explicit active workspace context. Platform workspace metadata may remain globally visible. Record support access starts/ends in the append-only `platform_access_logs` collection; never use UI visibility as the security boundary.
 
-1. Super-admin business context expires after 8 hours. Firestore rules must enforce the TTL on every business-data path, and no generic admin-role branch may bypass it. Workspace admins may read their own tenant policy metadata but may not edit tenant configuration.
+1. Super-admin business context expires after 8 hours. Firestore rules must enforce the TTL on every business-data path, and no generic admin-role branch may bypass it. Workspace admins may change only their workspace seller device/session caps; pairing mode, workspace lifecycle, and other tenant configuration remain platform-controlled.
 
 1. New business writes must require a concrete tenant via `TenantScope.requireTenant`; `__global__` is never a missing-tenant fallback. Unassigned non-platform users must be stopped at sign-in with an actionable message, not silently provisioned into a shared workspace.
 
@@ -489,6 +489,24 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-10-15 auth/session and invoice completion — v3.9.75+102:
+
+- Tenant registration resolves the actual paired device slot and validates its installation ID; local session models no longer cast unresolved Firestore server-timestamp sentinels to `Timestamp` after a successful write.
+- `SessionGuard` defers missing-session enforcement through the registration grace, queues authoritative checks, scopes every automatic sign-out to the checked UID, and re-arms renewal on resume/role changes. Revoked tenant and platform sessions cannot be restored by renewal.
+- Workspace-admin caps are platform-configured and shared across workspaces; sellers use per-workspace configurable caps; super-admin platform sessions use separate two-device/one-active-session slots. Rules and security UI enforce/display the same policy.
+- Invoice void status, balance, stock restoration, and reversal transactions now commit atomically. Cash-refund ledger rows reconcile with the outstanding balance delta.
+- Receipt sequences are bound to the same atomic workspace counter update by Rules. Invoice PDFs localize receipt methods, distinguish non-stock lines, and paginate with a dynamic page count.
+- Android versionCode now exceeds the highest code reported by the connected phone, allowing an in-place upgrade without uninstalling app data.
+- Firestore Rules Emulator: 106 passing. Focused auth, policy, invoice, PDF, dashboard, and localization regressions pass. Full release gates, deployment, install, commit, and push pending.
+
+2026-10-15 workspace invoicing — v3.9.61+100:
+
+- Invoice entry supports stock sale, tenant-enabled non-stock catalog sale, and cash receipt modes. Non-stock is selected by default, creates catalog line items without seller inventory deductions, and is available from shop detail with that shop preselected.
+- Cash receipt numbering, receipt invoice, cash-in transaction, and shop balance delta are atomic and tenant-scoped. Firestore rules require invoice/transaction linkage, the matching receipt amount, and the exact balance change.
+- Workspace administrators configure bilingual invoice branding, layout, accent, contact fields, and visibility. Invoice records capture a workspace header snapshot; seller-created snapshots must match workspace settings.
+- Voiding non-stock sales does not restore warehouse inventory. Invoice list/detail and PDFs identify receipts separately.
+- Firestore Rules Emulator: 102 passing. Focused settings/invoice/PDF/localization tests pass. Full release gates remain pending.
 
 2026-10-10 authentication, sessions, and device pairing — v3.9.60+99:
 

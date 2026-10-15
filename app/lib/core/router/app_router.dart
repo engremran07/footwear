@@ -28,6 +28,7 @@ import '../../screens/profile_screen.dart';
 import '../../screens/device_session_security_screen.dart';
 import '../../screens/invoices_list_screen.dart';
 import '../../screens/invoice_detail_screen.dart';
+import '../../screens/invoice_header_settings_screen.dart';
 import '../../screens/create_sale_invoice_screen.dart';
 import '../../screens/bootstrap_profile_screen.dart';
 import '../../screens/about_screen.dart';
@@ -63,8 +64,14 @@ bool _isAdminOnlyPath(String rawPath) {
 
 bool _isTenantManagementPath(String rawPath) {
   final path = _normalizePath(rawPath);
-  return path == '/tenants' ||
-      RegExp(r'^/tenants/[^/]+/security$').hasMatch(path);
+  return path == '/tenants';
+}
+
+String? _tenantSecurityPathId(String rawPath) {
+  final match = RegExp(
+    r'^/tenants/([^/]+)/security$',
+  ).firstMatch(_normalizePath(rawPath));
+  return match?.group(1);
 }
 
 bool _isSellerBlockedPath(String rawPath) {
@@ -213,6 +220,12 @@ class RouterNotifier extends ChangeNotifier {
         appUser.tenantId == null &&
         _isTenantBusinessPath(state.matchedLocation)) {
       return '/tenants';
+    }
+
+    final securityTenantId = _tenantSecurityPathId(state.matchedLocation);
+    if (securityTenantId != null &&
+        !canManageTenantSecurity(appUser, securityTenantId)) {
+      return appUser.isSuperAdmin ? '/tenants' : '/';
     }
 
     if (state.matchedLocation == '/settings/backup' &&
@@ -458,6 +471,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/settings',
             pageBuilder: (_, s) => _fadePage(const SettingsScreen(), s),
             routes: [
+              GoRoute(
+                path: 'invoice-header',
+                pageBuilder: (_, s) =>
+                    _fadePage(const InvoiceHeaderSettingsScreen(), s),
+              ),
               GoRoute(
                 path: 'flush',
                 pageBuilder: (_, s) =>

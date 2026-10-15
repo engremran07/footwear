@@ -31,6 +31,10 @@ service cloud.firestore {
     function isTenantAdminRole(role) {
       return isTenantAdminOnlyRole(role);
     }
+    function isWorkspaceAdminAccessRole(role) {
+      return role is string &&
+        role.matches('(?i)^\\s*(admin|manager|tenant_admin)\\s*$');
+    }
     function isSuperAdminRole(role) {
       return role is string && role.matches('(?i)^\\s*super_admin\\s*$');
     }
@@ -116,6 +120,13 @@ service cloud.firestore {
           validAccessLimit(data.max_active_sessions_allowed));
     }
 
+    function validWorkspaceAdminAccessPolicy(data) {
+      return (!('workspace_admin_max_devices_allowed' in data) ||
+          validAccessLimit(data.workspace_admin_max_devices_allowed)) &&
+        (!('workspace_admin_max_active_sessions_allowed' in data) ||
+          validAccessLimit(data.workspace_admin_max_active_sessions_allowed));
+    }
+
     function validTenantLifecycleTransition(currentData, nextData) {
       let changed = nextData.diff(currentData).affectedKeys();
       return !changed.hasAny(['active', 'archived_at', 'archived_by']) ||
@@ -140,6 +151,34 @@ service cloud.firestore {
         (slotId == 'slot_9' && slotNumber == 9 && maxSlots >= 10);
     }
 
+    function accessSlotPathMatches(slotId, slotNumber) {
+      return (slotId == 'slot_0' && slotNumber == 0) ||
+        (slotId == 'slot_1' && slotNumber == 1) ||
+        (slotId == 'slot_2' && slotNumber == 2) ||
+        (slotId == 'slot_3' && slotNumber == 3) ||
+        (slotId == 'slot_4' && slotNumber == 4) ||
+        (slotId == 'slot_5' && slotNumber == 5) ||
+        (slotId == 'slot_6' && slotNumber == 6) ||
+        (slotId == 'slot_7' && slotNumber == 7) ||
+        (slotId == 'slot_8' && slotNumber == 8) ||
+        (slotId == 'slot_9' && slotNumber == 9);
+    }
+
+    function validPlatformSessionSlot(slotId, slotNumber) {
+      return (slotId == 'slot_0' && slotNumber == 0) ||
+        (slotId == 'slot_1' && slotNumber == 1);
+    }
+
+    function platformSessionSlotAvailable(userId, slotId) {
+      let otherSlotId = slotId == 'slot_0' ? 'slot_1' : 'slot_0';
+      let otherSessionPath = /databases/$(database)/documents/users/$(userId)/platform_sessions/$(otherSlotId);
+      let otherSession = get(otherSessionPath).data;
+      return !exists(otherSessionPath) ||
+        otherSession.status != 'active' ||
+        !('expires_at' in otherSession) ||
+        otherSession.expires_at <= request.time;
+    }
+
     function tenantAccessLimit(tenantId, field) {
       let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
       let tenant = get(tenantPath).data;
@@ -151,6 +190,25 @@ service cloud.firestore {
       return exists(tenantPath) &&
         (!('tenant_id' in tenant) || tenant.tenant_id == tenantId) &&
         validAccessLimit(limit) ? limit : 0;
+    }
+
+    function workspaceAdminAccessLimit(field) {
+      let policyPath = /databases/$(database)/documents/settings/platform_access_policy;
+      let policy = get(policyPath).data;
+      let limit = field == 'max_devices_allowed'
+        ? (policy is map && 'workspace_admin_max_devices_allowed' in policy
+          ? policy.workspace_admin_max_devices_allowed : 3)
+        : (policy is map && 'workspace_admin_max_active_sessions_allowed' in policy
+          ? policy.workspace_admin_max_active_sessions_allowed : 2);
+      return validAccessLimit(limit) ? limit : 0;
+    }
+
+    function accessRecordLimit(tenantId, field) {
+      let role = getUserRole();
+      return isSellerRole(role)
+        ? tenantAccessLimit(tenantId, field)
+        : (isWorkspaceAdminAccessRole(role)
+          ? workspaceAdminAccessLimit(field) : 0);
     }
 
     function tenantRequiresDevicePairing(tenantId) {
@@ -179,6 +237,27 @@ service cloud.firestore {
       return (isOwnDoc(userId) && isActiveUser() &&
         currentUserTenantId() == tenantId) ||
         (isActiveUser() && isAdminForTenant(tenantId));
+    }
+
+    function canReadAccessRecordSlot(userId) {
+      let targetUser = get(
+        /databases/$(database)/documents/users/$(userId)
+      ).data;
+      return targetUser is map && isActiveUser() &&
+        (
+          (isOwnDoc(userId) &&
+            currentUserTenantId() == targetUser.tenant_id) ||
+          isAdminForTenant(targetUser.tenant_id)
+        );
+    }
+
+    function accessRecordSlotMatchesUser(userId) {
+      let targetUser = get(
+        /databases/$(database)/documents/users/$(userId)
+      ).data;
+      return resource == null ||
+        (resource.data.user_id == userId &&
+         resource.data.tenant_id == targetUser.tenant_id);
     }
 
     function accessRecordFieldsAreValid(data, userId, tenantId, slotId) {
@@ -216,11 +295,7 @@ service cloud.firestore {
         getAfter(devicePath).data.tenant_id == tenantId &&
         getAfter(devicePath).data.status == 'active' &&
         getAfter(devicePath).data.device_id == data.device_id &&
-        validAccessSlot(
-          data.device_slot_id,
-          getAfter(devicePath).data.slot_number,
-          tenantAccessLimit(tenantId, 'max_devices_allowed')
-        );
+        getAfter(devicePath).data.slot_id == data.device_slot_id;
     }
 
     // BUG-02: Sellers may only create cash_in or cash_out transactions.
@@ -437,6 +512,91 @@ service cloud.firestore {
           invoiceData.total - invoiceData.amount_received + 0.01;
     }
 
+    function sellerCashReceiptBalanceMatches(shopId, transactionId, transactionData) {
+      let invoicePath = /databases/$(database)/documents/invoices/$(transactionData.invoice_id);
+      let invoiceData = getAfter(invoicePath).data;
+      return !exists(invoicePath) &&
+        existsAfter(invoicePath) &&
+        transactionData.type == 'cash_in' &&
+        invoiceData.type == 'cash_receipt' &&
+        invoiceData.shop_id == shopId &&
+        invoiceData.route_id == transactionData.route_id &&
+        invoiceData.tenant_id == currentUserTenantId() &&
+        invoiceData.created_by == request.auth.uid &&
+        invoiceData.cash_receipt_transaction_id == transactionId &&
+        invoiceData.total is number &&
+        invoiceData.amount_received == invoiceData.total &&
+        transactionData.amount == invoiceData.total &&
+        request.resource.data.balance >= resource.data.balance -
+          invoiceData.total - 0.01 &&
+        request.resource.data.balance <= resource.data.balance -
+          invoiceData.total + 0.01;
+    }
+
+    function sellerCashReceiptIsLinked(invoiceId) {
+      let transactionId = request.resource.data.cash_receipt_transaction_id;
+      let transactionPath = /databases/$(database)/documents/transactions/$(transactionId);
+      let transactionData = getAfter(transactionPath).data;
+      let settingsPath = /databases/$(database)/documents/settings/$(request.resource.data.tenant_id);
+      let settingsBefore = get(settingsPath).data;
+      let settingsAfter = getAfter(settingsPath).data;
+      let sequence = request.resource.data.cash_receipt_sequence;
+      return transactionId is string && transactionId != '' &&
+        !exists(transactionPath) && existsAfter(transactionPath) &&
+        sequence is int && sequence > 0 &&
+        settingsBefore is map && settingsAfter is map &&
+        ((('last_cash_receipt_number' in settingsBefore) &&
+            settingsBefore.last_cash_receipt_number is int &&
+            sequence == settingsBefore.last_cash_receipt_number + 1) ||
+          (!('last_cash_receipt_number' in settingsBefore) && sequence == 1)) &&
+        settingsAfter.last_cash_receipt_number == sequence &&
+        transactionData.type == 'cash_in' &&
+        transactionData.amount == request.resource.data.total &&
+        transactionData.invoice_id == invoiceId &&
+        transactionData.shop_id == request.resource.data.shop_id &&
+        transactionData.route_id == request.resource.data.route_id &&
+        transactionData.tenant_id == request.resource.data.tenant_id &&
+        transactionData.created_by == request.resource.data.created_by;
+    }
+
+    function workspaceAllowsNonStockInvoices(tenantId) {
+      let settingsPath = /databases/$(database)/documents/settings/$(tenantId);
+      let settingsData = get(settingsPath).data;
+      return settingsData == null ||
+        !('allow_non_stock_invoices' in settingsData) ||
+        settingsData.allow_non_stock_invoices == true;
+    }
+
+    function sellerInvoiceHeaderSnapshotMatchesWorkspace(tenantId) {
+      let settingsPath = /databases/$(database)/documents/settings/$(tenantId);
+      let settingsData = get(settingsPath).data;
+      let snapshot = request.resource.data.invoice_header_snapshot;
+      return settingsData is map && snapshot is map &&
+        (
+          (('company_name' in settingsData &&
+            snapshot.company_name == settingsData.company_name) ||
+           (!('company_name' in settingsData &&
+             snapshot.company_name != 'My Business'))) &&
+          (
+            (settingsData.invoice_header is map &&
+             snapshot.diff(settingsData.invoice_header).affectedKeys()
+               .hasOnly(['company_name', 'logo_base64'])) ||
+            (!('invoice_header' in settingsData) &&
+             snapshot.keys().hasOnly(['company_name', 'logo_base64']))
+          ) &&
+          (
+            (('logo_base64' in settingsData &&
+              settingsData.logo_base64 is string &&
+              snapshot.logo_base64 == settingsData.logo_base64) ||
+             ('logo_base64' in settingsData &&
+              settingsData.logo_base64 == null &&
+              (!('logo_base64' in snapshot) || snapshot.logo_base64 == null)) ||
+             (!('logo_base64' in settingsData) &&
+              !('logo_base64' in snapshot)))
+          )
+        );
+    }
+
     function sellerShopBalanceMatchesNewTransaction(shopId, transactionId) {
       let transactionPath = /databases/$(database)/documents/transactions/$(transactionId);
       let transactionData = getAfter(transactionPath).data;
@@ -462,7 +622,10 @@ service cloud.firestore {
                 ? transactionData.amount
                 : -transactionData.amount) + 0.01) ||
           (('invoice_id' in transactionData) &&
-            sellerInvoiceBalanceMatches(shopId, transactionData))
+            (transactionData.type == 'cash_out'
+              ? sellerInvoiceBalanceMatches(shopId, transactionData)
+              : transactionData.type == 'cash_in' &&
+                sellerCashReceiptBalanceMatches(shopId, transactionId, transactionData)))
         );
     }
 
@@ -583,17 +746,17 @@ service cloud.firestore {
     // policy. Slot documents are updated transactionally by the client; rules
     // enforce the authoritative slot ceiling and ownership on every write.
     match /users/{userId}/device_registrations/{slotId} {
-      allow get: if (isOwnDoc(userId) && isActiveUser() &&
-          currentUserTenantId() == userDoc().data.tenant_id) ||
-        (canReadAccessRecord(userId, resource.data.tenant_id) &&
-          resource.data.user_id == userId);
+      allow get: if canReadAccessRecordSlot(userId) &&
+        accessRecordSlotMatchesUser(userId);
       allow list: if canReadAccessRecord(userId, resource.data.tenant_id) &&
         resource.data.user_id == userId;
       allow create: if isActiveUser() && isOwnDoc(userId) &&
         ((request.resource.data.status == 'active' &&
-            !tenantRequiresDevicePairing(currentUserTenantId())) ||
+            (!tenantRequiresDevicePairing(currentUserTenantId()) ||
+              isWorkspaceAdminAccessRole(getUserRole()))) ||
           (request.resource.data.status == 'pending' &&
-            tenantRequiresDevicePairing(currentUserTenantId()))) &&
+            tenantRequiresDevicePairing(currentUserTenantId()) &&
+            !isWorkspaceAdminAccessRole(getUserRole()))) &&
         accessRecordFieldsAreValid(
           request.resource.data,
           userId,
@@ -603,7 +766,7 @@ service cloud.firestore {
         validAccessSlot(
           slotId,
           request.resource.data.slot_number,
-          tenantAccessLimit(currentUserTenantId(), 'max_devices_allowed')
+          accessRecordLimit(currentUserTenantId(), 'max_devices_allowed')
         ) &&
         request.resource.data.registered_at is timestamp &&
         request.resource.data.registered_at == request.time &&
@@ -622,6 +785,7 @@ service cloud.firestore {
           request.resource.data.app_version.size() <= 40
         ) || (
           isActiveUser() && isAdminForTenant(resource.data.tenant_id) &&
+          request.auth.uid != userId &&
           resource.data.user_id == userId &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'revoked_at', 'revoked_by']) &&
@@ -630,6 +794,7 @@ service cloud.firestore {
           request.resource.data.revoked_by == request.auth.uid
         ) || (
           isActiveUser() && isAdminForTenant(resource.data.tenant_id) &&
+          request.auth.uid != userId &&
           resource.data.user_id == userId &&
           resource.data.status == 'revoked' &&
           request.resource.data.diff(resource.data).affectedKeys()
@@ -644,23 +809,42 @@ service cloud.firestore {
           request.resource.data.approved_by == request.auth.uid
         ) || (
           isActiveUser() && isOwnDoc(userId) &&
+          isWorkspaceAdminAccessRole(getUserRole()) &&
+          resource.data.user_id == userId &&
+          resource.data.tenant_id == currentUserTenantId() &&
+          resource.data.status == 'pending' &&
+          request.resource.data.status == 'active' &&
+          request.resource.data.device_id == resource.data.device_id &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'last_seen_at', 'app_version']) &&
+          validAccessSlot(
+            slotId,
+            resource.data.slot_number,
+            accessRecordLimit(currentUserTenantId(), 'max_devices_allowed')
+          ) &&
+          request.resource.data.last_seen_at == request.time &&
+          request.resource.data.app_version is string &&
+          request.resource.data.app_version.size() <= 40
+        ) || (
+          isActiveUser() && isOwnDoc(userId) &&
           resource.data.user_id == userId &&
           resource.data.tenant_id == currentUserTenantId() &&
           deviceRegistrationIsStale(resource.data) &&
           ((request.resource.data.status == 'active' &&
-              !tenantRequiresDevicePairing(currentUserTenantId())) ||
+              (!tenantRequiresDevicePairing(currentUserTenantId()) ||
+                isWorkspaceAdminAccessRole(getUserRole()))) ||
             (request.resource.data.status == 'pending' &&
-              tenantRequiresDevicePairing(currentUserTenantId()))) &&
+              tenantRequiresDevicePairing(currentUserTenantId()) &&
+              !isWorkspaceAdminAccessRole(getUserRole()))) &&
           accessRecordFieldsAreValid(
             request.resource.data,
             userId,
             currentUserTenantId(),
             slotId
           ) &&
-          validAccessSlot(
+          accessSlotPathMatches(
             slotId,
-            request.resource.data.slot_number,
-            tenantAccessLimit(currentUserTenantId(), 'max_devices_allowed')
+            request.resource.data.slot_number
           ) &&
           request.resource.data.registered_at == request.time &&
           request.resource.data.last_seen_at == request.time &&
@@ -668,6 +852,7 @@ service cloud.firestore {
           !('revoked_by' in request.resource.data) && docSizeOk()
         ) || (
           isActiveUser() && isAdminForTenant(resource.data.tenant_id) &&
+          request.auth.uid != userId &&
           resource.data.user_id == userId &&
           resource.data.status == 'pending' &&
           request.resource.data.diff(resource.data).affectedKeys()
@@ -676,7 +861,7 @@ service cloud.firestore {
           request.resource.data.approved_at == request.time &&
           request.resource.data.approved_by == request.auth.uid
         ) || (
-          isActiveUser() && isOwnDoc(userId) &&
+          isActiveUser() && isOwnDoc(userId) && isSeller() &&
           resource.data.user_id == userId &&
           resource.data.tenant_id == currentUserTenantId() &&
           resource.data.status == 'revoked' &&
@@ -693,13 +878,13 @@ service cloud.firestore {
           validAccessSlot(
             slotId,
             request.resource.data.slot_number,
-            tenantAccessLimit(currentUserTenantId(), 'max_devices_allowed')
+            accessRecordLimit(currentUserTenantId(), 'max_devices_allowed')
           ) &&
           request.resource.data.registered_at == request.time &&
           request.resource.data.last_seen_at == request.time &&
           docSizeOk()
         ) || (
-          isActiveUser() && isOwnDoc(userId) &&
+          isActiveUser() && isOwnDoc(userId) && isSeller() &&
           resource.data.user_id == userId &&
           resource.data.tenant_id == currentUserTenantId() &&
           resource.data.status == 'active' &&
@@ -714,10 +899,8 @@ service cloud.firestore {
     }
 
     match /users/{userId}/sessions/{slotId} {
-      allow get: if (isOwnDoc(userId) && isActiveUser() &&
-          currentUserTenantId() == userDoc().data.tenant_id) ||
-        (canReadAccessRecord(userId, resource.data.tenant_id) &&
-          resource.data.user_id == userId);
+      allow get: if canReadAccessRecordSlot(userId) &&
+        accessRecordSlotMatchesUser(userId);
       allow list: if canReadAccessRecord(userId, resource.data.tenant_id) &&
         resource.data.user_id == userId;
       allow create: if isActiveUser() && isOwnDoc(userId) &&
@@ -731,7 +914,7 @@ service cloud.firestore {
         validAccessSlot(
           slotId,
           request.resource.data.slot_number,
-          tenantAccessLimit(currentUserTenantId(), 'max_active_sessions_allowed')
+          accessRecordLimit(currentUserTenantId(), 'max_active_sessions_allowed')
         ) &&
         sessionDeviceIsRegistered(
           request.resource.data,
@@ -795,7 +978,7 @@ service cloud.firestore {
           validAccessSlot(
             slotId,
             request.resource.data.slot_number,
-            tenantAccessLimit(currentUserTenantId(), 'max_active_sessions_allowed')
+            accessRecordLimit(currentUserTenantId(), 'max_active_sessions_allowed')
           ) &&
           sessionDeviceIsRegistered(
             request.resource.data,
@@ -817,6 +1000,9 @@ service cloud.firestore {
     match /users/{userId}/platform_sessions/{sessionId} {
       allow get, list: if isOwnDoc(userId) && isSuperAdmin();
       allow create: if isOwnDoc(userId) && isSuperAdmin() &&
+        validPlatformSessionSlot(sessionId, request.resource.data.slot_number) &&
+        platformSessionSlotAvailable(userId, sessionId) &&
+        request.resource.data.slot_id == sessionId &&
         request.resource.data.user_id == userId &&
         request.resource.data.session_id is string &&
         request.resource.data.session_id.size() >= 8 &&
@@ -831,10 +1017,14 @@ service cloud.firestore {
         docSizeOk();
       allow update: if isOwnDoc(userId) && isSuperAdmin() &&
         resource.data.user_id == userId &&
-        resource.data.session_id == request.resource.data.session_id &&
-        resource.data.device_id == request.resource.data.device_id &&
+        resource.data.slot_id == sessionId &&
+        request.resource.data.slot_id == sessionId &&
+        resource.data.slot_number == request.resource.data.slot_number &&
+        validPlatformSessionSlot(sessionId, request.resource.data.slot_number) &&
         ((resource.data.status == 'active' &&
             request.resource.data.status == 'active' &&
+            resource.data.session_id == request.resource.data.session_id &&
+            resource.data.device_id == request.resource.data.device_id &&
             request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['last_seen_at', 'expires_at']) &&
             request.resource.data.last_seen_at == request.time &&
@@ -843,10 +1033,35 @@ service cloud.firestore {
             request.resource.data.expires_at <= request.time + duration.value(12, 'h')) ||
           (resource.data.status == 'active' &&
             request.resource.data.status == 'revoked' &&
+            resource.data.session_id == request.resource.data.session_id &&
+            resource.data.device_id == request.resource.data.device_id &&
             request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['status', 'revoked_at', 'terminated_by']) &&
             request.resource.data.revoked_at == request.time &&
-            request.resource.data.terminated_by == request.auth.uid));
+            request.resource.data.terminated_by == request.auth.uid) ||
+          ((resource.data.status == 'revoked' ||
+              (resource.data.status == 'active' &&
+                resource.data.expires_at <= request.time)) &&
+            platformSessionSlotAvailable(userId, sessionId) &&
+            request.resource.data.status == 'active' &&
+            request.resource.data.user_id == userId &&
+            request.resource.data.session_id is string &&
+            request.resource.data.session_id.size() >= 8 &&
+            request.resource.data.device_id is string &&
+            request.resource.data.device_id.size() >= 8 &&
+            request.resource.data.device_brand is string &&
+            request.resource.data.device_model is string &&
+            request.resource.data.platform is string &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly([
+                'session_id', 'device_id', 'device_brand', 'device_model',
+                'platform', 'status', 'created_at', 'last_seen_at', 'expires_at'
+              ]) &&
+            request.resource.data.created_at == request.time &&
+            request.resource.data.last_seen_at == request.time &&
+            request.resource.data.expires_at is timestamp &&
+            request.resource.data.expires_at > request.time &&
+            request.resource.data.expires_at <= request.time + duration.value(12, 'h')));
       allow delete: if false;
     }
 
@@ -878,30 +1093,26 @@ service cloud.firestore {
         request.resource.data.created_at == request.time &&
         validTenantAccessPolicy(request.resource.data) &&
         docSizeOk();
-      allow update: if (isSuperAdmin() && isAdminForTenant(tenantId) &&
-        request.resource.data.tenant_id == tenantId &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'name', 'slug', 'require_device_pairing', 'allow_admin_reset_only',
-          'max_devices_allowed', 'max_active_sessions_allowed',
-          'owner_user_id', 'updated_at', 'active', 'archived_at', 'archived_by'
-        ]) &&
-        validTenantLifecycleTransition(resource.data, request.resource.data) &&
-        validTenantAccessPolicy(request.resource.data) &&
-        request.resource.data.updated_at == request.time && docSizeOk()) || (
-        isTenantAdmin() &&
-        resource.data.tenant_id == currentUserTenantId() &&
-        request.resource.data.tenant_id == tenantId &&
-        request.resource.data.tenant_id == currentUserTenantId() &&
-        resource.data.owner_user_id == request.auth.uid &&
-        request.resource.data.owner_user_id == resource.data.owner_user_id &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'name', 'slug', 'require_device_pairing', 'allow_admin_reset_only',
-          'max_devices_allowed', 'max_active_sessions_allowed', 'updated_at'
-        ]) &&
-        validTenantAccessPolicy(request.resource.data) &&
-        request.resource.data.updated_at == request.time &&
-        docSizeOk()
-      );
+      allow update: if (
+          isSuperAdmin() && isAdminForTenant(tenantId) &&
+          request.resource.data.tenant_id == tenantId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'slug', 'require_device_pairing', 'allow_admin_reset_only',
+            'max_devices_allowed', 'max_active_sessions_allowed',
+            'owner_user_id', 'updated_at', 'active', 'archived_at', 'archived_by'
+          ]) &&
+          validTenantLifecycleTransition(resource.data, request.resource.data) &&
+          validTenantAccessPolicy(request.resource.data) &&
+          request.resource.data.updated_at == request.time && docSizeOk()
+        ) || (
+          isTenantAdmin() && tenantId == currentUserTenantId() &&
+          request.resource.data.tenant_id == tenantId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'max_devices_allowed', 'max_active_sessions_allowed', 'updated_at'
+          ]) &&
+          validTenantAccessPolicy(request.resource.data) &&
+          request.resource.data.updated_at == request.time && docSizeOk()
+        );
       allow delete: if isSuperAdmin() && tenantId == currentUserTenantId();
     }
 
@@ -1203,12 +1414,22 @@ service cloud.firestore {
 
     // --- settings -----------------------------------------------------------
     match /settings/{docId} {
-      allow read: if isAdminForTenant(docId) ||
+      allow read: if (docId == 'platform_access_policy' && isActiveUser() &&
+          (isSuperAdmin() || isWorkspaceAdminAccessRole(getUserRole()))) ||
+        isAdminForTenant(docId) ||
         (isActiveUser() &&
          (docId == currentUserTenantId() ||
           (docId == '__global__' && currentUserTenantId() == null)));
       // P0-2 FIX: settings docs are tenant-owned (docId = tenant_id); use isAdminForTenant check
-      allow create: if isAdminForTenant(docId) || (
+      allow create: if (docId == 'platform_access_policy' && isSuperAdmin() &&
+        request.resource.data.keys().hasOnly([
+          'workspace_admin_max_devices_allowed',
+          'workspace_admin_max_active_sessions_allowed', 'updated_by', 'updated_at'
+        ]) &&
+        request.resource.data.updated_by == request.auth.uid &&
+        request.resource.data.updated_at == request.time &&
+        validWorkspaceAdminAccessPolicy(request.resource.data)) ||
+        isAdminForTenant(docId) || (
         isSuperAdmin() &&
         !exists(/databases/$(database)/documents/tenants/$(docId)) &&
         existsAfter(/databases/$(database)/documents/tenants/$(docId)) &&
@@ -1216,17 +1437,41 @@ service cloud.firestore {
         getAfter(/databases/$(database)/documents/tenants/$(docId)).data.created_at == request.time &&
         request.resource.data.tenant_id == docId
       );
-      allow delete: if isSuperAdmin() && isAdminForTenant(docId);
+      allow delete: if docId != 'platform_access_policy' &&
+        isSuperAdmin() && isAdminForTenant(docId);
       // Admin: full update.
-      // Sellers: only invoice counter — and only increment by exactly 1 to
-      // prevent fraudulent bulk increments of the invoice sequence.
-      allow update: if (isAdminForTenant(docId) ||
+      // Sellers may increment either tenant-scoped sequence by exactly 1.
+      allow update: if (docId == 'platform_access_policy' && isSuperAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'workspace_admin_max_devices_allowed',
+          'workspace_admin_max_active_sessions_allowed', 'updated_by', 'updated_at'
+        ]) &&
+        request.resource.data.updated_by == request.auth.uid &&
+        request.resource.data.updated_at == request.time &&
+        validWorkspaceAdminAccessPolicy(request.resource.data)) ||
+        (isAdminForTenant(docId) ||
         (isActiveUser() &&
          docId == currentUserTenantId() &&
-         request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['last_invoice_number']) &&
-         request.resource.data.last_invoice_number ==
-           resource.data.last_invoice_number + 1)) && docSizeOk();
+         (
+           (request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['last_invoice_number']) &&
+            request.resource.data.last_invoice_number is number &&
+            ((('last_invoice_number' in resource.data) &&
+              resource.data.last_invoice_number is number &&
+              request.resource.data.last_invoice_number ==
+                resource.data.last_invoice_number + 1) ||
+             (!('last_invoice_number' in resource.data) &&
+              request.resource.data.last_invoice_number == 1))) ||
+           (request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['last_cash_receipt_number']) &&
+            request.resource.data.last_cash_receipt_number is number &&
+            ((('last_cash_receipt_number' in resource.data) &&
+              resource.data.last_cash_receipt_number is number &&
+              request.resource.data.last_cash_receipt_number ==
+                resource.data.last_cash_receipt_number + 1) ||
+             (!('last_cash_receipt_number' in resource.data) &&
+              request.resource.data.last_cash_receipt_number == 1)))
+         ))) && docSizeOk();
     }
 
     // --- invoices -----------------------------------------------------------
@@ -1247,7 +1492,8 @@ service cloud.firestore {
         (
           isSeller() &&
           request.resource.data.created_by == request.auth.uid &&
-          request.resource.data.type == 'sale' &&
+          (request.resource.data.type == 'sale' ||
+           request.resource.data.type == 'cash_receipt') &&
           request.resource.data.shop_id != null &&
           request.resource.data.shop_id != '' &&
           request.resource.data.route_id != null &&
@@ -1261,16 +1507,43 @@ service cloud.firestore {
         && request.resource.data.subtotal is number
         && request.resource.data.discount is number
         && request.resource.data.items is list
-        && request.resource.data.items.size() > 0
         && request.resource.data.subtotal >= 0
         && request.resource.data.discount >= 0
         && request.resource.data.total > 0
         && request.resource.data.amount_received is number
         && request.resource.data.amount_received >= 0
         && request.resource.data.amount_received <= request.resource.data.total + 0.01
-        && request.resource.data.total >= request.resource.data.subtotal - request.resource.data.discount - 0.01
-        && request.resource.data.total <= request.resource.data.subtotal - request.resource.data.discount + 0.01
+        && (
+          (request.resource.data.type == 'cash_receipt' &&
+           request.resource.data.items is list &&
+           request.resource.data.items.size() == 0 &&
+           request.resource.data.subtotal == 0 &&
+           request.resource.data.discount == 0 &&
+           request.resource.data.amount_received == request.resource.data.total &&
+           request.resource.data.fulfillment_mode == 'none' &&
+           sellerCashReceiptIsLinked(invoiceId)) ||
+          (request.resource.data.type != 'cash_receipt' &&
+           request.resource.data.items is list &&
+           request.resource.data.items.size() > 0 &&
+           request.resource.data.total >= request.resource.data.subtotal - request.resource.data.discount - 0.01 &&
+           request.resource.data.total <= request.resource.data.subtotal - request.resource.data.discount + 0.01)
+        )
+        && (request.resource.data.type != 'sale' ||
+          (
+            (request.resource.data.fulfillment_mode == 'stock' &&
+             request.resource.data.seller_inventory_deductions is map &&
+             request.resource.data.seller_inventory_deductions.size() > 0) ||
+            (request.resource.data.fulfillment_mode == 'non_stock' &&
+             request.resource.data.seller_inventory_deductions is map &&
+             request.resource.data.seller_inventory_deductions.size() == 0 &&
+             workspaceAllowsNonStockInvoices(request.resource.data.tenant_id))
+          ))
         && (request.resource.data.type != 'credit_note' || isValidCreditNoteLink())
+        && (!isSeller() ||
+          !('invoice_header_snapshot' in request.resource.data) ||
+          sellerInvoiceHeaderSnapshotMatchesWorkspace(
+            request.resource.data.tenant_id
+          ))
         && docSizeOk();
       allow update: if isAdminForTenant(resource.data.tenant_id) &&
         request.resource.data.tenant_id == resource.data.tenant_id && docSizeOk();

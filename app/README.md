@@ -1,4 +1,4 @@
-﻿# FootWear ERP — Flutter App (v3.9.60+99)
+﻿# FootWear ERP — Flutter App (v3.9.75+102)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
@@ -12,6 +12,12 @@ Encrypted backup export and Google Drive upload are separate actions; Drive uplo
 Workspace-admin and seller sign-in registers device access through tenant/user-scoped queries and links each application session to its registered device slot. Workspace create/edit failures remain visible in the form, and the workspace list tolerates temporary auth-profile loading.
 Sign-in stays on the login screen until access registration completes. Workspace device pairing uses pending approval, and administrators can remove, block, or reset devices with related active-session revocation. Sessions renew while foregrounded and show a five-minute expiry warning. These records support client-side device/seat controls; Firestore Rules do not bind requests to an active session ID under the current Spark architecture.
 
+Invoice creation supports stock sales, workspace-enabled non-stock catalog sales, and cash receipt invoices. Non-stock invoices preserve catalog item details without reducing inventory. Receipt numbering, receipt ledger entries, and shop balance changes are atomic and workspace-scoped. Workspace administrators configure bilingual invoice headers; generated PDFs use the header snapshot stored on each invoice. Shop detail provides a preselected invoice entry point while retaining ledger-only cash-in.
+
+Access limits are role-scoped: sellers use each workspace's configured cap, workspace admins share the cap configured by the platform super-admin, and super-admins use separate platform-only limits of two devices and one active session. Device/session rules are not a server authorization boundary under the current Spark architecture.
+
+Invoice voiding commits status, shop balance, inventory restoration, and reversal rows atomically. Receipt counter values are verified by Firestore Rules. Invoice PDFs localize receipt methods, distinguish non-stock lines, and paginate with dynamic page numbering.
+
 ---
 
 ## Requirements
@@ -20,7 +26,7 @@ Sign-in stays on the login screen until access registration completes. Workspace
 - Android SDK (API 21+)
 - Java 17
 - Firebase project with Firestore and Auth enabled (no Storage, no Cloud Functions needed)
-- Workspace ownership: each tenant has its own branding settings and device-pairing limit policy
+- Workspace ownership: each tenant has its own branding and seller device/session limits; workspace-admin caps are platform-configured
 
 ---
 
@@ -158,19 +164,29 @@ Workspace business access for platform super-admins expires after 8 hours and re
 ## Financial Pathways (never mix)
 
 ```text
-Pathway 1 — SALE WITH STOCK
+Pathway 1 — STOCK SALE
   CreateSaleInvoiceScreen → InvoiceNotifier.createSaleInvoice()
   Invoice + cash_out tx + optional cash_in tx + seller_inventory deduction (one atomic batch)
-  USE WHEN: new goods delivered to shop, stock deduction required
+  USE WHEN: new goods delivered and stock must decrease
 
-Pathway 2 — CASH COLLECTION (old debt, no new goods)
+Pathway 2 — NON-STOCK SALE
+  CreateSaleInvoiceScreen → InvoiceNotifier.createSaleInvoice(fulfillmentMode: non_stock)
+  Invoice + ledger writes + shop balance update; no inventory deduction
+  USE WHEN: recording a catalog sale without stock movement and workspace setting allows it
+
+Pathway 3 — CASH RECEIPT INVOICE
+  CreateSaleInvoiceScreen → InvoiceNotifier.createCashReceipt()
+  Receipt sequence + invoice + cash_in tx + shop balance update (one atomic transaction)
+  USE WHEN: collecting old debt and issuing a receipt document
+
+Pathway 4 — LEDGER-ONLY CASH COLLECTION
   ShopDetailScreen → TransactionNotifier.create(type: 'cash_in')
-  Cash_in ledger entry ONLY. No invoice. No stock movement.
-  USE WHEN: collecting outstanding balance, no new delivery
+  Cash_in ledger entry only. No invoice. No stock movement.
+  USE WHEN: collecting payment without a receipt document
 
 VOID / RETURN (admin only)
   InvoiceNotifier.voidInvoice()
-  Returns stock to inventory; issues one reversal transaction.
+  Returns stock only for stock-backed invoices; issues one reversal transaction.
   Cash refund mode adds a second cash_out tx.
 ```
 

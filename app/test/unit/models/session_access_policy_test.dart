@@ -4,6 +4,38 @@ import 'package:footwear_erp/core/utils/session_access_policy.dart';
 import 'package:footwear_erp/models/session_model.dart';
 
 void main() {
+  group('SessionAccessPolicy.requiresDeviceApproval', () {
+    test('requires approval for a seller registering a new device', () {
+      expect(
+        SessionAccessPolicy.requiresDeviceApproval(
+          pairingRequired: true,
+          hasActiveDevice: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not require approval for an active seller device', () {
+      expect(
+        SessionAccessPolicy.requiresDeviceApproval(
+          pairingRequired: true,
+          hasActiveDevice: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('workspace admins still require approval for a new device', () {
+      expect(
+        SessionAccessPolicy.requiresDeviceApproval(
+          pairingRequired: true,
+          hasActiveDevice: false,
+        ),
+        isTrue,
+      );
+    });
+  });
+
   group('SessionAccessPolicy.currentForDevice', () {
     final now = DateTime.utc(2026, 10, 3, 12);
 
@@ -45,6 +77,102 @@ void main() {
       );
     });
 
+    test('discards access checks started before auth state changed', () {
+      expect(
+        SessionAccessPolicy.shouldDiscardStaleAccessCheck(
+          checkGeneration: 2,
+          currentGeneration: 2,
+        ),
+        isFalse,
+      );
+      expect(
+        SessionAccessPolicy.shouldDiscardStaleAccessCheck(
+          checkGeneration: 2,
+          currentGeneration: 3,
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not sign out a different current account', () {
+      expect(
+        SessionAccessPolicy.shouldSignOutForAccessCheck(
+          expectedUid: 'user-a',
+          currentUid: 'user-a',
+          authOperationInProgress: false,
+        ),
+        isTrue,
+      );
+      expect(
+        SessionAccessPolicy.shouldSignOutForAccessCheck(
+          expectedUid: 'user-a',
+          currentUid: 'user-b',
+          authOperationInProgress: false,
+        ),
+        isFalse,
+      );
+      expect(
+        SessionAccessPolicy.shouldSignOutForAccessCheck(
+          expectedUid: 'user-a',
+          currentUid: 'user-a',
+          authOperationInProgress: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('resets session context when role changes for the same user', () {
+      expect(
+        SessionAccessPolicy.shouldResetSessionContext(
+          previousUserId: 'user-a',
+          nextUserId: 'user-a',
+          previousRole: 'seller',
+          nextRole: 'admin',
+          previousTenantId: 'tenant-a',
+          nextTenantId: 'tenant-a',
+        ),
+        isTrue,
+      );
+      expect(
+        SessionAccessPolicy.shouldResetSessionContext(
+          previousUserId: 'user-a',
+          nextUserId: 'user-a',
+          previousRole: 'seller',
+          nextRole: 'seller',
+          previousTenantId: 'tenant-a',
+          nextTenantId: 'tenant-a',
+        ),
+        isFalse,
+      );
+    });
+
+    test(
+      'rejects revoked records during renewal but allows interactive login',
+      () {
+        expect(
+          SessionAccessPolicy.shouldRejectRevokedAccessDuringRenewal(
+            isRenewal: true,
+            hasRevokedRecord: true,
+          ),
+          isTrue,
+        );
+        expect(
+          SessionAccessPolicy.shouldRejectRevokedAccessDuringRenewal(
+            isRenewal: false,
+            hasRevokedRecord: true,
+          ),
+          isFalse,
+        );
+        expect(
+          SessionAccessPolicy.shouldRejectRevokedAccessDuringRenewal(
+            isRenewal: true,
+            hasRevokedRecord: false,
+          ),
+          isFalse,
+        );
+      },
+    );
+
     SessionModel session({
       required String id,
       required String status,
@@ -52,13 +180,17 @@ void main() {
       DateTime? expiresAt,
       String deviceId = 'device-a',
       String userId = 'user-a',
+      String deviceSlotId = 'slot_0',
+      int slotNumber = 0,
     }) {
       return SessionModel(
         id: id,
         sessionId: id,
+        slotNumber: slotNumber,
         userId: userId,
         tenantId: 'tenant-a',
         deviceId: deviceId,
+        deviceSlotId: deviceSlotId,
         platform: 'web',
         status: status,
         createdAt: Timestamp.fromDate(lastSeenAt),
@@ -66,6 +198,55 @@ void main() {
         expiresAt: expiresAt == null ? null : Timestamp.fromDate(expiresAt),
       );
     }
+
+    test('uses the registered device slot independent of session slot', () {
+      final registeredSession = session(
+        id: 'session-slot-1',
+        status: 'active',
+        lastSeenAt: now,
+        expiresAt: now.add(const Duration(hours: 1)),
+        deviceSlotId: 'slot_4',
+        slotNumber: 1,
+      );
+
+      expect(
+        SessionAccessPolicy.deviceSlotIdForSession(
+          registeredSession,
+          deviceId: 'device-a',
+        ),
+        'slot_4',
+      );
+    });
+
+    test('rejects a session with another device or an invalid device slot', () {
+      final wrongDevice = session(
+        id: 'wrong-device',
+        status: 'active',
+        lastSeenAt: now,
+        deviceId: 'device-b',
+      );
+      final invalidSlot = session(
+        id: 'invalid-slot',
+        status: 'active',
+        lastSeenAt: now,
+        deviceSlotId: 'session-slot-1',
+      );
+
+      expect(
+        SessionAccessPolicy.deviceSlotIdForSession(
+          wrongDevice,
+          deviceId: 'device-a',
+        ),
+        isNull,
+      );
+      expect(
+        SessionAccessPolicy.deviceSlotIdForSession(
+          invalidSlot,
+          deviceId: 'device-a',
+        ),
+        isNull,
+      );
+    });
 
     test(
       'prefers a valid session over a stale revoked record for same device',

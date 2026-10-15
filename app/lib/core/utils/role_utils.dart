@@ -23,6 +23,12 @@ bool canManageWorkspaceRole(String role) {
   return normalized == 'super_admin';
 }
 
+bool canManageTenantSecurity(UserModel user, String tenantId) {
+  if (!user.active || tenantId.trim().isEmpty) return false;
+  if (user.isSuperAdmin) return user.activeWorkspaceId == tenantId;
+  return user.isTenantAdmin && user.tenantId == tenantId;
+}
+
 bool isPrivilegedRoleName(String role) {
   final normalized = normalizeRoleName(role);
   return normalized == 'admin' ||

@@ -31,6 +31,9 @@ class InvoiceModel {
   static const String typeSale = 'sale';
   static const String typeReturn = 'return';
   static const String typeCreditNote = 'credit_note';
+  static const String typeCashReceipt = 'cash_receipt';
+  static const String fulfillmentStock = 'stock';
+  static const String fulfillmentNonStock = 'non_stock';
   final String shopId;
   final String shopName;
   final String routeId;
@@ -50,9 +53,16 @@ class InvoiceModel {
   static const String statusPartial = 'partial';
   static const String statusVoid = 'void';
   final String? notes;
+  final String? paymentMethod;
+  final String? paymentReference;
+  final double? shopBalanceBefore;
+  final double? shopBalanceAfter;
+  final int? cashReceiptSequence;
   final String? linkedInvoiceId; // for credit notes referencing original
   final String? idempotencyKey;
   final Map<String, int> sellerInventoryDeductions;
+  final String fulfillmentMode;
+  final Map<String, dynamic> headerSnapshot;
   final String currency; // SAR | PKR
   final String createdBy;
   final Timestamp createdAt;
@@ -76,9 +86,16 @@ class InvoiceModel {
     this.outstandingAmount = 0,
     required this.status,
     this.notes,
+    this.paymentMethod,
+    this.paymentReference,
+    this.shopBalanceBefore,
+    this.shopBalanceAfter,
+    this.cashReceiptSequence,
     this.linkedInvoiceId,
     this.idempotencyKey,
     this.sellerInventoryDeductions = const {},
+    this.fulfillmentMode = fulfillmentStock,
+    this.headerSnapshot = const {},
     this.currency = 'SAR',
     required this.createdBy,
     required this.createdAt,
@@ -88,6 +105,8 @@ class InvoiceModel {
   bool get isSale => type == typeSale;
   bool get isReturn => type == typeReturn;
   bool get isCreditNote => type == typeCreditNote;
+  bool get isCashReceipt => type == typeCashReceipt;
+  bool get isNonStockSale => isSale && fulfillmentMode == fulfillmentNonStock;
   bool get isDraft => status == statusDraft;
   bool get isIssued => status == statusIssued;
   bool get isPaid => status == statusPaid;
@@ -100,6 +119,9 @@ class InvoiceModel {
     final amountReceived = (json['amount_received'] as num?)?.toDouble() ?? 0;
     final rawDeductions =
         (json['seller_inventory_deductions'] as Map<String, dynamic>?) ??
+        const <String, dynamic>{};
+    final rawHeader =
+        (json['invoice_header_snapshot'] as Map<String, dynamic>?) ??
         const <String, dynamic>{};
     final shopId = (json['shop_id'] as String?)?.trim() ?? '';
     final shopName = (json['shop_name'] as String?)?.trim() ?? '';
@@ -127,12 +149,19 @@ class InvoiceModel {
           (total - amountReceived),
       status: json['status'] as String? ?? statusDraft,
       notes: json['notes'] as String?,
+      paymentMethod: json['payment_method'] as String?,
+      paymentReference: json['payment_reference'] as String?,
+      shopBalanceBefore: (json['shop_balance_before'] as num?)?.toDouble(),
+      shopBalanceAfter: (json['shop_balance_after'] as num?)?.toDouble(),
+      cashReceiptSequence: (json['cash_receipt_sequence'] as num?)?.toInt(),
       linkedInvoiceId: json['linked_invoice_id'] as String?,
       idempotencyKey: json['idempotency_key'] as String?,
       sellerInventoryDeductions: {
         for (final entry in rawDeductions.entries)
           entry.key: (entry.value as num?)?.toInt() ?? 0,
       },
+      fulfillmentMode: json['fulfillment_mode'] as String? ?? fulfillmentStock,
+      headerSnapshot: Map<String, dynamic>.unmodifiable(rawHeader),
       currency: json['currency'] as String? ?? 'SAR',
       createdBy: json['created_by'] as String? ?? '',
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
@@ -157,10 +186,18 @@ class InvoiceModel {
     'outstanding_amount': outstandingAmount,
     'status': status,
     'notes': notes,
+    if (paymentMethod != null) 'payment_method': paymentMethod,
+    if (paymentReference != null) 'payment_reference': paymentReference,
+    if (shopBalanceBefore != null) 'shop_balance_before': shopBalanceBefore,
+    if (shopBalanceAfter != null) 'shop_balance_after': shopBalanceAfter,
+    if (cashReceiptSequence != null)
+      'cash_receipt_sequence': cashReceiptSequence,
     'linked_invoice_id': linkedInvoiceId,
     if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
     if (sellerInventoryDeductions.isNotEmpty)
       'seller_inventory_deductions': sellerInventoryDeductions,
+    'fulfillment_mode': fulfillmentMode,
+    if (headerSnapshot.isNotEmpty) 'invoice_header_snapshot': headerSnapshot,
     'currency': currency,
     'created_by': createdBy,
     'created_at': createdAt,
@@ -185,9 +222,16 @@ class InvoiceModel {
     double? outstandingAmount,
     String? status,
     String? notes,
+    String? paymentMethod,
+    String? paymentReference,
+    double? shopBalanceBefore,
+    double? shopBalanceAfter,
+    int? cashReceiptSequence,
     String? linkedInvoiceId,
     String? idempotencyKey,
     Map<String, int>? sellerInventoryDeductions,
+    String? fulfillmentMode,
+    Map<String, dynamic>? headerSnapshot,
     String? currency,
     String? createdBy,
     Timestamp? createdAt,
@@ -211,10 +255,17 @@ class InvoiceModel {
       outstandingAmount: outstandingAmount ?? this.outstandingAmount,
       status: status ?? this.status,
       notes: notes ?? this.notes,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      paymentReference: paymentReference ?? this.paymentReference,
+      shopBalanceBefore: shopBalanceBefore ?? this.shopBalanceBefore,
+      shopBalanceAfter: shopBalanceAfter ?? this.shopBalanceAfter,
+      cashReceiptSequence: cashReceiptSequence ?? this.cashReceiptSequence,
       linkedInvoiceId: linkedInvoiceId ?? this.linkedInvoiceId,
       idempotencyKey: idempotencyKey ?? this.idempotencyKey,
       sellerInventoryDeductions:
           sellerInventoryDeductions ?? this.sellerInventoryDeductions,
+      fulfillmentMode: fulfillmentMode ?? this.fulfillmentMode,
+      headerSnapshot: headerSnapshot ?? this.headerSnapshot,
       currency: currency ?? this.currency,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,

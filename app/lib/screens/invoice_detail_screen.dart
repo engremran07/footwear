@@ -323,7 +323,11 @@ class _InvoiceBody extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  invoice.isSale
+                  invoice.isCashReceipt
+                      ? tr('cash_receipt', ref)
+                      : invoice.isNonStockSale
+                      ? tr('invoice_non_stock_mode', ref)
+                      : invoice.isSale
                       ? tr('sale_invoice', ref)
                       : tr('credit_note', ref),
                   style: TextStyle(color: cs.onSurfaceVariant),
@@ -339,6 +343,32 @@ class _InvoiceBody extends ConsumerWidget {
                       : tr('shop', ref),
                 ),
                 _InfoRow(label: tr('date', ref), value: dateStr),
+                if (invoice.isCashReceipt && invoice.paymentMethod != null)
+                  _InfoRow(
+                    label: tr('payment_method', ref),
+                    value: tr('payment_method_${invoice.paymentMethod}', ref),
+                  ),
+                if (invoice.isCashReceipt && invoice.paymentReference != null)
+                  _InfoRow(
+                    label: tr('payment_reference', ref),
+                    value: invoice.paymentReference!,
+                  ),
+                if (invoice.isCashReceipt && invoice.shopBalanceBefore != null)
+                  _InfoRow(
+                    label: tr('balance_before', ref),
+                    value: AppFormatters.currency(
+                      invoice.shopBalanceBefore!,
+                      invoice.currency,
+                    ),
+                  ),
+                if (invoice.isCashReceipt && invoice.shopBalanceAfter != null)
+                  _InfoRow(
+                    label: tr('balance_after', ref),
+                    value: AppFormatters.currency(
+                      invoice.shopBalanceAfter!,
+                      invoice.currency,
+                    ),
+                  ),
                 if (invoice.linkedInvoiceId != null &&
                     invoice.linkedInvoiceId!.isNotEmpty)
                   _InfoRow(
@@ -381,13 +411,21 @@ class _InvoiceBody extends ConsumerWidget {
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                                Text(
-                                  '${item.size} • ${item.color}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: cs.onSurfaceVariant,
+                                if ([
+                                  item.size,
+                                  item.color,
+                                ].any((value) => value.trim().isNotEmpty))
+                                  Text(
+                                    [item.size, item.color]
+                                        .where(
+                                          (value) => value.trim().isNotEmpty,
+                                        )
+                                        .join(' • '),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: cs.onSurfaceVariant,
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                           ),
@@ -422,14 +460,15 @@ class _InvoiceBody extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _TotalRow(
-                  label: tr('subtotal', ref),
-                  value: AppFormatters.currency(
-                    invoice.subtotal,
-                    invoice.currency,
+                if (!invoice.isCashReceipt)
+                  _TotalRow(
+                    label: tr('subtotal', ref),
+                    value: AppFormatters.currency(
+                      invoice.subtotal,
+                      invoice.currency,
+                    ),
                   ),
-                ),
-                if (invoice.discount > 0)
+                if (!invoice.isCashReceipt && invoice.discount > 0)
                   _TotalRow(
                     label: tr('discount', ref),
                     value:
@@ -438,7 +477,10 @@ class _InvoiceBody extends ConsumerWidget {
                   ),
                 const Divider(),
                 _TotalRow(
-                  label: tr('total', ref),
+                  label: tr(
+                    invoice.isCashReceipt ? 'amount_received' : 'total',
+                    ref,
+                  ),
                   value: AppFormatters.currency(
                     invoice.total,
                     invoice.currency,
@@ -446,7 +488,7 @@ class _InvoiceBody extends ConsumerWidget {
                   bold: true,
                   color: invoice.isSale ? cs.error : cs.primary,
                 ),
-                if (invoice.amountReceived > 0)
+                if (!invoice.isCashReceipt && invoice.amountReceived > 0)
                   _TotalRow(
                     label: tr('amount_received', ref),
                     value: AppFormatters.currency(
@@ -455,7 +497,7 @@ class _InvoiceBody extends ConsumerWidget {
                     ),
                     color: cs.primary,
                   ),
-                if (invoice.outstandingAmount > 0)
+                if (!invoice.isCashReceipt && invoice.outstandingAmount > 0)
                   _TotalRow(
                     label: tr('outstanding_amount', ref),
                     value: AppFormatters.currency(

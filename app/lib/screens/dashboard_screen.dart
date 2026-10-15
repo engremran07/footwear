@@ -125,7 +125,7 @@ class DashboardScreen extends ConsumerWidget {
     if (user == null || authOperation.isLoading) {
       return Scaffold(body: ShimmerLoading.cards());
     }
-    if (user.isSuperAdmin) {
+    if (user.isSuperAdmin && user.tenantId == null) {
       return _SuperAdminDashboard(user: user);
     }
     if (!user.isAdmin) {

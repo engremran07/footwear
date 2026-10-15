@@ -12,12 +12,17 @@ import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/input_formatters.dart';
 import '../core/utils/snack_helper.dart';
+import '../models/invoice_model.dart';
+import '../models/product_model.dart';
+import '../models/product_variant_model.dart';
 import '../models/seller_inventory_model.dart';
+import '../models/settings_model.dart';
 import '../models/shop_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/invoice_provider.dart';
 import '../providers/network_provider.dart';
+import '../providers/product_provider.dart';
 import '../providers/seller_inventory_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/route_provider.dart';
@@ -26,6 +31,8 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/error_state.dart';
 
 // =============================================================================
+enum InvoiceEntryMode { stock, nonStock, cashReceipt }
+
 // CreateSaleInvoiceScreen — used ONLY for sales where stock is being deducted.
 //
 // PREREQUISITES:
@@ -57,6 +64,8 @@ class _CreateSaleInvoiceScreenState
   bool _shopAutoSelected = false;
   final _saleAmountC = TextEditingController();
   final _amountReceivedC = TextEditingController();
+  final _receiptAmountC = TextEditingController();
+  final _receiptReferenceC = TextEditingController();
   final _discountC = TextEditingController();
   final _notesC = TextEditingController();
   final _discountFn = FocusNode();
@@ -64,9 +73,14 @@ class _CreateSaleInvoiceScreenState
   final _notesFn = FocusNode();
   // _selectedQtys stores DOZENS per inventory item (primary UI unit)
   final Map<String, int> _selectedQtys = {};
+  final Map<String, int> _nonStockQtys = {};
+  final Map<String, TextEditingController> _nonStockUnitPriceCs = {};
   // _selectedExtraPairs stores extra pairs (0–11) per inventory item beyond full dozens
   final Map<String, int> _selectedExtraPairs = {};
   bool _submitting = false;
+  InvoiceEntryMode _entryMode = InvoiceEntryMode.nonStock;
+  String? _selectedProductId;
+  String _paymentMethod = 'cash';
   bool _isDirty = false;
   String? _pendingInvoiceIdempotencyKey;
   String? _pendingInvoiceFingerprint;
@@ -132,15 +146,54 @@ class _CreateSaleInvoiceScreenState
     return items;
   }
 
+  List<Map<String, dynamic>> _buildNonStockInvoiceItems(
+    List<ProductModel> products,
+    List<ProductVariantModel> variants,
+  ) {
+    final productsById = {for (final product in products) product.id: product};
+    return variants
+        .where((variant) => (_nonStockQtys[variant.id] ?? 0) > 0)
+        .map((variant) {
+          final quantity = _nonStockQtys[variant.id] ?? 0;
+          final unitPrice =
+              AppFormatters.parseAmountText(
+                _nonStockUnitPriceCs[variant.id]?.text ?? '',
+              ) ??
+              0;
+          final productName =
+              productsById[variant.productId]?.name.trim() ?? '';
+          final description = [
+            productName,
+            variant.variantName.trim(),
+          ].where((value) => value.isNotEmpty).join(' · ');
+          return <String, dynamic>{
+            'variant_id': variant.id,
+            'sku': '',
+            'product_name': description,
+            'size': '',
+            'color': '',
+            'qty': quantity,
+            'unit_price': unitPrice,
+            'subtotal': quantity * unitPrice,
+          };
+        })
+        .toList();
+  }
+
   @override
   void dispose() {
     _saleAmountC.dispose();
     _amountReceivedC.dispose();
+    _receiptAmountC.dispose();
+    _receiptReferenceC.dispose();
     _discountC.dispose();
     _notesC.dispose();
     _discountFn.dispose();
     _amountReceivedFn.dispose();
     _notesFn.dispose();
+    for (final controller in _nonStockUnitPriceCs.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -150,33 +203,36 @@ class _CreateSaleInvoiceScreenState
   double get _discountAmount =>
       AppFormatters.parseAmountText(_discountC.text) ?? 0;
 
-  double get _invoiceTotal {
-    final t = _saleAmount - _discountAmount;
-    return t > 0 ? t : 0;
-  }
-
   double get _amountReceived =>
       AppFormatters.parseAmountText(_amountReceivedC.text) ?? 0;
 
   double get _previousBalance => _selectedShop?.balance ?? 0;
 
-  double get _totalOutstanding => _previousBalance + _invoiceTotal;
-
-  double get _newBalance => _totalOutstanding - _amountReceived;
-
-  String _currentInvoiceFingerprint(Map<String, int> deductions) {
+  String _currentInvoiceFingerprint(
+    Map<String, int> deductions,
+    List<Map<String, dynamic>> items,
+  ) {
     final entries = deductions.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
     final deductionSignature = entries
         .map((e) => '${e.key}:${e.value}')
         .join('|');
+    final itemSignature = items.map((item) {
+      final unitPrice = (item['unit_price'] as num?)?.toDouble() ?? 0;
+      return '${item['variant_id'] ?? ''}:${item['qty'] ?? 0}:${unitPrice.toStringAsFixed(2)}';
+    }).toList()..sort();
     return [
+      _entryMode.name,
       _selectedShop?.id ?? '',
       _saleAmount.toStringAsFixed(2),
       _discountAmount.toStringAsFixed(2),
       _amountReceived.toStringAsFixed(2),
       AppSanitizer.text(_notesC.text, maxLength: 300),
+      _receiptAmountC.text,
+      _paymentMethod,
+      _receiptReferenceC.text,
       deductionSignature,
+      itemSignature.join('|'),
     ].join('::');
   }
 
@@ -197,6 +253,14 @@ class _CreateSaleInvoiceScreenState
     // Admin loads stock from warehouse to their own seller_inventory via the
     // Inventory screen transfer, then selects items here to create an invoice.
     final inventoryAsync = ref.watch(sellerInventoryProvider(user.id));
+    final settingsAsync = ref.watch(settingsProvider);
+    final isCatalogMode = _entryMode == InvoiceEntryMode.nonStock;
+    final productsAsync = isCatalogMode
+        ? ref.watch(productsProvider)
+        : const AsyncData<List<ProductModel>>([]);
+    final variantsAsync = isCatalogMode
+        ? ref.watch(allVariantsProvider)
+        : const AsyncData<List<ProductVariantModel>>([]);
 
     // Auto-select shop if preselected.
     if (widget.preselectedShopId != null && !_shopAutoSelected) {
@@ -225,18 +289,55 @@ class _CreateSaleInvoiceScreenState
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
-          body: inventoryAsync.when(
+          body: settingsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => mappedErrorState(
-              error: e,
+            error: (error, _) => mappedErrorState(
+              error: error,
               ref: ref,
-              onRetry: () => ref.invalidate(sellerInventoryProvider(user.id)),
+              onRetry: () => ref.invalidate(settingsProvider),
             ),
-            data: (inventory) {
-              final available = inventory
-                  .where((i) => i.quantityAvailable > 0)
-                  .toList();
-              return _buildBody(context, user, shopsAsync, available);
+            data: (settings) {
+              if (!settings.allowNonStockInvoices &&
+                  _entryMode == InvoiceEntryMode.nonStock) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && _entryMode == InvoiceEntryMode.nonStock) {
+                    setState(() => _entryMode = InvoiceEntryMode.stock);
+                  }
+                });
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (_entryMode == InvoiceEntryMode.stock) {
+                return inventoryAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (error, _) => mappedErrorState(
+                    error: error,
+                    ref: ref,
+                    onRetry: () =>
+                        ref.invalidate(sellerInventoryProvider(user.id)),
+                  ),
+                  data: (inventory) => _buildBody(
+                    context,
+                    user,
+                    shopsAsync,
+                    settings,
+                    inventory
+                        .where((item) => item.quantityAvailable > 0)
+                        .toList(),
+                    const AsyncData<List<ProductModel>>([]),
+                    const AsyncData<List<ProductVariantModel>>([]),
+                  ),
+                );
+              }
+              return _buildBody(
+                context,
+                user,
+                shopsAsync,
+                settings,
+                const <SellerInventoryModel>[],
+                productsAsync,
+                variantsAsync,
+              );
             },
           ),
         ),
@@ -248,11 +349,44 @@ class _CreateSaleInvoiceScreenState
     BuildContext context,
     UserModel user,
     AsyncValue<List<ShopModel>> shopsAsync,
+    SettingsModel settings,
     List<SellerInventoryModel> inventory,
+    AsyncValue<List<ProductModel>> productsAsync,
+    AsyncValue<List<ProductVariantModel>> variantsAsync,
   ) {
     final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
-    final ppc = ref.watch(settingsProvider).value?.pairsPerCarton ?? 12;
+    final ppc = settings.pairsPerCarton;
+    final products = productsAsync.value ?? const <ProductModel>[];
+    final selectedVariants = _selectedProductId == null
+        ? const <ProductVariantModel>[]
+        : (variantsAsync.value ?? const <ProductVariantModel>[])
+              .where(
+                (variant) =>
+                    variant.productId == _selectedProductId && variant.active,
+              )
+              .toList();
+    final nonStockItems = _buildNonStockInvoiceItems(
+      products,
+      selectedVariants,
+    );
+    final nonStockSubtotal = nonStockItems.fold<double>(
+      0,
+      (sum, item) => sum + (item['subtotal'] as num).toDouble(),
+    );
+    final displayedSubtotal = switch (_entryMode) {
+      InvoiceEntryMode.stock => _saleAmount,
+      InvoiceEntryMode.nonStock => nonStockSubtotal,
+      InvoiceEntryMode.cashReceipt =>
+        AppFormatters.parseAmountText(_receiptAmountC.text) ?? 0,
+    };
+    final displayedDiscount = _entryMode == InvoiceEntryMode.cashReceipt
+        ? 0.0
+        : _discountAmount;
+    final displayedTotal = (displayedSubtotal - displayedDiscount).clamp(
+      0.0,
+      double.infinity,
+    );
     // Resolve currency from the selected shop's route. Defaults to SAR.
     final routeIdForCurrency = _selectedShop != null
         ? (_selectedShop!.routeId.isNotEmpty
@@ -279,6 +413,40 @@ class _CreateSaleInvoiceScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  tr('invoice_mode', ref),
+                  style: ts.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<InvoiceEntryMode>(
+                  segments: [
+                    ButtonSegment(
+                      value: InvoiceEntryMode.stock,
+                      icon: const Icon(Icons.inventory_2_outlined),
+                      label: Text(tr('invoice_stock_mode', ref)),
+                    ),
+                    if (settings.allowNonStockInvoices)
+                      ButtonSegment(
+                        value: InvoiceEntryMode.nonStock,
+                        icon: const Icon(Icons.shopping_bag_outlined),
+                        label: Text(tr('invoice_non_stock_mode', ref)),
+                      ),
+                    ButtonSegment(
+                      value: InvoiceEntryMode.cashReceipt,
+                      icon: const Icon(Icons.payments_outlined),
+                      label: Text(tr('cash_receipt', ref)),
+                    ),
+                  ],
+                  selected: {_entryMode},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (selection) {
+                    setState(() {
+                      _entryMode = selection.first;
+                      _isDirty = true;
+                    });
+                  },
+                ),
+                const SizedBox(height: 20),
                 // ── Shop selector ──
                 Text(
                   tr('select_shop', ref),
@@ -352,109 +520,59 @@ class _CreateSaleInvoiceScreenState
                 const SizedBox(height: 20),
 
                 // ── Items ──
-                Text(
-                  tr('select_items', ref),
-                  style: ts.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                if (inventory.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Center(
-                      child: Text(
-                        tr('no_inventory_items', ref),
-                        style: ts.bodyMedium,
-                      ),
-                    ),
-                  )
-                else
-                  ...inventory.map((item) {
-                    final maxDozens = item.quantityAvailable ~/ ppc;
-                    final dozens = _selectedQtys[item.id] ?? 0;
-                    final extraPairs = _selectedExtraPairs[item.id] ?? 0;
-                    final maxExtraPairs =
-                        (item.quantityAvailable - dozens * ppc).clamp(
-                          0,
-                          ppc - 1,
-                        );
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
+                if (_entryMode == InvoiceEntryMode.stock) ...[
+                  Text(
+                    tr('select_items', ref),
+                    style: ts.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  if (inventory.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Center(
+                        child: Text(
+                          tr('no_inventory_items', ref),
+                          style: ts.bodyMedium,
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.variantName,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w500,
+                      ),
+                    )
+                  else
+                    ...inventory.map((item) {
+                      final maxDozens = item.quantityAvailable ~/ ppc;
+                      final dozens = _selectedQtys[item.id] ?? 0;
+                      final extraPairs = _selectedExtraPairs[item.id] ?? 0;
+                      final maxExtraPairs =
+                          (item.quantityAvailable - dozens * ppc).clamp(
+                            0,
+                            ppc - 1,
+                          );
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.variantName,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
-                            Text(
-                              '${tr("available", ref)}: ${AppFormatters.stock(item.quantityAvailable, ppc)}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 4),
-                            // ── Dozens stepper ──
-                            Row(
-                              children: [
-                                Text(
-                                  tr('lbl_cartons', ref),
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                const Spacer(),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.remove_circle_outline,
-                                    size: 22,
-                                  ),
-                                  tooltip: tr('tooltip_decrease_qty', ref),
-                                  onPressed: dozens <= 0
-                                      ? null
-                                      : () => setState(() {
-                                          _selectedQtys[item.id] = dozens - 1;
-                                          _isDirty = true;
-                                          if (dozens - 1 == 0) {
-                                            _selectedExtraPairs.remove(item.id);
-                                          }
-                                        }),
-                                ),
-                                SizedBox(
-                                  width: 32,
-                                  child: Text(
-                                    '$dozens',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.add_circle_outline,
-                                    size: 22,
-                                  ),
-                                  tooltip: tr('tooltip_increase_qty', ref),
-                                  onPressed: dozens >= maxDozens
-                                      ? null
-                                      : () => setState(() {
-                                          _selectedQtys[item.id] = dozens + 1;
-                                          _isDirty = true;
-                                        }),
-                                ),
-                              ],
-                            ),
-                            // ── Extra pairs stepper (optional, shown when dozens > 0) ──
-                            if (dozens > 0)
+                              Text(
+                                '${tr("available", ref)}: ${AppFormatters.stock(item.quantityAvailable, ppc)}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 4),
+                              // ── Dozens stepper ──
                               Row(
                                 children: [
                                   Text(
-                                    tr('lbl_extra_pairs', ref),
+                                    tr('lbl_cartons', ref),
                                     style: Theme.of(
                                       context,
                                     ).textTheme.bodySmall,
@@ -463,120 +581,465 @@ class _CreateSaleInvoiceScreenState
                                   IconButton(
                                     icon: const Icon(
                                       Icons.remove_circle_outline,
-                                      size: 20,
+                                      size: 22,
                                     ),
                                     tooltip: tr('tooltip_decrease_qty', ref),
-                                    onPressed: extraPairs <= 0
+                                    onPressed: dozens <= 0
                                         ? null
                                         : () => setState(() {
-                                            _selectedExtraPairs[item.id] =
-                                                extraPairs - 1;
+                                            _selectedQtys[item.id] = dozens - 1;
                                             _isDirty = true;
+                                            if (dozens - 1 == 0) {
+                                              _selectedExtraPairs.remove(
+                                                item.id,
+                                              );
+                                            }
                                           }),
                                   ),
                                   SizedBox(
                                     width: 32,
                                     child: Text(
-                                      '$extraPairs',
+                                      '$dozens',
                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(fontSize: 14),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
                                     ),
                                   ),
                                   IconButton(
                                     icon: const Icon(
                                       Icons.add_circle_outline,
-                                      size: 20,
+                                      size: 22,
                                     ),
                                     tooltip: tr('tooltip_increase_qty', ref),
-                                    // max extra pairs = ppc - 1 (a full dozen would be a new dozen)
-                                    onPressed: extraPairs >= maxExtraPairs
+                                    onPressed: dozens >= maxDozens
                                         ? null
                                         : () => setState(() {
-                                            _selectedExtraPairs[item.id] =
-                                                extraPairs + 1;
+                                            _selectedQtys[item.id] = dozens + 1;
                                             _isDirty = true;
                                           }),
                                   ),
                                 ],
                               ),
-                          ],
+                              // ── Extra pairs stepper (optional, shown when dozens > 0) ──
+                              if (dozens > 0)
+                                Row(
+                                  children: [
+                                    Text(
+                                      tr('lbl_extra_pairs', ref),
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                    const Spacer(),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.remove_circle_outline,
+                                        size: 20,
+                                      ),
+                                      tooltip: tr('tooltip_decrease_qty', ref),
+                                      onPressed: extraPairs <= 0
+                                          ? null
+                                          : () => setState(() {
+                                              _selectedExtraPairs[item.id] =
+                                                  extraPairs - 1;
+                                              _isDirty = true;
+                                            }),
+                                    ),
+                                    SizedBox(
+                                      width: 32,
+                                      child: Text(
+                                        '$extraPairs',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.add_circle_outline,
+                                        size: 20,
+                                      ),
+                                      tooltip: tr('tooltip_increase_qty', ref),
+                                      // max extra pairs = ppc - 1 (a full dozen would be a new dozen)
+                                      onPressed: extraPairs >= maxExtraPairs
+                                          ? null
+                                          : () => setState(() {
+                                              _selectedExtraPairs[item.id] =
+                                                  extraPairs + 1;
+                                              _isDirty = true;
+                                            }),
+                                    ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+                if (_entryMode == InvoiceEntryMode.nonStock) ...[
+                  Text(
+                    tr('invoice_catalog_items', ref),
+                    style: ts.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  productsAsync.when(
+                    loading: () => const LinearProgressIndicator(),
+                    error: (error, _) => mappedErrorState(
+                      error: error,
+                      ref: ref,
+                      onRetry: () => ref.invalidate(productsProvider),
+                    ),
+                    data: (catalog) {
+                      if (catalog.isEmpty) {
+                        return Text(tr('no_products_available', ref));
+                      }
+                      final validProductIds = catalog
+                          .map((product) => product.id)
+                          .toSet();
+                      final selectedProductId =
+                          validProductIds.contains(_selectedProductId)
+                          ? _selectedProductId
+                          : null;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          DropdownButtonFormField<String>(
+                            initialValue: selectedProductId,
+                            decoration: InputDecoration(
+                              labelText: tr('select_product', ref),
+                              prefixIcon: const Icon(Icons.category_outlined),
+                            ),
+                            items: catalog
+                                .map(
+                                  (product) => DropdownMenuItem(
+                                    value: product.id,
+                                    child: Text(
+                                      product.name,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (productId) {
+                              for (final controller
+                                  in _nonStockUnitPriceCs.values) {
+                                controller.dispose();
+                              }
+                              setState(() {
+                                _selectedProductId = productId;
+                                _nonStockQtys.clear();
+                                _nonStockUnitPriceCs.clear();
+                                _isDirty = true;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          if (_selectedProductId != null)
+                            variantsAsync.when(
+                              loading: () => const LinearProgressIndicator(),
+                              error: (error, _) => mappedErrorState(
+                                error: error,
+                                ref: ref,
+                                onRetry: () =>
+                                    ref.invalidate(allVariantsProvider),
+                              ),
+                              data: (allVariants) {
+                                final variants = allVariants
+                                    .where(
+                                      (variant) =>
+                                          variant.productId ==
+                                              _selectedProductId &&
+                                          variant.active,
+                                    )
+                                    .toList();
+                                if (variants.isEmpty) {
+                                  return Text(tr('no_variants_available', ref));
+                                }
+                                return Column(
+                                  children: variants.map((variant) {
+                                    final quantity =
+                                        _nonStockQtys[variant.id] ?? 0;
+                                    final priceController = _nonStockUnitPriceCs
+                                        .putIfAbsent(
+                                          variant.id,
+                                          TextEditingController.new,
+                                        );
+                                    return Card(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              variant.variantName,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            Row(
+                                              children: [
+                                                Text(tr('qty', ref)),
+                                                const Spacer(),
+                                                IconButton(
+                                                  tooltip: tr(
+                                                    'tooltip_decrease_qty',
+                                                    ref,
+                                                  ),
+                                                  onPressed: quantity <= 0
+                                                      ? null
+                                                      : () => setState(() {
+                                                          _nonStockQtys[variant
+                                                                  .id] =
+                                                              quantity - 1;
+                                                          _isDirty = true;
+                                                        }),
+                                                  icon: const Icon(
+                                                    Icons.remove_circle_outline,
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  width: 32,
+                                                  child: Text(
+                                                    '$quantity',
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                ),
+                                                IconButton(
+                                                  tooltip: tr(
+                                                    'tooltip_increase_qty',
+                                                    ref,
+                                                  ),
+                                                  onPressed: () => setState(() {
+                                                    _nonStockQtys[variant.id] =
+                                                        quantity + 1;
+                                                    _isDirty = true;
+                                                  }),
+                                                  icon: const Icon(
+                                                    Icons.add_circle_outline,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            if (quantity > 0)
+                                              TextField(
+                                                controller: priceController,
+                                                keyboardType:
+                                                    const TextInputType.numberWithOptions(
+                                                      decimal: true,
+                                                    ),
+                                                inputFormatters: [
+                                                  AppInputFormatters
+                                                      .amountFormatter,
+                                                ],
+                                                decoration: InputDecoration(
+                                                  labelText: tr(
+                                                    'unit_price',
+                                                    ref,
+                                                  ),
+                                                  prefixIcon: const Icon(
+                                                    Icons.currency_exchange,
+                                                  ),
+                                                ),
+                                                onChanged: (_) => setState(() {
+                                                  _isDirty = true;
+                                                }),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                );
+                              },
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                  if (nonStockItems.isNotEmpty)
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: Text(
+                        '${tr('subtotal', ref)}: ${AppFormatters.currency(nonStockSubtotal, currency)}',
+                        style: ts.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    );
-                  }),
+                    ),
+                ],
+                if (_entryMode == InvoiceEntryMode.cashReceipt) ...[
+                  Text(
+                    tr('cash_receipt_details', ref),
+                    style: ts.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _receiptAmountC,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [AppInputFormatters.amountFormatter],
+                    decoration: InputDecoration(
+                      labelText: tr('amount_received', ref),
+                      prefixIcon: const Icon(Icons.payments_outlined),
+                    ),
+                    onChanged: (_) => setState(() => _isDirty = true),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: _paymentMethod,
+                    decoration: InputDecoration(
+                      labelText: tr('payment_method', ref),
+                      prefixIcon: const Icon(
+                        Icons.account_balance_wallet_outlined,
+                      ),
+                    ),
+                    items: [
+                      for (final method in ['cash', 'bank_transfer', 'cheque'])
+                        DropdownMenuItem(
+                          value: method,
+                          child: Text(tr('payment_method_$method', ref)),
+                        ),
+                    ],
+                    onChanged: (method) {
+                      if (method != null) {
+                        setState(() {
+                          _paymentMethod = method;
+                          _isDirty = true;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _receiptReferenceC,
+                    decoration: InputDecoration(
+                      labelText: tr('payment_reference', ref),
+                      prefixIcon: const Icon(Icons.tag),
+                    ),
+                    onChanged: (_) => setState(() => _isDirty = true),
+                  ),
+                ],
 
                 const SizedBox(height: 16),
 
                 // ── Sale Amount ──
-                TextField(
-                  controller: _saleAmountC,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+                if (_entryMode == InvoiceEntryMode.stock) ...[
+                  TextField(
+                    controller: _saleAmountC,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: tr('sale_amount', ref),
+                      prefixIcon: const Icon(Icons.currency_exchange),
+                      hintText: '0.00',
+                    ),
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => _discountFn.requestFocus(),
+                    inputFormatters: [AppInputFormatters.amountFormatter],
+                    onChanged: (_) {
+                      if (!_isDirty) _isDirty = true;
+                      setState(() {});
+                    },
                   ),
-                  decoration: InputDecoration(
-                    labelText: tr('sale_amount', ref),
-                    prefixIcon: const Icon(Icons.currency_exchange),
-                    hintText: '0.00',
-                  ),
-                  textInputAction: TextInputAction.next,
-                  onSubmitted: (_) => _discountFn.requestFocus(),
-                  inputFormatters: [AppInputFormatters.amountFormatter],
-                  onChanged: (_) {
-                    if (!_isDirty) _isDirty = true;
-                    setState(() {});
-                  },
-                ),
+                ],
 
                 const SizedBox(height: 12),
 
                 // ── Discount ──
-                TextField(
-                  controller: _discountC,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+                if (_entryMode != InvoiceEntryMode.cashReceipt)
+                  TextField(
+                    controller: _discountC,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: tr('discount_amount', ref),
+                      prefixIcon: const Icon(Icons.money_off),
+                    ),
+                    focusNode: _discountFn,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => _amountReceivedFn.requestFocus(),
+                    inputFormatters: [AppInputFormatters.amountFormatter],
+                    onChanged: (_) {
+                      if (!_isDirty) _isDirty = true;
+                      setState(() {});
+                    },
                   ),
-                  decoration: InputDecoration(
-                    labelText: tr('discount_amount', ref),
-                    prefixIcon: const Icon(Icons.money_off),
-                  ),
-                  focusNode: _discountFn,
-                  textInputAction: TextInputAction.next,
-                  onSubmitted: (_) => _amountReceivedFn.requestFocus(),
-                  inputFormatters: [AppInputFormatters.amountFormatter],
-                  onChanged: (_) {
-                    if (!_isDirty) _isDirty = true;
-                    setState(() {});
-                  },
-                ),
 
                 const SizedBox(height: 12),
 
                 // ── Amount Received ──
-                TextField(
-                  controller: _amountReceivedC,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+                if (_entryMode != InvoiceEntryMode.cashReceipt)
+                  TextField(
+                    controller: _amountReceivedC,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: tr('amount_received', ref),
+                      prefixIcon: const Icon(Icons.payments),
+                      hintText: '0.00',
+                    ),
+                    focusNode: _amountReceivedFn,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => _notesFn.requestFocus(),
+                    inputFormatters: [AppInputFormatters.amountFormatter],
+                    onChanged: (_) {
+                      if (!_isDirty) _isDirty = true;
+                      setState(() {});
+                    },
                   ),
-                  decoration: InputDecoration(
-                    labelText: tr('amount_received', ref),
-                    prefixIcon: const Icon(Icons.payments),
-                    hintText: '0.00',
-                  ),
-                  focusNode: _amountReceivedFn,
-                  textInputAction: TextInputAction.next,
-                  onSubmitted: (_) => _notesFn.requestFocus(),
-                  inputFormatters: [AppInputFormatters.amountFormatter],
-                  onChanged: (_) {
-                    if (!_isDirty) _isDirty = true;
-                    setState(() {});
-                  },
-                ),
 
                 const SizedBox(height: 16),
 
                 // ── Payment Summary Card ──
-                if (_selectedShop != null)
-                  _buildPaymentSummary(cs, ts, currency),
+                if (_selectedShop != null &&
+                    _entryMode != InvoiceEntryMode.cashReceipt)
+                  _buildPaymentSummary(
+                    cs,
+                    ts,
+                    currency,
+                    saleAmount: displayedSubtotal,
+                    discount: displayedDiscount,
+                    amountReceived: _amountReceived,
+                  ),
+                if (_selectedShop != null &&
+                    _entryMode == InvoiceEntryMode.cashReceipt)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        children: [
+                          _summaryRow(
+                            tr('balance_before', ref),
+                            AppFormatters.currency(_previousBalance, currency),
+                            ts,
+                          ),
+                          _summaryRow(
+                            tr('amount_received', ref),
+                            '- ${AppFormatters.currency(displayedTotal, currency)}',
+                            ts,
+                          ),
+                          const Divider(),
+                          _summaryRow(
+                            tr('balance_after', ref),
+                            AppFormatters.currency(
+                              _previousBalance - displayedTotal,
+                              currency,
+                            ),
+                            ts,
+                            bold: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                 const SizedBox(height: 12),
 
@@ -628,13 +1091,23 @@ class _CreateSaleInvoiceScreenState
                         final extraLabel = totalExtraPairs > 0
                             ? ' $totalExtraPairs ${tr("pairs", ref)}'
                             : '';
-                        return Text(
-                          '${tr("items", ref)}: $totalDozens ${tr("lbl_cartons", ref)}$extraLabel',
-                          style: ts.bodyMedium,
-                        );
+                        final summary = switch (_entryMode) {
+                          InvoiceEntryMode.stock =>
+                            '${tr("items", ref)}: $totalDozens ${tr("lbl_cartons", ref)}$extraLabel',
+                          InvoiceEntryMode.nonStock =>
+                            '${tr("items", ref)}: ${nonStockItems.length}',
+                          InvoiceEntryMode.cashReceipt =>
+                            '${tr("amount_received", ref)}: ${AppFormatters.currency(displayedTotal, currency)}',
+                        };
+                        return Text(summary, style: ts.bodyMedium);
                       },
                     ),
-                    _buildSaleTypeChip(ts),
+                    if (_entryMode != InvoiceEntryMode.cashReceipt)
+                      _buildSaleTypeChip(
+                        ts,
+                        total: displayedTotal,
+                        received: _amountReceived,
+                      ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -657,7 +1130,17 @@ class _CreateSaleInvoiceScreenState
                             ),
                           )
                         : const Icon(Icons.receipt_long),
-                    label: Text(tr('create_sale_invoice', ref)),
+                    label: Text(switch (_entryMode) {
+                      InvoiceEntryMode.stock => tr('create_sale_invoice', ref),
+                      InvoiceEntryMode.nonStock => tr(
+                        'create_non_stock_invoice',
+                        ref,
+                      ),
+                      InvoiceEntryMode.cashReceipt => tr(
+                        'create_cash_receipt',
+                        ref,
+                      ),
+                    }),
                   ),
                 ),
               ],
@@ -669,12 +1152,19 @@ class _CreateSaleInvoiceScreenState
   }
 
   /// Payment summary card showing balance breakdown.
-  Widget _buildPaymentSummary(ColorScheme cs, TextTheme ts, String currency) {
+  Widget _buildPaymentSummary(
+    ColorScheme cs,
+    TextTheme ts,
+    String currency, {
+    required double saleAmount,
+    required double discount,
+    required double amountReceived,
+  }) {
     final prevBal = _previousBalance;
-    final sale = _invoiceTotal;
-    final totalDue = _totalOutstanding;
-    final received = _amountReceived;
-    final newBal = _newBalance;
+    final sale = (saleAmount - discount).clamp(0.0, double.infinity);
+    final totalDue = prevBal + sale;
+    final received = amountReceived;
+    final newBal = totalDue - received;
 
     return Card(
       color: AppTheme.clearBg(cs),
@@ -699,11 +1189,11 @@ class _CreateSaleInvoiceScreenState
               AppFormatters.currency(sale, currency),
               ts,
             ),
-            if (_discountAmount > 0) ...[
+            if (discount > 0) ...[
               const SizedBox(height: 4),
               _summaryRow(
                 tr('discount', ref),
-                '- ${AppFormatters.currency(_discountAmount, currency)}',
+                '- ${AppFormatters.currency(discount, currency)}',
                 ts,
                 color: AppBrand.successColor,
               ),
@@ -759,9 +1249,11 @@ class _CreateSaleInvoiceScreenState
   }
 
   /// Auto-derived sale type chip.
-  Widget _buildSaleTypeChip(TextTheme ts) {
-    final received = _amountReceived;
-    final total = _invoiceTotal;
+  Widget _buildSaleTypeChip(
+    TextTheme ts, {
+    required double total,
+    required double received,
+  }) {
     final String label;
     final Color bg;
 
@@ -829,7 +1321,18 @@ class _CreateSaleInvoiceScreenState
       messenger.showSnackBar(warningSnackBar(tr('warn_offline', ref)));
       return;
     }
-    final ppc = ref.read(settingsProvider).value?.pairsPerCarton ?? 12;
+    final SettingsModel settings;
+    try {
+      settings = await ref.read(settingsProvider.future);
+    } catch (error) {
+      if (mounted) {
+        messenger.showSnackBar(
+          errorSnackBar(tr(AppErrorMapper.key(error), ref)),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
 
     if (_selectedShop == null) {
       HapticFeedback.vibrate();
@@ -837,46 +1340,126 @@ class _CreateSaleInvoiceScreenState
       return;
     }
 
-    // Convert dozens → pairs for inventory deduction (quantity_available stores pairs)
-    final deductions = Map<String, int>.fromEntries(
-      _selectedQtys.entries
-          .where((e) => e.value > 0)
-          .map(
-            (e) => MapEntry(
-              e.key,
-              e.value * ppc + (_selectedExtraPairs[e.key] ?? 0),
-            ),
-          ),
-    );
-    // Invoices are exclusively for stock sales — at least one item is required for all roles
-    if (deductions.isEmpty) {
-      HapticFeedback.vibrate();
-      messenger.showSnackBar(
-        warningSnackBar(tr('select_at_least_one_item', ref)),
-      );
-      return;
+    final ppc = settings.pairsPerCarton;
+    final routeId = _selectedShop!.routeId.isNotEmpty
+        ? _selectedShop!.routeId
+        : (user.assignedRouteIds.firstOrNull ?? '');
+    final currency = ref.read(routeCurrencyProvider(routeId));
+    final List<Map<String, dynamic>> items;
+    final Map<String, int> deductions;
+    final double subtotal;
+    final double discount;
+    final double total;
+    final double amountReceived;
+
+    switch (_entryMode) {
+      case InvoiceEntryMode.stock:
+        deductions = Map<String, int>.fromEntries(
+          _selectedQtys.entries
+              .where((entry) => entry.value > 0)
+              .map(
+                (entry) => MapEntry(
+                  entry.key,
+                  entry.value * ppc + (_selectedExtraPairs[entry.key] ?? 0),
+                ),
+              ),
+        );
+        if (deductions.isEmpty) {
+          HapticFeedback.vibrate();
+          messenger.showSnackBar(
+            warningSnackBar(tr('select_at_least_one_item', ref)),
+          );
+          return;
+        }
+        subtotal = _saleAmount;
+        items = _buildInvoiceItems(
+          ref.read(sellerInventoryProvider(user.id)).value ?? [],
+          subtotal,
+          ppc,
+        );
+        discount = _discountAmount;
+        amountReceived = _amountReceived;
+        total = subtotal - discount;
+        break;
+      case InvoiceEntryMode.nonStock:
+        if (!settings.allowNonStockInvoices) {
+          HapticFeedback.vibrate();
+          messenger.showSnackBar(
+            warningSnackBar(tr('allow_non_stock_invoices', ref)),
+          );
+          return;
+        }
+        deductions = const {};
+        final products = ref.read(productsProvider).value ?? const [];
+        final variants = (ref.read(allVariantsProvider).value ?? const [])
+            .where(
+              (variant) =>
+                  variant.productId == _selectedProductId && variant.active,
+            )
+            .toList();
+        items = _buildNonStockInvoiceItems(products, variants);
+        subtotal = items.fold<double>(
+          0,
+          (sum, item) => sum + (item['subtotal'] as num).toDouble(),
+        );
+        discount = _discountAmount;
+        amountReceived = _amountReceived;
+        total = subtotal - discount;
+        if (items.isEmpty) {
+          HapticFeedback.vibrate();
+          messenger.showSnackBar(
+            warningSnackBar(tr('select_at_least_one_item', ref)),
+          );
+          return;
+        }
+        break;
+      case InvoiceEntryMode.cashReceipt:
+        final receiptAmount =
+            AppFormatters.parseAmountText(_receiptAmountC.text) ?? 0;
+        if (receiptAmount <= 0) {
+          HapticFeedback.vibrate();
+          messenger.showSnackBar(
+            warningSnackBar(tr('sale_amount_required', ref)),
+          );
+          return;
+        }
+        items = const [];
+        deductions = const {};
+        subtotal = 0;
+        discount = 0;
+        total = receiptAmount;
+        amountReceived = receiptAmount;
+        break;
     }
 
-    final saleAmount = _saleAmount;
-    if (saleAmount <= 0) {
+    if (total <= 0) {
       HapticFeedback.vibrate();
       messenger.showSnackBar(warningSnackBar(tr('sale_amount_required', ref)));
       return;
     }
 
-    final discount = _discountAmount;
-    if (discount < 0 || discount > saleAmount) {
-      HapticFeedback.vibrate();
-      messenger.showSnackBar(warningSnackBar(tr('discount', ref)));
-      return;
+    if (_entryMode != InvoiceEntryMode.cashReceipt) {
+      if (subtotal <= 0) {
+        HapticFeedback.vibrate();
+        messenger.showSnackBar(
+          warningSnackBar(tr('sale_amount_required', ref)),
+        );
+        return;
+      }
+      if (discount < 0 || discount > subtotal) {
+        HapticFeedback.vibrate();
+        messenger.showSnackBar(warningSnackBar(tr('discount', ref)));
+        return;
+      }
+      if (items.any((item) => (item['unit_price'] as num).toDouble() <= 0)) {
+        HapticFeedback.vibrate();
+        messenger.showSnackBar(
+          warningSnackBar(tr('sale_amount_required', ref)),
+        );
+        return;
+      }
     }
 
-    // Build line items from selected inventory
-    final inventoryList =
-        ref.read(sellerInventoryProvider(user.id)).value ?? [];
-    final total = _invoiceTotal;
-    final items = _buildInvoiceItems(inventoryList, saleAmount, ppc);
-    final amountReceived = _amountReceived;
     if (amountReceivedExceedsInvoiceTotal(
       amountReceived: amountReceived,
       total: total,
@@ -887,7 +1470,7 @@ class _CreateSaleInvoiceScreenState
       );
       return;
     }
-    final invoiceFingerprint = _currentInvoiceFingerprint(deductions);
+    final invoiceFingerprint = _currentInvoiceFingerprint(deductions, items);
     if (_pendingInvoiceFingerprint != invoiceFingerprint ||
         _pendingInvoiceIdempotencyKey == null) {
       _pendingInvoiceFingerprint = invoiceFingerprint;
@@ -902,35 +1485,50 @@ class _CreateSaleInvoiceScreenState
     setState(() => _submitting = true);
 
     try {
-      final invoiceId = await ref
-          .read(invoiceNotifierProvider.notifier)
-          .createSaleInvoice(
-            shopId: _selectedShop!.id,
-            shopName: _selectedShop!.name,
-            routeId: _selectedShop!.routeId.isNotEmpty
-                ? _selectedShop!.routeId
-                : (user.assignedRouteIds.firstOrNull ?? ''),
-            sellerId: user.id,
-            sellerName: user.displayName,
-            items: items,
-            subtotal: saleAmount,
-            discount: discount,
-            total: total,
-            amountReceived: amountReceived,
-            notes: _notesC.text.trim().isEmpty
-                ? null
-                : AppSanitizer.text(_notesC.text, maxLength: 300),
-            createdBy: user.id,
-            currency: ref.read(
-              routeCurrencyProvider(
-                _selectedShop!.routeId.isNotEmpty
-                    ? _selectedShop!.routeId
-                    : (user.assignedRouteIds.firstOrNull ?? ''),
-              ),
-            ),
-            sellerInventoryDeductions: deductions,
-            idempotencyKey: _pendingInvoiceIdempotencyKey,
-          );
+      final notifier = ref.read(invoiceNotifierProvider.notifier);
+      final invoiceId = switch (_entryMode) {
+        InvoiceEntryMode.cashReceipt => await notifier.createCashReceipt(
+          shopId: _selectedShop!.id,
+          shopName: _selectedShop!.name,
+          routeId: routeId,
+          sellerId: user.id,
+          sellerName: user.displayName,
+          amount: total,
+          createdBy: user.id,
+          currency: currency,
+          notes: _notesC.text.trim().isEmpty
+              ? null
+              : AppSanitizer.text(_notesC.text, maxLength: 300),
+          paymentMethod: _paymentMethod,
+          referenceNumber: _receiptReferenceC.text.trim().isEmpty
+              ? null
+              : AppSanitizer.text(_receiptReferenceC.text, maxLength: 100),
+          idempotencyKey: _pendingInvoiceIdempotencyKey,
+        ),
+        InvoiceEntryMode.stock ||
+        InvoiceEntryMode.nonStock => await notifier.createSaleInvoice(
+          shopId: _selectedShop!.id,
+          shopName: _selectedShop!.name,
+          routeId: routeId,
+          sellerId: user.id,
+          sellerName: user.displayName,
+          items: items,
+          subtotal: subtotal,
+          discount: discount,
+          total: total,
+          amountReceived: amountReceived,
+          notes: _notesC.text.trim().isEmpty
+              ? null
+              : AppSanitizer.text(_notesC.text, maxLength: 300),
+          createdBy: user.id,
+          currency: currency,
+          sellerInventoryDeductions: deductions,
+          fulfillmentMode: _entryMode == InvoiceEntryMode.stock
+              ? InvoiceModel.fulfillmentStock
+              : InvoiceModel.fulfillmentNonStock,
+          idempotencyKey: _pendingInvoiceIdempotencyKey,
+        ),
+      };
 
       if (mounted) {
         HapticFeedback.mediumImpact();

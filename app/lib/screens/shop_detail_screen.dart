@@ -1337,6 +1337,20 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                   ],
                 ),
               ),
+              if (canManageShop)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.push(
+                        '/invoices/new?shopId=${Uri.encodeComponent(shop.id)}',
+                      ),
+                      icon: const Icon(Icons.receipt_long_outlined),
+                      label: Text(tr('create_invoice', ref)),
+                    ),
+                  ),
+                ),
               const SizedBox(height: 8),
               // Transactions header
               Padding(

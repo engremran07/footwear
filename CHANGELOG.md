@@ -7,6 +7,41 @@ Most recent first.
 
 ---
 
+## [3.9.75+102] — 2026-10-15 — Auth, access policy, invoice integrity, and Android update compatibility
+
+### Fixed
+
+- Corrected post-registration session timestamp parsing, device-slot verification, stale-session enforcement, UID-scoped logout, resume renewal, and revoked-session renewal behavior.
+- Separated device/session policy: a platform-configured shared cap for workspace admins, per-workspace configurable seller caps, and separate super-admin platform slots.
+- Made invoice void status, shop balance, stock restoration, and ledger reversals atomic; cash-refund ledger entries now reconcile with the balance delta.
+- Bound cash-receipt sequence values to the same workspace counter update in Firestore Rules.
+- Localized cash-receipt payment methods and made invoice PDFs paginate with a dynamic page count.
+
+### Verification
+
+- Firestore Rules Emulator: 106 passing.
+- Focused Flutter auth, access policy, invoice model, void accounting, PDF pagination, and dashboard regressions pass.
+- Full release gates and deployment: pending.
+
+## [3.9.61+100] — 2026-10-15 — Workspace invoices and receipt PDFs
+
+### Added
+
+- Invoice creation now offers stock sales, non-stock catalog sales, and cash receipt invoices. Non-stock invoices do not change inventory; shop detail opens a preselected invoice form.
+- Workspace administrators can configure bilingual invoice headers, layouts, contact details, and visible fields. New invoice PDFs use the saved header snapshot.
+- Receipt numbering, receipt invoice, cash-in ledger row, and shop balance update are committed atomically per workspace.
+
+### Fixed
+
+- Firestore rules bind receipt invoices to their cash-in ledger entry and exact balance change, enforce the workspace non-stock setting, and reject seller-forged invoice headers.
+- Voiding a non-stock sale no longer restores inventory that was never deducted.
+
+### Verification
+
+- Firestore Rules Emulator: 102 passing.
+- Focused invoice, settings, PDF, and localization regressions: passing.
+- Full release gates: pending.
+
 ## [3.9.60+99] — 2026-10-10 — Authentication and device-session hardening
 
 ### Fixed

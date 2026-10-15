@@ -1,0 +1,471 @@
+SHOESERP AUTHENTICATION, SESSION, AND DEVICE-PAIRING MASTER AUDIT
+Date: 2026-10-15
+Audit source: latest upstream main, cloned to D:\Footwear-auth-audit-2026-10-15
+Audited commit: 25fd9d5f89904b67778d6014010e8b88b266da1c (2026-10-12)
+Repository: https://github.com/engremran07/footwear.git
+Scope: Flutter login/auth lifecycle, profile bootstrap, tenant and platform sessions, device installation identity, Firestore access rules, router guards, device-security screens, and tests.
+
+AUDIT STATUS
+
+This is a source-code master audit, not a production incident reconstruction. The clean clone is at the latest fetched upstream main and has no uncommitted changes. The existing D:\Footwear working tree has separate in-progress invoice work; it was not used as audit source and was not changed for this audit except for adding this report.
+
+The report does not claim to know which branch ran on the affected APK. No affected-user profile, Firebase Auth event log, device/session documents, APK runtime trace, or authenticated production access was provided. The main code-level logout defects and their exact preconditions are identified below. No application fix was applied and no test, emulator, build, or production deployment was run in the clean clone.
+
+EXECUTIVE SUMMARY
+
+There is no unconditional code path that signs out every user immediately after correct credentials. There are, however, two credible and reproducible post-authentication defects that can cause immediate logout on affected device/session histories:
+
+1. Registration allocates device and session slots independently, then validates clock skew against deviceRefs[session.slotNumber]. Session slot number is not device slot number. When they differ, the new login can be checked against another device's old last_seen_at; a timestamp over five minutes old is misclassified as device clock skew, the just-created session is revoked, and AuthNotifier signs out.
+2. SessionGuard starts an access query when the auth profile first appears, before sign-in registration has necessarily completed. If that query returns a pre-registration revoked-session snapshot after registration succeeds, the guard can sign out. A 15-second registration-grace policy exists but is not wired into enforcement. The post-registration auth notifier event can be dropped while the stale check is still in progress.
+
+A third direct path is intentional policy behavior: if pairing is required, a new device is stored as pending, the sign-in flow turns pending into an error, and Firebase Auth is signed out. A blocked device, reset-required device, exhausted slot limit, invalid/inactive profile, missing tenant assignment, or registration permission/network error also rolls back the Firebase sign-in. These cases must be distinguished from a silent runtime logout by capturing the mapped login error and auth event sequence.
+
+Overall severity: HIGH. The slot-index mismatch and stale session-check race can reject a legitimate login without a user-caused credential error. Session revocation and device-administration workflows are also inconsistent, and tenant-admin security controls currently route to a screen that the router blocks.
+
+1. INCIDENT PATH AND DIAGNOSIS
+
+Normal tenant sign-in sequence:
+
+1. LoginScreen calls AuthNotifier.signIn(email, password).
+2. Firebase Auth accepts credentials and emits the authenticated UID.
+3. AuthNotifier fetches users/{uid}; it rejects missing, inactive, unsupported-role, and workspace-unassigned profiles.
+4. Tenant users call SessionManagementNotifier.registerCurrentAccess; super-admin users call registerPlatformSession.
+5. Registration writes or refreshes device/session records. For tenant users it then performs a server read and a clock-skew check.
+6. AuthNotifier completes. The router redirects from /login to / after auth/profile state settles.
+7. SessionGuard independently queries server sessions/devices, enforces revoked/blocked/expiry states, and arms renewal/expiry timers.
+
+Direct source evidence:
+- app/lib/providers/auth_provider.dart: signIn enters AsyncLoading before Firebase Auth; all registration exceptions are caught, cleanup is attempted, then FirebaseAuth.instance.signOut() is called.
+- app/lib/providers/tenant_provider.dart: registerCurrentAccess independently selects deviceIndex and sessionIndex, writes device_slot_id, then validates the device timestamp using deviceRefs[session.slotNumber].
+- app/lib/core/services/session_guard.dart: profile and auth-notifier listeners can both request access verification; a running access check causes the second request to return.
+- app/lib/core/router/app_router.dart: router holds /login while auth notifier is loading, then routes based on auth/profile state. Router navigation itself does not call Firebase Auth signOut.
+
+Diagnostic decision tree for the affected device:
+- If the login UI reports device-pairing-pending, device-admin-reset-required, device-blocked, device-limit-reached, session-limit-reached, or device-clock-skew, the post-credential registration policy/path is directly implicated.
+- If FirebaseAuth.currentUser becomes null, identify the exact signOut caller: AuthNotifier.signIn rollback, SessionGuard enforcement, startup deferred token refresh, explicit user action, or auth persistence.
+- If the UI redirects to /login while FirebaseAuth.currentUser remains non-null, investigate authStateProvider stream error/null/persistence and RouterNotifier. Do not call this a Firebase sign-out until the UID is checked.
+- Capture the same timestamped sequence for UID, normalized role, tenant_id or active_workspace_id, device installation ID, selected device slot, selected session slot, device status, session status/expires_at, last_seen_at, pairing policy, and mapped error.
+
+2. PRIORITY FINDINGS
+
+FINDING AUTH-001 | P1 | TENANT ACCESS REGISTRATION | HIGH CONFIDENCE
+
+Title: Clock-skew validation indexes a device slot with the independent session slot number.
+
+File: app/lib/providers/tenant_provider.dart (registerCurrentAccess, post-commit verification near lines 770-780)
+Evidence:
+- Device selection computes deviceIndex from device registration records.
+- Session selection independently computes sessionIndex from session records.
+- Session data stores both slot_number: sessionIndex and device_slot_id: deviceRef.id.
+- After commit, the verifier reads deviceRefs[session.slotNumber] instead of the device reference encoded by session.deviceSlotId/deviceIndex.
+- If that different device's last_seen_at differs from the local clock by over five minutes, registration terminates the current session and throws device-clock-skew.
+- AuthNotifier.signIn catches registration errors and signs out.
+
+Impact: A valid login can create its session, then immediately revoke it and sign out when device/session slot allocation histories differ. The two slot spaces are intentionally independent, so equality cannot be assumed. This is the strongest concrete match for the reported immediate logout, conditional on a slot mismatch and a sufficiently old timestamp.
+
+Reproduction:
+1. Have a user with at least two device records and session records whose reusable slot indexes differ (for example, device 0 remains active after logout while session 0 is revoked/reused).
+2. Register or log in from a second device; force deviceIndex != sessionIndex.
+3. Make the device record currently at deviceRefs[sessionIndex] have last_seen_at older than five minutes.
+4. Observe the newly created session being revoked, device-clock-skew returned, and Firebase Auth signed out.
+
+Recommendation: Resolve the device reference from the selected device index/slot ID, not session.slotNumber. Validate that the fetched document's device_id equals the current installation ID before applying clock-skew policy. Add a regression where deviceIndex != sessionIndex and the other device has an old timestamp.
+
+FINDING AUTH-002 | P1 | SESSION GUARD / LOGIN RACE | HIGH CONFIDENCE IN RACE, CONDITIONAL INCIDENT CAUSE
+
+Title: A pre-registration session snapshot may be enforced after successful registration.
+
+Files: app/lib/core/services/session_guard.dart; app/lib/core/utils/session_access_policy.dart; app/test/unit/models/session_access_policy_test.dart
+Evidence:
+- The authUserProvider listener starts _verifyCurrentAccessSession when a profile first appears.
+- That method starts a server query before checking whether AuthNotifier.signIn is still loading; the downstream enforcement does return while loading.
+- The query may have captured a pre-registration revoked session. If it completes after signIn changes AuthNotifier state to AsyncData, the revoked result can now pass the loading check and sign out.
+- The authNotifierProvider listener requests a fresh check after login loading ends, but _accessCheckInProgress causes that request to return if the stale check is still active.
+- SessionAccessPolicy.shouldDeferMissingSessionEnforcement and its 15-second registration grace exist, but SessionGuard does not call the helper.
+
+Impact: A logout/previous revoked slot can race a successful re-login on the same installation. This is timing-dependent, not a deterministic every-login failure.
+
+Reproduction/test: Gate the server session query started by profile hydration; complete registration and AuthNotifier.signIn; then release the pre-registration revoked result. Assert that the guard does not sign out and performs an authoritative post-registration verification.
+
+Recommendation: Defer enforcement while sign-in/registration is loading and use the existing registration grace only for the current UID. Do not drop the authoritative post-registration check when a stale check is in progress; queue and rerun it after the current query completes.
+
+FINDING AUTH-003 | P1 | DEVICE ADMINISTRATION / FIRESTORE READS | HIGH CONFIDENCE
+
+Title: Admin revoke/block reads all fixed session slots, including missing documents that admin rules cannot read.
+
+Files: app/lib/providers/tenant_provider.dart (_setDeviceAccess); firestore.rules (users/{userId}/sessions/{slotId} get rule)
+Evidence:
+- _setDeviceAccess builds ten fixed sessionRefs and performs transaction.get on every slot, even when many have never been created.
+- The session get rule authorizes a workspace admin using resource.data.tenant_id. A nonexistent slot has no tenant_id/resource data to establish that authorization.
+- The transaction can therefore fail before it updates the device or revokes any active session.
+
+Impact: Workspace-admin and selected-super-admin remove/block actions may fail for ordinary users with unused session slots. This undermines the administrative control plane and can leave access active.
+
+Recommendation: Make missing-slot reads deliberately authorizable only for a canonical slot path under a user document whose tenant is in the caller's scope, or redesign the transaction to read only existing authorized records with a race-safe strategy. Add an emulator test invoking the actual notifier read shape against a user with one session and multiple absent slots.
+
+FINDING AUTH-004 | P1 | SESSION REVOCATION SEMANTICS | HIGH CONFIDENCE
+
+Title: Tenant session revocation is eligible for automatic reactivation during renewal.
+
+Files: app/lib/providers/tenant_provider.dart (registerCurrentAccess and terminateSession); app/lib/core/services/session_guard.dart (_renewCurrentAccessSession); firestore.rules (session update revoked-to-active branch)
+Evidence:
+- terminateSession marks a session revoked.
+- registerCurrentAccess does not reject a revoked session slot when selecting a reusable session slot; it writes a new active session there if the device remains active and policy allows reuse.
+- SessionGuard automatically calls registerCurrentAccess every ten minutes.
+- Rules permit owner reactivation of a revoked session if the device registration is active.
+
+Impact: An administrator's terminate-session action can be undone by client renewal, depending on ordering. If the guard checks first, it signs out; if renewal wins, the session can become active again. This is not a reliable revocation boundary and must not be represented as server-enforced access control.
+
+Recommendation: Define explicit semantics: device/session termination must be durable until a fresh interactive sign-in or administrator reset. Make renewal reject revoked state; preserve the repository's limitation that ordinary Firestore requests are not bound to these session IDs under Spark.
+
+FINDING AUTH-005 | P1/P2 | TENANT ADMIN ROUTING | HIGH CONFIDENCE
+
+Title: Tenant-admin device security link is visible but the router rejects its route.
+
+Files: app/lib/screens/tenant_management_screen.dart; app/lib/core/router/app_router.dart; app/lib/core/utils/role_utils.dart
+Evidence:
+- Tenant management screen shows a security icon for tenant admins.
+- The icon pushes /tenants/{tenantId}/security.
+- _isTenantManagementPath includes that path.
+- Router permits tenant management paths only when canManageWorkspaceRole(role) is true; that predicate returns true only for super_admin.
+
+Impact: Tenant admins tap a visible device/security action and are redirected to /. They can reach /profile/security for their own usage, but not the workspace-wide approve/remove/block/reset controls promised by the tenant management UI.
+
+Recommendation: Define route authorization separately for platform workspace selection and same-tenant security administration. Check tenant_admin ownership/current tenant on the target tenant ID; keep super-admin access bound to active_workspace_id. Add router tests for admin, tenant_admin, unselected super_admin, and selected super_admin targeting own vs other tenant.
+
+FINDING AUTH-006 | P2 | SIGN-IN ROLLBACK | HIGH CONFIDENCE
+
+Title: Any registration exception signs out, including transient Firestore/network errors.
+
+File: app/lib/providers/auth_provider.dart (tenant and platform registration catch blocks)
+Evidence:
+- Firebase Auth credential sign-in succeeds before profile/access registration.
+- Both registration catch blocks attempt cleanup, then call FirebaseAuth.instance.signOut() unconditionally and rethrow.
+- This includes permission-denied, unavailable, deadline, failed-precondition/index, and unexpected local exceptions, not only permanent policy rejection.
+
+Impact: A transient access-registration failure appears as “login succeeded then logged out.” The UI receives an error, but user-visible status may be too generic to distinguish pairing, policy, network, and rules failures.
+
+Recommendation: Preserve fail-closed behavior where required, but classify registration errors, keep the real mapped cause visible, check Firebase current UID before rollback, and avoid signing out a different account. Add tests for permanent policy denial, pending approval, transient network failure, and account-switch races.
+
+FINDING AUTH-007 | P2 | FIREBASE UID RACE | HIGH CONFIDENCE IN MISSING GUARD
+
+Title: Several sign-in rollback and startup token-refresh paths sign out the global current user without a UID recheck.
+
+Files: app/lib/providers/auth_provider.dart; app/lib/main.dart
+Evidence:
+- Login captures uid, but missing-profile/role/tenant/inactive and registration rollback paths call FirebaseAuth.instance.signOut() without verifying that currentUser.uid is still the captured uid.
+- main.dart deferred token refresh captures a User, then on a terminal refresh exception signs out FirebaseAuth.instance without confirming the current UID still matches.
+- Resume verification has a UID recheck, demonstrating the intended safer pattern elsewhere.
+
+Impact: If another auth event/account switch occurs while a delayed request is in flight, a stale failure for account A can sign out a newly current account B.
+
+Recommendation: Centralize a signOutIfCurrentUid(expectedUid) helper and use it in all async rollback/refresh paths. Test delayed failure for A after switching to B.
+
+FINDING AUTH-008 | P2 | SESSION LIFECYCLE | HIGH CONFIDENCE
+
+Title: Renewal timer is canceled on app pause and not restarted on resume.
+
+File: app/lib/core/services/session_guard.dart
+Evidence:
+- _onAppPaused cancels _renewalTimer.
+- _onAppResumed verifies access and restarts inactivity handling, but does not call _startSessionRenewal.
+- Renewal starts only when authUserProvider changes UID, so an app that pauses/resumes can remain foregrounded without periodic session renewal.
+
+Impact: A resumed app may later hit the old expiry timer and sign out despite continued use.
+
+Recommendation: Restart renewal after successful resume/auth verification for the same UID. Test pause/resume, verify renewal timer is rearmed, and advance past the original expiry while before the renewed expiry.
+
+FINDING AUTH-009 | P2 | DEVICE CLOCK / SERVER TIME | HIGH CONFIDENCE
+
+Title: Session expiry is generated from local device time before server-side TTL validation.
+
+Files: app/lib/providers/tenant_provider.dart; firestore.rules
+Evidence:
+- Tenant and platform session expires_at use DateTime.now() + 7h50m.
+- Rules validate expires_at against request.time and cap it at 12h.
+- A local clock sufficiently ahead/behind can cause registration permission denial; login catches that failure and signs out.
+- The server timestamp comparison after tenant registration occurs only after the transaction commits and therefore cannot protect the expiry write from clock-based rule rejection.
+
+Impact: Devices with significantly incorrect clocks can authenticate credentials, then fail access registration and be logged out. Stale-device detection also uses client time while Rules enforce a server-time 30-day threshold.
+
+Recommendation: Derive expiry/age decisions from server time or use a bounded server-time offset; expose clock-skew guidance before registration writes. Add tenant and platform rules-emulator tests around skewed time boundaries.
+
+FINDING AUTH-010 | P2 | PROFILE STREAM / STALE CACHE | CONDITIONAL
+
+Title: An inactive initial profile emission can trigger remote-inactive sign-out without waiting for server confirmation.
+
+Files: app/lib/providers/auth_provider.dart; app/lib/core/services/session_guard.dart
+Evidence:
+- authUserProvider maps Firestore profile snapshots directly into UserModel.
+- SessionGuard signs out whenever the profile stream emits active == false; it does not distinguish cached initial data from a server-confirmed snapshot or wait for sign-in registration to settle.
+- The registration grace helper is not used here.
+
+Impact: If local persistence contains an old inactive profile while the server profile is active, the first cached emission may sign out a valid session. This is conditional and requires stale local/server divergence.
+
+Recommendation: Make the guard wait for confirmed profile/access state, not just a cached boolean. Test inactive cached snapshot followed by active server snapshot.
+
+FINDING AUTH-011 | P2 | INSTALLATION ID / REINSTALL | CONFIRMED POLICY PATH
+
+Title: Clearing application storage creates a new installation identity and can require approval or exceed slot limits.
+
+File: app/lib/core/services/device_installation.dart
+Evidence:
+- Installation ID is a UUID stored in SharedPreferences and created when absent.
+- An ordinary same-package Android APK update should preserve app data; uninstall, clear-data, web origin change, or browser storage clear can generate a new ID.
+- Pairing-enabled new IDs become pending; slot exhaustion/blocked/reset policy errors cause sign-in rollback.
+
+Impact: Reinstall/data reset may look like “new APK login logs out.” This is expected policy, not proof that an in-place update rotated the ID.
+
+Recommendation: Label this as installation identity, explain the admin approval/reset step, show the specific pending/limit error, and monitor save failures. Do not silently weaken pairing to work around it.
+
+FINDING AUTH-012 | P2 | APP CHECK FAILURE UI | CONFIGURATION-DEPENDENT
+
+Title: App Check activation errors can be logged while the normal app shell continues.
+
+File: app/lib/main.dart
+Evidence:
+- Firebase initialized flag is set before awaiting App Check activation.
+- Catch logs initialization error, but retry UI is shown based on the Firebase flag only.
+- If App Check enforcement rejects registration reads/writes, the later auth registration rollback signs out.
+
+Impact: A configuration error can present as login failure/logout rather than an initialization retry message.
+
+Recommendation: Track full security initialization separately from Firebase core initialization; block authenticated app mounting until App Check activation is resolved or explicitly reported as non-fatal. Verify production provider configuration and enforcement.
+
+FINDING AUTH-013 | P2 | DEVICE ADMIN SCREEN SEARCH | HIGH CONFIDENCE
+
+Title: Registry search is ignored on the Sessions tab.
+
+File: app/lib/screens/device_session_security_screen.dart (_buildAdminView)
+Evidence:
+- filteredSessions is calculated from user/device/platform search.
+- Device tab receives filteredDevices; Sessions tab receives the original sessions list.
+
+Impact: Admins and selected super-admins cannot reliably find a target session by the search field; stale/large registries impair response to access incidents.
+
+Recommendation: Pass filteredSessions to _adminSessionList and add a widget test for matching and nonmatching session rows.
+
+FINDING AUTH-014 | P2 | DEVICE ADMIN SCREEN SCALE/RECOVERY | HIGH CONFIDENCE
+
+Title: Device/session registry results are capped without pagination and error handling is inconsistent.
+
+Files: app/lib/providers/tenant_provider.dart; app/lib/screens/device_session_security_screen.dart
+Evidence:
+- Tenant device and session registry streams cap at 200; platform session list caps at 20.
+- Tenant screen shows a limit notice at 200 but provides no cursor/load-more control; platform list has no equivalent notice.
+- Combined registry error state has no retry callback, while the tenant-policy error has one.
+
+Impact: Older records can be invisible, and transient failures can leave the control screen without an actionable retry.
+
+Recommendation: Cursor-page registry records, visibly communicate truncation until paging is complete, add retry for all participating providers, and test >limit result sets and recovery.
+
+FINDING AUTH-015 | P2 | DEVICE BLOCK RECOVERY | HIGH CONFIDENCE
+
+Title: Blocked devices have no unblock/reset path and are excluded from reusable capacity.
+
+Files: app/lib/providers/tenant_provider.dart; app/lib/screens/device_session_security_screen.dart; firestore.rules
+Evidence:
+- UI offers block but no unblock operation for blocked state.
+- Rules deny reactivation of blocked registrations.
+- Slot selection does not reuse blocked records.
+
+Impact: A mistaken or stale device block can permanently consume capacity and prevent the user from registering a replacement, especially at low device limits.
+
+Recommendation: Decide whether block is permanently terminal. If reversible, add a separate owner/admin recovery workflow with audit reason and Rules constraints; otherwise provide an explicit permanent-block warning and a safe replacement-slot process.
+
+FINDING AUTH-016 | P2 | WORKSPACE POLICY AUTHORITY | CONFIRMED CONTRACT MISMATCH
+
+Title: Tenant policy ownership differs across provider, Rules, UI, tests, and repository contract.
+
+Files: app/lib/providers/tenant_provider.dart; firestore.rules; app/lib/screens/device_session_security_screen.dart; tests/firestore-rules/rules.test.js; AGENTS.md
+Evidence:
+- Provider updateTenant allows tenant_admin when tenantId matches.
+- UI enables policy editor only for owner_user_id or selected super-admin.
+- Rules require owner_user_id == request.auth.uid for tenant-admin updates.
+- Rules tests allow the workspace owner to update limits.
+- AGENTS runtime contract says workspace admins may read policy metadata but may not edit tenant configuration.
+
+Impact: Direct notifier calls fail with permission-denied for non-owner tenant admins; docs conflict with both code and policy tests. Admin screens are not predictably wired to one authority model.
+
+Recommendation: Choose one authority policy (owner-only, tenant-admin, or platform-super-admin), then align UI, notifier checks, Rules, tests, and AGENTS/CLAUDE before enabling dynamic controls.
+
+FINDING AUTH-017 | P2 | SUPER-ADMIN WORKSPACE ROUTING | HIGH CONFIDENCE
+
+Title: Security route does not reject a foreign workspace ID at the router boundary.
+
+Files: app/lib/core/router/app_router.dart; app/lib/providers/tenant_provider.dart; app/lib/screens/device_session_security_screen.dart
+Evidence:
+- A selected super-admin passes the role-only tenant-management path guard for /tenants/{id}/security.
+- Router does not compare that id to active_workspace_id.
+- Provider returns no tenant for a non-active workspace; screen renders workspace-unavailable rather than redirecting back to selection.
+- This is a client UX/wiring gap, not a demonstrated Rules bypass.
+
+Impact: Direct navigation to another workspace's security URL produces confusing unavailable state and misleading context; server/data access remains separately constrained by Rules/provider checks.
+
+Recommendation: Add a route guard requiring path tenantId == active_workspace_id for selected super-admins; test active, unselected, and foreign tenant routes.
+
+FINDING AUTH-018 | P2 | SUPER-ADMIN WORKSPACE DASHBOARD | HIGH CONFIDENCE
+
+Title: Selected super-admin remains on platform totals rather than workspace business metrics.
+
+Files: app/lib/screens/dashboard_screen.dart; app/lib/providers/dashboard_provider.dart
+Evidence:
+- Dashboard screen sends every super-admin to the platform dashboard, even after workspace selection.
+- Dashboard provider returns platform workspace/user counts before workspace business metric branches.
+
+Impact: Support access context is not reflected by the main dashboard; the screen is not fully dynamic for selected workspace administration.
+
+Recommendation: When active_workspace_id is present, provide an explicitly scoped workspace dashboard; when absent, retain platform metadata-only view. Keep Rules as the security boundary.
+
+FINDING AUTH-019 | P2 | SUPPORT ACCESS AUDIT TRAIL | HIGH CONFIDENCE
+
+Title: Switching support workspace can omit the prior context's end event; failed cleanup can leave selected context stored.
+
+Files: app/lib/providers/auth_provider.dart; app/lib/screens/tenant_management_screen.dart
+Evidence:
+- selectWorkspace overwrites active workspace and logs only a new started event.
+- Sign-out attempts to clear workspace context and append an ended event, but continues to Firebase sign-out if that write fails.
+
+Impact: platform_access_logs can lack an end event and profile context may survive sign-out, despite the documented start/end audit contract. Rules expire access after eight hours, but the client UI/context may not reflect expiry.
+
+Recommendation: Log end+start atomically when switching; make clear-context failures visible/retryable; read and enforce active_workspace_selected_at in client navigation; test offline sign-out and workspace switching.
+
+FINDING AUTH-020 | P2 | SUPER-ADMIN SESSION CONTROL | HIGH CONFIDENCE
+
+Title: Platform-session termination can be undone by automatic renewal.
+
+Files: app/lib/providers/tenant_provider.dart; app/lib/core/services/session_guard.dart
+Evidence:
+- registerPlatformSession queries only active sessions for a device and creates a new active session when none is found.
+- SessionGuard automatically calls registration every ten minutes.
+- A revoked platform session is therefore not treated as a durable denial by the renewal operation.
+
+Impact: Another administrator's terminate action can be reversed by the client. As with tenant sessions, this is app-level session control only, not Firestore request authorization.
+
+Recommendation: Make revoked platform session an explicit registration denial until fresh sign-in or admin reset; test renewal racing with platform termination.
+
+FINDING AUTH-021 | P2 | INACTIVITY POLICY | ROLE-CHANGE CONDITIONAL
+
+Title: Same-UID role change does not reset role-specific session timers.
+
+File: app/lib/core/services/session_guard.dart
+Evidence:
+- Session clock and inactivity timer reset only when user ID changes.
+- Timer policy depends on isAdmin; tenant_admin and super_admin are admin-equivalent for inactivity/timeout policy.
+
+Impact: Promotion can inherit seller timing; demotion can retain admin 30-minute inactivity/2-hour background timeout and sign out unexpectedly. This is delayed, not an unconditional immediate login failure.
+
+Recommendation: Recompute/cancel/rearm role timers when role changes for the same UID; write same-UID role transition tests.
+
+FINDING AUTH-022 | P2 | AUTH CACHE INVALIDATION | CONDITIONAL
+
+Title: Admin export future is omitted from role-scoped invalidation.
+
+File: app/lib/providers/auth_provider.dart::_invalidateRoleScopedProviders; app/lib/providers/transaction_provider.dart
+Evidence:
+- allTransactionsExportProvider performs a one-shot admin-scoped read and is not listed in the invalidation function.
+- Known reports caller explicitly invalidates it before use, reducing current exposure, but future callers could reuse a prior admin result after account/role change.
+
+Impact: Conditional cross-account data retention risk. Not established as the current logout cause.
+
+Recommendation: Include it in role-scoped invalidation and test admin-to-seller transition in one ProviderContainer.
+
+FINDING AUTH-023 | P2 | TENANT ADMIN OWNER POLICY UI | HIGH CONFIDENCE
+
+Title: Policy editor authorization mismatches notifier and Firestore Rules.
+
+Files: app/lib/providers/tenant_provider.dart; firestore.rules; device_session_security_screen.dart
+Evidence:
+- UI is owner-only for tenant admins; provider precheck is broader; Rules are owner-only.
+
+Impact: non-owner direct calls appear locally authorized but fail remotely. See AUTH-016; this is a separately testable guard inconsistency.
+
+Recommendation: Make provider precheck identical to the chosen authority contract.
+
+3. EXPECTED SIGN-OUT CONDITIONS (NOT THEMSELVES BUGS)
+
+The following code paths intentionally revoke Firebase Auth after credentials are accepted. They must show the specific actionable error; users should not interpret them as password failure:
+- Firestore profile is missing, role is unsupported, account is inactive, or a non-super-admin has no tenant assignment.
+- Workspace pairing is required and the installation is pending approval. Approval does not auto-complete the already-failed sign-in; user must retry. Device-limit/session-limit exhaustion, blocked device, and admin-reset-only revoked device also reject registration.
+- Tenant/platform session registration fails for any reason; current code signs out after cleanup, including transient network/permission failures (AUTH-006).
+- Registration's post-commit timestamp check reports device-clock-skew (AUTH-001/AUTH-009).
+- SessionGuard finds current installation blocked, has a revoked session, has missing expiry, or reaches the access expiry timer.
+- Admin inactivity/background limits are reached (see current defaults in session_guard.dart; super_admin is classified as admin for those limits).
+- `rememberMe` is false on app startup, so main.dart signs out the restored Firebase session by design.
+
+4. ADMIN AND SUPER-ADMIN DEVICE-PAIRING CONTROL PLANE
+
+Existing controls:
+- Workspace policy contains require_device_pairing, allow_admin_reset_only, max_devices_allowed, and max_active_sessions_allowed.
+- Defaults are three device slots and two active session slots; pairing and admin-reset-only behavior are configurable.
+- Device screen includes own-device usage, tenant registry devices/sessions, pending approval, remove/revoke, block, reset, terminate session, and platform-session management.
+- Super-admin tenant business access is scoped by active_workspace_id and support reason in Firestore Rules; client screens do not replace those Rules.
+
+Missing/misaligned wiring:
+- Tenant admins see a tenant security link but router rejects it (AUTH-005).
+- Admin revoke/block transaction reads ten session docs including absent slots, which current admin get rules likely deny (AUTH-003); exercise actual notifier operation in emulator before relying on it.
+- Session search does not filter the Sessions tab; pagination/truncation and retry are incomplete (AUTH-013/AUTH-014).
+- Block is terminal and has no recovery path (AUTH-015).
+- Selected super-admin foreign security URL remains on the URL but shows unavailable rather than redirecting (AUTH-017).
+- Selected super-admin dashboard remains platform-wide metadata rather than selected-workspace metrics (AUTH-018).
+- Workspace switching/sign-out does not guarantee a complete start/end support-access log under failure (AUTH-019).
+- Session termination/revocation can be undone by renewal (AUTH-004/AUTH-020).
+- Tenant policy owner authority conflicts across docs, UI, provider, and Rules (AUTH-016/AUTH-023).
+
+5. TEST AND OBSERVABILITY GAPS
+
+Observed existing tests cover pure auth refresh policy, device display-name formatting, role parsing, access-policy selection/clock-skew/grace helper, dashboard startup, and Firestore rule slot/query/approval/revocation cases. They do not cover the critical app lifecycle edges:
+- AuthNotifier sign-in success through profile and access-registration completion.
+- Device slot index different from session slot index.
+- Delayed pre-registration session read enforced after sign-in completes.
+- Registration rollback after transient network/permission error and UID change during await.
+- Same-UID role changes and timer reset.
+- Pausing/resuming and renewal timer re-arming.
+- Admin revoke/block notifier with missing session slot docs.
+- Revocation vs renewal race for tenant and platform sessions.
+- Tenant-admin router access to security screen and selected-super-admin foreign workspace route.
+- Search filter, retry, and registry pagination behavior.
+
+Recommended minimum regression suite:
+A. Provider/integration: fake Firebase Auth+Firestore registration with mismatched device/session indexes; assert the current device timestamp is checked and the active session remains.
+B. Guard: gate stale session read until after successful registration; assert stale revoked snapshot cannot sign out; require a queued authoritative reread.
+C. Guard lifecycle: pause/resume restores renewal timer, role change resets timeout policy, and stale UID A completion cannot sign out UID B.
+D. Rules emulator: workspace admin revoke reads one existing session plus absent slots; approve/revoke/block/reset; session/platform revoke cannot be silently reactivated by same renewal semantics.
+E. Widget/router: tenant_admin can reach own workspace security page; cannot reach another tenant; selected super_admin can see only active workspace; search filters both tabs and retries recover.
+F. Auth error UX: pending/blocked/limit/clock skew/transient network errors remain distinct and actionable; instrument auth UID before/after rollback.
+
+Production diagnostic instrumentation should log (without passwords/tokens): auth operation ID, UID hash or safe UID reference, stage name, normalized role, tenant/workspace ID, device installation ID, device slot ID, session slot ID, registration status/error code, session result status/expiry, whether signOut was invoked and by which caller. Avoid logging email, password, ID token, or full profile. Debug lifecycle panel is debug-only and should not be treated as production evidence.
+
+6. PRIORITIZED REMEDIATION ROADMAP
+
+P0 / before declaring the immediate logout fixed:
+1. Fix AUTH-001 by using the actual device slot reference/id for post-commit server timestamp validation; verify fetched device_id matches the current installation.
+2. Fix AUTH-002 by deferring enforcement during registration, wiring the existing grace policy, and queueing an authoritative recheck instead of dropping it while another check is active.
+3. Make sign-in rollback UID-scoped and preserve actionable registration error codes (AUTH-006/AUTH-007).
+4. Add deterministic tests for AUTH-001 and AUTH-002 and reproduce against the same workspace/device slot history.
+
+P1 / access-control reliability:
+5. Make revoke/terminate durable against automatic renewal for tenant and platform sessions; accurately document the client-enforced boundary.
+6. Resolve admin transaction missing-slot reads in _setDeviceAccess and prove remove/block succeeds with absent session docs in Rules Emulator.
+7. Align tenant-admin/owner/super-admin policy authority in docs, notifier, router, UI, rules, and tests.
+8. Repair tenant-admin route guard and selected-super-admin workspace scoping.
+
+P2 / robustness and control-plane completeness:
+9. Restart session renewal after resume; handle same-UID role changes.
+10. Make clock-skew/time-to-live behavior server-time aware, with actionable error state.
+11. Fix security-screen session search, add cursor paging/explicit truncation, retry all registry streams, and define blocked-device recovery.
+12. Ensure App Check initialization failure has a proper retry/error state.
+13. Add explicit start/end audit events when switching support workspaces and make failed context clearing visible.
+14. Add app-level login/guard/router/rules regression coverage before adding more auth behavior.
+
+7. COMPLIANCE / RELEASE STATUS
+
+- Latest source reviewed: clean clone of upstream main, commit 25fd9d5f89904b67778d6014010e8b88b266da1c, dated 2026-10-12.
+- Clone working tree: clean at audit time.
+- Active D:\Footwear checkout: contains unrelated/in-progress invoice feature edits and was preserved.
+- No auth/session source files were changed by this audit.
+- No auth credentials were requested, read, or stored.
+- No tests, Firestore emulator, APK build, device reproduction, Firebase deploy, or live production check were run for this audit. Findings are static-source findings; the exact account-specific trigger remains unconfirmed.
+- Do not state “fixed” or “confirmed in production.” The highest-confidence code defect is AUTH-001; the most likely immediate sequence is AUTH-001, AUTH-002, or an explicit registration rejection. Runtime evidence from the affected device is required to select one.
+
+End of report.

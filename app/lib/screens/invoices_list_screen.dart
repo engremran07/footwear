@@ -172,28 +172,54 @@ class _InvoiceTile extends ConsumerWidget {
       default:
         statusColor = cs.surfaceContainerHighest;
     }
+    final invoiceTypeLabel = invoice.isCashReceipt
+        ? tr('cash_receipt', ref)
+        : invoice.isSale
+        ? tr('sale_invoice', ref)
+        : tr('credit_note', ref);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         onTap: () => context.push('/invoices/${invoice.id}'),
         leading: CircleAvatar(
-          backgroundColor: invoice.isSale
+          backgroundColor: invoice.isCashReceipt
+              ? AppTheme.clearBg(cs)
+              : invoice.isSale
               ? AppTheme.debtBg(cs)
               : AppTheme.clearBg(cs),
           child: Icon(
-            invoice.isSale ? Icons.receipt : Icons.assignment_return,
+            invoice.isCashReceipt
+                ? Icons.payments_outlined
+                : invoice.isSale
+                ? Icons.receipt
+                : Icons.assignment_return,
             size: 20,
-            color: invoice.isSale ? cs.error : cs.primary,
+            color: invoice.isSale && !invoice.isCashReceipt
+                ? cs.error
+                : cs.primary,
           ),
         ),
         title: Text(
           invoice.invoiceNumber,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: Text(
-          '${invoice.shopName} • $dateStr',
-          overflow: TextOverflow.ellipsis,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${invoice.shopName} • $dateStr',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              invoiceTypeLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ],
         ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,

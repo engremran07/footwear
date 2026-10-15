@@ -151,6 +151,20 @@ void main() {
       );
     });
 
+    test('platform session allocation limit reuses the session message', () {
+      expect(
+        AppErrorMapper.key(StateError('platform-session-limit-reached')),
+        equals('session_limit_reached'),
+      );
+    });
+
+    test('platform device limit has a specific message', () {
+      expect(
+        AppErrorMapper.key(StateError('platform-device-limit-reached')),
+        equals('platform_device_limit_reached'),
+      );
+    });
+
     test('exception containing "socket" → err_network', () {
       expect(
         AppErrorMapper.key(Exception('socket closed')),

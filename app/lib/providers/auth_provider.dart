@@ -9,6 +9,7 @@ import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/auth_refresh_policy.dart';
 import '../core/utils/role_utils.dart';
+import '../core/utils/session_access_policy.dart';
 import '../core/utils/tenant_scope.dart';
 import 'tenant_provider.dart';
 import '../models/user_model.dart';
@@ -107,11 +108,20 @@ class AuthNotifier extends AsyncNotifier<void> {
     // Export providers: admin-only, must be flushed on sign-out so a seller
     // session cannot access cached data from a prior admin session.
     ref.invalidate(sellerTransactionsExportProvider);
+    ref.invalidate(allTransactionsExportProvider);
     ref.invalidate(sellerInventoryExportProvider);
     ref.invalidate(alertCountsProvider);
     // Notification + history providers scoped to role — flush on session change.
     ref.invalidate(notificationsProvider);
     ref.invalidate(recentTransactionsProvider);
+  }
+
+  Future<void> _signOutIfCurrentUid(String expectedUid) async {
+    if (FirebaseAuth.instance.currentUser?.uid != expectedUid) return;
+    await FirebaseAuth.instance.signOut();
+    if (FirebaseAuth.instance.currentUser == null) {
+      _invalidateRoleScopedProviders();
+    }
   }
 
   Future<void> signIn(
@@ -163,8 +173,7 @@ class AuthNotifier extends AsyncNotifier<void> {
         final userDoc = await usersRef.doc(uid).get();
 
         if (!userDoc.exists) {
-          await FirebaseAuth.instance.signOut();
-          _invalidateRoleScopedProviders();
+          await _signOutIfCurrentUid(uid);
           throw FirebaseAuthException(
             code: 'permission-denied',
             message:
@@ -178,8 +187,7 @@ class AuthNotifier extends AsyncNotifier<void> {
           userData?['role'] as String? ?? '',
         );
         if (normalizedRole == 'unknown') {
-          await FirebaseAuth.instance.signOut();
-          _invalidateRoleScopedProviders();
+          await _signOutIfCurrentUid(uid);
           throw FirebaseAuthException(
             code: 'invalid-user-role',
             message:
@@ -194,8 +202,7 @@ class AuthNotifier extends AsyncNotifier<void> {
         if (!isSuperAdmin) {
           tenantId = TenantScope.normalize(userData?['tenant_id'] as String?);
           if (tenantId == null) {
-            await FirebaseAuth.instance.signOut();
-            _invalidateRoleScopedProviders();
+            await _signOutIfCurrentUid(uid);
             throw FirebaseAuthException(
               code: 'account-not-assigned-to-workspace',
               message:
@@ -204,7 +211,7 @@ class AuthNotifier extends AsyncNotifier<void> {
           }
         }
         if (!isActive) {
-          await FirebaseAuth.instance.signOut();
+          await _signOutIfCurrentUid(uid);
           throw FirebaseAuthException(
             code: 'user-disabled',
             message: 'User account is inactive',
@@ -228,8 +235,7 @@ class AuthNotifier extends AsyncNotifier<void> {
                 stackTrace: cleanupStack,
               );
             }
-            await FirebaseAuth.instance.signOut();
-            _invalidateRoleScopedProviders();
+            await _signOutIfCurrentUid(uid);
             Error.throwWithStackTrace(error, stackTrace);
           }
         } else if (tenantId != null) {
@@ -252,8 +258,7 @@ class AuthNotifier extends AsyncNotifier<void> {
                 stackTrace: cleanupStack,
               );
             }
-            await FirebaseAuth.instance.signOut();
-            _invalidateRoleScopedProviders();
+            await _signOutIfCurrentUid(uid);
             Error.throwWithStackTrace(error, stackTrace);
           }
         }
@@ -332,7 +337,7 @@ class AuthNotifier extends AsyncNotifier<void> {
       if (FirebaseAuth.instance.currentUser?.uid != checkedUid) return;
       if (shouldSignOutAfterAuthRefreshFailure(error.code)) {
         _logger.w('Signing out disabled or missing account: ${error.code}');
-        await FirebaseAuth.instance.signOut();
+        await _signOutIfCurrentUid(checkedUid);
         _invalidateRoleScopedProviders();
       } else {
         _logger.w(
@@ -350,10 +355,19 @@ class AuthNotifier extends AsyncNotifier<void> {
     }
   }
 
-  Future<void> signOut() async {
+  Future<void> signOut({String? expectedUid}) async {
+    if (expectedUid != null &&
+        !SessionAccessPolicy.shouldSignOutForAccessCheck(
+          expectedUid: expectedUid,
+          currentUid: FirebaseAuth.instance.currentUser?.uid,
+          authOperationInProgress: state.isLoading,
+        )) {
+      return;
+    }
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final authUser = FirebaseAuth.instance.currentUser;
+      if (expectedUid != null && authUser?.uid != expectedUid) return;
       try {
         if (authUser != null) {
           final profile = await FirebaseFirestore.instance

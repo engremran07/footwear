@@ -28,6 +28,62 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.75',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Sign-in now verifies the correct device slot and session before enforcing access, with separate limits for platform operators, workspace admins, and sellers.',
+          AppLocale.ar:
+              'يتحقق تسجيل الدخول من الجهاز والجلسة الصحيحين قبل فرض قيود الوصول، مع حدود منفصلة لمشرفي المنصة ومسؤولي مساحات العمل والبائعين.',
+          AppLocale.ur:
+              'سائن اِن اب رسائی کی پابندی سے پہلے درست ڈیوائس اور سیشن کی تصدیق کرتا ہے، جبکہ پلیٹ فارم، ورک اسپیس ایڈمن اور سیلر کے لیے الگ حدیں ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Invoice PDFs now show non-stock catalog lines clearly, preserve workspace branding, localize receipt details, and paginate longer invoices.',
+          AppLocale.ar:
+              'تعرض ملفات الفواتير أصناف الكتالوج دون مخزون بوضوح، وتحفظ هوية مساحة العمل، وتترجم تفاصيل الإيصال، وتدعم الفواتير متعددة الصفحات.',
+          AppLocale.ur:
+              'انوائس پی ڈی ایف اب بغیر اسٹاک کیٹلاگ آئٹمز واضح دکھاتی ہے، ورک اسپیس برانڈنگ محفوظ رکھتی ہے، رسید کی تفصیلات ترجمہ کرتی ہے اور طویل انوائس کے صفحات بناتی ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.9.61',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Create stock sales, non-stock catalog invoices, and cash receipt invoices. Non-stock invoices leave inventory unchanged.',
+          AppLocale.ar:
+              'أنشئ فواتير بيع من المخزون أو من الكتالوج دون خصم المخزون، وسندات قبض مرتبطة بحساب المتجر.',
+          AppLocale.ur:
+              'اسٹاک فروخت، کیٹلاگ سے بغیر اسٹاک انوائس، اور دکان کے کھاتے سے منسلک نقد وصولی کی رسید بنائیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🏷️',
+        text: {
+          AppLocale.en:
+              'Workspace administrators can configure bilingual invoice headers, layout, contact details, and visible fields.',
+          AppLocale.ar:
+              'يمكن لمسؤولي مساحة العمل تخصيص ترويسة الفاتورة باللغتين والتنسيق وبيانات التواصل والتفاصيل الظاهرة.',
+          AppLocale.ur:
+              'ورک اسپیس ایڈمن دو لسانی انوائس ہیڈر، لے آؤٹ، رابطے کی تفصیلات اور نمایاں فیلڈز ترتیب دے سکتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.60',
     date: 'October 2026',
     items: [

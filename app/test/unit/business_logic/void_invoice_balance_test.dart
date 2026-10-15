@@ -1,14 +1,6 @@
 // Tests for voidInvoice balance reversal logic (FC-01, FC-02, FC-03, FC-04 audit fixes).
 //
-// These tests verify the PURE MATH of the reversalDelta computation without hitting
-// Firestore. The helper below mirrors the exact switch in invoice_provider.dart so
-// that future changes to the provider will cause these tests to fail loudly.
-//
-// FC-01 NOTE: Audit v5 claimed cashRefund should use -total for reversalDelta.
-// Analysis shows the current -outstandingAmount is CORRECT:
-//   • Sale creation: balance += (total − amountReceived) = outstandingAmount
-//   • Void cashRefund: balance += −outstandingAmount → net 0 ✓
-//   Using -total would over-credit the customer (double refund scenario).
+// These tests exercise the production accounting plan without hitting Firestore.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/providers/invoice_provider.dart';
@@ -20,12 +12,13 @@ double _computeReversalDelta({
   required double outstandingAmount,
   required VoidRefundMode refundMode,
 }) {
-  const typeSale = 'sale';
-  return switch (type) {
-    typeSale =>
-      refundMode == VoidRefundMode.creditBalance ? -total : -outstandingAmount,
-    _ => total,
-  };
+  return buildVoidInvoiceAccountingPlan(
+    type: type,
+    total: total,
+    amountReceived: total - outstandingAmount,
+    outstandingAmount: outstandingAmount,
+    refundMode: refundMode,
+  ).balanceDelta;
 }
 
 bool _writeCashRefundTx({
@@ -39,12 +32,14 @@ double _visibleLedgerImpactAfterVoid({
   required VoidRefundMode refundMode,
 }) {
   final originalVisibleImpact = total - amountReceived;
-  final reversalReturnImpact = -total;
-  final cashRefundImpact =
-      refundMode == VoidRefundMode.cashRefund && amountReceived > 0
-      ? amountReceived
-      : 0.0;
-  return originalVisibleImpact + reversalReturnImpact + cashRefundImpact;
+  final plan = buildVoidInvoiceAccountingPlan(
+    type: 'sale',
+    total: total,
+    amountReceived: amountReceived,
+    outstandingAmount: total - amountReceived,
+    refundMode: refundMode,
+  );
+  return originalVisibleImpact + plan.ledgerDelta;
 }
 
 // ── tests ────────────────────────────────────────────────────────────────────
@@ -93,7 +88,22 @@ void main() {
   });
 
   group('voidInvoice — cashRefund mode', () {
-    // TEST-003: FC-01 dispute — cashRefund uses -outstandingAmount (CORRECT)
+    test('reverses the full sale and offsets it with the cash refund', () {
+      final plan = buildVoidInvoiceAccountingPlan(
+        type: 'sale',
+        total: 5000,
+        amountReceived: 2000,
+        outstandingAmount: 3000,
+        refundMode: VoidRefundMode.cashRefund,
+      );
+
+      expect(plan.balanceDelta, -3000);
+      expect(plan.reversalTransactionAmount, 5000);
+      expect(plan.cashRefundAmount, 2000);
+      expect(plan.ledgerDelta, plan.balanceDelta);
+    });
+
+    // TEST-003: The net balance delta removes only the outstanding amount.
     test('reversalDelta equals -outstandingAmount for sale invoice', () {
       // Explanation: sale creation added outstandingAmount to balance.
       // Void must remove exactly that. The cash refund tx records the physical
@@ -125,11 +135,17 @@ void main() {
       expect(shouldWrite, isTrue);
     });
 
-    test('cashRefund reversalAmount equals outstandingAmount', () {
-      const outstandingAmount = 3000.0;
-      // reversalAmount in provider: refundMode != creditBalance → outstandingAmount
-      const reversalAmount = outstandingAmount;
-      expect(reversalAmount, equals(3000.0));
+    test('cashRefund reversal row equals total before recording refund', () {
+      final plan = buildVoidInvoiceAccountingPlan(
+        type: 'sale',
+        total: 5000,
+        amountReceived: 2000,
+        outstandingAmount: 3000,
+        refundMode: VoidRefundMode.cashRefund,
+      );
+      expect(plan.reversalTransactionAmount, 5000);
+      expect(plan.cashRefundAmount, 2000);
+      expect(plan.ledgerDelta, -3000);
     });
 
     test('preserved originals plus reversal and refund return to zero', () {

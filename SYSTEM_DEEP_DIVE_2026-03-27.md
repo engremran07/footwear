@@ -1,6 +1,6 @@
 # ShoesERP System Deep Dive
 
-Last updated: 2026-10-03
+Last updated: 2026-10-15
 
 ## Backup and Restore
 
@@ -18,6 +18,14 @@ Workspace archival is an ordered provider operation. It disables member profiles
 
 Device session creation is bound to an active device registration in the same authenticated user's workspace. Slot identifiers, configured limits, and device/session identity must agree. Pairing-required workspaces create pending device registrations and require administrator approval before session creation. Device removal and related session revocation are atomic; blocking cannot be reversed by the device owner. Registrations inactive for 30 days may be reclaimed. Rules tests cover valid access, invalid slots, unregistered devices, tenant-scoped registry queries, pairing, block/recovery, and inactive workspace access.
 
+## Invoice Modes and Workspace Headers
+
+Invoice entry separates stock-backed sales, non-stock catalog sales, and cash receipt invoices. Non-stock sales retain product and variant detail while leaving seller inventory unchanged; Firestore rules enforce the workspace enablement setting and reject a stock sale without deduction metadata. Shop detail opens the shared invoice form with the current shop selected.
+
+Cash receipt creation increments the tenant's receipt sequence in the same Firestore transaction that creates the receipt invoice and `cash_in` ledger entry and reduces `shop.balance`. Rules bind the invoice, transaction, amount, and resulting balance so none of those writes can succeed alone. Ledger-only `cash_in` remains a separate operation when no receipt document is required.
+
+Workspace administrators configure English, Arabic, and Urdu invoice names, subtitles, addresses, contact and registration details, template, accent color, and visible fields. New invoices store a header snapshot, and seller-created snapshots are checked against the workspace settings. PDF generation uses the invoice snapshot so later branding edits do not alter existing documents. Voiding a non-stock sale does not restore inventory.
+
 ## Release Surfaces
 
 Web and Android builds use the same version from `app/pubspec.yaml` and `AppBrand`. Google Drive OAuth client IDs are deployment configuration, not source defaults; without them, file export remains available while Drive operations stay unavailable. Firebase Hosting must preserve no-cache headers for Flutter shell files and permit the Google static hosts required by Flutter web.
@@ -33,3 +41,15 @@ Registration errors are passed to the existing localized login error mapper afte
 ## Frontend Audit Evidence
 
 The 2026-10-03 frontend review is recorded in `AUDIT_REPORT_FOOTWEAR_ERP.md`. It is source-led and includes a live Android login capture, but authenticated role flows, theme/locale matrix screenshots, expanded-size visual QA, and profile-mode performance measurements remain pending because the required account password was not entered into the tooling session.
+
+## Authentication, Session, and Access-Limit Policy
+
+Tenant access registration reads the selected device slot from `session.device_slot_id`, verifies that its stored installation ID matches the current installation, and builds local `SessionModel` values with concrete timestamps rather than unresolved `FieldValue.serverTimestamp()` sentinels. `SessionGuard` defers missing-session enforcement during the 15-second registration grace, queues an authoritative recheck, rearms renewal after resume, resets timers when role or tenant changes, and passes the checked UID to every automatic sign-out. Revoked sessions are rejected during renewal. These records remain client-enforced under the Spark architecture.
+
+Access limits have three scopes. Sellers use configurable `max_devices_allowed` and `max_active_sessions_allowed` values on their own workspace; the workspace's tenant admin can edit only those caps. Workspace admins (legacy admin/manager and tenant_admin) share the separate `settings/platform_access_policy` caps across workspaces; only a platform super-admin can change them. Super-admins use `users/{uid}/platform_sessions`, with a fixed two-device and one-active-session limit, independently of tenant pairing and approval.
+
+## Invoice Integrity and PDF Behavior
+
+Cash receipts carry a `cash_receipt_sequence` that must equal the `settings/{tenantId}.last_cash_receipt_number` increment in the same atomic write. Invoice voiding reads and updates the invoice, shop balance, stock documents, and reversal transactions in one Firestore transaction. Cash refunds reverse the full sale in the ledger, add the cash-out refund row, and reduce the receivable only by the outstanding amount. Non-stock invoice voids do not restore inventory.
+
+Invoice PDFs use the captured workspace branding snapshot, localized payment method labels, mode-specific line tables, and `pw.MultiPage` with localized current/total page numbering. Long catalog invoices are covered by a page-count regression.

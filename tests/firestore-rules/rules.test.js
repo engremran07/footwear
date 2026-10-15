@@ -636,11 +636,276 @@ describe('invoices collection', () => {
         route_id: 'route-1',
         tenant_id: 'tenant-1',
         seller_id: 'seller-uid',
+        fulfillment_mode: 'stock',
+        seller_inventory_deductions: { 'inventory-1': 1 },
         items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
         subtotal: 100,
         discount: 0,
         total: 100,
         amount_received: 0,
+      }),
+    );
+  });
+
+  it('seller: cannot create a stock invoice without inventory deductions', async () => {
+    await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
+    await seedShop('shop-1');
+    await assertFails(
+      sellerCtx(testEnv).firestore().collection('invoices').doc('inv-no-stock').set({
+        created_by: 'seller-uid',
+        type: 'sale',
+        fulfillment_mode: 'stock',
+        seller_inventory_deductions: {},
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        tenant_id: 'tenant-1',
+        seller_id: 'seller-uid',
+        items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
+        subtotal: 100,
+        discount: 0,
+        total: 100,
+        amount_received: 0,
+      }),
+    );
+  });
+
+  it('seller: can create non-stock invoice when the workspace allows it', async () => {
+    await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
+    await seedShop('shop-1');
+    await seedSettings({ allow_non_stock_invoices: true });
+    await assertSucceeds(
+      sellerCtx(testEnv).firestore().collection('invoices').doc('inv-non-stock').set({
+        created_by: 'seller-uid',
+        type: 'sale',
+        fulfillment_mode: 'non_stock',
+        seller_inventory_deductions: {},
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        tenant_id: 'tenant-1',
+        seller_id: 'seller-uid',
+        items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
+        subtotal: 100,
+        discount: 0,
+        total: 100,
+        amount_received: 0,
+      }),
+    );
+  });
+
+  it('seller: cannot create non-stock invoice when the workspace disables it', async () => {
+    await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
+    await seedShop('shop-1');
+    await seedSettings({ allow_non_stock_invoices: false });
+    await assertFails(
+      sellerCtx(testEnv).firestore().collection('invoices').doc('inv-disabled').set({
+        created_by: 'seller-uid',
+        type: 'sale',
+        fulfillment_mode: 'non_stock',
+        seller_inventory_deductions: {},
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        tenant_id: 'tenant-1',
+        seller_id: 'seller-uid',
+        items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
+        subtotal: 100,
+        discount: 0,
+        total: 100,
+        amount_received: 0,
+      }),
+    );
+  });
+
+  it('seller: cannot override the workspace invoice header snapshot', async () => {
+    await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
+    await seedShop('shop-1');
+    await seedSettings({
+      company_name: 'Tenant Shop',
+      invoice_header: { name_en: 'Tenant Shop', visible_fields: [] },
+    });
+    await assertFails(
+      sellerCtx(testEnv).firestore().collection('invoices').doc('inv-forged-header').set({
+        created_by: 'seller-uid',
+        type: 'sale',
+        fulfillment_mode: 'stock',
+        seller_inventory_deductions: { 'inventory-1': 1 },
+        invoice_header_snapshot: {
+          name_en: 'Tenant Shop',
+          visible_fields: [],
+          company_name: 'Imposter Shop',
+        },
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        tenant_id: 'tenant-1',
+        seller_id: 'seller-uid',
+        items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
+        subtotal: 100,
+        discount: 0,
+        total: 100,
+        amount_received: 0,
+      }),
+    );
+  });
+
+  it('seller: can atomically create a linked cash receipt and reduce shop balance', async () => {
+    await seedUser('seller-uid', 'seller');
+    await seedShop('shop-1', { balance: 100 });
+    await seedSettings();
+    const db = sellerCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('receipt-1');
+    const transactionRef = db.collection('transactions').doc('receipt-tx');
+    const batch = db.batch();
+    batch.update(db.collection('settings').doc('tenant-1'), {
+      last_cash_receipt_number: 1,
+    });
+    batch.set(invoiceRef, {
+      created_by: 'seller-uid',
+      type: 'cash_receipt',
+      fulfillment_mode: 'none',
+      cash_receipt_transaction_id: transactionRef.id,
+      cash_receipt_sequence: 1,
+      shop_id: 'shop-1',
+      shop_name: 'Seed Shop',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      seller_id: 'seller-uid',
+      items: [],
+      subtotal: 0,
+      discount: 0,
+      total: 25,
+      amount_received: 25,
+      status: 'paid',
+    });
+    batch.set(transactionRef, {
+      created_by: 'seller-uid',
+      type: 'cash_in',
+      amount: 25,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      invoice_id: invoiceRef.id,
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 75,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_in',
+      last_transaction_amount: 25,
+      last_transaction_id: transactionRef.id,
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('seller: cannot create a cash receipt without advancing its workspace sequence', async () => {
+    await seedUser('seller-uid', 'seller');
+    await seedShop('shop-1', { balance: 100 });
+    await seedSettings();
+    const db = sellerCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('receipt-without-sequence');
+    const transactionRef = db.collection('transactions').doc('receipt-tx');
+    const batch = db.batch();
+    batch.set(invoiceRef, {
+      created_by: 'seller-uid',
+      type: 'cash_receipt',
+      fulfillment_mode: 'none',
+      cash_receipt_transaction_id: transactionRef.id,
+      cash_receipt_sequence: 1,
+      invoice_number: 'REC-2026-0001',
+      shop_id: 'shop-1',
+      shop_name: 'Seed Shop',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      seller_id: 'seller-uid',
+      items: [],
+      subtotal: 0,
+      discount: 0,
+      total: 25,
+      amount_received: 25,
+      status: 'paid',
+    });
+    batch.set(transactionRef, {
+      created_by: 'seller-uid',
+      type: 'cash_in',
+      amount: 25,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      invoice_id: invoiceRef.id,
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 75,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_in',
+      last_transaction_amount: 25,
+      last_transaction_id: transactionRef.id,
+    });
+    await assertFails(batch.commit());
+  });
+
+  it('seller: cannot apply a cash receipt with mismatched invoice linkage', async () => {
+    await seedUser('seller-uid', 'seller');
+    await seedShop('shop-1', { balance: 100 });
+    const db = sellerCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('receipt-unlinked');
+    const transactionRef = db.collection('transactions').doc('receipt-tx');
+    const batch = db.batch();
+    batch.set(invoiceRef, {
+      created_by: 'seller-uid',
+      type: 'cash_receipt',
+      fulfillment_mode: 'none',
+      cash_receipt_transaction_id: 'different-tx',
+      shop_id: 'shop-1',
+      shop_name: 'Seed Shop',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      seller_id: 'seller-uid',
+      items: [],
+      subtotal: 0,
+      discount: 0,
+      total: 25,
+      amount_received: 25,
+      status: 'paid',
+    });
+    batch.set(transactionRef, {
+      created_by: 'seller-uid',
+      type: 'cash_in',
+      amount: 25,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      invoice_id: invoiceRef.id,
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 75,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_in',
+      last_transaction_amount: 25,
+      last_transaction_id: transactionRef.id,
+    });
+    await assertFails(batch.commit());
+  });
+
+  it('seller: cannot create a cash receipt invoice without its cash-in transaction', async () => {
+    await seedUser('seller-uid', 'seller');
+    await seedShop('shop-1');
+    await assertFails(
+      sellerCtx(testEnv).firestore().collection('invoices').doc('receipt-orphan').set({
+        created_by: 'seller-uid',
+        type: 'cash_receipt',
+        fulfillment_mode: 'none',
+        cash_receipt_transaction_id: 'missing-tx',
+        shop_id: 'shop-1',
+        shop_name: 'Seed Shop',
+        route_id: 'route-1',
+        tenant_id: 'tenant-1',
+        seller_id: 'seller-uid',
+        items: [],
+        subtotal: 0,
+        discount: 0,
+        total: 25,
+        amount_received: 25,
+        status: 'paid',
       }),
     );
   });
@@ -656,6 +921,8 @@ describe('invoices collection', () => {
     batch.set(invoiceRef, {
       created_by: 'seller-uid',
       type: 'sale',
+      fulfillment_mode: 'stock',
+      seller_inventory_deductions: { 'inventory-1': 1 },
       shop_id: 'shop-1',
       route_id: 'route-1',
       tenant_id: 'tenant-1',
@@ -706,6 +973,8 @@ describe('invoices collection', () => {
     batch.set(invoiceRef, {
       created_by: 'seller-uid',
       type: 'sale',
+      fulfillment_mode: 'stock',
+      seller_inventory_deductions: { 'inventory-1': 1 },
       shop_id: 'shop-1',
       route_id: 'route-1',
       tenant_id: 'tenant-1',
@@ -1018,6 +1287,7 @@ describe('seller inventory quantity controls', () => {
       created_by: 'seller-uid',
       seller_id: 'seller-uid',
       type: 'sale',
+      fulfillment_mode: 'stock',
       shop_id: 'shop-1',
       route_id: 'route-1',
       items: [{ variant_id: 'variant-1', qty: 8, unit_price: 10 }],
@@ -1118,6 +1388,36 @@ describe('device and session slot rules', () => {
     await assertFails(db.collection('tenants').get());
   });
 
+  it('workspace admin can read missing access slots only for users in their tenant', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedUser('seller-uid', 'seller');
+    await seedUser('other-seller-uid', 'seller', true, {
+      tenant_id: 'tenant-2',
+    });
+    const db = adminCtx(testEnv).firestore();
+    await assertSucceeds(
+      db.collection('users')
+        .doc('seller-uid')
+        .collection('device_registrations')
+        .doc('slot_8')
+        .get(),
+    );
+    await assertSucceeds(
+      db.collection('users')
+        .doc('seller-uid')
+        .collection('sessions')
+        .doc('slot_8')
+        .get(),
+    );
+    await assertFails(
+      db.collection('users')
+        .doc('other-seller-uid')
+        .collection('sessions')
+        .doc('slot_8')
+        .get(),
+    );
+  });
+
   it('allows a seller to read an unused own access slot before registration', async () => {
     await seedAccessUsers();
     const db = sellerCtx(testEnv).firestore();
@@ -1182,6 +1482,63 @@ describe('device and session slot rules', () => {
       .set(deviceData(0)));
     await assertSucceeds(userRef.collection('sessions').doc('slot_0')
       .set(sessionData(0)));
+  });
+
+  it('workspace admin device pairing uses the platform cap, not seller approval', async () => {
+    await seedTenant({ requireDevicePairing: true });
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    const adminDb = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const deviceRef = adminDb.collection('users').doc('tenant-admin-uid')
+      .collection('device_registrations').doc('slot_0');
+
+    await assertSucceeds(deviceRef.set(deviceData(0, {
+      user_id: 'tenant-admin-uid',
+      status: 'active',
+    })));
+  });
+
+  it('workspace admin can resume a pending own device without approval metadata', async () => {
+    await seedTenant({ requireDevicePairing: true });
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('users').doc('tenant-admin-uid')
+        .collection('device_registrations').doc('slot_0')
+        .set(deviceData(0, {
+          user_id: 'tenant-admin-uid',
+          status: 'pending',
+        }));
+    });
+    const deviceRef = testEnv.authenticatedContext('tenant-admin-uid')
+      .firestore().collection('users').doc('tenant-admin-uid')
+      .collection('device_registrations').doc('slot_0');
+
+    await assertSucceeds(deviceRef.update({
+      status: 'active',
+      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
+      app_version: '3.9.75+102',
+    }));
+  });
+
+  it('workspace admin cannot approve their own pending device', async () => {
+    await seedTenant({ requireDevicePairing: true });
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('users').doc('tenant-admin-uid')
+        .collection('device_registrations').doc('slot_0')
+        .set(deviceData(0, {
+          user_id: 'tenant-admin-uid',
+          status: 'pending',
+        }));
+    });
+    const deviceRef = testEnv.authenticatedContext('tenant-admin-uid')
+      .firestore().collection('users').doc('tenant-admin-uid')
+      .collection('device_registrations').doc('slot_0');
+
+    await assertFails(deviceRef.update({
+      status: 'active',
+      approved_at: firebase.firestore.FieldValue.serverTimestamp(),
+      approved_by: 'tenant-admin-uid',
+    }));
   });
 
   it('enforces required device approval before session creation', async () => {
@@ -1424,21 +1781,106 @@ describe('device and session slot rules', () => {
     );
   });
 
-  it('workspace owner can update valid limits but not exceed the supported cap', async () => {
+  it('tenant admins can edit seller limits but not pairing policy; selected super-admin can', async () => {
     await seedAccessUsers();
-    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const tenantAdminDb = testEnv.authenticatedContext('tenant-admin-uid').firestore();
     await assertSucceeds(
-      db.collection('tenants').doc('tenant-1').update({
+      tenantAdminDb.collection('tenants').doc('tenant-1').update({
         max_devices_allowed: 3,
         max_active_sessions_allowed: 4,
         updated_at: firebase.firestore.FieldValue.serverTimestamp(),
       }),
     );
     await assertFails(
+      tenantAdminDb.collection('tenants').doc('tenant-1').update({
+        require_device_pairing: true,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+    await seedUser('platform-uid', 'super_admin', true, {
+      active_workspace_id: 'tenant-1',
+      active_workspace_reason: 'Approved policy administration',
+      active_workspace_selected_at: new Date(),
+    });
+    const db = testEnv.authenticatedContext('platform-uid').firestore();
+    await assertSucceeds(db.collection('tenants').doc('tenant-1').update({
+      max_devices_allowed: 3,
+      max_active_sessions_allowed: 4,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    }));
+    await assertFails(
       db.collection('tenants').doc('tenant-1').update({
         max_devices_allowed: 11,
         updated_at: firebase.firestore.FieldValue.serverTimestamp(),
       }),
+    );
+  });
+
+  it('platform super-admin controls global workspace-admin access limits', async () => {
+    await seedAccessUsers();
+    await seedUser('platform-uid', 'super_admin');
+    const platformPolicy = testEnv.authenticatedContext('platform-uid')
+      .firestore().collection('settings').doc('platform_access_policy');
+    await assertSucceeds(platformPolicy.set({
+      workspace_admin_max_devices_allowed: 3,
+      workspace_admin_max_active_sessions_allowed: 2,
+      updated_by: 'platform-uid',
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    }));
+
+    const tenantAdminDb = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    await assertSucceeds(
+      tenantAdminDb.collection('settings').doc('platform_access_policy').get(),
+    );
+    await assertFails(
+      tenantAdminDb.collection('settings').doc('platform_access_policy').update({
+        workspace_admin_max_devices_allowed: 10,
+        updated_by: 'tenant-admin-uid',
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      sellerCtx(testEnv).firestore()
+        .collection('settings').doc('platform_access_policy').get(),
+    );
+  });
+
+  it('workspace admins use the platform-wide access cap, not seller caps', async () => {
+    await seedTenant({ maxDevicesAllowed: 1, maxActiveSessionsAllowed: 1 });
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedUser('platform-uid', 'super_admin');
+    await testEnv.authenticatedContext('platform-uid').firestore()
+      .collection('settings').doc('platform_access_policy').set({
+        workspace_admin_max_devices_allowed: 3,
+        workspace_admin_max_active_sessions_allowed: 2,
+        updated_by: 'platform-uid',
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const userRef = db.collection('users').doc('tenant-admin-uid');
+    for (let slot = 0; slot < 3; slot++) {
+      await assertSucceeds(
+        userRef.collection('device_registrations').doc(`slot_${slot}`).set(
+          deviceData(slot, { user_id: 'tenant-admin-uid' }),
+        ),
+      );
+    }
+    await assertFails(
+      userRef.collection('device_registrations').doc('slot_3').set(
+        deviceData(3, { user_id: 'tenant-admin-uid' }),
+      ),
+    );
+    for (let slot = 0; slot < 2; slot++) {
+      await assertSucceeds(
+        userRef.collection('sessions').doc(`slot_${slot}`).set(
+          sessionData(slot, { user_id: 'tenant-admin-uid' }),
+        ),
+      );
+    }
+    await assertFails(
+      userRef.collection('sessions').doc('slot_2').set(
+        sessionData(2, { user_id: 'tenant-admin-uid' }),
+      ),
     );
   });
 
@@ -1488,12 +1930,14 @@ describe('device and session slot rules', () => {
 });
 
 describe('platform operator sessions', () => {
-  it('allows a super-admin to manage only their own platform sessions', async () => {
+  it('allows two fixed platform slots and denies other users or excess devices', async () => {
     await seedUser('platform-admin-uid', 'super_admin');
     await seedUser('other-platform-admin-uid', 'super_admin');
     const session = {
       user_id: 'platform-admin-uid',
       session_id: 'platform-session-123',
+      slot_id: 'slot_0',
+      slot_number: 0,
       device_id: 'platform-installation-1',
       device_brand: 'Microsoft',
       device_model: 'Surface',
@@ -1506,17 +1950,37 @@ describe('platform operator sessions', () => {
     const ownSessions = testEnv.authenticatedContext('platform-admin-uid')
       .firestore().collection('users').doc('platform-admin-uid')
       .collection('platform_sessions');
-    await assertSucceeds(ownSessions.doc('platform-session-123').set(session));
+    await assertSucceeds(ownSessions.doc('slot_0').set(session));
     await assertSucceeds(ownSessions.where('user_id', '==', 'platform-admin-uid').get());
-    await assertSucceeds(ownSessions.doc('platform-session-123').update({
+    await assertFails(ownSessions.doc('slot_1').set({
+      ...session,
+      session_id: 'platform-session-456',
+      slot_id: 'slot_1',
+      slot_number: 1,
+      device_id: 'platform-installation-2',
+    }));
+    await assertSucceeds(ownSessions.doc('slot_0').update({
       status: 'revoked',
       revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
       terminated_by: 'platform-admin-uid',
     }));
+    await assertSucceeds(ownSessions.doc('slot_1').set({
+      ...session,
+      session_id: 'platform-session-456',
+      slot_id: 'slot_1',
+      slot_number: 1,
+      device_id: 'platform-installation-2',
+    }));
+    await assertFails(ownSessions.doc('slot_2').set({
+      ...session,
+      session_id: 'platform-session-789',
+      slot_id: 'slot_2',
+      slot_number: 2,
+    }));
     await assertFails(
       testEnv.authenticatedContext('other-platform-admin-uid').firestore()
         .collection('users').doc('platform-admin-uid')
-        .collection('platform_sessions').doc('platform-session-123').get(),
+        .collection('platform_sessions').doc('slot_0').get(),
     );
   });
 });

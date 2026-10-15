@@ -1,4 +1,4 @@
-﻿# FootWear ERP — v3.9.60+99
+﻿# FootWear ERP — v3.9.75+102
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
@@ -9,6 +9,8 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 > **v3.9.58+97 (2026-10-03)** — Encrypted file and Drive backup destinations are explicit, workspace restore matches access scope, local archives can be deleted, and workspace archival revokes member access.
 > **v3.9.59+98 (2026-10-03)** — Workspace-admin and seller sign-in now use scoped device-session records; workspace setup errors remain visible, and login system-bar contrast follows the active theme.
 > **v3.9.60+99 (2026-10-10)** — Sign-in waits for access registration; device pairing, renewal, stale-device recovery, and platform-operator sessions have explicit controls. Session records remain client-enforced under the Spark architecture.
+> **v3.9.61+100 (2026-10-15)** — Invoice creation supports stock sales, non-stock catalog sales, and cash receipt invoices. Workspace admins configure bilingual invoice headers, and generated PDFs retain the header snapshot.
+> **v3.9.75+102 (2026-10-15)** — Sign-in and session renewal are guarded against stale records and account-switch races. Sellers use workspace-specific dynamic device/session limits; workspace-admin limits are shared and controlled by the platform super-admin; platform sessions remain separate. Invoice voiding is atomic and long invoice PDFs paginate. Android updates can be installed over the device's current package without removing app data.
 
 ---
 
@@ -22,16 +24,17 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 - **Shops (Customers)** — full CRUD with balance ledger, balance trend LineChart, days-overdue indicator
 - **Inventory** — warehouse stock allocation with low-stock warning badges
 - **Transactions** — cash-in / cash-out ledger with running balance
-- **Invoices** — sale invoices, credit notes, void/paid lifecycle, 3-step payment progression bar
+- **Invoices** — stock and non-stock sales, cash receipt invoices, credit notes, void/paid lifecycle, and workspace-configurable bilingual PDF headers
 - **Reports** — monthly cash flow BarChart, outstanding PieChart, PDF/Excel/image export
 - **User Management** — create/edit admin and seller accounts, soft-delete; password reset by email
-- **Settings** — workspace-scoped company name, logo (base64 ≤50 KB), pairs-per-carton, business preferences, and per-workspace device pairing limits
+- **Settings** — workspace-scoped company name, logo (base64 ≤50 KB), pairs-per-carton, business preferences, and seller device/session limits; shared workspace-admin caps are platform-controlled
 - **Profile** — name, language, theme and password controls for all users
 
 ### Seller
 
 - View assigned route and shops
 - Record cash-in / cash-out transactions for assigned shops
+- Create stock sales, workspace-enabled non-stock invoices, and cash receipt invoices from a shop
 - View account statements and invoices
 - Dashboard and inventory suppress transient permission errors during startup
 
@@ -226,10 +229,12 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 ## Financial Integrity Rules
 
 1. `shop.balance` is the **sole source of truth** for all monetary displays. It is mutated **only** by `InvoiceNotifier` or `TransactionNotifier` via atomic Firestore batch writes.
-2. **Pathway 1 (Sale with stock):** `CreateSaleInvoiceScreen` → `InvoiceNotifier.createSaleInvoice()` — invoice + cash ledger entry + stock deduction in one batch.
-3. **Pathway 2 (Cash collection, no new goods):** `ShopDetailScreen` → `TransactionNotifier.create(type: 'cash_in')` — ledger entry only, no invoice.
-4. **Void/return:** `InvoiceNotifier.voidInvoice()` — admin only, stock returned, one reversal transaction.
-5. Never create an invoice for cash-only collection. Never create a standalone transaction for a new stock sale.
+2. **Stock sale:** `CreateSaleInvoiceScreen` → `InvoiceNotifier.createSaleInvoice()` — invoice, cash ledger entries, exact inventory deductions, and shop balance update.
+3. **Non-stock sale:** same invoice notifier with `fulfillment_mode: non_stock` — catalog items are recorded without inventory deductions and only when the workspace setting permits it.
+4. **Cash receipt:** `InvoiceNotifier.createCashReceipt()` — tenant-scoped receipt number, receipt invoice, `cash_in` ledger row, and balance reduction in one Firestore transaction.
+5. **Ledger-only collection:** `ShopDetailScreen` → `TransactionNotifier.create(type: 'cash_in')` remains available when no receipt document is needed.
+6. **Void/return:** `InvoiceNotifier.voidInvoice()` — admin only; stock returns only for stock-backed invoices, with one reversal transaction.
+7. Never create a sale invoice for cash-only collection. Never create a standalone transaction for a new goods sale.
 
 ---
 

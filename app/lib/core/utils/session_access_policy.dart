@@ -7,6 +7,15 @@ class SessionAccessPolicy {
 
   static const deviceClockSkewTolerance = Duration(minutes: 5);
 
+  static const platformMaxDevicesAllowed = 2;
+
+  static const platformMaxActiveSessionsAllowed = 1;
+
+  static bool requiresDeviceApproval({
+    required bool pairingRequired,
+    required bool hasActiveDevice,
+  }) => pairingRequired && !hasActiveDevice;
+
   static bool isClockSkewed({
     required DateTime deviceNow,
     required DateTime serverNow,
@@ -15,6 +24,49 @@ class SessionAccessPolicy {
   static bool shouldDeferMissingSessionEnforcement({
     required Duration? sessionAge,
   }) => sessionAge != null && sessionAge < accessRegistrationGracePeriod;
+
+  static bool shouldDiscardStaleAccessCheck({
+    required int checkGeneration,
+    required int currentGeneration,
+  }) => checkGeneration != currentGeneration;
+
+  static bool shouldSignOutForAccessCheck({
+    required String expectedUid,
+    required String? currentUid,
+    required bool authOperationInProgress,
+  }) =>
+      expectedUid.isNotEmpty &&
+      currentUid == expectedUid &&
+      !authOperationInProgress;
+
+  static bool shouldRejectRevokedAccessDuringRenewal({
+    required bool isRenewal,
+    required bool hasRevokedRecord,
+  }) => isRenewal && hasRevokedRecord;
+
+  static bool shouldResetSessionContext({
+    required String? previousUserId,
+    required String? nextUserId,
+    required String? previousRole,
+    required String? nextRole,
+    required String? previousTenantId,
+    required String? nextTenantId,
+  }) =>
+      nextUserId != null &&
+      (previousUserId != nextUserId ||
+          previousRole != nextRole ||
+          previousTenantId != nextTenantId);
+
+  static String? deviceSlotIdForSession(
+    SessionModel session, {
+    required String deviceId,
+  }) {
+    if (session.deviceId != deviceId ||
+        !RegExp(r'^slot_[0-9]$').hasMatch(session.deviceSlotId)) {
+      return null;
+    }
+    return session.deviceSlotId;
+  }
 
   static SessionModel? currentForDevice(
     Iterable<SessionModel> sessions, {

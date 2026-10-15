@@ -100,7 +100,7 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
 
   final AsyncValue<List<RouteModel>> routes;
   final AsyncValue<List<ShopModel>> shops;
-  if (user.isSuperAdmin) {
+  if (user.isSuperAdmin && user.tenantId == null) {
     final workspaces = ref.watch(tenantsProvider);
     final users = user.tenantId == null ? null : ref.watch(allUsersProvider);
     if (workspaces.isLoading || (users?.isLoading ?? false)) {

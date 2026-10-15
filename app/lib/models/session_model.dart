@@ -61,6 +61,19 @@ class SessionModel {
     );
   }
 
+  factory SessionModel.fromPendingWriteData(
+    Map<String, dynamic> writeData,
+    String docId, {
+    required Timestamp createdAt,
+    required Timestamp lastSeenAt,
+  }) {
+    return SessionModel.fromJson({
+      ...writeData,
+      'created_at': createdAt,
+      'last_seen_at': lastSeenAt,
+    }, docId);
+  }
+
   Map<String, dynamic> toJson() => {
     'session_id': sessionId,
     'slot_number': slotNumber,

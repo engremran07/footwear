@@ -57,9 +57,20 @@ class AppErrorMapper {
 
     // ── Dart built-in errors ───────────────────────────────────────────
     final msg = error.toString().toLowerCase();
+    if (msg.contains('platform-device-limit-reached')) {
+      return 'platform_device_limit_reached';
+    }
     if (msg.contains('device-limit-reached')) return 'device_limit_reached';
     if (msg.contains('session-limit-reached')) return 'session_limit_reached';
     if (msg.contains('device-pairing-pending')) return 'device_pairing_pending';
+    if (msg.contains('session-revoked') ||
+        msg.contains('device-session-revoked')) {
+      return 'session_revoked';
+    }
+    if (msg.contains('device-session-mismatch') ||
+        msg.contains('invalid-platform-session-slot')) {
+      return 'device_session_mismatch';
+    }
     if (msg.contains('device-blocked')) return 'device_blocked';
     if (msg.contains('device-admin-reset-required')) {
       return 'device_admin_reset_required';

@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/models/access_usage_summary.dart';
 import '../core/models/tenant_model.dart';
+import '../core/models/workspace_admin_access_policy.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/session_access_policy.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/device_registration_model.dart';
 import '../models/session_model.dart';
@@ -60,6 +62,9 @@ class _DeviceSessionSecurityScreenState
         final devicesState = ref.watch(deviceRegistrationsProvider(user.id));
         final sessionsState = ref.watch(userSessionsProvider(user.id));
         final installationState = ref.watch(currentDeviceInstallationProvider);
+        final adminPolicyState = ref.watch(
+          workspaceAdminAccessPolicyProvider(user.id),
+        );
 
         return tenantState.when(
           data: (tenant) {
@@ -70,15 +75,41 @@ class _DeviceSessionSecurityScreenState
             }
             return devicesState.when(
               data: (devices) => sessionsState.when(
-                data: (sessions) => _buildOwnUsage(
-                  context,
-                  ref,
-                  user,
-                  tenant,
-                  devices,
-                  sessions,
-                  installationState.value?.installationId,
-                ),
+                data: (sessions) {
+                  if (!user.isAdmin) {
+                    return _buildOwnUsage(
+                      context,
+                      ref,
+                      user,
+                      tenant,
+                      devices,
+                      sessions,
+                      installationState.value?.installationId,
+                      null,
+                    );
+                  }
+                  return adminPolicyState.when(
+                    data: (policy) => _buildOwnUsage(
+                      context,
+                      ref,
+                      user,
+                      tenant,
+                      devices,
+                      sessions,
+                      installationState.value?.installationId,
+                      policy,
+                    ),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (error, _) => mappedErrorState(
+                      error: error,
+                      ref: ref,
+                      onRetry: () => ref.invalidate(
+                        workspaceAdminAccessPolicyProvider(user.id),
+                      ),
+                    ),
+                  );
+                },
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, _) => mappedErrorState(
                   error: error,
@@ -120,27 +151,73 @@ class _DeviceSessionSecurityScreenState
         ?.installationId;
     return sessionsState.when(
       data: (sessions) {
-        if (sessions.isEmpty) {
-          return Center(child: Text(tr('access_no_sessions', ref)));
-        }
+        final now = DateTime.now();
+        final activeSessions = sessions
+            .where((session) => session.status == 'active')
+            .where(
+              (session) => session.expiresAt?.toDate().isAfter(now) ?? false,
+            )
+            .toList();
+        final activeDeviceCount = activeSessions
+            .map((session) => session.deviceId)
+            .toSet()
+            .length;
+        final usage = AccessUsageSummary(
+          maxDevicesAllowed: SessionAccessPolicy.platformMaxDevicesAllowed,
+          registeredDevices: activeDeviceCount,
+          maxActiveSessionsAllowed:
+              SessionAccessPolicy.platformMaxActiveSessionsAllowed,
+          activeSessions: activeSessions.length,
+        );
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            _PlatformWorkspaceAdminPolicyEditor(userId: user.id),
+            const SizedBox(height: 16),
+            _CapacitySection(
+              title: tr('access_devices', ref),
+              icon: Icons.devices_outlined,
+              allowedLabel: tr('access_allowed', ref),
+              usedLabel: tr('access_registered', ref),
+              availableLabel: tr('access_available', ref),
+              allowed: usage.maxDevicesAllowed,
+              used: usage.registeredDevices,
+              available: usage.availableDeviceSlots,
+              overLimit: usage.overLimitDeviceCount,
+              ref: ref,
+            ),
+            const SizedBox(height: 8),
+            _CapacitySection(
+              title: tr('access_active_sessions', ref),
+              icon: Icons.phonelink_lock_outlined,
+              allowedLabel: tr('access_allowed', ref),
+              usedLabel: tr('access_active', ref),
+              availableLabel: tr('access_available', ref),
+              allowed: usage.maxActiveSessionsAllowed,
+              used: usage.activeSessions,
+              available: usage.availableSessionSlots,
+              overLimit: usage.overLimitSessionCount,
+              ref: ref,
+            ),
+            const SizedBox(height: 20),
             Text(
               tr('platform_sessions_title', ref),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            for (final session in sessions)
-              _SessionCard(
-                session: session,
-                isCurrent: session.deviceId == installationId,
-                userName: user.displayName,
-                onTerminate: session.status == 'active'
-                    ? () => _terminatePlatformSession(context, ref, session)
-                    : null,
-                ref: ref,
-              ),
+            if (sessions.isEmpty)
+              Text(tr('access_no_sessions', ref))
+            else
+              for (final session in sessions)
+                _SessionCard(
+                  session: session,
+                  isCurrent: session.deviceId == installationId,
+                  userName: user.displayName,
+                  onTerminate: session.status == 'active'
+                      ? () => _terminatePlatformSession(context, ref, session)
+                      : null,
+                  ref: ref,
+                ),
           ],
         );
       },
@@ -161,6 +238,7 @@ class _DeviceSessionSecurityScreenState
     List<DeviceRegistrationModel> devices,
     List<SessionModel> sessions,
     String? installationId,
+    WorkspaceAdminAccessPolicy? workspaceAdminPolicy,
   ) {
     final now = DateTime.now();
     final registeredDevices = devices
@@ -171,9 +249,12 @@ class _DeviceSessionSecurityScreenState
         .where((session) => session.expiresAt?.toDate().isAfter(now) ?? false)
         .length;
     final summary = AccessUsageSummary(
-      maxDevicesAllowed: tenant.maxDevicesAllowed,
+      maxDevicesAllowed:
+          workspaceAdminPolicy?.maxDevicesAllowed ?? tenant.maxDevicesAllowed,
       registeredDevices: registeredDevices,
-      maxActiveSessionsAllowed: tenant.maxActiveSessionsAllowed,
+      maxActiveSessionsAllowed:
+          workspaceAdminPolicy?.maxActiveSessionsAllowed ??
+          tenant.maxActiveSessionsAllowed,
       activeSessions: activeSessions,
     );
 
@@ -234,7 +315,7 @@ class _DeviceSessionSecurityScreenState
                         (session.expiresAt?.toDate().isAfter(now) ?? false),
                   )
                   .length,
-              onRevoke: tenant.allowAdminResetOnly
+              onRevoke: user.isAdmin || tenant.allowAdminResetOnly
                   ? null
                   : () => _revokeDevice(
                       context,
@@ -293,10 +374,11 @@ class _DeviceSessionSecurityScreenState
         if (tenant == null) {
           return Center(child: Text(tr('access_workspace_unavailable', ref)));
         }
-        final canEditPolicy = currentUser?.isSuperAdmin == true
-            ? currentUser?.activeWorkspaceId == tenant.id
-            : currentUser?.isTenantAdmin == true &&
-                  currentUser?.id == tenant.ownerUserId;
+        final canEditPolicy =
+            (currentUser?.isSuperAdmin == true &&
+                currentUser?.activeWorkspaceId == tenant.id) ||
+            (currentUser?.isTenantAdmin == true &&
+                currentUser?.tenantId == tenant.id);
         if (devicesState.isLoading ||
             sessionsState.isLoading ||
             usersState.isLoading) {
@@ -304,7 +386,17 @@ class _DeviceSessionSecurityScreenState
         }
         final error =
             devicesState.error ?? sessionsState.error ?? usersState.error;
-        if (error != null) return mappedErrorState(error: error, ref: ref);
+        if (error != null) {
+          return mappedErrorState(
+            error: error,
+            ref: ref,
+            onRetry: () {
+              ref.invalidate(tenantDeviceRegistryProvider(tenantId));
+              ref.invalidate(tenantSessionRegistryProvider(tenantId));
+              ref.invalidate(tenantUsersProvider(tenantId));
+            },
+          );
+        }
         final devices = devicesState.value ?? const <DeviceRegistrationModel>[];
         final sessions = sessionsState.value ?? const <SessionModel>[];
         final users = usersState.value ?? const <UserModel>[];
@@ -390,7 +482,7 @@ class _DeviceSessionSecurityScreenState
                           _adminSessionList(
                             context,
                             ref,
-                            sessions,
+                            filteredSessions,
                             userNames,
                             currentUser?.id,
                             installationId,
@@ -451,7 +543,7 @@ class _DeviceSessionSecurityScreenState
                 (session) => session.expiresAt?.toDate().isAfter(now) ?? false,
               )
               .length,
-          onRevoke: device.status == 'active'
+          onRevoke: device.status == 'active' && device.userId != currentUserId
               ? () => _revokeDevice(
                   context,
                   ref,
@@ -462,7 +554,8 @@ class _DeviceSessionSecurityScreenState
                   relatedSessionCount: relatedSessions.length,
                 )
               : null,
-          onApprove: device.status == 'pending'
+          onApprove:
+              device.status == 'pending' && device.userId != currentUserId
               ? () => _manageDevice(
                   context,
                   ref,
@@ -484,7 +577,7 @@ class _DeviceSessionSecurityScreenState
                       notifier.blockDevice(device.userId, device.id),
                 )
               : null,
-          onReset: device.status == 'revoked'
+          onReset: device.status == 'revoked' && device.userId != currentUserId
               ? () => _manageDevice(
                   context,
                   ref,
@@ -714,6 +807,151 @@ class _WorkspacePolicyEditor extends ConsumerStatefulWidget {
       _WorkspacePolicyEditorState();
 }
 
+class _PlatformWorkspaceAdminPolicyEditor extends ConsumerStatefulWidget {
+  final String userId;
+
+  const _PlatformWorkspaceAdminPolicyEditor({required this.userId});
+
+  @override
+  ConsumerState<_PlatformWorkspaceAdminPolicyEditor> createState() =>
+      _PlatformWorkspaceAdminPolicyEditorState();
+}
+
+class _PlatformWorkspaceAdminPolicyEditorState
+    extends ConsumerState<_PlatformWorkspaceAdminPolicyEditor> {
+  final _devicesController = TextEditingController();
+  final _sessionsController = TextEditingController();
+  WorkspaceAdminAccessPolicy? _loadedPolicy;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _devicesController.dispose();
+    _sessionsController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final devices = int.tryParse(_devicesController.text.trim());
+    final sessions = int.tryParse(_sessionsController.text.trim());
+    if (devices == null ||
+        sessions == null ||
+        devices < 1 ||
+        sessions < 1 ||
+        devices > AccessUsageSummary.maximumSlotsPerUser ||
+        sessions > AccessUsageSummary.maximumSlotsPerUser) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(errorSnackBar(tr('access_policy_range', ref)));
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(workspaceAdminAccessPolicyNotifierProvider.notifier)
+          .updatePolicy(
+            maxDevicesAllowed: devices,
+            maxActiveSessionsAllowed: sessions,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(successSnackBar(tr('access_policy_saved', ref)));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final policyState = ref.watch(
+      workspaceAdminAccessPolicyProvider(widget.userId),
+    );
+    return policyState.when(
+      data: (policy) {
+        if (_loadedPolicy != policy) {
+          _loadedPolicy = policy;
+          _devicesController.text = policy.maxDevicesAllowed.toString();
+          _sessionsController.text = policy.maxActiveSessionsAllowed.toString();
+        }
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tr('workspace_admin_policy_title', ref),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  tr('workspace_admin_policy_help', ref),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _devicesController,
+                        enabled: !_saving,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: tr('access_policy_devices', ref),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _sessionsController,
+                        enabled: !_saving,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: tr('access_policy_sessions', ref),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_outlined),
+                    label: Text(tr('save_changes', ref)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const LinearProgressIndicator(),
+      error: (error, _) => mappedErrorState(
+        error: error,
+        ref: ref,
+        onRetry: () =>
+            ref.invalidate(workspaceAdminAccessPolicyProvider(widget.userId)),
+      ),
+    );
+  }
+}
+
 class _WorkspacePolicyEditorState
     extends ConsumerState<_WorkspacePolicyEditor> {
   late final TextEditingController _devicesController;
@@ -767,15 +1005,10 @@ class _WorkspacePolicyEditorState
     try {
       await ref
           .read(tenantManagementNotifierProvider.notifier)
-          .updateTenant(
+          .updateTenantAccessLimits(
             widget.tenant.id,
-            name: widget.tenant.name,
-            slug: widget.tenant.slug,
-            requireDevicePairing: widget.tenant.requireDevicePairing,
-            allowAdminResetOnly: widget.tenant.allowAdminResetOnly,
             maxDevicesAllowed: devices,
             maxActiveSessionsAllowed: sessions,
-            ownerUserId: widget.tenant.ownerUserId,
           );
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -801,7 +1034,7 @@ class _WorkspacePolicyEditorState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            tr('access_policy_title', ref),
+            tr('seller_access_policy_title', ref),
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),

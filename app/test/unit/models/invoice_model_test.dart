@@ -7,6 +7,7 @@ void main() {
   final baseJson = <String, dynamic>{
     'invoice_number': 'INV-2026-0001',
     'type': 'sale',
+    'fulfillment_mode': 'non_stock',
     'shop_id': 's1',
     'shop_name': 'Test Shop',
     'route_id': 'r1',
@@ -33,6 +34,11 @@ void main() {
     'idempotency_key': 'idemp-1',
     'status': 'issued',
     'notes': 'Urgent order',
+    'invoice_header_snapshot': {
+      'name_en': 'Test Company',
+      'name_ar': 'شركة الاختبار',
+      'phone': '+966500000000',
+    },
     'created_by': 'u1',
     'created_at': ts,
     'updated_at': ts,
@@ -44,6 +50,8 @@ void main() {
       expect(m.id, 'inv1');
       expect(m.invoiceNumber, 'INV-2026-0001');
       expect(m.type, 'sale');
+      expect(m.fulfillmentMode, InvoiceModel.fulfillmentNonStock);
+      expect(m.headerSnapshot['name_en'], 'Test Company');
       expect(m.shopId, 's1');
       expect(m.shopName, 'Test Shop');
       expect(m.routeId, 'r1');
@@ -65,6 +73,8 @@ void main() {
       final m = InvoiceModel.fromJson({}, 'inv2');
       expect(m.invoiceNumber, '');
       expect(m.type, InvoiceModel.typeSale);
+      expect(m.fulfillmentMode, InvoiceModel.fulfillmentStock);
+      expect(m.headerSnapshot, isEmpty);
       expect(m.items, isEmpty);
       expect(m.subtotal, 0);
       expect(m.discount, 0);
@@ -108,6 +118,28 @@ void main() {
         'type': 'credit_note',
       }, 'inv3');
       expect(m.isCreditNote, isTrue);
+    });
+
+    test('isNonStockSale distinguishes non-stock sales from receipts', () {
+      final nonStockSale = InvoiceModel.fromJson({
+        ...baseJson,
+        'type': InvoiceModel.typeSale,
+        'fulfillment_mode': InvoiceModel.fulfillmentNonStock,
+      }, 'non-stock');
+      final stockSale = InvoiceModel.fromJson({
+        ...baseJson,
+        'type': InvoiceModel.typeSale,
+        'fulfillment_mode': InvoiceModel.fulfillmentStock,
+      }, 'stock');
+      final receipt = InvoiceModel.fromJson({
+        ...baseJson,
+        'type': InvoiceModel.typeCashReceipt,
+        'fulfillment_mode': 'none',
+      }, 'receipt');
+
+      expect(nonStockSale.isNonStockSale, isTrue);
+      expect(stockSale.isNonStockSale, isFalse);
+      expect(receipt.isNonStockSale, isFalse);
     });
   });
 
@@ -167,6 +199,8 @@ void main() {
       expect(restored.amountReceived, original.amountReceived);
       expect(restored.outstandingAmount, original.outstandingAmount);
       expect(restored.idempotencyKey, original.idempotencyKey);
+      expect(restored.fulfillmentMode, original.fulfillmentMode);
+      expect(restored.headerSnapshot, original.headerSnapshot);
       expect(restored.items, hasLength(original.items.length));
     });
 
@@ -175,6 +209,21 @@ void main() {
       final json = original.toJson();
       expect(json['outstanding_amount'], 1200.0);
       expect(json['idempotency_key'], 'idemp-1');
+    });
+
+    test('cash receipt sequence survives model round-trip and copyWith', () {
+      final receipt = InvoiceModel.fromJson({
+        ...baseJson,
+        'type': InvoiceModel.typeCashReceipt,
+        'cash_receipt_sequence': 12,
+      }, 'receipt-12');
+
+      expect(receipt.cashReceiptSequence, 12);
+      expect(
+        InvoiceModel.fromJson(receipt.toJson(), receipt.id).cashReceiptSequence,
+        12,
+      );
+      expect(receipt.copyWith(cashReceiptSequence: 13).cashReceiptSequence, 13);
     });
   });
 

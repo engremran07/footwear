@@ -11,6 +11,15 @@ void main() {
       'currency': 'SAR',
       'pairs_per_carton': 12,
       'logo_base64': 'aGVsbG8=', // base64('hello')
+      'allow_non_stock_invoices': false,
+      'invoice_header': {
+        'name_en': 'Test Company',
+        'name_ar': 'شركة الاختبار',
+        'phone': '+966500000000',
+        'template': 'classic',
+        'accent_color': '#345678',
+        'visible_fields': ['phone', 'email'],
+      },
       'updated_at': ts,
     };
 
@@ -22,6 +31,11 @@ void main() {
       expect(m.pairsPerCarton, 12);
       expect(m.logoBase64, 'aGVsbG8=');
       expect(m.logoBytes, isNotNull);
+      expect(m.allowNonStockInvoices, isFalse);
+      expect(m.invoiceHeader.nameEn, 'Test Company');
+      expect(m.invoiceHeader.nameAr, 'شركة الاختبار');
+      expect(m.invoiceHeader.phone, '+966500000000');
+      expect(m.invoiceHeader.visibleFields, containsAll(['phone', 'email']));
     });
 
     test('missing fields use defaults', () {
@@ -32,6 +46,18 @@ void main() {
       expect(m.pairsPerCarton, 12);
       expect(m.logoBase64, isNull);
       expect(m.logoBytes, isNull);
+      expect(m.allowNonStockInvoices, isTrue);
+      expect(m.invoiceHeader.nameEn, '');
+    });
+
+    test('invoice header snapshot includes tenant branding and logo', () {
+      final settings = SettingsModel.fromJson(baseJson);
+      final snapshot = settings.invoiceHeaderSnapshot;
+
+      expect(snapshot['name_en'], 'Test Company');
+      expect(snapshot['name_ar'], 'شركة الاختبار');
+      expect(snapshot['company_name'], 'Test Co');
+      expect(snapshot['logo_base64'], 'aGVsbG8=');
     });
   });
 
@@ -42,6 +68,13 @@ void main() {
         companyName: 'My Shop',
         currency: 'PKR',
         pairsPerCarton: 20,
+        allowNonStockInvoices: false,
+        invoiceHeader: const InvoiceHeaderConfig(
+          nameEn: 'Workshop',
+          nameAr: 'ورشة',
+          phone: '+966511111111',
+          visibleFields: {'phone', 'tax_number'},
+        ),
         updatedAt: ts,
       );
       final json = original.toJson();
@@ -49,6 +82,10 @@ void main() {
       expect(restored.companyName, original.companyName);
       expect(restored.currency, original.currency);
       expect(restored.pairsPerCarton, original.pairsPerCarton);
+      expect(restored.allowNonStockInvoices, isFalse);
+      expect(restored.invoiceHeader.nameEn, 'Workshop');
+      expect(restored.invoiceHeader.nameAr, 'ورشة');
+      expect(restored.invoiceHeader.visibleFields, {'phone', 'tax_number'});
     });
 
     test('copyWith can update and clear optional logo field', () {

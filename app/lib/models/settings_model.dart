@@ -2,12 +2,146 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+class InvoiceHeaderConfig {
+  final String nameEn;
+  final String nameAr;
+  final String nameUr;
+  final String subtitleEn;
+  final String subtitleAr;
+  final String subtitleUr;
+  final String addressEn;
+  final String addressAr;
+  final String addressUr;
+  final String phone;
+  final String email;
+  final String taxNumber;
+  final String commercialRegistrationNumber;
+  final String template;
+  final String accentColor;
+  final Set<String> visibleFields;
+
+  const InvoiceHeaderConfig({
+    this.nameEn = '',
+    this.nameAr = '',
+    this.nameUr = '',
+    this.subtitleEn = '',
+    this.subtitleAr = '',
+    this.subtitleUr = '',
+    this.addressEn = '',
+    this.addressAr = '',
+    this.addressUr = '',
+    this.phone = '',
+    this.email = '',
+    this.taxNumber = '',
+    this.commercialRegistrationNumber = '',
+    this.template = 'classic',
+    this.accentColor = '#315C4C',
+    this.visibleFields = const {
+      'logo',
+      'phone',
+      'email',
+      'tax_number',
+      'commercial_registration_number',
+    },
+  });
+
+  factory InvoiceHeaderConfig.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const InvoiceHeaderConfig();
+    final rawVisibleFields = json['visible_fields'] as List<dynamic>?;
+    return InvoiceHeaderConfig(
+      nameEn: json['name_en'] as String? ?? '',
+      nameAr: json['name_ar'] as String? ?? '',
+      nameUr: json['name_ur'] as String? ?? '',
+      subtitleEn: json['subtitle_en'] as String? ?? '',
+      subtitleAr: json['subtitle_ar'] as String? ?? '',
+      subtitleUr: json['subtitle_ur'] as String? ?? '',
+      addressEn: json['address_en'] as String? ?? '',
+      addressAr: json['address_ar'] as String? ?? '',
+      addressUr: json['address_ur'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      taxNumber: json['tax_number'] as String? ?? '',
+      commercialRegistrationNumber:
+          json['commercial_registration_number'] as String? ?? '',
+      template: json['template'] as String? ?? 'classic',
+      accentColor: json['accent_color'] as String? ?? '#315C4C',
+      visibleFields: rawVisibleFields == null
+          ? const {
+              'logo',
+              'phone',
+              'email',
+              'tax_number',
+              'commercial_registration_number',
+            }
+          : rawVisibleFields.whereType<String>().toSet(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'name_en': nameEn,
+    'name_ar': nameAr,
+    'name_ur': nameUr,
+    'subtitle_en': subtitleEn,
+    'subtitle_ar': subtitleAr,
+    'subtitle_ur': subtitleUr,
+    'address_en': addressEn,
+    'address_ar': addressAr,
+    'address_ur': addressUr,
+    'phone': phone,
+    'email': email,
+    'tax_number': taxNumber,
+    'commercial_registration_number': commercialRegistrationNumber,
+    'template': template,
+    'accent_color': accentColor,
+    'visible_fields': visibleFields.toList()..sort(),
+  };
+
+  InvoiceHeaderConfig copyWith({
+    String? nameEn,
+    String? nameAr,
+    String? nameUr,
+    String? subtitleEn,
+    String? subtitleAr,
+    String? subtitleUr,
+    String? addressEn,
+    String? addressAr,
+    String? addressUr,
+    String? phone,
+    String? email,
+    String? taxNumber,
+    String? commercialRegistrationNumber,
+    String? template,
+    String? accentColor,
+    Set<String>? visibleFields,
+  }) => InvoiceHeaderConfig(
+    nameEn: nameEn ?? this.nameEn,
+    nameAr: nameAr ?? this.nameAr,
+    nameUr: nameUr ?? this.nameUr,
+    subtitleEn: subtitleEn ?? this.subtitleEn,
+    subtitleAr: subtitleAr ?? this.subtitleAr,
+    subtitleUr: subtitleUr ?? this.subtitleUr,
+    addressEn: addressEn ?? this.addressEn,
+    addressAr: addressAr ?? this.addressAr,
+    addressUr: addressUr ?? this.addressUr,
+    phone: phone ?? this.phone,
+    email: email ?? this.email,
+    taxNumber: taxNumber ?? this.taxNumber,
+    commercialRegistrationNumber:
+        commercialRegistrationNumber ?? this.commercialRegistrationNumber,
+    template: template ?? this.template,
+    accentColor: accentColor ?? this.accentColor,
+    visibleFields: visibleFields ?? this.visibleFields,
+  );
+}
+
 class SettingsModel {
   final String tenantId;
   final String companyName;
   final String currency;
   final int pairsPerCarton;
   final bool requireAdminApprovalForSellerTransactionEdits;
+  final bool allowNonStockInvoices;
+  final InvoiceHeaderConfig invoiceHeader;
 
   /// Base64-encoded PNG/JPEG logo, stored directly in Firestore.
   /// Use [logoBytes] to get the decoded bytes for Image.memory() or PDF.
@@ -20,6 +154,8 @@ class SettingsModel {
     required this.currency,
     required this.pairsPerCarton,
     this.requireAdminApprovalForSellerTransactionEdits = false,
+    this.allowNonStockInvoices = true,
+    this.invoiceHeader = const InvoiceHeaderConfig(),
     this.logoBase64,
     required this.updatedAt,
   }) : assert(pairsPerCarton > 0, 'pairsPerCarton must be greater than 0');
@@ -30,6 +166,8 @@ class SettingsModel {
     String? currency,
     int? pairsPerCarton,
     bool? requireAdminApprovalForSellerTransactionEdits,
+    bool? allowNonStockInvoices,
+    InvoiceHeaderConfig? invoiceHeader,
     String? logoBase64,
     bool clearLogoBase64 = false,
     Timestamp? updatedAt,
@@ -42,6 +180,9 @@ class SettingsModel {
       requireAdminApprovalForSellerTransactionEdits:
           requireAdminApprovalForSellerTransactionEdits ??
           this.requireAdminApprovalForSellerTransactionEdits,
+      allowNonStockInvoices:
+          allowNonStockInvoices ?? this.allowNonStockInvoices,
+      invoiceHeader: invoiceHeader ?? this.invoiceHeader,
       logoBase64: clearLogoBase64 ? null : (logoBase64 ?? this.logoBase64),
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -58,6 +199,12 @@ class SettingsModel {
     }
   }
 
+  Map<String, dynamic> get invoiceHeaderSnapshot => {
+    ...invoiceHeader.toJson(),
+    'company_name': companyName,
+    if (logoBase64 != null) 'logo_base64': logoBase64,
+  };
+
   factory SettingsModel.fromJson(Map<String, dynamic> json) {
     final tenantId = json['tenant_id'] as String? ?? '__global__';
     return SettingsModel(
@@ -69,6 +216,10 @@ class SettingsModel {
           json['require_admin_approval_for_seller_transaction_edits']
               as bool? ??
           false,
+      allowNonStockInvoices: json['allow_non_stock_invoices'] as bool? ?? true,
+      invoiceHeader: InvoiceHeaderConfig.fromJson(
+        json['invoice_header'] as Map<String, dynamic>?,
+      ),
       logoBase64: json['logo_base64'] as String?,
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
     );
@@ -81,6 +232,8 @@ class SettingsModel {
     'pairs_per_carton': pairsPerCarton,
     'require_admin_approval_for_seller_transaction_edits':
         requireAdminApprovalForSellerTransactionEdits,
+    'allow_non_stock_invoices': allowNonStockInvoices,
+    'invoice_header': invoiceHeader.toJson(),
     'logo_base64': logoBase64,
     'updated_at': updatedAt,
   };
@@ -95,6 +248,9 @@ class SettingsModel {
           other.pairsPerCarton == pairsPerCarton &&
           other.requireAdminApprovalForSellerTransactionEdits ==
               requireAdminApprovalForSellerTransactionEdits &&
+          other.allowNonStockInvoices == allowNonStockInvoices &&
+          other.invoiceHeader.toJson().toString() ==
+              invoiceHeader.toJson().toString() &&
           other.logoBase64 == logoBase64 &&
           other.updatedAt == updatedAt);
 
@@ -105,6 +261,8 @@ class SettingsModel {
     currency,
     pairsPerCarton,
     requireAdminApprovalForSellerTransactionEdits,
+    allowNonStockInvoices,
+    invoiceHeader.toJson().toString(),
     logoBase64,
     updatedAt,
   );

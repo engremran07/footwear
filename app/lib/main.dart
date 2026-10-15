@@ -16,7 +16,7 @@ import 'providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  var firebaseInitialized = false;
+  var startupReady = false;
 
   // Edge-to-edge: draw behind system bars so zoom drawer fills full screen
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -29,10 +29,13 @@ void main() async {
   );
 
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    firebaseInitialized = true;
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } else {
+      Firebase.app();
+    }
 
     // Crashlytics has no web implementation; avoid unhandled platform calls.
     if (!kIsWeb) {
@@ -73,12 +76,13 @@ void main() async {
     if (!rememberMe && FirebaseAuth.instance.currentUser != null) {
       await FirebaseAuth.instance.signOut();
     }
+    startupReady = true;
     // Defer token refresh to after first frame to avoid blocking startup.
   } catch (e) {
     debugPrint('Firebase init failed: $e');
   }
 
-  if (!firebaseInitialized) {
+  if (!startupReady) {
     runApp(const ProviderScope(child: _FirebaseInitializationFailureApp()));
     return;
   }
@@ -156,7 +160,8 @@ Future<void> _deferredTokenRefresh() async {
   try {
     await user.getIdToken(true);
   } on FirebaseAuthException catch (e, stack) {
-    if (shouldSignOutAfterAuthRefreshFailure(e.code)) {
+    if (shouldSignOutAfterAuthRefreshFailure(e.code) &&
+        FirebaseAuth.instance.currentUser?.uid == user.uid) {
       await FirebaseAuth.instance.signOut();
     } else if (!kIsWeb) {
       FirebaseCrashlytics.instance.recordError(e, stack);
