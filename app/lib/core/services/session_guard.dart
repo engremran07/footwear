@@ -13,6 +13,7 @@ import '../../models/device_registration_model.dart';
 import '../constants/collections.dart';
 import '../l10n/app_locale.dart';
 import '../utils/session_access_policy.dart';
+import '../utils/session_access_error.dart';
 import '../models/access_usage_summary.dart';
 import '../utils/tenant_scope.dart';
 import '../../providers/tenant_provider.dart';
@@ -424,23 +425,28 @@ class _SessionGuardState extends ConsumerState<SessionGuard> {
             .read(sessionManagementNotifierProvider.notifier)
             .registerPlatformSession(userId: user.id, isRenewal: true);
       } else if (user.tenantId != null) {
-        await ref
+        final access = await ref
             .read(sessionManagementNotifierProvider.notifier)
             .registerCurrentAccess(
               userId: user.id,
               tenantId: user.tenantId!,
               isRenewal: true,
             );
+        if (SessionAccessPolicy.shouldTerminatePendingRenewal(
+          isRenewal: true,
+          accessStatus: access.status,
+        )) {
+          _signOutCurrentUser(user.id);
+          return;
+        }
       } else {
         return;
       }
       await _verifyCurrentAccessSession();
     } catch (error) {
       _trace('applicationSession.renew.error', {'error': error.runtimeType});
-      if (error.toString().contains('device-blocked') ||
-          error.toString().contains('device-admin-reset-required') ||
-          error.toString().contains('device-session-revoked') ||
-          error.toString().contains('session-revoked')) {
+      if (error is SessionAccessException &&
+          error.shouldTerminateSessionOnRenewal) {
         _signOutCurrentUser(user.id);
       }
     }

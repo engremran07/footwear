@@ -1,4 +1,4 @@
-﻿# FootWear ERP — Flutter App (v3.9.75+102)
+﻿# FootWear ERP — Flutter App (v3.9.76+702)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
@@ -10,7 +10,7 @@ Status chips display localized text and use high-contrast state colors when that
 
 Encrypted backup export and Google Drive upload are separate actions; Drive uploads do not create duplicate local archives. Restore behavior follows workspace scope, and local backup files can be deleted from the device restore picker. Workspace archival revokes member access records before the workspace is marked archived.
 Workspace-admin and seller sign-in registers device access through tenant/user-scoped queries and links each application session to its registered device slot. Workspace create/edit failures remain visible in the form, and the workspace list tolerates temporary auth-profile loading.
-Sign-in stays on the login screen until access registration completes. Workspace device pairing uses pending approval, and administrators can remove, block, or reset devices with related active-session revocation. Sessions renew while foregrounded and show a five-minute expiry warning. These records support client-side device/seat controls; Firestore Rules do not bind requests to an active session ID under the current Spark architecture.
+Sign-in stays on the login screen until access registration completes. Seller devices use pending approval when workspace pairing is enabled; workspace administrators register without seller approval and use shared platform caps, defaulting to three devices and two sessions if the platform policy document is absent. Administrators can remove, block, or reset devices with related active-session revocation. Sessions renew while foregrounded and show a five-minute expiry warning. These records support client-side device/seat controls; Firestore Rules do not bind requests to an active session ID under the current Spark architecture.
 
 Invoice creation supports stock sales, workspace-enabled non-stock catalog sales, and cash receipt invoices. Non-stock invoices preserve catalog item details without reducing inventory. Receipt numbering, receipt ledger entries, and shop balance changes are atomic and workspace-scoped. Workspace administrators configure bilingual invoice headers; generated PDFs use the header snapshot stored on each invoice. Shop detail provides a preselected invoice entry point while retaining ledger-only cash-in.
 

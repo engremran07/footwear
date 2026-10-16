@@ -10,6 +10,7 @@ import '../core/models/tenant_model.dart';
 import '../core/models/workspace_admin_access_policy.dart';
 import '../core/services/device_installation.dart';
 import '../core/utils/session_access_policy.dart';
+import '../core/utils/session_access_error.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/device_registration_model.dart';
 import '../models/session_model.dart';
@@ -683,7 +684,8 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
               snapshot?.data()?['status'] == 'pending' &&
               snapshot?.data()?['device_id'] == metadata.installationId,
         );
-        if (pendingDeviceIndex >= 0) {
+        final adminPendingIndex = isWorkspaceAdmin ? pendingDeviceIndex : -1;
+        if (pendingDeviceIndex >= 0 && adminPendingIndex < 0) {
           return _pendingSession(
             userId,
             tenantId,
@@ -696,7 +698,11 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
               snapshot?.data()?['status'] == 'blocked' &&
               snapshot?.data()?['device_id'] == metadata.installationId,
         );
-        if (blockedDeviceIndex >= 0) throw StateError('device-blocked');
+        if (blockedDeviceIndex >= 0) {
+          throw const SessionAccessException(
+            SessionAccessErrorCode.deviceBlocked,
+          );
+        }
         final revokedDeviceIndex = deviceSnapshots.indexWhere(
           (snapshot) =>
               snapshot?.data()?['status'] == 'revoked' &&
@@ -705,12 +711,24 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
         if (SessionAccessPolicy.shouldRejectRevokedAccessDuringRenewal(
           isRenewal: isRenewal,
           hasRevokedRecord: revokedDeviceIndex >= 0,
+          hasLiveRecord: existingDeviceIndex >= 0,
         )) {
-          throw StateError('device-session-revoked');
+          throw const SessionAccessException(
+            SessionAccessErrorCode.deviceSessionRevoked,
+          );
         }
-        if (revokedDeviceIndex >= 0 &&
-            (tenant.allowAdminResetOnly || isWorkspaceAdmin)) {
-          throw StateError('device-admin-reset-required');
+        if (SessionAccessPolicy.shouldRequireDeviceAdminReset(
+          hasRevokedRecord: revokedDeviceIndex >= 0,
+          hasLiveRecord: existingDeviceIndex >= 0,
+          adminResetOnly: tenant.allowAdminResetOnly,
+          isWorkspaceAdmin: isWorkspaceAdmin,
+        )) {
+          throw const SessionAccessException(
+            SessionAccessErrorCode.deviceAdminResetRequired,
+          );
+        }
+        if (adminPendingIndex >= maxDeviceSlots) {
+          throw StateError('device-limit-reached');
         }
         final staleDeviceIndex = deviceSnapshots.indexWhere((snapshot) {
           final data = snapshot?.data();
@@ -721,6 +739,8 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
         });
         final deviceIndex = existingDeviceIndex >= 0
             ? existingDeviceIndex
+            : adminPendingIndex >= 0
+            ? adminPendingIndex
             : revokedDeviceIndex >= 0
             ? revokedDeviceIndex
             : staleDeviceIndex >= 0
@@ -732,6 +752,7 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
                 allowRevoked: !tenant.allowAdminResetOnly,
               );
         if (existingDeviceIndex < 0 &&
+            adminPendingIndex < 0 &&
             (occupiedDevices.length >= maxDeviceSlots || deviceIndex < 0)) {
           throw StateError('device-limit-reached');
         }
@@ -747,6 +768,7 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
         final requiresApproval = SessionAccessPolicy.requiresDeviceApproval(
           pairingRequired: tenant.requireDevicePairing,
           hasActiveDevice: existingDeviceIndex >= 0 && !isStaleDevice,
+          isWorkspaceAdmin: isWorkspaceAdmin,
         );
         final deviceData = {
           'user_id': userId,
@@ -762,7 +784,13 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
           'status': requiresApproval ? 'pending' : 'active',
           'last_seen_at': FieldValue.serverTimestamp(),
         };
-        if (deviceSnapshot == null ||
+        if (adminPendingIndex >= 0 && deviceIndex == adminPendingIndex) {
+          transaction.update(deviceRef, {
+            'status': 'active',
+            'last_seen_at': FieldValue.serverTimestamp(),
+            'app_version': metadata.appVersion,
+          });
+        } else if (deviceSnapshot == null ||
             !deviceSnapshot.exists ||
             deviceSnapshot.data()?['status'] != 'active' ||
             isStaleDevice) {
@@ -781,18 +809,6 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
           return _pendingSession(userId, tenantId, metadata, deviceIndex);
         }
 
-        final hasRevokedDeviceSession = sessionSnapshots.any(
-          (snapshot) =>
-              snapshot?.data()?['device_id'] == metadata.installationId &&
-              snapshot?.data()?['status'] == 'revoked',
-        );
-        if (SessionAccessPolicy.shouldRejectRevokedAccessDuringRenewal(
-          isRenewal: isRenewal,
-          hasRevokedRecord: hasRevokedDeviceSession,
-        )) {
-          throw StateError('session-revoked');
-        }
-
         final activeSessions = <int>[];
         var existingSessionIndex = -1;
         for (var index = 0; index < sessionSnapshots.length; index++) {
@@ -805,6 +821,21 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
               existingSessionIndex = index;
             }
           }
+        }
+
+        final hasRevokedDeviceSession = sessionSnapshots.any(
+          (snapshot) =>
+              snapshot?.data()?['device_id'] == metadata.installationId &&
+              snapshot?.data()?['status'] == 'revoked',
+        );
+        if (SessionAccessPolicy.shouldRejectRevokedAccessDuringRenewal(
+          isRenewal: isRenewal,
+          hasRevokedRecord: hasRevokedDeviceSession,
+          hasLiveRecord: existingSessionIndex >= 0,
+        )) {
+          throw const SessionAccessException(
+            SessionAccessErrorCode.sessionRevoked,
+          );
         }
 
         var sessionIndex = existingSessionIndex;
@@ -965,13 +996,18 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
       if (SessionAccessPolicy.shouldRejectRevokedAccessDuringRenewal(
         isRenewal: isRenewal,
         hasRevokedRecord: revokedIndex >= 0,
+        hasLiveRecord: activeIndex >= 0,
       )) {
-        throw StateError('session-revoked');
+        throw const SessionAccessException(
+          SessionAccessErrorCode.sessionRevoked,
+        );
       }
       var slotIndex = activeIndex;
       if (slotIndex < 0) {
         if (isRenewal && revokedIndex >= 0) {
-          throw StateError('session-revoked');
+          throw const SessionAccessException(
+            SessionAccessErrorCode.sessionRevoked,
+          );
         }
         slotIndex = revokedIndex >= 0
             ? revokedIndex
@@ -1190,7 +1226,9 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
           db.collection(Collections.tenants).doc(device.tenantId),
         );
         if (tenant.data()?['allow_admin_reset_only'] != false) {
-          throw StateError('device-admin-reset-required');
+          throw const SessionAccessException(
+            SessionAccessErrorCode.deviceAdminResetRequired,
+          );
         }
       }
       if (block && !isWorkspaceAdmin) throw StateError('Permission denied');
@@ -1266,10 +1304,22 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
         .where('tenant_id', isEqualTo: tenantId)
         .where('user_id', isEqualTo: userId)
         .where('device_id', isEqualTo: metadata.installationId)
-        .limit(1)
+        .limit(AccessUsageSummary.maximumSlotsPerUser)
         .get();
-    if (sessions.docs.isEmpty) return;
-    await terminateSession(userId, sessions.docs.first.id, reason: 'logout');
+    final activeSessions = sessions.docs
+        .where((doc) => doc.data()['status'] == 'active')
+        .toList();
+    if (activeSessions.isEmpty) return;
+    final batch = FirebaseFirestore.instance.batch();
+    for (final session in activeSessions) {
+      batch.update(session.reference, {
+        'status': 'revoked',
+        'revoked_at': FieldValue.serverTimestamp(),
+        'termination_reason': 'logout',
+        'terminated_by': userId,
+      });
+    }
+    await batch.commit();
   }
 
   int _firstReusableDeviceSlot(

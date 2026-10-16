@@ -28,6 +28,34 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.76',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Workspace admins can sign in without seller device approval, and access registration handles older device and session records more reliably.',
+          AppLocale.ar:
+              'يمكن لمسؤولي مساحة العمل تسجيل الدخول دون موافقة أجهزة البائعين، وأصبح تسجيل الوصول يتعامل مع سجلات الأجهزة والجلسات القديمة بموثوقية أكبر.',
+          AppLocale.ur:
+              'ورک اسپیس ایڈمن سیلر ڈیوائس کی منظوری کے بغیر سائن اِن کر سکتے ہیں، اور رسائی کی رجسٹریشن پرانے ڈیوائس اور سیشن ریکارڈز کو زیادہ قابلِ اعتماد طریقے سے سنبھالتی ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📱',
+        text: {
+          AppLocale.en:
+              'Device pairing and session renewal now give clearer, more reliable access decisions.',
+          AppLocale.ar:
+              'أصبحت قرارات ربط الأجهزة وتجديد الجلسات أوضح وأكثر موثوقية.',
+          AppLocale.ur:
+              'ڈیوائس پیئرنگ اور سیشن کی تجدید کے رسائی فیصلے اب زیادہ واضح اور قابلِ اعتماد ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.75',
     date: 'October 2026',
     items: [

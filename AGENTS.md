@@ -490,6 +490,13 @@ Conflict resolution order for instructions:
 
 ## 10) Current Audit Status
 
+2026-10-16 session access recheck and remediation — v3.9.76+702 (deployed and installed):
+
+- Workspace device pairing is a seller policy. Workspace admins use the shared platform cap, register active devices without seller approval, and can resume their own matching pending slot in place only while it remains within that cap. Sellers remain subject to approval when pairing is enabled; self-approval remains denied.
+- Platform-session reactivation accepts removal of `revoked_at` and `terminated_by` only in the owner super-admin reactivation branch. Tenant and platform renewal reject revoked-only records but ignore unrelated old revoked slots when a valid live record exists for the same installation.
+- Tenant logout revokes every active session for the current installation in one batch. A pending renewal ends the checked UID's session rather than looping. Renewal enforcement uses typed session-access errors.
+- Missing `settings/platform_access_policy` uses the documented defaults (3 workspace-admin devices, 2 active sessions). Firestore Rules Emulator: 113 passing; Flutter tests: 562 passing; both analyzers clean. Rules/indexes deployment completed. Split APKs built: ARMv7 30.5 MB, ARM64 32.1 MB, x86_64 33.6 MB. ARM64 APK installed on `R5GL22RGT9V`; ADB reported `Success`, and the device reports versionName `3.9.76`, versionCode `3100302`. No authenticated sign-in smoke test or Firebase Hosting deployment was performed.
+
 2026-10-15 auth/session and invoice completion — v3.9.75+102:
 
 - Tenant registration resolves the actual paired device slot and validates its installation ID; local session models no longer cast unresolved Firestore server-timestamp sentinels to `Timestamp` after a successful write.

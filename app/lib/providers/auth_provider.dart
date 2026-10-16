@@ -10,6 +10,7 @@ import '../core/constants/collections.dart';
 import '../core/utils/auth_refresh_policy.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/session_access_policy.dart';
+import '../core/utils/session_access_error.dart';
 import '../core/utils/tenant_scope.dart';
 import 'tenant_provider.dart';
 import '../models/user_model.dart';
@@ -244,7 +245,9 @@ class AuthNotifier extends AsyncNotifier<void> {
                 .read(sessionManagementNotifierProvider.notifier)
                 .registerCurrentAccess(userId: uid, tenantId: tenantId);
             if (access.status == 'pending') {
-              throw StateError('device-pairing-pending');
+              throw const SessionAccessException(
+                SessionAccessErrorCode.devicePairingPending,
+              );
             }
           } catch (error, stackTrace) {
             try {

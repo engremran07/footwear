@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'session_access_error.dart';
 
 /// Maps Firebase and Dart exceptions to user-friendly i18n translation keys.
 /// All keys must exist in app_locale.dart for EN / AR / UR.
@@ -13,6 +14,16 @@ class AppErrorMapper {
 
   /// Returns a locale key for the given error object.
   static String key(Object error) {
+    if (error is SessionAccessException) {
+      return switch (error.code) {
+        SessionAccessErrorCode.devicePairingPending => 'device_pairing_pending',
+        SessionAccessErrorCode.deviceBlocked => 'device_blocked',
+        SessionAccessErrorCode.deviceAdminResetRequired =>
+          'device_admin_reset_required',
+        SessionAccessErrorCode.deviceSessionRevoked ||
+        SessionAccessErrorCode.sessionRevoked => 'session_revoked',
+      };
+    }
     // ── Firebase Auth errors ───────────────────────────────────────────
     if (error is FirebaseAuthException) {
       return switch (error.code) {

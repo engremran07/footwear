@@ -25,11 +25,23 @@ void main() {
       );
     });
 
-    test('workspace admins still require approval for a new device', () {
+    test('workspace admins are exempt from seller pairing approval', () {
       expect(
         SessionAccessPolicy.requiresDeviceApproval(
           pairingRequired: true,
           hasActiveDevice: false,
+          isWorkspaceAdmin: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('sellers still require approval when pairing is enabled', () {
+      expect(
+        SessionAccessPolicy.requiresDeviceApproval(
+          pairingRequired: true,
+          hasActiveDevice: false,
+          isWorkspaceAdmin: false,
         ),
         isTrue,
       );
@@ -172,6 +184,65 @@ void main() {
         );
       },
     );
+
+    test('does not veto renewal for an installation with a live session', () {
+      expect(
+        SessionAccessPolicy.shouldRejectRevokedAccessDuringRenewal(
+          isRenewal: true,
+          hasRevokedRecord: true,
+          hasLiveRecord: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('does not require device reset when another live slot exists', () {
+      expect(
+        SessionAccessPolicy.shouldRequireDeviceAdminReset(
+          hasRevokedRecord: true,
+          hasLiveRecord: true,
+          adminResetOnly: true,
+          isWorkspaceAdmin: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('requires reset for revoked-only admin device access', () {
+      expect(
+        SessionAccessPolicy.shouldRequireDeviceAdminReset(
+          hasRevokedRecord: true,
+          hasLiveRecord: false,
+          adminResetOnly: false,
+          isWorkspaceAdmin: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('terminates renewal when access is pending', () {
+      expect(
+        SessionAccessPolicy.shouldTerminatePendingRenewal(
+          isRenewal: true,
+          accessStatus: 'pending',
+        ),
+        isTrue,
+      );
+      expect(
+        SessionAccessPolicy.shouldTerminatePendingRenewal(
+          isRenewal: true,
+          accessStatus: 'active',
+        ),
+        isFalse,
+      );
+      expect(
+        SessionAccessPolicy.shouldTerminatePendingRenewal(
+          isRenewal: false,
+          accessStatus: 'pending',
+        ),
+        isFalse,
+      );
+    });
 
     SessionModel session({
       required String id,

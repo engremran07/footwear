@@ -7,6 +7,21 @@ Most recent first.
 
 ---
 
+## [3.9.76+702] — 2026-10-16 — Device pairing and session reliability
+
+### Fixed
+
+- Workspace admins are no longer gated by the seller device-pairing switch; eligible pending admin devices can resume within the shared platform cap.
+- Same-device platform sign-in works after sign-out, renewal distinguishes live access from unrelated revoked history, and logout revokes all active sessions on the installation.
+- Missing workspace-admin policy settings use the documented default caps. Renewal access errors now use typed codes.
+
+### Verification
+
+- Firestore Rules Emulator: 113 passing; rules and indexes deployment completed.
+- Flutter tests: 562 passed. Flutter and Dart test analyzers reported no issues.
+- Split APKs built: ARMv7 30.5 MB, ARM64 32.1 MB, x86_64 33.6 MB. ARM64 installed on R5GL22RGT9V; ADB reported `Success`.
+- Installed package reports versionName `3.9.76` and versionCode `3100302`. Authenticated sign-in smoke test and Hosting deployment were not performed.
+
 ## [3.9.75+102] — 2026-10-15 — Auth, access policy, invoice integrity, and Android update compatibility
 
 ### Fixed

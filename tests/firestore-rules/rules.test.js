@@ -1380,6 +1380,16 @@ describe('device and session slot rules', () => {
     await seedUser('tenant-admin-uid', 'tenant_admin');
   }
 
+  async function seedWorkspaceAdminPolicy() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('settings')
+        .doc('platform_access_policy').set({
+          workspace_admin_max_devices_allowed: 3,
+          workspace_admin_max_active_sessions_allowed: 2,
+        });
+    });
+  }
+
   it('seller can get only their own workspace document for session registration', async () => {
     await seedAccessUsers();
     const db = sellerCtx(testEnv).firestore();
@@ -1446,6 +1456,71 @@ describe('device and session slot rules', () => {
     );
   });
 
+  it('seller can sign in again on the same device after logout', async () => {
+    await seedTenant({ requireDevicePairing: true });
+    await seedUser('seller-uid', 'seller');
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const userRef = context.firestore().collection('users').doc('seller-uid');
+      await userRef.collection('device_registrations').doc('slot_0')
+        .set(deviceData(0, { status: 'active' }));
+      await userRef.collection('sessions').doc('slot_0').set(sessionData(0, {
+        status: 'revoked',
+        revoked_at: new Date(),
+        termination_reason: 'logout',
+        terminated_by: 'seller-uid',
+      }));
+    });
+
+    const db = sellerCtx(testEnv).firestore();
+    const userRef = db.collection('users').doc('seller-uid');
+    const batch = db.batch();
+    batch.update(userRef.collection('device_registrations').doc('slot_0'), {
+      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
+      app_version: 'recheck',
+    });
+    batch.set(userRef.collection('sessions').doc('slot_0'), sessionData(0, {
+      session_id: 'session-after-logout',
+    }));
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('workspace admin can sign in again on the same device after logout', async () => {
+    await seedTenant({ requireDevicePairing: true });
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedWorkspaceAdminPolicy();
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const userRef = context.firestore().collection('users')
+        .doc('tenant-admin-uid');
+      await userRef.collection('device_registrations').doc('slot_0')
+        .set(deviceData(0, {
+          user_id: 'tenant-admin-uid',
+          status: 'active',
+        }));
+      await userRef.collection('sessions').doc('slot_0').set(sessionData(0, {
+        user_id: 'tenant-admin-uid',
+        status: 'revoked',
+        revoked_at: new Date(),
+        termination_reason: 'logout',
+        terminated_by: 'tenant-admin-uid',
+      }));
+    });
+
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const userRef = db.collection('users').doc('tenant-admin-uid');
+    const batch = db.batch();
+    batch.update(userRef.collection('device_registrations').doc('slot_0'), {
+      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
+      app_version: 'recheck',
+    });
+    batch.set(userRef.collection('sessions').doc('slot_0'), sessionData(0, {
+      user_id: 'tenant-admin-uid',
+      session_id: 'session-after-logout',
+    }));
+
+    await assertSucceeds(batch.commit());
+  });
+
   it('allows workspace admins to query only their own access-record groups', async () => {
     await seedAccessUsers();
     await seedUser('registry-admin-uid', 'admin');
@@ -1487,8 +1562,30 @@ describe('device and session slot rules', () => {
   it('workspace admin device pairing uses the platform cap, not seller approval', async () => {
     await seedTenant({ requireDevicePairing: true });
     await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedWorkspaceAdminPolicy();
     const adminDb = testEnv.authenticatedContext('tenant-admin-uid').firestore();
     const deviceRef = adminDb.collection('users').doc('tenant-admin-uid')
+      .collection('device_registrations').doc('slot_0');
+
+    await assertSucceeds(deviceRef.set(deviceData(0, {
+      user_id: 'tenant-admin-uid',
+      status: 'active',
+    })));
+    await assertFails(
+      adminDb.collection('users').doc('tenant-admin-uid')
+        .collection('device_registrations').doc('slot_1')
+        .set(deviceData(1, {
+          user_id: 'tenant-admin-uid',
+          status: 'pending',
+        })),
+    );
+  });
+
+  it('workspace admin uses default platform caps when policy is absent', async () => {
+    await seedTenant({ requireDevicePairing: true });
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    const deviceRef = testEnv.authenticatedContext('tenant-admin-uid')
+      .firestore().collection('users').doc('tenant-admin-uid')
       .collection('device_registrations').doc('slot_0');
 
     await assertSucceeds(deviceRef.set(deviceData(0, {
@@ -1500,6 +1597,7 @@ describe('device and session slot rules', () => {
   it('workspace admin can resume a pending own device without approval metadata', async () => {
     await seedTenant({ requireDevicePairing: true });
     await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedWorkspaceAdminPolicy();
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await context.firestore().collection('users').doc('tenant-admin-uid')
         .collection('device_registrations').doc('slot_0')
@@ -1982,6 +2080,38 @@ describe('platform operator sessions', () => {
         .collection('users').doc('platform-admin-uid')
         .collection('platform_sessions').doc('slot_0').get(),
     );
+  });
+
+  it('allows a super-admin to reactivate the same platform slot after logout', async () => {
+    await seedUser('platform-admin-uid', 'super_admin');
+    const session = {
+      user_id: 'platform-admin-uid',
+      session_id: 'platform-session-123',
+      slot_id: 'slot_0',
+      slot_number: 0,
+      device_id: 'platform-installation-1',
+      device_brand: 'Samsung',
+      device_model: 'SM-A576B',
+      platform: 'android',
+      status: 'active',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
+      expires_at: new Date(Date.now() + 60 * 60 * 1000),
+    };
+    const slot = testEnv.authenticatedContext('platform-admin-uid')
+      .firestore().collection('users').doc('platform-admin-uid')
+      .collection('platform_sessions').doc('slot_0');
+
+    await assertSucceeds(slot.set(session));
+    await assertSucceeds(slot.update({
+      status: 'revoked',
+      revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
+      terminated_by: 'platform-admin-uid',
+    }));
+    await assertSucceeds(slot.set({
+      ...session,
+      session_id: 'platform-session-456',
+    }));
   });
 });
 

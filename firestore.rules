@@ -194,7 +194,7 @@ service cloud.firestore {
 
     function workspaceAdminAccessLimit(field) {
       let policyPath = /databases/$(database)/documents/settings/platform_access_policy;
-      let policy = get(policyPath).data;
+      let policy = exists(policyPath) ? get(policyPath).data : {};
       let limit = field == 'max_devices_allowed'
         ? (policy is map && 'workspace_admin_max_devices_allowed' in policy
           ? policy.workspace_admin_max_devices_allowed : 3)
@@ -775,6 +775,24 @@ service cloud.firestore {
         !('revoked_by' in request.resource.data) && docSizeOk();
       allow update: if (
           isActiveUser() && isOwnDoc(userId) &&
+          isWorkspaceAdminAccessRole(getUserRole()) &&
+          resource.data.user_id == userId &&
+          resource.data.tenant_id == currentUserTenantId() &&
+          resource.data.status == 'pending' &&
+          request.resource.data.status == 'active' &&
+          request.resource.data.device_id == resource.data.device_id &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'last_seen_at', 'app_version']) &&
+          validAccessSlot(
+            slotId,
+            resource.data.slot_number,
+            accessRecordLimit(currentUserTenantId(), 'max_devices_allowed')
+          ) &&
+          request.resource.data.last_seen_at == request.time &&
+          request.resource.data.app_version is string &&
+          request.resource.data.app_version.size() <= 40
+        ) || (
+          isActiveUser() && isOwnDoc(userId) &&
           resource.data.user_id == userId &&
           resource.data.tenant_id == currentUserTenantId() &&
           resource.data.status == 'active' &&
@@ -809,26 +827,9 @@ service cloud.firestore {
           request.resource.data.approved_by == request.auth.uid
         ) || (
           isActiveUser() && isOwnDoc(userId) &&
-          isWorkspaceAdminAccessRole(getUserRole()) &&
           resource.data.user_id == userId &&
           resource.data.tenant_id == currentUserTenantId() &&
-          resource.data.status == 'pending' &&
-          request.resource.data.status == 'active' &&
-          request.resource.data.device_id == resource.data.device_id &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'last_seen_at', 'app_version']) &&
-          validAccessSlot(
-            slotId,
-            resource.data.slot_number,
-            accessRecordLimit(currentUserTenantId(), 'max_devices_allowed')
-          ) &&
-          request.resource.data.last_seen_at == request.time &&
-          request.resource.data.app_version is string &&
-          request.resource.data.app_version.size() <= 40
-        ) || (
-          isActiveUser() && isOwnDoc(userId) &&
-          resource.data.user_id == userId &&
-          resource.data.tenant_id == currentUserTenantId() &&
+          resource.data.status == 'active' &&
           deviceRegistrationIsStale(resource.data) &&
           ((request.resource.data.status == 'active' &&
               (!tenantRequiresDevicePairing(currentUserTenantId()) ||
@@ -931,6 +932,35 @@ service cloud.firestore {
           isActiveUser() && isOwnDoc(userId) &&
           resource.data.user_id == userId &&
           resource.data.tenant_id == currentUserTenantId() &&
+          (resource.data.status == 'revoked' ||
+            resource.data.expires_at <= request.time) &&
+          request.resource.data.status == 'active' &&
+          sessionRecordFieldsAreValid(
+            request.resource.data,
+            userId,
+            currentUserTenantId(),
+            slotId
+          ) &&
+          validAccessSlot(
+            slotId,
+            request.resource.data.slot_number,
+            accessRecordLimit(currentUserTenantId(), 'max_active_sessions_allowed')
+          ) &&
+          sessionDeviceIsRegistered(
+            request.resource.data,
+            userId,
+            currentUserTenantId()
+          ) &&
+          request.resource.data.created_at == request.time &&
+          request.resource.data.last_seen_at == request.time &&
+          request.resource.data.expires_at is timestamp &&
+          request.resource.data.expires_at > request.time &&
+          request.resource.data.expires_at <= request.time + duration.value(12, 'h') &&
+          docSizeOk()
+        ) || (
+          isActiveUser() && isOwnDoc(userId) &&
+          resource.data.user_id == userId &&
+          resource.data.tenant_id == currentUserTenantId() &&
           resource.data.status == 'active' &&
           resource.data.expires_at > request.time &&
           request.resource.data.session_id == resource.data.session_id &&
@@ -962,35 +992,6 @@ service cloud.firestore {
           request.resource.data.terminated_by == request.auth.uid &&
           request.resource.data.termination_reason is string &&
           request.resource.data.termination_reason.size() <= 120
-        ) || (
-          isActiveUser() && isOwnDoc(userId) &&
-          resource.data.user_id == userId &&
-          resource.data.tenant_id == currentUserTenantId() &&
-          (resource.data.status == 'revoked' ||
-            resource.data.expires_at <= request.time) &&
-          request.resource.data.status == 'active' &&
-          sessionRecordFieldsAreValid(
-            request.resource.data,
-            userId,
-            currentUserTenantId(),
-            slotId
-          ) &&
-          validAccessSlot(
-            slotId,
-            request.resource.data.slot_number,
-            accessRecordLimit(currentUserTenantId(), 'max_active_sessions_allowed')
-          ) &&
-          sessionDeviceIsRegistered(
-            request.resource.data,
-            userId,
-            currentUserTenantId()
-          ) &&
-          request.resource.data.created_at == request.time &&
-          request.resource.data.last_seen_at == request.time &&
-          request.resource.data.expires_at is timestamp &&
-          request.resource.data.expires_at > request.time &&
-          request.resource.data.expires_at <= request.time + duration.value(12, 'h') &&
-          docSizeOk()
         );
       allow delete: if false;
     }
@@ -1055,7 +1056,8 @@ service cloud.firestore {
             request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly([
                 'session_id', 'device_id', 'device_brand', 'device_model',
-                'platform', 'status', 'created_at', 'last_seen_at', 'expires_at'
+                'platform', 'status', 'created_at', 'last_seen_at', 'expires_at',
+                'revoked_at', 'terminated_by'
               ]) &&
             request.resource.data.created_at == request.time &&
             request.resource.data.last_seen_at == request.time &&

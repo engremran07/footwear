@@ -1,4 +1,4 @@
-﻿# FootWear ERP — v3.9.75+102
+﻿# FootWear ERP — v3.9.76+702
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
@@ -11,6 +11,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 > **v3.9.60+99 (2026-10-10)** — Sign-in waits for access registration; device pairing, renewal, stale-device recovery, and platform-operator sessions have explicit controls. Session records remain client-enforced under the Spark architecture.
 > **v3.9.61+100 (2026-10-15)** — Invoice creation supports stock sales, non-stock catalog sales, and cash receipt invoices. Workspace admins configure bilingual invoice headers, and generated PDFs retain the header snapshot.
 > **v3.9.75+102 (2026-10-15)** — Sign-in and session renewal are guarded against stale records and account-switch races. Sellers use workspace-specific dynamic device/session limits; workspace-admin limits are shared and controlled by the platform super-admin; platform sessions remain separate. Invoice voiding is atomic and long invoice PDFs paginate. Android updates can be installed over the device's current package without removing app data.
+> **v3.9.76+702 (2026-10-16)** — Workspace-admin sign-in no longer follows seller pairing approval. Session re-registration, renewal, and logout handle revoked and pending records more reliably.
 
 ---
 
@@ -180,6 +181,7 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 ### Verified Runtime Invariants
 
 - Mutations require a concrete tenant; missing tenant identity is an error, never a `__global__` fallback. Unassigned users contact their workspace administrator instead of self-provisioning.
+- Device pairing approval applies to sellers. Workspace admins use the shared platform device/session cap and are not sent to seller approval; absent platform policy configuration defaults to three devices and two sessions.
 - Super-admin business access expires after 8 hours and remains enforced by Firestore rules. Legacy admins manage seller profiles; workspace-admin role changes require an active super-admin support context.
 - Seller stock reductions must match exact same-batch invoice deductions. Warehouse stock movements and returns append tenant-scoped inventory audit records atomically.
 - Financial corrections preserve prior values, actor, and a correction reason; invoice-linked transactions are corrected through invoice void/credit-note flows.

@@ -14,7 +14,8 @@ class SessionAccessPolicy {
   static bool requiresDeviceApproval({
     required bool pairingRequired,
     required bool hasActiveDevice,
-  }) => pairingRequired && !hasActiveDevice;
+    bool isWorkspaceAdmin = false,
+  }) => pairingRequired && !isWorkspaceAdmin && !hasActiveDevice;
 
   static bool isClockSkewed({
     required DateTime deviceNow,
@@ -42,7 +43,23 @@ class SessionAccessPolicy {
   static bool shouldRejectRevokedAccessDuringRenewal({
     required bool isRenewal,
     required bool hasRevokedRecord,
-  }) => isRenewal && hasRevokedRecord;
+    bool hasLiveRecord = false,
+  }) => isRenewal && hasRevokedRecord && !hasLiveRecord;
+
+  static bool shouldRequireDeviceAdminReset({
+    required bool hasRevokedRecord,
+    required bool hasLiveRecord,
+    required bool adminResetOnly,
+    required bool isWorkspaceAdmin,
+  }) =>
+      hasRevokedRecord &&
+      !hasLiveRecord &&
+      (adminResetOnly || isWorkspaceAdmin);
+
+  static bool shouldTerminatePendingRenewal({
+    required bool isRenewal,
+    required String accessStatus,
+  }) => isRenewal && accessStatus == 'pending';
 
   static bool shouldResetSessionContext({
     required String? previousUserId,

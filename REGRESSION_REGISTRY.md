@@ -1,7 +1,7 @@
 # ShoesERP Regression Registry
 
 **Maintained by:** Autonomous AI agent system (88-agent governance pack v2.0)  
-**Last updated:** 2026-10-03 — Forensic audit and workspace restore / v3.9.53+92
+**Last updated:** 2026-10-16 — Authentication/session remediation / v3.9.76+702
 **Purpose:** Single source of truth for known regressions, deferred risks, and process improvements.
 
 ---
@@ -28,6 +28,10 @@
 | RR-016 | P1-FIXED | Export "Entry By" name resolution | Entry By column showed "—" for all transactions in PDF/Excel exports. Two sub-causes: (1) `allUsersProvider` has `where('active', isEqualTo: true)` filter — deactivated sellers' historical transactions could never resolve to a name; (2) `ref.read(allUsersProvider).value ?? []` cache-miss pattern — if the `StreamProvider.autoDispose` hadn't emitted yet, the entire entryByMap was empty. | Fixed v3.7.11 — new `allUsersExportProvider` (`FutureProvider.autoDispose`, no active filter, one-shot `.get()`, limit 200) used in all 3 export paths (shops_list_screen, shop_detail_screen, reports_screen). | v3.7.9 |
 
 | RR-017 | P1-FIXED (pending apply) | `pdf_export.dart` | `buildPdfLedger()` used a fixed 28-rows-per-page manual chunk with an unbudgeted "Final balance" block appended only on the last page, silently overflowing the newest transactions (rows are sorted oldest→newest, so the last/overflowing page always held the newest data). | Fixed 2026-08-01 — migrated `buildPdfLedger` to `pw.MultiPage` with header/footer callbacks; manual row-budget pagination removed for this function. | v3.9.25+83 |
+| RR-018 | P0-FIXED (emulator/deploy/install validated) | Platform sessions | Same-device super-admin sign-in after normal sign-out failed because full-document re-registration removed revocation markers not permitted by Rules. | Fixed narrowly in the platform-session reactivation branch; regression passes in the 113-test Rules Emulator suite, rules deployed, and v3.9.76 installed. Authenticated sign-in smoke test remains pending. | v3.9.75+102 |
+| RR-019 | P1-FIXED (unit/Rules validated) | Workspace device pairing | The seller pairing switch gated workspace admins and stranded legacy pending admin devices. | Workspace admins bypass seller approval under shared platform caps and resume eligible pending slots in place; seller approval and self-approval denial remain. APK installed; authenticated approval/sign-in flow remains pending. | v3.9.75+102 |
+| RR-020 | P1-FIXED (unit/Rules validated) | Session renewal/logout | Old revoked records could veto a live installation renewal; logout could select a revoked record instead of active sessions; pending renewal could repeat. | Renewal distinguishes live and revoked-only records, logout batch-revokes matching active sessions, and pending renewal ends the checked UID. Provider/device-history integration and authenticated device flow remain pending. | v3.9.75+102 |
+| RR-021 | P1-FIXED (emulator/deploy validated) | Workspace-admin access policy | A missing `settings/platform_access_policy` document caused admin device registration to fail despite intended 3-device/2-session defaults. | Rules explicitly use defaults for an absent document; the no-policy registration regression passes in the emulator and rules are deployed. | v3.9.75+102 |
 
 ---
 
