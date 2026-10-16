@@ -30,6 +30,7 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
 import '../widgets/export_sheet.dart';
+import '../widgets/transaction_description_field.dart';
 import '../widgets/whatsapp_button.dart';
 
 // =============================================================================
@@ -146,12 +147,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 autofocus: true,
               ),
               const SizedBox(height: 12),
-              TextField(
+              TransactionDescriptionField(
                 controller: descC,
-                decoration: InputDecoration(
-                  labelText: tr('description', ref),
-                  prefixIcon: const Icon(Icons.notes),
-                ),
+                label: tr('description', ref),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -362,12 +360,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 ),
               ],
               const SizedBox(height: 12),
-              TextField(
+              TransactionDescriptionField(
                 controller: descC,
-                decoration: InputDecoration(
-                  labelText: tr('description', ref),
-                  prefixIcon: const Icon(Icons.notes),
-                ),
+                label: tr('description', ref),
               ),
               if (requireApproval) ...[
                 const SizedBox(height: 12),
@@ -613,12 +608,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 autofocus: true,
               ),
               const SizedBox(height: 12),
-              TextField(
+              TransactionDescriptionField(
                 controller: descC,
-                decoration: InputDecoration(
-                  labelText: tr('description', ref),
-                  prefixIcon: const Icon(Icons.notes),
-                ),
+                label: tr('description', ref),
               ),
               const SizedBox(height: 12),
               // Sale type selector
@@ -1339,7 +1331,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
               ),
               if (canManageShop)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                   child: SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(

@@ -46,12 +46,16 @@ import 'widget/app_online_indicator_test.dart' as app_online_indicator_widget;
 import 'widget/product_form_screen_test.dart' as product_form_screen_widget;
 import 'widget/auth_submit_feedback_test.dart' as auth_submit_feedback_widget;
 import 'widget/invoice_list_summary_test.dart' as invoice_list_summary_widget;
+import 'widget/transaction_description_field_test.dart'
+    as transaction_description_field_widget;
 import 'widget/users_list_workspace_context_test.dart'
     as users_list_workspace_context_widget;
 import 'widget/route_form_seller_load_test.dart'
     as route_form_seller_load_widget;
 import 'widget/settings_profile_error_test.dart'
     as settings_profile_error_widget;
+import 'widget/tenant_management_error_test.dart'
+    as tenant_management_error_widget;
 
 void main() {
   user_model.main();
@@ -93,7 +97,9 @@ void main() {
   product_form_screen_widget.main();
   auth_submit_feedback_widget.main();
   invoice_list_summary_widget.main();
+  transaction_description_field_widget.main();
   users_list_workspace_context_widget.main();
   route_form_seller_load_widget.main();
   settings_profile_error_widget.main();
+  tenant_management_error_widget.main();
 }

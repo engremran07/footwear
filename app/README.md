@@ -1,4 +1,4 @@
-﻿# FootWear ERP — Flutter App (v3.9.76+702)
+﻿# FootWear ERP — Flutter App (v3.9.79+705)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
@@ -14,11 +14,15 @@ Sign-in stays on the login screen until access registration completes. Seller de
 
 Invoice creation supports stock sales, workspace-enabled non-stock catalog sales, and cash receipt invoices. Non-stock invoices preserve catalog item details without reducing inventory. Receipt numbering, receipt ledger entries, and shop balance changes are atomic and workspace-scoped. Workspace administrators configure bilingual invoice headers; generated PDFs use the header snapshot stored on each invoice. Shop detail provides a preselected invoice entry point while retaining ledger-only cash-in.
 
+Non-stock invoicing is disabled for new and legacy workspaces unless an administrator explicitly enables it. Sale and credit-note creation commit the workspace invoice counter, invoice, ledger, shop balance, and stock movements in one Firestore transaction. Firestore Rules require invoice/ledger/shop links for sales, receipts, and credit notes; seller sales also validate the exact balance delta. Voiding a credit note reverses its stock movement and the original invoice's cumulative credit total. Transaction descriptions accept multiline notes.
+
 Access limits are role-scoped: sellers use each workspace's configured cap, workspace admins share the cap configured by the platform super-admin, and super-admins use separate platform-only limits of two devices and one active session. Device/session rules are not a server authorization boundary under the current Spark architecture.
 
 Invoice voiding commits status, shop balance, inventory restoration, and reversal rows atomically. Receipt counter values are verified by Firestore Rules. Invoice PDFs localize receipt methods, distinguish non-stock lines, and paginate with dynamic page numbering.
 
 ---
+
+Workspace creation does not wait for a global user list. Owner choices during edits are limited to users in the selected workspace, and full workspace edits require active platform-super-admin access. Save failures remain in the dialog with the correct mapped error; launcher artwork is generated from one source with matching Android/web scale.
 
 ## Requirements
 

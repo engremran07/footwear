@@ -13,6 +13,7 @@
 const { initializeTestEnvironment, assertFails, assertSucceeds } = require('@firebase/rules-unit-testing');
 const firebase = require('firebase/compat/app');
 require('firebase/compat/firestore');
+const assert = require('assert');
 const { readFileSync } = require('fs');
 const { resolve } = require('path');
 
@@ -543,6 +544,61 @@ describe('invoices collection', () => {
 
   it('admin: can create a linked credit note without exceeding original total', async () => {
     await seedUser('admin-uid', 'admin');
+    await seedShop('shop-1', { balance: 100 });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('invoices').doc('original-sale').set({
+        tenant_id: 'tenant-1',
+        shop_id: 'shop-1',
+        type: 'sale',
+        status: 'issued',
+        total: 100,
+        credit_note_total: 0,
+      });
+    });
+    const db = adminCtx(testEnv).firestore();
+    const batch = db.batch();
+    const creditRef = db.collection('invoices').doc('credit-valid');
+    const returnRef = db.collection('transactions').doc('credit-valid-tx');
+    batch.update(db.collection('invoices').doc('original-sale'), {
+      credit_note_total: 40,
+    });
+    batch.set(creditRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'admin-uid',
+      type: 'credit_note',
+      return_transaction_id: returnRef.id,
+      linked_invoice_id: 'original-sale',
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      items: [{ variant_id: 'variant-1', qty: 1, unit_price: 40 }],
+      subtotal: 40,
+      discount: 0,
+      total: 40,
+      amount_received: 0,
+    });
+    batch.set(returnRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'admin-uid',
+      type: 'return',
+      amount: 40,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: creditRef.id,
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 60,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'return',
+      last_transaction_amount: 40,
+      last_transaction_id: returnRef.id,
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('admin: cannot create a credit note without its return transaction and shop update', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedShop('shop-1', { balance: 100 });
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().collection('invoices').doc('original-sale').set({
         tenant_id: 'tenant-1',
@@ -558,8 +614,9 @@ describe('invoices collection', () => {
     batch.update(db.collection('invoices').doc('original-sale'), {
       credit_note_total: 40,
     });
-    batch.set(db.collection('invoices').doc('credit-valid'), {
+    batch.set(db.collection('invoices').doc('credit-orphan'), {
       tenant_id: 'tenant-1',
+      created_by: 'admin-uid',
       type: 'credit_note',
       linked_invoice_id: 'original-sale',
       shop_id: 'shop-1',
@@ -570,7 +627,7 @@ describe('invoices collection', () => {
       total: 40,
       amount_received: 0,
     });
-    await assertSucceeds(batch.commit());
+    await assertFails(batch.commit());
   });
 
   it('admin: cannot cumulatively credit more than the original total', async () => {
@@ -627,24 +684,312 @@ describe('invoices collection', () => {
 
   it('seller: can create invoice with valid items and route ownership', async () => {
     await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
-    await seedShop('shop-1');
-    await assertSucceeds(
-      sellerCtx(testEnv).firestore().collection('invoices').doc('inv-1').set({
+    await seedShop('shop-1', { balance: 0 });
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('seller_inventory').doc('inventory-1').set({
+        seller_id: 'seller-uid',
+        tenant_id: 'tenant-1',
+        quantity_available: 5,
+      });
+    });
+    const db = sellerCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('inv-1');
+    const saleRef = db.collection('transactions').doc('tx-inv-1');
+    const batch = db.batch();
+    batch.set(invoiceRef, {
+      created_by: 'seller-uid',
+      type: 'sale',
+      invoice_number: 'INV-2026-0001',
+      sale_transaction_id: saleRef.id,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      seller_id: 'seller-uid',
+      fulfillment_mode: 'stock',
+      seller_inventory_deductions: { 'inventory-1': 1 },
+      items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
+      subtotal: 100,
+      discount: 0,
+      total: 100,
+      amount_received: 0,
+    });
+    batch.set(saleRef, {
+      created_by: 'seller-uid',
+      type: 'cash_out',
+      amount: 100,
+      invoice_id: invoiceRef.id,
+      invoice_number: 'INV-2026-0001',
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 100,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 100,
+      last_transaction_id: saleRef.id,
+    });
+    batch.update(db.collection('seller_inventory').doc('inventory-1'), {
+      quantity_available: 4,
+      updated_at: new Date(),
+      last_sale_invoice_id: invoiceRef.id,
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('seller: cannot create a sale invoice without its ledger and balance writes', async () => {
+    await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
+    await seedShop('shop-1', { balance: 0 });
+    const invoiceRef = sellerCtx(testEnv).firestore()
+      .collection('invoices').doc('orphan-sale');
+
+    await assertFails(invoiceRef.set({
+      created_by: 'seller-uid',
+      type: 'sale',
+      fulfillment_mode: 'stock',
+      seller_inventory_deductions: { 'inventory-1': 1 },
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      seller_id: 'seller-uid',
+      items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
+      subtotal: 100,
+      discount: 0,
+      total: 100,
+      amount_received: 0,
+    }));
+  });
+
+  it('admin: cannot create a sale invoice without its ledger and balance writes', async () => {
+    await seedTenant();
+    await seedUser('admin-uid', 'admin');
+    await seedShop('shop-1', { balance: 0 });
+    await seedSettings({ allow_non_stock_invoices: true });
+    const invoiceRef = adminCtx(testEnv).firestore()
+      .collection('invoices').doc('orphan-admin-sale');
+
+    await assertFails(invoiceRef.set({
+      created_by: 'admin-uid',
+      type: 'sale',
+      fulfillment_mode: 'non_stock',
+      seller_inventory_deductions: {},
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      seller_id: 'admin-uid',
+      items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
+      subtotal: 100,
+      discount: 0,
+      total: 100,
+      amount_received: 0,
+    }));
+  });
+
+  it('admin: cannot create a linked sale invoice without changing shop balance', async () => {
+    await seedTenant();
+    await seedUser('admin-uid', 'admin');
+    await seedShop('shop-1', { balance: 10 });
+    await seedSettings({ allow_non_stock_invoices: true });
+    const db = adminCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('admin-orphan-balance');
+    const saleRef = db.collection('transactions').doc('admin-orphan-sale-tx');
+    const batch = db.batch();
+    batch.set(invoiceRef, {
+      created_by: 'admin-uid',
+      type: 'sale',
+      invoice_number: 'INV-2026-0003',
+      sale_transaction_id: saleRef.id,
+      fulfillment_mode: 'non_stock',
+      seller_inventory_deductions: {},
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      seller_id: 'admin-uid',
+      items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
+      subtotal: 100,
+      discount: 0,
+      total: 100,
+      amount_received: 0,
+    });
+    batch.set(saleRef, {
+      created_by: 'admin-uid',
+      type: 'cash_out',
+      amount: 100,
+      invoice_id: invoiceRef.id,
+      invoice_number: 'INV-2026-0003',
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+    });
+
+    await assertFails(batch.commit());
+  });
+
+  it('admin: can atomically create a partial sale with both ledger rows and balance', async () => {
+    await seedTenant();
+    await seedUser('admin-uid', 'admin');
+    await seedShop('shop-1', { balance: 20 });
+    await seedSettings({ allow_non_stock_invoices: true });
+    const db = adminCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('admin-partial-sale');
+    const saleRef = db.collection('transactions').doc('admin-partial-sale-out');
+    const paymentRef = db.collection('transactions').doc('admin-partial-sale-in');
+    const batch = db.batch();
+    batch.set(invoiceRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'admin-uid',
+      invoice_number: 'INV-2026-ADMIN-PARTIAL',
+      sale_transaction_id: saleRef.id,
+      payment_transaction_id: paymentRef.id,
+      type: 'sale',
+      fulfillment_mode: 'non_stock',
+      seller_inventory_deductions: {},
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      seller_id: 'admin-uid',
+      items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
+      subtotal: 100,
+      discount: 0,
+      total: 100,
+      amount_received: 25,
+    });
+    batch.set(saleRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'admin-uid',
+      type: 'cash_out',
+      amount: 100,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: invoiceRef.id,
+      invoice_number: 'INV-2026-ADMIN-PARTIAL',
+    });
+    batch.set(paymentRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'admin-uid',
+      type: 'cash_in',
+      amount: 25,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: invoiceRef.id,
+      invoice_number: 'INV-2026-ADMIN-PARTIAL',
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 95,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 100,
+      last_transaction_id: saleRef.id,
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('admin: can settle a partial sale invoice with its cash-in and balance update', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedShop('shop-1', { balance: 75 });
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('invoices').doc('partial-sale').set({
+        tenant_id: 'tenant-1',
         created_by: 'seller-uid',
         type: 'sale',
+        status: 'partial',
+        invoice_number: 'INV-2026-PARTIAL',
         shop_id: 'shop-1',
         route_id: 'route-1',
-        tenant_id: 'tenant-1',
-        seller_id: 'seller-uid',
-        fulfillment_mode: 'stock',
-        seller_inventory_deductions: { 'inventory-1': 1 },
-        items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
-        subtotal: 100,
-        discount: 0,
         total: 100,
-        amount_received: 0,
-      }),
-    );
+        amount_received: 25,
+        outstanding_amount: 75,
+      });
+    });
+
+    const db = adminCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('partial-sale');
+    const paymentRef = db.collection('transactions').doc('settlement-tx');
+    const batch = db.batch();
+    batch.update(invoiceRef, {
+      status: 'paid',
+      amount_received: 100,
+      outstanding_amount: 0,
+      updated_at: new Date(),
+    });
+    batch.set(paymentRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'admin-uid',
+      type: 'cash_in',
+      amount: 75,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: invoiceRef.id,
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 0,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_in',
+      last_transaction_amount: 75,
+      last_transaction_id: paymentRef.id,
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('admin: can void a partially paid sale with a linked cash refund', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedShop('shop-1', { balance: 75 });
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('invoices').doc('void-sale').set({
+        tenant_id: 'tenant-1',
+        created_by: 'seller-uid',
+        type: 'sale',
+        status: 'partial',
+        invoice_number: 'INV-2026-VOID',
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        total: 100,
+        amount_received: 25,
+        outstanding_amount: 75,
+      });
+    });
+
+    const db = adminCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('void-sale');
+    const reversalRef = db.collection('transactions').doc('void-return-tx');
+    const refundRef = db.collection('transactions').doc('void-refund-tx');
+    const batch = db.batch();
+    batch.update(invoiceRef, {
+      status: 'void',
+      void_by: 'admin-uid',
+      void_at: new Date(),
+      updated_at: new Date(),
+    });
+    batch.set(reversalRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'admin-uid',
+      type: 'return',
+      amount: 100,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: invoiceRef.id,
+    });
+    batch.set(refundRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'admin-uid',
+      type: 'cash_out',
+      amount: 25,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: invoiceRef.id,
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 0,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 25,
+      last_transaction_id: refundRef.id,
+    });
+    await assertSucceeds(batch.commit());
   });
 
   it('seller: cannot create a stock invoice without inventory deductions', async () => {
@@ -671,10 +1016,56 @@ describe('invoices collection', () => {
 
   it('seller: can create non-stock invoice when the workspace allows it', async () => {
     await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
-    await seedShop('shop-1');
+    await seedShop('shop-1', { balance: 0 });
     await seedSettings({ allow_non_stock_invoices: true });
-    await assertSucceeds(
-      sellerCtx(testEnv).firestore().collection('invoices').doc('inv-non-stock').set({
+    const db = sellerCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('inv-non-stock');
+    const saleRef = db.collection('transactions').doc('tx-non-stock');
+    const batch = db.batch();
+    batch.set(invoiceRef, {
+      created_by: 'seller-uid',
+      type: 'sale',
+      invoice_number: 'INV-2026-0002',
+      sale_transaction_id: saleRef.id,
+      fulfillment_mode: 'non_stock',
+      seller_inventory_deductions: {},
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      seller_id: 'seller-uid',
+      items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
+      subtotal: 100,
+      discount: 0,
+      total: 100,
+      amount_received: 0,
+    });
+    batch.set(saleRef, {
+      created_by: 'seller-uid',
+      type: 'cash_out',
+      amount: 100,
+      invoice_id: invoiceRef.id,
+      invoice_number: 'INV-2026-0002',
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 100,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 100,
+      last_transaction_id: saleRef.id,
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('seller: cannot create non-stock invoice when the workspace disables it', async () => {
+    await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
+    await seedShop('shop-1');
+    await seedSettings({ allow_non_stock_invoices: false });
+    await assertFails(
+      sellerCtx(testEnv).firestore().collection('invoices').doc('inv-disabled').set({
         created_by: 'seller-uid',
         type: 'sale',
         fulfillment_mode: 'non_stock',
@@ -692,12 +1083,12 @@ describe('invoices collection', () => {
     );
   });
 
-  it('seller: cannot create non-stock invoice when the workspace disables it', async () => {
+  it('seller: cannot create non-stock invoice when workspace setting is absent', async () => {
+    await seedTenant();
     await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
     await seedShop('shop-1');
-    await seedSettings({ allow_non_stock_invoices: false });
     await assertFails(
-      sellerCtx(testEnv).firestore().collection('invoices').doc('inv-disabled').set({
+      sellerCtx(testEnv).firestore().collection('invoices').doc('inv-no-setting').set({
         created_by: 'seller-uid',
         type: 'sale',
         fulfillment_mode: 'non_stock',
@@ -842,6 +1233,47 @@ describe('invoices collection', () => {
     await assertFails(batch.commit());
   });
 
+  it('seller: cannot create a cash receipt without its shop balance update', async () => {
+    await seedUser('seller-uid', 'seller');
+    await seedShop('shop-1', { balance: 100 });
+    await seedSettings();
+    const db = sellerCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('receipt-no-shop-update');
+    const transactionRef = db.collection('transactions').doc('receipt-no-shop-update-tx');
+    const batch = db.batch();
+    batch.update(db.collection('settings').doc('tenant-1'), {
+      last_cash_receipt_number: 1,
+    });
+    batch.set(invoiceRef, {
+      created_by: 'seller-uid',
+      type: 'cash_receipt',
+      fulfillment_mode: 'none',
+      cash_receipt_transaction_id: transactionRef.id,
+      cash_receipt_sequence: 1,
+      shop_id: 'shop-1',
+      shop_name: 'Seed Shop',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      seller_id: 'seller-uid',
+      items: [],
+      subtotal: 0,
+      discount: 0,
+      total: 25,
+      amount_received: 25,
+      status: 'paid',
+    });
+    batch.set(transactionRef, {
+      created_by: 'seller-uid',
+      type: 'cash_in',
+      amount: 25,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      invoice_id: invoiceRef.id,
+    });
+    await assertFails(batch.commit());
+  });
+
   it('seller: cannot apply a cash receipt with mismatched invoice linkage', async () => {
     await seedUser('seller-uid', 'seller');
     await seedShop('shop-1', { balance: 100 });
@@ -921,6 +1353,8 @@ describe('invoices collection', () => {
     batch.set(invoiceRef, {
       created_by: 'seller-uid',
       type: 'sale',
+      invoice_number: 'INV-2026-0001',
+      sale_transaction_id: saleRef.id,
       fulfillment_mode: 'stock',
       seller_inventory_deductions: { 'inventory-1': 1 },
       shop_id: 'shop-1',
@@ -938,6 +1372,7 @@ describe('invoices collection', () => {
       created_by: 'seller-uid',
       type: 'cash_out',
       amount: 100,
+      invoice_number: 'INV-2026-0001',
       shop_id: 'shop-1',
       route_id: 'route-1',
       tenant_id: 'tenant-1',
@@ -947,6 +1382,7 @@ describe('invoices collection', () => {
       created_by: 'seller-uid',
       type: 'cash_in',
       amount: 25,
+      invoice_number: 'INV-2026-0001',
       shop_id: 'shop-1',
       route_id: 'route-1',
       tenant_id: 'tenant-1',
@@ -1275,16 +1711,20 @@ describe('seller inventory quantity controls', () => {
 
   it('seller: can decrease own stock for a sale', async () => {
     await seedSellerInventory();
-    await seedShop('shop-1');
+    await seedShop('shop-1', { balance: 0 });
     const db = sellerCtx(testEnv).firestore();
     const batch = db.batch();
+    const invoiceRef = db.collection('invoices').doc('sale-linked-stock');
+    const saleRef = db.collection('transactions').doc('sale-linked-stock-tx');
     batch.update(db.collection('seller_inventory').doc('seller-uid_variant-1'), {
       quantity_available: 12,
-      last_sale_invoice_id: 'sale-linked-stock',
+      last_sale_invoice_id: invoiceRef.id,
     });
-    batch.set(db.collection('invoices').doc('sale-linked-stock'), {
+    batch.set(invoiceRef, {
       tenant_id: 'tenant-1',
       created_by: 'seller-uid',
+      invoice_number: 'INV-2026-STOCK-1',
+      sale_transaction_id: saleRef.id,
       seller_id: 'seller-uid',
       type: 'sale',
       fulfillment_mode: 'stock',
@@ -1296,6 +1736,24 @@ describe('seller inventory quantity controls', () => {
       total: 80,
       amount_received: 0,
       seller_inventory_deductions: { 'seller-uid_variant-1': 8 },
+    });
+    batch.set(saleRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'seller-uid',
+      type: 'cash_out',
+      amount: 80,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: invoiceRef.id,
+      invoice_number: 'INV-2026-STOCK-1',
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 80,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 80,
+      last_transaction_id: saleRef.id,
     });
     await assertSucceeds(batch.commit());
   });
@@ -1389,6 +1847,79 @@ describe('device and session slot rules', () => {
         });
     });
   }
+
+  it('workspace admin can disable and re-enable a seller while revoking sessions', async () => {
+    await seedAccessUsers();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const seller = ctx.firestore().collection('users').doc('seller-uid');
+      await seller.collection('device_registrations').doc('slot_0')
+        .set(deviceData(0));
+      await seller.collection('sessions').doc('slot_0')
+        .set(sessionData(0));
+      await seller.collection('device_registrations').doc('slot_1')
+        .set(deviceData(1));
+      await seller.collection('sessions').doc('slot_1')
+        .set(sessionData(1));
+    });
+
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const sellerRef = db.collection('users').doc('seller-uid');
+    await db.runTransaction(async (transaction) => {
+      const userSnapshot = await transaction.get(sellerRef);
+      const sessionRefs = [0, 1].map((slot) =>
+        sellerRef.collection('sessions').doc(`slot_${slot}`));
+      const sessionSnapshots = await Promise.all(
+        sessionRefs.map((sessionRef) => transaction.get(sessionRef)));
+      assert.strictEqual(userSnapshot.data().tenant_id, 'tenant-1');
+      transaction.update(sellerRef, {
+        active: false,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      sessionSnapshots.forEach((sessionSnapshot) => {
+        if (sessionSnapshot.data().status !== 'active') return;
+        transaction.update(sessionSnapshot.ref, {
+          status: 'revoked',
+          revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
+          termination_reason: 'account_disabled',
+          terminated_by: 'tenant-admin-uid',
+        });
+      });
+    });
+    await assertSucceeds(sellerRef.update({
+      active: true,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    }));
+    for (const slot of [0, 1]) {
+      const session = await sellerRef.collection('sessions')
+        .doc(`slot_${slot}`).get();
+      assert.strictEqual(session.data().status, 'revoked');
+    }
+  });
+
+  it('workspace admin cannot disable self, peer admins, or another tenant seller', async () => {
+    await seedAccessUsers();
+    await seedUser('peer-admin-uid', 'tenant_admin');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('users').doc('other-seller-uid').update({
+        tenant_id: 'tenant-2',
+      });
+    });
+
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+    await assertFails(db.collection('users').doc('tenant-admin-uid').update({
+      active: false,
+      updated_at: updatedAt,
+    }));
+    await assertFails(db.collection('users').doc('peer-admin-uid').update({
+      active: false,
+      updated_at: updatedAt,
+    }));
+    await assertFails(db.collection('users').doc('other-seller-uid').update({
+      active: false,
+      updated_at: updatedAt,
+    }));
+  });
 
   it('seller can get only their own workspace document for session registration', async () => {
     await seedAccessUsers();

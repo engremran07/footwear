@@ -415,7 +415,7 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
     }
   }
 
-  Future<void> createTenant({
+  Future<String> createTenant({
     required String name,
     required String slug,
     required bool requireDevicePairing,
@@ -437,11 +437,11 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
     _validateAccessLimits(maxDevicesAllowed, maxActiveSessionsAllowed);
     final normalizedLimit = maxDevicesAllowed;
     final normalizedSessionLimit = maxActiveSessionsAllowed;
+    final docId = tenantSlug.isEmpty
+        ? 'workspace-${DateTime.now().millisecondsSinceEpoch}'
+        : tenantSlug;
 
     await _runTenantWrite(() async {
-      final docId = tenantSlug.isEmpty
-          ? 'workspace-${DateTime.now().millisecondsSinceEpoch}'
-          : tenantSlug;
       final db = FirebaseFirestore.instance;
       final tenantRef = db.collection(Collections.tenants).doc(docId);
       final settingsRef = db.collection(Collections.settings).doc(docId);
@@ -483,6 +483,7 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
         });
       });
     });
+    return docId;
   }
 
   Future<void> updateTenant(
@@ -504,6 +505,9 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
     if (!canManage) {
       throw StateError('Authorized workspace administration is required.');
     }
+    if (ownerUserId != null) {
+      await _validateTenantOwner(tenantId, ownerUserId);
+    }
     _validateAccessLimits(maxDevicesAllowed, maxActiveSessionsAllowed);
     final normalizedLimit = maxDevicesAllowed;
     final normalizedSessionLimit = maxActiveSessionsAllowed;
@@ -524,6 +528,58 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
             'updated_at': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
     });
+  }
+
+  Future<void> assignTenantOwner(String tenantId, String ownerUserId) async {
+    var actingUser = await ref.read(authUserProvider.future);
+    if (actingUser?.isSuperAdmin == true) {
+      final authUid = FirebaseAuth.instance.currentUser?.uid;
+      final snapshot = authUid == null
+          ? null
+          : await FirebaseFirestore.instance
+                .collection(Collections.users)
+                .doc(authUid)
+                .get(const GetOptions(source: Source.server));
+      if (snapshot?.exists == true) {
+        actingUser = UserModel.fromJson(snapshot!.data()!, snapshot.id);
+      }
+    }
+    if (actingUser == null ||
+        !actingUser.active ||
+        !actingUser.isSuperAdmin ||
+        actingUser.activeWorkspaceId != tenantId) {
+      throw StateError('Authorized workspace administration is required.');
+    }
+    await _validateTenantOwner(tenantId, ownerUserId);
+    await _runTenantWrite(() async {
+      await FirebaseFirestore.instance
+          .collection(Collections.tenants)
+          .doc(tenantId)
+          .update({
+            'owner_user_id': ownerUserId.trim(),
+            'updated_at': FieldValue.serverTimestamp(),
+          });
+    });
+  }
+
+  Future<void> _validateTenantOwner(String tenantId, String ownerUserId) async {
+    final normalizedOwnerId = ownerUserId.trim();
+    if (normalizedOwnerId.isEmpty) {
+      throw ArgumentError('Workspace owner ID must not be empty.');
+    }
+    final owner = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(normalizedOwnerId)
+        .get(const GetOptions(source: Source.server));
+    final data = owner.data();
+    if (!owner.exists ||
+        data?['active'] != true ||
+        data?['tenant_id'] != tenantId ||
+        (data?['role'] as String?)?.trim().toLowerCase() != 'tenant_admin') {
+      throw StateError(
+        'Workspace owner must be an active administrator in this workspace.',
+      );
+    }
   }
 
   Future<void> updateTenantAccessLimits(

@@ -476,10 +476,10 @@ service cloud.firestore {
           .data.require_admin_approval_for_seller_transaction_edits == true;
     }
 
-    function sellerInvoiceBalanceMatches(shopId, transactionData) {
+    function sellerInvoiceBalanceMatches(shopId, transactionData, transactionId) {
       let invoicePath = /databases/$(database)/documents/invoices/$(transactionData.invoice_id);
       let invoiceData = getAfter(invoicePath).data;
-      let paymentId = invoiceData.payment_transaction_id;
+      let paymentId = invoiceData.get('payment_transaction_id', '');
       let paymentPath = /databases/$(database)/documents/transactions/$(paymentId);
       let paymentData = getAfter(paymentPath).data;
       return !exists(invoicePath) &&
@@ -487,8 +487,8 @@ service cloud.firestore {
         transactionData.type == 'cash_out' &&
         invoiceData.type == 'sale' &&
         invoiceData.shop_id == shopId &&
+        invoiceData.sale_transaction_id == transactionId &&
         invoiceData.tenant_id == currentUserTenantId() &&
-        invoiceData.created_by == request.auth.uid &&
         invoiceData.total is number &&
         invoiceData.amount_received is number &&
         transactionData.amount == invoiceData.total &&
@@ -510,6 +510,22 @@ service cloud.firestore {
           invoiceData.total - invoiceData.amount_received - 0.01 &&
         request.resource.data.balance <= resource.data.balance +
           invoiceData.total - invoiceData.amount_received + 0.01;
+    }
+
+    function saleInvoiceIsLinked(invoiceId) {
+      let saleId = request.resource.data.sale_transaction_id;
+      let salePath = /databases/$(database)/documents/transactions/$(saleId);
+      let shopPath = /databases/$(database)/documents/customers/$(request.resource.data.shop_id);
+      let sale = getAfter(salePath).data;
+      let shop = getAfter(shopPath).data;
+      return saleId is string && saleId != '' &&
+        !exists(salePath) && existsAfter(salePath) &&
+        sale.type == 'cash_out' &&
+        sale.amount == request.resource.data.total &&
+        sale.invoice_id == invoiceId &&
+        sale.shop_id == request.resource.data.shop_id &&
+        sale.route_id == request.resource.data.route_id &&
+        shop is map && shop.last_transaction_id == saleId;
     }
 
     function sellerCashReceiptBalanceMatches(shopId, transactionId, transactionData) {
@@ -537,6 +553,8 @@ service cloud.firestore {
       let transactionId = request.resource.data.cash_receipt_transaction_id;
       let transactionPath = /databases/$(database)/documents/transactions/$(transactionId);
       let transactionData = getAfter(transactionPath).data;
+      let shopPath = /databases/$(database)/documents/customers/$(request.resource.data.shop_id);
+      let shopAfter = getAfter(shopPath).data;
       let settingsPath = /databases/$(database)/documents/settings/$(request.resource.data.tenant_id);
       let settingsBefore = get(settingsPath).data;
       let settingsAfter = getAfter(settingsPath).data;
@@ -556,14 +574,143 @@ service cloud.firestore {
         transactionData.shop_id == request.resource.data.shop_id &&
         transactionData.route_id == request.resource.data.route_id &&
         transactionData.tenant_id == request.resource.data.tenant_id &&
-        transactionData.created_by == request.resource.data.created_by;
+        transactionData.created_by == request.auth.uid &&
+        shopAfter is map && shopAfter.last_transaction_id == transactionId;
+    }
+
+    function creditNoteIsLinked(invoiceId) {
+      let transactionId = request.resource.data.return_transaction_id;
+      let transactionPath = /databases/$(database)/documents/transactions/$(transactionId);
+      let transactionData = getAfter(transactionPath).data;
+      let shopPath = /databases/$(database)/documents/customers/$(request.resource.data.shop_id);
+      let shopAfter = getAfter(shopPath).data;
+      return transactionId is string && transactionId != '' &&
+        !exists(transactionPath) && existsAfter(transactionPath) &&
+        transactionData.type == 'return' &&
+        transactionData.amount == request.resource.data.total &&
+        transactionData.invoice_id == invoiceId &&
+        transactionData.shop_id == request.resource.data.shop_id &&
+        transactionData.route_id == request.resource.data.route_id &&
+        transactionData.tenant_id == request.resource.data.tenant_id &&
+        transactionData.created_by == request.auth.uid &&
+        shopAfter is map && shopAfter.last_transaction_id == transactionId;
+    }
+
+    function shopBalanceChangedBy(delta) {
+      return request.resource.data.balance >= resource.data.balance + delta - 0.01 &&
+        request.resource.data.balance <= resource.data.balance + delta + 0.01;
+    }
+
+    function adminSalePaymentIsLinked(invoiceId, invoiceData) {
+      let paymentId = invoiceData.get('payment_transaction_id', '');
+      let paymentPath = /databases/$(database)/documents/transactions/$(paymentId);
+      let payment = getAfter(paymentPath).data;
+      return (invoiceData.amount_received == 0 &&
+          !('payment_transaction_id' in invoiceData)) ||
+        (invoiceData.amount_received > 0 &&
+          paymentId is string && paymentId != '' &&
+          !exists(paymentPath) && existsAfter(paymentPath) &&
+          payment.type == 'cash_in' &&
+          payment.amount == invoiceData.amount_received &&
+          payment.invoice_id == invoiceId &&
+          payment.shop_id == invoiceData.shop_id &&
+          payment.route_id == invoiceData.route_id);
+    }
+
+    function adminNewInvoiceBalanceMatches(shopId, transactionId, transactionData, invoiceData) {
+      return invoiceData.shop_id == shopId &&
+        invoiceData.tenant_id == resource.data.tenant_id &&
+        transactionData.route_id == invoiceData.route_id &&
+        ((invoiceData.type == 'sale' && transactionData.type == 'cash_out' &&
+            invoiceData.sale_transaction_id == transactionId &&
+            transactionData.amount == invoiceData.total &&
+            invoiceData.amount_received is number &&
+            adminSalePaymentIsLinked(transactionData.invoice_id, invoiceData) &&
+            shopBalanceChangedBy(invoiceData.total - invoiceData.amount_received)) ||
+          (invoiceData.type == 'cash_receipt' && transactionData.type == 'cash_in' &&
+            invoiceData.cash_receipt_transaction_id == transactionId &&
+            transactionData.amount == invoiceData.total &&
+            shopBalanceChangedBy(-invoiceData.total)) ||
+          ((invoiceData.type == 'credit_note' || invoiceData.type == 'return') &&
+            transactionData.type == 'return' &&
+            transactionData.amount == invoiceData.total &&
+            shopBalanceChangedBy(-invoiceData.total)));
+    }
+
+    function adminUpdatedInvoiceBalanceMatches(transactionData, invoiceBefore, invoiceAfter) {
+      return transactionData.route_id == invoiceBefore.route_id &&
+        invoiceAfter.route_id == invoiceBefore.route_id &&
+        ((invoiceBefore.type == 'sale' && invoiceAfter.status == 'paid' &&
+            transactionData.type == 'cash_in' &&
+            invoiceAfter.amount_received == invoiceAfter.total &&
+            invoiceAfter.outstanding_amount == 0 &&
+            transactionData.amount == invoiceBefore.total - invoiceBefore.amount_received &&
+            shopBalanceChangedBy(-transactionData.amount)) ||
+          (invoiceBefore.type == 'sale' && invoiceAfter.status == 'void' &&
+            (transactionData.type == 'return' || transactionData.type == 'cash_out') &&
+            transactionData.amount == (transactionData.type == 'return'
+              ? invoiceBefore.total
+              : invoiceBefore.amount_received) &&
+            shopBalanceChangedBy(-(invoiceBefore.total - invoiceBefore.amount_received))) ||
+          (invoiceBefore.type != 'sale' && invoiceAfter.status == 'void' &&
+            transactionData.type == 'cash_out' &&
+            transactionData.amount == invoiceBefore.total &&
+            shopBalanceChangedBy(invoiceBefore.total)));
+    }
+
+    function adminShopFinancialUpdateIsLinked(shopId) {
+      let transactionId = request.resource.data.last_transaction_id;
+      let transactionPath = /databases/$(database)/documents/transactions/$(transactionId);
+      let transactionData = getAfter(transactionPath).data;
+      let invoiceId = transactionData is map
+        ? transactionData.get('invoice_id', '')
+        : '';
+      let invoicePath = /databases/$(database)/documents/invoices/$(invoiceId);
+      let invoiceBefore = get(invoicePath).data;
+      let invoiceAfter = getAfter(invoicePath).data;
+      return transactionId is string && transactionId != '' &&
+        transactionData is map &&
+        transactionData.shop_id == shopId &&
+        transactionData.tenant_id == resource.data.tenant_id &&
+        transactionData.created_by == request.auth.uid &&
+        transactionData.amount is number && transactionData.amount > 0 &&
+        request.resource.data.last_transaction_type == transactionData.type &&
+        request.resource.data.last_transaction_amount == transactionData.amount &&
+        (
+          (!('invoice_id' in transactionData) &&
+            (transactionData.type == 'cash_in' ||
+              transactionData.type == 'cash_out') &&
+            shopBalanceChangedBy(transactionData.type == 'cash_out'
+              ? transactionData.amount
+              : -transactionData.amount)) ||
+          (invoiceId is string && invoiceId != '' &&
+            (exists(invoicePath)
+              ? (invoiceBefore is map && invoiceAfter is map &&
+                invoiceBefore.shop_id == shopId &&
+                invoiceAfter.shop_id == shopId &&
+                invoiceBefore.tenant_id == resource.data.tenant_id &&
+                invoiceAfter.tenant_id == resource.data.tenant_id &&
+                adminUpdatedInvoiceBalanceMatches(
+                  transactionData,
+                  invoiceBefore,
+                  invoiceAfter
+                ))
+              : (invoiceAfter is map &&
+                existsAfter(invoicePath) &&
+                adminNewInvoiceBalanceMatches(
+                  shopId,
+                  transactionId,
+                  transactionData,
+                  invoiceAfter
+                ))))
+        );
     }
 
     function workspaceAllowsNonStockInvoices(tenantId) {
       let settingsPath = /databases/$(database)/documents/settings/$(tenantId);
       let settingsData = get(settingsPath).data;
-      return settingsData == null ||
-        !('allow_non_stock_invoices' in settingsData) ||
+      return settingsData is map &&
+        'allow_non_stock_invoices' in settingsData &&
         settingsData.allow_non_stock_invoices == true;
     }
 
@@ -623,7 +770,11 @@ service cloud.firestore {
                 : -transactionData.amount) + 0.01) ||
           (('invoice_id' in transactionData) &&
             (transactionData.type == 'cash_out'
-              ? sellerInvoiceBalanceMatches(shopId, transactionData)
+              ? sellerInvoiceBalanceMatches(
+                  shopId,
+                  transactionData,
+                  transactionId
+                )
               : transactionData.type == 'cash_in' &&
                 sellerCashReceiptBalanceMatches(shopId, transactionId, transactionData)))
         );
@@ -668,6 +819,20 @@ service cloud.firestore {
           request.resource.data.tenant_id == resource.data.tenant_id &&
           (!('role' in request.resource.data) ||
             !isSuperAdminRole(request.resource.data.role)) &&
+          docSizeOk()
+        ) ||
+        (
+          isActiveUser() &&
+          isWorkspaceAdminAccessRole(getUserRole()) &&
+          isAdminForTenant(resource.data.tenant_id) &&
+          request.auth.uid != userId &&
+          isSellerRole(resource.data.role) &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.tenant_id == resource.data.tenant_id &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['active', 'updated_at']) &&
+          request.resource.data.active is bool &&
+          request.resource.data.updated_at == request.time &&
           docSizeOk()
         ) ||
         (
@@ -1243,7 +1408,14 @@ service cloud.firestore {
       // (balance increments from invoice batches) must not be throttled; atomic
       // WriteBatch integrity is the correct guard, not a 1-second time gate.
       // P0-2 FIX: customers are tenant-owned; use isAdminForTenant check
-      allow update: if (isAdminForTenant(resource.data.tenant_id) ||
+      allow update: if (isAdminForTenant(resource.data.tenant_id) &&
+        request.resource.data.tenant_id == resource.data.tenant_id &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'balance', 'last_transaction_at', 'last_transaction_type',
+            'last_transaction_amount', 'last_transaction_id'
+          ]) || adminShopFinancialUpdateIsLinked(customerId)
+        ) ||
         (
           isSeller() &&
           resource.data.route_id is string &&
@@ -1503,7 +1675,8 @@ service cloud.firestore {
           isSellerForRoute(request.resource.data.route_id) &&
           isSellerForShop(request.resource.data.shop_id) &&
           request.resource.data.tenant_id == currentUserTenantId()
-        ))
+        )) &&
+        request.resource.data.created_by == request.auth.uid
         // Invoice math integrity: total must equal subtotal minus discount
         && request.resource.data.total is number
         && request.resource.data.subtotal is number
@@ -1540,7 +1713,9 @@ service cloud.firestore {
              request.resource.data.seller_inventory_deductions.size() == 0 &&
              workspaceAllowsNonStockInvoices(request.resource.data.tenant_id))
           ))
-        && (request.resource.data.type != 'credit_note' || isValidCreditNoteLink())
+        && (request.resource.data.type != 'credit_note' ||
+          (isValidCreditNoteLink() && creditNoteIsLinked(invoiceId)))
+        && (request.resource.data.type != 'sale' || saleInvoiceIsLinked(invoiceId))
         && (!isSeller() ||
           !('invoice_header_snapshot' in request.resource.data) ||
           sellerInvoiceHeaderSnapshotMatchesWorkspace(

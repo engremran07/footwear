@@ -156,6 +156,15 @@ void main() {
       );
     });
 
+    test('workspace admin context failures map to permission denied', () {
+      expect(
+        AppErrorMapper.key(
+          StateError('Authorized workspace administration is required.'),
+        ),
+        equals('err_permission_denied'),
+      );
+    });
+
     test('device allocation limit has a specific message', () {
       expect(
         AppErrorMapper.key(StateError('device-limit-reached')),
@@ -236,24 +245,30 @@ void main() {
       );
     });
 
-    // Regression: autoDispose StreamProvider race — disposed before first emission
-    test('StateError "Bad state: No element" → err_pdf_failed', () {
+    test('StateError "Bad state: No element" is not a PDF failure', () {
       expect(
         AppErrorMapper.key(StateError('Bad state: No element')),
-        equals('err_pdf_failed'),
+        equals('err_unknown'),
       );
     });
 
-    test('StateError lowercase "bad state" → err_pdf_failed', () {
+    test('StateError lowercase "bad state" is not a PDF failure', () {
       expect(
         AppErrorMapper.key(StateError('bad state: stream was disposed')),
-        equals('err_pdf_failed'),
+        equals('err_unknown'),
       );
     });
 
-    test('Exception with "no element" message → err_pdf_failed', () {
+    test('Exception with "no element" is not a PDF failure', () {
       expect(
         AppErrorMapper.key(Exception('Iterable contained no element')),
+        equals('err_unknown'),
+      );
+    });
+
+    test('explicit PDF export failures retain the PDF error message', () {
+      expect(
+        AppErrorMapper.key(Exception('pdf_export_failed')),
         equals('err_pdf_failed'),
       );
     });

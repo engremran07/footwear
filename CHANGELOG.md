@@ -7,6 +7,47 @@ Most recent first.
 
 ---
 
+## [3.9.79+705] — 2026-10-17 — Workspace access controls and app branding
+
+### Added
+
+- New workspace setup provisions an owner account, and owner selection is limited to active administrators in that workspace.
+- Workspace administrators can disable seller accounts with atomic active-session revocation, and can review, revoke, or block registered devices and terminate selected sessions.
+- Versioned PWA icon URLs ensure installed web apps request the current artwork.
+
+### Fixed
+
+- Account deactivation now reads and revokes all bounded active session slots in the same Firestore transaction as the account status change, avoiding a race with session registration.
+
+## [3.9.78+704] — 2026-10-16 — Workspace UX and icon consistency
+
+### Fixed
+
+- Workspace creation no longer waits on a global owner list; owner selection during edits is scoped to the selected workspace.
+- Full workspace editing is shown only to a super-admin with active access to that workspace. Save failures keep the dialog usable and use the appropriate localized error instead of a PDF message.
+- Android adaptive launcher art now uses the same foreground scale as the web icon, and shop invoice actions have consistent vertical spacing.
+
+### Verification
+
+- Flutter analysis: `No issues found! (ran in 10.9s)`; Dart test analysis: `No issues found!`; expanded Flutter suite: `All tests passed!` (564); Firestore Rules Emulator: 122 passing; Markdown lint: no output.
+- Web build: `EXIT: 0`; Hosting and Firestore rules/indexes deployments: `Deploy complete!`.
+- Split APKs built: ARMv7 30.5 MB, ARM64 32.1 MB, x86_64 33.6 MB. ARM64 installed on R5GL22RGT9V (`Success`); installed versionName `3.9.78`, versionCode `3100504`.
+
+## [3.9.77+703] — 2026-10-16 — Invoice integrity and transaction notes
+
+### Fixed
+
+- Non-stock invoicing now defaults to disabled unless explicitly enabled for the workspace.
+- Sale and credit-note creation atomically allocate tenant invoice numbers and commit invoice, ledger, shop balance, and stock changes. Cash receipts and returns require linked ledger/shop updates.
+- Credit-note voids reverse restored stock and release the original sale's cumulative credit total. Inventory return and void movements now write tenant-scoped audit rows.
+- Shop cash-in, cash-out, and edit descriptions support multiple lines.
+
+### Verification
+
+- Firestore Rules Emulator: 122 passing.
+- Flutter tests: 561 passed. `flutter analyze lib --no-pub` reported `No issues found! (ran in 128.5s)`; `dart analyze test/` reported `No issues found!`; Markdown lint completed with no output.
+- Web/APK builds, authorized production deployment, and phone installation are pending.
+
 ## [3.9.76+702] — 2026-10-16 — Device pairing and session reliability
 
 ### Fixed

@@ -55,7 +55,7 @@ class _InvoiceHeaderSettingsScreenState
   };
   bool _loaded = false;
   bool _saving = false;
-  bool _allowNonStockInvoices = true;
+  bool _allowNonStockInvoices = false;
   String _template = 'classic';
   String _accentColor = _accentColors.first;
   Set<String> _visibleFields = const {

@@ -28,6 +28,111 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.79',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🏢',
+        text: {
+          AppLocale.en:
+              'New workspaces can be created with an owner account, and owner selection is limited to administrators in that workspace.',
+          AppLocale.ar:
+              'يمكن إنشاء مساحات العمل الجديدة مع حساب مالك، ويقتصر اختيار المالك على مسؤولي مساحة العمل نفسها.',
+          AppLocale.ur:
+              'نئے ورک اسپیس کے ساتھ مالک کا اکاؤنٹ بنایا جا سکتا ہے، اور مالک کے انتخاب میں صرف اسی ورک اسپیس کے ایڈمن شامل ہوتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔒',
+        text: {
+          AppLocale.en:
+              'Workspace administrators can deactivate seller accounts and review, revoke, or block their registered devices and sessions.',
+          AppLocale.ar:
+              'يمكن لمسؤولي مساحة العمل تعطيل حسابات البائعين ومراجعة أجهزتهم وجلساتهم المسجلة وإلغائها أو حظرها.',
+          AppLocale.ur:
+              'ورک اسپیس ایڈمن سیلر اکاؤنٹس غیر فعال کر سکتے ہیں اور ان کے رجسٹرڈ ڈیوائسز اور سیشنز کا جائزہ لے کر انہیں منسوخ یا بلاک کر سکتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🎨',
+        text: {
+          AppLocale.en:
+              'Updated app artwork now refreshes correctly in the installed web app.',
+          AppLocale.ar:
+              'يتم الآن تحديث أيقونة التطبيق في نسخة الويب المثبتة بشكل صحيح.',
+          AppLocale.ur:
+              'انسٹال شدہ ویب ایپ میں ایپ کا نیا آئیکن اب درست طور پر اپ ڈیٹ ہوتا ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.9.78',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🏢',
+        text: {
+          AppLocale.en:
+              'Workspace owner selection and editing now follow the selected workspace, with clear feedback when saving is not allowed.',
+          AppLocale.ar:
+              'أصبح اختيار مالك مساحة العمل وتحريرها مرتبطاً بمساحة العمل المحددة، مع رسائل واضحة عند عدم السماح بالحفظ.',
+          AppLocale.ur:
+              'ورک اسپیس کے مالک کا انتخاب اور ترمیم اب منتخب ورک اسپیس کے مطابق ہے، اور محفوظ کرنے کی اجازت نہ ہونے پر واضح پیغام ملتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🎨',
+        text: {
+          AppLocale.en:
+              'The app icon now has a consistent size on Android and web, and shop actions have clearer spacing.',
+          AppLocale.ar:
+              'أصبح حجم أيقونة التطبيق متناسقاً على أندرويد والويب، مع مسافات أوضح بين إجراءات المتجر.',
+          AppLocale.ur:
+              'اینڈرائیڈ اور ویب پر ایپ آئیکن کا سائز یکساں ہے، اور دکان کے بٹنوں کے درمیان فاصلہ بہتر ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.9.77',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Non-stock invoices are off by default and can only be enabled for a workspace by its administrator.',
+          AppLocale.ar:
+              'الفواتير غير المرتبطة بالمخزون معطّلة افتراضياً، ولا يمكن تفعيلها إلا لمساحة العمل بواسطة مسؤولها.',
+          AppLocale.ur:
+              'نان اسٹاک انوائسز بطورِ ڈیفالٹ بند ہیں اور صرف ورک اسپیس کا ایڈمن انہیں فعال کر سکتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔒',
+        text: {
+          AppLocale.en:
+              'Sales, receipts, and returns now save their linked ledger, balance, stock, and invoice-number updates together.',
+          AppLocale.ar:
+              'تحفظ المبيعات والإيصالات والمرتجعات الآن قيودها وتحديثات الأرصدة والمخزون وأرقام الفواتير المرتبطة معاً.',
+          AppLocale.ur:
+              'سیلز، رسیدیں اور ریٹرنز اب متعلقہ لیجر، بیلنس، اسٹاک اور انوائس نمبر کی اپ ڈیٹس ایک ساتھ محفوظ کرتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📝',
+        text: {
+          AppLocale.en:
+              'Transaction descriptions support multiple lines for clearer notes.',
+          AppLocale.ar: 'تدعم أوصاف المعاملات عدة أسطر لإضافة ملاحظات أوضح.',
+          AppLocale.ur:
+              'واضح نوٹس کے لیے ٹرانزیکشن کی تفصیل میں متعدد سطریں لکھی جا سکتی ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.76',
     date: 'October 2026',
     items: [

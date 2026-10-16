@@ -154,7 +154,7 @@ class SettingsModel {
     required this.currency,
     required this.pairsPerCarton,
     this.requireAdminApprovalForSellerTransactionEdits = false,
-    this.allowNonStockInvoices = true,
+    this.allowNonStockInvoices = false,
     this.invoiceHeader = const InvoiceHeaderConfig(),
     this.logoBase64,
     required this.updatedAt,
@@ -216,7 +216,7 @@ class SettingsModel {
           json['require_admin_approval_for_seller_transaction_edits']
               as bool? ??
           false,
-      allowNonStockInvoices: json['allow_non_stock_invoices'] as bool? ?? true,
+      allowNonStockInvoices: json['allow_non_stock_invoices'] as bool? ?? false,
       invoiceHeader: InvoiceHeaderConfig.fromJson(
         json['invoice_header'] as Map<String, dynamic>?,
       ),

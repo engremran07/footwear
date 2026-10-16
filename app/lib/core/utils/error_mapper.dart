@@ -90,6 +90,10 @@ class AppErrorMapper {
     if (msg.contains('workspace policy unavailable')) {
       return 'workspace_policy_unavailable';
     }
+    if (msg.contains('authorized workspace administration is required') ||
+        msg.contains('active platform super-admin access is required')) {
+      return 'err_permission_denied';
+    }
     if (msg.contains('google drive') || msg.contains('oauth')) {
       return 'backup_drive_error';
     }
@@ -115,11 +119,9 @@ class AppErrorMapper {
       return 'err_export_no_data';
     }
     if (msg.contains('workspace-disabled')) return 'workspace_disabled';
-    if (msg.contains('pdf') || msg.contains('export failed')) {
-      return 'err_pdf_failed';
-    }
-    // StateError / stream disposal before first emission (autoDispose race)
-    if (msg.contains('bad state') || msg.contains('no element')) {
+    if (msg.contains('pdf_export_failed') ||
+        msg.contains('pdf export failed') ||
+        msg.contains('pdf generation failed')) {
       return 'err_pdf_failed';
     }
 

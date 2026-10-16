@@ -166,7 +166,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'details': 'Details',
     'name': 'Name',
     'not_found': 'Not found',
-    'success': 'Success',
+     'success': 'Success',
     'action_cannot_undo': 'This action cannot be undone. Continue?',
     'access_denied': 'Access denied',
     'error_occurred': 'An error occurred: \$e',
@@ -719,7 +719,14 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'role_unknown': 'Unsupported role',
     'workspaces': 'Workspaces',
     'create_workspace': 'Create workspace',
+    'complete_workspace_setup': 'Create owner account',
     'edit_workspace': 'Edit workspace',
+    'workspace_owner_account': 'Initial workspace admin account',
+    'workspace_owner_missing': 'No workspace owner account is assigned.',
+    'workspace_owner_details_required':
+        'Enter the owner name and a valid email address.',
+    'workspace_owner_password_required':
+        'The owner password must be at least 8 characters.',
     'workspace_name': 'Workspace name',
     'workspace_name_unavailable': 'Workspace name unavailable',
     'workspace_name_required': 'Workspace name is required',
@@ -1311,6 +1318,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'msg_user_hard_deleted': '%s permanently deleted',
     'reactivate': 'Reactivate',
     'confirm_reactivate_user': 'Reactivate %s and restore their access?',
+    'disable_user': 'Disable account',
+    'confirm_disable_user_sessions':
+        'Disable %s? Their active sessions will end. Registered devices remain available if the account is re-enabled.',
     'settings_company_logo': 'Company Logo',
     'settings_logo_specs':
         'PDF reports · PNG/JPG · max 800×400 px · max 300 KB',
@@ -2196,7 +2206,14 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'role_unknown': 'دور غير مدعوم',
     'workspaces': 'المساحات',
     'create_workspace': 'إنشاء مساحة',
+    'complete_workspace_setup': 'إنشاء حساب المالك',
     'edit_workspace': 'تعديل المساحة',
+    'workspace_owner_account': 'حساب مسؤول مساحة العمل الأول',
+    'workspace_owner_missing': 'لم يتم تعيين حساب مالك لمساحة العمل.',
+    'workspace_owner_details_required':
+        'أدخل اسم المالك وبريداً إلكترونياً صالحاً.',
+    'workspace_owner_password_required':
+        'يجب أن تتكون كلمة مرور المالك من 8 أحرف على الأقل.',
     'workspace_name': 'اسم المساحة',
     'workspace_name_unavailable': 'اسم مساحة العمل غير متاح',
     'workspace_name_required': 'اسم المساحة مطلوب',
@@ -2782,6 +2799,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'msg_user_hard_deleted': 'تم حذف %s نهائيًا',
     'reactivate': 'إعادة تفعيل',
     'confirm_reactivate_user': 'هل تريد إعادة تفعيل %s واستعادة صلاحياتهم؟',
+    'disable_user': 'تعطيل الحساب',
+    'confirm_disable_user_sessions':
+        'هل تريد تعطيل حساب %s؟ ستنتهي جلساته النشطة، وستبقى أجهزته المسجلة متاحة إذا أُعيد تفعيل الحساب.',
     'settings_company_logo': 'شعار الشركة',
     'settings_logo_specs':
         'تقارير PDF · PNG/JPG · بحد أقصى 800×400 بكسل · 300 كيلوبايت',
@@ -3674,7 +3694,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'role_unknown': 'غیر معاون کردار',
     'workspaces': 'ورک اسپیسز',
     'create_workspace': 'ورک اسپیس بنائیں',
+    'complete_workspace_setup': 'مالک کا اکاؤنٹ بنائیں',
     'edit_workspace': 'ورک اسپیس میں ترمیم',
+    'workspace_owner_account': 'ابتدائی ورک اسپیس ایڈمن اکاؤنٹ',
+    'workspace_owner_missing': 'ورک اسپیس کا مالک اکاؤنٹ مقرر نہیں ہے۔',
+    'workspace_owner_details_required': 'مالک کا نام اور درست ای میل درج کریں۔',
+    'workspace_owner_password_required':
+        'مالک کا پاس ورڈ کم از کم 8 حروف کا ہونا چاہیے۔',
     'workspace_name': 'ورک اسپیس کا نام',
     'workspace_name_unavailable': 'ورک اسپیس کا نام دستیاب نہیں',
     'workspace_name_required': 'ورک اسپیس کا نام ضروری ہے',
@@ -4265,6 +4291,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'reactivate': 'دوبارہ فعال کریں',
     'confirm_reactivate_user':
         '%s کو دوبارہ فعال کریں اور ان کی رسائی بحال کریں؟',
+    'disable_user': 'اکاؤنٹ غیر فعال کریں',
+    'confirm_disable_user_sessions':
+        '%s کو غیر فعال کریں؟ ان کے فعال سیشن ختم ہو جائیں گے۔ اکاؤنٹ دوبارہ فعال کرنے پر رجسٹرڈ ڈیوائسز دستیاب رہیں گی۔',
     'settings_company_logo': 'کمپنی لوگو',
     'settings_logo_specs':
         'PDF رپورٹس · PNG/JPG · زیادہ سے زیادہ 800×400 px · 300 KB',

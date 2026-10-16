@@ -5,6 +5,7 @@ import '../core/l10n/app_locale.dart';
 import '../core/models/tenant_model.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/snack_helper.dart';
+import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/tenant_provider.dart';
 import '../providers/user_provider.dart';
@@ -22,17 +23,26 @@ class _TenantManagementScreenState
     extends ConsumerState<TenantManagementScreen> {
   final _nameController = TextEditingController();
   final _slugController = TextEditingController();
+  final _ownerNameController = TextEditingController();
+  final _ownerEmailController = TextEditingController();
+  final _ownerPasswordController = TextEditingController();
   final _maxDevicesController = TextEditingController(text: '3');
   final _maxSessionsController = TextEditingController(text: '2');
   bool _requireDevicePairing = false;
   bool _allowAdminResetOnly = true;
   String? _selectedOwnerId;
+  String? _pendingTenantId;
+  String? _pendingOwnerId;
+  bool _selectedWorkspaceForProvisioning = false;
   bool _isCreating = false;
 
   @override
   void dispose() {
     _nameController.dispose();
     _slugController.dispose();
+    _ownerNameController.dispose();
+    _ownerEmailController.dispose();
+    _ownerPasswordController.dispose();
     _maxDevicesController.dispose();
     _maxSessionsController.dispose();
     super.dispose();
@@ -54,26 +64,49 @@ class _TenantManagementScreenState
       return;
     }
 
+    final ownerRequired = existing == null || existing.ownerUserId == null;
+    final createOwnerAccount = ownerRequired && _selectedOwnerId == null;
+    if (createOwnerAccount) {
+      final ownerName = _ownerNameController.text.trim();
+      final ownerEmail = _ownerEmailController.text.trim();
+      if (ownerName.isEmpty || !ownerEmail.contains('@')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          errorSnackBar(tr('workspace_owner_details_required', ref)),
+        );
+        return;
+      }
+      if (_ownerPasswordController.text.trim().length < 8 &&
+          _pendingOwnerId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          errorSnackBar(tr('workspace_owner_password_required', ref)),
+        );
+        return;
+      }
+    }
+
     setState(() => _isCreating = true);
+    var saved = false;
     try {
       final maxDevicesAllowed =
           int.tryParse(_maxDevicesController.text.trim()) ?? 1;
       final maxActiveSessionsAllowed =
           int.tryParse(_maxSessionsController.text.trim()) ?? 1;
       final notifier = ref.read(tenantManagementNotifierProvider.notifier);
+      final String tenantId;
       if (existing == null) {
-        await notifier.createTenant(
+        _pendingTenantId ??= await notifier.createTenant(
           name: name,
           slug: _slugController.text.trim(),
           requireDevicePairing: _requireDevicePairing,
           allowAdminResetOnly: _allowAdminResetOnly,
           maxDevicesAllowed: maxDevicesAllowed,
           maxActiveSessionsAllowed: maxActiveSessionsAllowed,
-          ownerUserId: _selectedOwnerId,
         );
+        tenantId = _pendingTenantId!;
       } else {
+        tenantId = existing.id;
         await notifier.updateTenant(
-          existing.id,
+          tenantId,
           name: name,
           slug: _slugController.text.trim(),
           requireDevicePairing: _requireDevicePairing,
@@ -84,28 +117,50 @@ class _TenantManagementScreenState
         );
       }
 
-      if (!mounted) return;
-      setState(() => _isCreating = false);
-      Navigator.of(context).pop();
+      if (createOwnerAccount) {
+        if (!_selectedWorkspaceForProvisioning) {
+          await ref
+              .read(authNotifierProvider.notifier)
+              .selectWorkspace(
+                workspaceId: tenantId,
+                reason: 'Initial workspace owner account setup',
+              );
+          _selectedWorkspaceForProvisioning = true;
+        }
+        _pendingOwnerId ??= await ref
+            .read(userManagementNotifierProvider.notifier)
+            .createUser(
+              email: _ownerEmailController.text.trim(),
+              password: _ownerPasswordController.text,
+              displayName: _ownerNameController.text.trim(),
+              role: 'tenant_admin',
+              tenantId: tenantId,
+            );
+        await notifier.assignTenantOwner(tenantId, _pendingOwnerId!);
+      }
+      saved = true;
     } catch (error) {
-      if (!mounted) return;
-      setState(() => _isCreating = false);
       _showMappedError(error);
+    } finally {
+      if (_selectedWorkspaceForProvisioning) {
+        _selectedWorkspaceForProvisioning = false;
+        try {
+          await ref.read(authNotifierProvider.notifier).endWorkspaceAccess();
+        } catch (error) {
+          saved = false;
+          _showMappedError(error);
+        }
+      }
+      if (mounted) setState(() => _isCreating = false);
+    }
+    if (saved && mounted) {
+      _pendingTenantId = null;
+      _pendingOwnerId = null;
+      Navigator.of(context, rootNavigator: true).pop();
     }
   }
 
   Future<void> _changeWorkspaceAccess(TenantModel tenant) async {
-    final currentUser = await ref.read(authUserProvider.future);
-    if (!mounted || currentUser == null || !currentUser.isSuperAdmin) return;
-    if (currentUser.activeWorkspaceId == tenant.id) {
-      try {
-        await ref.read(authNotifierProvider.notifier).endWorkspaceAccess();
-      } catch (error) {
-        _showMappedError(error);
-      }
-      return;
-    }
-
     final reasonController = TextEditingController();
     final reason = await showDialog<String>(
       context: context,
@@ -156,21 +211,28 @@ class _TenantManagementScreenState
       _requireDevicePairing = existing.requireDevicePairing;
       _allowAdminResetOnly = existing.allowAdminResetOnly;
       _selectedOwnerId = existing.ownerUserId;
+      _ownerNameController.clear();
+      _ownerEmailController.clear();
+      _ownerPasswordController.clear();
     } else {
-      _nameController.clear();
-      _slugController.clear();
-      _maxDevicesController.text = '3';
-      _maxSessionsController.text = '2';
-      _requireDevicePairing = false;
-      _allowAdminResetOnly = true;
-      _selectedOwnerId = null;
+      if (_pendingTenantId == null) {
+        _nameController.clear();
+        _slugController.clear();
+        _ownerNameController.clear();
+        _ownerEmailController.clear();
+        _ownerPasswordController.clear();
+        _maxDevicesController.text = '3';
+        _maxSessionsController.text = '2';
+        _requireDevicePairing = false;
+        _allowAdminResetOnly = true;
+        _selectedOwnerId = null;
+        _pendingOwnerId = null;
+      }
     }
 
     showDialog<void>(
       context: context,
       builder: (ctx) {
-        final ownerUsersAsync = ref.watch(allUsersProvider);
-
         return AlertDialog(
           title: Text(
             existing == null
@@ -184,6 +246,7 @@ class _TenantManagementScreenState
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
+                    key: const Key('workspace_name'),
                     controller: _nameController,
                     decoration: InputDecoration(
                       labelText: tr('workspace_name', ref),
@@ -191,6 +254,7 @@ class _TenantManagementScreenState
                   ),
                   const SizedBox(height: 12),
                   TextField(
+                    key: const Key('workspace_slug'),
                     controller: _slugController,
                     decoration: InputDecoration(labelText: tr('slug', ref)),
                   ),
@@ -223,42 +287,96 @@ class _TenantManagementScreenState
                         setState(() => _allowAdminResetOnly = value),
                     title: Text(tr('admin_reset_only', ref)),
                   ),
-                  const SizedBox(height: 12),
-                  ownerUsersAsync.when(
-                    data: (users) {
-                      return DropdownButtonFormField<String>(
-                        initialValue: _selectedOwnerId,
-                        items: [
-                          DropdownMenuItem<String>(
-                            value: null,
-                            child: Text(tr('no_owner', ref)),
-                          ),
-                          ...users.map(
-                            (user) => DropdownMenuItem<String>(
-                              value: user.id,
-                              child: Text(
-                                user.displayName.trim().isEmpty
-                                    ? user.email
-                                    : user.displayName,
+                  if (existing != null) ...[
+                    const SizedBox(height: 12),
+                    Consumer(
+                      builder: (context, ownerRef, _) => ownerRef
+                          .watch(tenantUsersProvider(existing.id))
+                          .when(
+                            data: (users) => DropdownButtonFormField<String>(
+                              key: const Key('workspace_owner_selector'),
+                              initialValue:
+                                  users.any(
+                                    (user) =>
+                                        user.role == UserRole.tenantAdmin &&
+                                        user.id == _selectedOwnerId,
+                                  )
+                                  ? _selectedOwnerId
+                                  : null,
+                              items: [
+                                DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text(tr('no_owner', ownerRef)),
+                                ),
+                                ...users
+                                    .where(
+                                      (user) =>
+                                          user.role == UserRole.tenantAdmin,
+                                    )
+                                    .map(
+                                      (user) => DropdownMenuItem<String>(
+                                        value: user.id,
+                                        child: Text(
+                                          user.displayName.trim().isEmpty
+                                              ? user.email
+                                              : user.displayName,
+                                        ),
+                                      ),
+                                    ),
+                              ],
+                              onChanged: (value) =>
+                                  setState(() => _selectedOwnerId = value),
+                              decoration: InputDecoration(
+                                labelText: tr('owner', ownerRef),
+                              ),
+                            ),
+                            loading: () => const LinearProgressIndicator(),
+                            error: (error, _) => mappedErrorState(
+                              error: error,
+                              ref: ownerRef,
+                              onRetry: () => ownerRef.invalidate(
+                                tenantUsersProvider(existing.id),
                               ),
                             ),
                           ),
-                        ],
-                        onChanged: (value) =>
-                            setState(() => _selectedOwnerId = value),
-                        decoration: InputDecoration(
-                          labelText: tr('owner', ref),
-                        ),
-                      );
-                    },
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (error, _) => mappedErrorState(
-                      error: error,
-                      ref: ref,
-                      onRetry: () => ref.invalidate(allUsersProvider),
                     ),
-                  ),
+                  ],
+                  if (existing == null ||
+                      (existing.ownerUserId == null &&
+                          _selectedOwnerId == null)) ...[
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        tr('workspace_owner_account', ref),
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      key: const Key('workspace_owner_name'),
+                      controller: _ownerNameController,
+                      decoration: InputDecoration(
+                        labelText: tr('display_name', ref),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const Key('workspace_owner_email'),
+                      controller: _ownerEmailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(labelText: tr('email', ref)),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const Key('workspace_owner_password'),
+                      controller: _ownerPasswordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: tr('temp_password', ref),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -271,14 +389,13 @@ class _TenantManagementScreenState
             FilledButton.icon(
               onPressed: _isCreating
                   ? null
-                  : () async {
-                      setState(() => _isCreating = true);
-                      await _createOrUpdateTenant(existing: existing);
-                    },
+                  : () => _createOrUpdateTenant(existing: existing),
               icon: const Icon(Icons.save_alt),
               label: Text(
                 existing == null
-                    ? tr('create_workspace', ref)
+                    ? (_pendingTenantId == null
+                          ? tr('create_workspace', ref)
+                          : tr('complete_workspace_setup', ref))
                     : tr('save_changes', ref),
               ),
             ),
@@ -298,9 +415,8 @@ class _TenantManagementScreenState
     final canCreateTenants = currentUser?.isSuperAdmin == true;
 
     bool canEditTenant(TenantModel tenant) {
-      return currentUser?.isSuperAdmin == true ||
-          (currentUser?.isTenantAdmin == true &&
-              currentUser?.id == tenant.ownerUserId);
+      return currentUser?.isSuperAdmin == true &&
+          currentUser?.activeWorkspaceId == tenant.id;
     }
 
     return Scaffold(
@@ -393,6 +509,13 @@ class _TenantManagementScreenState
                       Text(
                         '${tr('admin_reset_only', ref)}: ${tenant.allowAdminResetOnly ? tr('yes', ref) : tr('no', ref)}',
                       ),
+                      if (tenant.ownerUserId == null)
+                        Text(
+                          tr('workspace_owner_missing', ref),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
                       if (currentUser?.isSuperAdmin == true) ...[
                         const SizedBox(height: 12),
                         if (currentUser?.activeWorkspaceId == tenant.id &&

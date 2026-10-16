@@ -490,6 +490,27 @@ Conflict resolution order for instructions:
 
 ## 10) Current Audit Status
 
+2026-10-17 workspace owner and access controls — v3.9.79+705:
+
+- Workspace creation provisions a tenant-scoped owner account after workspace creation; owner choices are limited to active tenant administrators.
+- Workspace-admin seller deactivation atomically updates account status and revokes every bounded active session slot. The security registry supports per-device revoke/block and per-session termination, scoped to the selected workspace.
+- Device/session slots are per user; shared hardware does not consume another account's capacity. Firestore Rules still do not bind ordinary business requests to a client session ID.
+- Release verification is in progress; append exact analyzer, test, build, deployment, Git, and device evidence after the gates complete.
+
+2026-10-16 workspace UX and branding — v3.9.78+704:
+
+- Workspace owner selection is scoped to the selected workspace; creating a workspace no longer waits on a global users stream. Full workspace edit actions require active super-admin access, and save state is cleared on validation and write failures.
+- Generic `StateError`/`No element` messages no longer map to PDF failure. Android adaptive icon foreground scale now matches the web artwork, and shop invoice actions have a visible gap.
+- Flutter analysis: `No issues found! (ran in 10.9s)`; Dart test analysis: `No issues found!`; expanded Flutter suite: `All tests passed!` (564); Firestore Rules Emulator: 122 passing; Markdown lint: no output.
+- Web build `EXIT: 0`; Hosting and rules/indexes deployment completed. Split APKs: ARMv7 30.5 MB, ARM64 32.1 MB, x86_64 33.6 MB. ARM64 install on R5GL22RGT9V reported `Success`; device reports versionName `3.9.78`, versionCode `3100504`.
+- Changes remain uncommitted; no commit or push was requested.
+
+2026-10-16 invoice integrity and transaction notes — v3.9.77+703:
+
+- Non-stock invoices now default to disabled in the model, UI, provider, and Firestore Rules; workspaces must explicitly opt in.
+- Sale and credit-note creation atomically update the tenant invoice counter, invoice, ledger, shop balance, and stock. Cash receipts and credit notes require linked ledger/shop writes; admin and seller paths validate role-specific balance deltas. Credit-note voids reverse original credit totals and stock movements, with inventory audit rows.
+- Non-stock invoices default to disabled. Shop transaction descriptions support multiple lines. Rules Emulator: 122 passing; Flutter suite: 561 passing; `flutter analyze lib --no-pub` and `dart analyze test/` clean; Markdown lint clean. Web/APK builds, authorized deployment, and phone install are pending.
+
 2026-10-16 session access recheck and remediation — v3.9.76+702 (deployed and installed):
 
 - Workspace device pairing is a seller policy. Workspace admins use the shared platform cap, register active devices without seller approval, and can resume their own matching pending slot in place only while it remains within that cap. Sellers remain subject to approval when pairing is enabled; self-approval remains denied.

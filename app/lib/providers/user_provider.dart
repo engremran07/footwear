@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/models/access_usage_summary.dart';
 import '../core/utils/firestore_pagination.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
@@ -154,7 +155,20 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     return canManageUserAccountsRole(role);
   }
 
-  Future<String> _requireAdminUid() async {
+  Future<UserModel?> _currentProfileFromServer(String userId) async {
+    if (FirebaseAuth.instance.currentUser?.uid != userId) return null;
+    final profileSnap = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(userId)
+        .get(const GetOptions(source: Source.server));
+    if (FirebaseAuth.instance.currentUser?.uid != userId ||
+        !profileSnap.exists) {
+      return null;
+    }
+    return UserModel.fromJson(profileSnap.data()!, profileSnap.id);
+  }
+
+  Future<String> _requireAdminUid({String? requiredTenantId}) async {
     final authUser = FirebaseAuth.instance.currentUser;
     final adminUid = authUser?.uid.trim() ?? '';
     if (adminUid.isEmpty) {
@@ -164,15 +178,149 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       throw StateError('Admin privileges required');
     }
     final profile = await ref.read(authUserProvider.future);
-    if (profile?.isSuperAdmin == true && profile?.tenantId == null) {
-      throw StateError(
-        'Select a workspace support context before managing users.',
-      );
+    if (profile?.isSuperAdmin == true) {
+      final currentProfile = await _currentProfileFromServer(adminUid);
+      final activeTenantId = TenantScope.normalize(currentProfile?.tenantId);
+      if (currentProfile == null ||
+          !currentProfile.active ||
+          activeTenantId == null) {
+        throw StateError(
+          'Select a workspace support context before managing users.',
+        );
+      }
+      final requestedTenantId = TenantScope.normalize(requiredTenantId);
+      if (requestedTenantId != null && requestedTenantId != activeTenantId) {
+        throw StateError('Users must belong to the active workspace');
+      }
     }
     return adminUid;
   }
 
-  Future<void> createUser({
+  Future<
+    ({String adminUid, UserModel admin, UserModel target, String tenantId})
+  >
+  _requireManageableUser(String uid) async {
+    final adminUid = await _requireAdminUid();
+    final admin = await _currentProfileFromServer(adminUid);
+    if (admin == null || !admin.active) {
+      throw StateError('An active user profile is required.');
+    }
+    final tenantId = TenantScope.requireTenant(admin.tenantId);
+    final targetId = uid.trim();
+    if (targetId.isEmpty) throw ArgumentError('uid must not be empty');
+    if (targetId == adminUid) {
+      throw StateError('Administrators cannot disable their own account.');
+    }
+    final targetSnapshot = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(targetId)
+        .get(const GetOptions(source: Source.server));
+    if (!targetSnapshot.exists) throw StateError('User not found.');
+    final target = UserModel.fromJson(
+      targetSnapshot.data()!,
+      targetSnapshot.id,
+    );
+    if (target.tenantId != tenantId ||
+        target.isSuperAdmin ||
+        (!admin.isSuperAdmin && target.role != UserRole.seller)) {
+      throw StateError('Workspace user administration is required.');
+    }
+    return (
+      adminUid: adminUid,
+      admin: admin,
+      target: target,
+      tenantId: tenantId,
+    );
+  }
+
+  Future<void> _setUserActiveAtomically({
+    required String userId,
+    required String tenantId,
+    required String adminUid,
+    required bool adminIsSuperAdmin,
+    required bool active,
+    bool clearRouteAssignments = false,
+    String? displayName,
+  }) async {
+    final db = FirebaseFirestore.instance;
+    final userRef = db.collection(Collections.users).doc(userId);
+    final List<DocumentReference<Map<String, dynamic>>> sessionRefs =
+        List.generate(
+          AccessUsageSummary.maximumSlotsPerUser,
+          (index) =>
+              userRef.collection(Collections.sessions).doc('slot_$index'),
+        );
+    final routeSnapshot = clearRouteAssignments
+        ? await db
+              .collection(Collections.routes)
+              .where('tenant_id', isEqualTo: tenantId)
+              .where('assigned_seller_ids', arrayContains: userId)
+              .limit(20)
+              .get(const GetOptions(source: Source.server))
+        : null;
+
+    await db.runTransaction<void>((transaction) async {
+      final userSnapshot = await transaction.get(userRef);
+      final sessionSnapshots = await Future.wait(
+        sessionRefs.map((sessionRef) => transaction.get(sessionRef)),
+      );
+      final userData = userSnapshot.data();
+      final role = (userData?['role'] as String? ?? '').trim().toLowerCase();
+      if (!userSnapshot.exists ||
+          userData?['tenant_id'] != tenantId ||
+          role == 'super_admin' ||
+          (!adminIsSuperAdmin && role != 'seller')) {
+        throw StateError('Workspace user administration is required.');
+      }
+
+      if (active && userData?['active'] == true) return;
+      final userUpdate = <String, dynamic>{
+        'active': active,
+        'updated_at': FieldValue.serverTimestamp(),
+      };
+      if (clearRouteAssignments) {
+        userUpdate['assigned_route_ids'] = <String>[];
+        userUpdate['assigned_route_names'] = <String>[];
+      }
+      transaction.update(userRef, userUpdate);
+
+      if (active) return;
+      for (var index = 0; index < sessionSnapshots.length; index++) {
+        final snapshot = sessionSnapshots[index];
+        if (!snapshot.exists) continue;
+        final data = snapshot.data();
+        if (data?['user_id'] != userId ||
+            data?['tenant_id'] != tenantId ||
+            data?['slot_id'] != snapshot.id ||
+            (data?['slot_number'] as num?)?.toInt() != index) {
+          throw StateError('invalid-session-slot-record');
+        }
+        if (data?['status'] != 'active') continue;
+        transaction.update(sessionRefs[index], {
+          'status': 'revoked',
+          'revoked_at': FieldValue.serverTimestamp(),
+          'termination_reason': 'account_disabled',
+          'terminated_by': adminUid,
+        });
+      }
+
+      if (routeSnapshot != null) {
+        for (final route in routeSnapshot.docs) {
+          transaction.update(route.reference, {
+            'assigned_seller_ids': FieldValue.arrayRemove([userId]),
+            'assigned_seller_names': FieldValue.arrayRemove(
+              displayName != null && displayName.isNotEmpty
+                  ? [displayName]
+                  : [],
+            ),
+            'updated_at': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    });
+  }
+
+  Future<String> createUser({
     required String email,
     required String password,
     required String displayName,
@@ -182,12 +330,20 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     List<String> assignedRouteNames = const [],
     String? tenantId,
   }) async {
-    final adminUid = await _requireAdminUid();
-    final actingUser = await ref.read(authUserProvider.future);
+    final requestedTenantId = TenantScope.normalize(tenantId);
+    final adminUid = await _requireAdminUid(
+      requiredTenantId: requestedTenantId,
+    );
+    var actingUser = await ref.read(authUserProvider.future);
+    if (actingUser?.isSuperAdmin == true) {
+      actingUser = await _currentProfileFromServer(adminUid);
+    }
     if (actingUser == null || !actingUser.active) {
       throw StateError('An active user profile is required');
     }
+    final owner = actingUser;
     state = const AsyncLoading();
+    String? createdUserId;
     state = await AsyncValue.guard(() async {
       final normalizedRole = _normalizeRole(role);
       if (normalizedRole == 'super_admin') {
@@ -195,7 +351,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'Platform super-admin accounts require trusted out-of-band provisioning.',
         );
       }
-      if (!actingUser.isSuperAdmin && normalizedRole != 'seller') {
+      if (!owner.isSuperAdmin && normalizedRole != 'seller') {
         throw StateError(
           'Only a selected platform super-admin can create workspace administrators',
         );
@@ -216,8 +372,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         );
       }
 
-      final effectiveTenantId = TenantScope.requireTenant(actingUser.tenantId);
-      final requestedTenantId = TenantScope.normalize(tenantId);
+      final effectiveTenantId = TenantScope.requireTenant(owner.tenantId);
       if (requestedTenantId != null && requestedTenantId != effectiveTenantId) {
         throw StateError('Users must belong to the active workspace');
       }
@@ -241,6 +396,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           password: trimmedPassword,
         );
         final newUid = cred.user!.uid;
+        createdUserId = newUid;
 
         // Sign out immediately from the temp app (we only needed the UID)
         await tempAuth.signOut();
@@ -289,6 +445,13 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         } catch (_) {}
       }
     });
+    if (state.hasError) {
+      Error.throwWithStackTrace(
+        state.error!,
+        state.stackTrace ?? StackTrace.current,
+      );
+    }
+    return createdUserId!;
   }
 
   Future<void> updateUser(
@@ -421,63 +584,29 @@ class UserManagementNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> toggleActive(String uid, bool active) async {
-    await _requireAdminUid();
-    final trimmedUid = uid.trim();
-    if (trimmedUid.isEmpty) {
-      throw ArgumentError('uid must not be empty');
-    }
-    await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(trimmedUid)
-        .update({'active': active, 'updated_at': Timestamp.now()});
+    final target = await _requireManageableUser(uid);
+    await _setUserActiveAtomically(
+      userId: target.target.id,
+      tenantId: target.tenantId,
+      adminUid: target.adminUid,
+      adminIsSuperAdmin: target.admin.isSuperAdmin,
+      active: active,
+    );
   }
 
   /// Soft-delete: deactivate user + clear route assignments.
   /// Auth account is orphaned but cannot access anything (rules check active).
   Future<void> deleteUser(String uid) async {
-    await _requireAdminUid();
-    final trimmedUid = uid.trim();
-    if (trimmedUid.isEmpty) {
-      throw ArgumentError('uid must not be empty');
-    }
-
-    final db = FirebaseFirestore.instance;
-    final now = Timestamp.now();
-
-    // Read user doc to get display_name for arrayRemove
-    final userDoc = await db
-        .collection(Collections.users)
-        .doc(trimmedUid)
-        .get();
-    final userName = (userDoc.data()?['display_name'] as String?) ?? '';
-
-    // Clear seller from all assigned routes (array + legacy scalar)
-    final routeSnap = await db
-        .collection(Collections.routes)
-        .where('assigned_seller_ids', arrayContains: trimmedUid)
-        .limit(20)
-        .get();
-
-    final batch = db.batch();
-    for (final routeDoc in routeSnap.docs) {
-      batch.update(routeDoc.reference, {
-        'assigned_seller_ids': FieldValue.arrayRemove([trimmedUid]),
-        'assigned_seller_names': FieldValue.arrayRemove(
-          userName.isNotEmpty ? [userName] : [],
-        ),
-        'updated_at': now,
-      });
-    }
-
-    // Deactivate the user (soft-delete)
-    batch.update(db.collection(Collections.users).doc(trimmedUid), {
-      'active': false,
-      'assigned_route_ids': [],
-      'assigned_route_names': [],
-      'updated_at': now,
-    });
-
-    await batch.commit();
+    final target = await _requireManageableUser(uid);
+    await _setUserActiveAtomically(
+      userId: target.target.id,
+      tenantId: target.tenantId,
+      adminUid: target.adminUid,
+      adminIsSuperAdmin: target.admin.isSuperAdmin,
+      active: false,
+      clearRouteAssignments: true,
+      displayName: target.target.displayName,
+    );
   }
 
   /// Send a password-reset email to the seller.

@@ -46,7 +46,7 @@ void main() {
       expect(m.pairsPerCarton, 12);
       expect(m.logoBase64, isNull);
       expect(m.logoBytes, isNull);
-      expect(m.allowNonStockInvoices, isTrue);
+      expect(m.allowNonStockInvoices, isFalse);
       expect(m.invoiceHeader.nameEn, '');
     });
 

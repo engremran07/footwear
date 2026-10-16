@@ -1,0 +1,80 @@
+INVOICE SYSTEM AUDIT
+Date: 2026-10-16
+Release under verification: v3.9.77+703
+Scope: latest local ShoesERP state and the invoice audit handoff in the indexed Copilot session for d:\Footwear. The session store is local; it does not prove which GitHub identity authored that session.
+
+SUMMARY
+The audit traced stock sales, non-stock sales, cash receipts, credit notes/returns, partial settlement, invoice void/refund, numbering, shop balances, stock, PDF/export entry points, workspace settings, routing, and Rules tests. The reported code paths had real gaps; the fixes below are now implemented and covered by 122 Rules Emulator tests and 561 Flutter tests. No live business records were changed.
+
+FINDINGS AND FIXES
+
+P1 - Sale invoice retry and counter were not one atomic operation
+Root cause: sale and credit-note invoice numbers were consumed in a separate transaction before invoice/ledger/balance/stock writes. Sale idempotency used a query before the write, allowing retries/concurrent calls to race.
+Evidence: app/lib/providers/invoice_provider.dart:254-542, 727-970; firestore.rules:709-754.
+Change: stock/non-stock sale creation and credit-note creation now use tenant-scoped deterministic invoice IDs and one Firestore transaction for the idempotency check, tenant invoice counter, invoice, linked ledger rows, shop balance, original credit-note total, and inventory deltas. Stock availability/ownership is re-read inside the transaction before deductions.
+Regression coverage: tests/firestore-rules/rules.test.js:789-888; full Flutter test suite exercises model, invoice PDF, and financial regressions.
+Risk: a client-generated idempotency key must remain stable across a retry. The invoice screen preserves the key for the pending submission; the provider supplies a UUID only when no key is provided.
+
+P1 - Invoice, ledger, shop balance, and optional payment could be written independently
+Root cause: sale invoice Rules did not require the paired sale transaction and shop update; admin shop balance changes lacked an exact invoice-linked delta check. Receipt and credit-note creation had incomplete reciprocal checks.
+Evidence: app/lib/providers/invoice_provider.dart:402-542, 574-721, 727-970; firestore.rules:479-600, 620-705, 1685-1710.
+Change: Rules bind sale invoices to the same-batch cash_out row and shop marker, bind partial/full payments to amount_received, and validate admin/seller balance deltas in the shop update rules. Cash receipt and credit-note invoice creation now require the matching ledger transaction and shop marker. Credit notes also bind the original sale's cumulative credit total.
+Regression coverage: tests/firestore-rules/rules.test.js:598-936, 1139-1235, 1344; includes orphaned invoice denials and positive admin/seller partial payment cases.
+Risk: Firestore Rules intentionally use a 0.01 tolerance for existing double-valued currency fields. See remaining risks below.
+
+P1 - Non-stock invoice permission failed open for missing settings
+Root cause: model/UI/provider/Rules defaults treated an absent workspace setting as enabled.
+Evidence: app/lib/models/settings_model.dart:157,219; app/lib/screens/invoice_header_settings_screen.dart:58; app/lib/providers/invoice_provider.dart:436-444; firestore.rules:709-712.
+Change: absent settings now mean disabled in the model, UI, provider, and Rules. A workspace must explicitly opt in.
+Regression coverage: app/test/unit/models/settings_model_test.dart:14,41; Rules tests for enabled, disabled, and absent settings in tests/firestore-rules/rules.test.js:796-888.
+
+P1 - Return/credit-note concurrency and void reversal were inconsistent
+Root cause: cumulative credit limits were checked against a pre-transaction snapshot. Credit-note voids did not release the original invoice's credited total, and voiding a credit note could increment stock again rather than reverse the prior stock restoration.
+Evidence: app/lib/providers/invoice_provider.dart:727-970, 1012-1270.
+Change: credit-note limit check, original invoice total, invoice numbering, return ledger, shop balance, and stock restoration now commit in one transaction. Credit-note invoice records retain seller_inventory_restores. Voiding a credit note decrements those restored quantities and the original invoice's credit_note_total; sale void restores deducted stock. Both directions append tenant-scoped inventory_transactions records atomically.
+Regression coverage: Rules tests validate credit-note cumulative limits and invoice void/refund balance transitions. Full Flutter test suite includes void accounting-plan tests.
+Risk: live inventory documents were not modified in this audit; there is no production-data migration.
+
+P1 - Admin settlement accepted caller-supplied route/shop context
+Root cause: markAsPaid used the route argument to write a cash_in transaction without first binding it to the stored invoice/shop identity.
+Evidence: app/lib/providers/invoice_provider.dart:1280-1403; firestore.rules:640-705.
+Change: settlement requires the authenticated admin identity, matching tenant, sale invoice, stored route, and same-tenant shop before writes. Rules bind the settlement transaction route and amount to the invoice state transition and exact shop-balance reduction.
+Regression coverage: tests/firestore-rules/rules.test.js:829-888.
+
+P2 - Shop transaction descriptions were single-line fields
+Root cause: three shop-detail description inputs were plain TextFields without multiline keyboard/action configuration.
+Evidence: app/lib/screens/shop_detail_screen.dart:150,363,611; app/lib/widgets/transaction_description_field.dart:3-28.
+Change: all three description inputs share TransactionDescriptionField with multiline keyboard, newline action, 2-4 visible lines. No transaction provider, ledger payload, or balance behavior changed for this UI feature.
+Regression coverage: app/test/widget/transaction_description_field_test.dart:6-32.
+
+P2 - Rules test harness timeout was too short for expanded rule compilation
+Root cause: Mocha's 10-second hook timeout expired before the enlarged rules bundle completed emulator initialization.
+Evidence: tests/firestore-rules/package.json.
+Change: default Rules test timeout is 30 seconds. Default test command now completes successfully.
+
+P2 - Release metadata/docs lagged source changes
+Change: pubspec.yaml and AppBrand are synchronized at 3.9.77+703; trilingual changelog and README/app README/AGENTS/CLAUDE/system deep-dive entries were updated.
+Evidence: app/pubspec.yaml:4; app/lib/core/constants/app_brand.dart:15-17; app/lib/core/data/changelog_data.dart:30-64.
+
+CROSS-CUTTING AUDIT
+- Tenant: invoice, settings counter, shop, stock, ledger, and inventory audit writes are scoped to the authenticated workspace; providers reject mismatched shop route/workspace records.
+- Invoice IDs/counters: sale and credit-note counters use settings/{tenantId}; cash receipts retain their tenant-scoped receipt sequence. No new query/index was introduced for deterministic retry IDs.
+- Stock: stock-backed sale deductions are transaction-read and Rules-bound to the exact seller_inventory delta. Non-stock sales write no inventory movement. Credit-note restore and void reversal write inventory_transactions rows atomically.
+- PDF/history: InvoiceDetailScreen uses generateInvoicePdf with the invoice record and saved header snapshot; existing PDF tests cover cash receipts, non-stock items, and long invoices. No export call-site change was required.
+- Localization: new customer-facing changelog copy is present in EN/AR/UR. Multiline field labels use the existing localized description key.
+- Spark constraints: no paid Firebase product, Storage dependency, function, migration, or live-data reset was added.
+
+VERIFICATION EVIDENCE
+- Firestore Rules Emulator, default command: `122 passing`.
+- Flutter: `flutter test -r expanded` ended `All tests passed!` at test 561.
+- Full Flutter analyzer: `No issues found! (ran in 128.5s)`.
+- Dart test analyzer: `No issues found!`.
+- Markdown lint completed with no output.
+- Current version check: app/pubspec.yaml `3.9.77+703`; AppBrand `3.9.77` / `703`.
+- Rules/Hosting deployment, release web/APK builds, phone install, and authenticated business-flow smoke test are pending final release gates. Production deployment was explicitly authorized after local builds; no deployment has run yet.
+
+REMAINING RISKS / VERIFICATION LIMITS
+1. Financial amounts remain doubles with the existing 0.01 tolerance. Integer minor-unit accounting would require a reviewed compatibility/migration plan and was not introduced.
+2. No owner credentials were provided for authenticated sign-in or live invoice/receipt/void smoke tests. Do not interpret emulator tests or APK installation as production account verification.
+3. Rules and Hosting must be deployed before this APK can use the new stricter invoice write contract in production; deployment is authorized but not yet performed.
+4. Git commit/push was not requested in the current task and will not be performed automatically.

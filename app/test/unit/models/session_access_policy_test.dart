@@ -133,6 +133,30 @@ void main() {
       );
     });
 
+    test('another account on the same installation is not its session', () {
+      final otherAccountSession = SessionModel(
+        id: 'slot_0',
+        userId: 'account-a',
+        tenantId: 'workspace-a',
+        deviceId: 'shared-installation',
+        platform: 'android',
+        status: 'active',
+        createdAt: Timestamp.fromDate(now),
+        lastSeenAt: Timestamp.fromDate(now),
+        expiresAt: Timestamp.fromDate(now.add(const Duration(hours: 1))),
+      );
+
+      expect(
+        SessionAccessPolicy.currentForDevice(
+          [otherAccountSession],
+          deviceId: 'shared-installation',
+          userId: 'account-b',
+          now: now,
+        ),
+        isNull,
+      );
+    });
+
     test('resets session context when role changes for the same user', () {
       expect(
         SessionAccessPolicy.shouldResetSessionContext(

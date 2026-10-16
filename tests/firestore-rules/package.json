@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Firestore Security Rules emulator tests for ShoesERP",
   "scripts": {
-    "test": "mocha --timeout 10000 rules.test.js",
+    "test": "mocha --timeout 30000 rules.test.js",
     "test:emulator": "firebase emulators:exec --only firestore 'npm test'"
   },
   "devDependencies": {

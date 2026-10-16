@@ -1,4 +1,4 @@
-﻿# FootWear ERP — v3.9.76+702
+﻿# FootWear ERP — v3.9.79+705
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
@@ -12,6 +12,9 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 > **v3.9.61+100 (2026-10-15)** — Invoice creation supports stock sales, non-stock catalog sales, and cash receipt invoices. Workspace admins configure bilingual invoice headers, and generated PDFs retain the header snapshot.
 > **v3.9.75+102 (2026-10-15)** — Sign-in and session renewal are guarded against stale records and account-switch races. Sellers use workspace-specific dynamic device/session limits; workspace-admin limits are shared and controlled by the platform super-admin; platform sessions remain separate. Invoice voiding is atomic and long invoice PDFs paginate. Android updates can be installed over the device's current package without removing app data.
 > **v3.9.76+702 (2026-10-16)** — Workspace-admin sign-in no longer follows seller pairing approval. Session re-registration, renewal, and logout handle revoked and pending records more reliably.
+> **v3.9.77+703 (2026-10-16)** — Non-stock invoicing is disabled until explicitly enabled per workspace. Sale, receipt, return, and invoice-number updates are transactionally linked to ledger, balance, and stock changes; shop transaction descriptions accept multiple lines.
+> **v3.9.78+704 (2026-10-16)** — Workspace owners are selected within the active workspace, editing requires active platform access, save errors are classified accurately, and launcher icon sizing is consistent across Android and web.
+> **v3.9.79+705 (2026-10-17)** — Workspace setup provisions an owner account; workspace admins can disable sellers and revoke or block their device/session access; PWA icon URLs refresh installed artwork.
 
 ---
 
@@ -27,7 +30,7 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 - **Transactions** — cash-in / cash-out ledger with running balance
 - **Invoices** — stock and non-stock sales, cash receipt invoices, credit notes, void/paid lifecycle, and workspace-configurable bilingual PDF headers
 - **Reports** — monthly cash flow BarChart, outstanding PieChart, PDF/Excel/image export
-- **User Management** — create/edit admin and seller accounts, soft-delete; password reset by email
+- **User Management** — create/edit admin and seller accounts, disable/reactivate accounts, manage registered devices and sessions, and send password-reset emails
 - **Settings** — workspace-scoped company name, logo (base64 ≤50 KB), pairs-per-carton, business preferences, and seller device/session limits; shared workspace-admin caps are platform-controlled
 - **Profile** — name, language, theme and password controls for all users
 

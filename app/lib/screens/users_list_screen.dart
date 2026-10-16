@@ -224,6 +224,18 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
         ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
         return;
       }
+      if (!active) {
+        final confirmed = await ConfirmDialog.show(
+          context,
+          title: tr('disable_user', ref),
+          message: tr('confirm_disable_user_sessions', ref).replaceAll(
+            '%s',
+            user.displayName,
+          ),
+          isDestructive: true,
+        );
+        if (confirmed != true || !mounted) return;
+      }
       await ref
           .read(userManagementNotifierProvider.notifier)
           .toggleActive(user.id, active);
@@ -635,6 +647,35 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   // ── Reactivate user dialog ────────────────────────────────────────────────
 
   Future<void> _confirmReactivateUser(UserModel user) async {
+    if (user.assignedRouteIds.isNotEmpty) {
+      final confirmed = await ConfirmDialog.show(
+        context,
+        title: tr('reactivate', ref),
+        message: tr(
+          'confirm_reactivate_user',
+          ref,
+        ).replaceAll('%s', user.displayName),
+      );
+      if (confirmed != true) return;
+      try {
+        await ref
+            .read(userManagementNotifierProvider.notifier)
+            .toggleActive(user.id, true);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            successSnackBar(tr('saved_successfully', ref)),
+          );
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            errorSnackBar(tr(AppErrorMapper.key(error), ref)),
+          );
+        }
+      }
+      return;
+    }
+
     final routes = ref.read(routesProvider).value ?? [];
     final selectedRouteIds = <String>[];
     final selectedRouteNames = <String>[];

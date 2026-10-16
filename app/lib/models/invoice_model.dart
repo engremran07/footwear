@@ -21,8 +21,8 @@ import 'transaction_model.dart';
 //   linkedInvoiceId. Credit notes must be created within 30 days of original.
 //
 // INVOICE NUMBER:
-//   Format INV-YYYY-NNNN. Counter in settings/global.last_invoice_number.
-//   Incremented atomically via Firestore Transaction to prevent duplicates.
+//   Format INV-YYYY-NNNN. Counter in settings/{tenant_id}.last_invoice_number.
+//   Incremented atomically with invoice, ledger, balance, and stock writes.
 // =============================================================================
 class InvoiceModel {
   final String id;

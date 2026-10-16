@@ -1,6 +1,6 @@
 # ShoesERP System Deep Dive
 
-Last updated: 2026-10-15
+Last updated: 2026-10-17
 
 ## Backup and Restore
 
@@ -24,11 +24,21 @@ Invoice entry separates stock-backed sales, non-stock catalog sales, and cash re
 
 Cash receipt creation increments the tenant's receipt sequence in the same Firestore transaction that creates the receipt invoice and `cash_in` ledger entry and reduces `shop.balance`. Rules bind the invoice, transaction, amount, and resulting balance so none of those writes can succeed alone. Ledger-only `cash_in` remains a separate operation when no receipt document is required.
 
+Sale invoices link to their `cash_out` ledger row and, when money is received, to the matching `cash_in` row. The shop-balance delta must be written atomically with those records. These links are enforced for admins and sellers; seller rules additionally verify the exact outstanding-balance delta. Non-stock invoicing defaults to disabled when a workspace setting is absent and must be explicitly enabled. Transaction descriptions use a multiline field for notes.
+
+Sale and credit-note invoice numbers are allocated from `settings/{tenantId}.last_invoice_number` inside the same Firestore transaction as the business writes. Deterministic tenant-scoped invoice IDs make retries idempotent without a query-before-write race. Credit-note transactions also update the original invoice's cumulative credit amount and shop balance atomically. A credit-note void reverses both the stock restoration and that cumulative amount; sale voids restore sale stock and apply the selected refund mode.
+
 Workspace administrators configure English, Arabic, and Urdu invoice names, subtitles, addresses, contact and registration details, template, accent color, and visible fields. New invoices store a header snapshot, and seller-created snapshots are checked against the workspace settings. PDF generation uses the invoice snapshot so later branding edits do not alter existing documents. Voiding a non-stock sale does not restore inventory.
 
 ## Release Surfaces
 
 Web and Android builds use the same version from `app/pubspec.yaml` and `AppBrand`. Google Drive OAuth client IDs are deployment configuration, not source defaults; without them, file export remains available while Drive operations stay unavailable. Firebase Hosting must preserve no-cache headers for Flutter shell files and permit the Google static hosts required by Flutter web.
+
+## Workspace Management UX
+
+Workspace creation does not subscribe to a global user list. Editing an existing workspace loads active owner choices through a tenant-scoped user query. Full workspace edits are offered only to a platform super-admin with active access to that workspace; workspace admins retain only their seller-cap controls. Validation and provider failures always release the save state, keep the dialog open, and use the shared mapper's specific error rather than treating generic state errors as PDF failures. Android and web launcher icons are generated from the same source image, with no additional Android adaptive foreground inset.
+
+New workspace setup creates a tenant-scoped owner account after the workspace exists, then assigns that active `tenant_admin` as owner. Workspace user deactivation updates the account and revokes every active bounded session slot in one transaction. Administrators can separately revoke or block selected device registrations and terminate selected sessions from the workspace security registry. Access slots are per user; the same installation on another account does not consume that account's slots. Device/session enforcement remains client-side under the Spark architecture.
 
 ## Access Registration and Workspace UX
 
