@@ -153,19 +153,19 @@ void main() {
 
 # Run all tests
 
-flutter test -r expanded
+flutter test -r expanded --dart-define=use_arabic=true
 
 # Run with coverage
 
-flutter test --coverage
+flutter test --coverage --dart-define=use_arabic=true
 genhtml coverage/lcov.info -o coverage/html
 
 # Run specific Flutter test file
-flutter test test/unit/models/user_model_test.dart
+flutter test test/unit/models/user_model_test.dart --dart-define=use_arabic=true
 
 # Run widget tests
 
-flutter test test/widget/
+flutter test test/widget/ --dart-define=use_arabic=true
 
 # Firestore Rules Emulator suite (requires firebase-tools and npm dependencies)
 Push-Location tests/firestore-rules

@@ -28,6 +28,34 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.82',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📒',
+        text: {
+          AppLocale.en:
+              'Workspace administrators can manage supported invoices, receipts, credit notes, and audited transaction corrections with atomic shop-balance updates.',
+          AppLocale.ar:
+              'يمكن لمسؤولي مساحة العمل إدارة الفواتير والإيصالات والإشعارات الدائنة وتصحيحات المعاملات المسجلة للتدقيق، مع تحديث أرصدة المتاجر بشكل ذري.',
+          AppLocale.ur:
+              'ورک اسپیس ایڈمن معاون انوائسز، رسیدیں، کریڈٹ نوٹس اور آڈٹ شدہ ٹرانزیکشن اصلاحات کو دکان کے بیلنس کی ایٹمی اپ ڈیٹس کے ساتھ منظم کر سکتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🌐',
+        text: {
+          AppLocale.en:
+              'Arabic and Urdu text shaping and right-to-left layout are enabled for invoice and report PDF exports.',
+          AppLocale.ar:
+              'تم تفعيل تشكيل النص العربي والأردي وتخطيط الكتابة من اليمين إلى اليسار في ملفات PDF للفواتير والتقارير.',
+          AppLocale.ur:
+              'انوائس اور رپورٹ PDF ایکسپورٹس میں عربی اور اردو متن کی درست تشکیل اور دائیں سے بائیں ترتیب فعال ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.81',
     date: 'October 2026',
     items: [

@@ -50,7 +50,7 @@ Run before every commit touching Dart files:
 
 1. `flutter analyze lib --no-pub` → "No issues found!"
 
-2. `flutter test -r compact` → all pass
+2. `flutter test -r compact --dart-define=use_arabic=true` → all pass
 
 3. `grep -rn "\.collection('" app/lib/ | grep -v Collections\.` → zero matches
 

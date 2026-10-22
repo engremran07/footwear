@@ -133,11 +133,11 @@ Select-String -Path "app\pubspec.yaml","app\lib\core\constants\app_brand.dart" -
 
 flutter analyze lib --no-pub          # quote "No issues found!"
 dart analyze test/                    # quote "No issues found!"
-flutter test -r expanded              # quote "All N tests passed!"
+flutter test -r expanded --dart-define=use_arabic=true  # quote "All N tests passed!"
 
 # Step 3 — web build + hosting deploy
 
-$ErrorActionPreference='Continue'; flutter build web --release; Write-Host "EXIT: $LASTEXITCODE"
+$ErrorActionPreference='Continue'; flutter build web --release --dart-define=use_arabic=true; Write-Host "EXIT: $LASTEXITCODE"
 firebase deploy --only hosting        # quote "Deploy complete!"
 
 # Step 4 — APK build
@@ -145,7 +145,7 @@ firebase deploy --only hosting        # quote "Deploy complete!"
 $freeRamGB = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB
 Write-Host ("Free RAM before APK build: {0:N2} GB" -f $freeRamGB)
 if ($freeRamGB -lt 3.2) { throw "At least 3.2 GB free RAM is required before starting the APK build." }
-flutter build apk --release           # quote file size
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true  # quote file size
 
 # Step 5 — deploy Firestore (ALWAYS, not just on rules change)
 
@@ -269,7 +269,7 @@ final names = NameResolver(
 
 | Entry By blank for old/historical tx | Seller deactivated after tx; `where('active',isEqualTo:true)` excluded them | `allUsersExportProvider` has no active filter — covers all historical users |
 
-| Split-per-ABI APK not installed, wrong ABI file | build used the wrong artifact or install path | Use `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true` then `adb push` / `adb install --streaming -r` |
+| Split-per-ABI APK not installed, wrong ABI file | build used the wrong artifact or install path | Use `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true` then `adb push` / `adb install --streaming -r` |
 
 | Stale balance after dev flush | transactions deleted via console/CLI without updating shop.balance | Run `node dev_reset.js` from repo root after any manual flush |
 
@@ -335,7 +335,7 @@ grep -rn "FirebaseFirestore\|\.doc(\|\.collection(" app/lib/screens/
 
 # 5. Split-per-ABI release contract
 
-grep -rn "flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true" . --include="*.{yml,yaml,md,sh}"
+grep -rn "flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true" . --include="*.{yml,yaml,md,sh}"
 
 # Expected: release docs use the split-per-abi command and phone-storage install flow
 

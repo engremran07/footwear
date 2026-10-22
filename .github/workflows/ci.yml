@@ -69,7 +69,7 @@ jobs:
         run: cd app && flutter pub get
 
       - name: flutter test
-        run: cd app && flutter test -r expanded --coverage
+        run: cd app && flutter test -r expanded --coverage --dart-define=use_arabic=true
 
   hygiene:
     name: Code Hygiene Gates

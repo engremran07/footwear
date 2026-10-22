@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/firestore_pagination.dart';
-import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/shop_model.dart';
 import 'auth_provider.dart';
@@ -470,118 +469,140 @@ class ShopNotifier extends AsyncNotifier<void> {
 
   /// Admin-only: marks a shop as bad debt, writes off outstanding balance.
   Future<void> markAsBadDebt(String shopId) async {
-    final authUser = FirebaseAuth.instance.currentUser;
-    if (authUser == null) throw StateError('Not authenticated');
-    final me = await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(authUser.uid)
-        .get();
-    final role = (me.data()?['role'] as String? ?? '').trim();
-    if (!isPrivilegedRoleName(role)) {
+    final authUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final user = await ref.read(authUserProvider.future);
+    if (authUid.isEmpty || user == null || !user.active || user.id != authUid) {
+      throw StateError('An active user profile is required');
+    }
+    if (!user.isAdmin) {
       throw StateError('Only admin can mark bad debt');
     }
 
     final db = FirebaseFirestore.instance;
-    final tenantId = TenantScope.requireTenant(
-      (await ref.read(authUserProvider.future))?.tenantId,
-    );
-    final shopDoc = await db
-        .collection(Collections.customers)
-        .doc(shopId)
-        .get();
-    final balance = (shopDoc.data()?['balance'] as num?)?.toDouble() ?? 0;
-    if (balance <= 0) throw StateError('No outstanding balance to write off');
-
-    final batch = db.batch();
-
-    // Mark shop as bad debt
-    batch.update(db.collection(Collections.customers).doc(shopId), {
-      'bad_debt': true,
-      'bad_debt_amount': balance,
-      'bad_debt_date': Timestamp.now(),
-      'balance': 0.0,
-      'updated_at': Timestamp.now(),
-      'last_transaction_at': Timestamp.now(),
-      'last_transaction_type': 'write_off',
-      'last_transaction_amount': balance,
-    });
-
-    // Create write_off transaction
+    final tenantId = TenantScope.requireTenant(user.tenantId);
+    final normalizedShopId = shopId.trim();
+    if (normalizedShopId.isEmpty) {
+      throw ArgumentError('shopId must not be empty');
+    }
+    final shopRef = db.collection(Collections.customers).doc(normalizedShopId);
     final txRef = db.collection(Collections.transactions).doc();
-    batch.set(txRef, {
-      'tenant_id': tenantId,
-      'type': 'write_off',
-      'shop_id': shopId,
-      'shop_name': shopDoc.data()?['name'] ?? '',
-      'route_id': shopDoc.data()?['route_id'] ?? '',
-      'amount': balance,
-      'description': 'Bad debt write-off',
-      'items': <Map<String, dynamic>>[],
-      'created_by': authUser.uid,
-      'created_at': Timestamp.now(),
-      'deleted': false,
-    });
 
-    await batch.commit();
+    await db.runTransaction((transaction) async {
+      final shopDoc = await transaction.get(shopRef);
+      final shopData = shopDoc.data();
+      if (!shopDoc.exists ||
+          shopData == null ||
+          shopData['tenant_id'] != tenantId ||
+          shopData['balance'] is! num) {
+        throw StateError('Shop is outside the active workspace');
+      }
+      if (shopData['bad_debt'] == true) {
+        throw StateError('Shop is already marked as bad debt');
+      }
+      final balance = (shopData['balance'] as num).toDouble();
+      if (balance <= 0) {
+        throw StateError('No outstanding balance to write off');
+      }
+      final routeId = (shopData['route_id'] as String?)?.trim() ?? '';
+      if (routeId.isEmpty) {
+        throw StateError('Shop route is required for a financial write-off');
+      }
+      final now = Timestamp.now();
+
+      transaction.set(txRef, {
+        'tenant_id': tenantId,
+        'type': 'write_off',
+        'shop_id': normalizedShopId,
+        'shop_name': shopData['name'] ?? '',
+        'route_id': routeId,
+        'amount': balance,
+        'description': 'Bad debt write-off',
+        'items': <Map<String, dynamic>>[],
+        'created_by': user.id,
+        'created_at': now,
+        'deleted': false,
+      });
+      transaction.update(shopRef, {
+        'bad_debt': true,
+        'bad_debt_amount': balance,
+        'bad_debt_date': now,
+        'balance': 0.0,
+        'updated_at': now,
+        'last_transaction_at': now,
+        'last_transaction_type': 'write_off',
+        'last_transaction_amount': balance,
+        'last_transaction_id': txRef.id,
+      });
+    });
   }
 
   /// Admin-only: recovers a bad-debt shop, restoring its written-off balance.
   Future<void> recoverBadDebt(String shopId) async {
-    final authUser = FirebaseAuth.instance.currentUser;
-    if (authUser == null) throw StateError('Not authenticated');
-    final me = await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(authUser.uid)
-        .get();
-    final role = (me.data()?['role'] as String? ?? '').trim();
-    if (!isPrivilegedRoleName(role)) {
+    final authUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final user = await ref.read(authUserProvider.future);
+    if (authUid.isEmpty || user == null || !user.active || user.id != authUid) {
+      throw StateError('An active user profile is required');
+    }
+    if (!user.isAdmin) {
       throw StateError('Only admin can recover bad debt');
     }
 
     final db = FirebaseFirestore.instance;
-    final tenantId = TenantScope.requireTenant(
-      (await ref.read(authUserProvider.future))?.tenantId,
-    );
-    final shopDoc = await db
-        .collection(Collections.customers)
-        .doc(shopId)
-        .get();
-    final isBadDebt = shopDoc.data()?['bad_debt'] as bool? ?? false;
-    if (!isBadDebt) throw StateError('Shop is not marked as bad debt');
-    final amount =
-        (shopDoc.data()?['bad_debt_amount'] as num?)?.toDouble() ?? 0;
-
-    final batch = db.batch();
-
-    // Restore shop: un-flag bad debt, restore balance
-    batch.update(db.collection(Collections.customers).doc(shopId), {
-      'bad_debt': false,
-      'bad_debt_amount': 0,
-      'bad_debt_date': null,
-      'balance': amount,
-      'updated_at': Timestamp.now(),
-      'last_transaction_at': Timestamp.now(),
-      'last_transaction_type': 'cash_out',
-      'last_transaction_amount': amount,
-    });
-
-    // Create recovery transaction to record the reversal
+    final tenantId = TenantScope.requireTenant(user.tenantId);
+    final normalizedShopId = shopId.trim();
+    if (normalizedShopId.isEmpty) {
+      throw ArgumentError('shopId must not be empty');
+    }
+    final shopRef = db.collection(Collections.customers).doc(normalizedShopId);
     final txRef = db.collection(Collections.transactions).doc();
-    batch.set(txRef, {
-      'tenant_id': tenantId,
-      'type': 'cash_out',
-      'shop_id': shopId,
-      'shop_name': shopDoc.data()?['name'] ?? '',
-      'route_id': shopDoc.data()?['route_id'] ?? '',
-      'amount': amount,
-      'description': 'Bad debt recovered — balance restored',
-      'items': <Map<String, dynamic>>[],
-      'created_by': authUser.uid,
-      'created_at': Timestamp.now(),
-      'deleted': false,
-    });
 
-    await batch.commit();
+    await db.runTransaction((transaction) async {
+      final shopDoc = await transaction.get(shopRef);
+      final shopData = shopDoc.data();
+      if (!shopDoc.exists ||
+          shopData == null ||
+          shopData['tenant_id'] != tenantId ||
+          shopData['balance'] is! num) {
+        throw StateError('Shop is outside the active workspace');
+      }
+      if (shopData['bad_debt'] != true) {
+        throw StateError('Shop is not marked as bad debt');
+      }
+      final amount = (shopData['bad_debt_amount'] as num?)?.toDouble() ?? 0;
+      if (amount <= 0) {
+        throw StateError('Bad-debt amount must be greater than zero');
+      }
+      final routeId = (shopData['route_id'] as String?)?.trim() ?? '';
+      if (routeId.isEmpty) {
+        throw StateError('Shop route is required for a financial recovery');
+      }
+      final now = Timestamp.now();
+
+      transaction.set(txRef, {
+        'tenant_id': tenantId,
+        'type': 'cash_out',
+        'shop_id': normalizedShopId,
+        'shop_name': shopData['name'] ?? '',
+        'route_id': routeId,
+        'amount': amount,
+        'description': 'Bad debt recovered — balance restored',
+        'items': <Map<String, dynamic>>[],
+        'created_by': user.id,
+        'created_at': now,
+        'deleted': false,
+      });
+      transaction.update(shopRef, {
+        'bad_debt': false,
+        'bad_debt_amount': 0,
+        'bad_debt_date': null,
+        'balance': FieldValue.increment(amount),
+        'updated_at': now,
+        'last_transaction_at': now,
+        'last_transaction_type': 'cash_out',
+        'last_transaction_amount': amount,
+        'last_transaction_id': txRef.id,
+      });
+    });
   }
 
   Future<void> deactivate(String id, String routeId) async {

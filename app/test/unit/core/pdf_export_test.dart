@@ -47,8 +47,8 @@ void main() {
     );
 
     expect(summary.totalDebit, 100);
-    expect(summary.totalCredit, 45);
-    expect(summary.closingBalance, 75);
+    expect(summary.totalCredit, 52);
+    expect(summary.closingBalance, 68);
   });
 
   test('paginateItems splits a list into page-sized chunks', () {
@@ -197,6 +197,178 @@ void main() {
     ).firstMatch(latin1.decode(bytes, allowInvalid: true));
     expect(pageCount, isNotNull);
     expect(int.parse(pageCount!.group(1)!), greaterThan(1));
+  });
+
+  test('PDF test builds enable the Arabic shaping algorithm', () {
+    expect(const bool.fromEnvironment('use_arabic'), isTrue);
+  });
+
+  test('Arabic and Urdu text builds across shared PDF report paths', () async {
+    final date = Timestamp.fromDate(DateTime(2026, 10, 22));
+    const arabic = 'تقرير الحساب';
+    const urdu = 'یہ اردو رپورٹ ٹیسٹ ہے';
+    Map<String, String> labelsFor(AppLocale locale, List<String> keys) => {
+      for (final key in keys) key: trRead(key, locale),
+    };
+    void expectPdf(List<int> bytes) {
+      expect(bytes, isNotEmpty);
+      expect(latin1.decode(bytes.take(5).toList()), '%PDF-');
+    }
+
+    final tablePdf = await buildPdfTable(
+      title: arabic,
+      headers: const ['المتجر', 'دکان'],
+      rows: [
+        [arabic, urdu],
+      ],
+      locale: AppLocale.ar,
+    );
+    expectPdf(tablePdf);
+
+    final transaction = TransactionModel(
+      id: 'rtl-transaction',
+      shopId: 'rtl-shop',
+      shopName: urdu,
+      routeId: 'route-rtl',
+      type: TransactionModel.typeCashOut,
+      amount: 25,
+      createdBy: 'seller-rtl',
+      createdAt: date,
+      description: '$arabic — $urdu',
+    );
+    const ledgerKeys = [
+      'account_statement',
+      'report_date',
+      'generated_by',
+      'date',
+      'description',
+      'debit',
+      'credit',
+      'running_balance',
+      'net_payable',
+      'total_entries',
+      'page',
+      'opening_balance',
+    ];
+    final ledgerPdf = await buildPdfLedger(
+      shopName: urdu,
+      companyName: arabic,
+      openingBalance: 10,
+      transactions: [transaction],
+      labels: labelsFor(AppLocale.ur, ledgerKeys),
+      locale: AppLocale.ur,
+    );
+    expectPdf(ledgerPdf);
+
+    const sellerReportKeys = [
+      'seller_report',
+      'report_date',
+      'seller',
+      'route',
+      'inventory',
+      'stock_received',
+      'stock_sold',
+      'stock_remaining',
+      'shops',
+      'shop',
+      'revenue',
+      'outstanding',
+      'total',
+      'pairs',
+    ];
+    final sellerPdf = await buildPdfSellerReport(
+      sellerName: urdu,
+      sellerPhone: '+923001234567',
+      routeName: arabic,
+      shops: [
+        const SellerReportShop(
+          name: urdu,
+          totalPairsSold: 12,
+          totalRevenue: 50,
+          outstandingBalance: 25,
+        ),
+      ],
+      stockReceived: 24,
+      stockSold: 12,
+      stockRemaining: 12,
+      labels: labelsFor(AppLocale.ar, sellerReportKeys),
+      locale: AppLocale.ar,
+      companyName: arabic,
+    );
+    expectPdf(sellerPdf);
+
+    final invoicePdf = await generateInvoicePdf(
+      invoice: InvoiceModel(
+        id: 'rtl-invoice',
+        invoiceNumber: 'INV-RTL-1',
+        type: InvoiceModel.typeSale,
+        shopId: 'rtl-shop',
+        shopName: urdu,
+        items: [
+          const TransactionItem(
+            variantId: 'rtl-variant',
+            sku: 'RTL-1',
+            productName: '$arabic — $urdu',
+            size: '42',
+            color: 'أسود',
+            qty: 1,
+            unitPrice: 25,
+            subtotal: 25,
+          ),
+        ],
+        subtotal: 25,
+        total: 25,
+        amountReceived: 0,
+        outstandingAmount: 25,
+        status: InvoiceModel.statusIssued,
+        createdBy: 'seller-rtl',
+        createdAt: date,
+        updatedAt: date,
+        headerSnapshot: const {
+          'name_en': 'Footwear',
+          'name_ar': 'شركة الأحذية',
+          'name_ur': 'جوتوں کی کمپنی',
+          'company_name': 'Footwear',
+          'visible_fields': [],
+        },
+      ),
+      companyName: 'Footwear',
+      locale: AppLocale.ur,
+    );
+    expectPdf(invoicePdf);
+
+    const multiShopKeys = [
+      'report_date',
+      'generated_by',
+      'total_entries',
+      'net_payable',
+      'name',
+      'route',
+      'debit',
+      'credit',
+      'running_balance',
+      'date',
+      'description',
+      'page',
+      'opening_balance',
+    ];
+    final multiShopPdf = await buildPdfMultiShopLedger(
+      title: arabic,
+      subtitle: urdu,
+      companyName: arabic,
+      generatedBy: urdu,
+      sections: [
+        MultiShopLedgerSection(
+          shopName: urdu,
+          routeLabel: arabic,
+          openingBalance: 10,
+          transactions: [transaction],
+        ),
+      ],
+      labels: labelsFor(AppLocale.ur, multiShopKeys),
+      locale: AppLocale.ur,
+    );
+    expectPdf(multiShopPdf);
   });
 
   test(

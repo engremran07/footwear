@@ -560,6 +560,13 @@ service cloud.firestore {
             shopBalanceChangedBy(transactionData.type == 'cash_out'
               ? transactionData.amount
               : -transactionData.amount)) ||
+          (!('invoice_id' in transactionData) &&
+            transactionData.type == 'write_off' &&
+            resource.data.get('bad_debt', false) != true &&
+            resource.data.balance == transactionData.amount &&
+            request.resource.data.bad_debt == true &&
+            request.resource.data.bad_debt_amount == transactionData.amount &&
+            request.resource.data.balance == 0) ||
           (invoiceId is string && invoiceId != '' &&
             (exists(invoicePath)
               ? (invoiceBefore is map && invoiceAfter is map &&
@@ -607,14 +614,22 @@ service cloud.firestore {
     }
 
     function standaloneTransactionCreateIsLinked(txId, txData, shopBefore, shopAfter) {
-      let delta = txData.type == 'cash_out'
+      let cashDelta = txData.type == 'cash_out'
         ? txData.amount
         : -txData.amount;
-      return txData.type in ['cash_in', 'cash_out'] &&
-        shopAfter.last_transaction_id == txId &&
+      return shopAfter.last_transaction_id == txId &&
         shopAfter.last_transaction_type == txData.type &&
         shopAfter.last_transaction_amount == txData.amount &&
-        shopBalanceMatchesDataDelta(shopBefore, shopAfter, delta);
+        (
+          (txData.type in ['cash_in', 'cash_out'] &&
+            shopBalanceMatchesDataDelta(shopBefore, shopAfter, cashDelta)) ||
+          (txData.type == 'write_off' &&
+            shopBefore.get('bad_debt', false) != true &&
+            shopBefore.balance == txData.amount &&
+            shopAfter.bad_debt == true &&
+            shopAfter.bad_debt_amount == txData.amount &&
+            shopAfter.balance == 0)
+        );
     }
 
     function newInvoiceTransactionIsLinked(
@@ -816,16 +831,16 @@ service cloud.firestore {
         transactionBefore.amount is number &&
         transactionBefore.amount > 0 &&
         !('invoice_id' in transactionBefore) &&
-        transactionBefore.deleted != true &&
-        transactionAfter.deleted == true &&
-        transactionAfter.deleted_by == request.auth.uid &&
-        transactionAfter.deleted_at == request.time &&
-        transactionAfter.updated_at == request.time &&
+        transactionBefore.get('deleted', false) != true &&
+        transactionAfter.get('deleted', false) == true &&
+        transactionAfter.get('deleted_by', '') == request.auth.uid &&
+        transactionAfter.get('deleted_at', null) == request.time &&
+        transactionAfter.get('updated_at', null) == request.time &&
         transactionAfter.diff(transactionBefore).affectedKeys().hasOnly([
           'deleted', 'deleted_at', 'deleted_by', 'updated_at'
         ]) &&
         shopBefore.balance is number &&
-        shopAfter.last_balance_correction_transaction_id == txId &&
+        shopAfter.get('last_balance_correction_transaction_id', '') == txId &&
         shopAfter.balance is number &&
         shopAfter.balance >= shopBefore.balance + reversalDelta - 0.01 &&
         shopAfter.balance <= shopBefore.balance + reversalDelta + 0.01 &&
@@ -835,6 +850,89 @@ service cloud.firestore {
             !('last_transaction_type' in shopAfter) &&
             !('last_transaction_amount' in shopAfter) &&
             !('last_transaction_id' in shopAfter)));
+    }
+
+    function adminTransactionEditMatchesData(
+      txId,
+      shopId,
+      transactionBefore,
+      transactionAfter,
+      shopBefore,
+      shopAfter
+    ) {
+      let oldDelta = transactionBefore.type == 'cash_out'
+        ? transactionBefore.amount
+        : -transactionBefore.amount;
+      let newDelta = transactionAfter.type == 'cash_out'
+        ? transactionAfter.amount
+        : -transactionAfter.amount;
+      let expectedBalance = shopBefore.balance - oldDelta + newDelta;
+      let cachedId = shopBefore.get('last_transaction_id', '');
+      return transactionBefore.shop_id == shopId &&
+        transactionBefore.type in ['cash_in', 'cash_out'] &&
+        transactionBefore.amount is number &&
+        transactionBefore.amount > 0 &&
+        transactionBefore.get('deleted', false) != true &&
+        !('invoice_id' in transactionBefore) &&
+        transactionAfter.shop_id == shopId &&
+        transactionAfter.type in ['cash_in', 'cash_out'] &&
+        transactionAfter.amount is number &&
+        transactionAfter.amount > 0 &&
+        transactionAfter.get('deleted', false) != true &&
+        !('invoice_id' in transactionAfter) &&
+        transactionAfter.diff(transactionBefore).affectedKeys().hasAny([
+          'amount', 'type', 'created_at'
+        ]) &&
+        shopAfter.get('last_balance_correction_transaction_id', '') == txId &&
+        shopAfter.balance is number &&
+        shopAfter.balance >= expectedBalance - 0.01 &&
+        shopAfter.balance <= expectedBalance + 0.01 &&
+        (
+          (cachedId == txId &&
+            shopAfter.get('last_transaction_id', '') == txId &&
+            shopAfter.get('last_transaction_type', '') == transactionAfter.type &&
+            shopAfter.get('last_transaction_amount', -1) == transactionAfter.amount &&
+            shopAfter.get('last_transaction_at', null) ==
+              transactionAfter.get('created_at', null)) ||
+          (cachedId != txId &&
+            shopAfter.get('last_transaction_id', '') == cachedId &&
+            shopAfter.get('last_transaction_type', '') ==
+              shopBefore.get('last_transaction_type', '') &&
+            shopAfter.get('last_transaction_amount', -1) ==
+              shopBefore.get('last_transaction_amount', -1) &&
+            shopAfter.get('last_transaction_at', null) ==
+              shopBefore.get('last_transaction_at', null))
+        );
+    }
+
+    function adminTransactionEditMatchesTransaction(txId) {
+      let shopPath = /databases/$(database)/documents/customers/$(resource.data.shop_id);
+      let shopBefore = get(shopPath).data;
+      let shopAfter = getAfter(shopPath).data;
+      return adminTransactionEditMatchesData(
+        txId,
+        resource.data.shop_id,
+        resource.data,
+        request.resource.data,
+        shopBefore,
+        shopAfter
+      );
+    }
+
+    function adminTransactionCorrectionMatchesShop(txId, shopId) {
+      let transactionPath = /databases/$(database)/documents/transactions/$(txId);
+      let transactionBefore = get(transactionPath).data;
+      let transactionAfter = getAfter(transactionPath).data;
+      return transactionAfter.get('deleted', false) == true
+        ? adminTransactionSoftDeleteMatchesShop(txId, shopId)
+        : adminTransactionEditMatchesData(
+            txId,
+            shopId,
+            transactionBefore,
+            transactionAfter,
+            resource.data,
+            request.resource.data
+          );
     }
 
     function workspaceAllowsNonStockInvoices(tenantId) {
@@ -1215,7 +1313,8 @@ service cloud.firestore {
             'balance', 'last_transaction_at', 'last_transaction_type',
             'last_transaction_amount', 'last_transaction_id'
           ]) ||
-          (('last_transaction_id' in request.resource.data) &&
+          (request.resource.data.get('last_transaction_id', '') !=
+              resource.data.get('last_transaction_id', '') &&
             adminShopFinancialUpdateIsLinked(customerId)) ||
           (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'balance', 'updated_at',
@@ -1223,13 +1322,17 @@ service cloud.firestore {
               'last_transaction_at', 'last_transaction_type',
               'last_transaction_amount', 'last_transaction_id'
             ]) &&
-            request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['balance']) &&
-            request.resource.data.last_balance_correction_transaction_id is string &&
-            adminTransactionSoftDeleteMatchesShop(
-              request.resource.data.last_balance_correction_transaction_id,
-              customerId
-            ))
+              request.resource.data.get(
+                'last_balance_correction_transaction_id', ''
+              ) is string &&
+              (
+                adminTransactionCorrectionMatchesShop(
+                  request.resource.data.get(
+                    'last_balance_correction_transaction_id', ''
+                  ),
+                  customerId
+                )
+              ))
         ) ||
         (
           isSeller() &&
@@ -1303,10 +1406,10 @@ service cloud.firestore {
           isValidTransactionType(request.resource.data.type) &&
           (!request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['deleted', 'deleted_at', 'deleted_by']) ||
-            (request.resource.data.deleted == true &&
-              request.resource.data.deleted_by == request.auth.uid &&
-              request.resource.data.deleted_at == request.time &&
-              request.resource.data.updated_at == request.time &&
+            (request.resource.data.get('deleted', false) == true &&
+              request.resource.data.get('deleted_by', '') == request.auth.uid &&
+              request.resource.data.get('deleted_at', null) == request.time &&
+              request.resource.data.get('updated_at', null) == request.time &&
               request.resource.data.shop_id is string &&
               request.resource.data.shop_id != '' &&
               adminTransactionSoftDeleteMatchesShop(
@@ -1315,7 +1418,8 @@ service cloud.firestore {
               ))) &&
           (!request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'amount', 'type', 'created_at'
-          ]) || hasValidTransactionEditHistory()) &&
+          ]) || (hasValidTransactionEditHistory() &&
+            adminTransactionEditMatchesTransaction(txId))) &&
             (!('invoice_id' in resource.data &&
               resource.data.invoice_id is string &&
               resource.data.invoice_id != '') ||

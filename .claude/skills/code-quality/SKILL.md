@@ -24,7 +24,7 @@ and a recognizable catalog of vibe-coded debt signals.
 
 | `ref.read(provider)` inside `build()` | Stale data guarantee | `ref.watch(provider)` |
 
-| `flutter build apk --release --split-per-abi` | Correct Android release artifact path | `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true` |
+| `flutter build apk --release --split-per-abi` | Correct Android release artifact path | `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true` |
 
 | Hardcoded `Colors.red`, `Colors.white` | Theme breakage in dark mode | `AppBrand.errorFg`, `AppBrand.errorBg`, etc. |
 
@@ -77,7 +77,7 @@ cd app && flutter analyze lib --no-pub
 
 # 2. flutter test (all must pass)
 
-flutter test -r expanded
+flutter test -r expanded --dart-define=use_arabic=true
 
 # 3. No raw collection strings
 

@@ -40,8 +40,18 @@ Map<String, dynamic> buildWriteOffTransaction({
 }
 
 /// Returns the shop fields that should be updated during write-off.
-Map<String, dynamic> buildWriteOffShopUpdate({required double balance}) {
-  return {'bad_debt': true, 'bad_debt_amount': balance, 'balance': 0.0};
+Map<String, dynamic> buildWriteOffShopUpdate({
+  required double balance,
+  required String transactionId,
+}) {
+  return {
+    'bad_debt': true,
+    'bad_debt_amount': balance,
+    'balance': 0.0,
+    'last_transaction_type': 'write_off',
+    'last_transaction_amount': balance,
+    'last_transaction_id': transactionId,
+  };
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -106,7 +116,10 @@ void main() {
   // ── Shop update fields ────────────────────────────────────────────────────
 
   group('markAsBadDebt — shop document update fields', () {
-    final update = buildWriteOffShopUpdate(balance: 3200.0);
+    final update = buildWriteOffShopUpdate(
+      balance: 3200.0,
+      transactionId: 'write-off-1',
+    );
 
     test('bad_debt is set to true', () {
       expect(update['bad_debt'], isTrue);
@@ -118,6 +131,12 @@ void main() {
 
     test('balance is zeroed to 0.0', () {
       expect(update['balance'], 0.0);
+    });
+
+    test('write-off is linked from the shop last-transaction marker', () {
+      expect(update['last_transaction_id'], 'write-off-1');
+      expect(update['last_transaction_type'], 'write_off');
+      expect(update['last_transaction_amount'], 3200.0);
     });
   });
 

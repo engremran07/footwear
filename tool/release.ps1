@@ -29,8 +29,8 @@ $rootDir     = Split-Path -Parent $scriptDir
 $appDir      = Join-Path $rootDir "app"
 $pubspec     = Join-Path $appDir "pubspec.yaml"
 $releasesDir = Join-Path $rootDir "releases"
-$apkBuildCommand = "flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true"
-$webBuildCommand = "flutter build web --release"
+$apkBuildCommand = "flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true"
+$webBuildCommand = "flutter build web --release --dart-define=use_arabic=true"
 
 if (-not (Test-Path $pubspec)) {
   DIE "pubspec.yaml not found at $pubspec -- check repo layout."
@@ -141,7 +141,7 @@ try {
   # 3. Tests
   if (-not $SkipTests) {
     Step "flutter test"
-    DRY "flutter test test/unit --reporter=expanded"
+    DRY "flutter test test/unit --reporter=expanded --dart-define=use_arabic=true"
     if (-not $DryRun) { OK "All unit tests passed" }
   } else {
     WARN "Tests skipped (-SkipTests)"

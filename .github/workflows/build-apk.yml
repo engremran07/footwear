@@ -98,13 +98,14 @@ jobs:
         run: cd app && flutter analyze lib --no-pub
 
       - name: flutter test
-        run: cd app && flutter test -r expanded
+        run: cd app && flutter test -r expanded --dart-define=use_arabic=true
 
       - name: Build debug APK
         if: github.event.inputs.build_type == 'debug'
         env:
           GOOGLE_DRIVE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_SERVER_CLIENT_ID }}
         run: cd app && flutter build apk --debug \
+          --dart-define=use_arabic=true \
           --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID"
 
       - name: Build release APK (split-per-abi)
@@ -113,6 +114,7 @@ jobs:
           GOOGLE_DRIVE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_SERVER_CLIENT_ID }}
         run: cd app && flutter build apk --release --split-per-abi \
           --dart-define=USE_PLAY_INTEGRITY=true \
+          --dart-define=use_arabic=true \
           --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID"
 
       - name: Upload APK artifact

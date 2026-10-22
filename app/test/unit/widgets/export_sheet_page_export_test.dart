@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:footwear_erp/core/l10n/app_locale.dart';
+import 'package:footwear_erp/core/utils/pdf_export.dart';
 import 'package:footwear_erp/widgets/export_sheet.dart';
 
 void main() {
@@ -24,6 +26,31 @@ void main() {
     for (final imageBytes in pageImages) {
       expect(imageBytes, isNotEmpty);
     }
+  });
+
+  test('RTL PDF bytes are passed to the PNG page export path', () async {
+    expect(const bool.fromEnvironment('use_arabic'), isTrue);
+    final pdfBytes = await buildPdfTable(
+      title: 'تقرير اردو',
+      headers: const ['دکان'],
+      rows: const [
+        ['یہ اردو دکان ہے'],
+      ],
+      locale: AppLocale.ur,
+    );
+    final pagePng = await _makeTestPng(1, 1);
+    final exportedPages = await rasterizePdfPagesToPngs(
+      pdfBytes,
+      rasterizer: (sourcePdf, {dpi = 300}) async {
+        expect(sourcePdf, same(pdfBytes));
+        expect(String.fromCharCodes(sourcePdf.take(5)), '%PDF-');
+        expect(dpi, 300);
+        return [pagePng];
+      },
+    );
+
+    expect(exportedPages, hasLength(1));
+    expect(exportedPages.single, isNotEmpty);
   });
 }
 

@@ -47,8 +47,7 @@ import '../widgets/whatsapp_button.dart';
 //        → InvoiceNotifier.createSaleInvoice()
 //        → Creates invoice + cash_out tx + stock deduction atomically.
 //
-// Additionally: return of goods uses _showReturnDialog → _ReturnSheet
-//               → TransactionNotifier.createReturn()
+// Returns are handled only by invoice credit-note/void workflows.
 //
 // BAD DEBT: admin-only button in AppBar when balance > 0 && !shop.badDebt.
 //           → ShopNotifier.markAsBadDebt() → zeros balance, flags shop.
@@ -1450,24 +1449,20 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           canEdit:
                               !tx.deleted &&
                               !tx.editRequestPending &&
+                              tx.isStandaloneCashTransaction &&
                               (user?.isAdmin == true ||
                                   (user?.isSeller == true &&
-                                      user?.id == tx.createdBy &&
-                                      (tx.invoiceId == null ||
-                                          tx.invoiceId!.isEmpty) &&
-                                      (tx.type == TransactionModel.typeCashIn ||
-                                          tx.type ==
-                                              TransactionModel.typeCashOut))),
+                                      user?.id == tx.createdBy)),
                           canApproveEdit:
                               !tx.deleted &&
                               user?.isAdmin == true &&
+                              tx.isStandaloneCashTransaction &&
                               tx.editRequestPending,
                           canDelete:
                               !tx.deleted &&
                               user?.isAdmin == true &&
                               (tx.invoiceId == null || tx.invoiceId!.isEmpty) &&
-                              (tx.type == TransactionModel.typeCashIn ||
-                                  tx.type == TransactionModel.typeCashOut),
+                              tx.isStandaloneCashTransaction,
                           onEdit: () => _showEditTransactionDialog(tx),
                           onApproveEdit: () => _reviewEditRequest(tx, true),
                           onRejectEdit: () => _reviewEditRequest(tx, false),

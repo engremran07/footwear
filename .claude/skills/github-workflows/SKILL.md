@@ -142,17 +142,17 @@ Before every commit, ALL of the following must succeed and evidence quoted:
 
 | 3 | `dart analyze test/` | `No issues found!` |
 
-| 4 | `flutter test -r expanded` | `All N tests passed!` |
+| 4 | `flutter test -r expanded --dart-define=use_arabic=true` | `All N tests passed!` |
 
 | 5 | Hygiene gates 5a-5e | all zero results |
 
 | 6 | `markdownlint "**/*.md" --ignore node_modules --ignore "app/build" --ignore "functions/node_modules"` | zero output (exit 0) |
 
-| 7 | `flutter build web --release` | `EXIT: 0` |
+| 7 | `flutter build web --release --dart-define=use_arabic=true` | `EXIT: 0` |
 
 | 8 | `firebase deploy --only hosting` | `Deploy complete!` |
 
-| 9 | `flutter build apk --release` | file size quoted |
+| 9 | `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true` | file size quoted |
 
 | 10 | `firebase deploy --only firestore:rules,firestore:indexes` | `Deploy complete!` |
 

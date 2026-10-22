@@ -50,7 +50,7 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 15. Stock tracking and selling unit is DOZENS (1 dozen = 12 pairs). quantity_available
     in Firestore stores PAIRS for legacy compat. UI always shows and accepts dozens as
     primary, with optional extra pairs (0–11). Android release artifact path is
-    split-per-ABI: flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true.
+    split-per-ABI: flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true.
 16. Admin has no assigned_route_id — admin is the warehouse AND a field seller.
     Admin can own seller_inventory docs (seller_id = adminUid). isAdmin() in Firestore
     rules covers all admin operations including self-stock-allocation.
@@ -60,6 +60,9 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 18. All export/report name resolution MUST use `NameResolver` (`name_resolver.dart`).
     Never build ad-hoc uid→name maps. Never fall back to a raw UID string.
     Use `trRead()` with locale for all export string literals — no hardcoded English.
+    Every Flutter test, run, and build that can generate PDFs must pass
+    `--dart-define=use_arabic=true`; without it, the PDF package reorders RTL
+    text but does not shape Arabic-script letters.
 19. Every `ExportSheet.show()` call MUST provide `pdfBytesBuilder` when the data is a
     ledger, account statement, or seller report. The generic `buildPdfTable()` fallback
     is only acceptable for simple flat tables (inventory list, shops list). If the export
@@ -259,7 +262,7 @@ Never keep ambiguity-driven workaround code without explicit justification.
 | `if (user.isSeller && ...)` on stock source | Admin silently excluded | `sellerInventoryProvider(user.id)` for all |
 | `.where('deleted', isEqualTo: false)` | Pre-DI-01 docs excluded | Client-side `d.data()['deleted'] != true` |
 | `ref.read(provider)` in `build()` | Stale data guarantee | `ref.watch(provider)` |
-| ABI-split APK build command | Wrong split APK | `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true` |
+| ABI-split APK build command | Wrong split APK | `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true` |
 | Hardcoded `Colors.red`, `Colors.white` | Dark mode breakage | `AppBrand.errorFg`, `AppBrand.errorBg` |
 | Raw `SnackBar(content: Text(...))` | Unstyled SnackBar | `errorSnackBar()` / `successSnackBar()` |
 | `avoid_double_and_int_checks lint violation` in web build | Transitive dep locked to old `image`/`archive` by another pkg | Find blocking package; replace or upgrade it — see Chain 5 |

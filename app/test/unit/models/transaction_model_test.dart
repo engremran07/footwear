@@ -145,7 +145,12 @@ void main() {
 
       expect(writeOff.isWriteOff, isTrue);
       expect(writeOff.reducesBalance, isTrue);
-      expect(writeOff.balanceImpact, 0);
+      expect(writeOff.balanceImpact, -500.0);
+      expect(TransactionModel.isStandaloneCashType('cash_in'), isTrue);
+      expect(TransactionModel.isStandaloneCashType('cash_out'), isTrue);
+      expect(TransactionModel.isStandaloneCashType('return'), isFalse);
+      expect(TransactionModel.isStandaloneCashType('payment'), isFalse);
+      expect(TransactionModel.isStandaloneCashType('write_off'), isFalse);
     });
 
     test('hasItems is false for empty items', () {

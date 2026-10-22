@@ -62,7 +62,7 @@ English, Arabic (RTL), Urdu (RTL) — 372+ translation keys synced across all sc
 | Backend / Auth | Firebase (Firestore + Auth only) — zero Storage, zero Cloud Functions |
 | Design system | AppTokens, AppAnimations, AppSanitizer, AppInputFormatters |
 | Charts | fl_chart 1.2.0 (BarChart, LineChart, PieChart) |
-| PDF export | `pdf` package + `Isolate.run()` — Arabic + Urdu fonts |
+| PDF export | `pdf` package + `Isolate.run()` — Arabic shaping enabled with `--dart-define=use_arabic=true` |
 | Excel export | Custom xlsx writer (`excel_export.dart`) using `archive ^4.0.0` |
 | Print / Share | `printing` + share_plus 13.0.0 |
 | Image compression | `flutter_image_compress` (base64 logo) |
@@ -113,14 +113,14 @@ Place your `google-services.json` in `app/android/app/` (not committed — obtai
 
 ```bash
 cd app
-flutter run
+flutter run --dart-define=use_arabic=true
 ```
 
 ### Build release APK (split-per-ABI for phone delivery)
 
 ```bash
 cd app
-flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true
 # Output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 #         build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
 #         build/app/outputs/flutter-apk/app-x86_64-release.apk
@@ -139,7 +139,7 @@ adb install --streaming -r build/app/outputs/flutter-apk/app-arm64-v8a-release.a
 
 ```bash
 cd app
-flutter build web --release
+flutter build web --release --dart-define=use_arabic=true
 firebase deploy --only hosting
 ```
 
@@ -256,7 +256,7 @@ cd app
 flutter analyze lib --no-pub
 
 # All tests must pass
-flutter test -r expanded
+flutter test -r expanded --dart-define=use_arabic=true
 
 # No raw Firestore collection strings
 grep -rn "\.collection('" app/lib/ | grep -v "Collections\."
@@ -272,10 +272,10 @@ grep -rn "StateProvider\b" app/lib/ --include="*.dart"
 1. Atomic version bump or explicit version-sync verification: `app/pubspec.yaml` and `app/lib/core/constants/app_brand.dart` must match before release artifacts are built.
 2. `flutter analyze lib --no-pub` → quote exact final line.
 3. `dart analyze test/` → quote `No issues found!`.
-4. `flutter test -r expanded` → quote pass count.
-5. `flutter build web --release` → confirm `EXIT: $LASTEXITCODE` = 0.
+4. `flutter test -r expanded --dart-define=use_arabic=true` → quote pass count.
+5. `flutter build web --release --dart-define=use_arabic=true` → confirm `EXIT: $LASTEXITCODE` = 0.
 6. `firebase deploy --only hosting` after the web build.
-7. `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true` → quote the generated ABI APK path(s) and size(s).
+7. `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true` → quote the generated ABI APK path(s) and size(s).
 8. `firebase deploy --only firestore:rules,firestore:indexes` on every signoff, before commit/push is considered complete.
 9. `git log --oneline -5`, `git status --short`, and `git diff --stat HEAD` → confirm only expected local changes remain.
 10. `git add -A`, `git commit -m "type: summary — vX.Y.Z+N"`, and `git push` → quote commit hash and push output.

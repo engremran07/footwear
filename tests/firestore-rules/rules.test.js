@@ -25,6 +25,11 @@ let testEnv;
 function adminCtx(env) {
   return env.authenticatedContext('admin-uid', { email: 'admin@test.com' });
 }
+function tenantAdminCtx(env) {
+  return env.authenticatedContext('tenant-admin-uid', {
+    email: 'tenant-admin@test.com',
+  });
+}
 function sellerCtx(env) {
   return env.authenticatedContext('seller-uid', { email: 'seller@test.com' });
 }
@@ -1151,6 +1156,235 @@ describe('invoices collection', () => {
     await assertSucceeds(batch.commit());
   });
 
+  it('tenant admin can atomically create a partial sale with linked ledger rows', async () => {
+    await seedTenant();
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedShop('shop-1', { balance: 20 });
+    await seedSettings({ allow_non_stock_invoices: true });
+    const db = tenantAdminCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('tenant-admin-partial-sale');
+    const saleRef = db.collection('transactions').doc('tenant-admin-sale-out');
+    const paymentRef = db.collection('transactions').doc('tenant-admin-sale-in');
+    const batch = db.batch();
+    batch.set(invoiceRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      invoice_number: 'INV-2026-TENANT-ADMIN',
+      sale_transaction_id: saleRef.id,
+      payment_transaction_id: paymentRef.id,
+      type: 'sale',
+      fulfillment_mode: 'non_stock',
+      seller_inventory_deductions: {},
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      seller_id: 'tenant-admin-uid',
+      items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
+      subtotal: 100,
+      discount: 0,
+      total: 100,
+      amount_received: 25,
+    });
+    batch.set(saleRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      type: 'cash_out',
+      amount: 100,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: invoiceRef.id,
+      invoice_number: 'INV-2026-TENANT-ADMIN',
+    });
+    batch.set(paymentRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      type: 'cash_in',
+      amount: 25,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: invoiceRef.id,
+      invoice_number: 'INV-2026-TENANT-ADMIN',
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 95,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 100,
+      last_transaction_id: saleRef.id,
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('tenant admin can create a linked cash receipt and advance its sequence', async () => {
+    await seedTenant();
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedShop('shop-1', { balance: 100 });
+    await seedSettings();
+    const db = tenantAdminCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('tenant-admin-receipt');
+    const transactionRef = db.collection('transactions')
+      .doc('tenant-admin-receipt-tx');
+    const batch = db.batch();
+    batch.update(db.collection('settings').doc('tenant-1'), {
+      last_cash_receipt_number: 1,
+    });
+    batch.set(invoiceRef, {
+      created_by: 'tenant-admin-uid',
+      type: 'cash_receipt',
+      fulfillment_mode: 'none',
+      cash_receipt_transaction_id: transactionRef.id,
+      cash_receipt_sequence: 1,
+      invoice_number: 'REC-2026-0001',
+      shop_id: 'shop-1',
+      shop_name: 'Seed Shop',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      seller_id: 'tenant-admin-uid',
+      items: [],
+      subtotal: 0,
+      discount: 0,
+      total: 25,
+      amount_received: 25,
+      status: 'paid',
+    });
+    batch.set(transactionRef, {
+      created_by: 'tenant-admin-uid',
+      type: 'cash_in',
+      amount: 25,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      invoice_id: invoiceRef.id,
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 75,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_in',
+      last_transaction_amount: 25,
+      last_transaction_id: transactionRef.id,
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('tenant admin can create a linked credit note and return transaction', async () => {
+    await seedTenant();
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedShop('shop-1', { balance: 100 });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('invoices').doc('tenant-admin-original').set({
+        tenant_id: 'tenant-1',
+        shop_id: 'shop-1',
+        type: 'sale',
+        status: 'issued',
+        total: 100,
+        credit_note_total: 0,
+      });
+    });
+    const db = tenantAdminCtx(testEnv).firestore();
+    const batch = db.batch();
+    const originalRef = db.collection('invoices').doc('tenant-admin-original');
+    const creditRef = db.collection('invoices').doc('tenant-admin-credit');
+    const returnRef = db.collection('transactions').doc('tenant-admin-return');
+    batch.update(originalRef, { credit_note_total: 40 });
+    batch.set(creditRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      type: 'credit_note',
+      return_transaction_id: returnRef.id,
+      linked_invoice_id: originalRef.id,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      items: [{ variant_id: 'variant-1', qty: 1, unit_price: 40 }],
+      subtotal: 40,
+      discount: 0,
+      total: 40,
+      amount_received: 0,
+    });
+    batch.set(returnRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      type: 'return',
+      amount: 40,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: creditRef.id,
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 60,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'return',
+      last_transaction_amount: 40,
+      last_transaction_id: returnRef.id,
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('tenant admin can void a partial sale with its linked refund rows', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedShop('shop-1', { balance: 75 });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('invoices').doc('tenant-admin-void-sale').set({
+        tenant_id: 'tenant-1',
+        created_by: 'seller-uid',
+        type: 'sale',
+        status: 'partial',
+        invoice_number: 'INV-2026-TENANT-VOID',
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        total: 100,
+        amount_received: 25,
+        outstanding_amount: 75,
+      });
+    });
+
+    const db = tenantAdminCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('tenant-admin-void-sale');
+    const reversalRef = db.collection('transactions')
+      .doc('tenant-admin-void-return');
+    const refundRef = db.collection('transactions')
+      .doc('tenant-admin-void-refund');
+    const batch = db.batch();
+    batch.update(invoiceRef, {
+      status: 'void',
+      void_by: 'tenant-admin-uid',
+      void_at: new Date(),
+      updated_at: new Date(),
+    });
+    batch.set(reversalRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      type: 'return',
+      amount: 100,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: invoiceRef.id,
+    });
+    batch.set(refundRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      type: 'cash_out',
+      amount: 25,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: invoiceRef.id,
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 0,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 25,
+      last_transaction_id: refundRef.id,
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
   it('seller: cannot create a stock invoice without inventory deductions', async () => {
     await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
     await seedShop('shop-1');
@@ -1694,28 +1928,117 @@ describe('transactions collection', () => {
   it('admin: can correct financial fields with a matching append-only history entry', async () => {
     await seedUser('admin-uid', 'admin');
     const createdAt = new Date('2026-01-01T00:00:00.000Z');
+    await seedShop('shop-1', {
+      balance: -100,
+      last_transaction_id: 'tx-admin-edit-history',
+      last_transaction_type: 'cash_in',
+      last_transaction_amount: 100,
+      last_transaction_at: createdAt,
+    });
     await seedTransaction('tx-admin-edit-history', {
+      shop_id: 'shop-1',
       created_at: createdAt,
       description: 'Original entry',
     });
-    await assertSucceeds(
+    const db = adminCtx(testEnv).firestore();
+    const transaction = db.collection('transactions').doc('tx-admin-edit-history');
+    const batch = db.batch();
+    batch.update(transaction, {
+      amount: 120,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      edit_history: [{
+        previous_amount: 100,
+        previous_type: 'cash_in',
+        previous_created_at: createdAt,
+        previous_description: 'Original entry',
+        changed_by: 'admin-uid',
+        reason: 'Receipt amount correction',
+        changed_at: new Date(),
+      }],
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: -120,
+      last_balance_correction_transaction_id: transaction.id,
+      last_transaction_amount: 120,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('admin cannot correct a transaction without its atomic shop balance update', async () => {
+    await seedUser('admin-uid', 'admin');
+    const createdAt = new Date('2026-01-01T00:00:00.000Z');
+    await seedShop('shop-1', { balance: -100 });
+    await seedTransaction('tx-admin-edit-unlinked', {
+      shop_id: 'shop-1',
+      created_at: createdAt,
+    });
+    await assertFails(
       adminCtx(testEnv).firestore()
         .collection('transactions')
-        .doc('tx-admin-edit-history')
+        .doc('tx-admin-edit-unlinked')
         .update({
           amount: 120,
-          updated_at: new Date(),
+          updated_at: firebase.firestore.FieldValue.serverTimestamp(),
           edit_history: [{
             previous_amount: 100,
             previous_type: 'cash_in',
             previous_created_at: createdAt,
-            previous_description: 'Original entry',
+            previous_description: 'seed',
             changed_by: 'admin-uid',
             reason: 'Receipt amount correction',
             changed_at: new Date(),
           }],
         }),
     );
+  });
+
+  it('workspace admin can correct its tenant ledger and shop balance atomically', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedShop('shop-1', {
+      balance: -100,
+      last_transaction_id: 'tx-workspace-edit',
+      last_transaction_type: 'cash_in',
+      last_transaction_amount: 100,
+      last_transaction_at: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    await seedTransaction('tx-workspace-edit', {
+      created_by: 'seller-uid',
+      shop_id: 'shop-1',
+      tenant_id: 'tenant-1',
+      type: 'cash_in',
+      amount: 100,
+      created_at: new Date('2026-01-01T00:00:00.000Z'),
+      description: 'Original receipt',
+    });
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const transaction = db.collection('transactions').doc('tx-workspace-edit');
+    const batch = db.batch();
+
+    batch.update(transaction, {
+      amount: 120,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      edit_history: [{
+        previous_amount: 100,
+        previous_type: 'cash_in',
+        previous_created_at: new Date('2026-01-01T00:00:00.000Z'),
+        previous_description: 'Original receipt',
+        changed_by: 'tenant-admin-uid',
+        reason: 'Correct recorded receipt',
+        changed_at: new Date(),
+      }],
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: -120,
+      last_balance_correction_transaction_id: transaction.id,
+      last_transaction_at: new Date('2026-01-01T00:00:00.000Z'),
+      last_transaction_type: 'cash_in',
+      last_transaction_amount: 120,
+      last_transaction_id: transaction.id,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await assertSucceeds(batch.commit());
   });
 
   it('seller: cannot create a transaction with a foreign or missing tenant', async () => {
@@ -1780,6 +2103,140 @@ describe('transactions collection', () => {
       description: 'Updated workspace ledger row',
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
     }));
+  });
+
+  it('workspace admin can atomically write off bad debt with a linked ledger row', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedShop('shop-1', { balance: 500, bad_debt: false });
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const transaction = db.collection('transactions').doc('write-off-tx');
+    const batch = db.batch();
+
+    batch.set(transaction, {
+      shop_id: 'shop-1',
+      shop_name: 'Seed Shop',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      type: 'write_off',
+      amount: 500,
+      description: 'Bad debt write-off',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      bad_debt: true,
+      bad_debt_amount: 500,
+      bad_debt_date: firebase.firestore.FieldValue.serverTimestamp(),
+      balance: 0,
+      last_transaction_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_transaction_type: 'write_off',
+      last_transaction_amount: 500,
+      last_transaction_id: transaction.id,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('workspace admin cannot write off more than the exact shop balance', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedShop('shop-1', { balance: 500, bad_debt: false });
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const transaction = db.collection('transactions').doc('write-off-overstated');
+    const batch = db.batch();
+
+    batch.set(transaction, {
+      shop_id: 'shop-1',
+      shop_name: 'Seed Shop',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      type: 'write_off',
+      amount: 600,
+      description: 'Bad debt write-off',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      bad_debt: true,
+      bad_debt_amount: 600,
+      balance: 0,
+      last_transaction_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_transaction_type: 'write_off',
+      last_transaction_amount: 600,
+      last_transaction_id: transaction.id,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await assertFails(batch.commit());
+  });
+
+  it('workspace admin can recover bad debt with an atomic linked cash-out row', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedShop('shop-1', {
+      balance: 0,
+      bad_debt: true,
+      bad_debt_amount: 500,
+    });
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const transaction = db.collection('transactions').doc('bad-debt-recovery');
+    const batch = db.batch();
+
+    batch.set(transaction, {
+      shop_id: 'shop-1',
+      shop_name: 'Seed Shop',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      type: 'cash_out',
+      amount: 500,
+      description: 'Bad debt recovered',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      bad_debt: false,
+      bad_debt_amount: 0,
+      bad_debt_date: null,
+      balance: 500,
+      last_transaction_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 500,
+      last_transaction_id: transaction.id,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('workspace admin cannot create a standalone return or payment row', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedShop('shop-1', { balance: 100 });
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+
+    for (const type of ['return', 'payment']) {
+      const transaction = db.collection('transactions').doc(`standalone-${type}`);
+      const batch = db.batch();
+      batch.set(transaction, {
+        shop_id: 'shop-1',
+        shop_name: 'Seed Shop',
+        route_id: 'route-1',
+        tenant_id: 'tenant-1',
+        created_by: 'tenant-admin-uid',
+        type,
+        amount: 25,
+        description: 'Standalone non-cash row',
+        created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      batch.update(db.collection('customers').doc('shop-1'), {
+        balance: 75,
+        last_transaction_at: firebase.firestore.FieldValue.serverTimestamp(),
+        last_transaction_type: type,
+        last_transaction_amount: 25,
+        last_transaction_id: transaction.id,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await assertFails(batch.commit());
+    }
   });
 
   it('workspace admin cannot create an orphan or mismatched ledger row', async () => {

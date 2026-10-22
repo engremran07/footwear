@@ -146,6 +146,13 @@ void _requireLabelKeys(
   }
 }
 
+String _pdfLabel(Map<String, String> labels, String key, AppLocale locale) {
+  final explicit = labels[key]?.trim();
+  if (explicit != null && explicit.isNotEmpty) return explicit;
+  final localized = trRead(key, locale);
+  return localized == key ? '—' : localized;
+}
+
 String pdfCurrencyLabel(AppLocale locale, String currency) {
   final normalized = currency.trim().toUpperCase();
   if (locale == AppLocale.ar) {
@@ -345,7 +352,7 @@ Future<Uint8List> buildPdfTable({
                     ? pw.Alignment.centerLeft
                     : pw.Alignment.centerRight,
                 child: pw.Text(
-                  (pageLabel ?? 'Page %1 of %2')
+                  (pageLabel ?? trRead('page_x_of_y', locale))
                       .replaceAll('%1', '${page + 1}')
                       .replaceAll('%2', '$pageCount'),
                   style: const pw.TextStyle(
@@ -486,7 +493,7 @@ Future<Uint8List> buildPdfLedger({
       rows.add(
         _LedgerRow(
           date: '',
-          desc: labels['opening_balance'] ?? 'Opening Balance',
+          desc: _pdfLabel(labels, 'opening_balance', locale),
           entryBy: '',
           mode: '',
           cashIn: 0,
@@ -546,19 +553,19 @@ Future<Uint8List> buildPdfLedger({
         : [dateW, remarkW, amtW, amtW, balW];
     final headerLabels = showEntryBy
         ? [
-            labels['date'] ?? 'Date',
-            labels['description'] ?? 'Remark',
-            labels['entry_by'] ?? 'Entry By',
-            labels['debit'] ?? 'Cash Out',
-            labels['credit'] ?? 'Cash In',
-            labels['running_balance'] ?? 'Balance',
+            _pdfLabel(labels, 'date', locale),
+            _pdfLabel(labels, 'description', locale),
+            _pdfLabel(labels, 'entry_by', locale),
+            _pdfLabel(labels, 'debit', locale),
+            _pdfLabel(labels, 'credit', locale),
+            _pdfLabel(labels, 'running_balance', locale),
           ]
         : [
-            labels['date'] ?? 'Date',
-            labels['description'] ?? 'Remark',
-            labels['debit'] ?? 'Cash Out',
-            labels['credit'] ?? 'Cash In',
-            labels['running_balance'] ?? 'Balance',
+            _pdfLabel(labels, 'date', locale),
+            _pdfLabel(labels, 'description', locale),
+            _pdfLabel(labels, 'debit', locale),
+            _pdfLabel(labels, 'credit', locale),
+            _pdfLabel(labels, 'running_balance', locale),
           ];
     final colCount = colWidths.length;
 
@@ -622,13 +629,13 @@ Future<Uint8List> buildPdfLedger({
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
                         pw.Text(
-                          '${labels['report_date'] ?? 'Generated On'}: ${_fmtDate(now)}',
+                          '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(now)}',
                           style: ts(size: 8, color: PdfColors.grey700),
                           textDirection: dir,
                         ),
                         if (generatedBy.isNotEmpty)
                           pw.Text(
-                            '${labels['generated_by'] ?? 'By'}: ${_s(generatedBy)}',
+                            '${_pdfLabel(labels, 'generated_by', locale)}: ${_s(generatedBy)}',
                             style: ts(size: 8, color: PdfColors.grey700),
                             textDirection: dir,
                           ),
@@ -659,7 +666,7 @@ Future<Uint8List> buildPdfLedger({
                       ),
                     ),
                     child: pw.Text(
-                      '${labels['duration'] ?? 'Duration'}: ${_fmtDate(dateFrom)} — ${_fmtDate(dateTo)}',
+                      '${_pdfLabel(labels, 'duration', locale)}: ${_fmtDate(dateFrom)} — ${_fmtDate(dateTo)}',
                       style: ts(size: 8, color: PdfColors.grey700),
                       textDirection: dir,
                     ),
@@ -674,7 +681,7 @@ Future<Uint8List> buildPdfLedger({
                   child: pw.Row(
                     children: [
                       _summaryCell(
-                        label: labels['credit'] ?? 'Credit',
+                        label: _pdfLabel(labels, 'credit', locale),
                         value: _fmtAmtC(summary.totalCredit, currencyStr),
                         color: PdfColors.green800,
                         primaryFont: primaryFont,
@@ -686,7 +693,7 @@ Future<Uint8List> buildPdfLedger({
                         color: PdfColors.blue100,
                       ),
                       _summaryCell(
-                        label: labels['debit'] ?? 'Debit',
+                        label: _pdfLabel(labels, 'debit', locale),
                         value: _fmtAmtC(summary.totalDebit, currencyStr),
                         color: PdfColors.red800,
                         primaryFont: primaryFont,
@@ -698,7 +705,7 @@ Future<Uint8List> buildPdfLedger({
                         color: PdfColors.blue100,
                       ),
                       _summaryCell(
-                        label: labels['net_payable'] ?? 'Final Balance',
+                        label: _pdfLabel(labels, 'net_payable', locale),
                         value: _fmtAmtC(
                           summary.closingBalance.abs(),
                           currencyStr,
@@ -715,7 +722,7 @@ Future<Uint8List> buildPdfLedger({
                 ),
                 pw.SizedBox(height: 4),
                 pw.Text(
-                  '${labels['total_entries'] ?? 'Total entries'}: $entryCount',
+                  '${_pdfLabel(labels, 'total_entries', locale)}: $entryCount',
                   style: ts(size: 8, color: PdfColors.grey600),
                   textDirection: dir,
                 ),
@@ -747,7 +754,7 @@ Future<Uint8List> buildPdfLedger({
             pw.Align(
               alignment: pw.Alignment.centerRight,
               child: pw.Text(
-                '${labels['page'] ?? 'Page'} ${ctx.pageNumber} / ${ctx.pagesCount}',
+                '${_pdfLabel(labels, 'page', locale)} ${ctx.pageNumber} / ${ctx.pagesCount}',
                 style: ts(size: 7, color: PdfColors.grey500),
               ),
             ),
@@ -801,7 +808,7 @@ Future<Uint8List> buildPdfLedger({
                     ),
                   ),
                   child: pw.Text(
-                    labels['net_payable'] ?? 'Final Balance',
+                    _pdfLabel(labels, 'net_payable', locale),
                     style: pw.TextStyle(
                       fontSize: 9,
                       fontWeight: pw.FontWeight.bold,
@@ -1119,7 +1126,7 @@ Future<Uint8List> buildPdfSellerReport({
                         textDirection: _cellDir(companyName, dir),
                       ),
                       pw.Text(
-                        labels['seller_report'] ?? 'Seller Report',
+                        _pdfLabel(labels, 'seller_report', locale),
                         style: ts(
                           size: 13,
                           fw: pw.FontWeight.bold,
@@ -1132,7 +1139,7 @@ Future<Uint8List> buildPdfSellerReport({
                 ],
               ),
               pw.Text(
-                '${labels['report_date'] ?? 'Date'}: ${_fmtDate(DateTime.now())}',
+                '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(DateTime.now())}',
                 style: ts(size: 8, color: PdfColors.grey700),
                 textDirection: dir,
               ),
@@ -1156,7 +1163,7 @@ Future<Uint8List> buildPdfSellerReport({
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
-                      '${labels['seller'] ?? 'Seller'}: ${_s(sellerName)}',
+                      '${_pdfLabel(labels, 'seller', locale)}: ${_s(sellerName)}',
                       style: ts(size: 10, fw: pw.FontWeight.bold),
                       textDirection: _cellDir(sellerName, dir),
                     ),
@@ -1168,7 +1175,7 @@ Future<Uint8List> buildPdfSellerReport({
                   ],
                 ),
                 pw.Text(
-                  '${labels['route'] ?? 'Route'}: ${_s(routeName)}',
+                  '${_pdfLabel(labels, 'route', locale)}: ${_s(routeName)}',
                   style: ts(size: 10, fw: pw.FontWeight.bold),
                   textDirection: _cellDir(routeName, dir),
                 ),
@@ -1179,7 +1186,7 @@ Future<Uint8List> buildPdfSellerReport({
 
           // ── Stock Summary ──
           pw.Text(
-            labels['inventory'] ?? 'Stock Summary',
+            _pdfLabel(labels, 'inventory', locale),
             style: ts(size: 11, fw: pw.FontWeight.bold),
             textDirection: dir,
           ),
@@ -1187,7 +1194,7 @@ Future<Uint8List> buildPdfSellerReport({
           pw.Row(
             children: [
               _stockCard(
-                labels['stock_received'] ?? 'Received',
+                _pdfLabel(labels, 'stock_received', locale),
                 stockReceived.toString(),
                 PdfColors.blue50,
                 primaryFont: primaryFont,
@@ -1195,7 +1202,7 @@ Future<Uint8List> buildPdfSellerReport({
               ),
               pw.SizedBox(width: 8),
               _stockCard(
-                labels['stock_sold'] ?? 'Sold',
+                _pdfLabel(labels, 'stock_sold', locale),
                 stockSold.toString(),
                 PdfColors.orange50,
                 primaryFont: primaryFont,
@@ -1203,7 +1210,7 @@ Future<Uint8List> buildPdfSellerReport({
               ),
               pw.SizedBox(width: 8),
               _stockCard(
-                labels['stock_remaining'] ?? 'Remaining',
+                _pdfLabel(labels, 'stock_remaining', locale),
                 stockRemaining.toString(),
                 PdfColors.green50,
                 primaryFont: primaryFont,
@@ -1215,7 +1222,7 @@ Future<Uint8List> buildPdfSellerReport({
 
           // ── Customer Table ──
           pw.Text(
-            labels['shops'] ?? 'Shops',
+            _pdfLabel(labels, 'shops', locale),
             style: ts(size: 11, fw: pw.FontWeight.bold),
             textDirection: dir,
           ),
@@ -1223,10 +1230,10 @@ Future<Uint8List> buildPdfSellerReport({
           pw.TableHelper.fromTextArray(
             headers:
                 [
-                      labels['shop'] ?? 'Shop',
-                      labels['stock_sold'] ?? 'Sold (Pairs)',
-                      labels['revenue'] ?? 'Revenue',
-                      labels['outstanding'] ?? 'Outstanding',
+                      _pdfLabel(labels, 'shop', locale),
+                      _pdfLabel(labels, 'stock_sold', locale),
+                      _pdfLabel(labels, 'revenue', locale),
+                      _pdfLabel(labels, 'outstanding', locale),
                     ]
                     .map(
                       (h) => pw.Text(
@@ -1291,17 +1298,17 @@ Future<Uint8List> buildPdfSellerReport({
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
-                  '${labels['total'] ?? 'Total'} ${labels['stock_sold'] ?? 'Sold'}: $totalPairs ${labels['pairs'] ?? 'pairs'}',
+                  '${_pdfLabel(labels, 'total', locale)} ${_pdfLabel(labels, 'stock_sold', locale)}: $totalPairs ${_pdfLabel(labels, 'pairs', locale)}',
                   style: ts(size: 9, fw: pw.FontWeight.bold),
                   textDirection: dir,
                 ),
                 pw.Text(
-                  '${labels['revenue'] ?? 'Revenue'}: ${_fmtAmt(totalRevenue)}',
+                  '${_pdfLabel(labels, 'revenue', locale)}: ${_fmtAmt(totalRevenue)}',
                   style: ts(size: 9, fw: pw.FontWeight.bold),
                   textDirection: dir,
                 ),
                 pw.Text(
-                  '${labels['outstanding'] ?? 'Outstanding'}: ${_fmtAmt(totalOutstanding)}',
+                  '${_pdfLabel(labels, 'outstanding', locale)}: ${_fmtAmt(totalOutstanding)}',
                   style: ts(
                     size: 9,
                     fw: pw.FontWeight.bold,
@@ -2074,19 +2081,19 @@ Future<Uint8List> buildPdfMultiShopLedger({
         : [dateW, remarkW, amtW, amtW, balW];
     final headerLabels = showEntryBy
         ? [
-            labels['date'] ?? 'Date',
-            labels['description'] ?? 'Remark',
-            labels['entry_by'] ?? 'Entry By',
-            labels['debit'] ?? 'Debit',
-            labels['credit'] ?? 'Credit',
-            labels['running_balance'] ?? 'Balance',
+            _pdfLabel(labels, 'date', locale),
+            _pdfLabel(labels, 'description', locale),
+            _pdfLabel(labels, 'entry_by', locale),
+            _pdfLabel(labels, 'debit', locale),
+            _pdfLabel(labels, 'credit', locale),
+            _pdfLabel(labels, 'running_balance', locale),
           ]
         : [
-            labels['date'] ?? 'Date',
-            labels['description'] ?? 'Remark',
-            labels['debit'] ?? 'Debit',
-            labels['credit'] ?? 'Credit',
-            labels['running_balance'] ?? 'Balance',
+            _pdfLabel(labels, 'date', locale),
+            _pdfLabel(labels, 'description', locale),
+            _pdfLabel(labels, 'debit', locale),
+            _pdfLabel(labels, 'credit', locale),
+            _pdfLabel(labels, 'running_balance', locale),
           ];
     final colCount = colWidths.length;
 
@@ -2271,13 +2278,13 @@ Future<Uint8List> buildPdfMultiShopLedger({
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
                       pw.Text(
-                        '${labels['report_date'] ?? 'Generated'}: ${_fmtDate(now)}',
+                        '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(now)}',
                         style: ts(size: 8, color: PdfColors.grey700),
                         textDirection: dir,
                       ),
                       if (generatedBy.isNotEmpty)
                         pw.Text(
-                          '${labels['generated_by'] ?? 'By'}: ${_s(generatedBy)}',
+                          '${_pdfLabel(labels, 'generated_by', locale)}: ${_s(generatedBy)}',
                           style: ts(size: 8, color: PdfColors.grey700),
                           textDirection: dir,
                         ),
@@ -2301,7 +2308,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                 child: pw.Row(
                   children: [
                     _summaryCell(
-                      label: labels['total_entries'] ?? 'Total Shops',
+                      label: _pdfLabel(labels, 'total_entries', locale),
                       value: '$totalShops',
                       color: PdfColors.blue800,
                       primaryFont: primaryFont,
@@ -2313,7 +2320,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                       color: PdfColors.blue100,
                     ),
                     _summaryCell(
-                      label: labels['net_payable'] ?? 'Total Outstanding',
+                      label: _pdfLabel(labels, 'net_payable', locale),
                       value: balanceSummary,
                       color: PdfColors.blue800,
                       primaryFont: primaryFont,
@@ -2333,7 +2340,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
               child: pw.Row(
                 children: [
                   _coverCell(
-                    labels['name'] ?? 'Shop',
+                    _pdfLabel(labels, 'name', locale),
                     cnW,
                     dir,
                     primaryFont,
@@ -2341,7 +2348,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                     isHeader: true,
                   ),
                   _coverCell(
-                    labels['route'] ?? 'Route',
+                    _pdfLabel(labels, 'route', locale),
                     crW,
                     dir,
                     primaryFont,
@@ -2349,7 +2356,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                     isHeader: true,
                   ),
                   _coverCell(
-                    labels['debit'] ?? 'Debit',
+                    _pdfLabel(labels, 'debit', locale),
                     caW,
                     dir,
                     primaryFont,
@@ -2357,7 +2364,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                     isHeader: true,
                   ),
                   _coverCell(
-                    labels['credit'] ?? 'Credit',
+                    _pdfLabel(labels, 'credit', locale),
                     caW,
                     dir,
                     primaryFont,
@@ -2365,7 +2372,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                     isHeader: true,
                   ),
                   _coverCell(
-                    labels['running_balance'] ?? 'Balance',
+                    _pdfLabel(labels, 'running_balance', locale),
                     cbW,
                     dir,
                     primaryFont,
@@ -2386,7 +2393,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
             pw.Align(
               alignment: pw.Alignment.centerRight,
               child: pw.Text(
-                '${labels['page'] ?? 'Page'} ${ctx.pageNumber} / ${ctx.pagesCount}',
+                '${_pdfLabel(labels, 'page', locale)} ${ctx.pageNumber} / ${ctx.pagesCount}',
                 style: ts(size: 7, color: PdfColors.grey500),
               ),
             ),
@@ -2417,7 +2424,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
         shopRows.add(
           _LedgerRow(
             date: '',
-            desc: labels['opening_balance'] ?? 'Opening Balance',
+            desc: _pdfLabel(labels, 'opening_balance', locale),
             entryBy: '',
             mode: '',
             cashIn: 0,
@@ -2525,7 +2532,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                         textDirection: _cellDir(sec.shopName, dir),
                       ),
                       pw.Text(
-                        '${labels['report_date'] ?? 'Date'}: ${_fmtDate(now)}  |  ${labels['generated_by'] ?? 'By'}: ${_s(generatedBy)}',
+                        '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(now)}  |  ${_pdfLabel(labels, 'generated_by', locale)}: ${_s(generatedBy)}',
                         style: ts(size: 7, color: PdfColors.grey700),
                         textDirection: dir,
                       ),
@@ -2540,7 +2547,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                   child: pw.Row(
                     children: [
                       _summaryCell(
-                        label: labels['credit'] ?? 'Credit',
+                        label: _pdfLabel(labels, 'credit', locale),
                         value: _fmtAmtC(totalCredit, currencyLabel),
                         color: PdfColors.green800,
                         primaryFont: primaryFont,
@@ -2552,7 +2559,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                         color: PdfColors.blue100,
                       ),
                       _summaryCell(
-                        label: labels['debit'] ?? 'Debit',
+                        label: _pdfLabel(labels, 'debit', locale),
                         value: _fmtAmtC(totalDebit, currencyLabel),
                         color: PdfColors.red800,
                         primaryFont: primaryFont,
@@ -2564,7 +2571,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                         color: PdfColors.blue100,
                       ),
                       _summaryCell(
-                        label: labels['net_payable'] ?? 'Balance',
+                        label: _pdfLabel(labels, 'net_payable', locale),
                         value: _fmtAmtC(finalBal.abs(), currencyLabel),
                         color: finalBal >= 0
                             ? PdfColors.red800
@@ -2578,7 +2585,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                 ),
                 pw.SizedBox(height: 4),
                 pw.Text(
-                  '${labels['total_entries'] ?? 'Total entries'}: $entryCount',
+                  '${_pdfLabel(labels, 'total_entries', locale)}: $entryCount',
                   style: ts(size: 8, color: PdfColors.grey600),
                   textDirection: dir,
                 ),
@@ -2629,7 +2636,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
               pw.Align(
                 alignment: pw.Alignment.centerRight,
                 child: pw.Text(
-                  '${_s(sec.shopName)} — ${labels['page'] ?? 'Page'} ${ctx.pageNumber} / ${ctx.pagesCount}',
+                  '${_s(sec.shopName)} — ${_pdfLabel(labels, 'page', locale)} ${ctx.pageNumber} / ${ctx.pagesCount}',
                   style: ts(size: 7, color: PdfColors.grey500),
                 ),
               ),
@@ -2681,7 +2688,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                       ),
                     ),
                     child: pw.Text(
-                      labels['net_payable'] ?? 'Final Balance',
+                      _pdfLabel(labels, 'net_payable', locale),
                       style: pw.TextStyle(
                         fontSize: 9,
                         fontWeight: pw.FontWeight.bold,

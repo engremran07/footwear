@@ -100,6 +100,8 @@ class TransactionModel {
   static const String typeReturn = 'return';
   static const String typePayment = 'payment';
   static const String typeWriteOff = 'write_off';
+  static bool isStandaloneCashType(String type) =>
+      type == typeCashIn || type == typeCashOut;
   final String? saleType; // cash | credit
   final double amount;
   final String currency; // SAR | PKR
@@ -160,11 +162,11 @@ class TransactionModel {
   bool get isReturn => type == 'return';
   bool get isPayment => type == typePayment;
   bool get isWriteOff => type == typeWriteOff;
+  bool get isStandaloneCashTransaction => isStandaloneCashType(type);
   bool get reducesBalance => isCashIn || isReturn || isPayment || isWriteOff;
   double get balanceImpact => switch (type) {
     typeCashOut => amount,
-    typeCashIn || typeReturn || typePayment => -amount,
-    typeWriteOff => 0,
+    typeCashIn || typeReturn || typePayment || typeWriteOff => -amount,
     // Unknown legacy type from Firestore — treat as zero impact.
     // Do NOT throw here: balanceImpact is called in folding over all
     // transactions for PDF export; a throw crashes the entire export.

@@ -198,7 +198,7 @@ Seller:
 1. **AI agents MUST provide verifiable evidence for every signoff claim.**
   Acceptable evidence formats:
    - `flutter analyze lib --no-pub` → must quote exact final line
-   - `flutter test -r expanded` → must quote pass count line
+   - `flutter test -r expanded --dart-define=use_arabic=true` → must quote pass count line
    - APK build → must quote file size from output
    - Web build → must state `EXIT: 0`
   Claims of "tests pass" or "no issues" without quoting the actual tool
@@ -216,7 +216,10 @@ Seller:
   Never build ad-hoc `entryByMap` maps. Never fall back to a raw UID string.
   Fallback must always be a localized `unknown_user` label or `'—'`.
   Export string literals (page footers, column headers, timestamps) must
-  use `trRead()` with the current locale — no hardcoded English.
+  use `trRead()` with the current locale — no hardcoded English. Every Flutter
+  test, run, and build that can generate PDFs must pass
+  `--dart-define=use_arabic=true`; the `pdf` package otherwise performs bidi
+  reordering without Arabic-script letter shaping.
 
 1. **Every `ExportSheet.show()` call MUST provide `pdfBytesBuilder`** when the
   data is a ledger, account statement, or seller report. The generic
@@ -316,11 +319,11 @@ grep -E "^version:|appVersion|buildNumber" pubspec.yaml lib/core/constants/app_b
 flutter pub get
 flutter analyze lib --no-pub
 dart analyze test/
-flutter test -r expanded
-flutter build web --release
+flutter test -r expanded --dart-define=use_arabic=true
+flutter build web --release --dart-define=use_arabic=true
 firebase deploy --only hosting
 # Split-per-ABI Android APKs (canonical phone-delivery artifact set)
-flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true
 cd ..
 firebase deploy --only firestore:rules,firestore:indexes
 git log --oneline -5
@@ -375,7 +378,7 @@ Evidence required: `No issues found!`
 #### Step 4 — All tests green
 
 ```powershell
-flutter test -r expanded
+flutter test -r expanded --dart-define=use_arabic=true
 ```
 
 Evidence required: quote `All N tests passed!` with N count
@@ -407,7 +410,7 @@ Evidence required: zero output (exit 0)
 
 ```powershell
 $ErrorActionPreference='Continue'
-cd app; flutter build web --release
+cd app; flutter build web --release --dart-define=use_arabic=true
 Write-Host "EXIT: $LASTEXITCODE"
 ```
 
@@ -426,7 +429,7 @@ Run only when Hosting deployment is explicitly authorized.
 #### Step 9 — APK release build
 
 ```powershell
-flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true
 ```
 
 Evidence required: quote the generated ABI APK path(s) and size(s), for example `Built build\app\outputs\flutter-apk\app-arm64-v8a-release.apk (XXmb)`.
@@ -513,6 +516,14 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-10-22 financial workflows and RTL PDF release — v3.9.82+708:
+
+- Workspace-admin transaction and invoice workflows now have regression coverage for standalone cash corrections, bad-debt write-off/recovery, sale invoices, receipts, credit notes, and voids. Financial rows remain linked to atomic shop-balance updates; invoice-linked transaction protections remain in place.
+- Arabic/Urdu PDF shaping is enabled for local Flutter run/test actions, CI, release scripts, and web/APK builds. PDF label fallbacks use localized keys, and image export continues to rasterize the same shaped PDF bytes.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 25.7s)`; `dart analyze test/`: `No issues found!`; Flutter tests: `01:14 +527: All tests passed!`; Firestore Rules Emulator: `117 passing (26s)`; Markdown lint and workflow YAML parsing completed without findings.
+- Web build `EXIT: 0`; Firebase Hosting deploy completed. Split APKs: ARMv7 30.3 MB, ARM64 31.9 MB, x86_64 33.4 MB. Rules/indexes deployed successfully. Production has 23 indexes and 2 field overrides not listed locally; deployment did not force-delete them.
+- ARM64 APK copied to `/sdcard/Download/app-arm64-v8a-release.apk` and installed on `R5GL22RGT9V` with `Success`; device reports versionName `3.9.82`, versionCode `3100908`. The app launched and the recent Flutter log filter showed no matching fatal or permission-denied entries; authenticated admin/seller workflow smoke tests were not performed.
 
 2026-10-22 custom access purge, workspace CRUD, and Rules hardening — v3.9.81+707:
 

@@ -40,7 +40,7 @@ Workspace creation does not wait for a global user list. Owner choices during ed
 ```bash
 flutter pub get
 flutter analyze lib --no-pub
-flutter run
+flutter run --dart-define=use_arabic=true
 ```
 
 Place `google-services.json` in `android/app/` before running (obtain from Firebase Console — gitignored).
@@ -56,11 +56,11 @@ Google Drive backup requires a Google OAuth web client and Android client for pa
 grep -E "^version:|appVersion|buildNumber" pubspec.yaml lib/core/constants/app_brand.dart
 
 # Web release
-flutter build web --release
+flutter build web --release --dart-define=use_arabic=true
 firebase deploy --only hosting
 
 # Release APK (split-per-ABI binaries for device delivery)
-flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true
 # Output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 #         build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
 #         build/app/outputs/flutter-apk/app-x86_64-release.apk
@@ -86,7 +86,7 @@ adb install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
 | Auth | Firebase Auth (email/password) via secondary `FirebaseApp` for user creation |
 | Design system | AppTokens, AppAnimations, AppSanitizer, AppInputFormatters |
 | Charts | fl_chart 1.2.0 (BarChart, LineChart, PieChart) |
-| Exports (PDF) | `pdf` package + `Isolate.run()` — Arabic + Urdu fonts |
+| Exports (PDF) | `pdf` package + `Isolate.run()` — Arabic shaping enabled with `--dart-define=use_arabic=true` |
 | Exports (Excel) | Custom xlsx writer (`excel_export.dart`) using `archive ^4.0.0` |
 | Print / Share | `printing` + share_plus 13.0.0 (`SharePlus.instance.share(ShareParams(...))`) |
 | Image compression | `flutter_image_compress` (base64 logo ≤50 KB) |
@@ -234,19 +234,19 @@ grep -E "^version:|appVersion|buildNumber" pubspec.yaml lib/core/constants/app_b
 flutter analyze lib --no-pub
 
 # 3 — All tests green (quote pass count)
-flutter test -r expanded
+flutter test -r expanded --dart-define=use_arabic=true
 
 # 4 — No StateProvider
 grep -rn "StateProvider\b" lib/ --include="*.dart"
 
 # 5 — Web (confirm EXIT: $LASTEXITCODE = 0)
-flutter build web --release
+flutter build web --release --dart-define=use_arabic=true
 
 # 6 — Hosting deploy
 firebase deploy --only hosting
 
 # 7 — APK (quote file size)
-flutter build apk --release
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true
 
 # 8 — Firestore deploy (run from repo root)
 # firebase deploy --only firestore:rules,firestore:indexes

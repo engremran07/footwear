@@ -38,12 +38,12 @@ grep -E "^version:|appVersion|buildNumber" pubspec.yaml lib/core/constants/app_b
 
 # Web first, because Hosting is part of the shared release surface.
 
-flutter build web --release
+flutter build web --release --dart-define=use_arabic=true
 firebase deploy --only hosting
 
 # Split-per-ABI APK set — canonical phone-delivery artifact set.
 
-flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true
 
 # Output locations:
 
@@ -271,11 +271,11 @@ jobs:
       - name: Analyze
         run: cd app && flutter analyze lib --no-pub
       - name: Test
-        run: cd app && flutter test -r expanded
+        run: cd app && flutter test -r expanded --dart-define=use_arabic=true
       - name: Build web
-        run: cd app && flutter build web --release
+        run: cd app && flutter build web --release --dart-define=use_arabic=true
       - name: Build APK
-        run: cd app && flutter build apk --release
+        run: cd app && flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true
 
 ```
 
