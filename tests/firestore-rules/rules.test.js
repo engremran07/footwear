@@ -1505,7 +1505,12 @@ describe('tenant destructive operations', () => {
       const docId = collection === 'settings' || collection === 'tenants'
         ? 'tenant-1'
         : `delete-target-${collection}`;
-      await assertSucceeds(db.collection(collection).doc(docId).delete());
+      const deletion = db.collection(collection).doc(docId).delete();
+      if (collection === 'transactions') {
+        await assertFails(deletion);
+      } else {
+        await assertSucceeds(deletion);
+      }
     }
   });
 });
@@ -1578,6 +1583,73 @@ describe('transactions collection', () => {
     }
   });
 
+  it('seller can query assigned-shop transactions in created-at order', async () => {
+    await seedUser('seller-uid', 'seller', true, {
+      assigned_route_ids: ['route-1'],
+    });
+    await seedShop('shop-1');
+    await seedTransaction('tx-shop-read', {
+      type: 'cash_in',
+      created_at: new Date(),
+    });
+
+    const transactions = await sellerCtx(testEnv).firestore()
+      .collection('transactions')
+      .where('tenant_id', '==', 'tenant-1')
+      .where('shop_id', '==', 'shop-1')
+      .orderBy('created_at', 'desc')
+      .get();
+
+    assert.strictEqual(transactions.size, 1);
+    assert.strictEqual(transactions.docs[0].id, 'tx-shop-read');
+  });
+
+  it('seller can sort transactions for assigned routes by created-at', async () => {
+    await seedUser('seller-uid', 'seller', true, {
+      assigned_route_ids: ['route-1'],
+    });
+    await seedTransaction('tx-route-old', {
+      created_at: new Date('2026-10-17T08:00:00.000Z'),
+    });
+    await seedTransaction('tx-route-new', {
+      created_at: new Date('2026-10-18T08:00:00.000Z'),
+    });
+
+    const transactions = await sellerCtx(testEnv).firestore()
+      .collection('transactions')
+      .where('tenant_id', '==', 'tenant-1')
+      .where('route_id', 'in', ['route-1'])
+      .orderBy('created_at', 'desc')
+      .get();
+
+    assert.deepStrictEqual(
+      transactions.docs.map((doc) => doc.id),
+      ['tx-route-new', 'tx-route-old'],
+    );
+  });
+
+  it('workspace admins can sort tenant transactions by created-at', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedTransaction('tx-tenant-old', {
+      created_at: new Date('2026-10-17T08:00:00.000Z'),
+    });
+    await seedTransaction('tx-tenant-new', {
+      created_at: new Date('2026-10-18T08:00:00.000Z'),
+    });
+
+    const transactions = await testEnv.authenticatedContext('tenant-admin-uid')
+      .firestore()
+      .collection('transactions')
+      .where('tenant_id', '==', 'tenant-1')
+      .orderBy('created_at', 'desc')
+      .get();
+
+    assert.deepStrictEqual(
+      transactions.docs.map((doc) => doc.id),
+      ['tx-tenant-new', 'tx-tenant-old'],
+    );
+  });
+
   it('seller: cannot delete transactions', async () => {
     await seedUser('seller-uid', 'seller');
     // Seed a transaction doc first
@@ -1594,7 +1666,8 @@ describe('transactions collection', () => {
     );
   });
 
-  it('selected super-admin: can delete transactions in active tenant', async () => {
+  it('selected super-admin: can soft-delete transactions with linked balance reversal', async () => {
+    await seedShop('shop-1', { balance: 100 });
     await seedUser('platform-delete-tx-uid', 'super_admin', true, {
       active_workspace_id: 'tenant-1',
       active_workspace_reason: 'Approved workspace cleanup',
@@ -1602,19 +1675,110 @@ describe('transactions collection', () => {
     });
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().collection('transactions').doc('tx1').set({
-        seller_id: 'seller-uid',
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        created_by: 'seller-uid',
         amount: 100,
-        type: 'cash_in',
+        type: 'cash_out',
         tenant_id: 'tenant-1',
+        deleted: false,
       });
     });
+    const db = testEnv.authenticatedContext('platform-delete-tx-uid').firestore();
+    const batch = db.batch();
+    batch.update(db.collection('transactions').doc('tx1'), {
+      deleted: true,
+      deleted_by: 'platform-delete-tx-uid',
+      deleted_at: firebase.firestore.FieldValue.serverTimestamp(),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 0,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_balance_correction_transaction_id: 'tx1',
+    });
     await assertSucceeds(
-      testEnv.authenticatedContext('platform-delete-tx-uid')
-        .firestore()
-        .collection('transactions')
-        .doc('tx1')
-        .delete(),
+      batch.commit(),
     );
+  });
+
+  it('prevents all transaction hard deletes', async () => {
+    await seedUser('platform-delete-tx-uid', 'super_admin', true, {
+      active_workspace_id: 'tenant-1',
+      active_workspace_reason: 'Approved workspace cleanup',
+      active_workspace_selected_at: new Date(),
+    });
+    await seedTransaction('tx1');
+    await assertFails(
+      testEnv.authenticatedContext('platform-delete-tx-uid')
+        .firestore().collection('transactions').doc('tx1').delete(),
+    );
+  });
+
+  it('workspace admin can soft-delete a non-invoice transaction with atomic balance reversal', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedShop('shop-1', {
+      balance: 100,
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 100,
+      last_transaction_id: 'tx1',
+    });
+    await seedTransaction('tx1', {
+      type: 'cash_out',
+      amount: 100,
+      deleted: false,
+    });
+
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const batch = db.batch();
+    batch.update(db.collection('transactions').doc('tx1'), {
+      deleted: true,
+      deleted_by: 'tenant-admin-uid',
+      deleted_at: firebase.firestore.FieldValue.serverTimestamp(),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 0,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_balance_correction_transaction_id: 'tx1',
+      last_transaction_at: firebase.firestore.FieldValue.delete(),
+      last_transaction_type: firebase.firestore.FieldValue.delete(),
+      last_transaction_amount: firebase.firestore.FieldValue.delete(),
+      last_transaction_id: firebase.firestore.FieldValue.delete(),
+    });
+
+    await assertSucceeds(batch.commit());
+    const shop = await db.collection('customers').doc('shop-1').get();
+    assert.strictEqual('last_transaction_id' in shop.data(), false);
+  });
+
+  it('seller cannot soft-delete a transaction or reverse its balance', async () => {
+    await seedUser('seller-uid', 'seller');
+    await seedShop('shop-1', { balance: 100 });
+    await seedTransaction('tx1', {
+      type: 'cash_out',
+      amount: 100,
+      deleted: false,
+    });
+
+    const db = sellerCtx(testEnv).firestore();
+    const batch = db.batch();
+    batch.update(db.collection('transactions').doc('tx1'), {
+      deleted: true,
+      deleted_by: 'seller-uid',
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 0,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_transaction_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 100,
+      last_transaction_id: 'tx1',
+    });
+
+    await assertFails(batch.commit());
   });
 
   it('seller: cannot update amount without atomic shop balance correction', async () => {
@@ -1847,6 +2011,94 @@ describe('device and session slot rules', () => {
         });
     });
   }
+
+  it('workspace admins can pair unlimited devices while active sessions stay capped', async () => {
+    await seedTenant({ requireDevicePairing: true });
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedWorkspaceAdminPolicy();
+
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const userRef = db.collection('users').doc('tenant-admin-uid');
+    const deviceIds = Array.from({ length: 12 }, (_, index) =>
+      `installation-${index}-uuid`);
+
+    for (const deviceId of deviceIds) {
+      await assertSucceeds(
+        userRef.collection('device_registrations').doc(`device_${deviceId}`).set(
+          deviceData(0, {
+            user_id: 'tenant-admin-uid',
+            slot_id: `device_${deviceId}`,
+            slot_number: 0,
+            device_id: deviceId,
+            status: 'active',
+          }),
+        ),
+      );
+    }
+
+    for (let slot = 0; slot < 2; slot++) {
+      await assertSucceeds(
+        userRef.collection('sessions').doc(`slot_${slot}`).set(
+          sessionData(slot, {
+            user_id: 'tenant-admin-uid',
+            device_slot_id: `device_${deviceIds[slot]}`,
+            device_id: deviceIds[slot],
+          }),
+        ),
+      );
+    }
+    await assertFails(
+      userRef.collection('sessions').doc('slot_2').set(
+        sessionData(2, {
+          user_id: 'tenant-admin-uid',
+          device_slot_id: `device_${deviceIds[2]}`,
+          device_id: deviceIds[2],
+        }),
+      ),
+    );
+  });
+
+  it('seller can auto-approve a pending device after pairing is disabled', async () => {
+    await seedTenant({ requireDevicePairing: false, maxDevicesAllowed: 1 });
+    await seedUser('seller-uid', 'seller');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('users').doc('seller-uid')
+        .collection('device_registrations').doc('slot_0')
+        .set(deviceData(0, { status: 'pending' }));
+    });
+
+    await assertSucceeds(
+      sellerCtx(testEnv).firestore()
+        .collection('users').doc('seller-uid')
+        .collection('device_registrations').doc('slot_0')
+        .update({
+          status: 'active',
+          last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
+          app_version: 'test',
+        }),
+    );
+  });
+
+  it('seller cannot auto-approve a pending device while pairing is enabled', async () => {
+    await seedTenant({ requireDevicePairing: true, maxDevicesAllowed: 1 });
+    await seedUser('seller-uid', 'seller');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('users').doc('seller-uid')
+        .collection('device_registrations').doc('slot_0')
+        .set(deviceData(0, { status: 'pending' }));
+    });
+
+    await assertFails(
+      sellerCtx(testEnv).firestore()
+        .collection('users').doc('seller-uid')
+        .collection('device_registrations').doc('slot_0')
+        .update({
+          status: 'active',
+          last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
+          app_version: 'test',
+        }),
+    );
+  });
 
   it('workspace admin can disable and re-enable a seller while revoking sessions', async () => {
     await seedAccessUsers();
@@ -2474,7 +2726,7 @@ describe('device and session slot rules', () => {
     );
   });
 
-  it('workspace admins use the platform-wide access cap, not seller caps', async () => {
+  it('workspace admins have unlimited devices but use the platform session cap', async () => {
     await seedTenant({ maxDevicesAllowed: 1, maxActiveSessionsAllowed: 1 });
     await seedUser('tenant-admin-uid', 'tenant_admin');
     await seedUser('platform-uid', 'super_admin');
@@ -2487,28 +2739,37 @@ describe('device and session slot rules', () => {
       });
     const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
     const userRef = db.collection('users').doc('tenant-admin-uid');
-    for (let slot = 0; slot < 3; slot++) {
+    for (let slot = 0; slot < 12; slot++) {
+      const deviceId = `installation-${slot}-unique`;
       await assertSucceeds(
-        userRef.collection('device_registrations').doc(`slot_${slot}`).set(
-          deviceData(slot, { user_id: 'tenant-admin-uid' }),
+        userRef.collection('device_registrations').doc(`device_${deviceId}`).set(
+          deviceData(0, {
+            user_id: 'tenant-admin-uid',
+            slot_id: `device_${deviceId}`,
+            device_id: deviceId,
+          }),
         ),
       );
     }
-    await assertFails(
-      userRef.collection('device_registrations').doc('slot_3').set(
-        deviceData(3, { user_id: 'tenant-admin-uid' }),
-      ),
-    );
     for (let slot = 0; slot < 2; slot++) {
+      const deviceId = `installation-${slot}-unique`;
       await assertSucceeds(
         userRef.collection('sessions').doc(`slot_${slot}`).set(
-          sessionData(slot, { user_id: 'tenant-admin-uid' }),
+          sessionData(slot, {
+            user_id: 'tenant-admin-uid',
+            device_slot_id: `device_${deviceId}`,
+            device_id: deviceId,
+          }),
         ),
       );
     }
     await assertFails(
       userRef.collection('sessions').doc('slot_2').set(
-        sessionData(2, { user_id: 'tenant-admin-uid' }),
+        sessionData(2, {
+          user_id: 'tenant-admin-uid',
+          device_slot_id: 'device_installation-2-unique',
+          device_id: 'installation-2-unique',
+        }),
       ),
     );
   });

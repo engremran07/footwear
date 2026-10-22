@@ -48,6 +48,59 @@ void main() {
     });
   });
 
+  group('SessionAccessPolicy.canAutoApprovePendingDevice', () {
+    test(
+      'auto-approves when pairing is off and the slot is within capacity',
+      () {
+        expect(
+          SessionAccessPolicy.canAutoApprovePendingDevice(
+            pairingRequired: false,
+            slotNumber: 1,
+            maxDevicesAllowed: 3,
+            occupiedDeviceCount: 3,
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test('keeps approval required while workspace pairing is enabled', () {
+      expect(
+        SessionAccessPolicy.canAutoApprovePendingDevice(
+          pairingRequired: true,
+          slotNumber: 1,
+          maxDevicesAllowed: 3,
+          occupiedDeviceCount: 2,
+        ),
+        isFalse,
+      );
+    });
+
+    test('rejects a pending slot outside the configured device cap', () {
+      expect(
+        SessionAccessPolicy.canAutoApprovePendingDevice(
+          pairingRequired: false,
+          slotNumber: 3,
+          maxDevicesAllowed: 3,
+          occupiedDeviceCount: 4,
+        ),
+        isFalse,
+      );
+    });
+
+    test('rejects auto-approval when occupied slots exceed a reduced cap', () {
+      expect(
+        SessionAccessPolicy.canAutoApprovePendingDevice(
+          pairingRequired: false,
+          slotNumber: 1,
+          maxDevicesAllowed: 2,
+          occupiedDeviceCount: 3,
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('SessionAccessPolicy.currentForDevice', () {
     final now = DateTime.utc(2026, 10, 3, 12);
 
@@ -310,6 +363,25 @@ void main() {
           deviceId: 'device-a',
         ),
         'slot_4',
+      );
+    });
+
+    test('accepts installation-keyed workspace-admin device slots', () {
+      final registeredSession = session(
+        id: 'session-slot-1',
+        status: 'active',
+        lastSeenAt: now,
+        expiresAt: now.add(const Duration(hours: 1)),
+        deviceSlotId: 'device_installation-id-1234',
+        slotNumber: 1,
+      );
+
+      expect(
+        SessionAccessPolicy.deviceSlotIdForSession(
+          registeredSession,
+          deviceId: 'device-a',
+        ),
+        'device_installation-id-1234',
       );
     });
 

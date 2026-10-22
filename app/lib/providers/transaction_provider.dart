@@ -711,30 +711,84 @@ class TransactionNotifier extends AsyncNotifier<void> {
     if (txId.trim().isEmpty) {
       throw ArgumentError('txId must not be empty');
     }
+    await _runWriteGuard(() async {
+      final user = await ref.read(authUserProvider.future);
+      if (user == null || !user.active || !user.isAdmin) {
+        throw StateError('Active workspace administrator access is required.');
+      }
+      final tenantId = TenantScope.requireTenant(user.tenantId);
+      if (deletedBy.trim() != user.id) {
+        throw StateError('Transaction deletion actor does not match.');
+      }
 
-    final db = FirebaseFirestore.instance;
-    final batch = db.batch();
-    final now = Timestamp.now();
+      final db = FirebaseFirestore.instance;
+      final transactionRef = db
+          .collection(Collections.transactions)
+          .doc(txId.trim());
+      final snapshot = await transactionRef.get();
+      final data = snapshot.data();
+      if (!snapshot.exists || data == null) {
+        throw StateError('Transaction not found.');
+      }
+      if (data['tenant_id'] != tenantId) {
+        throw StateError('Transaction is outside the active workspace.');
+      }
+      if (data['deleted'] == true) return;
+      if ((data['invoice_id'] as String?)?.trim().isNotEmpty == true) {
+        throw StateError(
+          'Invoice-linked transactions cannot be deleted. Void or credit the invoice instead.',
+        );
+      }
+      final storedType = data['type'] as String? ?? '';
+      final storedAmount = (data['amount'] as num?)?.toDouble() ?? 0;
+      if ((storedType != TransactionModel.typeCashIn &&
+              storedType != TransactionModel.typeCashOut) ||
+          storedAmount <= 0 ||
+          storedAmount != amount ||
+          storedType != type) {
+        throw StateError(
+          'Transaction changed or is not deletable. Refresh and retry.',
+        );
+      }
+      final storedShopId = (data['shop_id'] as String?)?.trim() ?? '';
+      if (storedShopId.isEmpty || storedShopId != shopId?.trim()) {
+        throw StateError('Transaction shop does not match.');
+      }
+      final shopRef = db.collection(Collections.customers).doc(storedShopId);
+      final shopSnapshot = await shopRef.get();
+      final shopData = shopSnapshot.data();
+      if (!shopSnapshot.exists ||
+          shopData == null ||
+          shopData['tenant_id'] != tenantId) {
+        throw StateError('Transaction shop is outside the active workspace.');
+      }
 
-    // Soft-delete: preserve audit trail, never hard-delete
-    batch.update(db.collection(Collections.transactions).doc(txId), {
-      'deleted': true,
-      'deleted_at': now,
-      'deleted_by': deletedBy.trim(),
-      'updated_at': now,
-    });
-
-    if (shopId != null && shopId.isNotEmpty) {
-      // Reverse: cash_out added to balance, so subtract; cash_in subtracted, so add
-      final reversalDelta = type == 'cash_out' ? -amount : amount;
-      batch.update(db.collection(Collections.customers).doc(shopId), {
-        'balance': FieldValue.increment(reversalDelta),
-        'updated_at': now,
-        'last_transaction_at': now,
+      final reversalDelta = storedType == TransactionModel.typeCashOut
+          ? -storedAmount
+          : storedAmount;
+      final batch = db.batch();
+      batch.update(transactionRef, {
+        'deleted': true,
+        'deleted_at': FieldValue.serverTimestamp(),
+        'deleted_by': user.id,
+        'updated_at': FieldValue.serverTimestamp(),
       });
-    }
-
-    await _commit(batch);
+      final shopUpdate = <String, dynamic>{
+        'balance': FieldValue.increment(reversalDelta),
+        'updated_at': FieldValue.serverTimestamp(),
+        'last_balance_correction_transaction_id': txId.trim(),
+      };
+      if (shopData['last_transaction_id'] == txId.trim()) {
+        shopUpdate.addAll({
+          'last_transaction_at': FieldValue.delete(),
+          'last_transaction_type': FieldValue.delete(),
+          'last_transaction_amount': FieldValue.delete(),
+          'last_transaction_id': FieldValue.delete(),
+        });
+      }
+      batch.update(shopRef, shopUpdate);
+      await _commit(batch);
+    });
   }
 
   /// Creates a return transaction: reduces what the customer owes and optionally

@@ -1,19 +1,20 @@
 class AccessUsageSummary {
   static const int maximumSlotsPerUser = 10;
 
-  final int maxDevicesAllowed;
+  final int? maxDevicesAllowed;
   final int registeredDevices;
   final int maxActiveSessionsAllowed;
   final int activeSessions;
 
   factory AccessUsageSummary({
-    required int maxDevicesAllowed,
+    required int? maxDevicesAllowed,
     required int registeredDevices,
     required int maxActiveSessionsAllowed,
     required int activeSessions,
   }) {
-    if (maxDevicesAllowed < 1 ||
-        maxDevicesAllowed > maximumSlotsPerUser ||
+    if ((maxDevicesAllowed != null &&
+            (maxDevicesAllowed < 1 ||
+                maxDevicesAllowed > maximumSlotsPerUser)) ||
         maxActiveSessionsAllowed < 1 ||
         maxActiveSessionsAllowed > maximumSlotsPerUser) {
       throw ArgumentError('Access limits must be between 1 and 10.');
@@ -36,14 +37,16 @@ class AccessUsageSummary {
     required this.activeSessions,
   });
 
-  int get availableDeviceSlots =>
-      (maxDevicesAllowed - registeredDevices).clamp(0, maxDevicesAllowed);
+  int get availableDeviceSlots => maxDevicesAllowed == null
+      ? 0
+      : (maxDevicesAllowed! - registeredDevices).clamp(0, maxDevicesAllowed!);
 
   int get availableSessionSlots => (maxActiveSessionsAllowed - activeSessions)
       .clamp(0, maxActiveSessionsAllowed);
 
-  int get overLimitDeviceCount =>
-      (registeredDevices - maxDevicesAllowed).clamp(0, registeredDevices);
+  int get overLimitDeviceCount => maxDevicesAllowed == null
+      ? 0
+      : (registeredDevices - maxDevicesAllowed!).clamp(0, registeredDevices);
 
   int get overLimitSessionCount =>
       (activeSessions - maxActiveSessionsAllowed).clamp(0, activeSessions);

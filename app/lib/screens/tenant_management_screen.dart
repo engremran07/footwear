@@ -275,17 +275,24 @@ class _TenantManagementScreenState
                     ),
                   ),
                   const SizedBox(height: 12),
-                  SwitchListTile.adaptive(
-                    value: _requireDevicePairing,
-                    onChanged: (value) =>
-                        setState(() => _requireDevicePairing = value),
-                    title: Text(tr('require_device_pairing', ref)),
+                  StatefulBuilder(
+                    builder: (context, setPairingState) =>
+                        SwitchListTile.adaptive(
+                          value: _requireDevicePairing,
+                          onChanged: (value) => setPairingState(
+                            () => _requireDevicePairing = value,
+                          ),
+                          title: Text(tr('require_device_pairing', ref)),
+                        ),
                   ),
-                  SwitchListTile.adaptive(
-                    value: _allowAdminResetOnly,
-                    onChanged: (value) =>
-                        setState(() => _allowAdminResetOnly = value),
-                    title: Text(tr('admin_reset_only', ref)),
+                  StatefulBuilder(
+                    builder: (context, setResetState) =>
+                        SwitchListTile.adaptive(
+                          value: _allowAdminResetOnly,
+                          onChanged: (value) =>
+                              setResetState(() => _allowAdminResetOnly = value),
+                          title: Text(tr('admin_reset_only', ref)),
+                        ),
                   ),
                   if (existing != null) ...[
                     const SizedBox(height: 12),
@@ -492,6 +499,15 @@ class _TenantManagementScreenState
                                 '/tenants/${tenant.id}/security',
                               ),
                               icon: const Icon(Icons.phonelink_lock_outlined),
+                            ),
+                          if (currentUser?.isTenantAdmin == true ||
+                              (currentUser?.isSuperAdmin == true &&
+                                  currentUser?.activeWorkspaceId == tenant.id))
+                            IconButton(
+                              tooltip: tr('paired_devices_title', ref),
+                              onPressed: () =>
+                                  context.push('/tenants/${tenant.id}/devices'),
+                              icon: const Icon(Icons.devices_outlined),
                             ),
                           if (canEditTenant(tenant))
                             IconButton(

@@ -28,6 +28,45 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.80',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📱',
+        text: {
+          AppLocale.en:
+              'Workspace admins can pair unlimited devices while their concurrent sessions remain capped by the platform policy.',
+          AppLocale.ar:
+              'يمكن لمسؤولي مساحة العمل ربط عدد غير محدود من الأجهزة مع بقاء الجلسات المتزامنة خاضعة لحد سياسة المنصة.',
+          AppLocale.ur:
+              'ورک اسپیس ایڈمن لامحدود ڈیوائسز جوڑ سکتے ہیں، جبکہ بیک وقت سیشنز پلیٹ فارم پالیسی کی حد میں رہیں گے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔎',
+        text: {
+          AppLocale.en:
+              'A paired-device list shows the account email, device model, app version, and Android version.',
+          AppLocale.ar:
+              'تعرض قائمة الأجهزة المقترنة بريد الحساب وطراز الجهاز وإصدار التطبيق وإصدار أندرويد.',
+          AppLocale.ur:
+              'جوڑی گئی ڈیوائسز کی فہرست اکاؤنٹ ای میل، ڈیوائس ماڈل، ایپ ورژن اور اینڈرائیڈ ورژن دکھاتی ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📒',
+        text: {
+          AppLocale.en:
+              'Workspace admins can correct standalone cash transactions with an audited balance reversal; invoice-linked entries stay protected.',
+          AppLocale.ar:
+              'يمكن لمسؤولي مساحة العمل تصحيح معاملات النقد المستقلة مع عكس الرصيد وتسجيله، وتبقى القيود المرتبطة بالفواتير محمية.',
+          AppLocale.ur:
+              'ورک اسپیس ایڈمن آڈٹ شدہ بیلنس ریورسل کے ساتھ الگ نقد ٹرانزیکشن درست کر سکتے ہیں؛ انوائس سے منسلک اندراجات محفوظ رہتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.79',
     date: 'October 2026',
     items: [

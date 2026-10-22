@@ -1,0 +1,16 @@
+---
+title: Critical data flows (documented and source-linked)
+---
+flowchart LR
+  SaleUI["CreateSaleInvoiceScreen · app/lib/screens/create_sale_invoice_screen.dart#L1298"] -->|app/lib/screens/create_sale_invoice_screen.dart#L1298| SaleProvider[InvoiceNotifier.createSaleInvoice]
+  SaleProvider["InvoiceNotifier.createSaleInvoice · app/lib/providers/invoice_provider.dart#L253"] -->|app/lib/providers/invoice_provider.dart#L253| SaleInvoice[Invoice + counter]
+  SaleProvider -->|app/lib/providers/invoice_provider.dart#L253| Ledger[Transactions + shop.balance]
+  SaleProvider -->|app/lib/providers/invoice_provider.dart#L253| Stock[Seller inventory + audit row]
+  ReceiptUI["Cash receipt mode · app/lib/providers/invoice_provider.dart#L583"] -->|app/lib/providers/invoice_provider.dart#L583| ReceiptProvider[InvoiceNotifier.createCashReceipt]
+  ReceiptProvider -->|app/lib/providers/invoice_provider.dart#L583| ReceiptInvoice[Receipt invoice + counter]
+  ReceiptProvider -->|app/lib/providers/invoice_provider.dart#L583| Ledger
+  SellerLogin["AuthNotifier.signIn · app/lib/providers/auth_provider.dart#L126"] -->|app/lib/providers/tenant_provider.dart#L628| AccessProvider[registerCurrentAccess]
+  AccessProvider -->|app/lib/providers/tenant_provider.dart#L628| DeviceSlots[users/{uid}/device_registrations]
+  AccessProvider -->|app/lib/providers/tenant_provider.dart#L628| SessionSlots[users/{uid}/sessions]
+  DeviceSlots -->|firestore.rules#L291| Rules[Firestore Rules validate owner/tenant/status/slot]
+  SessionSlots -->|firestore.rules#L276| Rules

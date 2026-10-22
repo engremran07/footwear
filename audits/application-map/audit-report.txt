@@ -1,0 +1,80 @@
+FOOTWEAR APPLICATION DISCOVERY — STATIC SOURCE REPORT
+Generated: 2026-10-16T23:51:22.367Z
+Repository: engremran07/footwear
+Branch/commit: main / 79c107838fea38132d40ce2d3276b03ac59c9080
+Upstream main at discovery: 79c107838fea38132d40ce2d3276b03ac59c9080
+App version metadata: 3.9.79+705
+Dirty application files preserved: app/lib/core/utils/session_access_policy.dart, app/lib/providers/tenant_provider.dart, app/test/unit/models/session_access_policy_test.dart, tests/firestore-rules/rules.test.js
+
+INVENTORY COUNTS
+- Firestore collection constants: 18; unique paths: 17 (aliases preserved in inventory.json)
+- action: 377
+- background-task: 29
+- collection: 17
+- documentation: 56
+- export: 31
+- index: 26
+- index-override: 4
+- integration: 46
+- model: 18
+- module: 242
+- pipeline-step: 80
+- provider: 99
+- query: 88
+- recovery-path: 210
+- role: 6
+- route: 34
+- rule-match: 21
+- screen: 29
+- security-rule: 72
+- service: 6
+- test: 681
+- test-file: 1
+- test-suite: 143
+- widget: 19
+- workflow: 5
+
+DISCOVERY FINDINGS
+- Orphan candidates (heuristic only): 0
+- Query candidates: 88; provider source scan saw 125 where clauses, 29 orderBy clauses, and 235 collection calls. Query-to-index mapping is heuristic, not a Firestore planner result.
+- Possible index-gap candidates: 0; provider dependency cycle candidates: 0; possible orphan declarations: 0. All are static heuristics.
+- Unresolved route/collection/index references: 0; source citation validation: PASS (0 issues; 61 Mermaid citations).
+- Current dirty paths: app/lib/core/utils/session_access_policy.dart, app/lib/providers/tenant_provider.dart, app/test/unit/models/session_access_policy_test.dart, tests/firestore-rules/rules.test.js. Tests are declarations unless a reviewed output below records an execution.
+- Prior release evidence is for commit 79c1078 only; it does not validate the current dirty tree.
+
+REVIEWED EXECUTION EVIDENCE
+- Last committed release Flutter suite: All tests passed! (567) [passed-before-current-uncommitted-work]
+- Last committed release Firestore Rules Emulator suite: 124 passing [passed-before-current-uncommitted-work]
+- Session access policy helper: 00:04 +25: All tests passed! [passed-current-worktree]
+- Seller pending registration Rules transition: 0 passing, 1 failing; Firestore Rules evaluator reported its 1000-expression evaluation budget was exceeded during update evaluation. [unresolved; does not establish an allow/deny policy result]
+
+DOCUMENTATION / SOURCE DISCREPANCY CANDIDATES
+- DOC-ROUTES: AGENTS.md contains a route inventory that is shorter than the route declarations discovered in app_router.dart; source routes are authoritative for this map. Sources: AGENTS.md, app/lib/core/router/app_router.dart.
+- DOC-BLUEPRINT: MASTER_BLUEPRINT.md identifies v3.9.53+92 while app/pubspec.yaml is v3.9.79+705. Sources: MASTER_BLUEPRINT.md, app/pubspec.yaml.
+- DOC-REALTIME-PROPOSALS: ENTERPRISE_REALTIME_FEATURES_v3.10.md labels activity logging, presence, and digest notifications as proposed; these are not treated as implemented features unless matching runtime source is found. Sources: ENTERPRISE_REALTIME_FEATURES_v3.10.md, app/lib/core/constants/collections.dart, firestore.rules.
+- DOC-SAAS-HISTORY: AUDIT_SAAS_MIGRATION_2026_08_16.md contains historical tenant/global fallback and self-heal claims that conflict with current AGENTS.md invariants; preserve as historical evidence, not current runtime truth. Sources: AUDIT_SAAS_MIGRATION_2026_08_16.md, AGENTS.md, app/lib/core/utils/tenant_scope.dart.
+- DOC-FUNCTIONS: The checked-in functions directory has no Functions source files and firebase.json has no functions deployment target; root package.json still declares firebase-admin. This does not establish the state of remote deployed services. Sources: functions/src, firebase.json, package.json, AGENTS.md.
+
+DOCUMENTATION VERSION SNAPSHOT
+- README.md: 3.9.79+705 (matches app)
+- app/README.md: 3.9.79+705 (matches app)
+- MASTER_BLUEPRINT.md: 3.9.53+92 (version differs; inspect for drift)
+- AGENTS.md: no top-level version detected (unversioned; review content freshness)
+- CLAUDE.md: no top-level version detected (unversioned; review content freshness)
+- CHANGELOG.md: 3.9.79+705 (matches app)
+
+LIMITATIONS
+- This is static source discovery, not an execution trace or proof of production behavior.
+- Dart relationships inferred from imports, identifiers, and nearby query text can over- or under-connect dynamic/reflection-driven behavior.
+- Firestore Rules are indexed as source clauses; this generator does not evaluate Rules semantics, getAfter dependencies, or runtime access outcomes.
+- A test declaration is not a passing test. Current-tree test status is not executed by this generator.
+- Binary assets, build products, vendored dependencies, Git internals, and generated lockfiles are excluded.
+- Authentication, live Firestore contents, Firebase deployment state, device behavior, and external provider configuration are not inspected.
+- Screen actions are static callback-site candidates; closures, generated controls, and callbacks assembled from data may be missed.
+
+ARTIFACTS
+- dashboard.html: offline searchable inventory and local graph navigation
+- inventory.json: nodes, edges, evidence, risks, test declarations, limitations
+- diagrams/*.mmd: Mermaid architecture, dependencies, role journeys, and critical flows
+- baseline.json and comparison.json: first-run snapshot and repeatable diff
+- Regenerate with: node audits/application-map/generate.js

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../core/l10n/app_locale.dart';
@@ -40,7 +41,18 @@ class _DeviceSessionSecurityScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(tr('access_security_title', ref))),
+      appBar: AppBar(
+        title: Text(tr('access_security_title', ref)),
+        actions: [
+          if (widget.tenantId != null)
+            IconButton(
+              tooltip: tr('paired_devices_title', ref),
+              onPressed: () =>
+                  context.push('/tenants/${widget.tenantId}/devices'),
+              icon: const Icon(Icons.devices_outlined),
+            ),
+        ],
+      ),
       body: widget.tenantId == null
           ? _buildUserView(context, ref)
           : _buildAdminView(context, ref, widget.tenantId!),
@@ -249,8 +261,7 @@ class _DeviceSessionSecurityScreenState
         .where((session) => session.expiresAt?.toDate().isAfter(now) ?? false)
         .length;
     final summary = AccessUsageSummary(
-      maxDevicesAllowed:
-          workspaceAdminPolicy?.maxDevicesAllowed ?? tenant.maxDevicesAllowed,
+      maxDevicesAllowed: user.isAdmin ? null : tenant.maxDevicesAllowed,
       registeredDevices: registeredDevices,
       maxActiveSessionsAllowed:
           workspaceAdminPolicy?.maxActiveSessionsAllowed ??
@@ -286,6 +297,14 @@ class _DeviceSessionSecurityScreenState
           overLimit: summary.overLimitSessionCount,
           ref: ref,
         ),
+        if (devices.length >= 200)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              tr('access_registry_limit_notice', ref),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
         if (summary.overLimitDeviceCount > 0 ||
             summary.overLimitSessionCount > 0) ...[
           const SizedBox(height: 8),
@@ -819,26 +838,20 @@ class _PlatformWorkspaceAdminPolicyEditor extends ConsumerStatefulWidget {
 
 class _PlatformWorkspaceAdminPolicyEditorState
     extends ConsumerState<_PlatformWorkspaceAdminPolicyEditor> {
-  final _devicesController = TextEditingController();
   final _sessionsController = TextEditingController();
   WorkspaceAdminAccessPolicy? _loadedPolicy;
   bool _saving = false;
 
   @override
   void dispose() {
-    _devicesController.dispose();
     _sessionsController.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    final devices = int.tryParse(_devicesController.text.trim());
     final sessions = int.tryParse(_sessionsController.text.trim());
-    if (devices == null ||
-        sessions == null ||
-        devices < 1 ||
+    if (sessions == null ||
         sessions < 1 ||
-        devices > AccessUsageSummary.maximumSlotsPerUser ||
         sessions > AccessUsageSummary.maximumSlotsPerUser) {
       ScaffoldMessenger.of(
         context,
@@ -849,10 +862,7 @@ class _PlatformWorkspaceAdminPolicyEditorState
     try {
       await ref
           .read(workspaceAdminAccessPolicyNotifierProvider.notifier)
-          .updatePolicy(
-            maxDevicesAllowed: devices,
-            maxActiveSessionsAllowed: sessions,
-          );
+          .updatePolicy(maxActiveSessionsAllowed: sessions);
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -878,7 +888,6 @@ class _PlatformWorkspaceAdminPolicyEditorState
       data: (policy) {
         if (_loadedPolicy != policy) {
           _loadedPolicy = policy;
-          _devicesController.text = policy.maxDevicesAllowed.toString();
           _sessionsController.text = policy.maxActiveSessionsAllowed.toString();
         }
         return Card(
@@ -899,17 +908,6 @@ class _PlatformWorkspaceAdminPolicyEditorState
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _devicesController,
-                        enabled: !_saving,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: tr('access_policy_devices', ref),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: TextField(
                         controller: _sessionsController,
@@ -1099,9 +1097,9 @@ class _CapacitySection extends StatelessWidget {
   final String allowedLabel;
   final String usedLabel;
   final String availableLabel;
-  final int allowed;
+  final int? allowed;
   final int used;
-  final int available;
+  final int? available;
   final int overLimit;
   final WidgetRef ref;
 
@@ -1137,9 +1135,15 @@ class _CapacitySection extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                _CapacityValue(label: allowedLabel, value: allowed),
-                _CapacityValue(label: usedLabel, value: used),
-                _CapacityValue(label: availableLabel, value: available),
+                _CapacityValue(
+                  label: allowedLabel,
+                  value: allowed?.toString() ?? tr('unlimited', ref),
+                ),
+                _CapacityValue(label: usedLabel, value: used.toString()),
+                _CapacityValue(
+                  label: availableLabel,
+                  value: available?.toString() ?? tr('unlimited', ref),
+                ),
               ],
             ),
             if (overLimit > 0)
@@ -1159,7 +1163,7 @@ class _CapacitySection extends StatelessWidget {
 
 class _CapacityValue extends StatelessWidget {
   final String label;
-  final int value;
+  final String value;
 
   const _CapacityValue({required this.label, required this.value});
 
@@ -1170,7 +1174,7 @@ class _CapacityValue extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: Theme.of(context).textTheme.bodySmall),
-          Text(value.toString(), style: Theme.of(context).textTheme.titleLarge),
+          Text(value, style: Theme.of(context).textTheme.titleLarge),
         ],
       ),
     );

@@ -151,6 +151,13 @@ service cloud.firestore {
         (slotId == 'slot_9' && slotNumber == 9 && maxSlots >= 10);
     }
 
+    function validDeviceRegistrationSlot(slotId, slotNumber, maxSlots) {
+      return validAccessSlot(slotId, slotNumber, maxSlots) ||
+        (isWorkspaceAdminAccessRole(getUserRole()) &&
+          slotId.matches('^device_[A-Za-z0-9_-]{8,128}$') &&
+          slotNumber == 0);
+    }
+
     function accessSlotPathMatches(slotId, slotNumber) {
       return (slotId == 'slot_0' && slotNumber == 0) ||
         (slotId == 'slot_1' && slotNumber == 1) ||
@@ -278,7 +285,9 @@ service cloud.firestore {
         data.slot_id == slotId && data.slot_number is int &&
         data.slot_number >= 0 && data.slot_number <= 9 &&
         data.device_slot_id is string &&
-        data.device_slot_id.matches('^slot_[0-9]$') &&
+        (data.device_slot_id.matches('^slot_[0-9]$') ||
+          (isWorkspaceAdminAccessRole(getUserRole()) &&
+            data.device_slot_id.matches('^device_[A-Za-z0-9_-]{8,128}$'))) &&
         data.session_id is string && data.session_id.size() >= 8 &&
         data.session_id.size() <= 128 &&
         data.device_id is string && data.device_id.size() >= 8 &&
@@ -706,6 +715,44 @@ service cloud.firestore {
         );
     }
 
+    function adminTransactionSoftDeleteMatchesShop(txId, shopId) {
+      let transactionPath = /databases/$(database)/documents/transactions/$(txId);
+      let transactionBefore = get(transactionPath).data;
+      let transactionAfter = getAfter(transactionPath).data;
+      let shopPath = /databases/$(database)/documents/customers/$(shopId);
+      let shopBefore = get(shopPath).data;
+      let shopAfter = getAfter(shopPath).data;
+      let reversalDelta = transactionBefore.type == 'cash_out'
+        ? -transactionBefore.amount
+        : transactionBefore.amount;
+      return exists(transactionPath) && existsAfter(transactionPath) &&
+        transactionBefore.shop_id == shopId &&
+        transactionBefore.tenant_id == resource.data.tenant_id &&
+        transactionBefore.type in ['cash_in', 'cash_out'] &&
+        transactionBefore.amount is number &&
+        transactionBefore.amount > 0 &&
+        !('invoice_id' in transactionBefore) &&
+        transactionBefore.deleted != true &&
+        transactionAfter.deleted == true &&
+        transactionAfter.deleted_by == request.auth.uid &&
+        transactionAfter.deleted_at == request.time &&
+        transactionAfter.updated_at == request.time &&
+        transactionAfter.diff(transactionBefore).affectedKeys().hasOnly([
+          'deleted', 'deleted_at', 'deleted_by', 'updated_at'
+        ]) &&
+        shopBefore.balance is number &&
+        shopAfter.last_balance_correction_transaction_id == txId &&
+        shopAfter.balance is number &&
+        shopAfter.balance >= shopBefore.balance + reversalDelta - 0.01 &&
+        shopAfter.balance <= shopBefore.balance + reversalDelta + 0.01 &&
+        (!('last_transaction_id' in shopBefore) ||
+          shopBefore.last_transaction_id != txId ||
+          (!('last_transaction_at' in shopAfter) &&
+            !('last_transaction_type' in shopAfter) &&
+            !('last_transaction_amount' in shopAfter) &&
+            !('last_transaction_id' in shopAfter)));
+    }
+
     function workspaceAllowsNonStockInvoices(tenantId) {
       let settingsPath = /databases/$(database)/documents/settings/$(tenantId);
       let settingsData = get(settingsPath).data;
@@ -928,7 +975,7 @@ service cloud.firestore {
           currentUserTenantId(),
           slotId
         ) &&
-        validAccessSlot(
+        validDeviceRegistrationSlot(
           slotId,
           request.resource.data.slot_number,
           accessRecordLimit(currentUserTenantId(), 'max_devices_allowed')
@@ -948,7 +995,7 @@ service cloud.firestore {
           request.resource.data.device_id == resource.data.device_id &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'last_seen_at', 'app_version']) &&
-          validAccessSlot(
+          validDeviceRegistrationSlot(
             slotId,
             resource.data.slot_number,
             accessRecordLimit(currentUserTenantId(), 'max_devices_allowed')
@@ -960,9 +1007,13 @@ service cloud.firestore {
           isActiveUser() && isOwnDoc(userId) &&
           resource.data.user_id == userId &&
           resource.data.tenant_id == currentUserTenantId() &&
-          resource.data.status == 'active' &&
+            resource.data.status in ['active', 'pending'] &&
+            (resource.data.status == 'active' ||
+              (isSeller() &&
+                !tenantRequiresDevicePairing(currentUserTenantId()))) &&
+            request.resource.data.status == 'active' &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['last_seen_at', 'app_version']) &&
+              .hasOnly(['status', 'last_seen_at', 'app_version']) &&
           request.resource.data.last_seen_at == request.time &&
           request.resource.data.app_version is string &&
           request.resource.data.app_version.size() <= 40
@@ -1041,7 +1092,7 @@ service cloud.firestore {
             currentUserTenantId(),
             slotId
           ) &&
-          validAccessSlot(
+          validDeviceRegistrationSlot(
             slotId,
             request.resource.data.slot_number,
             accessRecordLimit(currentUserTenantId(), 'max_devices_allowed')
@@ -1106,7 +1157,7 @@ service cloud.firestore {
             currentUserTenantId(),
             slotId
           ) &&
-          validAccessSlot(
+          validDeviceRegistrationSlot(
             slotId,
             request.resource.data.slot_number,
             accessRecordLimit(currentUserTenantId(), 'max_active_sessions_allowed')
@@ -1414,7 +1465,22 @@ service cloud.firestore {
           !request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'balance', 'last_transaction_at', 'last_transaction_type',
             'last_transaction_amount', 'last_transaction_id'
-          ]) || adminShopFinancialUpdateIsLinked(customerId)
+          ]) ||
+          (('last_transaction_id' in request.resource.data) &&
+            adminShopFinancialUpdateIsLinked(customerId)) ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'balance', 'updated_at',
+              'last_balance_correction_transaction_id',
+              'last_transaction_at', 'last_transaction_type',
+              'last_transaction_amount', 'last_transaction_id'
+            ]) &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['balance']) &&
+            request.resource.data.last_balance_correction_transaction_id is string &&
+            adminTransactionSoftDeleteMatchesShop(
+              request.resource.data.last_balance_correction_transaction_id,
+              customerId
+            ))
         ) ||
         (
           isSeller() &&
@@ -1486,6 +1552,18 @@ service cloud.firestore {
         ? (isAdminForTenant(resource.data.tenant_id) &&
           request.resource.data.tenant_id == resource.data.tenant_id &&
           isValidTransactionType(request.resource.data.type) &&
+          (!request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['deleted', 'deleted_at', 'deleted_by']) ||
+            (request.resource.data.deleted == true &&
+              request.resource.data.deleted_by == request.auth.uid &&
+              request.resource.data.deleted_at == request.time &&
+              request.resource.data.updated_at == request.time &&
+              request.resource.data.shop_id is string &&
+              request.resource.data.shop_id != '' &&
+              adminTransactionSoftDeleteMatchesShop(
+                txId,
+                request.resource.data.shop_id
+              ))) &&
           (!request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'amount', 'type', 'created_at'
           ]) || hasValidTransactionEditHistory()) &&
@@ -1528,8 +1606,7 @@ service cloud.firestore {
             )
           )
         );
-      allow delete: if isSuperAdmin() &&
-        isAdminForTenant(resource.data.tenant_id);
+      allow delete: if false;
     }
 
     // --- seller inventory ---------------------------------------------------

@@ -17,6 +17,27 @@ class SessionAccessPolicy {
     bool isWorkspaceAdmin = false,
   }) => pairingRequired && !isWorkspaceAdmin && !hasActiveDevice;
 
+  static bool canAutoApprovePendingDevice({
+    required bool pairingRequired,
+    required int slotNumber,
+    required int maxDevicesAllowed,
+    required int occupiedDeviceCount,
+  }) =>
+      !pairingRequired &&
+      slotNumber >= 0 &&
+      slotNumber < maxDevicesAllowed &&
+      occupiedDeviceCount <= maxDevicesAllowed;
+
+  static String deviceRegistrationSlotId({
+    required String installationId,
+    required int slotNumber,
+    required bool isWorkspaceAdmin,
+  }) => isWorkspaceAdmin ? 'device_$installationId' : 'slot_$slotNumber';
+
+  static bool isValidDeviceRegistrationSlotId(String slotId) =>
+      RegExp(r'^slot_[0-9]$').hasMatch(slotId) ||
+      RegExp(r'^device_[A-Za-z0-9_-]{8,128}$').hasMatch(slotId);
+
   static bool isClockSkewed({
     required DateTime deviceNow,
     required DateTime serverNow,
@@ -79,7 +100,7 @@ class SessionAccessPolicy {
     required String deviceId,
   }) {
     if (session.deviceId != deviceId ||
-        !RegExp(r'^slot_[0-9]$').hasMatch(session.deviceSlotId)) {
+        !isValidDeviceRegistrationSlotId(session.deviceSlotId)) {
       return null;
     }
     return session.deviceSlotId;

@@ -26,6 +26,7 @@ import '../../screens/notification_center_screen.dart';
 import '../../screens/settings_screen.dart';
 import '../../screens/profile_screen.dart';
 import '../../screens/device_session_security_screen.dart';
+import '../../screens/paired_devices_screen.dart';
 import '../../screens/invoices_list_screen.dart';
 import '../../screens/invoice_detail_screen.dart';
 import '../../screens/invoice_header_settings_screen.dart';
@@ -69,7 +70,7 @@ bool _isTenantManagementPath(String rawPath) {
 
 String? _tenantSecurityPathId(String rawPath) {
   final match = RegExp(
-    r'^/tenants/([^/]+)/security$',
+    r'^/tenants/([^/]+)/(?:security|devices)$',
   ).firstMatch(_normalizePath(rawPath));
   return match?.group(1);
 }
@@ -437,6 +438,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               DeviceSessionSecurityScreen(
                 tenantId: s.pathParameters['tenantId'],
               ),
+              s,
+            ),
+          ),
+          GoRoute(
+            path: '/tenants/:tenantId/devices',
+            pageBuilder: (_, s) => _fadePage(
+              PairedDevicesScreen(tenantId: s.pathParameters['tenantId']!),
               s,
             ),
           ),

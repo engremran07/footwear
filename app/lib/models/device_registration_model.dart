@@ -38,6 +38,41 @@ class DeviceRegistrationModel {
   String get displayName =>
       [brand, model].where((value) => value.trim().isNotEmpty).join(' ');
 
+  static List<DeviceRegistrationModel> deduplicate(
+    Iterable<DeviceRegistrationModel> devices,
+  ) {
+    final unique = <(String, String), DeviceRegistrationModel>{};
+    for (final device in devices) {
+      final key = (device.userId, device.deviceId);
+      final current = unique[key];
+      if (current == null || _compareDuplicateCandidate(device, current) > 0) {
+        unique[key] = device;
+      }
+    }
+    return unique.values.toList()..sort((left, right) {
+      final byUser = left.userId.compareTo(right.userId);
+      return byUser != 0 ? byUser : left.deviceId.compareTo(right.deviceId);
+    });
+  }
+
+  static int _compareDuplicateCandidate(
+    DeviceRegistrationModel candidate,
+    DeviceRegistrationModel current,
+  ) {
+    int statusRank(String status) => switch (status) {
+      'blocked' => 4,
+      'active' => 3,
+      'pending' => 2,
+      'revoked' => 1,
+      _ => 0,
+    };
+    final byStatus = statusRank(
+      candidate.status,
+    ).compareTo(statusRank(current.status));
+    if (byStatus != 0) return byStatus;
+    return candidate.lastSeenAt.compareTo(current.lastSeenAt);
+  }
+
   factory DeviceRegistrationModel.fromJson(
     Map<String, dynamic> json,
     String docId,

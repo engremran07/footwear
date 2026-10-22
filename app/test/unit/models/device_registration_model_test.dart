@@ -41,4 +41,35 @@ void main() {
     expect(model.platform, 'unknown');
     expect(model.displayName, isEmpty);
   });
+
+  test('deduplicate keeps the strongest latest record per user and device', () {
+    DeviceRegistrationModel registration({
+      required String id,
+      required String status,
+      required int lastSeen,
+    }) => DeviceRegistrationModel(
+      id: id,
+      userId: 'user-1',
+      tenantId: 'workspace-1',
+      slotNumber: 0,
+      deviceId: 'same-installation-id',
+      brand: 'Samsung',
+      model: 'SM-A576B',
+      platform: 'android',
+      osVersion: '16',
+      appVersion: '3.9.79+705',
+      status: status,
+      registeredAt: Timestamp.fromMillisecondsSinceEpoch(0),
+      lastSeenAt: Timestamp.fromMillisecondsSinceEpoch(lastSeen),
+    );
+
+    final devices = DeviceRegistrationModel.deduplicate([
+      registration(id: 'slot_0', status: 'active', lastSeen: 100),
+      registration(id: 'device_same', status: 'active', lastSeen: 200),
+      registration(id: 'device_blocked', status: 'blocked', lastSeen: 50),
+    ]);
+
+    expect(devices, hasLength(1));
+    expect(devices.single.id, 'device_blocked');
+  });
 }

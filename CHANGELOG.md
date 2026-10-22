@@ -7,6 +7,23 @@ Most recent first.
 
 ---
 
+## [3.9.80+706] — 2026-10-18 — Workspace access and transaction integrity
+
+### Added
+
+- Workspace admins can pair unlimited devices while their shared platform active-session cap remains enforced.
+- Added a tenant-scoped paired-device registry with account name/email, device model, app version, Android/OS version, status, timestamps, duplicate suppression, and 200-record device/user read caps.
+
+### Fixed
+
+- Pairing and admin-reset switches now rebuild correctly in the workspace dialog; pending seller devices can activate after pairing is disabled.
+- Workspace admins can soft-delete standalone cash ledger entries only with an exact atomic shop-balance reversal; deleting the latest entry also clears its cached shop summary. Hard transaction deletes, seller deletes, and invoice-linked deletes are denied.
+
+### Verification
+
+- Firestore Rules Emulator: `133 passing`; `flutter analyze lib --no-pub`: `No issues found! (ran in 8.4s)`; `dart analyze test/`: `No issues found!`; expanded Flutter suite: `All tests passed!` (577); Markdown lint clean.
+- APK build was not started because free RAM remained at `2.64 GB`, below the required `3.2 GB` preflight. Production Rules/indexes were not deployed.
+
 ## [3.9.79+705] — 2026-10-17 — Workspace access controls and app branding
 
 ### Added

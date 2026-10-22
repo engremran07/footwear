@@ -1,0 +1,17 @@
+Footwear application map regeneration
+
+Prerequisite: Node.js 18+; no npm packages are required.
+
+From the repository root run:
+  node audits/application-map/generate.js
+
+The generator scans first-party Dart source/tests, Firestore Rules/indexes, Firebase configuration, workflow YAML, tool scripts, and repository documents. It skips generated build output, vendor dependencies, binary assets, and Git internals.
+It writes inventory.json, dashboard.html, audit-report.txt, four Mermaid files under diagrams/, and comparison.json. The first run creates baseline.json. Later runs compare against that frozen baseline without replacing it.
+To intentionally establish a new baseline, review the current comparison first, preserve the prior baseline separately, then run: node audits/application-map/generate.js --reset-baseline
+
+Evidence semantics:
+- Direct: a declaration or reference was found at the cited source line.
+- Inferred: a relation is suggested by identifier/import proximity or a static query heuristic; inspect its cited source before relying on it.
+- Risk/orphan/index flags are candidates, not confirmed defects.
+- The generator inventories test declarations; run tests separately and record exact outputs before claiming pass status.
+- Dynamic auth state, Firestore contents, app/device rendering, backend rule evaluation, and external service state remain unverified.

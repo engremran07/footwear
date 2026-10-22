@@ -54,6 +54,8 @@ Defined in app/lib/core/router/app_router.dart:
 - /reports
 - /profile
 - /settings
+- /tenants/:tenantId/security
+- /tenants/:tenantId/devices
 
 ## 3) Permission Matrix
 
@@ -73,7 +75,7 @@ Seller:
 
 1. Role alignment is mandatory in all three layers: app/lib/models/user_model.dart, firestore.rules, and provider write guards on security-critical fields.
 
-1. Workspace branding and seller device/session limits are tenant-scoped. Workspace admins may configure seller caps only within their workspace. One separate `settings/platform_access_policy` record controls the shared workspace-admin cap across workspaces; only a super-admin may edit it. Super-admin devices and sessions are platform-only and do not consume tenant pairing slots.
+1. Workspace branding and seller device/session limits are tenant-scoped. Workspace admins may configure seller caps only within their workspace. Workspace admins have unlimited paired-device registrations; one separate `settings/platform_access_policy` record controls their shared concurrent-session cap across workspaces, and only a super-admin may edit it. Super-admin devices and sessions are platform-only and do not consume tenant pairing slots.
 
 1. Super-admin business access is workspace-scoped. Never let a super-admin read tenant routes, shops, products, inventory, invoices, transactions, reports, users, or tenant settings without an explicit active workspace context. Platform workspace metadata may remain globally visible. Record support access starts/ends in the append-only `platform_access_logs` collection; never use UI visibility as the security boundary.
 
@@ -122,6 +124,8 @@ Seller:
 1. Seller inventory may only decrease in the same batch as a sale invoice whose `seller_inventory_deductions` map matches the exact quantity delta. Warehouse transfers, adjustments, and returns must atomically update stock and append tenant-scoped `inventory_transactions` records.
 
 1. Financial transaction corrections must preserve the previous amount/type/date in an append-only `edit_history` entry with actor and a reason of at least 10 characters. Invoice-linked ledger rows are corrected only by void/credit-note flows.
+
+1. Standalone cash-in/cash-out transaction deletion is soft-delete only. A tenant admin-equivalent may delete only an unlinked cash row with an exact same-batch `shop.balance` reversal and correction transaction ID. Clear cached last-transaction fields only when they point to the deleted row. Sellers, invoice-linked rows, and hard deletes are denied.
 
 1. Full exports must cursor-page until exhausted; hard limits remain appropriate only for live UI windows that visibly communicate truncation. Full restore must upsert all backup data before pruning obsolete tenant documents. Plaintext backup archives are not accepted for restore.
 
@@ -489,6 +493,15 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-10-18 workspace access and transaction integrity — v3.9.80+706:
+
+- Workspace admins use installation-keyed paired-device records without a device-count cap; active sessions remain bounded by the shared platform policy. Seller device/session limits and seller pairing approval remain workspace-scoped.
+- The dedicated paired-device registry shows account name/email, device model, app version, Android/OS version, status, and timestamps. It deduplicates per user/installation and caps live registry/profile reads at 200 documents each.
+- Pairing-disabled pending seller devices can self-activate; pairing-enabled devices still require administrator approval. Workspace settings toggles rebuild their dialog route correctly.
+- Transaction deletion is soft-delete only. Workspace admins may reverse standalone cash-in/cash-out entries only in the same batch as an exact shop-balance correction; sellers and invoice-linked transactions cannot be deleted.
+- Firestore Rules Emulator: `133 passing`. `flutter analyze lib --no-pub`: `No issues found! (ran in 8.4s)`; `dart analyze test/`: `No issues found!`; `flutter test -r expanded`: `All tests passed!` (577). Markdown lint produced no findings; Firestore indexes JSON parsed successfully.
+- APK build was not started: free RAM was `2.64 GB`, below the required `3.2 GB` threshold, after stopping the project Gradle daemon (none were running). Production Rules/indexes and Hosting were not deployed; no device install was attempted.
 
 2026-10-17 workspace owner and access controls — v3.9.79+705:
 

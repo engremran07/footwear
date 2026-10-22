@@ -1,0 +1,99 @@
+{
+  "asOf": "2026-10-17",
+  "remoteMain": {
+    "url": "https://github.com/engremran07/footwear",
+    "branch": "main",
+    "sha": "79c107838fea38132d40ce2d3276b03ac59c9080",
+    "verification": "git ls-remote refs/heads/main matched local HEAD during this discovery session"
+  },
+  "workingTree": {
+    "baseCommit": "79c1078",
+    "preservedUncommittedPaths": [
+      "app/lib/core/utils/session_access_policy.dart",
+      "app/lib/providers/tenant_provider.dart",
+      "app/test/unit/models/session_access_policy_test.dart",
+      "tests/firestore-rules/rules.test.js"
+    ],
+    "scopeNote": "These hybrid-pairing changes were already in progress and were preserved; business behavior edits are paused during initial discovery."
+  },
+  "verification": [
+    {
+      "scope": "Last committed release Flutter suite",
+      "commit": "79c1078",
+      "command": "flutter test -r expanded",
+      "result": "All tests passed! (567)",
+      "status": "passed-before-current-uncommitted-work"
+    },
+    {
+      "scope": "Last committed release Firestore Rules Emulator suite",
+      "commit": "79c1078",
+      "command": "firebase emulators:exec --only firestore \"npm test\"",
+      "result": "124 passing",
+      "status": "passed-before-current-uncommitted-work"
+    },
+    {
+      "scope": "Session access policy helper",
+      "command": "flutter test test/unit/models/session_access_policy_test.dart",
+      "result": "00:04 +25: All tests passed!",
+      "status": "passed-current-worktree"
+    },
+    {
+      "scope": "Seller pending registration Rules transition",
+      "command": "focused firebase emulators:exec / Mocha regression",
+      "result": "0 passing, 1 failing; Firestore Rules evaluator reported its 1000-expression evaluation budget was exceeded during update evaluation.",
+      "status": "unresolved; does not establish an allow/deny policy result"
+    }
+  ],
+  "documentEvidence": [
+    {
+      "id": "DOC-ROUTES",
+      "observation": "AGENTS.md contains a route inventory that is shorter than the route declarations discovered in app_router.dart; source routes are authoritative for this map.",
+      "sources": [
+        { "path": "AGENTS.md", "line": 31, "note": "Documented route map heading" },
+        { "path": "app/lib/core/router/app_router.dart", "line": 435, "note": "Tenant security route omitted from the shorter required route list" }
+      ],
+      "classification": "documentation/source drift candidate"
+    },
+    {
+      "id": "DOC-BLUEPRINT",
+      "observation": "MASTER_BLUEPRINT.md identifies v3.9.53+92 while app/pubspec.yaml is v3.9.79+705.",
+      "sources": [
+        { "path": "MASTER_BLUEPRINT.md", "line": 3, "note": "Blueprint version metadata" },
+        { "path": "app/pubspec.yaml", "line": 4, "note": "Current app version metadata" }
+      ],
+      "classification": "version/documentation drift"
+    },
+    {
+      "id": "DOC-REALTIME-PROPOSALS",
+      "observation": "ENTERPRISE_REALTIME_FEATURES_v3.10.md labels activity logging, presence, and digest notifications as proposed; these are not treated as implemented features unless matching runtime source is found.",
+      "sources": [
+        { "path": "ENTERPRISE_REALTIME_FEATURES_v3.10.md", "line": 42, "note": "Activity logging labeled proposed" },
+        { "path": "app/lib/core/constants/collections.dart", "line": 1, "note": "Canonical collection inventory; proposed names were not found by the source scan" },
+        { "path": "firestore.rules", "line": 1, "note": "Rules source scanned for corresponding collection matches" }
+      ],
+      "classification": "documentation-only/proposed until source corroborates"
+    },
+    {
+      "id": "DOC-SAAS-HISTORY",
+      "observation": "AUDIT_SAAS_MIGRATION_2026_08_16.md contains historical tenant/global fallback and self-heal claims that conflict with current AGENTS.md invariants; preserve as historical evidence, not current runtime truth.",
+      "sources": [
+        { "path": "AUDIT_SAAS_MIGRATION_2026_08_16.md", "line": 36, "note": "Historical global fallback claim" },
+        { "path": "AGENTS.md", "line": 69, "note": "Current concrete-tenant write invariant" },
+        { "path": "app/lib/core/utils/tenant_scope.dart", "line": 11, "note": "Blank/missing tenant normalizes to null" },
+        { "path": "app/lib/core/utils/tenant_scope.dart", "line": 22, "note": "requireTenant rejects missing tenant" }
+      ],
+      "classification": "historical audit claim requires source revalidation"
+    },
+    {
+      "id": "DOC-FUNCTIONS",
+      "observation": "The checked-in functions directory has no Functions source files and firebase.json has no functions deployment target; root package.json still declares firebase-admin. This does not establish the state of remote deployed services.",
+      "sources": [
+        { "path": "functions/src", "line": null, "note": "Directory listing: no checked-in .js/.ts implementation files; only debug.log" },
+        { "path": "firebase.json", "line": 1, "note": "Firebase deploy configuration has Firestore and Hosting, no Functions target" },
+        { "path": "package.json", "line": 2, "note": "Root manifest declares firebase-admin" },
+        { "path": "AGENTS.md", "line": 76, "note": "Runtime contract states no Cloud Functions" }
+      ],
+      "classification": "repository configuration discrepancy; remote state unverified"
+    }
+  ]
+}

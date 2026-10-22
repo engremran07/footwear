@@ -1,0 +1,20 @@
+---
+title: Feature dependencies (representative source paths)
+---
+flowchart LR
+  Auth["Authentication/access · app/lib/providers/auth_provider.dart#L126"]
+  Workspace["Workspace/user admin · app/lib/screens/tenant_management_screen.dart#L408"]
+  Routes["Routes/assignments · app/lib/providers/route_provider.dart#L9"]
+  Inventory["Warehouse/seller stock · app/lib/providers/product_provider.dart#L369"]
+  Shops["Shops/ledger · app/lib/providers/shop_provider.dart#L132"]
+  Invoices["Stock/non-stock/receipt invoices · app/lib/providers/invoice_provider.dart#L253"]
+  Finance["Balances/transaction ledger · app/lib/providers/transaction_provider.dart#L470"]
+  Reports["Reports/exports · app/lib/screens/reports_screen.dart#L205"]
+  Auth -->|app/lib/providers/auth_provider.dart#L126| Workspace
+  Workspace -->|app/lib/providers/user_provider.dart#L321| Routes
+  Routes -->|app/lib/providers/shop_provider.dart#L132| Shops
+  Inventory -->|app/lib/providers/invoice_provider.dart#L253| Invoices
+  Invoices -->|app/lib/providers/invoice_provider.dart#L253| Finance
+  Shops -->|app/lib/providers/transaction_provider.dart#L44| Reports
+  Invoices -->|app/lib/core/utils/pdf_export.dart#L1373| Reports
+  Auth -->|app/lib/providers/tenant_provider.dart#L628| Inventory

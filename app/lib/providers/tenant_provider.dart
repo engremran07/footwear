@@ -129,6 +129,27 @@ final tenantUsersProvider = StreamProvider.family<List<UserModel>, String>((
       );
 });
 
+final tenantAccessRegistryUsersProvider =
+    StreamProvider.family<List<UserModel>, String>((ref, tenantId) {
+      final currentUser = ref.watch(authUserProvider).value;
+      if (currentUser == null ||
+          (!currentUser.isSuperAdmin && currentUser.tenantId != tenantId) ||
+          (currentUser.isSuperAdmin &&
+              currentUser.activeWorkspaceId != tenantId)) {
+        return const Stream<List<UserModel>>.empty();
+      }
+      return FirebaseFirestore.instance
+          .collection(Collections.users)
+          .where('tenant_id', isEqualTo: tenantId)
+          .limit(200)
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map((doc) => UserModel.fromJson(doc.data(), doc.id))
+                .toList(),
+          );
+    });
+
 /// Inactive users for a specific workspace (super admin or tenant admin only)
 final allInactiveUsersForTenantProvider =
     StreamProvider.family<List<UserModel>, String>((ref, tenantId) {
@@ -236,14 +257,14 @@ final deviceRegistrationsProvider = StreamProvider.autoDispose
           .collection(Collections.deviceRegistrations)
           .where('tenant_id', isEqualTo: tenantId)
           .where('user_id', isEqualTo: userId)
-          .limit(AccessUsageSummary.maximumSlotsPerUser)
+          .limit(200)
           .snapshots()
           .map(
-            (snapshot) => snapshot.docs
-                .map(
-                  (doc) => DeviceRegistrationModel.fromJson(doc.data(), doc.id),
-                )
-                .toList(),
+            (snapshot) => DeviceRegistrationModel.deduplicate(
+              snapshot.docs.map(
+                (doc) => DeviceRegistrationModel.fromJson(doc.data(), doc.id),
+              ),
+            ),
           );
     });
 
@@ -265,11 +286,11 @@ final tenantDeviceRegistryProvider =
           .limit(200)
           .snapshots()
           .map(
-            (snapshot) => snapshot.docs
-                .map(
-                  (doc) => DeviceRegistrationModel.fromJson(doc.data(), doc.id),
-                )
-                .toList(),
+            (snapshot) => DeviceRegistrationModel.deduplicate(
+              snapshot.docs.map(
+                (doc) => DeviceRegistrationModel.fromJson(doc.data(), doc.id),
+              ),
+            ),
           );
     });
 
@@ -318,15 +339,10 @@ class WorkspaceAdminAccessPolicyNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
-  Future<void> updatePolicy({
-    required int maxDevicesAllowed,
-    required int maxActiveSessionsAllowed,
-  }) async {
-    if (maxDevicesAllowed < 1 ||
-        maxDevicesAllowed > AccessUsageSummary.maximumSlotsPerUser ||
-        maxActiveSessionsAllowed < 1 ||
+  Future<void> updatePolicy({required int maxActiveSessionsAllowed}) async {
+    if (maxActiveSessionsAllowed < 1 ||
         maxActiveSessionsAllowed > AccessUsageSummary.maximumSlotsPerUser) {
-      throw ArgumentError('Access limits must be between 1 and 10.');
+      throw ArgumentError('Active session limits must be between 1 and 10.');
     }
     final user = await ref.read(authUserProvider.future);
     if (user == null || !user.active || !user.isSuperAdmin) {
@@ -338,7 +354,7 @@ class WorkspaceAdminAccessPolicyNotifier extends AsyncNotifier<void> {
           .collection(Collections.settings)
           .doc(WorkspaceAdminAccessPolicy.documentId)
           .set({
-            'workspace_admin_max_devices_allowed': maxDevicesAllowed,
+            'workspace_admin_max_devices_allowed': FieldValue.delete(),
             'workspace_admin_max_active_sessions_allowed':
                 maxActiveSessionsAllowed,
             'updated_by': user.id,
@@ -660,11 +676,21 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
       (index) => userRef.collection(Collections.sessions).doc('slot_$index'),
     );
     final isWorkspaceAdmin = currentUser.isAdmin && !currentUser.isSuperAdmin;
+    final workspaceAdminDeviceRef = isWorkspaceAdmin
+        ? userRef
+              .collection(Collections.deviceRegistrations)
+              .doc(
+                SessionAccessPolicy.deviceRegistrationSlotId(
+                  installationId: metadata.installationId,
+                  slotNumber: 0,
+                  isWorkspaceAdmin: true,
+                ),
+              )
+        : null;
     final workspaceAdminPolicyRef = db
         .collection(Collections.settings)
         .doc(WorkspaceAdminAccessPolicy.documentId);
 
-    state = const AsyncLoading();
     try {
       final session = await db.runTransaction<SessionModel>((
         transaction,
@@ -683,9 +709,7 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
         final adminPolicy = WorkspaceAdminAccessPolicy.fromJson(
           adminPolicySnapshot?.data(),
         );
-        final maxDeviceSlots = isWorkspaceAdmin
-            ? adminPolicy.maxDevicesAllowed
-            : tenant.maxDevicesAllowed;
+        final maxDeviceSlots = tenant.maxDevicesAllowed;
         final maxSessionSlots = isWorkspaceAdmin
             ? adminPolicy.maxActiveSessionsAllowed
             : tenant.maxActiveSessionsAllowed;
@@ -693,6 +717,9 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
             await Future.wait<DocumentSnapshot<Map<String, dynamic>>?>(
               deviceRefs.map((deviceRef) => transaction.get(deviceRef)),
             );
+        final workspaceAdminDeviceSnapshot = workspaceAdminDeviceRef == null
+            ? null
+            : await transaction.get(workspaceAdminDeviceRef);
         for (var index = 0; index < deviceSnapshots.length; index++) {
           final snapshot = deviceSnapshots[index];
           if (snapshot?.exists != true) continue;
@@ -701,6 +728,16 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
               data?['tenant_id'] != tenantId ||
               data?['slot_id'] != snapshot.id ||
               (data?['slot_number'] as num?)?.toInt() != index) {
+            throw StateError('invalid-device-slot-record');
+          }
+        }
+        if (workspaceAdminDeviceSnapshot?.exists == true) {
+          final data = workspaceAdminDeviceSnapshot!.data();
+          if (data?['user_id'] != userId ||
+              data?['tenant_id'] != tenantId ||
+              data?['slot_id'] != workspaceAdminDeviceSnapshot.id ||
+              (data?['slot_number'] as num?)?.toInt() != 0 ||
+              data?['device_id'] != metadata.installationId) {
             throw StateError('invalid-device-slot-record');
           }
         }
@@ -730,31 +767,52 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
           return lastSeenAt is! Timestamp ||
               lastSeenAt.toDate().isAfter(staleDeviceCutoff);
         }).toList();
+        if (workspaceAdminDeviceSnapshot?.data()?['status'] == 'active' ||
+            workspaceAdminDeviceSnapshot?.data()?['status'] == 'pending') {
+          occupiedDevices.add(workspaceAdminDeviceSnapshot);
+        }
         final existingDeviceIndex = deviceSnapshots.indexWhere(
           (snapshot) =>
               snapshot?.data()?['status'] == 'active' &&
               snapshot?.data()?['device_id'] == metadata.installationId,
         );
+        final hasExistingWorkspaceAdminDevice =
+            workspaceAdminDeviceSnapshot?.data()?['status'] == 'active';
         final pendingDeviceIndex = deviceSnapshots.indexWhere(
           (snapshot) =>
               snapshot?.data()?['status'] == 'pending' &&
               snapshot?.data()?['device_id'] == metadata.installationId,
         );
         final adminPendingIndex = isWorkspaceAdmin ? pendingDeviceIndex : -1;
+        final canAutoApprovePending =
+            pendingDeviceIndex >= 0 &&
+            SessionAccessPolicy.canAutoApprovePendingDevice(
+              pairingRequired: tenant.requireDevicePairing,
+              slotNumber: pendingDeviceIndex,
+              maxDevicesAllowed: maxDeviceSlots,
+              occupiedDeviceCount: occupiedDevices.length,
+            );
         if (pendingDeviceIndex >= 0 && adminPendingIndex < 0) {
-          return _pendingSession(
-            userId,
-            tenantId,
-            metadata,
-            pendingDeviceIndex,
-          );
+          if (tenant.requireDevicePairing) {
+            return _pendingSession(
+              userId,
+              tenantId,
+              metadata,
+              pendingDeviceIndex,
+            );
+          }
+          if (!canAutoApprovePending) {
+            throw StateError('device-limit-reached');
+          }
         }
         final blockedDeviceIndex = deviceSnapshots.indexWhere(
           (snapshot) =>
               snapshot?.data()?['status'] == 'blocked' &&
               snapshot?.data()?['device_id'] == metadata.installationId,
         );
-        if (blockedDeviceIndex >= 0) {
+        final isWorkspaceAdminDeviceBlocked =
+            workspaceAdminDeviceSnapshot?.data()?['status'] == 'blocked';
+        if (blockedDeviceIndex >= 0 || isWorkspaceAdminDeviceBlocked) {
           throw const SessionAccessException(
             SessionAccessErrorCode.deviceBlocked,
           );
@@ -764,27 +822,30 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
               snapshot?.data()?['status'] == 'revoked' &&
               snapshot?.data()?['device_id'] == metadata.installationId,
         );
+        final isWorkspaceAdminDeviceRevoked =
+            workspaceAdminDeviceSnapshot?.data()?['status'] == 'revoked';
         if (SessionAccessPolicy.shouldRejectRevokedAccessDuringRenewal(
           isRenewal: isRenewal,
-          hasRevokedRecord: revokedDeviceIndex >= 0,
-          hasLiveRecord: existingDeviceIndex >= 0,
+          hasRevokedRecord:
+              revokedDeviceIndex >= 0 || isWorkspaceAdminDeviceRevoked,
+          hasLiveRecord:
+              existingDeviceIndex >= 0 || hasExistingWorkspaceAdminDevice,
         )) {
           throw const SessionAccessException(
             SessionAccessErrorCode.deviceSessionRevoked,
           );
         }
         if (SessionAccessPolicy.shouldRequireDeviceAdminReset(
-          hasRevokedRecord: revokedDeviceIndex >= 0,
-          hasLiveRecord: existingDeviceIndex >= 0,
+          hasRevokedRecord:
+              revokedDeviceIndex >= 0 || isWorkspaceAdminDeviceRevoked,
+          hasLiveRecord:
+              existingDeviceIndex >= 0 || hasExistingWorkspaceAdminDevice,
           adminResetOnly: tenant.allowAdminResetOnly,
           isWorkspaceAdmin: isWorkspaceAdmin,
         )) {
           throw const SessionAccessException(
             SessionAccessErrorCode.deviceAdminResetRequired,
           );
-        }
-        if (adminPendingIndex >= maxDeviceSlots) {
-          throw StateError('device-limit-reached');
         }
         final staleDeviceIndex = deviceSnapshots.indexWhere((snapshot) {
           final data = snapshot?.data();
@@ -793,28 +854,43 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
               lastSeenAt is Timestamp &&
               !lastSeenAt.toDate().isAfter(staleDeviceCutoff);
         });
-        final deviceIndex = existingDeviceIndex >= 0
+        final legacyDeviceIndex = existingDeviceIndex >= 0
             ? existingDeviceIndex
             : adminPendingIndex >= 0
             ? adminPendingIndex
+            : canAutoApprovePending
+            ? pendingDeviceIndex
             : revokedDeviceIndex >= 0
             ? revokedDeviceIndex
             : staleDeviceIndex >= 0
             ? staleDeviceIndex
-            : _firstReusableDeviceSlot(
-                deviceSnapshots,
-                maxDeviceSlots,
-                now: now,
-                allowRevoked: !tenant.allowAdminResetOnly,
-              );
-        if (existingDeviceIndex < 0 &&
-            adminPendingIndex < 0 &&
+            : null;
+        final useWorkspaceAdminDeviceRecord =
+            isWorkspaceAdmin &&
+            (hasExistingWorkspaceAdminDevice || legacyDeviceIndex == null);
+        final deviceIndex =
+            legacyDeviceIndex ??
+            (isWorkspaceAdmin
+                ? 0
+                : _firstReusableDeviceSlot(
+                    deviceSnapshots,
+                    maxDeviceSlots,
+                    now: now,
+                    allowRevoked: !tenant.allowAdminResetOnly,
+                  ));
+        if (!isWorkspaceAdmin &&
+            existingDeviceIndex < 0 &&
+            !canAutoApprovePending &&
             (occupiedDevices.length >= maxDeviceSlots || deviceIndex < 0)) {
           throw StateError('device-limit-reached');
         }
 
-        final deviceRef = deviceRefs[deviceIndex];
-        final deviceSnapshot = deviceSnapshots[deviceIndex];
+        final deviceRef = useWorkspaceAdminDeviceRecord
+            ? workspaceAdminDeviceRef!
+            : deviceRefs[deviceIndex];
+        final deviceSnapshot = useWorkspaceAdminDeviceRecord
+            ? workspaceAdminDeviceSnapshot
+            : deviceSnapshots[deviceIndex];
         final isStaleDevice =
             deviceSnapshot?.data()?['status'] == 'active' &&
             (deviceSnapshot?.data()?['last_seen_at'] is Timestamp) &&
@@ -823,14 +899,21 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
                 .isAfter(staleDeviceCutoff);
         final requiresApproval = SessionAccessPolicy.requiresDeviceApproval(
           pairingRequired: tenant.requireDevicePairing,
-          hasActiveDevice: existingDeviceIndex >= 0 && !isStaleDevice,
+          hasActiveDevice:
+              (existingDeviceIndex >= 0 || hasExistingWorkspaceAdminDevice) &&
+              !isStaleDevice,
           isWorkspaceAdmin: isWorkspaceAdmin,
+        );
+        final deviceSlotId = SessionAccessPolicy.deviceRegistrationSlotId(
+          installationId: metadata.installationId,
+          slotNumber: deviceIndex,
+          isWorkspaceAdmin: useWorkspaceAdminDeviceRecord,
         );
         final deviceData = {
           'user_id': userId,
           'tenant_id': tenantId,
-          'slot_id': deviceRef.id,
-          'slot_number': deviceIndex,
+          'slot_id': deviceSlotId,
+          'slot_number': useWorkspaceAdminDeviceRecord ? 0 : deviceIndex,
           'device_id': metadata.installationId,
           'brand': metadata.brand,
           'model': metadata.model,
@@ -841,6 +924,19 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
           'last_seen_at': FieldValue.serverTimestamp(),
         };
         if (adminPendingIndex >= 0 && deviceIndex == adminPendingIndex) {
+          transaction.update(deviceRef, {
+            'status': 'active',
+            'last_seen_at': FieldValue.serverTimestamp(),
+            'app_version': metadata.appVersion,
+          });
+        } else if (useWorkspaceAdminDeviceRecord &&
+            deviceSnapshot?.data()?['status'] == 'pending') {
+          transaction.update(deviceRef, {
+            'status': 'active',
+            'last_seen_at': FieldValue.serverTimestamp(),
+            'app_version': metadata.appVersion,
+          });
+        } else if (canAutoApprovePending && deviceIndex == pendingDeviceIndex) {
           transaction.update(deviceRef, {
             'status': 'active',
             'last_seen_at': FieldValue.serverTimestamp(),
@@ -917,7 +1013,7 @@ class SessionManagementNotifier extends AsyncNotifier<void> {
           'tenant_id': tenantId,
           'slot_id': sessionRef.id,
           'slot_number': sessionIndex,
-          'device_slot_id': deviceRef.id,
+          'device_slot_id': deviceSlotId,
           'session_id': sessionId,
           'device_id': metadata.installationId,
           'device_brand': metadata.brand,

@@ -87,9 +87,10 @@ whenever fixing any issue. Catch and fix culprits found while reading touched fi
   active unexpired session for the installation, and never sign out a different
   UID after an asynchronous check. Keep login failures visible; show a status
   for attempts pending longer than 12 seconds.
-- Access limits are role-scoped: sellers use per-workspace dynamic caps;
-  workspace admins share a super-admin-configured platform cap; super-admins
-  use separate platform-only slots (2 devices, 1 active session).
+- Access limits are role-scoped: sellers use per-workspace dynamic device and
+  session caps; workspace admins have unlimited paired devices but share a
+  super-admin-configured active-session cap; super-admins use separate
+  platform-only slots (2 devices, 1 active session).
 
 ## Canonical Audit Doc
 

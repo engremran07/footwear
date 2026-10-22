@@ -1,4 +1,4 @@
-﻿# FootWear ERP — Flutter App (v3.9.79+705)
+﻿# FootWear ERP — Flutter App (v3.9.80+706)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
@@ -10,13 +10,15 @@ Status chips display localized text and use high-contrast state colors when that
 
 Encrypted backup export and Google Drive upload are separate actions; Drive uploads do not create duplicate local archives. Restore behavior follows workspace scope, and local backup files can be deleted from the device restore picker. Workspace archival revokes member access records before the workspace is marked archived.
 Workspace-admin and seller sign-in registers device access through tenant/user-scoped queries and links each application session to its registered device slot. Workspace create/edit failures remain visible in the form, and the workspace list tolerates temporary auth-profile loading.
-Sign-in stays on the login screen until access registration completes. Seller devices use pending approval when workspace pairing is enabled; workspace administrators register without seller approval and use shared platform caps, defaulting to three devices and two sessions if the platform policy document is absent. Administrators can remove, block, or reset devices with related active-session revocation. Sessions renew while foregrounded and show a five-minute expiry warning. These records support client-side device/seat controls; Firestore Rules do not bind requests to an active session ID under the current Spark architecture.
+Sign-in stays on the login screen until access registration completes. Seller devices use pending approval when workspace pairing is enabled; pairing-off pending seller devices can activate on their next registration. Workspace administrators can pair unlimited devices without seller approval, while the shared platform policy caps concurrent workspace-admin sessions (default: two). The separate paired-device registry shows account name/email, device model, app version, Android/OS version, status, and timestamps. It deduplicates by user and installation and caps each live device/user query at 200 records. Administrators can remove, block, or reset devices with related active-session revocation. Sessions renew while foregrounded and show a five-minute expiry warning. These records support client-side device/seat controls; Firestore Rules do not bind requests to an active session ID under the current Spark architecture.
 
 Invoice creation supports stock sales, workspace-enabled non-stock catalog sales, and cash receipt invoices. Non-stock invoices preserve catalog item details without reducing inventory. Receipt numbering, receipt ledger entries, and shop balance changes are atomic and workspace-scoped. Workspace administrators configure bilingual invoice headers; generated PDFs use the header snapshot stored on each invoice. Shop detail provides a preselected invoice entry point while retaining ledger-only cash-in.
 
 Non-stock invoicing is disabled for new and legacy workspaces unless an administrator explicitly enables it. Sale and credit-note creation commit the workspace invoice counter, invoice, ledger, shop balance, and stock movements in one Firestore transaction. Firestore Rules require invoice/ledger/shop links for sales, receipts, and credit notes; seller sales also validate the exact balance delta. Voiding a credit note reverses its stock movement and the original invoice's cumulative credit total. Transaction descriptions accept multiline notes.
 
-Access limits are role-scoped: sellers use each workspace's configured cap, workspace admins share the cap configured by the platform super-admin, and super-admins use separate platform-only limits of two devices and one active session. Device/session rules are not a server authorization boundary under the current Spark architecture.
+Access limits are role-scoped: sellers use each workspace's configured device/session caps, workspace admins have unlimited paired-device registrations and share the active-session cap configured by the platform super-admin, and super-admins use separate platform-only limits of two devices and one active session. Device/session rules are not a server authorization boundary under the current Spark architecture.
+
+Standalone cash-in/cash-out corrections use audited soft deletion only. The provider records the actor, reverses the exact shop-balance delta, and clears the cached latest-transaction summary when it points to the deleted row, all in the same batch. Workspace admins may perform this correction; sellers cannot delete transactions, hard deletion is denied, and invoice-linked transactions remain immutable outside invoice void/credit-note flows.
 
 Invoice voiding commits status, shop balance, inventory restoration, and reversal rows atomically. Receipt counter values are verified by Firestore Rules. Invoice PDFs localize receipt methods, distinguish non-stock lines, and paginate with dynamic page numbering.
 
@@ -135,6 +137,8 @@ lib/
 | `/invoices/:id` | Invoice detail | All |
 | `/reports` | Reports (PDF / Excel) | Admin |
 | `/settings` | Settings | Admin |
+| `/tenants/:tenantId/security` | Device and session security | Workspace admin / selected super-admin |
+| `/tenants/:tenantId/devices` | Paired-device registry | Workspace admin / selected super-admin |
 
 ---
 

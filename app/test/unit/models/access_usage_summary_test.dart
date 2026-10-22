@@ -17,6 +17,22 @@ void main() {
       expect(summary.overLimitSessionCount, 0);
     });
 
+    test(
+      'represents unlimited device capacity independently of session cap',
+      () {
+        final summary = AccessUsageSummary(
+          maxDevicesAllowed: null,
+          registeredDevices: 24,
+          maxActiveSessionsAllowed: 2,
+          activeSessions: 1,
+        );
+
+        expect(summary.availableDeviceSlots, 0);
+        expect(summary.overLimitDeviceCount, 0);
+        expect(summary.availableSessionSlots, 1);
+      },
+    );
+
     test('policy reductions preserve existing registrations as over limit', () {
       final summary = AccessUsageSummary(
         maxDevicesAllowed: 3,

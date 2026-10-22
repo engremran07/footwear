@@ -1462,7 +1462,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               !tx.deleted &&
                               user?.isAdmin == true &&
                               tx.editRequestPending,
-                          canDelete: !tx.deleted && user?.isAdmin == true,
+                          canDelete:
+                              !tx.deleted &&
+                              user?.isAdmin == true &&
+                              (tx.invoiceId == null || tx.invoiceId!.isEmpty) &&
+                              (tx.type == TransactionModel.typeCashIn ||
+                                  tx.type == TransactionModel.typeCashOut),
                           onEdit: () => _showEditTransactionDialog(tx),
                           onApproveEdit: () => _reviewEditRequest(tx, true),
                           onRejectEdit: () => _reviewEditRequest(tx, false),

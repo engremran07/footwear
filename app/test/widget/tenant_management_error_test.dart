@@ -135,6 +135,66 @@ void main() {
     expect(find.text('Seller Account'), findsNothing);
   });
 
+  testWidgets('workspace policy switches can be turned off and saved', (
+    tester,
+  ) async {
+    final tenant = TenantModel(
+      id: 'alpha',
+      name: 'Alpha',
+      slug: 'alpha',
+      requireDevicePairing: true,
+      allowAdminResetOnly: true,
+      ownerUserId: 'owner-uid',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final user = UserModel(
+      id: 'platform-admin',
+      email: 'platform@example.com',
+      displayName: 'Platform Admin',
+      role: UserRole.superAdmin,
+      active: true,
+      activeWorkspaceId: tenant.id,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final tenantNotifier = _RecordingTenantManagementNotifier();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(user)),
+          tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
+          tenantUsersProvider.overrideWith(
+            (ref, tenantId) => Stream.value(const <UserModel>[]),
+          ),
+          tenantManagementNotifierProvider.overrideWith(() => tenantNotifier),
+        ],
+        child: const MaterialApp(home: TenantManagementScreen()),
+      ),
+    );
+
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.edit));
+    await tester.pump();
+
+    final switches = find.byType(SwitchListTile);
+    expect(tester.widget<SwitchListTile>(switches.at(0)).value, isTrue);
+    expect(tester.widget<SwitchListTile>(switches.at(1)).value, isTrue);
+    await tester.tap(switches.at(0));
+    await tester.pump();
+    await tester.tap(switches.at(1));
+    await tester.pump();
+    expect(tester.widget<SwitchListTile>(switches.at(0)).value, isFalse);
+    expect(tester.widget<SwitchListTile>(switches.at(1)).value, isFalse);
+
+    await tester.tap(find.byIcon(Icons.save_alt));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(tenantNotifier.updatedRequireDevicePairing, isFalse);
+    expect(tenantNotifier.updatedAllowAdminResetOnly, isFalse);
+  });
+
   testWidgets('workspace create does not wait for global owner users', (
     tester,
   ) async {
@@ -241,6 +301,8 @@ void main() {
 
 class _RecordingTenantManagementNotifier extends TenantManagementNotifier {
   String? assignedOwnerId;
+  bool? updatedRequireDevicePairing;
+  bool? updatedAllowAdminResetOnly;
 
   @override
   Future<String> createTenant({
@@ -252,6 +314,21 @@ class _RecordingTenantManagementNotifier extends TenantManagementNotifier {
     required int maxActiveSessionsAllowed,
     String? ownerUserId,
   }) async => 'alpha';
+
+  @override
+  Future<void> updateTenant(
+    String tenantId, {
+    required String name,
+    required String slug,
+    required bool requireDevicePairing,
+    required bool allowAdminResetOnly,
+    required int maxDevicesAllowed,
+    required int maxActiveSessionsAllowed,
+    String? ownerUserId,
+  }) async {
+    updatedRequireDevicePairing = requireDevicePairing;
+    updatedAllowAdminResetOnly = allowAdminResetOnly;
+  }
 
   @override
   Future<void> assignTenantOwner(String tenantId, String ownerUserId) async {
