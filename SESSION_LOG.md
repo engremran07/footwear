@@ -29,7 +29,8 @@
 - Web release: `EXIT: 0`; Hosting deployment: `Deploy complete!`.
 - Rules/indexes deployment: `Deploy complete!`; Firebase reported 23 remote indexes and 2 field overrides absent from the source manifest, preserved without deletion.
 - APKs: ARMv7 30.3 MB, ARM64 31.8 MB, x86_64 33.3 MB. `adb push` reported 33,382,424 bytes; streamed install returned `Success`.
-- Commit and push to `main`: pending final staged-diff review.
+- Release commit: `da780c7` (`feat: remove app-managed device access and release CRUD — v3.9.81+707`), 80 files changed.
+- Push: `32d843d..da780c7 main -> main` on `origin`.
 
 ---
 

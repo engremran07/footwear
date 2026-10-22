@@ -5,7 +5,7 @@ Repository: engremran07/footwear
 Branch: main
 Audited base revision: 32d843d8b7e7707b7325b15f21570da3acfa6dbf
 Release: v3.9.81+707
-Worktree: release deployed and installed; commit/push to `main` pending
+Worktree: release committed and pushed to `main` (`da780c7`)
 Scope: remove app-managed device pairing/custom access slots while preserving
 Firebase Authentication, tenant boundaries, workspace-admin business CRUD,
 sorting, and financial integrity.
@@ -35,8 +35,8 @@ rewritten.
 Rules/indexes and Hosting were deployed to `shoeserp-clean-20260327`; the web
 release and ABI-split APKs were built, and the ARM64 APK was copied to and
 installed on phone `R5GL22RGT9V`. Deployment did not delete legacy Firestore
-records or Firebase Auth accounts. Commit/push will be recorded in section 7
-after the final diff review.
+records or Firebase Auth accounts. Commit/push evidence is recorded in section
+7.
 
 
 2. IMPORTANT SCOPE AND DELETION POLICY
@@ -278,7 +278,8 @@ builds, phone copy/install, and commit/push to `main`.
   ARMv7 30.3 MB, ARM64 31.8 MB, x86_64 33.3 MB.
 - Device `R5GL22RGT9V`: copied ARM64 artifact to Downloads; install output
   `Success`.
-- Commit and push are authorized and will be recorded after final diff review.
+- Commit: `da780c7` (`feat: remove app-managed device access and release CRUD — v3.9.81+707`).
+- Push: `32d843d..da780c7 main -> main` on `origin`.
 - No production Firestore business documents or Firebase Auth identities were
   deleted. The user requested feature removal and deployment, not legacy data
   cleanup; these remaining records are outside this change's approved scope.
