@@ -1,0 +1,300 @@
+SHOESERP - FINAL CUSTOM DEVICE-ACCESS PURGE AND SAAS CRUD AUDIT
+
+Audit date: 2026-10-22
+Repository: engremran07/footwear
+Branch: main
+Audited base revision: 32d843d8b7e7707b7325b15f21570da3acfa6dbf
+Release: v3.9.81+707
+Worktree: release deployed and installed; commit/push to `main` pending
+Scope: remove app-managed device pairing/custom access slots while preserving
+Firebase Authentication, tenant boundaries, workspace-admin business CRUD,
+sorting, and financial integrity.
+
+
+1. EXECUTIVE RESULT
+
+The code-level purge is implemented in the current worktree. The app no longer
+registers devices, requires pairing approval, allocates custom access slots,
+renews custom sessions, or wraps authenticated navigation in a custom session
+guard. The related screens, routes, models, services, localization strings,
+collection constants, Firestore Rules paths/helpers, and dedicated indexes
+were removed.
+
+Firebase Authentication remains. Active user-profile checks, role checks,
+tenant isolation, super-admin selected-workspace context, the eight-hour
+support-context Rules limit, and append-only platform_access_logs remain.
+These are separate identity, authorization, and audit controls, not device
+pairing or custom sign-in slots.
+
+Workspace-admin route, shop, and transaction CRUD paths are tenant-scoped and
+covered by Rules regression tests. Shop creation plus route-count reconciliation
+and ledger creation plus shop-balance changes are exercised as atomic batches.
+Existing sort providers, comparators, filters, and query ordering were not
+rewritten.
+
+Rules/indexes and Hosting were deployed to `shoeserp-clean-20260327`; the web
+release and ABI-split APKs were built, and the ARM64 APK was copied to and
+installed on phone `R5GL22RGT9V`. Deployment did not delete legacy Firestore
+records or Firebase Auth accounts. Commit/push will be recorded in section 7
+after the final diff review.
+
+
+2. IMPORTANT SCOPE AND DELETION POLICY
+
+Authentication:
+- Firebase Auth remains the only sign-in mechanism. Firebase SDK token
+  lifecycle and web persistence remain in place.
+- Sign-in validates an active Firestore profile, canonical role, and tenant
+  assignment. It does not call custom device/session registration.
+- Super-admin business access still requires an explicitly selected workspace,
+  a reason, append-only start/end records, and an eight-hour Rules-enforced
+  context. This is retained by design.
+
+Existing Firestore data:
+- No production data was read, migrated, or deleted in this implementation.
+- Existing users/{uid}/sessions, device_registrations, platform_sessions, or
+  legacy device-policy fields, if present, are inert from this source tree;
+  removing app references and Rules paths does not erase stored documents.
+- Data cleanup must be a separately reviewed, backed-up, dry-run migration
+  against an explicitly confirmed Firebase project. platform_access_logs and
+  Firebase Auth identities are not part of such cleanup.
+
+Delete behavior:
+- No new soft-delete behavior was added as part of this purge.
+- Existing standalone cash-in/cash-out correction remains an audited soft
+  delete with an exact same-batch shop.balance reversal. This is required by
+  the repository's financial-integrity contract; hard deletion or removing the
+  reversal would corrupt balances and financial history.
+- Invoice-linked transactions remain protected and are corrected only through
+  invoice void/credit-note flows. Referenced routes/shops retain their existing
+  safe deactivation behavior; physical deletion remains governed by existing
+  reference and role safeguards.
+
+
+3. RECENT SOURCE HISTORY AND CHAT CONTEXT
+
+Recent commits reviewed:
+- 32d843d8b7e7707b7325b15f21570da3acfa6dbf (2026-10-22): purge-titled
+  change, but the audited base still contained pairing/session implementation.
+- 79c107838fea38132d40ce2d3276b03ac59c9080 (2026-10-17): workspace owner,
+  account access, and invoice hardening.
+- f19c04c59a09f07629b202e545160e786be5a08d (2026-10-16): custom device/session
+  registration hardening.
+- 2266b53 (recent history): authentication/session sign-in and logout issue
+  work.
+- 25fd9d5 (recent history): authentication/session sign-in and logout issue
+  work.
+
+Chat-history evidence:
+- Workspace session lookup for 2026-09-25 through 2026-10-22 returned one
+  Footwear conversation: "Purge sessions and device pairing feature", created
+  2026-10-22.
+- Cloud and local session-store searches for the prior 30 days returned no
+  additional matching sessions. Three separate recent chats were not
+  available to inspect; no unseen chat content is inferred or fabricated.
+
+
+4. IMPLEMENTATION SURFACES
+
+Removed from active application source:
+- Auth-time custom access registration and custom access cleanup.
+- SessionGuard and installation-identity services.
+- Device/session security and paired-device screens and their routes.
+- Custom access policy/error/usage models and device/session models.
+- Device/session policy fields and management controls from tenant models,
+  providers, and screens.
+- Pairing/session-specific Rules helpers and user subcollection access paths.
+- Collection constants and tenant collection-group indexes used only by the
+  removed feature.
+- Obsolete access-policy and lock-overlay localization labels.
+
+Preserved and retained:
+- Firebase Auth sign-in, owner-controlled password reset, and auth lifecycle.
+- Active profile, role, tenant, seller-route, and super-admin support-context
+  validation.
+- Platform-access audit logs and workspace context expiry.
+- Financial safeguards, sort state, route/shop list ordering, and export
+  sorting.
+
+Workspace CRUD changes:
+- Route and shop writes validate the active profile, role, and concrete tenant.
+- Shop create and route-count increment commit atomically. Seller route-count
+  reconciliation is linked to the newly created shop in Rules.
+- Admin route reassignment reconciles both affected route counts atomically.
+- Rules tests cover tenant-admin route/shop create and update, cross-tenant
+  denials, and transaction create/update in an atomic ledger/shop-balance batch.
+- Existing route/shop/transaction sorting code was left intact. The complete
+  Flutter suite passed; it includes transaction export sort coverage. No new
+  dedicated route/shop sort-widget test was added in this change.
+
+
+5. VALIDATION EVIDENCE
+
+- `flutter analyze lib --no-pub`
+  Output: `No issues found! (ran in 17.3s)`
+- `dart analyze test/`
+  Output: `No issues found!`
+- `flutter test -r expanded`
+  Final output: `00:56 +528: All tests passed!`
+- Focused test runner:
+  Output summary: 49 passed, 0 failed.
+- Firestore Rules Emulator:
+  Output: `103 passing (19s)`
+  Windows note: the package's npm `test:emulator` script failed because its
+  single-quoted nested command was split by the Windows shell. The direct
+  Windows-safe command succeeded:
+  `firebase emulators:exec --only firestore "npm test"`
+- Markdown lint:
+  Exit code 0; no output.
+- `firestore.indexes.json` parsed successfully; `git diff --check` returned no
+  findings. Version is still synchronized at `3.9.80+706` in pubspec and
+  `AppBrand`.
+- Hygiene checks: no raw collection literals, no Firestore access in
+  screens/widgets, no `StateProvider<T>` usages, and
+  `allTransactionsProvider` remains in the auth invalidation list.
+- Active-source grep for custom access symbols across app/lib, app/test,
+  firestore.rules, firestore.indexes.json, tests, pubspec.yaml, and pubspec.lock:
+  No matches for SessionGuard, device registration, pairing, custom slot,
+  platform session/policy, renewal, or removed screen/service identifiers.
+
+5A. FIRESTORE RULES REMEDIATION ADDENDUM — 2026-10-22
+
+An additional local Rules audit identified these gaps:
+- Shop creation could supply a nonzero opening balance and cached last-
+  transaction values.
+- Admin or seller transaction creation could produce an orphan/mismatched
+  ledger row without its corresponding same-batch shop/balance write.
+- An active member profile could retain business access when its tenant
+  document was inactive.
+
+Local remediation:
+- `isAdminForTenant` now checks privileged role/tenant eligibility before
+  loading tenant status. Ordinary tenant-admin and seller business access
+  requires the tenant document to be active. Selected super-admin restoration
+  remains a separate, explicit path.
+- Shop creates require `balance == 0` and reject seeded cached last-
+  transaction metadata.
+- Standalone transactions require an exact linked shop/balance change in the
+  same atomic write. Invoice-linked seller entries use invoice references and
+  the existing invoice/shop aggregate checks rather than duplicating expensive
+  per-row balance calculations. This preserves multi-row invoices and avoids
+  Firestore's expression-evaluation ceiling.
+- Regression tests cover inactive-tenant access with active profiles, a
+  nonzero shop opening balance, orphan/mismatched ledger writes, and valid
+  tenant restore behavior.
+
+Verification:
+- Baseline with the new regressions against the pre-fix Rules: `103 passing`,
+  `4 failing` (the four new finding reproductions).
+- Intermediate implementation exposed a Firestore Rules expression-limit
+  regression in valid seller invoice and stock-sale batches. The final change
+  reduced redundant seller invoice linkage checks and short-circuits irrelevant
+  roles before tenant lookups.
+- Targeted seller invoice/CRUD check: `4 passing`.
+- Full Rules Emulator: `107 passing (21s)`, command:
+  `firebase emulators:exec --only firestore "npm test"` from
+  `tests/firestore-rules/`.
+- Repository Markdown lint exited 0 with no output; `git diff --check` passed.
+- Reviewed new agent/skill/instruction frontmatter; no GitHub workflow files
+  were changed. Deleted the unreferenced `firebase_rules_debug.txt` and
+  regenerated the application map. No `.tt` files were present; historical
+  audit `.txt` files remain indexed or linked and were preserved.
+- Full current Rules Emulator suite: `107 passing (25s)`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 109.5s)`.
+- `dart analyze test/`: `No issues found!`.
+- `flutter test -r expanded`: `00:58 +528: All tests passed!`.
+- Web release build: `EXIT: 0`; Firebase Hosting deployment: `Deploy complete!`
+  at `https://shoeserp-clean-20260327.web.app`.
+- Rules/index deployment: `Deploy complete!`. Firebase reported 23 remote
+  indexes and 2 field overrides absent from the local manifest; they were left
+  untouched (no `--force` deletion was requested).
+- Split APKs: ARMv7 30.3 MB, ARM64 31.8 MB, x86_64 33.3 MB. The ARM64 APK
+  (`app-arm64-v8a-release.apk`, 33,382,424 bytes) was pushed to
+  `/sdcard/Download/app-arm64-v8a-release.apk`; ADB install returned `Success`.
+- The Problems tool still lists 126 stale diagnostics attached to five deleted
+  pairing/session Dart files. Each reported path is absent from disk; scoped
+  checks on current changed app/test files report `No errors found`, and both
+  Dart analyzers plus the full Flutter suite are clean.
+- The rules deploy does not prune production index entries or change business
+  data. No application data migration was run.
+
+
+6. FINDING STATUS
+
+F-01 - Purge request not implemented at audited HEAD: CLOSED IN LOCAL SOURCE.
+The base revision retained the custom access feature; the current worktree
+removes its application, UI, Rules, localization, and index dependencies.
+
+F-02 - Custom access registration gates sign-in: CLOSED IN LOCAL SOURCE.
+Firebase Auth sign-in no longer performs custom access registration or rolls
+back a valid Firebase sign-in because a device slot/pairing check failed.
+
+F-03 - Physical deletion differs from logical deletion: POLICY RETAINED.
+Financial and referenced-record safeguards were not weakened. No new soft
+delete was introduced by this task. The mandated standalone cash correction
+soft-delete path remains; route/shop deactivation and safe physical-delete
+constraints remain as designed.
+
+F-04 - Tenant authorization/deployed Rules state: LOCAL TESTS PASS; RULES
+DEPLOYED. Tenant-admin CRUD and cross-tenant Rules cases pass in the emulator.
+No live-account CRUD smoke test was performed.
+
+F-05 - Security-boundary conflation: CLOSED IN SOURCE.
+Firebase Auth, active profile, tenant isolation, selected super-admin
+workspace, eight-hour Rules TTL, and append-only platform access logs remain.
+
+F-06 - Existing Firestore records may remain: OPEN, DATA-MIGRATION ONLY.
+No live Firestore documents were deleted. Any cleanup requires project
+confirmation, backup, dry run, and separate approval.
+
+F-07 - Regression coverage: SOURCE TESTS PASS.
+Custom feature-specific tests were removed or replaced with retained-auth,
+tenant CRUD, cross-tenant denial, and financial atomicity coverage. Existing
+historical audit records were not rewritten.
+
+F-08 - Shop opening balance can be forged: CLOSED AND DEPLOYED. Rules reject
+nonzero opening balances and seeded transaction-summary metadata.
+
+F-09 - Transaction creation can be disconnected from shop balance: CLOSED IN
+SOURCE AND DEPLOYED. Standalone ledger rows require same-batch balance linkage;
+invoice-linked flows retain invoice-specific and aggregate balance checks.
+Regression tests cover orphan and mismatched writes.
+
+F-10 - Inactive tenant access with active user profile: CLOSED AND DEPLOYED.
+Ordinary business access checks tenant activity as well as the user profile,
+with a separate selected-super-admin restoration path.
+
+
+7. RELEASE AND DEPLOYMENT
+
+The user explicitly authorized Rules/indexes and Hosting deployment, release
+builds, phone copy/install, and commit/push to `main`.
+
+- Firebase target: `shoeserp-clean-20260327` (configured default).
+- `firebase deploy --only firestore:rules,firestore:indexes`: `Deploy complete!`.
+- `flutter build web --release`: `EXIT: 0`; `firebase deploy --only hosting`:
+  `Deploy complete!`; URL `https://shoeserp-clean-20260327.web.app`.
+- `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true`:
+  ARMv7 30.3 MB, ARM64 31.8 MB, x86_64 33.3 MB.
+- Device `R5GL22RGT9V`: copied ARM64 artifact to Downloads; install output
+  `Success`.
+- Commit and push are authorized and will be recorded after final diff review.
+- No production Firestore business documents or Firebase Auth identities were
+  deleted. The user requested feature removal and deployment, not legacy data
+  cleanup; these remaining records are outside this change's approved scope.
+
+
+8. FINAL CONCLUSION
+
+The app-managed device-pairing and custom session-approval feature is removed
+from app source and Rules; Firebase Authentication, tenant isolation,
+super-admin support context, financial safeguards, workspace-admin CRUD, and
+sorting remain. Rules/indexes and Hosting are deployed; v3.9.81+707 web and
+APK artifacts were built; the ARM64 APK was copied to and installed on the
+connected phone. Validation evidence and remaining scope limitations are
+listed above.
+
+This is not a historical-data purge. Existing legacy pairing/session documents
+and Firebase Auth identities were not deleted, and the removal of app-managed
+session controls must not be represented as a change to Firebase Auth account
+state.

@@ -1,7 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'access_usage_summary.dart';
-
 class TenantModel {
   final String id;
   final String name;
@@ -9,10 +7,6 @@ class TenantModel {
   final String? plan;
   final bool active;
   final bool isTrial;
-  final bool requireDevicePairing;
-  final bool allowAdminResetOnly;
-  final int maxDevicesAllowed;
-  final int maxActiveSessionsAllowed;
   final Timestamp createdAt;
   final Timestamp updatedAt;
   final String? ownerUserId;
@@ -28,10 +22,6 @@ class TenantModel {
     this.plan,
     this.active = true,
     this.isTrial = false,
-    this.requireDevicePairing = false,
-    this.allowAdminResetOnly = true,
-    this.maxDevicesAllowed = 3,
-    this.maxActiveSessionsAllowed = 2,
     required this.createdAt,
     required this.updatedAt,
     this.ownerUserId,
@@ -49,16 +39,6 @@ class TenantModel {
       plan: json['plan'] as String?,
       active: json['active'] as bool? ?? true,
       isTrial: json['is_trial'] as bool? ?? false,
-      requireDevicePairing: json['require_device_pairing'] as bool? ?? false,
-      allowAdminResetOnly: json['allow_admin_reset_only'] as bool? ?? true,
-      maxDevicesAllowed: ((json['max_devices_allowed'] as num?) ?? 3)
-          .toInt()
-          .clamp(1, AccessUsageSummary.maximumSlotsPerUser),
-      maxActiveSessionsAllowed:
-          ((json['max_active_sessions_allowed'] as num?) ?? 2).toInt().clamp(
-            1,
-            AccessUsageSummary.maximumSlotsPerUser,
-          ),
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
       ownerUserId: json['owner_user_id'] as String?,
@@ -75,10 +55,6 @@ class TenantModel {
     'plan': plan,
     'active': active,
     'is_trial': isTrial,
-    'require_device_pairing': requireDevicePairing,
-    'allow_admin_reset_only': allowAdminResetOnly,
-    'max_devices_allowed': maxDevicesAllowed,
-    'max_active_sessions_allowed': maxActiveSessionsAllowed,
     'created_at': createdAt,
     'updated_at': updatedAt,
     'owner_user_id': ownerUserId,

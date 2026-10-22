@@ -1,6 +1,6 @@
 ﻿# ShoesERP AI Coding Rules (CLAUDE.md)
 
-Last updated: 2026-09-26
+Last updated: 2026-10-22
 
 ## Runtime Override (Always First)
 
@@ -8,6 +8,8 @@ The live codebase is a route/seller distribution ERP.
 
 - Roles: admin, seller (manager must be admin-equivalent)
 - Super-admin is platform-only by default. Tenant business data requires explicit `active_workspace_id` plus a reasoned support context; selection start/end is written to append-only `platform_access_logs`.
+- Firebase Auth is the app's only sign-in mechanism. The app has no custom device registration, pairing approval, session slots, or session renewal; Firestore Rules enforce active profile, role, tenant, and selected-workspace scope.
+- Business-data access additionally requires an active tenant document. An active user profile does not override an inactive workspace; the explicitly selected super-admin restoration path is the limited exception.
 - Collections: users, products, product_variants, seller_inventory, inventory_transactions,
   routes, shops [Firestore name: 'customers' — legacy, use Collections.shops],
   transactions, invoices, settings
@@ -35,8 +37,7 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 7. Any where+orderBy query requires index entry when fields differ.
 8. Keep role handling canonical and normalized (trim/lowercase in app writes).
    Tenant-aware roles (tenant_admin, super_admin) must be treated as privileged roles and must carry a tenant_id in new documents and in the user profile.
-  Each workspace owns its business settings and seller device/session limits. Workspace admins may change only seller caps in their workspace. A separate `settings/platform_access_policy` controls the shared workspace-admin active-session cap across all workspaces and is super-admin-only. Workspace admins have unlimited paired devices; super-admin platform sessions use their own two-device/one-active-session slots.
-  The workspace device-pairing switch applies to sellers; workspace admins are not approval-gated. A missing platform policy document defaults workspace-admin active sessions to 2.
+  Workspace settings are tenant-scoped. Workspace administrators may manage business settings within their workspace; device-pairing and custom session-cap policies are not part of the runtime.
 9. Keep admin-only write enforcement in submit methods (screen-level defense in depth).
 10. Validate required identity fields (for example created_by/route_id/shop_id) before provider writes.
 11. No Firebase Storage — company logos stored as base64 in Firestore, product images use external HTTP URLs. Do not add firebase_storage dependency.
@@ -85,14 +86,15 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 23. Never store or ship service-account credentials. Arbitrary-user Auth administration belongs in a trusted backend; the client may not create/promote super-admins or mutate another user's Auth credentials.
 24. Platform super-admins may read workspace metadata globally, but every business-data operation must be scoped to the selected workspace and an auditable support reason. No selection means no business records.
 25. Super-admin business-context selection and exit events are append-only in `platform_access_logs`. Never create/promote platform super-admin accounts or mutate another user's Auth credentials from client code. Never store service-account credentials in Firestore, backups, APKs, or web builds.
-26. Super-admin business context expires after 8 hours in Firestore rules. Workspace admins may update only their workspace seller access caps; pairing mode, workspace lifecycle, and other tenant configuration remain platform-controlled.
+26. Super-admin business context expires after 8 hours in Firestore rules. Workspace admins may update only workspace-scoped business settings; workspace lifecycle and other platform configuration remain platform-controlled. Do not restore app-managed device registration, pairing, or session-slot enforcement.
 27. Require a concrete tenant for every new business write via `TenantScope.requireTenant`; never replace missing tenant identity with `__global__`. Unassigned users must not be silently self-healed into a shared tenant.
 28. Local admins manage seller profiles only. Workspace-admin role changes require an active platform super-admin workspace context.
 29. Seller stock decrements must match a same-batch sale invoice's exact `seller_inventory_deductions` entry. Every warehouse stock mutation requires an atomic tenant-scoped inventory audit row.
 30. Admin financial corrections append the prior amount/type/date, actor, and a reason of at least 10 characters to `edit_history`; invoice-linked transaction amounts/types/dates are immutable outside void/credit-note flows. Standalone cash-in/cash-out transactions may only be soft-deleted by a tenant admin-equivalent with an exact atomic shop-balance reversal and correction transaction link. Clear cached last-transaction fields only if they point at the deleted row. Sellers, invoice-linked entries, and hard deletes are denied.
-31. Export queries must cursor-page to exhaustion. Tenant-admin backup restore is upsert-only and never prunes; selected super-admin restore upserts before pruning obsolete records in the active tenant. Reject legacy plaintext backup archives.
-32. Keep sessions on transient token-refresh/network failures. Firebase initialization failure must render a retry state and must not mount the normal app shell.
-33. Copilot chat history and request IDs do not merge across GitHub identities through repository changes. Preserve durable decisions, pending tasks, audit IDs, and verification evidence in `SESSION_LOG.md` and the current audit report. On an account/profile switch, read those plus `git status`/`git diff`; never store credentials or full chat transcripts in the repository or claim separate accounts were synchronized.
+31. Shop creation starts with a zero balance and no fabricated last-transaction fields. Standalone transactions must be linked to a same-batch shop/balance update. Invoice batches may contain multiple ledger rows and use validated invoice references plus aggregate balance changes; do not impose a one-row/one-delta rule.
+32. Export queries must cursor-page to exhaustion. Tenant-admin backup restore is upsert-only and never prunes; selected super-admin restore upserts before pruning obsolete records in the active tenant. Reject legacy plaintext backup archives.
+33. Keep users signed in through transient token-refresh/network failures. Firebase initialization failure must render a retry state and must not mount the normal app shell.
+34. Copilot chat history and request IDs do not merge across GitHub identities through repository changes. Preserve durable decisions, pending tasks, audit IDs, and verification evidence in `SESSION_LOG.md` and the current audit report. On an account/profile switch, read those plus `git status`/`git diff`; never store credentials or full chat transcripts in the repository or claim separate accounts were synchronized.
 
 ## Financial Pathways (never mix these)
 
@@ -278,74 +280,45 @@ Never keep ambiguity-driven workaround code without explicit justification.
 | Vibe Debt | Accumulated complexity from AI-generated code nobody understands | Understand every line you write; never copy-paste without tracing |
 | Confidence Theater | "Fixed!" with evidence (tests pass) but bug untouched | Claim requires exact code-path trace, not just "tests pass" |
 
-## Fifteen Non-Negotiable Pre-Signoff Steps
+## Scope-Aware Verification and Release
 
-**All 15 steps are mandatory for every session that touches code. No bypass.**
+Run checks that match the requested change. There is no unconditional
+release/deployment sequence for every code edit.
 
-```bash
-# 1 — Version bump + sync
-Select-String -Path "app\pubspec.yaml","app\lib\core\constants\app_brand.dart" -Pattern '^version:|appVersion|buildNumber'
-# If this session is producing release artifacts, bump PATCH+BUILD before continuing.
+### Local Validation
 
-# 2 — Zero analyze issues
-flutter analyze lib --no-pub
-# Must end: No issues found! (ran in Xs)
+- For Dart changes, run relevant tests and `flutter analyze lib --no-pub`.
+- For test changes, run the targeted suite and `dart analyze test/`.
+- For Firestore Rules changes, run the Rules Emulator suite from
+  `tests/firestore-rules/`:
 
-# 3 — Zero test dir issues
-dart analyze test/
-# Must end: No issues found!
+  ```powershell
+  Push-Location tests/firestore-rules
+  firebase emulators:exec --only firestore "npm test"
+  Pop-Location
+  ```
 
-# 4 — All tests green
-flutter test -r expanded
-# Must quote: All N tests passed!
+- For Markdown changes, run the repository Markdown lint command.
+- Quote exact tool output for every validation claim. A focused suite's count
+  is not the full-suite count.
 
-# 5 — No raw collection strings
-grep -rn "\.collection\('" app/lib/ | grep -v "Collections\."
-# Must return zero lines
+### Production and Release Authorization
 
-# 6 — No Firestore writes in screens/widgets
-grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/
-# Must return zero lines
+Version bumps, release builds, Hosting/Rules deployment, production data
+changes, device installation, commits, pushes, tags, and GitHub releases are
+separate operations. Perform them only when explicitly authorized by the user.
 
-# 7 — No StateProvider (banned Riverpod 3)
-grep -rn "StateProvider\b" app/lib/ --include="*.dart"
-# Must return zero lines
+The current workflow side effects are:
 
-# 8 — Zero markdown lint issues (Problems tab must be empty)
-markdownlint "**/*.md" ".claude/**/*.md" ".github/**/*.md" --ignore node_modules --ignore app/build --ignore functions/node_modules
-# Must exit 0 with zero output
+- A push to `main` runs `.github/workflows/deploy-web.yml`, which deploys
+  Firebase Hosting and Firestore Rules/indexes.
+- A version tag or authorized manual dispatch can run
+  `.github/workflows/release.yml`, which builds and deploys release surfaces.
+- `.github/workflows/build-apk.yml` is a manual APK artifact build.
 
-# 9 — Web release build (PowerShell — check $LASTEXITCODE, not pipe output)
-$ErrorActionPreference='Continue'; cd app; flutter build web --release; Write-Host "EXIT: $LASTEXITCODE"
-# Must state EXIT: 0
-
-# 10 — Firebase Hosting deployed
-firebase deploy --only hosting
-# Must quote: Deploy complete!
-
-# 11 — APK build
-flutter build apk --release
-
-# 12 — Firestore rules + indexes deployed (always, not just on change)
-firebase deploy --only firestore:rules,firestore:indexes
-# Must quote: Deploy complete!
-
-# 13 — GitHub local audit
-git log --oneline -5
-git status --short
-git diff --stat HEAD
-# confirm no unexpected artifacts
-
-# 14 — Commit + push
-git add -A && git commit -m "type: summary — vX.Y.Z+N"
-git push
-# Must quote commit hash and push output
-
-# 15 — APK install + final smoke verification
-adb devices
-adb -s <device-id> push "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" /sdcard/Download/
-adb -s <device-id> install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
-```
+Do not push or dispatch a workflow as an implicit way to obtain deployment
+permission. State clearly when production state and release artifacts remain
+unmodified.
 
 ## Anti-Bypass Enforcement Matrix
 
@@ -376,23 +349,12 @@ When an admin's ID token is rejected mid-session (INVALID_ID_TOKEN):
 
 Never silently swallow `INVALID_ID_TOKEN` — always force refresh or sign out.
 
-## Pre-Signoff Verification
+## Pre-Release Verification
 
-See **Fifteen Non-Negotiable Pre-Signoff Steps** above — all 15 steps are
-mandatory. Key checks in brief:
-
-- version bump/sync quoted from `app/pubspec.yaml` and `app/lib/core/constants/app_brand.dart`
-- flutter analyze lib --no-pub
-- dart analyze test/
-- flutter test -r expanded
-- flutter build web --release → EXIT: 0
-- firebase deploy --only hosting → Deploy complete!
-- flutter build apk --release
-- firebase deploy --only firestore:rules,firestore:indexes → Deploy complete!
-- git log --oneline -5 + git status --short + git diff --stat HEAD → no unexpected artifacts
-- git add -A + git commit + git push → quote commit hash + push output
-- If device connected: adb install --streaming -r → Success
-- Verify admin and seller startup for `/` and `/inventory`; transient permission-denied UI during stream warm-up is a regression.
+When a release is explicitly requested, verify synchronized versions,
+analyzers, relevant tests, both requested build surfaces, authorized
+deployments, Git delta, and requested device installation. Local-only work
+must not be described as a release or production signoff.
 
 ## Security Baseline
 
@@ -403,6 +365,7 @@ mandatory. Key checks in brief:
 
 ## Done In This Baseline
 
+- v3.9.81+707 (2026-10-22): Removed app-managed device pairing and custom session approvals while retaining Firebase Auth, tenant-scoped workspace-admin CRUD/sorting, selected-super-admin support context, and financial protections. Shop opening balances, standalone ledger-to-shop batch links, and inactive-tenant access are covered by local Rules Emulator regressions. Release and deployment evidence is recorded in SESSION_LOG.md.
 - v3.9.80+706 (2026-10-18): Workspace admins can register unlimited paired devices while keeping a shared bounded active-session policy; tenant-scoped paired-device registry includes account email/name and device/app/OS metadata with 200-record read caps and duplicate suppression. Pairing-off pending seller registrations can activate. Workspace admins can audited-soft-delete standalone cash entries with an atomic balance reversal; hard transaction deletion and invoice-linked deletion are denied. Verification and APK artifact details are recorded after release checks.
 - v3.9.79+705 (2026-10-17): Workspace creation provisions its tenant-scoped owner account; workspace administrators can disable sellers with atomic active-session revocation and manage registered device/session access. Device/session slots remain per user, and client session enforcement is not a Firestore authorization boundary. PWA icon cache keys match this release.
 - v3.9.78+704 (2026-10-16): Workspace owner selection is tenant-scoped, workspace editing requires an active super-admin context, save errors retain accurate mappings, Android/web launcher artwork uses a consistent scale, and shop invoice actions have improved spacing.

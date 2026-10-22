@@ -5,48 +5,20 @@ description: "Use when: writing new tests, auditing test coverage gaps, adding w
 
 # Skill: ShoesERP Testing Strategy
 
-## Current Coverage Status (as of April 2026)
+## Coverage Status
 
-- ✅ Unit tests: 122 passing (models + core utils)
+Test counts and coverage change over time. Never treat counts in this file as
+current evidence. Inspect the present test tree and run the relevant commands
+before reporting coverage or pass counts.
 
-- ❌ Widget tests: 0 (directory empty)
+Current test locations:
 
-- ❌ Provider/Riverpod tests: 0
+- Flutter tests: `app/test/`
+- Firestore Rules Emulator tests: `tests/firestore-rules/rules.test.js`
 
-- ❌ Integration tests: 0
-
-- ❌ PDF export tests: 0
-
-- ❌ Firestore rules tests: 0
-
-## Test Pyramid Target
-
-```text
-
-          [Integration]  ← 5 tests minimum
-        [Widget Tests]   ← 15 tests minimum
-      [Provider Tests]   ← 20 tests minimum
-   [Unit Tests: Models]  ← ✅ 122 passing
-
-```
-
-## Unit Test Gaps to Fill
-
-### Missing Model Tests
-
-- `inventory_transaction_model_test.dart`
-
-- `product_variant_model_test.dart`
-
-- `seller_inventory_model_test.dart`
-
-### Missing Core Tests
-
-- `app_sanitizer_test.dart` — verify `_s()` strips control chars
-
-- `error_mapper_test.dart` — verify all FirebaseException codes map
-
-- `formatters_test.dart` — already done ✅
+Choose coverage based on risk and observable behavior rather than a fixed
+minimum per test category. Preserve existing tests and add regressions for
+security, role, tenant, financial, and CRUD behavior changed by the task.
 
 ## Provider Tests Pattern (with Riverpod)
 
@@ -114,7 +86,7 @@ void main() {
 
 ```javascript
 
-// test/firestore_rules_test.js
+// tests/firestore-rules/rules.test.js
 const { initializeTestEnvironment, assertFails, assertSucceeds } 
   = require('@firebase/rules-unit-testing');
 
@@ -188,39 +160,36 @@ flutter test -r expanded
 flutter test --coverage
 genhtml coverage/lcov.info -o coverage/html
 
-# Run specific test file
-
+# Run specific Flutter test file
 flutter test test/unit/models/user_model_test.dart
 
 # Run widget tests
 
 flutter test test/widget/
 
-# Firebase rules (requires firebase-tools)
-
-npx firebase emulators:exec --only firestore "npx jest test/firestore_rules_test.js"
+# Firestore Rules Emulator suite (requires firebase-tools and npm dependencies)
+Push-Location tests/firestore-rules
+firebase emulators:exec --only firestore "npm test"
+Pop-Location
 
 ```
 
-## Pre-Release Test Checklist
+## Task-Scoped Validation Checklist
 
-- [ ] All 122+ unit tests pass
-
-- [ ] Widget tests for all critical screens
-
-- [ ] Provider tests for dashboardStatsProvider, invoiceNotifier
-
-- [ ] PDF generation test with non-ASCII (Arabic/Urdu) content
-
-- [ ] Firestore rules tests for permission-denied cases
-
-- [ ] `flutter analyze lib --no-pub` — zero issues
+- [ ] Run the smallest relevant test set first; expand to the full suite when
+  shared behavior or regressions warrant it.
+- [ ] Run Firestore Rules Emulator tests for Rules or authorization changes.
+- [ ] Include both denied attacks and legitimate role-scoped CRUD/batch paths.
+- [ ] Run `flutter analyze lib --no-pub` and `dart analyze test/` for Dart
+  changes.
+- [ ] For release claims, run the requested release checks and quote their
+  actual output. A local test pass does not prove production deployment.
 
 ## Firestore Rules Emulator Test Structure
 
 ```javascript
 
-// test/firestore_rules_test.js
+// tests/firestore-rules/rules.test.js
 const { initializeTestEnvironment, assertFails, assertSucceeds }
   = require('@firebase/rules-unit-testing');
 
@@ -253,24 +222,31 @@ Run with:
 
 ```bash
 
-npx firebase emulators:exec --only firestore "npx jest test/firestore_rules_test.js"
+Push-Location tests/firestore-rules
+firebase emulators:exec --only firestore "npm test"
+Pop-Location
 
 ```
 
-## Archive / Soft-Delete 4-Test Requirement
+## Existing Soft-Delete Behavior
 
-For every model that supports soft-delete (`deleted` field), four tests are mandatory:
+Do not introduce soft-delete behavior just to make a test or CRUD path pass.
+When a requested change touches an existing soft-delete flow, first verify its
+business and financial contract, then test the actual supported behavior,
+including:
 
 ```dart
 
 test('active docs returned when deleted is false', ...);
 test('active docs returned when deleted field is absent', ...); // pre-DI-01 docs
 test('deleted docs filtered out when deleted is true', ...);
-test('batch delete sets deleted=true + deleted_at + deleted_by', ...);
+test('authorized correction records the delete actor and timestamp atomically', ...);
 
 ```
 
-See `inline-audit SKILL.md §6` for the correct client-side filter pattern.
+For transaction correction, also cover the exact same-batch shop-balance
+reversal and deny hard delete unless the product owner and financial contract
+explicitly authorize a different design.
 
 ## Provider Test Template
 

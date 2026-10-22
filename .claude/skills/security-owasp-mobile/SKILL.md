@@ -1,202 +1,113 @@
 ---
 name: security-owasp-mobile
-description: "Use when: hardening app security, auditing Firebase rules, preventing injection, securing PDF export, validating auth tokens, reviewing OWASP Mobile Top 10 compliance."
+description: "Use when: reviewing ShoesERP mobile security, Firebase Authentication, Firestore Rules, tenant isolation, secrets, input validation, backups, or OWASP MASVS/mobile risks."
 ---
 
-# Skill: OWASP Mobile Security + Firebase Hardening
-
-## OWASP Mobile Top 10 (2024) Compliance for ShoesERP
-
-### M1 — Improper Credential Usage
-
-- ✅ No API keys in source code — Firebase config via `firebase_options.dart` (legitimate)
-
-- ✅ No hardcoded admin passwords
-
-- ⚠️ `firebase_options.dart` is committed to git — acceptable for Firebase (client config is public), but verify API key restrictions in Firebase console
-
-- Action: Restrict Firebase API key to Android/iOS app package only in Google Cloud Console
-
-### M2 — Inadequate Supply Chain Security
-
-- ⚠️ 62 packages have newer versions incompatible with constraints — run `flutter pub outdated` regularly
-
-- Action: Pin critical security-sensitive packages: `firebase_auth`, `cloud_firestore`, `firebase_core`
-
-- Action: Review each major version upgrade for breaking security changes
-
-### M3 — Insecure Authentication
-
-- ✅ Firebase Auth (email/password) — proper token refresh
-
-- ✅ `authStateProvider` stream drives all auth flows
-
-- ✅ Secondary `FirebaseApp` approach for user creation (no admin SDK needed)
-
-- ⚠️ No MFA (multi-factor authentication) for admin role
-
-- ⚠️ No session timeout notification to user before 8h admin hard limit
-
-- Action: Show warning dialog at 7h30m for admin users
-
-### M4 — Insufficient Input/Output Validation
-
-- ✅ `AppSanitizer` and `AppValidators` used in forms
-
-- ✅ PDF export uses `_s()` sanitizer (S-08) for text interpolation
-
-- ✅ `docSizeOk()` in Firestore rules prevents large doc abuse
-
-- ⚠️ Invoice total vs items sum NOT validated at provider level (only UI)
-
-- Action: Add server-side validation in `InvoiceNotifier.createInvoice()` before batch commit
-
-### M5 — Insecure Communication
-
-- ✅ All Firebase communication uses TLS (HTTPS)
-
-- ✅ No custom network calls outside Firebase SDK
-
-- ✅ `cached_network_image` for external product images (HTTPS URLs expected)
-
-- ⚠️ No URL validation for product `image_url` field — could accept `http://` (insecure)
-
-- Action: Validate `image_url` starts with `https://` in ProductFormScreen and provider
-
-### M6 — Inadequate Privacy Controls
-
-- ✅ No biometrics or sensitive hardware access
-
-- ✅ Minimal permissions: only notifications + storage for PDF
-
-- ⚠️ Customer data (name, balance, phone) stored in Firestore without encryption at rest
-
-- Firebase Firestore encrypts at rest by default ✅
-
-- ⚠️ `SharedPreferences` stores `auth.remember_me` — acceptable (no tokens stored)
-
-### M7 — Insufficient Binary Protections
-
-- ✅ ProGuard/R8 configured (`proguard-rules.pro` exists)
-
-- ✅ Split-per-ABI APK builds
-
-- ⚠️ `android:debuggable` must be `false` in release build — verify in `build.gradle.kts`
-
-- Action: Confirm `buildTypes.release.debuggable = false`
-
-### M8 — Security Misconfiguration
-
-- ✅ `firestore.rules` deployed with deny-by-default
-
-- ✅ `storage.rules` exists (though Storage is not used)
-
-- ✅ `firebase_app_check` dependency included — verify AppCheck is enforced in rules
-
-- ⚠️ AppCheck enforcement: if AppCheck is in debug mode in release builds, rules bypass is possible
-
-- Action: Verify AppCheck is in production mode for release APK
-
-### M9 — Insecure Data Storage
-
-- ✅ No sensitive data in `SharedPreferences` beyond `auth.remember_me`
-
-- ✅ No local SQLite or unencrypted local storage
-
-- ✅ PDF files generated in-memory (Isolate.run) and shared via share_plus, not persisted
-
-- ⚠️ `path_provider` used for download helper — verify temp files are cleaned up after share
-
-### M10 — Insufficient Cryptography
-
-- ✅ No custom cryptography — uses Firebase's managed encryption
-
-- ✅ Base64 for logo is encoding, not encryption — acceptable for non-secret data
-
-## Firebase Rules Hardening Checklist
-
-```javascript
-
-// Already in rules — verify these are deployed:
-// ✅ deny-by-default (no match = denied)
-// ✅ isActiveUser() check on all reads
-// ✅ docSizeOk() on all writes
-// ✅ withinWriteRate() on user updates
-// ✅ isAdminRole() with regex (case-insensitive, trim-tolerant)
-// ✅ isSellerForRoute() prevents cross-route writes
-// ✅ Bootstrap admin create is one-time (checks !exists())
-
-// AUDIT ITEM: transactions.update — sellers can update ANY field on their own tx
-// Current rule: isAdmin() || (isSeller() && created_by == uid)
-
-// Risk: seller could update amount, route_id, etc. after creation
-// Recommendation: sellers should only update limited fields:
-allow update: if isAdmin() ||
-
-  (isSeller() && resource.data.created_by == request.auth.uid &&
-   request.resource.data.diff(resource.data).affectedKeys()
-     .hasOnly(['status', 'notes', 'updated_at']));
-
-```
-
-## PDF Security (S-08 Compliance)
-
-- ✅ `_s()` sanitizer strips control chars + collapses whitespace
-
-- ✅ No string interpolation with raw user input in PDF widgets
-
-- ✅ `Isolate.run()` isolates PDF generation from main thread
-
-## URL Injection Prevention
-
-```dart
-
-// Product image URL validation:
-String? validateImageUrl(String? url) {
-  if (url == null || url.isEmpty) return null;
-
-  final uri = Uri.tryParse(url);
-  if (uri == null || !uri.hasScheme) return 'Invalid URL';
-
-  if (uri.scheme != 'https') return 'Only HTTPS URLs allowed';
-  return null;
-}
-
-```
-
-## Input Sanitization at Provider Layer
-
-```dart
-
-// In InvoiceNotifier.createInvoice() — before batch write:
-if (invoice.items.isNotEmpty) {
-  final computedSubtotal = invoice.items.fold<double>(0, (s, i) => s + i.subtotal);
-  if ((computedSubtotal - invoice.subtotal).abs() > 0.01) {
-    throw AppException('Invoice totals are inconsistent');
-  }
-}
-if (invoice.amountReceived > invoice.total + 0.01) {
-  throw AppException('Amount received exceeds invoice total');
-}
-
-```
-
-## Session Security
-
-- 8h admin hard session limit (AppLifecycleListener) — ALREADY IMPLEMENTED
-
-- ⚠️ Warning dialog missing at 7h30m
-
-- ⚠️ Seller sessions: no timeout (intentional — sellers operate for full working days)
-
-## Android Release Checklist
-
-- [ ] `debuggable = false` in release buildType
-
-- [ ] ProGuard rules include Firebase, Riverpod, gson
-
-- [ ] `firebase_app_check` in production mode (not debug)
-
-- [ ] No `console.log` / `Logger` calls in release build (use `kReleaseMode` guard)
-
-- [ ] Signing keystore stored outside source tree (key.properties not committed)
+# Skill: ShoesERP Mobile and Firebase Security Review
+
+## Review Standard
+
+Use current OWASP and Firebase documentation, then verify every claim against
+the checked-out source, tests, and configuration. This checklist is an audit
+guide, not a certification or a claim that ShoesERP is OWASP compliant. Record
+evidence, severity, confidence, scope, and unresolved limitations.
+
+## Authentication and Authorization
+
+- Firebase Authentication is the app's sign-in mechanism. Firebase SDK token
+  refresh and persistence are distinct from app-managed sessions.
+- The current source has no app-managed device registration, pairing approval,
+  session slots, renewal loop, or custom session gate. Do not recommend restoring
+  these controls unless the product owner explicitly changes the requirement.
+- Verify active Firestore profile and role checks, concrete tenant assignment,
+  seller route scope, and selected-workspace support context for platform
+  super-admin business access.
+- Firestore Rules are the server-side data authorization boundary. Router
+  visibility and provider guards are defense in depth, not substitutes.
+- Client-side session tracking cannot bind ordinary Firestore requests to a
+  custom session ID. App Check is an app/device attestation signal, not a
+  replacement for Rules or authorization.
+- Client code must not create/promote super-admins, administer arbitrary users'
+  Auth credentials, or contain service-account credentials. Use owner-controlled
+  Firebase Auth flows or an explicitly authorized trusted backend.
+- Never report MFA, token revocation, App Check enforcement, or a session
+  timeout as present without verifying current source and Firebase project
+  configuration.
+
+## Firestore Rules and Tenant Boundaries
+
+- Confirm deny-by-default behavior and role normalization from the actual
+  `firestore.rules` and `UserModel`.
+- Check every business collection for tenant ownership and role-specific
+  authorization. An active user profile does not imply that the user's tenant
+  is active.
+- Verify that inactive workspaces deny ordinary business access while allowing
+  only the intentionally supported selected-super-admin restoration flow.
+- Check `get`, `exists`, and `getAfter` access-call counts and Rules expression
+  complexity for representative atomic batches. The Firestore Rules Emulator
+  enforces the expression evaluation limit; preserve valid seller and admin
+  invoice, ledger, shop-balance, and stock batches.
+- A shop must not be created with a fabricated opening balance or cached
+  transaction fields.
+- Standalone transaction rows must be linked to their same-batch shop/balance
+  update. Invoice flows may contain multiple ledger rows and must be validated
+  against the invoice's aggregate delta; do not assume one row equals one
+  balance change.
+- Validate adversarial cases and legitimate CRUD in
+  `tests/firestore-rules/rules.test.js`. Run with:
+
+  ```powershell
+  Push-Location tests/firestore-rules
+  firebase emulators:exec --only firestore "npm test"
+  Pop-Location
+  ```
+
+Rules tests do not prove production deployment state. Do not deploy rules or
+indexes without explicit authorization.
+
+## Data Integrity and Privacy
+
+- Follow `shop.balance` as the sole financial source of truth. Invoice and
+  transaction writes that affect it must be atomic and preserve ledger links.
+- Preserve inventory audit records and exact invoice deductions for stock
+  changes.
+- Treat historical backups as sensitive. Verify tenant/route scoping,
+  encryption, restore behavior, and pruning authority.
+- Do not weaken established correction, deletion, or audit-history controls
+  without tracing all provider and Rules paths and adding regression tests.
+- Do not log credentials, access tokens, full PII, or sensitive document
+  contents. Inspect error and analytics paths for accidental disclosure.
+- Validate user-controlled input at the provider boundary; UI-only validation
+  is insufficient for security-critical writes.
+
+## Mobile and Release Surfaces
+
+- Inspect Android permissions, exported components, deep links, release
+  debuggability, signing configuration, and ProGuard/R8 behavior in the actual
+  manifest and Gradle files.
+- Verify secrets are not committed or passed through client build defines.
+  Public Firebase client configuration is not equivalent to a service-account
+  credential; access still depends on Rules and API restrictions.
+- Confirm external product image URLs are restricted to HTTPS where enforced.
+- Do not claim data is encrypted by application-level cryptography merely
+  because Firebase encrypts service data at rest or TLS protects transport.
+- Distinguish local builds, emulator tests, deployed Hosting, deployed Rules,
+  and APK installation in every security report.
+
+## Required Report Format
+
+For each finding, include:
+
+| Field | Required evidence |
+|---|---|
+| Severity | Critical, high, medium, or low with rationale |
+| Location | File and exact line(s) |
+| Attack preconditions | Required role, tenant, and request state |
+| Impact | Concrete confidentiality, integrity, or availability effect |
+| Reproduction | Safe emulator/test evidence; no production exploitation |
+| Remediation | Minimal source change and regression test |
+| Confidence | 1–10, reflecting evidence quality |
+| Status | Verified fixed, open, or blocked; identify deployment status |
+
+Do not test against production accounts or mutate live data unless the user
+explicitly authorizes that target and action.

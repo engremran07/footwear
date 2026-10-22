@@ -1,7 +1,7 @@
 # ShoesERP Master Blueprint
 
-**Version:** v3.9.53+92
-**Last updated:** 2026-10-03 — Tenant restore and forensic audit pass
+**Version:** v3.9.80+706
+**Last updated:** 2026-10-22 — Custom device-access purge and tenant CRUD audit
 **Purpose:** Architecture handoff document — living reference for structure, conventions, and runtime contracts.
 
 ---
@@ -13,8 +13,14 @@ ShoesERP is a route/seller distribution ERP for a footwear distribution business
 **Tier:** Firebase Spark (free). No Cloud Functions, no Firebase Storage.  
 **Platforms:** Android (split-per-ABI APK set) + Web (Firebase Hosting)
 **State management:** Riverpod 3.x (`NotifierProvider`, `AsyncNotifier`, `StreamProvider.autoDispose`)  
-**Navigation:** GoRouter (21 routes, auth guard)  
+**Navigation:** GoRouter with Firebase Auth/profile guards
 **Auth:** Firebase Auth (email+password) + secondary FirebaseApp for safe user creation
+
+**Access boundary:** Firebase Auth is the only sign-in mechanism. The app does
+not register devices, require pairing approval, or manage custom session slots.
+Firestore Rules enforce active-profile, role, tenant, and selected
+super-admin-workspace access. The audited super-admin workspace context and its
+append-only `platform_access_logs` are separate from sign-in.
 
 ---
 
@@ -24,6 +30,8 @@ ShoesERP is a route/seller distribution ERP for a footwear distribution business
 |------------------------|-------------|
 | `admin` | Full write access to all collections. Can act as field seller (has own seller_inventory). |
 | `manager` | Treated as admin-equivalent in all app + rules logic (legacy value). |
+| `tenant_admin` | Full CRUD within the assigned tenant, subject to financial and role-management safeguards. |
+| `super_admin` | Platform metadata globally; business data only in an explicitly selected, audited workspace. |
 | `seller` | Read active business docs. Create/update shops in assigned route. Create transactions for assigned route. Update own profile. No write to routes/products/settings. |
 
 **Normalization rule:** All role values are written `trim().toLowerCase()`. Rules use `isAdminRole()` regex `/(admin|manager)/i`.
@@ -58,7 +66,7 @@ ShoesERP is built as a shared-Firebase multi-workspace SaaS application. The pre
 ### Tenant model
 
 - `tenants` collection (`Collections.tenants`) stores workspace records.
-- Each tenant document contains `tenant_id`, `name`, `slug`, `plan`, `active`, `owner_user_id`, `require_device_pairing`, `allow_admin_reset_only`, `created_at`, and `updated_at`.
+- Each tenant document contains workspace identity, owner, plan, lifecycle, and business settings. Device-pairing and custom session-policy fields are not part of the runtime model.
 - `tenant_id` is the canonical workspace partition key used across users and business collections.
 
 ### Role semantics
@@ -138,7 +146,7 @@ Void/Return (admin only):
 | `routesProvider` | StreamProvider.autoDispose | admin+seller | |
 | `productsProvider` | StreamProvider.autoDispose | admin+seller | |
 
-All admin-scoped providers **must** appear in `_invalidateRoleScopedProviders()` in `auth_provider.dart` to prevent data leaks across sessions.
+All admin-scoped providers **must** appear in `_invalidateRoleScopedProviders()` in `auth_provider.dart` to prevent data leaks across account or role changes.
 
 ---
 
@@ -215,7 +223,7 @@ Defined in `app/lib/core/router/app_router.dart`. Auth guard redirects unauthent
 |----|------|-----------|--------------|
 | RR-001 | Historical service-account credential exposure | Closed 2026-09-26: key revoked, Firestore credential removed, backup sanitized, client Auth signing path removed. Continue to exclude the credential from history/artifacts. | Closed; trusted backend required only if arbitrary-user Auth administration returns |
 | RR-002 | Float currency arithmetic | ±0.01 epsilon tolerance in invoice provider | Accounting sprint |
-| RR-003 | Lock overlay tap-to-dismiss | Sessions still expire; 8h hard cutoff applies | local_auth sprint |
+| RR-003 | Retired app-managed lock overlay | The custom guard and overlay are no longer part of the runtime; Firebase Auth and the super-admin workspace TTL remain separate controls. | Closed — custom guard removed |
 | RR-004 | Hard pagination caps | 150 tx / 500 shops is sufficient for current scale | Scale sprint |
 
 ---
@@ -224,9 +232,9 @@ Defined in `app/lib/core/router/app_router.dart`. Auth guard redirects unauthent
 
 | Field | Current | File |
 |-------|---------|------|
-| `appVersion` | `3.9.53` | `app/lib/core/constants/app_brand.dart` |
-| `buildNumber` | `92` | `app/lib/core/constants/app_brand.dart` |
-| `version` | `3.9.53+92` | `app/pubspec.yaml` |
+| `appVersion` | `3.9.80` | `app/lib/core/constants/app_brand.dart` |
+| `buildNumber` | `706` | `app/lib/core/constants/app_brand.dart` |
+| `version` | `3.9.80+706` | `app/pubspec.yaml` |
 
 Both files **must stay in sync** before every release. Bump both together.
 

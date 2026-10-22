@@ -1,4 +1,4 @@
-﻿# FootWear ERP — v3.9.80+706
+# FootWear ERP — v3.9.81+707
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
@@ -15,7 +15,9 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 > **v3.9.77+703 (2026-10-16)** — Non-stock invoicing is disabled until explicitly enabled per workspace. Sale, receipt, return, and invoice-number updates are transactionally linked to ledger, balance, and stock changes; shop transaction descriptions accept multiple lines.
 > **v3.9.78+704 (2026-10-16)** — Workspace owners are selected within the active workspace, editing requires active platform access, save errors are classified accurately, and launcher icon sizing is consistent across Android and web.
 > **v3.9.79+705 (2026-10-17)** — Workspace setup provisions an owner account; workspace admins can disable sellers and revoke or block their device/session access; PWA icon URLs refresh installed artwork.
-> **v3.9.80+706 (2026-10-18)** — Workspace admins can pair unlimited devices while the platform caps concurrent sessions. A separate paired-device registry shows account and Android/app/device details. Transaction corrections use audited, atomic soft deletion; invoice-linked entries remain protected.
+> **v3.9.81+707 (2026-10-22)** — Firebase Authentication remains the only sign-in mechanism, without app-managed device pairing or custom session approvals. Workspace admins retain tenant-scoped routes, shops, and transaction CRUD. Firestore Rules enforce active tenants, zero-balance shop creation, and atomic standalone ledger/shop balance links.
+>
+> Prior version bullets below are historical release notes.
 
 ---
 
@@ -31,8 +33,8 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 - **Transactions** — cash-in / cash-out ledger with running balance
 - **Invoices** — stock and non-stock sales, cash receipt invoices, credit notes, void/paid lifecycle, and workspace-configurable bilingual PDF headers
 - **Reports** — monthly cash flow BarChart, outstanding PieChart, PDF/Excel/image export
-- **User Management** — create/edit admin and seller accounts, disable/reactivate accounts, review paired devices and sessions, and send password-reset emails
-- **Settings** — workspace-scoped company name, logo (base64 ≤50 KB), pairs-per-carton, business preferences, and seller device/session limits; shared workspace-admin caps are platform-controlled
+- **User Management** — create/edit permitted admin and seller accounts, disable/reactivate accounts, and send password-reset emails
+- **Settings** — workspace-scoped company name, logo (base64 ≤50 KB), pairs-per-carton, and business preferences
 - **Profile** — name, language, theme and password controls for all users
 
 ### Seller
@@ -162,7 +164,7 @@ No Cloud Functions deployment needed. User creation uses a secondary `FirebaseAp
 
 ShoesERP is designed as a single-project SaaS app. All tenant data lives in one Firebase project and is partitioned by `tenant_id` to support multiple workspaces on the Spark free tier.
 
-- The `tenants` collection stores workspace metadata, plan flags, owner user, and device-pairing policy.
+- The `tenants` collection stores workspace metadata, plan flags, and owner user.
 - Every tenant-scoped business document (`users`, `routes`, `customers`/`shops`, `products`, `seller_inventory`, `transactions`, `invoices`, etc.) must carry `tenant_id`.
 - `tenant_admin` is scoped to a single tenant. `super_admin` is a platform operator and sees workspace metadata globally, but sees no workspace business records by default.
 - Super-admin business support requires selecting one active workspace and entering a reason; the app records access start/end in append-only `platform_access_logs`. Firestore rules enforce the selected workspace regardless of client navigation.
@@ -185,8 +187,7 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 ### Verified Runtime Invariants
 
 - Mutations require a concrete tenant; missing tenant identity is an error, never a `__global__` fallback. Unassigned users contact their workspace administrator instead of self-provisioning.
-- Device pairing approval applies to sellers. Workspace admins can register unlimited paired devices without seller approval; a separate platform policy caps concurrent workspace-admin sessions (default: two). Sellers retain per-workspace device/session caps.
-- The paired-device registry is tenant-scoped and deduplicates by account and installation ID. It shows account name/email, device model, app version, Android/OS version, and access timestamps; live device and user streams are each capped at 200 records.
+- Firebase Auth sign-in is not gated by device registration, pairing approval, or custom session slots. Firestore Rules continue to enforce active profiles, role permissions, concrete tenant scope, and audited super-admin workspace context.
 - Transaction corrections use soft deletion only. Workspace admins can reverse standalone cash-in/cash-out transactions only with an exact same-batch shop-balance update; seller deletes and invoice-linked deletes are denied.
 - Super-admin business access expires after 8 hours and remains enforced by Firestore rules. Legacy admins manage seller profiles; workspace-admin role changes require an active super-admin support context.
 - Seller stock reductions must match exact same-batch invoice deductions. Warehouse stock movements and returns append tenant-scoped inventory audit records atomically.

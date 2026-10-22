@@ -7,6 +7,25 @@ Most recent first.
 
 ---
 
+## [3.9.81+707] — 2026-10-22 — Custom access removal and workspace CRUD
+
+### Changed
+
+- Firebase Authentication remains the sign-in mechanism without app-managed device pairing or custom session approvals.
+- Workspace administrators retain tenant-scoped route, shop, and transaction CRUD; existing sorting behavior is preserved.
+- Business Rules require active tenants, zero-balance shop creation, and atomic standalone ledger/shop balance links.
+
+### Cleanup
+
+- Removed obsolete pairing/session Dart sources and the unreferenced Firebase CLI debug log; regenerated the application map. Historical audit reports remain.
+
+### Verification
+
+- Firestore Rules Emulator: `107 passing (25s)`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 109.5s)`; `dart analyze test/`: `No issues found!`; `flutter test -r expanded`: `00:58 +528: All tests passed!`.
+- Web build: `EXIT: 0`; Hosting and Firestore rules/indexes deployment: `Deploy complete!`.
+- Split APKs: ARMv7 30.3 MB, ARM64 31.8 MB, x86_64 33.3 MB. ARM64 copied to and installed on R5GL22RGT9V (`Success`).
+
 ## [3.9.80+706] — 2026-10-18 — Workspace access and transaction integrity
 
 ### Added

@@ -1,146 +1,108 @@
 ---
 name: firebase-free-tier
-description: "Use when: ensuring all Firebase usage stays within Spark (free) plan limits, auditing for paid-only features, optimizing Firestore read/write counts, preventing quota exhaustion."
+description: "Use when: checking Firebase Spark-plan eligibility, Firestore quotas, Firebase Auth limits, read/write cost, or whether a proposed feature needs a paid plan."
 ---
 
-# Skill: Firebase Free-Tier Compliance (Spark Plan)
+# Skill: Firebase Plan and Quota Review
 
-## Spark Plan Limits (as of 2026)
+## Scope
 
-| Resource | Free Limit | Danger Zone |
+Check Firebase product availability, billing-plan requirements, and usage against
+current official documentation. Do not equate a repository design goal with an
+enforced billing limit. Verify current plan and project usage before making
+claims about production cost or quota headroom.
 
-|---|---|---|
+The application currently uses Firebase Authentication and Cloud Firestore. It
+does not use Firebase Storage or Cloud Functions in the client architecture.
+Company logos are stored as bounded base64 values in Firestore; product images
+use external HTTPS URLs. Confirm manifests and source before repeating these
+claims.
 
-| Firestore reads/day | 50,000 | >40,000 |
+## Firestore Free Quota
 
-| Firestore writes/day | 20,000 | >16,000 |
+As verified from the official Firestore quota documentation on 2026-10-22, the
+free quota for one database per project includes:
 
-| Firestore deletes/day | 20,000 | >16,000 |
+| Resource | Free quota |
+|---|---:|
+| Stored data | 1 GiB |
+| Document reads | 50,000 per day |
+| Document writes | 20,000 per day |
+| Document deletes | 20,000 per day |
+| Outbound data transfer | 10 GiB per month |
 
-| Firestore storage | 1 GB | >800 MB |
+These values and free-tier eligibility can change. Consult the linked official
+pricing and quota pages before planning capacity or promising zero cost. Other
+Firebase products have separate limits and may require billing, even when
+Firestore remains within its free quota.
 
-| Auth users | Unlimited | — |
+Firebase Authentication does not have a generic “10,000 operations/month”
+limit. Limits vary by operation and sign-in provider. Check the current
+Authentication limits and pricing pages for the exact operation in scope.
 
-| Auth operations | 10,000/month | — |
+## Project Architecture Checks
 
-| Functions invocations | 0 (REMOVED from this app) | — |
+- Do not add `firebase_storage` or Storage APIs; the current app contract excludes
+  Firebase Storage.
+- Do not add Cloud Functions or other paid-plan dependencies without explicit
+  product and billing review.
+- Never embed service-account credentials or privileged credentials in client
+  code, Firestore, backups, or build defines.
+- The Firebase client configuration is not a service-account secret. Verify API
+  key restrictions and Firebase Security Rules separately; obscuring a client
+  key is not an authorization boundary.
+- `docSizeOk()` in `firestore.rules` limits the number of document fields
+  (`request.resource.data.size() < 100`). It does not measure bytes or enforce
+  a 50 KB cap.
+- Workspace logo size limits are application validation, not the meaning of
+  `docSizeOk()`. Confirm the actual provider and Rules checks before stating
+  their exact bounds.
+- Firestore Rules do not filter query results. A query must be authorized for
+  every possible result document; test the actual query shape and index.
 
-| Storage | 0 (REMOVED from this app) | — |
+## Read and Write Cost Review
 
-## Zero-Cost Architecture Rules
+For each proposed listener or query:
 
-1. **NO firebase_storage** — dependency must NOT be in pubspec.yaml
+1. Identify its source collection, filters, order, limit, refresh behavior, and
+   consuming UI.
+2. Prefer an existing scoped stream when it meets the feature's freshness and
+   completeness requirements. Avoid redundant listeners.
+3. Use a visible limit for UI windows when the screen communicates truncation.
+   Full exports and backups must cursor-page until the result is exhausted.
+4. Account for document reads caused by listener snapshots, query results,
+   transaction retries, and Firestore Rules document-access calls. Repeated
+   Rules lookups may be cached during evaluation; do not assume every call
+   creates a distinct billable read.
+5. Avoid invoking queries repeatedly in rebuilds or loops. Derive display
+   metrics from already-loaded data only when that preserves correctness.
+6. Keep multi-document financial changes atomic. Never trade balance/ledger
+   integrity for fewer writes.
 
-2. **NO Cloud Functions** — functions/index.js must only contain stub/no-op or be empty
+`withinWriteRate()` is a repository-specific write guard, not a Firebase free
+quota. Apply it only where the rules and runtime flow require it; do not add it
+to high-frequency or atomic financial paths without testing their valid batches.
 
-3. **NO Blaze-only features**: no Extensions, no BigQuery exports, no Firestore backups
+`collectionGroup` is a supported Firestore query feature, not categorically
+more expensive or forbidden. Review its result scope, indexes, Rules query
+authorization, and measured cost before using or rejecting it.
 
-4. **Company logos**: base64 in Firestore settings doc, ≤50 KB cap enforced by docSizeOk()
+## Verification Procedure
 
-5. **Product images**: external HTTP URLs only (URL field), never uploaded blobs
+1. Inspect `app/pubspec.yaml`, the relevant service/provider code,
+   `firebase.json`, `firestore.rules`, and current workflow definitions.
+2. Verify claimed billing/limit details against official Firebase pricing,
+   quotas, and Authentication documentation.
+3. Run the relevant emulator or unit tests; do not deploy as a substitute for
+   local validation.
+4. Use Firebase Console usage metrics only when project access and explicit
+   authorization are available. Do not infer live usage from source code.
+5. Report uncertainty, source date, and whether the conclusion describes code,
+   emulator evidence, or live project configuration.
 
-## Read Optimization Patterns
+## Official References
 
-```dart
-
-// GOOD: Stream (cached by Firestore SDK, only sends delta updates)
-StreamProvider<List<T>>((ref) => FirebaseFirestore.instance
-  .collection(col).snapshots().map(...))
-
-// BAD: Future inside build() — re-reads entire collection each call
-FutureProvider<List<T>>((ref) => FirebaseFirestore.instance
-  .collection(col).get().then(...))
-
-// GOOD: Limit queries to avoid full-collection scans
-.limit(200)  // always set a reasonable limit
-
-// GOOD: Dashboard derived from streams (zero extra reads)
-Provider<AsyncValue<Stats>>((ref) => _computeFromStreams(ref));
-
-// BAD: Aggregate queries (count/sum) in loops or on every rebuild
-// Use computed values from already-loaded stream data instead
-
-```
-
-## Write Optimization Rules
-
-- Batch related writes (e.g., invoice + balance update + stock deduction) in a single `WriteBatch`
-
-- Avoid writes on every keystroke — debounce or write only on submit
-
-- The `withinWriteRate()` rule in firestore.rules enforces 1s cooldown — respect it in UI
-
-## Invoice Numbering (Atomic Counter)
-
-The `settings/global.last_invoice_number` counter MUST use a Firestore Transaction (not batch) to prevent race conditions:
-
-```dart
-
-// CORRECT — atomic read-compute-write
-await db.runTransaction((txn) async {
-  final doc = await txn.get(settingsRef);
-  final next = ((doc.data()?['last_invoice_number'] as int?) ?? 0) + 1;
-  txn.update(settingsRef, {'last_invoice_number': next});
-  return 'INV-${DateTime.now().year}-${next.toString().padLeft(4, '0')}';
-});
-// WRONG — read-then-update outside a transaction (race condition)
-
-```
-
-## Firestore Rules Free-Tier Guards
-
-```javascript
-
-// docSizeOk() — already in rules, prevents large doc abuse
-function docSizeOk() {
-  return request.resource.data.size() < 50000;
-}
-
-// withinWriteRate() — already in rules, 1s cooldown
-function withinWriteRate() {
-  return resource == null
-    || !('updated_at' in resource.data)
-
-    || request.time > resource.data.updated_at + duration.value(1, 's');
-
-}
-
-```
-
-## Firestore Cost Killers to Avoid
-
-- Real-time listeners on large collections without `.limit()` → add `.limit()`
-
-- `get()` calls inside Firestore Rules (each = 1 extra read) → minimize `get()` in rules
-
-- Multiple listeners on same collection in different providers → consolidate to one StreamProvider
-
-- `collectionGroup` queries → avoid (expensive, hard to index)
-
-- Dashboard aggregate queries → derive from already-loaded stream data (zero extra reads)
-
-## Budget Alert Setup (Manual, via Console)
-
-Since free tier has no budget alerts, monitor the Firebase Console daily:
-
-- Firestore → Usage tab → check reads/writes
-
-- Alert threshold: 80% of daily limit = 40K reads / 16K writes
-
-## Free-Tier Monitoring Checklist
-
-- [ ] No `firebase_storage` in pubspec.yaml
-
-- [ ] No Cloud Functions in functions/ (or functions/ removed)
-
-- [ ] All collections use `.limit()` in queries
-
-- [ ] Dashboard stats computed from stream providers (not aggregate queries)
-
-- [ ] Invoice numbering uses Firestore Transaction (not batch for counter)
-
-- [ ] settings doc ≤50 KB (base64 logo compressed to 256×256, ≤50KB)
-
-- [ ] No `collectionGroup` queries
-
-- [ ] No `get()` calls in rules beyond what's already there
+- [Firebase pricing plans](https://firebase.google.com/pricing)
+- [Cloud Firestore quotas and free quota](https://firebase.google.com/docs/firestore/quotas)
+- [Firebase Authentication limits](https://firebase.google.com/docs/auth/limits)
+- [Cloud Firestore pricing](https://firebase.google.com/docs/firestore/pricing)

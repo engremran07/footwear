@@ -198,7 +198,7 @@ does not accept a remote device path as its APK argument.
 [ ] allUsersExportProvider used with await .future (not .value ?? [] cache read)
 [ ] Export providers are NOT autoDispose (one-shot Firestore .get() must survive past first microtask)
 [ ] Every ref.read(exportProvider.future) has ref.invalidate() before it for fresh data
-[ ] SessionGuard defers enforcement during sign-in, prefers the latest valid same-device session, and scopes sign-out to the checked UID
+[ ] Firebase Auth sign-in validates the active profile and preserves role, tenant, and selected-workspace authorization
 
 ```
 

@@ -31,7 +31,7 @@ service cloud.firestore {
     function isTenantAdminRole(role) {
       return isTenantAdminOnlyRole(role);
     }
-    function isWorkspaceAdminAccessRole(role) {
+    function isWorkspaceAdminRole(role) {
       return role is string &&
         role.matches('(?i)^\\s*(admin|manager|tenant_admin)\\s*$');
     }
@@ -43,28 +43,46 @@ service cloud.firestore {
       return isActiveUser() && isSuperAdminRole(getUserRole());
     }
 
-    // P0-2 FIX: isAdminForTenant(tenantId) checks if the current user is an
-    // admin-tier account that can access this specific tenant's data. Used as
-    // the security boundary for all tenant-owned documents: routes, shops,
-    // transactions, invoices, products, inventory, notifications, etc.
-    function isAdminForTenant(tenantId) {
-      return (
-        isSuperAdmin() &&
+    function isTenantActive(tenantId) {
+      return tenantId is string && tenantId != '' &&
+        (tenantId == '__global__' ||
+          get(/databases/$(database)/documents/tenants/$(tenantId)).data.active == true);
+    }
+
+    function isSuperAdminForSelectedWorkspace(tenantId) {
+      return isSuperAdmin() &&
         userDoc().data.active_workspace_id == tenantId &&
         userDoc().data.active_workspace_reason is string &&
         userDoc().data.active_workspace_reason.size() >= 10 &&
         userDoc().data.active_workspace_selected_at is timestamp &&
         userDoc().data.active_workspace_selected_at >
-          request.time - duration.value(8, 'h')
-      ) || (
-        isActiveUser() &&
-        !isSuperAdminRole(getUserRole()) &&
+          request.time - duration.value(8, 'h');
+    }
+
+    function isSuperAdminRestoringTenant(tenantId) {
+      let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
+      return isSuperAdminForSelectedWorkspace(tenantId) &&
+        get(tenantPath).data.active == false &&
+        getAfter(tenantPath).data.active == true;
+    }
+
+    // P0-2 FIX: isAdminForTenant(tenantId) checks if the current user is an
+    // admin-tier account that can access this specific tenant's data. Used as
+    // the security boundary for all tenant-owned documents: routes, shops,
+    // transactions, invoices, products, inventory, notifications, etc.
+    function isAdminForTenant(tenantId) {
+      return isActiveUser() &&
         isAdminRole(getUserRole()) &&
         (
-          currentUserTenantId() == tenantId ||
-          (tenantId == '__global__' && currentUserTenantId() == null)
-        )
-      );
+          (isSuperAdminRole(getUserRole()) &&
+            isSuperAdminForSelectedWorkspace(tenantId)) ||
+          (!isSuperAdminRole(getUserRole()) &&
+            (
+              currentUserTenantId() == tenantId ||
+              (tenantId == '__global__' && currentUserTenantId() == null)
+            ))
+        ) &&
+        isTenantActive(tenantId);
     }
 
     function currentUserTenantId() {
@@ -109,24 +127,6 @@ service cloud.firestore {
       return request.resource.data.size() < 100;
     }
 
-    function validAccessLimit(value) {
-      return value is int && value >= 1 && value <= 10;
-    }
-
-    function validTenantAccessPolicy(data) {
-      return (!('max_devices_allowed' in data) ||
-          validAccessLimit(data.max_devices_allowed)) &&
-        (!('max_active_sessions_allowed' in data) ||
-          validAccessLimit(data.max_active_sessions_allowed));
-    }
-
-    function validWorkspaceAdminAccessPolicy(data) {
-      return (!('workspace_admin_max_devices_allowed' in data) ||
-          validAccessLimit(data.workspace_admin_max_devices_allowed)) &&
-        (!('workspace_admin_max_active_sessions_allowed' in data) ||
-          validAccessLimit(data.workspace_admin_max_active_sessions_allowed));
-    }
-
     function validTenantLifecycleTransition(currentData, nextData) {
       let changed = nextData.diff(currentData).affectedKeys();
       return !changed.hasAny(['active', 'archived_at', 'archived_by']) ||
@@ -136,175 +136,6 @@ service cloud.firestore {
         (nextData.active == true &&
           !('archived_at' in nextData) &&
           !('archived_by' in nextData));
-    }
-
-    function validAccessSlot(slotId, slotNumber, maxSlots) {
-      return (slotId == 'slot_0' && slotNumber == 0 && maxSlots >= 1) ||
-        (slotId == 'slot_1' && slotNumber == 1 && maxSlots >= 2) ||
-        (slotId == 'slot_2' && slotNumber == 2 && maxSlots >= 3) ||
-        (slotId == 'slot_3' && slotNumber == 3 && maxSlots >= 4) ||
-        (slotId == 'slot_4' && slotNumber == 4 && maxSlots >= 5) ||
-        (slotId == 'slot_5' && slotNumber == 5 && maxSlots >= 6) ||
-        (slotId == 'slot_6' && slotNumber == 6 && maxSlots >= 7) ||
-        (slotId == 'slot_7' && slotNumber == 7 && maxSlots >= 8) ||
-        (slotId == 'slot_8' && slotNumber == 8 && maxSlots >= 9) ||
-        (slotId == 'slot_9' && slotNumber == 9 && maxSlots >= 10);
-    }
-
-    function validDeviceRegistrationSlot(slotId, slotNumber, maxSlots) {
-      return validAccessSlot(slotId, slotNumber, maxSlots) ||
-        (isWorkspaceAdminAccessRole(getUserRole()) &&
-          slotId.matches('^device_[A-Za-z0-9_-]{8,128}$') &&
-          slotNumber == 0);
-    }
-
-    function accessSlotPathMatches(slotId, slotNumber) {
-      return (slotId == 'slot_0' && slotNumber == 0) ||
-        (slotId == 'slot_1' && slotNumber == 1) ||
-        (slotId == 'slot_2' && slotNumber == 2) ||
-        (slotId == 'slot_3' && slotNumber == 3) ||
-        (slotId == 'slot_4' && slotNumber == 4) ||
-        (slotId == 'slot_5' && slotNumber == 5) ||
-        (slotId == 'slot_6' && slotNumber == 6) ||
-        (slotId == 'slot_7' && slotNumber == 7) ||
-        (slotId == 'slot_8' && slotNumber == 8) ||
-        (slotId == 'slot_9' && slotNumber == 9);
-    }
-
-    function validPlatformSessionSlot(slotId, slotNumber) {
-      return (slotId == 'slot_0' && slotNumber == 0) ||
-        (slotId == 'slot_1' && slotNumber == 1);
-    }
-
-    function platformSessionSlotAvailable(userId, slotId) {
-      let otherSlotId = slotId == 'slot_0' ? 'slot_1' : 'slot_0';
-      let otherSessionPath = /databases/$(database)/documents/users/$(userId)/platform_sessions/$(otherSlotId);
-      let otherSession = get(otherSessionPath).data;
-      return !exists(otherSessionPath) ||
-        otherSession.status != 'active' ||
-        !('expires_at' in otherSession) ||
-        otherSession.expires_at <= request.time;
-    }
-
-    function tenantAccessLimit(tenantId, field) {
-      let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
-      let tenant = get(tenantPath).data;
-      let limit = field == 'max_devices_allowed'
-        ? (('max_devices_allowed' in tenant) ? tenant.max_devices_allowed : 3)
-        : (('max_active_sessions_allowed' in tenant)
-          ? tenant.max_active_sessions_allowed
-          : 2);
-      return exists(tenantPath) &&
-        (!('tenant_id' in tenant) || tenant.tenant_id == tenantId) &&
-        validAccessLimit(limit) ? limit : 0;
-    }
-
-    function workspaceAdminAccessLimit(field) {
-      let policyPath = /databases/$(database)/documents/settings/platform_access_policy;
-      let policy = exists(policyPath) ? get(policyPath).data : {};
-      let limit = field == 'max_devices_allowed'
-        ? (policy is map && 'workspace_admin_max_devices_allowed' in policy
-          ? policy.workspace_admin_max_devices_allowed : 3)
-        : (policy is map && 'workspace_admin_max_active_sessions_allowed' in policy
-          ? policy.workspace_admin_max_active_sessions_allowed : 2);
-      return validAccessLimit(limit) ? limit : 0;
-    }
-
-    function accessRecordLimit(tenantId, field) {
-      let role = getUserRole();
-      return isSellerRole(role)
-        ? tenantAccessLimit(tenantId, field)
-        : (isWorkspaceAdminAccessRole(role)
-          ? workspaceAdminAccessLimit(field) : 0);
-    }
-
-    function tenantRequiresDevicePairing(tenantId) {
-      let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
-      let tenant = get(tenantPath).data;
-      return exists(tenantPath) &&
-        ('require_device_pairing' in tenant) &&
-        tenant.require_device_pairing == true;
-    }
-
-    function tenantAllowsSelfDeviceReset(tenantId) {
-      let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
-      let tenant = get(tenantPath).data;
-      return exists(tenantPath) &&
-        ('allow_admin_reset_only' in tenant) &&
-        tenant.allow_admin_reset_only == false;
-    }
-
-    function deviceRegistrationIsStale(data) {
-      return data.status == 'active' &&
-        data.last_seen_at is timestamp &&
-        data.last_seen_at <= request.time - duration.value(30, 'd');
-    }
-
-    function canReadAccessRecord(userId, tenantId) {
-      return (isOwnDoc(userId) && isActiveUser() &&
-        currentUserTenantId() == tenantId) ||
-        (isActiveUser() && isAdminForTenant(tenantId));
-    }
-
-    function canReadAccessRecordSlot(userId) {
-      let targetUser = get(
-        /databases/$(database)/documents/users/$(userId)
-      ).data;
-      return targetUser is map && isActiveUser() &&
-        (
-          (isOwnDoc(userId) &&
-            currentUserTenantId() == targetUser.tenant_id) ||
-          isAdminForTenant(targetUser.tenant_id)
-        );
-    }
-
-    function accessRecordSlotMatchesUser(userId) {
-      let targetUser = get(
-        /databases/$(database)/documents/users/$(userId)
-      ).data;
-      return resource == null ||
-        (resource.data.user_id == userId &&
-         resource.data.tenant_id == targetUser.tenant_id);
-    }
-
-    function accessRecordFieldsAreValid(data, userId, tenantId, slotId) {
-      return data.user_id == userId && data.tenant_id == tenantId &&
-        data.slot_id == slotId && data.slot_number is int &&
-        data.slot_number >= 0 && data.slot_number <= 9 &&
-        data.device_id is string && data.device_id.size() >= 8 &&
-        data.device_id.size() <= 128 &&
-        data.brand is string && data.brand.size() <= 80 &&
-        data.model is string && data.model.size() <= 120 &&
-        data.platform is string && data.platform.size() <= 24 &&
-        data.os_version is string && data.os_version.size() <= 80 &&
-        data.app_version is string && data.app_version.size() <= 40;
-    }
-
-    function sessionRecordFieldsAreValid(data, userId, tenantId, slotId) {
-      return data.user_id == userId && data.tenant_id == tenantId &&
-        data.slot_id == slotId && data.slot_number is int &&
-        data.slot_number >= 0 && data.slot_number <= 9 &&
-        data.device_slot_id is string &&
-        (data.device_slot_id.matches('^slot_[0-9]$') ||
-          (isWorkspaceAdminAccessRole(getUserRole()) &&
-            data.device_slot_id.matches('^device_[A-Za-z0-9_-]{8,128}$'))) &&
-        data.session_id is string && data.session_id.size() >= 8 &&
-        data.session_id.size() <= 128 &&
-        data.device_id is string && data.device_id.size() >= 8 &&
-        data.device_id.size() <= 128 &&
-        data.device_brand is string && data.device_brand.size() <= 80 &&
-        data.device_model is string && data.device_model.size() <= 120 &&
-        data.platform is string && data.platform.size() <= 24;
-    }
-
-    function sessionDeviceIsRegistered(data, userId, tenantId) {
-      let devicePath = /databases/$(database)/documents/users/$(userId)/device_registrations/$(data.device_slot_id);
-      return existsAfter(devicePath) &&
-        getAfter(devicePath).data.user_id == userId &&
-        getAfter(devicePath).data.tenant_id == tenantId &&
-        getAfter(devicePath).data.status == 'active' &&
-        getAfter(devicePath).data.device_id == data.device_id &&
-        getAfter(devicePath).data.slot_id == data.device_slot_id;
     }
 
     // BUG-02: Sellers may only create cash_in or cash_out transactions.
@@ -330,7 +161,43 @@ service cloud.firestore {
     }
 
     function isSellerForRoute(routeId) {
-      return isSeller() && routeId in assignedRouteIds();
+      return isSeller() &&
+        isTenantActive(currentUserTenantId()) &&
+        routeId in assignedRouteIds();
+    }
+
+    function sellerRouteShopCountUpdateIsLinked(routeId) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let currentCount = ('total_shops' in resource.data &&
+          resource.data.total_shops is number)
+        ? resource.data.total_shops
+        : 0;
+      let shopId = ('last_shop_created_id' in request.resource.data)
+        ? request.resource.data.last_shop_created_id
+        : '';
+      let shopPath = /databases/$(database)/documents/customers/$(shopId);
+      return isSeller() &&
+        isSellerForRoute(routeId) &&
+        resource.data.active == true &&
+        resource.data.tenant_id == currentUserTenantId() &&
+        request.resource.data.tenant_id == resource.data.tenant_id &&
+        changed.hasOnly([
+          'total_shops', 'last_shop_created_id', 'updated_at'
+        ]) &&
+        changed.hasAll([
+          'total_shops', 'last_shop_created_id', 'updated_at'
+        ]) &&
+        request.resource.data.updated_at == request.time &&
+        request.resource.data.total_shops is number &&
+        request.resource.data.total_shops == currentCount + 1 &&
+        shopId is string &&
+        shopId != '' &&
+        !exists(shopPath) &&
+        existsAfter(shopPath) &&
+        getAfter(shopPath).data.tenant_id == resource.data.tenant_id &&
+        getAfter(shopPath).data.route_id == routeId &&
+        getAfter(shopPath).data.created_by == request.auth.uid &&
+        getAfter(shopPath).data.active == true;
     }
 
     // Returns the route_id for a shop/customer document.
@@ -345,6 +212,7 @@ service cloud.firestore {
         shopId is string &&
         shopId != '' &&
         shopRouteId(shopId) in assignedRouteIds() &&
+        isTenantActive(shopTenantId(shopId)) &&
         shopTenantId(shopId) == currentUserTenantId();
     }
 
@@ -715,6 +583,222 @@ service cloud.firestore {
         );
     }
 
+    function shopBalanceMatchesDataDelta(shopBefore, shopAfter, delta) {
+      return shopBefore is map && shopAfter is map &&
+        shopBefore.balance is number && shopAfter.balance is number &&
+        shopAfter.balance >= shopBefore.balance + delta - 0.01 &&
+        shopAfter.balance <= shopBefore.balance + delta + 0.01;
+    }
+
+    function transactionCreateShopMatches(txData, shopBefore, shopAfter) {
+      return txData.created_by == request.auth.uid &&
+        txData.shop_id is string && txData.shop_id != '' &&
+        txData.route_id is string && txData.route_id != '' &&
+        txData.tenant_id is string &&
+        shopBefore is map && shopAfter is map &&
+        shopBefore.tenant_id == txData.tenant_id &&
+        shopAfter.tenant_id == txData.tenant_id &&
+        shopBefore.route_id == txData.route_id &&
+        shopAfter.route_id == txData.route_id &&
+        shopBefore.balance is number && shopAfter.balance is number &&
+        shopAfter.last_transaction_id is string &&
+        shopAfter.last_transaction_id !=
+          shopBefore.get('last_transaction_id', '');
+    }
+
+    function standaloneTransactionCreateIsLinked(txId, txData, shopBefore, shopAfter) {
+      let delta = txData.type == 'cash_out'
+        ? txData.amount
+        : -txData.amount;
+      return txData.type in ['cash_in', 'cash_out'] &&
+        shopAfter.last_transaction_id == txId &&
+        shopAfter.last_transaction_type == txData.type &&
+        shopAfter.last_transaction_amount == txData.amount &&
+        shopBalanceMatchesDataDelta(shopBefore, shopAfter, delta);
+    }
+
+    function newInvoiceTransactionIsLinked(
+      txId,
+      txData,
+      invoiceData,
+      shopBefore,
+      shopAfter
+    ) {
+      let saleCashOut = invoiceData.type == 'sale' &&
+        txData.type == 'cash_out' &&
+        invoiceData.sale_transaction_id == txId &&
+        txData.amount == invoiceData.total;
+      let saleCashIn = invoiceData.type == 'sale' &&
+        txData.type == 'cash_in' &&
+        invoiceData.amount_received > 0 &&
+        invoiceData.payment_transaction_id == txId &&
+        txData.amount == invoiceData.amount_received;
+      let cashReceipt = invoiceData.type == 'cash_receipt' &&
+        txData.type == 'cash_in' &&
+        invoiceData.cash_receipt_transaction_id == txId &&
+        txData.amount == invoiceData.total;
+      let creditNote = invoiceData.type in ['credit_note', 'return'] &&
+        txData.type == 'return' &&
+        invoiceData.return_transaction_id == txId &&
+        txData.amount == invoiceData.total;
+      let expectedLastType = invoiceData.type == 'sale'
+        ? 'cash_out'
+        : (invoiceData.type == 'cash_receipt' ? 'cash_in' : 'return');
+      let balanceDelta = invoiceData.type == 'sale'
+        ? invoiceData.total - invoiceData.amount_received
+        : -invoiceData.total;
+      let expectedLastId = invoiceData.type == 'sale'
+        ? invoiceData.sale_transaction_id
+        : txId;
+      return invoiceData is map &&
+        invoiceData.created_by == request.auth.uid &&
+        invoiceData.total is number && invoiceData.total > 0 &&
+        invoiceData.amount_received is number &&
+        (saleCashOut || saleCashIn || cashReceipt || creditNote) &&
+        expectedLastId is string &&
+        expectedLastId != shopBefore.get('last_transaction_id', '') &&
+        shopAfter.last_transaction_id == expectedLastId &&
+        shopAfter.last_transaction_type == expectedLastType &&
+        shopAfter.last_transaction_amount == invoiceData.total &&
+        shopBalanceMatchesDataDelta(shopBefore, shopAfter, balanceDelta);
+    }
+
+    function updatedInvoiceTransactionIsLinked(
+      txId,
+      txData,
+      invoiceBefore,
+      invoiceAfter,
+      shopBefore,
+      shopAfter
+    ) {
+      let invoiceTotal = invoiceBefore.total;
+      let amountReceived = invoiceBefore.get('amount_received', 0);
+      let paid = invoiceBefore.type == 'sale' &&
+        invoiceBefore.status != 'paid' &&
+        invoiceAfter.status == 'paid' &&
+        txData.type == 'cash_in' &&
+        invoiceAfter.amount_received == invoiceAfter.total &&
+        invoiceAfter.outstanding_amount == 0 &&
+        txData.amount == invoiceTotal - amountReceived &&
+        shopAfter.last_transaction_id == txId &&
+        shopBalanceMatchesDataDelta(shopBefore, shopAfter, -txData.amount);
+      let saleVoid = invoiceBefore.type == 'sale' &&
+        invoiceBefore.status != 'void' &&
+        invoiceAfter.status == 'void' &&
+        txData.type in ['return', 'cash_out'] &&
+        txData.amount == (txData.type == 'return'
+          ? invoiceTotal
+          : amountReceived) &&
+        shopBalanceMatchesDataDelta(
+          shopBefore,
+          shopAfter,
+          -(invoiceTotal - amountReceived)
+        ) &&
+        (shopAfter.last_transaction_id == txId ||
+          (txData.type == 'return' &&
+            amountReceived > 0 &&
+            shopAfter.last_transaction_type == 'cash_out' &&
+            shopAfter.last_transaction_amount == amountReceived));
+      let otherVoid = invoiceBefore.type != 'sale' &&
+        invoiceBefore.status != 'void' &&
+        invoiceAfter.status == 'void' &&
+        txData.type == 'cash_out' &&
+        txData.amount == invoiceTotal &&
+        shopAfter.last_transaction_id == txId &&
+        shopBalanceMatchesDataDelta(shopBefore, shopAfter, invoiceTotal);
+      return invoiceBefore is map && invoiceAfter is map &&
+        invoiceBefore.shop_id == txData.shop_id &&
+        invoiceAfter.shop_id == txData.shop_id &&
+        invoiceBefore.route_id == txData.route_id &&
+        invoiceAfter.route_id == txData.route_id &&
+        invoiceBefore.tenant_id == txData.tenant_id &&
+        invoiceAfter.tenant_id == txData.tenant_id &&
+        invoiceTotal is number && amountReceived is number &&
+        invoiceAfter.total == invoiceTotal &&
+        (paid || saleVoid || otherVoid);
+    }
+
+    function invoiceTransactionCreateIsLinked(
+      txId,
+      txData,
+      shopBefore,
+      shopAfter
+    ) {
+      let invoiceId = txData.get('invoice_id', '');
+      let invoicePath = /databases/$(database)/documents/invoices/$(invoiceId);
+      let invoiceBefore = get(invoicePath).data;
+      let invoiceAfter = getAfter(invoicePath).data;
+      return invoiceId is string && invoiceId != '' &&
+        (exists(invoicePath)
+          ? (invoiceBefore is map && invoiceAfter is map &&
+            updatedInvoiceTransactionIsLinked(
+              txId,
+              txData,
+              invoiceBefore,
+              invoiceAfter,
+              shopBefore,
+              shopAfter
+            ))
+          : (invoiceAfter is map &&
+            existsAfter(invoicePath) &&
+            newInvoiceTransactionIsLinked(
+              txId,
+              txData,
+              invoiceAfter,
+              shopBefore,
+              shopAfter
+            )));
+    }
+
+    function sellerInvoiceTransactionIsLinked(txId, txData) {
+      let invoiceId = txData.get('invoice_id', '');
+      let invoicePath = /databases/$(database)/documents/invoices/$(invoiceId);
+      let invoiceAfter = getAfter(invoicePath).data;
+      return invoiceId is string && invoiceId != '' &&
+        existsAfter(invoicePath) &&
+        invoiceAfter is map &&
+        invoiceAfter.shop_id == txData.shop_id &&
+        invoiceAfter.route_id == txData.route_id &&
+        invoiceAfter.tenant_id == txData.tenant_id &&
+        invoiceAfter.created_by == request.auth.uid &&
+        (
+          (invoiceAfter.type == 'sale' &&
+            ((txData.type == 'cash_out' &&
+                invoiceAfter.sale_transaction_id == txId &&
+                txData.amount == invoiceAfter.total) ||
+              (txData.type == 'cash_in' &&
+                invoiceAfter.payment_transaction_id == txId &&
+                txData.amount == invoiceAfter.amount_received))) ||
+          (invoiceAfter.type == 'cash_receipt' &&
+            txData.type == 'cash_in' &&
+            invoiceAfter.cash_receipt_transaction_id == txId &&
+            txData.amount == invoiceAfter.total)
+        );
+    }
+
+    function transactionCreateIsLinked(txId) {
+      let txData = request.resource.data;
+      let shopPath = /databases/$(database)/documents/customers/$(txData.shop_id);
+      let shopBefore = get(shopPath).data;
+      let shopAfter = getAfter(shopPath).data;
+      return isSeller() && ('invoice_id' in txData)
+        ? sellerInvoiceTransactionIsLinked(txId, txData)
+        : transactionCreateShopMatches(txData, shopBefore, shopAfter) &&
+          (!('invoice_id' in txData)
+            ? standaloneTransactionCreateIsLinked(
+                txId,
+                txData,
+                shopBefore,
+                shopAfter
+              )
+            : invoiceTransactionCreateIsLinked(
+                txId,
+                txData,
+                shopBefore,
+                shopAfter
+              ));
+    }
+
     function adminTransactionSoftDeleteMatchesShop(txId, shopId) {
       let transactionPath = /databases/$(database)/documents/transactions/$(txId);
       let transactionBefore = get(transactionPath).data;
@@ -862,7 +946,8 @@ service cloud.firestore {
         // client write-rate throttling, which otherwise blocks bulk assignment.
         (
           isSuperAdmin() &&
-          isAdminForTenant(resource.data.tenant_id) &&
+          (isAdminForTenant(resource.data.tenant_id) ||
+            isSuperAdminRestoringTenant(resource.data.tenant_id)) &&
           request.resource.data.tenant_id == resource.data.tenant_id &&
           (!('role' in request.resource.data) ||
             !isSuperAdminRole(request.resource.data.role)) &&
@@ -870,7 +955,7 @@ service cloud.firestore {
         ) ||
         (
           isActiveUser() &&
-          isWorkspaceAdminAccessRole(getUserRole()) &&
+          isWorkspaceAdminRole(getUserRole()) &&
           isAdminForTenant(resource.data.tenant_id) &&
           request.auth.uid != userId &&
           isSellerRole(resource.data.role) &&
@@ -928,6 +1013,7 @@ service cloud.firestore {
         (
           isActiveUser() &&
           isTenantAdminRole(getUserRole()) &&
+          isTenantActive(resource.data.tenant_id) &&
           resource.data.tenant_id == currentUserTenantId() &&
           isSellerRole(resource.data.role) &&
           request.resource.data.tenant_id == resource.data.tenant_id &&
@@ -942,6 +1028,7 @@ service cloud.firestore {
           isActiveUser() &&
           isAdminRole(getUserRole()) &&
           !isTenantAdminRole(getUserRole()) &&
+          isTenantActive(resource.data.tenant_id) &&
           resource.data.tenant_id == currentUserTenantId() &&
           isSellerRole(resource.data.role) &&
           request.resource.data.tenant_id == resource.data.tenant_id &&
@@ -951,347 +1038,6 @@ service cloud.firestore {
         )
       );
       allow delete: if isSuperAdmin() &&
-        isAdminForTenant(resource.data.tenant_id);
-    }
-
-    // Device and application-session slots are bounded by the workspace
-    // policy. Slot documents are updated transactionally by the client; rules
-    // enforce the authoritative slot ceiling and ownership on every write.
-    match /users/{userId}/device_registrations/{slotId} {
-      allow get: if canReadAccessRecordSlot(userId) &&
-        accessRecordSlotMatchesUser(userId);
-      allow list: if canReadAccessRecord(userId, resource.data.tenant_id) &&
-        resource.data.user_id == userId;
-      allow create: if isActiveUser() && isOwnDoc(userId) &&
-        ((request.resource.data.status == 'active' &&
-            (!tenantRequiresDevicePairing(currentUserTenantId()) ||
-              isWorkspaceAdminAccessRole(getUserRole()))) ||
-          (request.resource.data.status == 'pending' &&
-            tenantRequiresDevicePairing(currentUserTenantId()) &&
-            !isWorkspaceAdminAccessRole(getUserRole()))) &&
-        accessRecordFieldsAreValid(
-          request.resource.data,
-          userId,
-          currentUserTenantId(),
-          slotId
-        ) &&
-        validDeviceRegistrationSlot(
-          slotId,
-          request.resource.data.slot_number,
-          accessRecordLimit(currentUserTenantId(), 'max_devices_allowed')
-        ) &&
-        request.resource.data.registered_at is timestamp &&
-        request.resource.data.registered_at == request.time &&
-        request.resource.data.last_seen_at == request.time &&
-        !('revoked_at' in request.resource.data) &&
-        !('revoked_by' in request.resource.data) && docSizeOk();
-      allow update: if (
-          isActiveUser() && isOwnDoc(userId) &&
-          isWorkspaceAdminAccessRole(getUserRole()) &&
-          resource.data.user_id == userId &&
-          resource.data.tenant_id == currentUserTenantId() &&
-          resource.data.status == 'pending' &&
-          request.resource.data.status == 'active' &&
-          request.resource.data.device_id == resource.data.device_id &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'last_seen_at', 'app_version']) &&
-          validDeviceRegistrationSlot(
-            slotId,
-            resource.data.slot_number,
-            accessRecordLimit(currentUserTenantId(), 'max_devices_allowed')
-          ) &&
-          request.resource.data.last_seen_at == request.time &&
-          request.resource.data.app_version is string &&
-          request.resource.data.app_version.size() <= 40
-        ) || (
-          isActiveUser() && isOwnDoc(userId) &&
-          resource.data.user_id == userId &&
-          resource.data.tenant_id == currentUserTenantId() &&
-            resource.data.status in ['active', 'pending'] &&
-            (resource.data.status == 'active' ||
-              (isSeller() &&
-                !tenantRequiresDevicePairing(currentUserTenantId()))) &&
-            request.resource.data.status == 'active' &&
-          request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['status', 'last_seen_at', 'app_version']) &&
-          request.resource.data.last_seen_at == request.time &&
-          request.resource.data.app_version is string &&
-          request.resource.data.app_version.size() <= 40
-        ) || (
-          isActiveUser() && isAdminForTenant(resource.data.tenant_id) &&
-          request.auth.uid != userId &&
-          resource.data.user_id == userId &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'revoked_at', 'revoked_by']) &&
-          request.resource.data.status in ['revoked', 'blocked'] &&
-          request.resource.data.revoked_at == request.time &&
-          request.resource.data.revoked_by == request.auth.uid
-        ) || (
-          isActiveUser() && isAdminForTenant(resource.data.tenant_id) &&
-          request.auth.uid != userId &&
-          resource.data.user_id == userId &&
-          resource.data.status == 'revoked' &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly([
-              'status', 'registered_at', 'last_seen_at', 'approved_at',
-              'approved_by'
-            ]) &&
-          request.resource.data.status == 'active' &&
-          request.resource.data.registered_at == request.time &&
-          request.resource.data.last_seen_at == request.time &&
-          request.resource.data.approved_at == request.time &&
-          request.resource.data.approved_by == request.auth.uid
-        ) || (
-          isActiveUser() && isOwnDoc(userId) &&
-          resource.data.user_id == userId &&
-          resource.data.tenant_id == currentUserTenantId() &&
-          resource.data.status == 'active' &&
-          deviceRegistrationIsStale(resource.data) &&
-          ((request.resource.data.status == 'active' &&
-              (!tenantRequiresDevicePairing(currentUserTenantId()) ||
-                isWorkspaceAdminAccessRole(getUserRole()))) ||
-            (request.resource.data.status == 'pending' &&
-              tenantRequiresDevicePairing(currentUserTenantId()) &&
-              !isWorkspaceAdminAccessRole(getUserRole()))) &&
-          accessRecordFieldsAreValid(
-            request.resource.data,
-            userId,
-            currentUserTenantId(),
-            slotId
-          ) &&
-          accessSlotPathMatches(
-            slotId,
-            request.resource.data.slot_number
-          ) &&
-          request.resource.data.registered_at == request.time &&
-          request.resource.data.last_seen_at == request.time &&
-          !('revoked_at' in request.resource.data) &&
-          !('revoked_by' in request.resource.data) && docSizeOk()
-        ) || (
-          isActiveUser() && isAdminForTenant(resource.data.tenant_id) &&
-          request.auth.uid != userId &&
-          resource.data.user_id == userId &&
-          resource.data.status == 'pending' &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'approved_at', 'approved_by']) &&
-          request.resource.data.status == 'active' &&
-          request.resource.data.approved_at == request.time &&
-          request.resource.data.approved_by == request.auth.uid
-        ) || (
-          isActiveUser() && isOwnDoc(userId) && isSeller() &&
-          resource.data.user_id == userId &&
-          resource.data.tenant_id == currentUserTenantId() &&
-          resource.data.status == 'revoked' &&
-          tenantAllowsSelfDeviceReset(currentUserTenantId()) &&
-          request.resource.data.status ==
-            (tenantRequiresDevicePairing(currentUserTenantId())
-              ? 'pending' : 'active') &&
-          accessRecordFieldsAreValid(
-            request.resource.data,
-            userId,
-            currentUserTenantId(),
-            slotId
-          ) &&
-          validDeviceRegistrationSlot(
-            slotId,
-            request.resource.data.slot_number,
-            accessRecordLimit(currentUserTenantId(), 'max_devices_allowed')
-          ) &&
-          request.resource.data.registered_at == request.time &&
-          request.resource.data.last_seen_at == request.time &&
-          docSizeOk()
-        ) || (
-          isActiveUser() && isOwnDoc(userId) && isSeller() &&
-          resource.data.user_id == userId &&
-          resource.data.tenant_id == currentUserTenantId() &&
-          resource.data.status == 'active' &&
-          tenantAllowsSelfDeviceReset(currentUserTenantId()) &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'revoked_at', 'revoked_by']) &&
-          request.resource.data.status == 'revoked' &&
-          request.resource.data.revoked_at == request.time &&
-          request.resource.data.revoked_by == request.auth.uid
-        );
-      allow delete: if false;
-    }
-
-    match /users/{userId}/sessions/{slotId} {
-      allow get: if canReadAccessRecordSlot(userId) &&
-        accessRecordSlotMatchesUser(userId);
-      allow list: if canReadAccessRecord(userId, resource.data.tenant_id) &&
-        resource.data.user_id == userId;
-      allow create: if isActiveUser() && isOwnDoc(userId) &&
-        request.resource.data.status == 'active' &&
-        sessionRecordFieldsAreValid(
-          request.resource.data,
-          userId,
-          currentUserTenantId(),
-          slotId
-        ) &&
-        validAccessSlot(
-          slotId,
-          request.resource.data.slot_number,
-          accessRecordLimit(currentUserTenantId(), 'max_active_sessions_allowed')
-        ) &&
-        sessionDeviceIsRegistered(
-          request.resource.data,
-          userId,
-          currentUserTenantId()
-        ) &&
-        request.resource.data.created_at == request.time &&
-        request.resource.data.last_seen_at == request.time &&
-        request.resource.data.expires_at is timestamp &&
-        request.resource.data.expires_at > request.time &&
-        request.resource.data.expires_at <= request.time + duration.value(12, 'h') &&
-        !('revoked_at' in request.resource.data) && docSizeOk();
-      allow update: if (
-          isActiveUser() && isOwnDoc(userId) &&
-          resource.data.user_id == userId &&
-          resource.data.tenant_id == currentUserTenantId() &&
-          (resource.data.status == 'revoked' ||
-            resource.data.expires_at <= request.time) &&
-          request.resource.data.status == 'active' &&
-          sessionRecordFieldsAreValid(
-            request.resource.data,
-            userId,
-            currentUserTenantId(),
-            slotId
-          ) &&
-          validDeviceRegistrationSlot(
-            slotId,
-            request.resource.data.slot_number,
-            accessRecordLimit(currentUserTenantId(), 'max_active_sessions_allowed')
-          ) &&
-          sessionDeviceIsRegistered(
-            request.resource.data,
-            userId,
-            currentUserTenantId()
-          ) &&
-          request.resource.data.created_at == request.time &&
-          request.resource.data.last_seen_at == request.time &&
-          request.resource.data.expires_at is timestamp &&
-          request.resource.data.expires_at > request.time &&
-          request.resource.data.expires_at <= request.time + duration.value(12, 'h') &&
-          docSizeOk()
-        ) || (
-          isActiveUser() && isOwnDoc(userId) &&
-          resource.data.user_id == userId &&
-          resource.data.tenant_id == currentUserTenantId() &&
-          resource.data.status == 'active' &&
-          resource.data.expires_at > request.time &&
-          request.resource.data.session_id == resource.data.session_id &&
-          request.resource.data.device_id == resource.data.device_id &&
-          request.resource.data.device_slot_id is string &&
-          (!('device_slot_id' in resource.data) ||
-            request.resource.data.device_slot_id == resource.data.device_slot_id) &&
-          sessionDeviceIsRegistered(
-            request.resource.data,
-            userId,
-            currentUserTenantId()
-          ) &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['last_seen_at', 'expires_at', 'device_slot_id']) &&
-          request.resource.data.last_seen_at == request.time &&
-          request.resource.data.expires_at is timestamp &&
-          request.resource.data.expires_at > request.time &&
-          request.resource.data.expires_at <= request.time + duration.value(12, 'h')
-        ) || (
-          isActiveUser() && (isOwnDoc(userId) ||
-            isAdminForTenant(resource.data.tenant_id)) &&
-          resource.data.user_id == userId &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly([
-              'status', 'revoked_at', 'termination_reason', 'terminated_by'
-            ]) &&
-          request.resource.data.status == 'revoked' &&
-          request.resource.data.revoked_at == request.time &&
-          request.resource.data.terminated_by == request.auth.uid &&
-          request.resource.data.termination_reason is string &&
-          request.resource.data.termination_reason.size() <= 120
-        );
-      allow delete: if false;
-    }
-
-    // Platform operators have no tenant by default. Their own session records
-    // stay separate from tenant device/session registries and business scope.
-    match /users/{userId}/platform_sessions/{sessionId} {
-      allow get, list: if isOwnDoc(userId) && isSuperAdmin();
-      allow create: if isOwnDoc(userId) && isSuperAdmin() &&
-        validPlatformSessionSlot(sessionId, request.resource.data.slot_number) &&
-        platformSessionSlotAvailable(userId, sessionId) &&
-        request.resource.data.slot_id == sessionId &&
-        request.resource.data.user_id == userId &&
-        request.resource.data.session_id is string &&
-        request.resource.data.session_id.size() >= 8 &&
-        request.resource.data.device_id is string &&
-        request.resource.data.device_id.size() >= 8 &&
-        request.resource.data.status == 'active' &&
-        request.resource.data.created_at == request.time &&
-        request.resource.data.last_seen_at == request.time &&
-        request.resource.data.expires_at is timestamp &&
-        request.resource.data.expires_at > request.time &&
-        request.resource.data.expires_at <= request.time + duration.value(12, 'h') &&
-        docSizeOk();
-      allow update: if isOwnDoc(userId) && isSuperAdmin() &&
-        resource.data.user_id == userId &&
-        resource.data.slot_id == sessionId &&
-        request.resource.data.slot_id == sessionId &&
-        resource.data.slot_number == request.resource.data.slot_number &&
-        validPlatformSessionSlot(sessionId, request.resource.data.slot_number) &&
-        ((resource.data.status == 'active' &&
-            request.resource.data.status == 'active' &&
-            resource.data.session_id == request.resource.data.session_id &&
-            resource.data.device_id == request.resource.data.device_id &&
-            request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['last_seen_at', 'expires_at']) &&
-            request.resource.data.last_seen_at == request.time &&
-            request.resource.data.expires_at is timestamp &&
-            request.resource.data.expires_at > request.time &&
-            request.resource.data.expires_at <= request.time + duration.value(12, 'h')) ||
-          (resource.data.status == 'active' &&
-            request.resource.data.status == 'revoked' &&
-            resource.data.session_id == request.resource.data.session_id &&
-            resource.data.device_id == request.resource.data.device_id &&
-            request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['status', 'revoked_at', 'terminated_by']) &&
-            request.resource.data.revoked_at == request.time &&
-            request.resource.data.terminated_by == request.auth.uid) ||
-          ((resource.data.status == 'revoked' ||
-              (resource.data.status == 'active' &&
-                resource.data.expires_at <= request.time)) &&
-            platformSessionSlotAvailable(userId, sessionId) &&
-            request.resource.data.status == 'active' &&
-            request.resource.data.user_id == userId &&
-            request.resource.data.session_id is string &&
-            request.resource.data.session_id.size() >= 8 &&
-            request.resource.data.device_id is string &&
-            request.resource.data.device_id.size() >= 8 &&
-            request.resource.data.device_brand is string &&
-            request.resource.data.device_model is string &&
-            request.resource.data.platform is string &&
-            request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly([
-                'session_id', 'device_id', 'device_brand', 'device_model',
-                'platform', 'status', 'created_at', 'last_seen_at', 'expires_at',
-                'revoked_at', 'terminated_by'
-              ]) &&
-            request.resource.data.created_at == request.time &&
-            request.resource.data.last_seen_at == request.time &&
-            request.resource.data.expires_at is timestamp &&
-            request.resource.data.expires_at > request.time &&
-            request.resource.data.expires_at <= request.time + duration.value(12, 'h')));
-      allow delete: if false;
-    }
-
-    // Collection-group registry queries require an explicit recursive list
-    // rule; the per-user matches above remain the boundary for direct reads.
-    match /{path=**}/device_registrations/{slotId} {
-      allow list: if isActiveUser() &&
-        isAdminForTenant(resource.data.tenant_id);
-    }
-
-    match /{path=**}/sessions/{slotId} {
-      allow list: if isActiveUser() &&
         isAdminForTenant(resource.data.tenant_id);
     }
 
@@ -1309,35 +1055,25 @@ service cloud.firestore {
         request.resource.data.created_by == request.auth.uid &&
         request.resource.data.created_at is timestamp &&
         request.resource.data.created_at == request.time &&
-        validTenantAccessPolicy(request.resource.data) &&
         docSizeOk();
       allow update: if (
-          isSuperAdmin() && isAdminForTenant(tenantId) &&
+          isSuperAdminForSelectedWorkspace(tenantId) &&
           request.resource.data.tenant_id == tenantId &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'slug', 'require_device_pairing', 'allow_admin_reset_only',
-            'max_devices_allowed', 'max_active_sessions_allowed',
-            'owner_user_id', 'updated_at', 'active', 'archived_at', 'archived_by'
+            'name', 'slug', 'owner_user_id', 'updated_at', 'active',
+            'archived_at', 'archived_by'
           ]) &&
           validTenantLifecycleTransition(resource.data, request.resource.data) &&
-          validTenantAccessPolicy(request.resource.data) &&
-          request.resource.data.updated_at == request.time && docSizeOk()
-        ) || (
-          isTenantAdmin() && tenantId == currentUserTenantId() &&
-          request.resource.data.tenant_id == tenantId &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'max_devices_allowed', 'max_active_sessions_allowed', 'updated_at'
-          ]) &&
-          validTenantAccessPolicy(request.resource.data) &&
           request.resource.data.updated_at == request.time && docSizeOk()
         );
-      allow delete: if isSuperAdmin() && tenantId == currentUserTenantId();
+      allow delete: if isSuperAdminForSelectedWorkspace(tenantId);
     }
 
     // --- products -----------------------------------------------------------
     match /products/{productId} {
       allow read: if isAdminForTenant(resource.data.tenant_id) ||
         (isActiveUser() && !isSuperAdminRole(getUserRole()) &&
+         isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
       // P0-2 FIX: products are tenant-owned; use isAdminForTenant check
       allow create: if isAdminForTenant(request.resource.data.tenant_id) &&
@@ -1365,6 +1101,7 @@ service cloud.firestore {
     match /product_variants/{variantId} {
       allow read: if isAdminForTenant(resource.data.tenant_id) ||
         (isActiveUser() && !isSuperAdminRole(getUserRole()) &&
+         isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
       // P0-2 FIX: product_variants are tenant-owned; use isAdminForTenant check
       allow create: if isAdminForTenant(request.resource.data.tenant_id) &&
@@ -1400,6 +1137,7 @@ service cloud.firestore {
         (isSeller() && isSellerForRoute(routeId) &&
          resource.data.tenant_id == currentUserTenantId()) ||
         (isSeller() && request.auth.uid in resource.data.assigned_seller_ids &&
+         isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
       // P0-2 FIX: routes are tenant-owned; use isAdminForTenant check
       allow create: if isAdminForTenant(request.resource.data.tenant_id) &&
@@ -1409,17 +1147,22 @@ service cloud.firestore {
         request.resource.data.route_number >= 0 &&
         request.resource.data.total_shops is number &&
         request.resource.data.total_shops >= 0 && docSizeOk();
-      allow update: if isAdminForTenant(resource.data.tenant_id) &&
-        request.resource.data.tenant_id == resource.data.tenant_id &&
-        (!('name' in request.resource.data) ||
-          (request.resource.data.name is string &&
-            request.resource.data.name != '')) &&
-        (!('route_number' in request.resource.data) ||
-          (request.resource.data.route_number is int &&
-            request.resource.data.route_number >= 0)) &&
-        (!('total_shops' in request.resource.data) ||
-          (request.resource.data.total_shops is number &&
-            request.resource.data.total_shops >= 0)) && docSizeOk();
+      allow update: if (
+        (
+          isAdminForTenant(resource.data.tenant_id) &&
+          request.resource.data.tenant_id == resource.data.tenant_id &&
+          (!('name' in request.resource.data) ||
+            (request.resource.data.name is string &&
+              request.resource.data.name != '')) &&
+          (!('route_number' in request.resource.data) ||
+            (request.resource.data.route_number is int &&
+              request.resource.data.route_number >= 0)) &&
+          (!('total_shops' in request.resource.data) ||
+            (request.resource.data.total_shops is number &&
+              request.resource.data.total_shops >= 0))
+        ) ||
+        sellerRouteShopCountUpdateIsLinked(routeId)
+      ) && docSizeOk();
       allow delete: if isSuperAdmin() &&
         isAdminForTenant(resource.data.tenant_id);
     }
@@ -1441,7 +1184,13 @@ service cloud.firestore {
         );
       // Sellers must include a non-empty route_id when creating customers
       // P0-2 FIX: customers are tenant-owned; use isAdminForTenant check
-      allow create: if (isAdminForTenant(request.resource.data.tenant_id) ||
+      allow create: if request.resource.data.balance is number &&
+        request.resource.data.balance == 0 &&
+        !request.resource.data.keys().hasAny([
+          'last_transaction_at', 'last_transaction_type',
+          'last_transaction_amount', 'last_transaction_id'
+        ]) &&
+        (isAdminForTenant(request.resource.data.tenant_id) ||
         (
           isSeller() &&
           request.resource.data.name is string &&
@@ -1539,7 +1288,7 @@ service cloud.firestore {
           request.resource.data.route_id != '' &&
           isSellerForRoute(request.resource.data.route_id) &&
           isSellerForShop(request.resource.data.shop_id)
-        )) && docSizeOk()
+        )) && transactionCreateIsLinked(txId) && docSizeOk()
         // Admin also requires valid type and positive amount for integrity
         && (isSeller() || (
           isValidTransactionType(request.resource.data.type) &&
@@ -1614,6 +1363,7 @@ service cloud.firestore {
       // P0-2 FIX: seller_inventory is tenant-owned; use isAdminForTenant check
       allow read: if isAdminForTenant(resource.data.tenant_id) ||
         (isSeller() && resource.data.seller_id == request.auth.uid &&
+         isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
       allow create: if isAdminForTenant(request.resource.data.tenant_id);
       allow delete: if isSuperAdmin() &&
@@ -1631,6 +1381,7 @@ service cloud.firestore {
         (
           isSeller() &&
           resource.data.seller_id == request.auth.uid &&
+          isTenantActive(resource.data.tenant_id) &&
           resource.data.tenant_id == currentUserTenantId() &&
           request.resource.data.quantity_available <= resource.data.quantity_available &&
           request.resource.data.quantity_available >= 0 &&
@@ -1645,12 +1396,14 @@ service cloud.firestore {
       // P0-2 FIX: inventory_transactions are tenant-owned; use isAdminForTenant check
       allow read: if isAdminForTenant(resource.data.tenant_id) ||
         (isSeller() && resource.data.seller_id == request.auth.uid &&
+         isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
       allow create: if (isAdminForTenant(request.resource.data.tenant_id) ||
         (
           isSeller() &&
           request.resource.data.seller_id == request.auth.uid &&
           request.resource.data.created_by == request.auth.uid &&
+          isTenantActive(request.resource.data.tenant_id) &&
           request.resource.data.tenant_id == currentUserTenantId()
         ))
         && isValidInventoryTransactionType(request.resource.data.type)
@@ -1665,22 +1418,13 @@ service cloud.firestore {
 
     // --- settings -----------------------------------------------------------
     match /settings/{docId} {
-      allow read: if (docId == 'platform_access_policy' && isActiveUser() &&
-          (isSuperAdmin() || isWorkspaceAdminAccessRole(getUserRole()))) ||
-        isAdminForTenant(docId) ||
+      allow read: if isAdminForTenant(docId) ||
         (isActiveUser() &&
+         isTenantActive(docId) &&
          (docId == currentUserTenantId() ||
           (docId == '__global__' && currentUserTenantId() == null)));
       // P0-2 FIX: settings docs are tenant-owned (docId = tenant_id); use isAdminForTenant check
-      allow create: if (docId == 'platform_access_policy' && isSuperAdmin() &&
-        request.resource.data.keys().hasOnly([
-          'workspace_admin_max_devices_allowed',
-          'workspace_admin_max_active_sessions_allowed', 'updated_by', 'updated_at'
-        ]) &&
-        request.resource.data.updated_by == request.auth.uid &&
-        request.resource.data.updated_at == request.time &&
-        validWorkspaceAdminAccessPolicy(request.resource.data)) ||
-        isAdminForTenant(docId) || (
+      allow create: if isAdminForTenant(docId) || (
         isSuperAdmin() &&
         !exists(/databases/$(database)/documents/tenants/$(docId)) &&
         existsAfter(/databases/$(database)/documents/tenants/$(docId)) &&
@@ -1688,20 +1432,12 @@ service cloud.firestore {
         getAfter(/databases/$(database)/documents/tenants/$(docId)).data.created_at == request.time &&
         request.resource.data.tenant_id == docId
       );
-      allow delete: if docId != 'platform_access_policy' &&
-        isSuperAdmin() && isAdminForTenant(docId);
+      allow delete: if isSuperAdmin() && isAdminForTenant(docId);
       // Admin: full update.
       // Sellers may increment either tenant-scoped sequence by exactly 1.
-      allow update: if (docId == 'platform_access_policy' && isSuperAdmin() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'workspace_admin_max_devices_allowed',
-          'workspace_admin_max_active_sessions_allowed', 'updated_by', 'updated_at'
-        ]) &&
-        request.resource.data.updated_by == request.auth.uid &&
-        request.resource.data.updated_at == request.time &&
-        validWorkspaceAdminAccessPolicy(request.resource.data)) ||
-        (isAdminForTenant(docId) ||
+      allow update: if isAdminForTenant(docId) ||
         (isActiveUser() &&
+         isTenantActive(docId) &&
          docId == currentUserTenantId() &&
          (
            (request.resource.data.diff(resource.data).affectedKeys()
@@ -1722,7 +1458,7 @@ service cloud.firestore {
                 resource.data.last_cash_receipt_number + 1) ||
              (!('last_cash_receipt_number' in resource.data) &&
               request.resource.data.last_cash_receipt_number == 1)))
-         ))) && docSizeOk();
+         )) && docSizeOk();
     }
 
     // --- invoices -----------------------------------------------------------
@@ -1732,6 +1468,7 @@ service cloud.firestore {
         (
           isSeller() && (
             (resource.data.seller_id == request.auth.uid &&
+             isTenantActive(resource.data.tenant_id) &&
              resource.data.tenant_id == currentUserTenantId()) ||
             (resource.data.route_id != null &&
              resource.data.route_id != '' &&
@@ -1821,6 +1558,7 @@ service cloud.firestore {
       allow read: if isAdminForTenant(resource.data.tenant_id) && isActiveUser();
       allow create: if isActiveUser()
           && request.resource.data.created_by == request.auth.uid
+          && isTenantActive(request.resource.data.tenant_id)
           && request.resource.data.tenant_id == currentUserTenantId()
           && request.resource.data.created_at is timestamp
           && request.resource.data.created_at == request.time

@@ -183,24 +183,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_account_role_invalid':
         'Your account role is unsupported. Contact your workspace administrator.',
     'err_user_disabled': 'This account has been disabled. Contact admin.',
-    'session_limit_reached':
-        'Active session limit reached. End another session or ask your workspace administrator.',
-    'device_limit_reached':
-        'Device limit reached. Remove an old device or ask your workspace administrator.',
-    'platform_device_limit_reached':
-        'Platform device limit reached. Remove an old platform session, then try again.',
-    'device_pairing_pending':
-        'This device is waiting for workspace administrator approval.',
-    'session_revoked':
-        'This session was ended by an administrator. Sign in again to register a new session.',
-    'device_session_mismatch':
-        'Device access could not be verified. Check device registration and try again.',
-    'device_blocked':
-        'This device is blocked. Contact your workspace administrator.',
-    'device_admin_reset_required':
-        'Ask your workspace administrator to reset this device.',
-    'device_clock_skew':
-        'Your device clock differs from server time. Enable automatic date and time, then try again.',
     'workspace_policy_unavailable':
         'Workspace access policy is unavailable. Try again or contact your administrator.',
     'workspace_disabled':
@@ -733,73 +715,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'route_unavailable': 'Selected route unavailable',
     'status_unknown': 'Unknown status',
     'slug': 'Slug',
-    'max_devices_allowed': 'Max devices allowed',
-    'max_active_sessions_allowed': 'Max active sessions allowed',
-    'require_device_pairing': 'Require device pairing',
-    'admin_reset_only': 'Admin reset only',
-    'access_security_title': 'Devices & sessions',
-    'paired_devices_title': 'Paired devices',
-    'paired_devices_search': 'Search account, email, device, or version',
-    'access_android_version': 'Android',
-    'access_os_version': 'OS',
-    'platform_sessions_title': 'Platform operator sessions',
     'access_workspace_unavailable': 'Workspace access is unavailable.',
-    'access_devices': 'Devices',
-    'access_allowed': 'Allowed',
-    'access_registered': 'Registered',
-    'access_available': 'Available',
     'unlimited': 'Unlimited',
-    'access_active_sessions': 'Active sessions',
-    'access_active': 'Active',
-    'access_policy_reduced_notice':
-        'Current usage exceeds the workspace limit.',
-    'access_no_devices': 'No devices registered.',
-    'access_no_sessions': 'No sessions found.',
-    'access_registry_limit_notice': 'Showing the first 200 access records.',
-    'access_registry_search': 'Search user, device, or platform',
-    'access_unknown_user': 'Unknown user',
-    'access_remove_device': 'Remove device',
-    'access_user': 'User',
-    'access_device': 'Device',
-    'access_status': 'Status',
-    'access_related_sessions': 'Related sessions',
-    'access_device_revoke_effect':
-        'This device and its active sessions will be revoked.',
-    'access_device_removed': 'Device removed.',
-    'access_approve_device': 'Approve device',
-    'access_device_approved': 'Device approved.',
-    'access_block_device': 'Block device',
-    'access_device_blocked': 'Device blocked.',
-    'access_reset_device': 'Reset device access',
-    'access_device_reset': 'Device access reset.',
-    'access_terminate_session': 'End session',
-    'access_session_terminate_effect': 'The selected session will be ended.',
-    'access_session_terminated': 'Session ended.',
-    'access_started': 'Started',
-    'access_policy_range': 'Enter limits from 1 to 10.',
-    'access_policy_saved': 'Access policy saved.',
-    'access_policy_title': 'Workspace access policy',
-    'seller_access_policy_title': 'Seller device and session limits',
-    'workspace_admin_policy_title': 'Workspace-admin session limit',
-    'workspace_admin_policy_help':
-        'Workspace admins may pair unlimited devices. This limit controls concurrent sessions across all workspaces.',
-    'access_policy_devices': 'Device limit',
-    'access_policy_devices_help':
-        'Maximum registered seller devices per user in this workspace',
-    'access_policy_sessions': 'Session limit',
-    'access_policy_sessions_help':
-        'Maximum concurrent seller sessions per user in this workspace',
-    'access_over_limit': 'Over limit',
-    'access_unknown_device': 'Unknown device',
-    'access_app_version': 'App',
-    'access_registered_at': 'Registered',
-    'access_last_seen': 'Last seen',
-    'access_current_device': 'This device',
-    'access_status_active': 'Active',
-    'access_status_pending': 'Pending approval',
-    'access_status_revoked': 'Removed',
-    'access_status_blocked': 'Blocked',
-    'access_status_expired': 'Expired',
     'no_owner': 'No owner',
     'owner': 'Owner',
     'save_changes': 'Save changes',
@@ -1055,16 +972,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'coverage_submitted': 'Coverage request submitted',
     'date_range': 'Date Range',
 
-    // ── Session Security ──
-    'session_expired': 'Session expired — please sign in again',
-    'session_expiring_soon': 'Session Expiring Soon',
-    'session_warning_30min':
-        'Your admin session will expire in 30 minutes. Please save your work.',
-    'session_warning_5min':
-        'Your access session expires in five minutes. Stay signed in to renew it.',
-    'stay_signed_in': 'Stay signed in',
-    'lock_screen_session_active': 'Session Active',
-    'lock_screen_tap_to_continue': 'Tap anywhere to continue',
+    // ── Shop Analytics ──
     'i_got': 'I got',
     'i_gave': 'I gave',
     'i_will_get': 'I will get',
@@ -1324,8 +1232,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'reactivate': 'Reactivate',
     'confirm_reactivate_user': 'Reactivate %s and restore their access?',
     'disable_user': 'Disable account',
-    'confirm_disable_user_sessions':
-        'Disable %s? Their active sessions will end. Registered devices remain available if the account is re-enabled.',
+    'confirm_deactivate_user':
+        'Disable %s? They will lose access, and their route assignments will be cleared.',
     'settings_company_logo': 'Company Logo',
     'settings_logo_specs':
         'PDF reports · PNG/JPG · max 800×400 px · max 300 KB',
@@ -1682,22 +1590,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_account_role_invalid':
         'دور الحساب غير مدعوم. تواصل مع مسؤول مساحة العمل.',
     'err_user_disabled': 'تم تعطيل هذا الحساب. تواصل مع المسؤول.',
-    'session_limit_reached':
-        'تم الوصول إلى الحد الأقصى للجلسات النشطة. أنهِ جلسة أخرى أو تواصل مع مسؤول مساحة العمل.',
-    'device_limit_reached':
-        'تم الوصول إلى حد الأجهزة. أزل جهازاً قديماً أو تواصل مع مسؤول مساحة العمل.',
-    'platform_device_limit_reached':
-        'تم الوصول إلى حد أجهزة المنصة. أزل جلسة منصة قديمة ثم أعد المحاولة.',
-    'device_pairing_pending': 'هذا الجهاز بانتظار موافقة مسؤول مساحة العمل.',
-    'session_revoked':
-        'أنهى المسؤول هذه الجلسة. سجّل الدخول مجدداً لتسجيل جلسة جديدة.',
-    'device_session_mismatch':
-        'تعذر التحقق من وصول الجهاز. تحقق من تسجيل الجهاز ثم أعد المحاولة.',
-    'device_blocked': 'تم حظر هذا الجهاز. تواصل مع مسؤول مساحة العمل.',
-    'device_admin_reset_required':
-        'اطلب من مسؤول مساحة العمل إعادة تعيين هذا الجهاز.',
-    'device_clock_skew':
-        'وقت جهازك يختلف عن وقت الخادم. فعّل التاريخ والوقت التلقائيين ثم أعد المحاولة.',
     'workspace_policy_unavailable':
         'سياسة وصول مساحة العمل غير متاحة. حاول مجدداً أو تواصل مع المسؤول.',
     'workspace_disabled': 'تمت أرشفة مساحة العمل هذه. تواصل مع مسؤول المنصة.',
@@ -2225,71 +2117,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'route_unavailable': 'المسار المحدد غير متاح',
     'status_unknown': 'حالة غير معروفة',
     'slug': 'المعرف',
-    'max_devices_allowed': 'أقصى عدد للأجهزة المسموح بها',
-    'max_active_sessions_allowed': 'أقصى عدد للجلسات النشطة',
-    'require_device_pairing': 'يتطلب اقتران الجهاز',
-    'admin_reset_only': 'إعادة تعيين من قبل المشرف فقط',
-    'access_security_title': 'الأجهزة والجلسات',
-    'paired_devices_title': 'الأجهزة المقترنة',
-    'paired_devices_search': 'ابحث عن الحساب أو البريد أو الجهاز أو الإصدار',
-    'access_android_version': 'أندرويد',
-    'access_os_version': 'نظام التشغيل',
-    'platform_sessions_title': 'جلسات مشرف المنصة',
     'access_workspace_unavailable': 'الوصول إلى مساحة العمل غير متاح.',
-    'access_devices': 'الأجهزة',
-    'access_allowed': 'المسموح',
-    'access_registered': 'المسجل',
-    'access_available': 'المتاح',
     'unlimited': 'غير محدود',
-    'access_active_sessions': 'الجلسات النشطة',
-    'access_active': 'نشط',
-    'access_policy_reduced_notice': 'الاستخدام الحالي يتجاوز حد مساحة العمل.',
-    'access_no_devices': 'لا توجد أجهزة مسجلة.',
-    'access_no_sessions': 'لا توجد جلسات.',
-    'access_registry_limit_notice': 'يتم عرض أول 200 سجل وصول.',
-    'access_registry_search': 'ابحث عن مستخدم أو جهاز أو منصة',
-    'access_unknown_user': 'مستخدم غير معروف',
-    'access_remove_device': 'إزالة الجهاز',
-    'access_user': 'المستخدم',
-    'access_device': 'الجهاز',
-    'access_status': 'الحالة',
-    'access_related_sessions': 'الجلسات المرتبطة',
-    'access_device_revoke_effect': 'سيتم إلغاء هذا الجهاز وجلساته النشطة.',
-    'access_device_removed': 'تمت إزالة الجهاز.',
-    'access_approve_device': 'الموافقة على الجهاز',
-    'access_device_approved': 'تمت الموافقة على الجهاز.',
-    'access_block_device': 'حظر الجهاز',
-    'access_device_blocked': 'تم حظر الجهاز.',
-    'access_reset_device': 'إعادة تعيين وصول الجهاز',
-    'access_device_reset': 'تمت إعادة تعيين وصول الجهاز.',
-    'access_terminate_session': 'إنهاء الجلسة',
-    'access_session_terminate_effect': 'سيتم إنهاء الجلسة المحددة.',
-    'access_session_terminated': 'تم إنهاء الجلسة.',
-    'access_started': 'بدأت',
-    'access_policy_range': 'أدخل حداً من 1 إلى 10.',
-    'access_policy_saved': 'تم حفظ سياسة الوصول.',
-    'access_policy_title': 'سياسة وصول مساحة العمل',
-    'seller_access_policy_title': 'حدود أجهزة وجلسات البائعين',
-    'workspace_admin_policy_title': 'حد جلسات مسؤولي مساحة العمل',
-    'workspace_admin_policy_help':
-        'يمكن لمسؤولي مساحة العمل إقران عدد غير محدود من الأجهزة. يحدد هذا الحد الجلسات المتزامنة عبر جميع المساحات.',
-    'access_policy_devices': 'حد الأجهزة',
-    'access_policy_devices_help':
-        'أقصى عدد لأجهزة البائع المسجلة لكل مستخدم في مساحة العمل',
-    'access_policy_sessions': 'حد الجلسات',
-    'access_policy_sessions_help':
-        'أقصى عدد لجلسات البائع المتزامنة لكل مستخدم في مساحة العمل',
-    'access_over_limit': 'تجاوز الحد',
-    'access_unknown_device': 'جهاز غير معروف',
-    'access_app_version': 'التطبيق',
-    'access_registered_at': 'تاريخ التسجيل',
-    'access_last_seen': 'آخر ظهور',
-    'access_current_device': 'هذا الجهاز',
-    'access_status_active': 'نشط',
-    'access_status_pending': 'بانتظار الموافقة',
-    'access_status_revoked': 'تمت الإزالة',
-    'access_status_blocked': 'محظور',
-    'access_status_expired': 'منتهية الصلاحية',
     'no_owner': 'بدون مالك',
     'owner': 'المالك',
     'save_changes': 'حفظ التغييرات',
@@ -2543,15 +2372,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'coverage_submitted': 'تم تقديم طلب التغطية',
     'date_range': 'نطاق التاريخ',
 
-    // ── Session Security ──
-    'session_expired': 'انتهت الجلسة — يرجى تسجيل الدخول مرة أخرى',
-    'session_expiring_soon': 'الجلسة على وشك الانتهاء',
-    'session_warning_30min': 'ستنتهي جلسة المشرف خلال 30 دقيقة. يرجى حفظ عملك.',
-    'session_warning_5min':
-        'ستنتهي جلسة الوصول خلال خمس دقائق. ابقَ مسجلاً لتجديدها.',
-    'stay_signed_in': 'البقاء مسجلاً',
-    'lock_screen_session_active': 'الجلسة نشطة',
-    'lock_screen_tap_to_continue': 'اضغط في أي مكان للمتابعة',
+    // ── تحليلات المتجر ──
     'i_got': 'استلمت',
     'i_gave': 'أعطيت',
     'i_will_get': 'سأستلم',
@@ -2810,8 +2631,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'reactivate': 'إعادة تفعيل',
     'confirm_reactivate_user': 'هل تريد إعادة تفعيل %s واستعادة صلاحياتهم؟',
     'disable_user': 'تعطيل الحساب',
-    'confirm_disable_user_sessions':
-        'هل تريد تعطيل حساب %s؟ ستنتهي جلساته النشطة، وستبقى أجهزته المسجلة متاحة إذا أُعيد تفعيل الحساب.',
+    'confirm_deactivate_user':
+        'هل تريد تعطيل %s؟ سيفقد الوصول وستتم إزالة تعيينات المسارات.',
     'settings_company_logo': 'شعار الشركة',
     'settings_logo_specs':
         'تقارير PDF · PNG/JPG · بحد أقصى 800×400 بكسل · 300 كيلوبايت',
@@ -3163,23 +2984,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_account_role_invalid':
         'آپ کے اکاؤنٹ کا کردار معاونت یافتہ نہیں۔ ورک اسپیس منتظم سے رابطہ کریں۔',
     'err_user_disabled': 'یہ اکاؤنٹ غیر فعال ہے۔ ایڈمن سے رابطہ کریں۔',
-    'session_limit_reached':
-        'فعال سیشن کی حد پوری ہو گئی ہے۔ دوسرا سیشن ختم کریں یا اپنے ورک اسپیس منتظم سے رابطہ کریں۔',
-    'device_limit_reached':
-        'ڈیوائس کی حد پوری ہو گئی ہے۔ پرانی ڈیوائس ہٹائیں یا ورک اسپیس منتظم سے رابطہ کریں۔',
-    'platform_device_limit_reached':
-        'پلیٹ فارم ڈیوائس کی حد پوری ہو گئی ہے۔ پرانا پلیٹ فارم سیشن ہٹا کر دوبارہ کوشش کریں۔',
-    'device_pairing_pending':
-        'یہ ڈیوائس ورک اسپیس منتظم کی منظوری کی منتظر ہے۔',
-    'session_revoked':
-        'ایڈمن نے یہ سیشن ختم کیا۔ نیا سیشن رجسٹر کرنے کے لیے دوبارہ سائن اِن کریں۔',
-    'device_session_mismatch':
-        'ڈیوائس رسائی کی تصدیق نہیں ہو سکی۔ ڈیوائس رجسٹریشن چیک کر کے دوبارہ کوشش کریں۔',
-    'device_blocked': 'یہ ڈیوائس بلاک ہے۔ ورک اسپیس منتظم سے رابطہ کریں۔',
-    'device_admin_reset_required':
-        'ورک اسپیس منتظم سے اس ڈیوائس کو ری سیٹ کرنے کو کہیں۔',
-    'device_clock_skew':
-        'آپ کے ڈیوائس کا وقت سرور سے مختلف ہے۔ خودکار تاریخ اور وقت فعال کریں، پھر دوبارہ کوشش کریں۔',
     'workspace_policy_unavailable':
         'ورک اسپیس رسائی پالیسی دستیاب نہیں۔ دوبارہ کوشش کریں یا منتظم سے رابطہ کریں۔',
     'workspace_disabled':
@@ -3717,73 +3521,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'route_unavailable': 'منتخب کردہ روٹ دستیاب نہیں',
     'status_unknown': 'نامعلوم حالت',
     'slug': 'سلاگ',
-    'max_devices_allowed': 'اجازت دیے گئے ڈیوائسز کی زیادہ سے زیادہ تعداد',
-    'max_active_sessions_allowed': 'فعال سیشنز کی زیادہ سے زیادہ تعداد',
-    'require_device_pairing': 'ڈیوائس جوڑا ضروری ہے',
-    'admin_reset_only': 'صرف ایڈمن دوبارہ سیٹ کر سکتا ہے',
-    'access_security_title': 'ڈیوائسز اور سیشنز',
-    'paired_devices_title': 'جوڑی گئی ڈیوائسز',
-    'paired_devices_search': 'اکاؤنٹ، ای میل، ڈیوائس یا ورژن تلاش کریں',
-    'access_android_version': 'اینڈرائیڈ',
-    'access_os_version': 'آپریٹنگ سسٹم',
-    'platform_sessions_title': 'پلیٹ فارم آپریٹر سیشنز',
     'access_workspace_unavailable': 'ورک اسپیس تک رسائی دستیاب نہیں۔',
-    'access_devices': 'ڈیوائسز',
-    'access_allowed': 'اجازت یافتہ',
-    'access_registered': 'رجسٹرڈ',
-    'access_available': 'دستیاب',
     'unlimited': 'لامحدود',
-    'access_active_sessions': 'فعال سیشنز',
-    'access_active': 'فعال',
-    'access_policy_reduced_notice':
-        'موجودہ استعمال ورک اسپیس کی حد سے زیادہ ہے۔',
-    'access_no_devices': 'کوئی ڈیوائس رجسٹرڈ نہیں۔',
-    'access_no_sessions': 'کوئی سیشن نہیں ملا۔',
-    'access_registry_limit_notice': 'پہلے 200 رسائی ریکارڈ دکھائے جا رہے ہیں۔',
-    'access_registry_search': 'صارف، ڈیوائس یا پلیٹ فارم تلاش کریں',
-    'access_unknown_user': 'نامعلوم صارف',
-    'access_remove_device': 'ڈیوائس ہٹائیں',
-    'access_user': 'صارف',
-    'access_device': 'ڈیوائس',
-    'access_status': 'حالت',
-    'access_related_sessions': 'متعلقہ سیشنز',
-    'access_device_revoke_effect':
-        'یہ ڈیوائس اور اس کے فعال سیشن ختم ہو جائیں گے۔',
-    'access_device_removed': 'ڈیوائس ہٹا دی گئی۔',
-    'access_approve_device': 'ڈیوائس منظور کریں',
-    'access_device_approved': 'ڈیوائس منظور ہو گئی۔',
-    'access_block_device': 'ڈیوائس بلاک کریں',
-    'access_device_blocked': 'ڈیوائس بلاک ہو گئی۔',
-    'access_reset_device': 'ڈیوائس رسائی ری سیٹ کریں',
-    'access_device_reset': 'ڈیوائس رسائی ری سیٹ ہو گئی۔',
-    'access_terminate_session': 'سیشن ختم کریں',
-    'access_session_terminate_effect': 'منتخب سیشن ختم ہو جائے گا۔',
-    'access_session_terminated': 'سیشن ختم ہو گیا۔',
-    'access_started': 'شروع ہوا',
-    'access_policy_range': '1 سے 10 کے درمیان حد درج کریں۔',
-    'access_policy_saved': 'رسائی پالیسی محفوظ ہو گئی۔',
-    'access_policy_title': 'ورک اسپیس رسائی پالیسی',
-    'seller_access_policy_title': 'سیلر ڈیوائس اور سیشن کی حدیں',
-    'workspace_admin_policy_title': 'ورک اسپیس ایڈمن سیشن کی حد',
-    'workspace_admin_policy_help':
-        'ورک اسپیس ایڈمن لامحدود ڈیوائسز جوڑ سکتے ہیں۔ یہ حد تمام ورک اسپیس میں بیک وقت سیشنز کو کنٹرول کرتی ہے۔',
-    'access_policy_devices': 'ڈیوائس حد',
-    'access_policy_devices_help':
-        'اس ورک اسپیس میں ہر سیلر کے لیے زیادہ سے زیادہ رجسٹرڈ ڈیوائسز',
-    'access_policy_sessions': 'سیشن حد',
-    'access_policy_sessions_help':
-        'اس ورک اسپیس میں ہر سیلر کے لیے بیک وقت زیادہ سے زیادہ سیشنز',
-    'access_over_limit': 'حد سے زیادہ',
-    'access_unknown_device': 'نامعلوم ڈیوائس',
-    'access_app_version': 'ایپ',
-    'access_registered_at': 'رجسٹریشن',
-    'access_last_seen': 'آخری بار دیکھا گیا',
-    'access_current_device': 'یہ ڈیوائس',
-    'access_status_active': 'فعال',
-    'access_status_pending': 'منظوری زیر التوا',
-    'access_status_revoked': 'ہٹا دی گئی',
-    'access_status_blocked': 'بلاک',
-    'access_status_expired': 'میعاد ختم',
     'no_owner': 'کوئی مالک نہیں',
     'owner': 'مالک',
     'save_changes': 'تبدیلیاں محفوظ کریں',
@@ -4039,16 +3778,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'coverage_submitted': 'کوریج کی درخواست جمع ہو گئی',
     'date_range': 'تاریخ کی حد',
 
-    // ── Session Security ──
-    'session_expired': 'سیشن ختم ہو گیا — دوبارہ سائن ان کریں',
-    'session_expiring_soon': 'سیشن جلد ختم ہو گا',
-    'session_warning_30min':
-        'آپ کا ایڈمن سیشن 30 منٹ میں ختم ہو جائے گا۔ براہ کرم اپنا کام محفوظ کریں۔',
-    'session_warning_5min':
-        'آپ کا رسائی سیشن پانچ منٹ میں ختم ہو جائے گا۔ اسے تجدید کرنے کے لیے سائن ان رہیں۔',
-    'stay_signed_in': 'سائن ان رہیں',
-    'lock_screen_session_active': 'سیشن فعال ہے',
-    'lock_screen_tap_to_continue': 'جاری رکھنے کے لیے کہیں بھی ٹیپ کریں',
+    // ── دکان کے تجزیات ──
     'i_got': 'ملا',
     'i_gave': 'دیا',
     'i_will_get': 'ملے گا',
@@ -4307,8 +4037,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'confirm_reactivate_user':
         '%s کو دوبارہ فعال کریں اور ان کی رسائی بحال کریں؟',
     'disable_user': 'اکاؤنٹ غیر فعال کریں',
-    'confirm_disable_user_sessions':
-        '%s کو غیر فعال کریں؟ ان کے فعال سیشن ختم ہو جائیں گے۔ اکاؤنٹ دوبارہ فعال کرنے پر رجسٹرڈ ڈیوائسز دستیاب رہیں گی۔',
+    'confirm_deactivate_user':
+        'کیا %s کا اکاؤنٹ غیر فعال کریں؟ رسائی ختم ہوگی اور راستوں کی تفویض ہٹا دی جائے گی۔',
     'settings_company_logo': 'کمپنی لوگو',
     'settings_logo_specs':
         'PDF رپورٹس · PNG/JPG · زیادہ سے زیادہ 800×400 px · 300 KB',

@@ -9,10 +9,7 @@ import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/auth_refresh_policy.dart';
 import '../core/utils/role_utils.dart';
-import '../core/utils/session_access_policy.dart';
-import '../core/utils/session_access_error.dart';
 import '../core/utils/tenant_scope.dart';
-import 'tenant_provider.dart';
 import '../models/user_model.dart';
 import 'alert_provider.dart';
 import 'dashboard_provider.dart';
@@ -75,7 +72,7 @@ class AuthNotifier extends AsyncNotifier<void> {
     // a dependent before its dependency. dashboardStatsProvider will rebuild
     // automatically when authUserProvider rebuilds.
     // SM-01: Also invalidate the last-good cache so stale stats from the
-    // previous session do not flash briefly when a new user signs in.
+    // previous account do not flash briefly when a new user signs in.
     ref.invalidate(lastGoodDashboardStatsProvider);
     ref.invalidate(settingsProvider);
     ref.invalidate(allTransactionsProvider);
@@ -87,8 +84,8 @@ class AuthNotifier extends AsyncNotifier<void> {
     ref.invalidate(sellersProvider);
     ref.invalidate(allVariantsProvider);
     ref.invalidate(allVariantsExportProvider);
-    // A§4-R17: admin-only providers must be invalidated to prevent data leak
-    // across sessions (e.g. admin logs out, seller logs in on same device).
+    // A§4-R17: admin-only providers must be invalidated to prevent data leaks
+    // across account changes (e.g. an admin logs out and a seller logs in).
     ref.invalidate(routesProvider);
     ref.invalidate(routesExportProvider);
     ref.invalidate(shopsProvider);
@@ -103,16 +100,16 @@ class AuthNotifier extends AsyncNotifier<void> {
     ref.invalidate(allInventoryTransactionsProvider);
     ref.invalidate(outstandingShopsProvider);
     // Seller multi-route shops provider — autoDispose but invalidate for
-    // defense-in-depth against session data leak.
+    // defense-in-depth against cross-account data exposure.
     ref.invalidate(sellerAllShopsProvider);
     ref.invalidate(routesBySellerProvider);
     // Export providers: admin-only, must be flushed on sign-out so a seller
-    // session cannot access cached data from a prior admin session.
+    // account cannot access cached data from a prior admin account.
     ref.invalidate(sellerTransactionsExportProvider);
     ref.invalidate(allTransactionsExportProvider);
     ref.invalidate(sellerInventoryExportProvider);
     ref.invalidate(alertCountsProvider);
-    // Notification + history providers scoped to role — flush on session change.
+    // Notification + history providers scoped to role — flush on account change.
     ref.invalidate(notificationsProvider);
     ref.invalidate(recentTransactionsProvider);
   }
@@ -219,53 +216,6 @@ class AuthNotifier extends AsyncNotifier<void> {
           );
         }
 
-        if (isSuperAdmin) {
-          try {
-            await ref
-                .read(sessionManagementNotifierProvider.notifier)
-                .registerPlatformSession(userId: uid);
-          } catch (error, stackTrace) {
-            try {
-              await ref
-                  .read(sessionManagementNotifierProvider.notifier)
-                  .terminateCurrentPlatformSession(uid);
-            } catch (cleanupError, cleanupStack) {
-              _logger.w(
-                'Platform access rollback skipped after registration failure',
-                error: cleanupError,
-                stackTrace: cleanupStack,
-              );
-            }
-            await _signOutIfCurrentUid(uid);
-            Error.throwWithStackTrace(error, stackTrace);
-          }
-        } else if (tenantId != null) {
-          try {
-            final access = await ref
-                .read(sessionManagementNotifierProvider.notifier)
-                .registerCurrentAccess(userId: uid, tenantId: tenantId);
-            if (access.status == 'pending') {
-              throw const SessionAccessException(
-                SessionAccessErrorCode.devicePairingPending,
-              );
-            }
-          } catch (error, stackTrace) {
-            try {
-              await ref
-                  .read(sessionManagementNotifierProvider.notifier)
-                  .terminateCurrentSession(uid);
-            } catch (cleanupError, cleanupStack) {
-              _logger.w(
-                'Application access rollback skipped after registration failure',
-                error: cleanupError,
-                stackTrace: cleanupStack,
-              );
-            }
-            await _signOutIfCurrentUid(uid);
-            Error.throwWithStackTrace(error, stackTrace);
-          }
-        }
-
         // ── Email-verified sync (Auth → Firestore, non-blocking) ──────────
         // Reload Auth user to get latest emailVerified from Firebase servers.
         // If Auth says verified but Firestore doesn't, sync it now so the
@@ -360,11 +310,7 @@ class AuthNotifier extends AsyncNotifier<void> {
 
   Future<void> signOut({String? expectedUid}) async {
     if (expectedUid != null &&
-        !SessionAccessPolicy.shouldSignOutForAccessCheck(
-          expectedUid: expectedUid,
-          currentUid: FirebaseAuth.instance.currentUser?.uid,
-          authOperationInProgress: state.isLoading,
-        )) {
+        FirebaseAuth.instance.currentUser?.uid != expectedUid) {
       return;
     }
     state = const AsyncLoading();
@@ -378,32 +324,6 @@ class AuthNotifier extends AsyncNotifier<void> {
               .doc(authUser.uid)
               .get();
           final profileData = profile.data();
-          if ((profileData?['role'] as String? ?? '').trim().toLowerCase() ==
-              'super_admin') {
-            try {
-              await ref
-                  .read(sessionManagementNotifierProvider.notifier)
-                  .terminateCurrentPlatformSession(authUser.uid);
-            } catch (e, stack) {
-              _logger.w(
-                'Platform session termination skipped during sign-out',
-                error: e,
-                stackTrace: stack,
-              );
-            }
-          } else {
-            try {
-              await ref
-                  .read(sessionManagementNotifierProvider.notifier)
-                  .terminateCurrentSession(authUser.uid);
-            } catch (e, stack) {
-              _logger.w(
-                'Application session termination skipped during sign-out',
-                error: e,
-                stackTrace: stack,
-              );
-            }
-          }
           if ((profileData?['role'] as String? ?? '').trim().toLowerCase() ==
               'super_admin') {
             final workspaceId = profileData?['active_workspace_id'] as String?;

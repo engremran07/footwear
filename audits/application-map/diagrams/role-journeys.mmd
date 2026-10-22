@@ -2,18 +2,18 @@
 title: Role journeys (source-derived; runtime auth unverified)
 ---
 flowchart LR
-  Start([Login · app/lib/screens/login_screen.dart#L100]) -->|app/lib/providers/auth_provider.dart#L126| Profile[users/{uid} profile]
-  Profile -->|app/lib/providers/auth_provider.dart#L126| Role{Normalized role}
+  Start([Login · app/lib/screens/login_screen.dart#L100]) -->|app/lib/providers/auth_provider.dart#L123| Profile[users/{uid} profile]
+  Profile -->|app/lib/providers/auth_provider.dart#L123| Role{Normalized role}
   Role -->|app/lib/models/user_model.dart#L77| Seller[Seller: tenant + route assignment]
   Role -->|app/lib/models/user_model.dart#L78| TenantAdmin[Tenant admin: own workspace]
   Role -->|app/lib/models/user_model.dart#L72| LegacyAdmin[Admin / manager: tenant-scoped operations]
   Role -->|firestore.rules#L38| SuperAdmin[Super-admin: platform metadata]
-  Seller -->|app/lib/providers/tenant_provider.dart#L628| Access[Device/session registration]
-  TenantAdmin -->|app/lib/providers/tenant_provider.dart#L628| Access
-  LegacyAdmin -->|app/lib/providers/tenant_provider.dart#L628| Access
-  SuperAdmin -->|app/lib/providers/tenant_provider.dart#L1012| PlatformSession[Separate platform session]
-  Access -->|app/lib/core/utils/session_access_policy.dart#L12| Pairing{Seller pairing enabled?}
-  Pairing -->|app/lib/providers/tenant_provider.dart#L1223| Approval[Admin approval surface]
-  Pairing -->|app/lib/providers/tenant_provider.dart#L628| Business[Tenant business UI]
-  SuperAdmin -->|app/lib/providers/auth_provider.dart#L470| Business
+  Seller -->|app/lib/providers/tenant_provider.dart#L1| Access[Device/session registration]
+  TenantAdmin -->|app/lib/providers/tenant_provider.dart#L1| Access
+  LegacyAdmin -->|app/lib/providers/tenant_provider.dart#L1| Access
+  SuperAdmin -->|app/lib/providers/tenant_provider.dart#L1| PlatformSession[Separate platform session]
+  Access -->|app/lib/core/utils/session_access_policy.dart#L1| Pairing{Seller pairing enabled?}
+  Pairing -->|app/lib/providers/tenant_provider.dart#L1| Approval[Admin approval surface]
+  Pairing -->|app/lib/providers/tenant_provider.dart#L1| Business[Tenant business UI]
+  SuperAdmin -->|app/lib/providers/auth_provider.dart#L390| Business
   Business -->|firestore.rules#L16| Rules[Firestore Rules re-check tenant/role scope]

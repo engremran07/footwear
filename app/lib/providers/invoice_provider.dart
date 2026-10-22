@@ -1406,7 +1406,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
   /// Marks an invoice as paid.
   ///
   /// FI-06 / BUG-05: Uses Firestore transaction for atomicity — prevents
-  /// race condition where two sessions mark-as-paid simultaneously.
+  /// race condition where two concurrent transactions mark-as-paid simultaneously.
   Future<void> markAsPaid({
     required String invoiceId,
     required String routeId,

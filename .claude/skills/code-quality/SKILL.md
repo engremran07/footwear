@@ -35,7 +35,7 @@ and a recognizable catalog of vibe-coded debt signals.
 ### Chain 1: Collection Rename
 
 `collections.dart` rename → providers break → rules break → indexes stale  
-**Fix order:** constants.dart → providers → rules → indexes → `firebase deploy --only firestore:rules,firestore:indexes`
+**Fix order:** constants.dart → providers → rules → indexes → Rules Emulator tests. Deploy Rules/indexes only when the user explicitly authorizes production deployment.
 
 ### Chain 2: Auth Provider Leak
 
@@ -50,7 +50,7 @@ Rules accept 'admin'; app writes 'Admin' → all admin writes fail with `permiss
 ### Chain 4: Composite Index Gap
 
 `where(A) + orderBy(B)` query added → no index → list renders empty with no error message  
-**Fix:** Add entry to `firestore.indexes.json` → redeploy.
+**Fix:** Add an entry to `firestore.indexes.json` and validate the query/rule path locally. Deploy only when explicitly authorized.
 
 ### Chain 5: Transitive Dep Wasm Lock
 
@@ -67,7 +67,7 @@ A pub package locks a shared transitive dep (e.g. `archive`) to an old major ver
 **Fix order:** Replace or upgrade the blocking package. Never force-override `archive` major version — it compiles but breaks caller package API at runtime.  
 **PowerShell gotcha:** `flutter build web --release` appears to exit code 1 via PowerShell `NativeCommandError` even on a clean Wasm build. Check `$LASTEXITCODE` explicitly; exit 0 = real success even when Wasm dry-run messages appear.
 
-## Five Non-Negotiable Pre-Commit Checks
+## Focused Code-Change Checks
 
 ```bash
 
@@ -87,13 +87,13 @@ grep -rn "\.collection('" lib/ | grep -v "Collections\."
 
 grep -rn "FirebaseFirestore\|\.doc(\|\.collection(" lib/screens/ lib/widgets/
 
-# 5. No split-per-abi in scripts/workflows
-
-grep -rn "split-per-abi" ../ --include="*.{yml,yaml,md,sh}"
+# 5. Release scripts document the canonical ABI split (when release files change)
+grep -rn "flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true" ../ --include="*.{yml,yaml,md,sh}"
 
 ```
 
-All five checks must return zero violations before any commit.
+Run checks relevant to the edited scope. A release build, deployment, commit, or
+push is a separate operation and requires explicit user authorization.
 
 ## Dead Code Detection
 
@@ -127,7 +127,7 @@ grep -rn "static const String" app/lib/core/constants/ | \
 
 | M2 Inadequate Supply Chain Security | `flutter pub outdated` before each release; ProGuard enabled |
 
-| M3 Insecure Authentication | Firebase Auth + session guard (8h hard limit, 15min inactivity) |
+| M3 Insecure Authentication | Firebase Auth plus active-profile, role, tenant, and selected-workspace Rules checks; no app-managed device/session gate |
 
 | M4 Insufficient Input/Output Validation | `AppSanitizer._s()` on all PDF interpolation; URL HTTPS validation |
 

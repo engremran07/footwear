@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/firestore_pagination.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/route_model.dart';
@@ -222,20 +223,27 @@ class RouteNotifier extends AsyncNotifier<void> {
   Future<void> create(Map<String, dynamic> data) async {
     final db = FirebaseFirestore.instance;
     final currentUser = await ref.read(authUserProvider.future);
-    if (currentUser == null || !currentUser.active) {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty ||
+        currentUser == null ||
+        !currentUser.active ||
+        currentUser.id != uid) {
       throw StateError('An active user profile is required');
     }
     if (!currentUser.isAdmin) {
       throw StateError('Only admin can create routes');
     }
     final tenantId = TenantScope.requireTenant(currentUser.tenantId);
+    final routeName = (data['name'] as String? ?? '').trim();
+    if (routeName.isEmpty) throw ArgumentError('name must not be empty');
     final routeRef = db.collection(Collections.routes).doc();
-    final routeName = data['name'] as String? ?? '';
     final currency = data['currency'] as String? ?? 'SAR';
     final sellerIds =
         (data['assigned_seller_ids'] as List<dynamic>?)
             ?.cast<String>()
-            .where((s) => s.trim().isNotEmpty)
+            .map((sellerId) => sellerId.trim())
+            .where((sellerId) => sellerId.isNotEmpty)
+            .toSet()
             .toList() ??
         const <String>[];
     final sellerNames =
@@ -253,19 +261,27 @@ class RouteNotifier extends AsyncNotifier<void> {
       for (final sid in sellerIds) {
         final ref = db.collection(Collections.users).doc(sid);
         final snap = await txn.get(ref);
-        if (!snap.exists) throw StateError('Seller not found');
+        final seller = snap.data();
+        if (seller == null ||
+            seller['active'] != true ||
+            canonicalRoleName(seller['role'] as String? ?? '') != 'seller' ||
+            TenantScope.normalize(seller['tenant_id'] as String?) != tenantId) {
+          throw StateError('Seller is unavailable in this workspace');
+        }
         sellerRefs.add(ref);
       }
 
       final now = Timestamp.now();
       txn.set(routeRef, {
         ...TenantScope.applyToData(data, tenantId: tenantId),
+        'name': routeName,
         'assigned_seller_ids': sellerIds,
         'assigned_seller_names': sellerNames,
         'currency': currency,
         'route_number': routeNumber,
         'total_shops': 0,
         'active': true,
+        'created_by': uid,
         'created_at': now,
         'updated_at': now,
       });
@@ -284,32 +300,40 @@ class RouteNotifier extends AsyncNotifier<void> {
   Future<void> updateRoute(String id, Map<String, dynamic> data) async {
     final db = FirebaseFirestore.instance;
     final currentUser = await ref.read(authUserProvider.future);
-    if (currentUser == null || !currentUser.active) {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty ||
+        currentUser == null ||
+        !currentUser.active ||
+        currentUser.id != uid) {
       throw StateError('An active user profile is required');
     }
     if (!currentUser.isAdmin) {
       throw StateError('Only admin can update routes');
     }
     final routeRef = db.collection(Collections.routes).doc(id);
+    final tenantId = TenantScope.requireTenant(currentUser.tenantId);
     await db.runTransaction<void>((txn) async {
       final currentRoute = await txn.get(routeRef);
       if (!currentRoute.exists) {
         throw StateError('Route not found');
       }
+      final currentRouteData = currentRoute.data();
+      if (currentRouteData == null ||
+          !TenantScope.matchesTenant(currentRouteData, tenantId)) {
+        throw StateError('Route is unavailable in this workspace');
+      }
 
       final routeName =
-          data['name'] as String? ??
-          currentRoute.data()?['name'] as String? ??
-          '';
-      final tenantId = TenantScope.requireTenant(currentUser.tenantId);
+          (data['name'] as String? ?? currentRouteData['name'] as String? ?? '')
+              .trim();
+      if (routeName.isEmpty) throw ArgumentError('name must not be empty');
       final currency =
           data['currency'] as String? ??
-          currentRoute.data()?['currency'] as String? ??
+          currentRouteData['currency'] as String? ??
           'SAR';
 
       // Old seller IDs from current route doc.
-      final oldRaw =
-          currentRoute.data()?['assigned_seller_ids'] as List<dynamic>?;
+      final oldRaw = currentRouteData['assigned_seller_ids'] as List<dynamic>?;
       final oldSellerIds = oldRaw != null
           ? oldRaw.cast<String>().toSet()
           : <String>{};
@@ -334,7 +358,13 @@ class RouteNotifier extends AsyncNotifier<void> {
       for (final sid in added) {
         final ref = db.collection(Collections.users).doc(sid);
         final snap = await txn.get(ref);
-        if (!snap.exists) throw StateError('Seller not found');
+        final seller = snap.data();
+        if (seller == null ||
+            seller['active'] != true ||
+            canonicalRoleName(seller['role'] as String? ?? '') != 'seller' ||
+            TenantScope.normalize(seller['tenant_id'] as String?) != tenantId) {
+          throw StateError('Seller is unavailable in this workspace');
+        }
       }
 
       final now = Timestamp.now();
@@ -367,23 +397,28 @@ class RouteNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> delete(String id) async {
-    final authUser = FirebaseAuth.instance.currentUser;
-    if (authUser == null) {
-      throw StateError('Not authenticated');
+    final currentUser = await ref.read(authUserProvider.future);
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty ||
+        currentUser == null ||
+        !currentUser.active ||
+        currentUser.id != uid) {
+      throw StateError('An active user profile is required');
     }
-    final db = FirebaseFirestore.instance;
-    final me = await db.collection(Collections.users).doc(authUser.uid).get();
-    final role = (me.data()?['role'] as String? ?? '').trim();
-    if (!isPrivilegedRoleName(role)) {
+    if (!currentUser.isAdmin) {
       throw StateError('Only admin can delete routes');
     }
-    final currentUser = await ref.read(authUserProvider.future);
-    final tenantId = TenantScope.requireTenant(currentUser?.tenantId);
+    final tenantId = TenantScope.requireTenant(currentUser.tenantId);
 
-    // Check for assigned sellers
+    final db = FirebaseFirestore.instance;
     final routeDoc = await db.collection(Collections.routes).doc(id).get();
+    final routeData = routeDoc.data();
+    if (routeData == null || !TenantScope.matchesTenant(routeData, tenantId)) {
+      throw StateError('Route is unavailable in this workspace');
+    }
+
     final assignedSellerIds =
-        routeDoc.data()?['assigned_seller_ids'] as List<dynamic>?;
+        routeData['assigned_seller_ids'] as List<dynamic>?;
     if (assignedSellerIds != null && assignedSellerIds.isNotEmpty) {
       throw StateError('route_has_seller');
     }
@@ -400,7 +435,7 @@ class RouteNotifier extends AsyncNotifier<void> {
       throw StateError('route_has_shops');
     }
 
-    await db.collection(Collections.routes).doc(id).update({
+    await routeDoc.reference.update({
       'active': false,
       'updated_at': Timestamp.now(),
     });

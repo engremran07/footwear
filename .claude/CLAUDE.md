@@ -2,7 +2,7 @@
 
 Use this workspace-specific file as a local mirror of root guidance.
 
-Last updated: 2026-10-15
+Last updated: 2026-10-22
 
 ## Runtime First Rule
 
@@ -47,75 +47,48 @@ whenever fixing any issue. Catch and fix culprits found while reading touched fi
 
 - no direct Firestore writes in screens/widgets
 
-## Governance Notes (v3.7.2+50)
+## Current Guidance
 
-- `StateProvider` is BANNED. Use `NotifierProvider<T, S>` only. Grep must return zero.
-
-- All 4 CI workflows now standardised on Flutter 3.41.6.
-
-- Anti-Bypass Enforcement Matrix lives in CLAUDE.md — require quoted tool output for every claim.
-
-- Breakage Chain 6 (StateProvider lifecycle) added to CLAUDE.md.
-
-- Zero Problems tab tolerance: markdown AND Flutter analyze must always be fully clean.
-
-- Markdown governance: load `.claude/skills/markdown-governance/SKILL.md` before creating any `.md` file.
-
-- CI Gates 15-17 active: StateProvider banned; Firestore files valid; no temp artifacts.
-
-- `.gitignore` covers all temp artifacts: logs, debug files, installer flags, dev scripts.
-
-- AGENTS.md §8 is now the 15-step mandatory signoff sequence. All 15 steps non-bypassable.
-
-- `firebase deploy --only firestore:rules,firestore:indexes` is MANDATORY on every signoff — not just on rules change.
-
-- Web build + hosting deploy is MANDATORY on every signoff.
-
-- GitHub commit audit (git log + git status) is MANDATORY before every commit.
-
-- Before every Android release build, check free RAM and require at least 3.2 GB.
-  If below threshold, reclaim memory and recheck before starting Gradle.
-
-- For phone delivery, build split-per-ABI, `adb push` the matching APK to the
-  device, then run `adb install --streaming -r` with the host-side APK path.
-
-- Flutter CanvasKit and web fonts require `https://www.gstatic.com` and
-  `https://fonts.gstatic.com` in Hosting CSP `connect-src`; verify the deployed
-  page in a browser after Hosting changes.
-
-- Session enforcement must wait for access registration, choose the latest
-  active unexpired session for the installation, and never sign out a different
-  UID after an asynchronous check. Keep login failures visible; show a status
-  for attempts pending longer than 12 seconds.
-- Access limits are role-scoped: sellers use per-workspace dynamic device and
-  session caps; workspace admins have unlimited paired devices but share a
-  super-admin-configured active-session cap; super-admins use separate
-  platform-only slots (2 devices, 1 active session).
+- `StateProvider` is banned in Riverpod 3; use `NotifierProvider` or another
+  supported provider type.
+- Keep Markdown lint and Flutter analysis clean for the files and checks
+  relevant to the requested change.
+- Load `.claude/skills/markdown-governance/SKILL.md` before creating or editing
+  Markdown governance files.
+- Firebase Auth is the only sign-in mechanism. Preserve visible mapped login
+  errors, active-profile checks, tenant routing, and super-admin workspace
+  auditing; do not restore app-managed device or session gates.
+- Workspace admins and sellers retain their scoped CRUD capabilities. Firestore
+  Rules enforce active-tenant access, tenant ownership, and linked financial
+  writes; use the emulator suite when changing Rules.
+- A Rules Emulator result is not production deployment evidence.
+- Run only the tests, builds, and operational steps relevant to the task.
+  Production deploys, production data changes, release builds, device installs,
+  commits, and pushes require explicit user authorization.
+- A push to `main` triggers the live Hosting and Firestore deployment workflow;
+  release tags/manual release dispatches also have production side effects.
+- For an authorized Android release, use the split-per-ABI command and check
+  available memory before Gradle. Install only when Android delivery is in
+  scope and authorized.
+- Verify Hosting CSP and web shell cache headers when the Hosting configuration
+  or web surface is part of the authorized change.
 
 ## Canonical Audit Doc
 
 See AGENTS.md §10 for latest audit findings.
 
-## Verification Mirror
+## Verification Reference
 
-- Select-String -Path "app\pubspec.yaml","app\lib\core\constants\app_brand.dart" -Pattern '^version:|appVersion|buildNumber'
+Select commands based on the requested scope. For Firestore Rules changes, run
+the emulator suite from `tests/firestore-rules/`:
 
-- flutter analyze lib --no-pub
+```powershell
+Push-Location tests/firestore-rules
+firebase emulators:exec --only firestore "npm test"
+Pop-Location
+```
 
-- dart analyze test/
-
-- flutter test -r expanded
-
-- flutter build web --release ; firebase deploy --only hosting
-
-- Check free RAM (>=3.2 GB) before starting the APK build.
-
-- flutter build apk --release
-
-- firebase deploy --only firestore:rules,firestore:indexes
-
-- git log --oneline -5 ; git status --short ; git diff --stat HEAD
-
-- git add -A ; git commit ; git push
-
-- adb push matching ABI APK, then adb install --streaming -r with host APK path (if connected)
+For an explicitly authorized release, consult the current version/build,
+analysis, test, build, deployment, and install instructions in root
+`AGENTS.md`. Quote actual tool output; do not imply a deployment or publication
+that was not performed.

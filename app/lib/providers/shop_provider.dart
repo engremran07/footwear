@@ -291,39 +291,76 @@ class ShopNotifier extends AsyncNotifier<void> {
     final db = FirebaseFirestore.instance;
     final currentUser = await ref.read(authUserProvider.future);
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    if (uid.isEmpty || currentUser == null || !currentUser.active) {
+    if (uid.isEmpty ||
+        currentUser == null ||
+        !currentUser.active ||
+        currentUser.id != uid) {
       throw StateError('An active user profile is required');
     }
+    if (!currentUser.isAdmin && !currentUser.isSeller) {
+      throw StateError('Only admins and assigned sellers can create shops');
+    }
     final tenantId = TenantScope.requireTenant(currentUser.tenantId);
-    // Pre-generate doc ID so retries on network failure are idempotent
-    // (using add() can create a duplicate if the first write succeeds but
-    // the ACK is lost and the SDK retries the request).
+    final routeId = (data['route_id'] as String? ?? '').trim();
+    final name = (data['name'] as String? ?? '').trim();
+    if (routeId.isEmpty) throw ArgumentError('routeId must not be empty');
+    if (name.isEmpty) throw ArgumentError('name must not be empty');
+    if (currentUser.isSeller &&
+        !currentUser.assignedRouteIds.contains(routeId)) {
+      throw StateError('Sellers can only create shops on assigned routes');
+    }
+
     final shopRef = db.collection(Collections.customers).doc();
-    await shopRef.set({
-      ...TenantScope.applyToData(data, tenantId: tenantId),
-      // Always overwrite created_by with the verified Firebase Auth uid.
-      // Screens may pass an empty string if authUserProvider hasn't resolved
-      // yet; using the Auth uid directly is the authoritative source.
-      'created_by': uid,
-      'balance': 0.0,
-      'active': true,
-      'created_at': Timestamp.now(),
-      'updated_at': Timestamp.now(),
-    });
-    // Try to increment route total_shops (may fail for sellers â€” non-critical)
-    try {
-      final routeId = data['route_id'] as String;
-      await db.collection(Collections.routes).doc(routeId).update({
-        'total_shops': FieldValue.increment(1),
+    final routeRef = db.collection(Collections.routes).doc(routeId);
+    await db.runTransaction<void>((transaction) async {
+      final routeSnapshot = await transaction.get(routeRef);
+      final routeData = routeSnapshot.data();
+      if (routeData == null ||
+          !TenantScope.matchesTenant(routeData, tenantId) ||
+          routeData['active'] != true) {
+        throw StateError('Selected route is unavailable');
+      }
+
+      final totalShops = (routeData['total_shops'] as num?)?.toInt() ?? 0;
+      final now = Timestamp.now();
+      transaction.set(shopRef, {
+        ...TenantScope.applyToData(data, tenantId: tenantId),
+        'name': name,
+        'route_id': routeId,
+        'route_number':
+            (routeData['route_number'] as num?)?.toInt() ??
+            (data['route_number'] as num?)?.toInt() ??
+            0,
+        'created_by': uid,
+        'balance': 0.0,
+        'active': true,
+        'created_at': now,
+        'updated_at': now,
       });
-    } catch (_) {}
+      transaction.update(routeRef, {
+        'total_shops': totalShops + 1,
+        'last_shop_created_id': shopRef.id,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+    });
   }
 
   Future<void> updateShop(String id, Map<String, dynamic> data) async {
-    const allowedFields = <String>{
+    final currentUser = await ref.read(authUserProvider.future);
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty ||
+        currentUser == null ||
+        !currentUser.active ||
+        currentUser.id != uid) {
+      throw StateError('An active user profile is required');
+    }
+    if (!currentUser.isAdmin && !currentUser.isSeller) {
+      throw StateError('Only admins and sellers can update shops');
+    }
+    final tenantId = TenantScope.requireTenant(currentUser.tenantId);
+    const adminFields = <String>{
       'name',
       'route_id',
-      'route_number',
       'phone',
       'address',
       'area',
@@ -334,19 +371,101 @@ class ShopNotifier extends AsyncNotifier<void> {
       'latitude',
       'longitude',
     };
+    const sellerFields = <String>{
+      'name',
+      'phone',
+      'address',
+      'area',
+      'city',
+      'contact_name',
+      'notes',
+      'latitude',
+      'longitude',
+    };
+    final allowedFields = currentUser.isAdmin ? adminFields : sellerFields;
     final filteredData = <String, dynamic>{
       for (final entry in data.entries)
         if (allowedFields.contains(entry.key)) entry.key: entry.value,
     };
 
-    if (filteredData.isEmpty) {
+    final requestedRouteId = (data['route_id'] as String? ?? '').trim();
+    if (currentUser.isSeller &&
+        requestedRouteId.isNotEmpty &&
+        !currentUser.assignedRouteIds.contains(requestedRouteId)) {
+      throw StateError('Sellers can only manage shops on assigned routes');
+    }
+    if (filteredData.isEmpty && requestedRouteId.isEmpty) {
       throw ArgumentError('No writable shop fields were provided');
     }
 
-    await FirebaseFirestore.instance
-        .collection(Collections.customers)
-        .doc(id)
-        .update({...filteredData, 'updated_at': Timestamp.now()});
+    final db = FirebaseFirestore.instance;
+    final shopRef = db.collection(Collections.customers).doc(id);
+    await db.runTransaction<void>((transaction) async {
+      final shopSnapshot = await transaction.get(shopRef);
+      final shop = shopSnapshot.data();
+      if (shop == null || !TenantScope.matchesTenant(shop, tenantId)) {
+        throw StateError('Shop is unavailable in this workspace');
+      }
+      final currentRouteId = (shop['route_id'] as String? ?? '').trim();
+      if (currentUser.isSeller &&
+          (currentRouteId.isEmpty ||
+              !currentUser.assignedRouteIds.contains(currentRouteId))) {
+        throw StateError('Sellers can only manage shops on assigned routes');
+      }
+
+      final targetRouteId = currentUser.isAdmin && requestedRouteId.isNotEmpty
+          ? requestedRouteId
+          : currentRouteId;
+      final routeChanged = targetRouteId != currentRouteId;
+      DocumentSnapshot<Map<String, dynamic>>? oldRouteSnapshot;
+      DocumentSnapshot<Map<String, dynamic>>? newRouteSnapshot;
+      DocumentReference<Map<String, dynamic>>? oldRouteRef;
+      DocumentReference<Map<String, dynamic>>? newRouteRef;
+
+      if (routeChanged) {
+        oldRouteRef = db.collection(Collections.routes).doc(currentRouteId);
+        newRouteRef = db.collection(Collections.routes).doc(targetRouteId);
+        oldRouteSnapshot = await transaction.get(oldRouteRef);
+        newRouteSnapshot = await transaction.get(newRouteRef);
+        final oldRoute = oldRouteSnapshot.data();
+        final newRoute = newRouteSnapshot.data();
+        if (oldRoute == null ||
+            !TenantScope.matchesTenant(oldRoute, tenantId) ||
+            newRoute == null ||
+            !TenantScope.matchesTenant(newRoute, tenantId) ||
+            newRoute['active'] != true) {
+          throw StateError('Selected route is unavailable');
+        }
+      } else if (requestedRouteId.isNotEmpty &&
+          requestedRouteId != currentRouteId) {
+        throw StateError('Sellers cannot reassign shops to another route');
+      }
+
+      final update = <String, dynamic>{
+        ...filteredData,
+        'updated_at': Timestamp.now(),
+      };
+      if (currentUser.isAdmin && requestedRouteId.isNotEmpty) {
+        update['route_id'] = targetRouteId;
+      }
+      if (routeChanged) {
+        update['route_number'] =
+            (newRouteSnapshot!.data()?['route_number'] as num?)?.toInt() ?? 0;
+        final oldCount =
+            (oldRouteSnapshot!.data()?['total_shops'] as num?)?.toInt() ?? 0;
+        final newCount =
+            (newRouteSnapshot.data()?['total_shops'] as num?)?.toInt() ?? 0;
+        transaction.update(oldRouteRef!, {
+          'total_shops': (oldCount - 1).clamp(0, 1 << 31),
+          'updated_at': Timestamp.now(),
+        });
+        transaction.update(newRouteRef!, {
+          'total_shops': newCount + 1,
+          'updated_at': Timestamp.now(),
+        });
+      }
+      transaction.update(shopRef, update);
+    });
   }
 
   /// Admin-only: marks a shop as bad debt, writes off outstanding balance.
@@ -466,31 +585,59 @@ class ShopNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> deactivate(String id, String routeId) async {
-    final authUser = FirebaseAuth.instance.currentUser;
-    if (authUser == null) {
-      throw StateError('Not authenticated');
+    final currentUser = await ref.read(authUserProvider.future);
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty ||
+        currentUser == null ||
+        !currentUser.active ||
+        currentUser.id != uid) {
+      throw StateError('An active user profile is required');
     }
-    final me = await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(authUser.uid)
-        .get();
-    final role = (me.data()?['role'] as String? ?? '').trim();
-    if (!isPrivilegedRoleName(role)) {
+    if (!currentUser.isAdmin) {
       throw StateError('Only admin can delete shops');
     }
 
     final db = FirebaseFirestore.instance;
-    final batch = db.batch();
-    batch.update(db.collection(Collections.customers).doc(id), {
-      'active': false,
-      'updated_at': Timestamp.now(),
-    });
-    if (routeId.trim().isNotEmpty) {
-      batch.update(db.collection(Collections.routes).doc(routeId), {
-        'total_shops': FieldValue.increment(-1),
+    final tenantId = TenantScope.requireTenant(currentUser.tenantId);
+    final shopRef = db.collection(Collections.customers).doc(id);
+    await db.runTransaction<void>((transaction) async {
+      final shopSnapshot = await transaction.get(shopRef);
+      final shop = shopSnapshot.data();
+      if (shop == null || !TenantScope.matchesTenant(shop, tenantId)) {
+        throw StateError('Shop is unavailable in this workspace');
+      }
+      if (shop['active'] != true) {
+        throw StateError('Shop is already inactive');
+      }
+      final linkedRouteId = (shop['route_id'] as String? ?? '').trim();
+      if (routeId.trim().isNotEmpty && routeId.trim() != linkedRouteId) {
+        throw StateError('Shop route changed; refresh and try again');
+      }
+
+      DocumentReference<Map<String, dynamic>>? routeRef;
+      DocumentSnapshot<Map<String, dynamic>>? routeSnapshot;
+      if (linkedRouteId.isNotEmpty) {
+        routeRef = db.collection(Collections.routes).doc(linkedRouteId);
+        routeSnapshot = await transaction.get(routeRef);
+        final route = routeSnapshot.data();
+        if (route == null || !TenantScope.matchesTenant(route, tenantId)) {
+          throw StateError('Shop route is unavailable in this workspace');
+        }
+      }
+
+      transaction.update(shopRef, {
+        'active': false,
+        'updated_at': Timestamp.now(),
       });
-    }
-    await batch.commit();
+      if (routeRef != null) {
+        final totalShops =
+            (routeSnapshot!.data()?['total_shops'] as num?)?.toInt() ?? 0;
+        transaction.update(routeRef, {
+          'total_shops': (totalShops - 1).clamp(0, 1 << 31),
+          'updated_at': Timestamp.now(),
+        });
+      }
+    });
   }
 }
 

@@ -228,10 +228,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
         final confirmed = await ConfirmDialog.show(
           context,
           title: tr('disable_user', ref),
-          message: tr('confirm_disable_user_sessions', ref).replaceAll(
-            '%s',
-            user.displayName,
-          ),
+          message: tr(
+            'confirm_deactivate_user',
+            ref,
+          ).replaceAll('%s', user.displayName),
           isDestructive: true,
         );
         if (confirmed != true || !mounted) return;
@@ -662,15 +662,15 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
             .read(userManagementNotifierProvider.notifier)
             .toggleActive(user.id, true);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            successSnackBar(tr('saved_successfully', ref)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
         }
       } catch (error) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            errorSnackBar(tr(AppErrorMapper.key(error), ref)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
         }
       }
       return;

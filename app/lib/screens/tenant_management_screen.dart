@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/models/tenant_model.dart';
 import '../core/utils/error_mapper.dart';
@@ -26,10 +25,6 @@ class _TenantManagementScreenState
   final _ownerNameController = TextEditingController();
   final _ownerEmailController = TextEditingController();
   final _ownerPasswordController = TextEditingController();
-  final _maxDevicesController = TextEditingController(text: '3');
-  final _maxSessionsController = TextEditingController(text: '2');
-  bool _requireDevicePairing = false;
-  bool _allowAdminResetOnly = true;
   String? _selectedOwnerId;
   String? _pendingTenantId;
   String? _pendingOwnerId;
@@ -43,8 +38,6 @@ class _TenantManagementScreenState
     _ownerNameController.dispose();
     _ownerEmailController.dispose();
     _ownerPasswordController.dispose();
-    _maxDevicesController.dispose();
-    _maxSessionsController.dispose();
     super.dispose();
   }
 
@@ -87,20 +80,12 @@ class _TenantManagementScreenState
     setState(() => _isCreating = true);
     var saved = false;
     try {
-      final maxDevicesAllowed =
-          int.tryParse(_maxDevicesController.text.trim()) ?? 1;
-      final maxActiveSessionsAllowed =
-          int.tryParse(_maxSessionsController.text.trim()) ?? 1;
       final notifier = ref.read(tenantManagementNotifierProvider.notifier);
       final String tenantId;
       if (existing == null) {
         _pendingTenantId ??= await notifier.createTenant(
           name: name,
           slug: _slugController.text.trim(),
-          requireDevicePairing: _requireDevicePairing,
-          allowAdminResetOnly: _allowAdminResetOnly,
-          maxDevicesAllowed: maxDevicesAllowed,
-          maxActiveSessionsAllowed: maxActiveSessionsAllowed,
         );
         tenantId = _pendingTenantId!;
       } else {
@@ -109,10 +94,6 @@ class _TenantManagementScreenState
           tenantId,
           name: name,
           slug: _slugController.text.trim(),
-          requireDevicePairing: _requireDevicePairing,
-          allowAdminResetOnly: _allowAdminResetOnly,
-          maxDevicesAllowed: maxDevicesAllowed,
-          maxActiveSessionsAllowed: maxActiveSessionsAllowed,
           ownerUserId: _selectedOwnerId,
         );
       }
@@ -205,11 +186,6 @@ class _TenantManagementScreenState
     if (existing != null) {
       _nameController.text = existing.name;
       _slugController.text = existing.slug;
-      _maxDevicesController.text = existing.maxDevicesAllowed.toString();
-      _maxSessionsController.text = existing.maxActiveSessionsAllowed
-          .toString();
-      _requireDevicePairing = existing.requireDevicePairing;
-      _allowAdminResetOnly = existing.allowAdminResetOnly;
       _selectedOwnerId = existing.ownerUserId;
       _ownerNameController.clear();
       _ownerEmailController.clear();
@@ -221,10 +197,6 @@ class _TenantManagementScreenState
         _ownerNameController.clear();
         _ownerEmailController.clear();
         _ownerPasswordController.clear();
-        _maxDevicesController.text = '3';
-        _maxSessionsController.text = '2';
-        _requireDevicePairing = false;
-        _allowAdminResetOnly = true;
         _selectedOwnerId = null;
         _pendingOwnerId = null;
       }
@@ -259,41 +231,6 @@ class _TenantManagementScreenState
                     decoration: InputDecoration(labelText: tr('slug', ref)),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: _maxDevicesController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: tr('max_devices_allowed', ref),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _maxSessionsController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: tr('max_active_sessions_allowed', ref),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  StatefulBuilder(
-                    builder: (context, setPairingState) =>
-                        SwitchListTile.adaptive(
-                          value: _requireDevicePairing,
-                          onChanged: (value) => setPairingState(
-                            () => _requireDevicePairing = value,
-                          ),
-                          title: Text(tr('require_device_pairing', ref)),
-                        ),
-                  ),
-                  StatefulBuilder(
-                    builder: (context, setResetState) =>
-                        SwitchListTile.adaptive(
-                          value: _allowAdminResetOnly,
-                          onChanged: (value) =>
-                              setResetState(() => _allowAdminResetOnly = value),
-                          title: Text(tr('admin_reset_only', ref)),
-                        ),
-                  ),
                   if (existing != null) ...[
                     const SizedBox(height: 12),
                     Consumer(
@@ -490,25 +427,6 @@ class _TenantManagementScreenState
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),
-                          if (currentUser?.isTenantAdmin == true ||
-                              (currentUser?.isSuperAdmin == true &&
-                                  currentUser?.activeWorkspaceId == tenant.id))
-                            IconButton(
-                              tooltip: tr('security_devices_sessions', ref),
-                              onPressed: () => context.push(
-                                '/tenants/${tenant.id}/security',
-                              ),
-                              icon: const Icon(Icons.phonelink_lock_outlined),
-                            ),
-                          if (currentUser?.isTenantAdmin == true ||
-                              (currentUser?.isSuperAdmin == true &&
-                                  currentUser?.activeWorkspaceId == tenant.id))
-                            IconButton(
-                              tooltip: tr('paired_devices_title', ref),
-                              onPressed: () =>
-                                  context.push('/tenants/${tenant.id}/devices'),
-                              icon: const Icon(Icons.devices_outlined),
-                            ),
                           if (canEditTenant(tenant))
                             IconButton(
                               onPressed: () =>
@@ -519,12 +437,6 @@ class _TenantManagementScreenState
                       ),
                       const SizedBox(height: 8),
                       Text('${tr('slug', ref)}: ${tenant.slug}'),
-                      Text(
-                        '${tr('require_device_pairing', ref)}: ${tenant.requireDevicePairing ? tr('yes', ref) : tr('no', ref)}',
-                      ),
-                      Text(
-                        '${tr('admin_reset_only', ref)}: ${tenant.allowAdminResetOnly ? tr('yes', ref) : tr('no', ref)}',
-                      ),
                       if (tenant.ownerUserId == null)
                         Text(
                           tr('workspace_owner_missing', ref),

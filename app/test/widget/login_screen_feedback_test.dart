@@ -3,13 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/network_provider.dart';
 import 'package:footwear_erp/screens/login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  testWidgets('slow sign-in hint is replaced by a persistent mapped error', (
+  testWidgets('slow sign-in hint is replaced by a persistent auth error', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
@@ -39,7 +40,7 @@ void main() {
     expect(find.byKey(const ValueKey('login-slow-message')), findsOneWidget);
 
     result.completeError(
-      StateError('session-limit-reached'),
+      FirebaseAuthException(code: 'network-request-failed'),
       StackTrace.current,
     );
     await tester.pump();
@@ -48,9 +49,7 @@ void main() {
     expect(find.byKey(const ValueKey('login-slow-message')), findsNothing);
     expect(find.byKey(const ValueKey('login-error-message')), findsOneWidget);
     expect(
-      find.text(
-        'Active session limit reached. End another session or ask your workspace administrator.',
-      ),
+      find.text('No internet connection. Check your network and try again.'),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);

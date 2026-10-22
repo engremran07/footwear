@@ -55,7 +55,16 @@ after(async () => {
 // ─── Seed helpers ────────────────────────────────────────────────────────────
 async function seedUser(uid, role, active = true, extra = {}) {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
-    await ctx.firestore().collection('users').doc(uid).set({
+    const db = ctx.firestore();
+    const tenantId = extra.tenant_id ?? 'tenant-1';
+    if (typeof tenantId === 'string' && tenantId !== '' && tenantId !== '__global__') {
+      const tenantRef = db.collection('tenants').doc(tenantId);
+      const tenant = await tenantRef.get();
+      if (!tenant.exists) {
+        await tenantRef.set({ tenant_id: tenantId, active: true });
+      }
+    }
+    await db.collection('users').doc(uid).set({
       role,
       active,
       display_name: 'Test User',
@@ -70,24 +79,13 @@ async function seedUser(uid, role, active = true, extra = {}) {
 async function seedTenant({
   tenantId = 'tenant-1',
   ownerUserId = 'tenant-admin-uid',
-  maxDevicesAllowed = 2,
-  maxActiveSessionsAllowed = 2,
   includeTenantId = true,
-  includeLimits = true,
-  requireDevicePairing = false,
-  allowAdminResetOnly = true,
 } = {}) {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await ctx.firestore().collection('tenants').doc(tenantId).set({
       ...(includeTenantId ? { tenant_id: tenantId } : {}),
       owner_user_id: ownerUserId,
       active: true,
-      ...(includeLimits ? {
-        max_devices_allowed: maxDevicesAllowed,
-        max_active_sessions_allowed: maxActiveSessionsAllowed,
-      } : {}),
-      require_device_pairing: requireDevicePairing,
-      allow_admin_reset_only: allowAdminResetOnly,
     });
   });
 }
@@ -331,6 +329,35 @@ describe('routes collection', () => {
     );
   });
 
+  it('workspace admin can create and update routes in their tenant', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const route = db.collection('routes').doc('r-workspace-admin');
+
+    await assertSucceeds(route.set({
+      name: 'Workspace Route',
+      route_number: 2,
+      total_shops: 0,
+      active: true,
+      tenant_id: 'tenant-1',
+    }));
+    await assertSucceeds(route.update({ name: 'Updated Workspace Route' }));
+  });
+
+  it('workspace admin cannot create a route in another tenant', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await assertFails(
+      testEnv.authenticatedContext('tenant-admin-uid')
+        .firestore().collection('routes').doc('r-foreign').set({
+          name: 'Foreign Route',
+          route_number: 2,
+          total_shops: 0,
+          active: true,
+          tenant_id: 'tenant-2',
+        }),
+    );
+  });
+
   it('admin: cannot create a route with a negative route number', async () => {
     await seedUser('admin-uid', 'admin');
     await assertFails(
@@ -405,6 +432,138 @@ describe('customers collection', () => {
         balance: 0,
       }),
     );
+  });
+
+  it('seller can atomically create a shop and reconcile its route count', async () => {
+    await seedUser('seller-uid', 'seller', true, {
+      assigned_route_ids: ['route-1'],
+    });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('routes').doc('route-1').set({
+        name: 'Assigned Route',
+        route_number: 1,
+        total_shops: 0,
+        assigned_seller_ids: ['seller-uid'],
+        tenant_id: 'tenant-1',
+        active: true,
+      });
+    });
+    const db = sellerCtx(testEnv).firestore();
+    const shopRef = db.collection('customers').doc('shop-counted');
+    const batch = db.batch();
+    batch.set(shopRef, {
+      name: 'Counted Shop',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      created_by: 'seller-uid',
+      balance: 0,
+      active: true,
+    });
+    batch.update(db.collection('routes').doc('route-1'), {
+      total_shops: 1,
+      last_shop_created_id: shopRef.id,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('seller cannot change a route count without creating its linked shop', async () => {
+    await seedUser('seller-uid', 'seller', true, {
+      assigned_route_ids: ['route-1'],
+    });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('routes').doc('route-1').set({
+        name: 'Assigned Route',
+        route_number: 1,
+        total_shops: 0,
+        assigned_seller_ids: ['seller-uid'],
+        tenant_id: 'tenant-1',
+        active: true,
+      });
+    });
+    await assertFails(
+      sellerCtx(testEnv).firestore().collection('routes').doc('route-1').update({
+        total_shops: 1,
+        last_shop_created_id: 'missing-shop',
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+  });
+
+  it('workspace admin can create and update shops in their tenant', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('routes').doc('route-1').set({
+        name: 'Workspace Route',
+        route_number: 1,
+        total_shops: 0,
+        tenant_id: 'tenant-1',
+        active: true,
+      });
+    });
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const shop = db.collection('customers').doc('shop-workspace-admin');
+    const batch = db.batch();
+
+    batch.set(shop, {
+      name: 'Workspace Shop',
+      route_id: 'route-1',
+      route_number: 1,
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      balance: 0,
+      active: true,
+    });
+    batch.update(db.collection('routes').doc('route-1'), {
+      total_shops: 1,
+      last_shop_created_id: shop.id,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await assertSucceeds(batch.commit());
+    await assertSucceeds(shop.update({ name: 'Updated Workspace Shop' }));
+  });
+
+  it('workspace admin cannot create a shop with an opening balance', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await assertFails(
+      testEnv.authenticatedContext('tenant-admin-uid')
+        .firestore()
+        .collection('customers')
+        .doc('shop-opening-balance')
+        .set({
+          name: 'Shop with opening balance',
+          route_id: 'route-1',
+          tenant_id: 'tenant-1',
+          balance: 500,
+          active: true,
+        }),
+    );
+  });
+
+  it('workspace admin cannot create or update shops in another tenant', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const foreignShop = db.collection('customers').doc('shop-foreign');
+
+    await assertFails(foreignShop.set({
+      name: 'Foreign Shop',
+      route_id: 'route-1',
+      tenant_id: 'tenant-2',
+      balance: 0,
+      active: true,
+    }));
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('customers').doc('shop-foreign').set({
+        name: 'Seeded Foreign Shop',
+        route_id: 'route-1',
+        tenant_id: 'tenant-2',
+        balance: 0,
+        active: true,
+      });
+    });
+    await assertFails(foreignShop.update({ name: 'Changed Foreign Shop' }));
   });
 
   it('seller: cannot create a shop with a non-zero balance', async () => {
@@ -1583,6 +1742,99 @@ describe('transactions collection', () => {
     }
   });
 
+  it('workspace admin can create and update tenant ledger rows', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('customers').doc('shop-1').set({
+        name: 'Workspace Shop',
+        route_id: 'route-1',
+        tenant_id: 'tenant-1',
+        balance: 0,
+      });
+    });
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const transaction = db.collection('transactions').doc('tx-workspace-admin');
+    const batch = db.batch();
+
+    batch.set(transaction, {
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      amount: 25,
+      type: 'cash_in',
+      description: 'Workspace ledger row',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: -25,
+      last_transaction_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_transaction_type: 'cash_in',
+      last_transaction_amount: 25,
+      last_transaction_id: transaction.id,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await assertSucceeds(batch.commit());
+    await assertSucceeds(transaction.update({
+      description: 'Updated workspace ledger row',
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    }));
+  });
+
+  it('workspace admin cannot create an orphan or mismatched ledger row', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedShop('shop-1', { balance: 0 });
+    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const transactionData = {
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      created_by: 'tenant-admin-uid',
+      amount: 25,
+      type: 'cash_in',
+      description: 'Unlinked workspace ledger row',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await assertFails(
+      db.collection('transactions').doc('tx-no-shop-update').set(transactionData),
+    );
+
+    const batch = db.batch();
+    batch.set(
+      db.collection('transactions').doc('tx-mismatched-shop-update'),
+      transactionData,
+    );
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: -24,
+      last_transaction_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_transaction_type: 'cash_in',
+      last_transaction_amount: 25,
+      last_transaction_id: 'tx-mismatched-shop-update',
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertFails(batch.commit());
+  });
+
+  it('seller cannot create a ledger row without its atomic shop balance update', async () => {
+    await seedUser('seller-uid', 'seller', true, {
+      assigned_route_ids: ['route-1'],
+    });
+    await seedShop('shop-1', { balance: 0 });
+    const db = sellerCtx(testEnv).firestore();
+    await assertFails(
+      db.collection('transactions').doc('tx-seller-orphan').set({
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        tenant_id: 'tenant-1',
+        created_by: 'seller-uid',
+        amount: 25,
+        type: 'cash_in',
+      }),
+    );
+  });
+
   it('seller can query assigned-shop transactions in created-at order', async () => {
     await seedUser('seller-uid', 'seller', true, {
       assigned_route_ids: ['route-1'],
@@ -1951,962 +2203,6 @@ describe('seller inventory quantity controls', () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Device and session slot access controls
-// ═══════════════════════════════════════════════════════════════════════════
-describe('device and session slot rules', () => {
-  function deviceData(slotNumber, overrides = {}) {
-    return {
-      user_id: 'seller-uid',
-      tenant_id: 'tenant-1',
-      slot_id: `slot_${slotNumber}`,
-      slot_number: slotNumber,
-      device_id: `installation-${slotNumber}`,
-      brand: 'Samsung',
-      model: 'SM-A576B',
-      platform: 'android',
-      os_version: '16',
-      app_version: 'test',
-      status: 'active',
-      registered_at: firebase.firestore.FieldValue.serverTimestamp(),
-      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
-      ...overrides,
-    };
-  }
-
-  function sessionData(slotNumber, overrides = {}) {
-    return {
-      user_id: 'seller-uid',
-      tenant_id: 'tenant-1',
-      slot_id: `slot_${slotNumber}`,
-      slot_number: slotNumber,
-      session_id: `session-${slotNumber}`,
-      device_slot_id: `slot_${slotNumber}`,
-      device_id: `installation-${slotNumber}`,
-      device_brand: 'Samsung',
-      device_model: 'SM-A576B',
-      platform: 'android',
-      status: 'active',
-      created_at: firebase.firestore.FieldValue.serverTimestamp(),
-      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
-      expires_at: new Date(Date.now() + 60 * 60 * 1000),
-      ...overrides,
-    };
-  }
-
-  async function seedAccessUsers() {
-    await seedTenant();
-    await seedTenant({ tenantId: 'tenant-2' });
-    await seedUser('seller-uid', 'seller');
-    await seedUser('other-seller-uid', 'seller');
-    await seedUser('tenant-admin-uid', 'tenant_admin');
-  }
-
-  async function seedWorkspaceAdminPolicy() {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await ctx.firestore().collection('settings')
-        .doc('platform_access_policy').set({
-          workspace_admin_max_devices_allowed: 3,
-          workspace_admin_max_active_sessions_allowed: 2,
-        });
-    });
-  }
-
-  it('workspace admins can pair unlimited devices while active sessions stay capped', async () => {
-    await seedTenant({ requireDevicePairing: true });
-    await seedUser('tenant-admin-uid', 'tenant_admin');
-    await seedWorkspaceAdminPolicy();
-
-    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
-    const userRef = db.collection('users').doc('tenant-admin-uid');
-    const deviceIds = Array.from({ length: 12 }, (_, index) =>
-      `installation-${index}-uuid`);
-
-    for (const deviceId of deviceIds) {
-      await assertSucceeds(
-        userRef.collection('device_registrations').doc(`device_${deviceId}`).set(
-          deviceData(0, {
-            user_id: 'tenant-admin-uid',
-            slot_id: `device_${deviceId}`,
-            slot_number: 0,
-            device_id: deviceId,
-            status: 'active',
-          }),
-        ),
-      );
-    }
-
-    for (let slot = 0; slot < 2; slot++) {
-      await assertSucceeds(
-        userRef.collection('sessions').doc(`slot_${slot}`).set(
-          sessionData(slot, {
-            user_id: 'tenant-admin-uid',
-            device_slot_id: `device_${deviceIds[slot]}`,
-            device_id: deviceIds[slot],
-          }),
-        ),
-      );
-    }
-    await assertFails(
-      userRef.collection('sessions').doc('slot_2').set(
-        sessionData(2, {
-          user_id: 'tenant-admin-uid',
-          device_slot_id: `device_${deviceIds[2]}`,
-          device_id: deviceIds[2],
-        }),
-      ),
-    );
-  });
-
-  it('seller can auto-approve a pending device after pairing is disabled', async () => {
-    await seedTenant({ requireDevicePairing: false, maxDevicesAllowed: 1 });
-    await seedUser('seller-uid', 'seller');
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await ctx.firestore().collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0')
-        .set(deviceData(0, { status: 'pending' }));
-    });
-
-    await assertSucceeds(
-      sellerCtx(testEnv).firestore()
-        .collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0')
-        .update({
-          status: 'active',
-          last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
-          app_version: 'test',
-        }),
-    );
-  });
-
-  it('seller cannot auto-approve a pending device while pairing is enabled', async () => {
-    await seedTenant({ requireDevicePairing: true, maxDevicesAllowed: 1 });
-    await seedUser('seller-uid', 'seller');
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await ctx.firestore().collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0')
-        .set(deviceData(0, { status: 'pending' }));
-    });
-
-    await assertFails(
-      sellerCtx(testEnv).firestore()
-        .collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0')
-        .update({
-          status: 'active',
-          last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
-          app_version: 'test',
-        }),
-    );
-  });
-
-  it('workspace admin can disable and re-enable a seller while revoking sessions', async () => {
-    await seedAccessUsers();
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      const seller = ctx.firestore().collection('users').doc('seller-uid');
-      await seller.collection('device_registrations').doc('slot_0')
-        .set(deviceData(0));
-      await seller.collection('sessions').doc('slot_0')
-        .set(sessionData(0));
-      await seller.collection('device_registrations').doc('slot_1')
-        .set(deviceData(1));
-      await seller.collection('sessions').doc('slot_1')
-        .set(sessionData(1));
-    });
-
-    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
-    const sellerRef = db.collection('users').doc('seller-uid');
-    await db.runTransaction(async (transaction) => {
-      const userSnapshot = await transaction.get(sellerRef);
-      const sessionRefs = [0, 1].map((slot) =>
-        sellerRef.collection('sessions').doc(`slot_${slot}`));
-      const sessionSnapshots = await Promise.all(
-        sessionRefs.map((sessionRef) => transaction.get(sessionRef)));
-      assert.strictEqual(userSnapshot.data().tenant_id, 'tenant-1');
-      transaction.update(sellerRef, {
-        active: false,
-        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-      });
-      sessionSnapshots.forEach((sessionSnapshot) => {
-        if (sessionSnapshot.data().status !== 'active') return;
-        transaction.update(sessionSnapshot.ref, {
-          status: 'revoked',
-          revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
-          termination_reason: 'account_disabled',
-          terminated_by: 'tenant-admin-uid',
-        });
-      });
-    });
-    await assertSucceeds(sellerRef.update({
-      active: true,
-      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-    }));
-    for (const slot of [0, 1]) {
-      const session = await sellerRef.collection('sessions')
-        .doc(`slot_${slot}`).get();
-      assert.strictEqual(session.data().status, 'revoked');
-    }
-  });
-
-  it('workspace admin cannot disable self, peer admins, or another tenant seller', async () => {
-    await seedAccessUsers();
-    await seedUser('peer-admin-uid', 'tenant_admin');
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await ctx.firestore().collection('users').doc('other-seller-uid').update({
-        tenant_id: 'tenant-2',
-      });
-    });
-
-    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
-    const updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-    await assertFails(db.collection('users').doc('tenant-admin-uid').update({
-      active: false,
-      updated_at: updatedAt,
-    }));
-    await assertFails(db.collection('users').doc('peer-admin-uid').update({
-      active: false,
-      updated_at: updatedAt,
-    }));
-    await assertFails(db.collection('users').doc('other-seller-uid').update({
-      active: false,
-      updated_at: updatedAt,
-    }));
-  });
-
-  it('seller can get only their own workspace document for session registration', async () => {
-    await seedAccessUsers();
-    const db = sellerCtx(testEnv).firestore();
-    await assertSucceeds(db.collection('tenants').doc('tenant-1').get());
-    await assertFails(db.collection('tenants').doc('tenant-2').get());
-    await assertFails(db.collection('tenants').get());
-  });
-
-  it('workspace admin can read missing access slots only for users in their tenant', async () => {
-    await seedUser('admin-uid', 'admin');
-    await seedUser('seller-uid', 'seller');
-    await seedUser('other-seller-uid', 'seller', true, {
-      tenant_id: 'tenant-2',
-    });
-    const db = adminCtx(testEnv).firestore();
-    await assertSucceeds(
-      db.collection('users')
-        .doc('seller-uid')
-        .collection('device_registrations')
-        .doc('slot_8')
-        .get(),
-    );
-    await assertSucceeds(
-      db.collection('users')
-        .doc('seller-uid')
-        .collection('sessions')
-        .doc('slot_8')
-        .get(),
-    );
-    await assertFails(
-      db.collection('users')
-        .doc('other-seller-uid')
-        .collection('sessions')
-        .doc('slot_8')
-        .get(),
-    );
-  });
-
-  it('allows a seller to read an unused own access slot before registration', async () => {
-    await seedAccessUsers();
-    const db = sellerCtx(testEnv).firestore();
-    const userRef = db.collection('users').doc('seller-uid');
-    await assertSucceeds(
-      userRef.collection('device_registrations').doc('slot_0').get(),
-    );
-    await assertSucceeds(userRef.collection('sessions').doc('slot_0').get());
-  });
-
-  it('allows only tenant-and-user-scoped session queries', async () => {
-    await seedAccessUsers();
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      const userRef = ctx.firestore().collection('users').doc('seller-uid');
-      await userRef.collection('sessions').doc('slot_0').set(sessionData(0));
-    });
-    const sessions = sellerCtx(testEnv).firestore()
-      .collection('users').doc('seller-uid').collection('sessions');
-
-    await assertFails(sessions.get());
-    await assertSucceeds(
-      sessions
-        .where('tenant_id', '==', 'tenant-1')
-        .where('user_id', '==', 'seller-uid')
-        .get(),
-    );
-  });
-
-  it('seller can sign in again on the same device after logout', async () => {
-    await seedTenant({ requireDevicePairing: true });
-    await seedUser('seller-uid', 'seller');
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      const userRef = context.firestore().collection('users').doc('seller-uid');
-      await userRef.collection('device_registrations').doc('slot_0')
-        .set(deviceData(0, { status: 'active' }));
-      await userRef.collection('sessions').doc('slot_0').set(sessionData(0, {
-        status: 'revoked',
-        revoked_at: new Date(),
-        termination_reason: 'logout',
-        terminated_by: 'seller-uid',
-      }));
-    });
-
-    const db = sellerCtx(testEnv).firestore();
-    const userRef = db.collection('users').doc('seller-uid');
-    const batch = db.batch();
-    batch.update(userRef.collection('device_registrations').doc('slot_0'), {
-      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
-      app_version: 'recheck',
-    });
-    batch.set(userRef.collection('sessions').doc('slot_0'), sessionData(0, {
-      session_id: 'session-after-logout',
-    }));
-
-    await assertSucceeds(batch.commit());
-  });
-
-  it('workspace admin can sign in again on the same device after logout', async () => {
-    await seedTenant({ requireDevicePairing: true });
-    await seedUser('tenant-admin-uid', 'tenant_admin');
-    await seedWorkspaceAdminPolicy();
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      const userRef = context.firestore().collection('users')
-        .doc('tenant-admin-uid');
-      await userRef.collection('device_registrations').doc('slot_0')
-        .set(deviceData(0, {
-          user_id: 'tenant-admin-uid',
-          status: 'active',
-        }));
-      await userRef.collection('sessions').doc('slot_0').set(sessionData(0, {
-        user_id: 'tenant-admin-uid',
-        status: 'revoked',
-        revoked_at: new Date(),
-        termination_reason: 'logout',
-        terminated_by: 'tenant-admin-uid',
-      }));
-    });
-
-    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
-    const userRef = db.collection('users').doc('tenant-admin-uid');
-    const batch = db.batch();
-    batch.update(userRef.collection('device_registrations').doc('slot_0'), {
-      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
-      app_version: 'recheck',
-    });
-    batch.set(userRef.collection('sessions').doc('slot_0'), sessionData(0, {
-      user_id: 'tenant-admin-uid',
-      session_id: 'session-after-logout',
-    }));
-
-    await assertSucceeds(batch.commit());
-  });
-
-  it('allows workspace admins to query only their own access-record groups', async () => {
-    await seedAccessUsers();
-    await seedUser('registry-admin-uid', 'admin');
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      const db = ctx.firestore();
-      await db.collection('users').doc('seller-uid')
-        .collection('sessions').doc('slot_0').set(sessionData(0));
-      await db.collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0').set(deviceData(0));
-    });
-
-    const adminDb = testEnv.authenticatedContext('registry-admin-uid').firestore();
-    const sellerDb = sellerCtx(testEnv).firestore();
-    await assertSucceeds(
-      adminDb.collectionGroup('sessions')
-        .where('tenant_id', '==', 'tenant-1').get(),
-    );
-    await assertSucceeds(
-      adminDb.collectionGroup('device_registrations')
-        .where('tenant_id', '==', 'tenant-1').get(),
-    );
-    await assertFails(
-      sellerDb.collectionGroup('sessions')
-        .where('tenant_id', '==', 'tenant-1').get(),
-    );
-  });
-
-  it('accepts legacy tenant policy documents without a duplicated tenant_id', async () => {
-    await seedTenant({ includeTenantId: false });
-    await seedUser('seller-uid', 'seller');
-    const userRef = sellerCtx(testEnv).firestore()
-      .collection('users').doc('seller-uid');
-    await assertSucceeds(userRef.collection('device_registrations').doc('slot_0')
-      .set(deviceData(0)));
-    await assertSucceeds(userRef.collection('sessions').doc('slot_0')
-      .set(sessionData(0)));
-  });
-
-  it('workspace admin device pairing uses the platform cap, not seller approval', async () => {
-    await seedTenant({ requireDevicePairing: true });
-    await seedUser('tenant-admin-uid', 'tenant_admin');
-    await seedWorkspaceAdminPolicy();
-    const adminDb = testEnv.authenticatedContext('tenant-admin-uid').firestore();
-    const deviceRef = adminDb.collection('users').doc('tenant-admin-uid')
-      .collection('device_registrations').doc('slot_0');
-
-    await assertSucceeds(deviceRef.set(deviceData(0, {
-      user_id: 'tenant-admin-uid',
-      status: 'active',
-    })));
-    await assertFails(
-      adminDb.collection('users').doc('tenant-admin-uid')
-        .collection('device_registrations').doc('slot_1')
-        .set(deviceData(1, {
-          user_id: 'tenant-admin-uid',
-          status: 'pending',
-        })),
-    );
-  });
-
-  it('workspace admin uses default platform caps when policy is absent', async () => {
-    await seedTenant({ requireDevicePairing: true });
-    await seedUser('tenant-admin-uid', 'tenant_admin');
-    const deviceRef = testEnv.authenticatedContext('tenant-admin-uid')
-      .firestore().collection('users').doc('tenant-admin-uid')
-      .collection('device_registrations').doc('slot_0');
-
-    await assertSucceeds(deviceRef.set(deviceData(0, {
-      user_id: 'tenant-admin-uid',
-      status: 'active',
-    })));
-  });
-
-  it('workspace admin can resume a pending own device without approval metadata', async () => {
-    await seedTenant({ requireDevicePairing: true });
-    await seedUser('tenant-admin-uid', 'tenant_admin');
-    await seedWorkspaceAdminPolicy();
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('tenant-admin-uid')
-        .collection('device_registrations').doc('slot_0')
-        .set(deviceData(0, {
-          user_id: 'tenant-admin-uid',
-          status: 'pending',
-        }));
-    });
-    const deviceRef = testEnv.authenticatedContext('tenant-admin-uid')
-      .firestore().collection('users').doc('tenant-admin-uid')
-      .collection('device_registrations').doc('slot_0');
-
-    await assertSucceeds(deviceRef.update({
-      status: 'active',
-      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
-      app_version: '3.9.75+102',
-    }));
-  });
-
-  it('workspace admin cannot approve their own pending device', async () => {
-    await seedTenant({ requireDevicePairing: true });
-    await seedUser('tenant-admin-uid', 'tenant_admin');
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('tenant-admin-uid')
-        .collection('device_registrations').doc('slot_0')
-        .set(deviceData(0, {
-          user_id: 'tenant-admin-uid',
-          status: 'pending',
-        }));
-    });
-    const deviceRef = testEnv.authenticatedContext('tenant-admin-uid')
-      .firestore().collection('users').doc('tenant-admin-uid')
-      .collection('device_registrations').doc('slot_0');
-
-    await assertFails(deviceRef.update({
-      status: 'active',
-      approved_at: firebase.firestore.FieldValue.serverTimestamp(),
-      approved_by: 'tenant-admin-uid',
-    }));
-  });
-
-  it('enforces required device approval before session creation', async () => {
-    await seedTenant({ requireDevicePairing: true });
-    await seedUser('seller-uid', 'seller');
-    await seedUser('tenant-admin-uid', 'tenant_admin');
-    const sellerDb = sellerCtx(testEnv).firestore();
-    const userRef = sellerDb.collection('users').doc('seller-uid');
-    await assertSucceeds(
-      userRef.collection('device_registrations').doc('slot_0')
-        .set(deviceData(0, { status: 'pending' })),
-    );
-    await assertFails(
-      userRef.collection('sessions').doc('slot_0').set(sessionData(0)),
-    );
-
-    await testEnv.authenticatedContext('tenant-admin-uid').firestore()
-      .collection('users').doc('seller-uid')
-      .collection('device_registrations').doc('slot_0')
-      .update({
-        status: 'active',
-        approved_at: firebase.firestore.FieldValue.serverTimestamp(),
-        approved_by: 'tenant-admin-uid',
-      });
-    await assertSucceeds(
-      userRef.collection('sessions').doc('slot_0').set(sessionData(0)),
-    );
-  });
-
-  it('prevents owners and administrators from reactivating blocked devices', async () => {
-    await seedAccessUsers();
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await ctx.firestore().collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0')
-        .set(deviceData(0, { status: 'blocked' }));
-    });
-    const sellerDevice = sellerCtx(testEnv).firestore()
-      .collection('users').doc('seller-uid')
-      .collection('device_registrations').doc('slot_0');
-    await assertFails(sellerDevice.update({
-      status: 'active',
-      registered_at: firebase.firestore.FieldValue.serverTimestamp(),
-      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
-    }));
-    const adminDevice = testEnv.authenticatedContext('tenant-admin-uid')
-      .firestore().collection('users').doc('seller-uid')
-      .collection('device_registrations').doc('slot_0');
-    await assertFails(adminDevice.update({
-      status: 'active',
-      approved_at: firebase.firestore.FieldValue.serverTimestamp(),
-      approved_by: 'tenant-admin-uid',
-    }));
-  });
-
-  it('allows an owner to reclaim a device registration inactive for 30 days', async () => {
-    await seedAccessUsers();
-    const staleAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      const db = ctx.firestore();
-      await db.collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0')
-        .set(deviceData(0, { last_seen_at: staleAt }));
-    });
-    const device = sellerCtx(testEnv).firestore()
-      .collection('users').doc('seller-uid')
-      .collection('device_registrations').doc('slot_0');
-    await assertSucceeds(
-      device.set(deviceData(0, {
-        device_id: 'replacement-installation',
-        registered_at: firebase.firestore.FieldValue.serverTimestamp(),
-        last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
-      })),
-    );
-  });
-
-  it('uses three device and two session slots when legacy policy fields are absent', async () => {
-    await seedTenant({ includeTenantId: false, includeLimits: false });
-    await seedUser('seller-uid', 'seller');
-    const userRef = sellerCtx(testEnv).firestore()
-      .collection('users').doc('seller-uid');
-    for (let slot = 0; slot < 3; slot++) {
-      await assertSucceeds(
-        userRef.collection('device_registrations').doc(`slot_${slot}`)
-          .set(deviceData(slot)),
-      );
-    }
-    for (let slot = 0; slot < 2; slot++) {
-      await assertSucceeds(
-        userRef.collection('sessions').doc(`slot_${slot}`)
-          .set(sessionData(slot)),
-      );
-    }
-    await assertFails(
-      userRef.collection('sessions').doc('slot_2').set(sessionData(2)),
-    );
-  });
-
-  it('allows moderate client-clock skew but rejects excessive session expiry', async () => {
-    await seedAccessUsers();
-    const db = sellerCtx(testEnv).firestore();
-    const userRef = db.collection('users').doc('seller-uid');
-    await userRef.collection('device_registrations').doc('slot_0')
-      .set(deviceData(0));
-    await assertSucceeds(
-      userRef.collection('sessions').doc('slot_0').set(
-        sessionData(0, { expires_at: new Date(Date.now() + 11 * 60 * 60 * 1000) }),
-      ),
-    );
-    await assertFails(
-      userRef.collection('sessions').doc('slot_1').set(
-        sessionData(1, {
-          device_slot_id: 'slot_0',
-          expires_at: new Date(Date.now() + 13 * 60 * 60 * 1000),
-        }),
-      ),
-    );
-  });
-
-  it('seller can allocate own device and session slots within policy', async () => {
-    await seedAccessUsers();
-    const db = sellerCtx(testEnv).firestore();
-    await assertSucceeds(
-      db.collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0')
-        .set(deviceData(0)),
-    );
-    await assertSucceeds(
-      db.collection('users').doc('seller-uid')
-        .collection('sessions').doc('slot_0')
-        .set(sessionData(0)),
-    );
-  });
-
-  it('seller cannot allocate beyond the workspace limits', async () => {
-    await seedTenant({ maxDevicesAllowed: 1, maxActiveSessionsAllowed: 1 });
-    await seedUser('seller-uid', 'seller');
-    const db = sellerCtx(testEnv).firestore();
-    await assertFails(
-      db.collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_1')
-        .set(deviceData(1)),
-    );
-    await assertFails(
-      db.collection('users').doc('seller-uid')
-        .collection('sessions').doc('slot_1')
-        .set(sessionData(1)),
-    );
-  });
-
-  it('cannot forge a low slot number in a higher slot document path', async () => {
-    await seedTenant({ maxDevicesAllowed: 1, maxActiveSessionsAllowed: 1 });
-    await seedUser('seller-uid', 'seller');
-    const db = sellerCtx(testEnv).firestore();
-    await assertFails(
-      db.collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_9')
-        .set(deviceData(0, { slot_id: 'slot_9' })),
-    );
-    await assertFails(
-      db.collection('users').doc('seller-uid')
-        .collection('sessions').doc('slot_9')
-        .set(sessionData(0, { slot_id: 'slot_9' })),
-    );
-  });
-
-  it('rejects arbitrary document IDs even when the slot number is within policy', async () => {
-    await seedAccessUsers();
-    const db = sellerCtx(testEnv).firestore();
-    await assertFails(
-      db.collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('custom-device-0')
-        .set(deviceData(0, { slot_id: 'custom-device-0' })),
-    );
-    await assertFails(
-      db.collection('users').doc('seller-uid')
-        .collection('sessions').doc('custom-session-0')
-        .set(sessionData(0, { slot_id: 'custom-session-0' })),
-    );
-  });
-
-  it('requires sessions to reference an active device with the same installation ID', async () => {
-    await seedAccessUsers();
-    const db = sellerCtx(testEnv).firestore();
-    const userRef = db.collection('users').doc('seller-uid');
-    await assertFails(
-      userRef.collection('sessions').doc('slot_0').set(sessionData(0)),
-    );
-    await userRef.collection('device_registrations').doc('slot_0')
-      .set(deviceData(0));
-    await assertFails(
-      userRef.collection('sessions').doc('slot_0').set(
-        sessionData(0, { device_id: 'another-installation' }),
-      ),
-    );
-    await assertSucceeds(
-      userRef.collection('sessions').doc('slot_0').set(sessionData(0)),
-    );
-  });
-
-  it('links legacy sessions to their active device on refresh', async () => {
-    await seedAccessUsers();
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      const db = ctx.firestore();
-      await db.collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0').set(deviceData(0));
-      const legacySession = sessionData(0);
-      delete legacySession.device_slot_id;
-      await db.collection('users').doc('seller-uid')
-        .collection('sessions').doc('slot_0').set(legacySession);
-    });
-
-    const sessionRef = sellerCtx(testEnv).firestore()
-      .collection('users').doc('seller-uid')
-      .collection('sessions').doc('slot_0');
-    await assertSucceeds(
-      sessionRef.update({
-        device_slot_id: 'slot_0',
-        last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
-        expires_at: new Date(Date.now() + 60 * 60 * 1000),
-      }),
-    );
-  });
-
-  it('seller cannot read or write another user access records', async () => {
-    await seedAccessUsers();
-    const db = sellerCtx(testEnv).firestore();
-    const otherDevices = db.collection('users').doc('other-seller-uid')
-      .collection('device_registrations');
-    await assertFails(otherDevices.get());
-    await assertFails(otherDevices.doc('slot_0').set(deviceData(0, {
-      user_id: 'other-seller-uid',
-    })));
-  });
-
-  it('seller cannot change workspace access policy', async () => {
-    await seedAccessUsers();
-    await assertFails(
-      sellerCtx(testEnv).firestore().collection('tenants').doc('tenant-1')
-        .update({ max_devices_allowed: 10 }),
-    );
-  });
-
-  it('tenant admins can edit seller limits but not pairing policy; selected super-admin can', async () => {
-    await seedAccessUsers();
-    const tenantAdminDb = testEnv.authenticatedContext('tenant-admin-uid').firestore();
-    await assertSucceeds(
-      tenantAdminDb.collection('tenants').doc('tenant-1').update({
-        max_devices_allowed: 3,
-        max_active_sessions_allowed: 4,
-        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-      }),
-    );
-    await assertFails(
-      tenantAdminDb.collection('tenants').doc('tenant-1').update({
-        require_device_pairing: true,
-        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-      }),
-    );
-    await seedUser('platform-uid', 'super_admin', true, {
-      active_workspace_id: 'tenant-1',
-      active_workspace_reason: 'Approved policy administration',
-      active_workspace_selected_at: new Date(),
-    });
-    const db = testEnv.authenticatedContext('platform-uid').firestore();
-    await assertSucceeds(db.collection('tenants').doc('tenant-1').update({
-      max_devices_allowed: 3,
-      max_active_sessions_allowed: 4,
-      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-    }));
-    await assertFails(
-      db.collection('tenants').doc('tenant-1').update({
-        max_devices_allowed: 11,
-        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-      }),
-    );
-  });
-
-  it('platform super-admin controls global workspace-admin access limits', async () => {
-    await seedAccessUsers();
-    await seedUser('platform-uid', 'super_admin');
-    const platformPolicy = testEnv.authenticatedContext('platform-uid')
-      .firestore().collection('settings').doc('platform_access_policy');
-    await assertSucceeds(platformPolicy.set({
-      workspace_admin_max_devices_allowed: 3,
-      workspace_admin_max_active_sessions_allowed: 2,
-      updated_by: 'platform-uid',
-      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-    }));
-
-    const tenantAdminDb = testEnv.authenticatedContext('tenant-admin-uid').firestore();
-    await assertSucceeds(
-      tenantAdminDb.collection('settings').doc('platform_access_policy').get(),
-    );
-    await assertFails(
-      tenantAdminDb.collection('settings').doc('platform_access_policy').update({
-        workspace_admin_max_devices_allowed: 10,
-        updated_by: 'tenant-admin-uid',
-        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-      }),
-    );
-    await assertFails(
-      sellerCtx(testEnv).firestore()
-        .collection('settings').doc('platform_access_policy').get(),
-    );
-  });
-
-  it('workspace admins have unlimited devices but use the platform session cap', async () => {
-    await seedTenant({ maxDevicesAllowed: 1, maxActiveSessionsAllowed: 1 });
-    await seedUser('tenant-admin-uid', 'tenant_admin');
-    await seedUser('platform-uid', 'super_admin');
-    await testEnv.authenticatedContext('platform-uid').firestore()
-      .collection('settings').doc('platform_access_policy').set({
-        workspace_admin_max_devices_allowed: 3,
-        workspace_admin_max_active_sessions_allowed: 2,
-        updated_by: 'platform-uid',
-        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-      });
-    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
-    const userRef = db.collection('users').doc('tenant-admin-uid');
-    for (let slot = 0; slot < 12; slot++) {
-      const deviceId = `installation-${slot}-unique`;
-      await assertSucceeds(
-        userRef.collection('device_registrations').doc(`device_${deviceId}`).set(
-          deviceData(0, {
-            user_id: 'tenant-admin-uid',
-            slot_id: `device_${deviceId}`,
-            device_id: deviceId,
-          }),
-        ),
-      );
-    }
-    for (let slot = 0; slot < 2; slot++) {
-      const deviceId = `installation-${slot}-unique`;
-      await assertSucceeds(
-        userRef.collection('sessions').doc(`slot_${slot}`).set(
-          sessionData(slot, {
-            user_id: 'tenant-admin-uid',
-            device_slot_id: `device_${deviceId}`,
-            device_id: deviceId,
-          }),
-        ),
-      );
-    }
-    await assertFails(
-      userRef.collection('sessions').doc('slot_2').set(
-        sessionData(2, {
-          user_id: 'tenant-admin-uid',
-          device_slot_id: 'device_installation-2-unique',
-          device_id: 'installation-2-unique',
-        }),
-      ),
-    );
-  });
-
-  it('workspace admin can revoke a device and related session atomically', async () => {
-    await seedAccessUsers();
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      const db = ctx.firestore();
-      await db.collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0').set({
-          ...deviceData(0),
-          registered_at: new Date(),
-          last_seen_at: new Date(),
-        });
-      await db.collection('users').doc('seller-uid')
-        .collection('sessions').doc('slot_0').set({
-          ...sessionData(0),
-          created_at: new Date(),
-          last_seen_at: new Date(),
-          expires_at: new Date(Date.now() + 60 * 60 * 1000),
-        });
-    });
-    const db = testEnv.authenticatedContext('tenant-admin-uid').firestore();
-    const batch = db.batch();
-    batch.update(
-      db.collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0'),
-      {
-        status: 'revoked',
-        revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
-        revoked_by: 'tenant-admin-uid',
-      },
-    );
-    batch.update(
-      db.collection('users').doc('seller-uid')
-        .collection('sessions').doc('slot_0'),
-      {
-        status: 'revoked',
-        revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
-        termination_reason: 'device_revoked',
-        terminated_by: 'tenant-admin-uid',
-      },
-    );
-    await assertSucceeds(
-      batch.commit(),
-    );
-  });
-});
-
-describe('platform operator sessions', () => {
-  it('allows two fixed platform slots and denies other users or excess devices', async () => {
-    await seedUser('platform-admin-uid', 'super_admin');
-    await seedUser('other-platform-admin-uid', 'super_admin');
-    const session = {
-      user_id: 'platform-admin-uid',
-      session_id: 'platform-session-123',
-      slot_id: 'slot_0',
-      slot_number: 0,
-      device_id: 'platform-installation-1',
-      device_brand: 'Microsoft',
-      device_model: 'Surface',
-      platform: 'windows',
-      status: 'active',
-      created_at: firebase.firestore.FieldValue.serverTimestamp(),
-      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
-      expires_at: new Date(Date.now() + 60 * 60 * 1000),
-    };
-    const ownSessions = testEnv.authenticatedContext('platform-admin-uid')
-      .firestore().collection('users').doc('platform-admin-uid')
-      .collection('platform_sessions');
-    await assertSucceeds(ownSessions.doc('slot_0').set(session));
-    await assertSucceeds(ownSessions.where('user_id', '==', 'platform-admin-uid').get());
-    await assertFails(ownSessions.doc('slot_1').set({
-      ...session,
-      session_id: 'platform-session-456',
-      slot_id: 'slot_1',
-      slot_number: 1,
-      device_id: 'platform-installation-2',
-    }));
-    await assertSucceeds(ownSessions.doc('slot_0').update({
-      status: 'revoked',
-      revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
-      terminated_by: 'platform-admin-uid',
-    }));
-    await assertSucceeds(ownSessions.doc('slot_1').set({
-      ...session,
-      session_id: 'platform-session-456',
-      slot_id: 'slot_1',
-      slot_number: 1,
-      device_id: 'platform-installation-2',
-    }));
-    await assertFails(ownSessions.doc('slot_2').set({
-      ...session,
-      session_id: 'platform-session-789',
-      slot_id: 'slot_2',
-      slot_number: 2,
-    }));
-    await assertFails(
-      testEnv.authenticatedContext('other-platform-admin-uid').firestore()
-        .collection('users').doc('platform-admin-uid')
-        .collection('platform_sessions').doc('slot_0').get(),
-    );
-  });
-
-  it('allows a super-admin to reactivate the same platform slot after logout', async () => {
-    await seedUser('platform-admin-uid', 'super_admin');
-    const session = {
-      user_id: 'platform-admin-uid',
-      session_id: 'platform-session-123',
-      slot_id: 'slot_0',
-      slot_number: 0,
-      device_id: 'platform-installation-1',
-      device_brand: 'Samsung',
-      device_model: 'SM-A576B',
-      platform: 'android',
-      status: 'active',
-      created_at: firebase.firestore.FieldValue.serverTimestamp(),
-      last_seen_at: firebase.firestore.FieldValue.serverTimestamp(),
-      expires_at: new Date(Date.now() + 60 * 60 * 1000),
-    };
-    const slot = testEnv.authenticatedContext('platform-admin-uid')
-      .firestore().collection('users').doc('platform-admin-uid')
-      .collection('platform_sessions').doc('slot_0');
-
-    await assertSucceeds(slot.set(session));
-    await assertSucceeds(slot.update({
-      status: 'revoked',
-      revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
-      terminated_by: 'platform-admin-uid',
-    }));
-    await assertSucceeds(slot.set({
-      ...session,
-      session_id: 'platform-session-456',
-    }));
-  });
-});
-
 describe('inventory_transactions collection', () => {
   it('admin: cannot create a stock audit row without tenant identity', async () => {
     await seedUser('admin-uid', 'admin');
@@ -3099,18 +2395,6 @@ describe('platform super-admin workspace isolation', () => {
     });
   }
 
-  it('legacy workspace admin can read own tenant policy but cannot edit it', async () => {
-    await seedUser('admin-uid', 'admin');
-    await seedWorkspace('tenant-1');
-    const db = adminCtx(testEnv).firestore();
-    await assertSucceeds(db.collection('tenants').doc('tenant-1').get());
-    await assertFails(
-      db.collection('tenants').doc('tenant-1').update({
-        max_devices_allowed: 999,
-      }),
-    );
-  });
-
   it('selected super-admin can archive and restore a workspace', async () => {
     await seedWorkspace('tenant-1');
     await seedUser('platform-lifecycle-uid', 'super_admin', true, {
@@ -3155,7 +2439,7 @@ describe('platform super-admin workspace isolation', () => {
     );
   });
 
-  it('archive revokes tenant users and access records, then restores prior activity', async () => {
+  it('archive disables tenant users and restores prior activity', async () => {
     await seedWorkspace('tenant-1');
     await seedUser('seller-uid', 'seller');
     await seedUser('platform-archive-flow-uid', 'super_admin', true, {
@@ -3169,35 +2453,12 @@ describe('platform super-admin workspace isolation', () => {
         name: 'Archive flow product',
         tenant_id: 'tenant-1',
       });
-      await db.collection('users').doc('seller-uid')
-        .collection('device_registrations').doc('slot_0').set({
-          user_id: 'seller-uid',
-          tenant_id: 'tenant-1',
-          slot_id: 'slot_0',
-          slot_number: 0,
-          device_id: 'installation-0',
-          status: 'active',
-        });
-      await db.collection('users').doc('seller-uid')
-        .collection('sessions').doc('slot_0').set({
-          user_id: 'seller-uid',
-          tenant_id: 'tenant-1',
-          slot_id: 'slot_0',
-          slot_number: 0,
-          session_id: 'archive-session-0',
-          device_slot_id: 'slot_0',
-          device_id: 'installation-0',
-          status: 'active',
-          expires_at: new Date(Date.now() + 60 * 60 * 1000),
-        });
     });
 
     const db = testEnv.authenticatedContext('platform-archive-flow-uid')
       .firestore();
     const tenantRef = db.collection('tenants').doc('tenant-1');
     const sellerRef = db.collection('users').doc('seller-uid');
-    const deviceRef = sellerRef.collection('device_registrations').doc('slot_0');
-    const sessionRef = sellerRef.collection('sessions').doc('slot_0');
     const archiveBatch = db.batch();
     archiveBatch.update(tenantRef, {
       active: false,
@@ -3209,17 +2470,6 @@ describe('platform super-admin workspace isolation', () => {
       active: false,
       workspace_was_active: true,
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-    archiveBatch.update(deviceRef, {
-      status: 'revoked',
-      revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
-      revoked_by: 'platform-archive-flow-uid',
-    });
-    archiveBatch.update(sessionRef, {
-      status: 'revoked',
-      revoked_at: firebase.firestore.FieldValue.serverTimestamp(),
-      termination_reason: 'workspace_archived',
-      terminated_by: 'platform-archive-flow-uid',
     });
     await assertSucceeds(archiveBatch.commit());
     await assertFails(
@@ -3280,6 +2530,57 @@ describe('platform super-admin workspace isolation', () => {
       );
     }
     await assertFails(db.collection('settings').doc('tenant-1').get());
+  });
+
+  it('inactive tenant denies business access while member profiles stay active', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedUser('seller-uid', 'seller', true, {
+      assigned_route_ids: ['route-1'],
+    });
+    await seedShop('shop-inactive-tenant');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.collection('products').doc('inactive-tenant-product').set({
+        name: 'Inactive tenant product',
+        tenant_id: 'tenant-1',
+      });
+      await db.collection('tenants').doc('tenant-1').update({ active: false });
+    });
+
+    const adminDb = testEnv.authenticatedContext('tenant-admin-uid').firestore();
+    const sellerDb = sellerCtx(testEnv).firestore();
+    const profile = await adminDb.collection('users').doc('tenant-admin-uid').get();
+    assert.strictEqual(profile.data().active, true);
+
+    await assertFails(
+      adminDb.collection('products').doc('inactive-tenant-product').get(),
+    );
+    await assertFails(
+      adminDb.collection('customers').doc('shop-inactive-tenant').get(),
+    );
+    await assertFails(
+      adminDb.collection('customers')
+        .doc('shop-inactive-tenant')
+        .update({ name: 'Blocked while workspace is inactive' }),
+    );
+    await assertFails(
+      sellerDb.collection('customers').doc('shop-inactive-tenant').get(),
+    );
+    await assertFails(
+      sellerDb.collection('products').doc('inactive-tenant-product').get(),
+    );
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('tenants').doc('tenant-1').update({
+        active: true,
+      });
+    });
+    await assertSucceeds(
+      adminDb.collection('products').doc('inactive-tenant-product').get(),
+    );
+    await assertSucceeds(
+      sellerDb.collection('customers').doc('shop-inactive-tenant').get(),
+    );
   });
 
   it('super-admin can atomically create a workspace and its settings', async () => {

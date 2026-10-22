@@ -9,8 +9,8 @@ flowchart LR
   ReceiptUI["Cash receipt mode · app/lib/providers/invoice_provider.dart#L583"] -->|app/lib/providers/invoice_provider.dart#L583| ReceiptProvider[InvoiceNotifier.createCashReceipt]
   ReceiptProvider -->|app/lib/providers/invoice_provider.dart#L583| ReceiptInvoice[Receipt invoice + counter]
   ReceiptProvider -->|app/lib/providers/invoice_provider.dart#L583| Ledger
-  SellerLogin["AuthNotifier.signIn · app/lib/providers/auth_provider.dart#L126"] -->|app/lib/providers/tenant_provider.dart#L628| AccessProvider[registerCurrentAccess]
-  AccessProvider -->|app/lib/providers/tenant_provider.dart#L628| DeviceSlots[users/{uid}/device_registrations]
-  AccessProvider -->|app/lib/providers/tenant_provider.dart#L628| SessionSlots[users/{uid}/sessions]
-  DeviceSlots -->|firestore.rules#L291| Rules[Firestore Rules validate owner/tenant/status/slot]
-  SessionSlots -->|firestore.rules#L276| Rules
+  SellerLogin["AuthNotifier.signIn · app/lib/providers/auth_provider.dart#L123"] -->|app/lib/providers/tenant_provider.dart#L1| AccessProvider[registerCurrentAccess]
+  AccessProvider -->|app/lib/providers/tenant_provider.dart#L1| DeviceSlots[users/{uid}/device_registrations]
+  AccessProvider -->|app/lib/providers/tenant_provider.dart#L1| SessionSlots[users/{uid}/sessions]
+  DeviceSlots -->|firestore.rules#L1| Rules[Firestore Rules validate owner/tenant/status/slot]
+  SessionSlots -->|firestore.rules#L1| Rules

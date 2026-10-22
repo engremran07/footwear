@@ -28,6 +28,45 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.81',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Sign-in now uses Firebase Authentication without device pairing or custom session approvals.',
+          AppLocale.ar:
+              'يعتمد تسجيل الدخول الآن على مصادقة Firebase دون إقران الأجهزة أو الموافقة على جلسات مخصصة.',
+          AppLocale.ur:
+              'اب سائن اِن Firebase Authentication کے ذریعے ہوتا ہے، ڈیوائس پیئرنگ یا کسٹم سیشن منظوری کے بغیر۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🏢',
+        text: {
+          AppLocale.en:
+              'Workspace administrators can manage routes, shops, and transactions within their workspace.',
+          AppLocale.ar:
+              'يمكن لمسؤولي مساحة العمل إدارة المسارات والمتاجر والمعاملات داخل مساحة عملهم.',
+          AppLocale.ur:
+              'ورک اسپیس ایڈمن اپنی ورک اسپیس میں روٹس، دکانوں اور ٹرانزیکشنز کا انتظام کر سکتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🛡️',
+        text: {
+          AppLocale.en:
+              'Shop balances and transaction records receive stronger checks when saved together.',
+          AppLocale.ar:
+              'تخضع أرصدة المتاجر وسجلات المعاملات لفحوصات أقوى عند حفظها معًا.',
+          AppLocale.ur:
+              'دکان کے بیلنس اور ٹرانزیکشن ریکارڈ ایک ساتھ محفوظ ہوتے وقت مزید مضبوط جانچ سے گزرتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.80',
     date: 'October 2026',
     items: [

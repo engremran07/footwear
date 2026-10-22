@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/core/utils/auth_refresh_policy.dart';
 
 void main() {
-  test('network and transient failures retain the authenticated session', () {
+  test('network and transient failures retain authenticated state', () {
     expect(
       shouldSignOutAfterAuthRefreshFailure('network-request-failed'),
       isFalse,

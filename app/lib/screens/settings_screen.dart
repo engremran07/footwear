@@ -290,17 +290,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             // Company Logo (admin only)
             if (currentUser.isAdmin) ...[
               const _LogoCard(),
-              if ((currentUser.isTenantAdmin || currentUser.isSuperAdmin) &&
-                  currentUser.tenantId != null)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.phonelink_lock_outlined),
-                  title: Text(tr('security_devices_sessions', ref)),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push(
-                    '/tenants/${currentUser.tenantId}/security',
-                  ),
-                ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.receipt_long_outlined),

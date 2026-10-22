@@ -475,8 +475,7 @@ class _SellerDashboard extends ConsumerWidget {
     );
 
     // Stale-while-revalidate gate: shimmer only on cold start (loading, no data
-    // yet, and no error). Permission errors are suppressed only while sign-in
-    // is still registering the session; settled failures use the retry state.
+    // yet, and no error). Settled failures use the retry state.
     if ((!routesAsync.hasValue && !routesAsync.hasError) ||
         (!shopsAsync.hasValue && !shopsAsync.hasError)) {
       return Scaffold(body: ShimmerLoading.cards());
@@ -503,7 +502,6 @@ class _SellerDashboard extends ConsumerWidget {
       );
     }
 
-    // Use cached values during a transient access-registration failure.
     final routes = routesAsync.value ?? const [];
     final shops = shopsAsync.value ?? const [];
     // Inventory: use .value if loaded, 0 while still loading — stat grid

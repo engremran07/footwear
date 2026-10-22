@@ -6,6 +6,80 @@
 
 ---
 
+## SESSION-015 — 2026-10-22 — v3.9.81+707 release, deploy, and device install
+
+**Agent:** GitHub Copilot
+**Baseline:** SESSION-013/014 purge, CRUD, and Rules work; branch `main`.
+**Trigger:** User explicitly authorized Firebase Rules/indexes and Hosting deployment, web/APK release builds, phone copy/install, cleanup, and commit/push to `main`.
+
+### Work Performed
+
+- Synchronized `app/pubspec.yaml` and `AppBrand` to `3.9.81+707`; added a trilingual What's New entry and updated current release documentation.
+- Removed tracked `firebase_rules_debug.txt`, which was an old Firebase CLI debug log with no source references, and regenerated the application-map inventory. No `.tt` files exist. Other `.txt` files were retained because they are audit/history deliverables or are indexed/referenced by the application map.
+- Cleared stale generated Flutter metadata after the first web build exposed an obsolete `device_info_plus` web-plugin registration left over from the removed dependency. `flutter clean` plus `flutter pub get` regenerated the plugin registrant; the subsequent build succeeded.
+- Deployed Firestore Rules/indexes and Hosting to configured project `shoeserp-clean-20260327`. Remote-only indexes/field overrides were left untouched; deploy was not run with `--force`.
+- Built web and split-per-ABI APK artifacts. Copied ARM64 APK to `/sdcard/Download/app-arm64-v8a-release.apk` and installed it on `R5GL22RGT9V`.
+- Did not delete legacy Firestore documents or Firebase Auth identities; no data cleanup was authorized.
+
+### Verification
+
+- Rules Emulator: `107 passing (25s)`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 109.5s)`; `dart analyze test/`: `No issues found!`; `flutter test -r expanded`: `00:58 +528: All tests passed!`.
+- Markdown lint exited 0; `git diff --check` was clean. Current-file Problems queries report `No errors found`. The global Problems view still contains 126 stale diagnostics attached to five deleted pairing/session files; all five paths are absent from disk.
+- Web release: `EXIT: 0`; Hosting deployment: `Deploy complete!`.
+- Rules/indexes deployment: `Deploy complete!`; Firebase reported 23 remote indexes and 2 field overrides absent from the source manifest, preserved without deletion.
+- APKs: ARMv7 30.3 MB, ARM64 31.8 MB, x86_64 33.3 MB. `adb push` reported 33,382,424 bytes; streamed install returned `Success`.
+- Commit and push to `main`: pending final staged-diff review.
+
+---
+
+## SESSION-014 — 2026-10-22 — Firestore Rules integrity remediation
+
+**Agent:** GitHub Copilot
+**Baseline:** SESSION-013 local purge/CRUD work; existing worktree changes preserved.
+**Trigger:** Close local Rules findings discovered during follow-up audit of shop creation, ledger linkage, and inactive tenant access.
+
+### Work Performed
+
+- Tightened local Firestore Rules so ordinary workspace business access requires an active tenant, shop creation cannot seed a nonzero balance or cached transaction metadata, and standalone ledger entries link to the exact same-batch shop/balance change.
+- Kept super-admin restoration on its separate selected-workspace path. Reduced redundant seller invoice linkage checks after emulator testing exposed Firestore's Rules expression-evaluation ceiling on valid invoice batches.
+- Added regression coverage for inactive tenant access, forged shop opening balances, and orphaned or mismatched transactions. Updated the requested audit report with the findings and test evidence.
+
+### Verification
+
+- Baseline with new regressions: `103 passing`, `4 failing`; the four failures reproduced the newly identified gaps.
+- Targeted valid seller invoice/CRUD check: `4 passing`.
+- Full Firestore Rules Emulator suite: `107 passing (21s)`.
+- Repository Markdown lint exited 0 with no output; `git diff --check` passed. Reviewed new agent/skill/instruction frontmatter; no workflow files changed.
+- Removed the two known generated Firestore emulator debug logs; final scan found none. Flutter analyzers and tests were not rerun for this Rules-only addendum.
+- No production Rules/index or Hosting deployment, production-data change, release build, device install, commit, or push was performed.
+
+---
+
+## SESSION-013 — 2026-10-22 — Custom device-access purge and tenant CRUD restoration
+
+**Agent:** GitHub Copilot
+**Baseline:** `32d843d` on `main`; working tree contained the in-progress purge and tenant CRUD changes.
+**Trigger:** Remove app-managed device/pairing enforcement while retaining Firebase Auth, tenant isolation, workspace-admin CRUD, sorting, and financial controls; update the requested audit report.
+
+### Work Performed
+
+- Removed app-managed device registration, pairing approval, custom access slots and renewal/enforcement, related screens/routes/models/services, feature-only Rules paths/helpers, and custom access indexes. Firebase Auth and the audited super-admin workspace context remain.
+- Restored tenant-admin route, shop, and ledger write paths with active-profile and tenant checks. Shop creation reconciles route counts atomically; route reassignment reconciles both affected route counts atomically.
+- Kept existing sort providers/screens and financial deletion boundaries. Standalone cash corrections still require audited soft deletion and an exact same-batch balance reversal; invoice-linked ledger entries remain protected.
+- Updated current architecture docs and automated audit prompts; historical release and audit entries remain historical. Updated the `.txt` audit with current implementation and validation evidence.
+- Reviewed recent commits `32d843d`, `79c1078`, `f19c04c`, `2266b53`, and `25fd9d5`. Workspace chat-history lookup exposed only the active Footwear session; three separate recent chats were not available and were not invented.
+
+### Verification
+
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 17.3s)`.
+- `dart analyze test/`: `No issues found!`.
+- Full Flutter tests: `00:56 +528: All tests passed!`; focused tests: 49 passed.
+- Firestore Rules Emulator: `103 passing`. The package `test:emulator` script's single-quote command failed under Windows; the direct Windows-safe `firebase emulators:exec --only firestore "npm test"` invocation passed.
+- Markdown lint exited 0 with no output. Production Rules/Hosting were not deployed; production access records were not deleted; no release artifacts, commit, or push were produced.
+
+---
+
 ## SESSION-012 — 2026-10-10 — v3.9.60+99 / Authentication, sessions, device pairing, and carried-over export audit
 
 **Agent:** GitHub Copilot

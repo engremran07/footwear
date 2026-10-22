@@ -4,7 +4,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_brand.dart';
 import 'core/l10n/app_locale.dart';
-import 'core/services/session_guard.dart';
+import 'core/services/auth_lifecycle_observer.dart';
 import 'providers/theme_preference_provider.dart';
 
 class FootwearErpApp extends ConsumerWidget {
@@ -30,7 +30,7 @@ class FootwearErpApp extends ConsumerWidget {
       builder: (context, child) {
         return Directionality(
           textDirection: appLocale.direction,
-          child: SessionGuard(child: child ?? const SizedBox.shrink()),
+          child: AuthLifecycleObserver(child: child ?? const SizedBox.shrink()),
         );
       },
     );

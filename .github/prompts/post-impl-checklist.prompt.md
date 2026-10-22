@@ -1,190 +1,60 @@
 ---
-mode: agent
-description: 20-gate quality gate runner for ShoesERP. Run this after implementing any change to verify all quality standards are met before committing. Blocks on any failure.
+name: ShoesERP Change Verification
+description: "Select and run verification appropriate to the changed ShoesERP files and the operations explicitly requested by the user."
+argument-hint: "Describe the change and whether local validation, release, deployment, or Git operations are authorized."
+agent: agent
 ---
 
-# ShoesERP 20-Gate Post-Implementation Checklist
-
-Run all 20 gates in order. A single failure BLOCKS the release. Fix root cause before proceeding.
-
-## Gate 1 — Static Analysis
-
-```bash
-
-cd app && flutter analyze lib --no-pub
-
-```
-
-Expected: "No issues found!"
-
-## Gate 2 — Full Test Suite
-
-```bash
-
-cd app && flutter test -r expanded
-
-```
-
-Expected: All tests pass (minimum 335). No deletions allowed; fix failing tests before proceeding.
-
-## Gate 3 — Firestore Rules Deployed
-
-```bash
-
-firebase deploy --only firestore:rules
-
-```
-
-Verify rules include `docSizeOk()` and `withinWriteRate()` on all creates/updates.
-
-## Gate 4 — Firestore Indexes Deployed
-
-```bash
-
-firebase deploy --only firestore:indexes
-
-```
-
-Verify every `where(A)+orderBy(B)` (A ≠ B) query has a composite index.
-
-## Gate 5 — Version Consistency
-
-Check that `app/pubspec.yaml` version and `app/lib/core/constants/app_brand.dart` version/buildNumber are identical.
-
-```bash
-
-grep "^version:" app/pubspec.yaml
-grep "appVersion\|buildNumber" app/lib/core/constants/app_brand.dart
-
-```
-
-## Gate 6 — L10n Key Parity
-
-All EN keys must exist in AR and UR. Run the hygiene gate from ci.yml Gate 5.
-Zero missing keys acceptable.
-
-## Gate 7 — No Dead Providers
-
-Every provider defined in `app/lib/providers/` must have at least one consumer (ref.watch or ref.read) outside of its own file. Search for zero-consumer providers.
-
-## Gate 8 — No Raw Firestore Collection Literals
-
-```bash
-
-grep -rn "\.collection('" app/lib/ | grep -v Collections\.
-
-```
-
-Expected: zero matches. All collection references use `Collections.*` constants.
-
-## Gate 9 — Split-per-ABI release wording in all documentation
-
-```bash
-
-grep -E "split-per-abi|adb push .*app-arm64-v8a-release.apk" README.md app/README.md AGENTS.md CLAUDE.md
-
-```
-
-Expected: release command references are present and historical fat-APK-only wording is removed.
-
-## Gate 10 — Provider Write Guards
-
-All provider methods that write `created_by`, `route_id`, `shop_id`, `seller_id` must validate non-empty before `batch.commit()`. Search for `.commit()` calls without preceding empty-check of identity fields.
-
-## Gate 11 — allTransactionsProvider Invalidation
-
-```bash
-
-grep "allTransactionsProvider" app/lib/providers/auth_provider.dart
-
-```
-
-Expected: present in `_invalidateRoleScopedProviders()`.
-
-## Gate 12 — Admin-Only Screen Defense-in-Depth
-
-All admin-only screens (settings, user management, reports admin view) must enforce admin check in the submit/write method, not just at the router guard. Search for `isAdmin` check in:
-
-- `app/lib/screens/settings_screen.dart` submit methods
-
-- `app/lib/screens/users_list_screen.dart` write methods
-
-## Gate 13 — Financial Pathway Routes Correct
-
-Verify:
-
-- `createSaleInvoice()` is ONLY called from invoice creation screens (not from cash-collection flows)
-
-- `TransactionNotifier.create(type: 'cash_in')` is ONLY called from shop detail cash collection (not from invoice creation)
-
-- No standalone transaction for a new stock sale
-
-## Gate 14 — Seller Route Constraints
-
-All seller-facing shop/transaction creation must include `route_id` validation. Sellers cannot create shops or transactions outside their `assigned_route_id`. Check that all seller shop create calls pass `route_id`.
-
-## Gate 15 — Privileged Credential Safety
-
-Verify no service-account key is stored in Firestore, repository backups, client code, or build defines. Arbitrary-user Auth administration must use a trusted backend; use Firebase Auth owner-controlled reset and verification flows from the client.
-
-## Gate 16 — PDF Generation in Isolate
-
-```bash
-
-grep -rn "Isolate.run\|compute(" app/lib/ | grep -i "pdf"
-
-```
-
-All 4 PDF export functions (invoice, route, inventory, report) must use `Isolate.run()`.
-
-## Gate 17 — Session Guard Active
-
-Verify `SessionGuard` wraps the root widget in `app/lib/app.dart`. Admin hard limit is 8h, warning at 7h30m.
-
-## Gate 18 — Firestore Rules docSizeOk + withinWriteRate
-
-```bash
-
-grep -c "docSizeOk()\|withinWriteRate()" firestore.rules
-
-```
-
-Expected: ≥2 occurrences of each.
-
-## Gate 19 — withinWriteRate Rule Present
-
-```bash
-
-grep "withinWriteRate" firestore.rules
-
-```
-
-Expected: present in all high-frequency write paths (seller_inventory, products, product_variants).
-
-## Gate 20 — Release Surface Sync
-
-- `app/pubspec.yaml` version == `app/lib/core/constants/app_brand.dart` version ✓ (Gate 5)
-
-- APK built from same source as web ✓
-
-- Both deployed before commit ✓
-
-- git tag v{version} created after successful deploy ✓
-
----
-
-## Pass Criteria
-
-All 20 gates green → proceed to commit. Any gate failure → fix root cause, re-run failed gate.
-
-## Blocking Patterns (never commit with these)
-
-- `flutter analyze` errors
-
-- Test failures
-
-- Missing allTransactionsProvider in _invalidateRoleScopedProviders
-
-- Version mismatch between pubspec.yaml and app_brand.dart
-
-- L10n key missing from any language
+# ShoesERP Change Verification
+
+Verify the actual change and its requested scope. There is no fixed minimum
+suite count and no automatic release/deployment checklist for every edit.
+
+## 1. Inspect Scope
+
+- Read `AGENTS.md`, `CLAUDE.md`, relevant `.github/instructions/`, and the
+  changed files.
+- Inspect `git status --short`; preserve changes that predate this task.
+- Identify changed runtime behavior, data writes, Rules/indexes, and user-facing
+  release surfaces.
+
+## 2. Run Relevant Local Checks
+
+Choose the smallest adequate checks, then expand if they reveal a shared
+regression:
+
+- Dart source changes: run targeted tests and `flutter analyze lib --no-pub`.
+- Dart test changes: run targeted Flutter tests and `dart analyze test/`.
+- Firestore Rules or authorization changes: run
+  `firebase emulators:exec --only firestore "npm test"` from
+  `tests/firestore-rules/`.
+- Query changes: inspect Rules authorization and `firestore.indexes.json`.
+- Markdown changes: run project Markdown lint.
+- Workflow/configuration changes: validate syntax and inspect actual triggers,
+  secrets, permissions, and deployment effects.
+
+Report exact output. Do not state a test count that the tool did not emit.
+
+## 3. Release and Production Operations
+
+Treat the following as separate, opt-in actions. Perform them only when the
+user explicitly requests or authorizes them:
+
+- Version/changelog bump and release artifact builds.
+- Firebase Hosting, Firestore Rules/indexes, or any other production deploy.
+- Production data migration or cleanup.
+- APK installation, commit, push, tag, or GitHub release creation.
+
+The current repository workflows have side effects: a push to `main` triggers
+`.github/workflows/deploy-web.yml`, which deploys Hosting and Firestore
+Rules/indexes; a version tag or selected manual run can trigger
+`.github/workflows/release.yml`, which builds and deploys release surfaces.
+Do not push or dispatch these workflows unless the user has authorized those
+effects.
+
+## 4. Final Report
+
+Summarize changed files, exact local checks and results, and what was not run.
+Clearly distinguish source changes, emulator verification, deployed production
+state, release artifacts, and Git publication. Never describe local-only work
+as deployed or release-complete.

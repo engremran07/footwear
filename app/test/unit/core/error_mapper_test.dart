@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/core/utils/error_mapper.dart';
-import 'package:footwear_erp/core/utils/session_access_error.dart';
 
 void main() {
   group('AppErrorMapper.key — FirebaseAuthException', () {
@@ -131,24 +130,6 @@ void main() {
   });
 
   group('AppErrorMapper.key — plain Dart errors', () {
-    test('typed blocked-device error maps to the localized device error', () {
-      expect(
-        AppErrorMapper.key(
-          const SessionAccessException(SessionAccessErrorCode.deviceBlocked),
-        ),
-        equals('device_blocked'),
-      );
-    });
-
-    test('typed revoked-session error maps to the localized session error', () {
-      expect(
-        AppErrorMapper.key(
-          const SessionAccessException(SessionAccessErrorCode.sessionRevoked),
-        ),
-        equals('session_revoked'),
-      );
-    });
-
     test('archived workspace has a specific sign-in message', () {
       expect(
         AppErrorMapper.key(StateError('workspace-disabled')),
@@ -162,34 +143,6 @@ void main() {
           StateError('Authorized workspace administration is required.'),
         ),
         equals('err_permission_denied'),
-      );
-    });
-
-    test('device allocation limit has a specific message', () {
-      expect(
-        AppErrorMapper.key(StateError('device-limit-reached')),
-        equals('device_limit_reached'),
-      );
-    });
-
-    test('session allocation limit has a specific message', () {
-      expect(
-        AppErrorMapper.key(StateError('session-limit-reached')),
-        equals('session_limit_reached'),
-      );
-    });
-
-    test('platform session allocation limit reuses the session message', () {
-      expect(
-        AppErrorMapper.key(StateError('platform-session-limit-reached')),
-        equals('session_limit_reached'),
-      );
-    });
-
-    test('platform device limit has a specific message', () {
-      expect(
-        AppErrorMapper.key(StateError('platform-device-limit-reached')),
-        equals('platform_device_limit_reached'),
       );
     });
 

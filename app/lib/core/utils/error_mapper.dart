@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'session_access_error.dart';
 
 /// Maps Firebase and Dart exceptions to user-friendly i18n translation keys.
 /// All keys must exist in app_locale.dart for EN / AR / UR.
@@ -14,16 +13,6 @@ class AppErrorMapper {
 
   /// Returns a locale key for the given error object.
   static String key(Object error) {
-    if (error is SessionAccessException) {
-      return switch (error.code) {
-        SessionAccessErrorCode.devicePairingPending => 'device_pairing_pending',
-        SessionAccessErrorCode.deviceBlocked => 'device_blocked',
-        SessionAccessErrorCode.deviceAdminResetRequired =>
-          'device_admin_reset_required',
-        SessionAccessErrorCode.deviceSessionRevoked ||
-        SessionAccessErrorCode.sessionRevoked => 'session_revoked',
-      };
-    }
     // ── Firebase Auth errors ───────────────────────────────────────────
     if (error is FirebaseAuthException) {
       return switch (error.code) {
@@ -68,28 +57,6 @@ class AppErrorMapper {
 
     // ── Dart built-in errors ───────────────────────────────────────────
     final msg = error.toString().toLowerCase();
-    if (msg.contains('platform-device-limit-reached')) {
-      return 'platform_device_limit_reached';
-    }
-    if (msg.contains('device-limit-reached')) return 'device_limit_reached';
-    if (msg.contains('session-limit-reached')) return 'session_limit_reached';
-    if (msg.contains('device-pairing-pending')) return 'device_pairing_pending';
-    if (msg.contains('session-revoked') ||
-        msg.contains('device-session-revoked')) {
-      return 'session_revoked';
-    }
-    if (msg.contains('device-session-mismatch') ||
-        msg.contains('invalid-platform-session-slot')) {
-      return 'device_session_mismatch';
-    }
-    if (msg.contains('device-blocked')) return 'device_blocked';
-    if (msg.contains('device-admin-reset-required')) {
-      return 'device_admin_reset_required';
-    }
-    if (msg.contains('device-clock-skew')) return 'device_clock_skew';
-    if (msg.contains('workspace policy unavailable')) {
-      return 'workspace_policy_unavailable';
-    }
     if (msg.contains('authorized workspace administration is required') ||
         msg.contains('active platform super-admin access is required')) {
       return 'err_permission_denied';

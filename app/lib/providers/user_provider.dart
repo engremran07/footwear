@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
-import '../core/models/access_usage_summary.dart';
 import '../core/utils/firestore_pagination.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
@@ -236,7 +235,6 @@ class UserManagementNotifier extends AsyncNotifier<void> {
   Future<void> _setUserActiveAtomically({
     required String userId,
     required String tenantId,
-    required String adminUid,
     required bool adminIsSuperAdmin,
     required bool active,
     bool clearRouteAssignments = false,
@@ -244,12 +242,6 @@ class UserManagementNotifier extends AsyncNotifier<void> {
   }) async {
     final db = FirebaseFirestore.instance;
     final userRef = db.collection(Collections.users).doc(userId);
-    final List<DocumentReference<Map<String, dynamic>>> sessionRefs =
-        List.generate(
-          AccessUsageSummary.maximumSlotsPerUser,
-          (index) =>
-              userRef.collection(Collections.sessions).doc('slot_$index'),
-        );
     final routeSnapshot = clearRouteAssignments
         ? await db
               .collection(Collections.routes)
@@ -261,9 +253,6 @@ class UserManagementNotifier extends AsyncNotifier<void> {
 
     await db.runTransaction<void>((transaction) async {
       final userSnapshot = await transaction.get(userRef);
-      final sessionSnapshots = await Future.wait(
-        sessionRefs.map((sessionRef) => transaction.get(sessionRef)),
-      );
       final userData = userSnapshot.data();
       final role = (userData?['role'] as String? ?? '').trim().toLowerCase();
       if (!userSnapshot.exists ||
@@ -285,25 +274,6 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       transaction.update(userRef, userUpdate);
 
       if (active) return;
-      for (var index = 0; index < sessionSnapshots.length; index++) {
-        final snapshot = sessionSnapshots[index];
-        if (!snapshot.exists) continue;
-        final data = snapshot.data();
-        if (data?['user_id'] != userId ||
-            data?['tenant_id'] != tenantId ||
-            data?['slot_id'] != snapshot.id ||
-            (data?['slot_number'] as num?)?.toInt() != index) {
-          throw StateError('invalid-session-slot-record');
-        }
-        if (data?['status'] != 'active') continue;
-        transaction.update(sessionRefs[index], {
-          'status': 'revoked',
-          'revoked_at': FieldValue.serverTimestamp(),
-          'termination_reason': 'account_disabled',
-          'terminated_by': adminUid,
-        });
-      }
-
       if (routeSnapshot != null) {
         for (final route in routeSnapshot.docs) {
           transaction.update(route.reference, {
@@ -588,7 +558,6 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     await _setUserActiveAtomically(
       userId: target.target.id,
       tenantId: target.tenantId,
-      adminUid: target.adminUid,
       adminIsSuperAdmin: target.admin.isSuperAdmin,
       active: active,
     );
@@ -601,7 +570,6 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     await _setUserActiveAtomically(
       userId: target.target.id,
       tenantId: target.tenantId,
-      adminUid: target.adminUid,
       adminIsSuperAdmin: target.admin.isSuperAdmin,
       active: false,
       clearRouteAssignments: true,

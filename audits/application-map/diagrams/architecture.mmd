@@ -3,15 +3,15 @@ title: Source architecture (static map)
 ---
 flowchart LR
   UI["Flutter screens/widgets · app/lib/screens/dashboard_screen.dart#L135"]
-  Router["GoRouter and role redirects · app/lib/core/router/app_router.dart#L275"]
-  Auth["Firebase Auth and SessionGuard · app/lib/providers/auth_provider.dart#L126"]
-  State["Riverpod providers/notifiers · app/lib/providers/tenant_provider.dart#L628"]
-  Rules["Firestore Rules · firestore.rules#L793"]
+  Router["GoRouter and role redirects · app/lib/core/router/app_router.dart#L261"]
+  Auth["Firebase Auth and SessionGuard · app/lib/providers/auth_provider.dart#L123"]
+  State["Riverpod providers/notifiers · app/lib/providers/tenant_provider.dart#L1"]
+  Rules["Firestore Rules · firestore.rules#L924"]
   Data["Firestore collections/indexes · app/lib/core/constants/collections.dart#L15"]
   Export["PDF/XLSX/print/share · app/lib/widgets/export_sheet.dart#L55"]
-  Router -->|app/lib/core/router/app_router.dart#L275| UI
+  Router -->|app/lib/core/router/app_router.dart#L261| UI
   UI -->|app/lib/screens/dashboard_screen.dart#L135| State
-  Auth -->|app/lib/providers/auth_provider.dart#L126| State
-  State -->|app/lib/providers/tenant_provider.dart#L628| Data
-  Rules -->|firestore.rules#L793| Data
+  Auth -->|app/lib/providers/auth_provider.dart#L123| State
+  State -->|app/lib/providers/tenant_provider.dart#L1| Data
+  Rules -->|firestore.rules#L924| Data
   State -->|app/lib/screens/reports_screen.dart#L205| Export

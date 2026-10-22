@@ -13,7 +13,6 @@ void main() {
         plan: 'pro',
         active: true,
         isTrial: false,
-        maxDevicesAllowed: 3,
         createdAt: ts,
         updatedAt: ts,
         ownerUserId: 'owner-1',
@@ -30,7 +29,10 @@ void main() {
       expect(restored.name, original.name);
       expect(restored.slug, original.slug);
       expect(restored.plan, original.plan);
-      expect(restored.maxDevicesAllowed, original.maxDevicesAllowed);
+      expect(restored.active, original.active);
+      expect(restored.isTrial, original.isTrial);
+      expect(restored.createdAt, original.createdAt);
+      expect(restored.updatedAt, original.updatedAt);
       expect(restored.ownerUserId, original.ownerUserId);
       expect(restored.archivedAt, original.archivedAt);
       expect(restored.archivedBy, original.archivedBy);
@@ -48,8 +50,9 @@ void main() {
       expect(m.active, isTrue);
       expect(m.isTrial, isFalse);
       expect(m.plan, isNull);
-      expect(m.maxDevicesAllowed, 3);
-      expect(m.maxActiveSessionsAllowed, 2);
+      expect(m.ownerUserId, isNull);
+      expect(m.archivedAt, isNull);
+      expect(m.archivedBy, isNull);
     });
   });
 }

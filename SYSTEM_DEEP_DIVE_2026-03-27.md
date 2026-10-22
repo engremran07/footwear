@@ -1,6 +1,6 @@
 # ShoesERP System Deep Dive
 
-Last updated: 2026-10-17
+Last updated: 2026-10-22
 
 ## Backup and Restore
 
@@ -14,9 +14,13 @@ Local encrypted archives are listed through the shared restore picker and can be
 
 ## Workspace Archival
 
-Workspace archival is an ordered provider operation. It disables member profiles and revokes their device registrations and active sessions before recording the workspace's archived state. Firestore access checks use the member's active profile gate so ordinary business reads and writes are denied after archival without adding repeated tenant reads to high-volume transaction rules. An archived workspace must not be reactivated or edited through an ordinary client update.
+Workspace archival is an ordered provider operation. It deactivates member profiles before recording the workspace's archived state. Business Rules require both an active profile and an active tenant document, so ordinary reads and writes are denied if either is inactive. A selected super-admin can reactivate an inactive workspace only through the explicit restoration path; ordinary business access stays denied until restoration completes. The emulator suite covers an inactive tenant while member profiles remain active.
 
-Device session creation is bound to an active device registration in the same authenticated user's workspace. Slot identifiers, configured limits, and device/session identity must agree. Pairing-required workspaces create pending device registrations and require administrator approval before session creation. Device removal and related session revocation are atomic; blocking cannot be reversed by the device owner. Registrations inactive for 30 days may be reclaimed. Rules tests cover valid access, invalid slots, unregistered devices, tenant-scoped registry queries, pairing, block/recovery, and inactive workspace access.
+## Authentication and Workspace Access
+
+Firebase Authentication is the app's only sign-in mechanism. After Firebase Auth succeeds, the app loads the matching user profile and validates that it is active, has a supported role, and belongs to a concrete tenant unless it is a platform super-admin. The router and role-scoped providers wait for profile state and preserve mapped errors; no device registration, pairing approval, custom access slot, renewal timer, or app-managed session gate participates in sign-in.
+
+Firestore Rules enforce active-profile status, active-tenant status, role permissions, and tenant ownership on business documents. A platform super-admin may see workspace metadata globally, but business data requires a selected workspace and a support reason; selection and exit are recorded in append-only `platform_access_logs`, and Rules enforce the eight-hour support-context limit. This audited workspace context is distinct from the removed app-managed access controls.
 
 ## Invoice Modes and Workspace Headers
 
@@ -28,6 +32,13 @@ Sale invoices link to their `cash_out` ledger row and, when money is received, t
 
 Sale and credit-note invoice numbers are allocated from `settings/{tenantId}.last_invoice_number` inside the same Firestore transaction as the business writes. Deterministic tenant-scoped invoice IDs make retries idempotent without a query-before-write race. Credit-note transactions also update the original invoice's cumulative credit amount and shop balance atomically. A credit-note void reverses both the stock restoration and that cumulative amount; sale voids restore sale stock and apply the selected refund mode.
 
+Shop creation Rules reject a nonzero opening balance or seeded cached
+last-transaction summary. Standalone transaction creation must link to the
+same-batch shop and exact balance delta. Multi-row invoice batches are checked
+through invoice references and aggregate shop-balance validation; seller
+invoice transaction Rules avoid redundant per-row delta evaluation to stay
+within Firestore's expression budget.
+
 Workspace administrators configure English, Arabic, and Urdu invoice names, subtitles, addresses, contact and registration details, template, accent color, and visible fields. New invoices store a header snapshot, and seller-created snapshots are checked against the workspace settings. PDF generation uses the invoice snapshot so later branding edits do not alter existing documents. Voiding a non-stock sale does not restore inventory.
 
 ## Release Surfaces
@@ -36,31 +47,21 @@ Web and Android builds use the same version from `app/pubspec.yaml` and `AppBran
 
 ## Workspace Management UX
 
-Workspace creation does not subscribe to a global user list. Editing an existing workspace loads active owner choices through a tenant-scoped user query. Full workspace edits are offered only to a platform super-admin with active access to that workspace; workspace admins retain only their seller-cap controls. Validation and provider failures always release the save state, keep the dialog open, and use the shared mapper's specific error rather than treating generic state errors as PDF failures. Android and web launcher icons are generated from the same source image, with no additional Android adaptive foreground inset.
+Workspace creation does not subscribe to a global user list. Editing an existing workspace loads active owner choices through a tenant-scoped user query. Full workspace edits are offered only to a platform super-admin with active access to that workspace; tenant admins retain their workspace-scoped business settings and CRUD. Validation and provider failures always release the save state, keep the dialog open, and use the shared mapper's specific error rather than treating generic state errors as PDF failures. Android and web launcher icons are generated from the same source image, with no additional Android adaptive foreground inset.
 
-New workspace setup creates a tenant-scoped owner account after the workspace exists, then assigns that active `tenant_admin` as owner. Workspace user deactivation updates the account and revokes every active bounded session slot in one transaction. Administrators can separately revoke or block selected device registrations and terminate selected sessions from the workspace security registry. Access slots are per user; the same installation on another account does not consume that account's slots. Device/session enforcement remains client-side under the Spark architecture.
-
-## Access Registration and Workspace UX
-
-Tenant and seller sign-in requires an application device registration and session before `AuthNotifier.signIn()` completes. The router keeps users on `/login` while registration runs, and mapped failures remain visible. The client reads only records matching the signed-in `tenant_id` and `user_id`, including direct reads of missing own slots; workspace registry collection-group queries are separately authorized and indexed. Existing records are re-read transactionally and each session records the selected `device_slot_id`. Server-sourced checks drive session expiry, foreground renewal, clock-skew feedback, and stale-slot recovery. Super-admin platform sessions are stored separately under `users/{uid}/platform_sessions` and do not grant tenant business access.
-
-Session/device records remain client-enforced under the current Spark architecture. Firestore Rules cannot match ordinary authenticated business requests to a client session ID. Session termination prevents the supported app client from continuing, but alone does not block a modified client with a valid Firebase Auth token. Do not claim otherwise; server enforcement requires trusted claims or an equivalent authenticated backend.
-
-Registration errors are passed to the existing localized login error mapper after cleanup; they are not all reported as a session-capacity failure. Workspace-management rendering tolerates an unavailable profile while auth settles. Create/edit notifier failures are rethrown after preserving AsyncValue state so the screen can keep the dialog open and show the mapped error.
+New workspace setup creates a tenant-scoped owner account after the workspace exists, then assigns that active `tenant_admin` as owner. Workspace user deactivation updates the active profile status; it does not manage custom device or session records. Route and shop updates remain guarded and tenant-scoped, and linked shop/route counts are reconciled atomically. Route, shop, and transaction sorting remains in the existing providers and screens.
 
 ## Frontend Audit Evidence
 
 The 2026-10-03 frontend review is recorded in `AUDIT_REPORT_FOOTWEAR_ERP.md`. It is source-led and includes a live Android login capture, but authenticated role flows, theme/locale matrix screenshots, expanded-size visual QA, and profile-mode performance measurements remain pending because the required account password was not entered into the tooling session.
 
-## Authentication, Session, and Access-Limit Policy
+## CRUD and Sorting Guarantees
 
-Tenant access registration reads the selected device slot from `session.device_slot_id`, verifies that its stored installation ID matches the current installation, and builds local `SessionModel` values with concrete timestamps rather than unresolved `FieldValue.serverTimestamp()` sentinels. `SessionGuard` defers missing-session enforcement during the 15-second registration grace, queues an authoritative recheck, rearms renewal after resume, resets timers when role or tenant changes, and passes the checked UID to every automatic sign-out. Revoked sessions are rejected during renewal. These records remain client-enforced under the Spark architecture.
+Tenant administrators may create, read, and update business records inside their own workspace, subject to collection-specific financial and role-management safeguards. Sellers remain constrained to assigned routes and may not write administrator-only records. Provider guards validate the authenticated profile and tenant before writes; Firestore Rules independently enforce the same scope.
 
-Access limits have three scopes. Sellers use configurable `max_devices_allowed` and `max_active_sessions_allowed` values on their own workspace; the workspace's tenant admin can edit only those caps. Workspace admins (legacy admin/manager and tenant_admin) have unlimited paired-device registrations and share the `workspace_admin_max_active_sessions_allowed` value in `settings/platform_access_policy`; only a platform super-admin can change it. Super-admins use `users/{uid}/platform_sessions`, with a fixed two-device and one-active-session limit, independently of tenant pairing and approval.
+Route, shop, and transaction lists preserve their existing sort modes and query ordering. Shop creation and route-count reconciliation commit atomically, and administrator route reassignment adjusts both affected route counts in the same transaction. Referenced routes and shops use their existing deactivation workflow; invoice-linked ledger records remain immutable outside invoice correction flows. Standalone cash-in/cash-out removal retains the audited soft-delete and exact shop-balance reversal required by the financial-integrity contract.
 
-The workspace pairing switch gates seller devices only. Workspace admins use installation-keyed device records and do not approve their own devices. If `settings/platform_access_policy` is absent, the workspace-admin active-session default is two. Pairing-off pending seller registrations can activate on their next access registration; pairing-enabled seller registrations still require workspace-admin approval. The separate paired-device view queries at most 200 tenant devices and 200 tenant user profiles, resolves account identity in one bounded stream instead of per-device reads, and deduplicates by user plus installation ID. Device metadata includes model, app version, and Android/OS version. Platform-session re-registration may remove prior `revoked_at` and `terminated_by` markers only through the owner super-admin reactivation branch. Renewal rejects revoked-only access while tolerating unrelated revoked history beside a live record for the same installation. These session records still do not authorize or deny ordinary Firestore business requests.
-
-Standalone `cash_in` and `cash_out` transactions can be soft-deleted only by a tenant admin-equivalent actor. The provider re-reads the transaction and shop, verifies the active tenant, actor, amount/type, and absence of `invoice_id`, then commits the delete marker, actor/timestamps, exact shop-balance reversal, and `last_balance_correction_transaction_id` in one batch. If the deleted row is the shop's latest transaction, the cached last-transaction fields are cleared in that batch. Rules enforce the reciprocal transaction/shop link and deny hard deletes. Sellers cannot delete transactions; invoice-linked financial records stay in the void/credit-note workflows. The workspace settings dialog updates its own route state so pairing and admin-reset switches visibly toggle before saving.
+Standalone `cash_in` and `cash_out` transactions can be soft-deleted only by a tenant admin-equivalent actor. The provider re-reads the transaction and shop, verifies the active tenant, actor, amount/type, and absence of `invoice_id`, then commits the delete marker, actor/timestamps, exact shop-balance reversal, and `last_balance_correction_transaction_id` in one batch. If the deleted row is the shop's latest transaction, the cached last-transaction fields are cleared in that batch. Rules enforce the reciprocal transaction/shop link and deny hard deletes. Sellers cannot delete transactions; invoice-linked financial records stay in the void/credit-note workflows.
 
 ## Invoice Integrity and PDF Behavior
 

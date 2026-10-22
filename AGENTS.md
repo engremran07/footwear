@@ -1,6 +1,6 @@
 ﻿# ShoesERP AGENTS Runtime Contract
 
-Last updated: 2026-09-26
+Last updated: 2026-10-22
 
 ## 1) Runtime Truth (Authoritative)
 
@@ -10,10 +10,13 @@ This repository is a route/seller distribution ERP.
 - Legacy role value manager must be treated as admin-equivalent in app and rules
 - Tenant-aware roles tenant_admin and super_admin are now supported and must be treated as privileged, tenant-scoped roles in app and rules
 - Super-admin is a platform operator, not a global business-data reader. By default it may access workspace metadata only; client business data requires an explicit `active_workspace_id`, a support reason of at least 10 characters, and an append-only `platform_access_logs` event. Access ends by clearing the active workspace context.
-- New tenant-scoped users should carry a tenant_id and device pairing metadata where applicable, and must not cross tenant boundaries in rules or providers
-- Each workspace owns its business settings and seller device/session limits. Workspace-admin limits use a separate platform policy, and super-admin platform sessions use their own fixed slots.
+- New tenant-scoped users carry a tenant_id and must not cross tenant boundaries in rules or providers. Firebase Authentication is the app's only sign-in/session mechanism; the app does not register devices, require pairing, or maintain custom access slots.
+- Business access requires both an active user profile and an active tenant
+  document. Inactive tenants block ordinary admin/seller business access; the
+  selected super-admin restoration path is the narrowly scoped exception.
+- Workspace settings are tenant-scoped. No workspace or platform device-pairing, device-cap, or custom session-cap policy is used.
 - Canonical collections:
-  - users (subcollections: `sessions`, `device_registrations`, `platform_sessions`)
+  - users (Firebase Auth-linked profiles)
   - products
   - product_variants
   - seller_inventory
@@ -54,14 +57,20 @@ Defined in app/lib/core/router/app_router.dart:
 - /reports
 - /profile
 - /settings
-- /tenants/:tenantId/security
-- /tenants/:tenantId/devices
 
 ## 3) Permission Matrix
 
 Admin-equivalent (admin/manager):
 
 - Full write access to all business collections
+
+Workspace admin (tenant_admin):
+
+- Full CRUD within the assigned tenant, subject to financial and user-role safeguards
+
+Platform super-admin:
+
+- Platform workspace metadata globally; business data only in the explicitly selected, audited workspace
 
 Seller:
 
@@ -75,11 +84,22 @@ Seller:
 
 1. Role alignment is mandatory in all three layers: app/lib/models/user_model.dart, firestore.rules, and provider write guards on security-critical fields.
 
-1. Workspace branding and seller device/session limits are tenant-scoped. Workspace admins may configure seller caps only within their workspace. Workspace admins have unlimited paired-device registrations; one separate `settings/platform_access_policy` record controls their shared concurrent-session cap across workspaces, and only a super-admin may edit it. Super-admin devices and sessions are platform-only and do not consume tenant pairing slots.
+1. Firebase Authentication is the only authentication mechanism. Do not add app-managed device registration, pairing approval, session slots, session renewal, or device/session policy fields. Keep active-profile, role, tenant, and super-admin support-context checks.
+
+1. Business reads and writes require an active tenant as well as an active
+  profile. A selected super-admin may restore an inactive workspace only
+  through the explicit tenant-lifecycle restoration path; ordinary business
+  reads/writes remain denied until the tenant is active.
+
+1. Shop creation must begin with `balance == 0` and cannot seed cached
+  last-transaction fields. Standalone transaction creation must be linked to
+  the exact same-batch shop and balance update. Invoice operations may contain
+  multiple ledger rows and must preserve their validated invoice references
+  and aggregate shop-balance delta.
 
 1. Super-admin business access is workspace-scoped. Never let a super-admin read tenant routes, shops, products, inventory, invoices, transactions, reports, users, or tenant settings without an explicit active workspace context. Platform workspace metadata may remain globally visible. Record support access starts/ends in the append-only `platform_access_logs` collection; never use UI visibility as the security boundary.
 
-1. Super-admin business context expires after 8 hours. Firestore rules must enforce the TTL on every business-data path, and no generic admin-role branch may bypass it. Workspace admins may change only their workspace seller device/session caps; pairing mode, workspace lifecycle, and other tenant configuration remain platform-controlled.
+1. Super-admin business context expires after 8 hours. Firestore rules must enforce the TTL on every business-data path, and no generic admin-role branch may bypass it. Workspace admins may change only their workspace-scoped business settings; workspace lifecycle and platform configuration remain platform-controlled.
 
 1. New business writes must require a concrete tenant via `TenantScope.requireTenant`; `__global__` is never a missing-tenant fallback. Unassigned non-platform users must be stopped at sign-in with an actionable message, not silently provisioned into a shared workspace.
 
@@ -135,13 +155,7 @@ Seller:
   only (zero-cost tier). Company logos are stored as base64 in Firestore.
   Product images use external HTTP URLs. Do not introduce firebase_storage.
 
-1. **Device sessions are client-enforced under the current Spark architecture.**
-  Slot registration, expiry, pairing, and revocation provide device/seat
-  controls, but Firestore Rules cannot bind an ordinary Firebase Auth request
-  to an active device-session ID. Do not claim that revoking a session blocks
-  direct Firestore requests. App Check attests app/device integrity but does
-  not replace session authorization; server enforcement requires trusted claims
-  or another authenticated backend.
+1. Firebase Auth SDK owns credential and token lifecycle. Do not introduce custom device/session enrollment or client-side session enforcement as an authorization boundary. Firestore Rules must continue to enforce active-user, role, tenant, and selected super-admin workspace scope on every business-data path.
 
 1. Any provider that reads admin-only data (e.g. `allTransactionsProvider`,
   `allInvoicesProvider`, `adminAllSellerInventoryProvider`) MUST be added to
@@ -314,20 +328,24 @@ git status --short
 git diff --stat HEAD
 ```
 
-## 8) Autonomous Agent Checklist
+## 8) Scope-Aware Verification and Release Checklist
 
-**NON-BYPASSABLE. Every step is mandatory on every signoff. No exceptions.**
+Run checks that match the requested change. Emulator tests, analyzers, and
+local builds are separate from production deployment and publication. Never
+deploy, modify production data, build a release, install, commit, push, or tag
+unless the user explicitly authorizes that operation.
 
 ### Before writing code
 
 - Read AGENTS.md and CLAUDE.md
 - Validate role/rules/collection alignment
 
-### The 15-Step Mandatory Signoff Sequence
+### Release Sequence (Only When an End-to-End Release Is Authorized)
 
-Every session ending with code changes MUST complete ALL 15 steps in order
-and quote the required evidence for each. A session is NOT complete until
-every step has been executed and its evidence recorded in the response.
+Use these steps as a release checklist only when the user requests a release.
+For local-only implementation tasks, run relevant local tests and clearly list
+unperformed release/production operations. Emulator output is not proof of
+production deployment.
 
 #### Step 1 — Version bump + sync
 
@@ -403,6 +421,7 @@ firebase deploy --only hosting
 ```
 
 Evidence required: quote "Deploy complete!" from output.
+Run only when Hosting deployment is explicitly authorized.
 
 #### Step 9 — APK release build
 
@@ -419,8 +438,7 @@ firebase deploy --only firestore:rules,firestore:indexes
 ```
 
 Evidence required: quote "Deploy complete!" from output.
-This is ALWAYS required, not only when rules changed — it confirms the
-deployed state matches the local file state before commit/push.
+Run only when production Rules/indexes deployment is explicitly authorized.
 
 #### Step 11 — GitHub local audit
 
@@ -440,7 +458,8 @@ git add -A
 git commit -m "<type>: <summary> — v<version>"
 ```
 
-Evidence required: quote commit hash from output.
+Commit only when explicitly requested. Evidence required when performed: quote
+the commit hash from output.
 Commit message must follow: `type: summary` where type ∈
 {feat, fix, chore, style, refactor, test, docs, ci, release}.
 
@@ -450,14 +469,14 @@ Commit message must follow: `type: summary` where type ∈
 git push
 ```
 
-Evidence required: quote push output including branch name and commit hash.
+Push only when explicitly requested. A push to `main` triggers
+`.github/workflows/deploy-web.yml`; a version tag or manual release dispatch
+can trigger `.github/workflows/release.yml`, including production deployment.
 
-#### Step 14 — APK install to device (NON-BYPASSABLE if device connected)
+#### Step 14 — APK install to device (only when Android delivery is requested)
 
-> **HARD RULE:** Run `adb devices` after every release build. If ANY device is
-> listed (not just the header line), you MUST install the APK. Skipping this
-> step when a device is connected is a **blocked signoff** — the session is
-> considered incomplete regardless of all other evidence.
+Install only when Android delivery is in scope and explicitly authorized. If
+no APK was requested or built, do not run this step.
 
 ```powershell
 adb devices   # if any device listed below header, MUST proceed with install
@@ -469,7 +488,7 @@ Evidence required: quote `Success` from adb output, OR quote exact `adb devices`
 output showing only the header (`List of devices attached`) with no devices — in
 which case document as "No device connected — install skipped".
 
-#### Step 15 — Final verification
+#### Step 15 — Final verification (when applicable)
 
 - Verify admin and seller startup for `/` and `/inventory` after
   auth/router/provider/rules edits; no transient permission-denied UI acceptable
@@ -477,11 +496,12 @@ which case document as "No device connected — install skipped".
 - If bug resolution involved multiple candidate fixes, run band-aid-loop-reversal
   skill before committing
 
-### Bypass Consequences
+### Evidence and Scope
 
-Any signoff that skips or omits evidence for any step is an **incomplete
-session**. The next agent session MUST check `git log` to confirm which steps
-were completed, then run all missing steps before starting new work.
+Report exact output for checks actually run. State explicitly when production
+deployment, release builds, data migration, device installation, commit, or
+push were not authorized or performed. Do not call local-only work a deployed
+release or a complete production signoff.
 
 ## 9) Runtime Document Hierarchy
 
@@ -493,6 +513,39 @@ Conflict resolution order for instructions:
 4. Skill files under .claude/skills/
 
 ## 10) Current Audit Status
+
+2026-10-22 custom access purge, workspace CRUD, and Rules hardening — v3.9.81+707:
+
+- Firebase Auth remains the sole sign-in mechanism; app-managed device pairing and custom session approvals were removed. Tenant-scoped workspace CRUD and existing sorting remain.
+- Rules require active tenants, zero-balance shop creation without fabricated transaction summaries, and exact same-batch shop/balance links for standalone ledger entries. Invoice batches preserve their multi-row aggregate validation.
+- Rules Emulator: `107 passing (25s)`; `flutter analyze lib --no-pub`: `No issues found! (ran in 109.5s)`; `dart analyze test/`: `No issues found!`; Flutter tests: `00:58 +528: All tests passed!`.
+- Web `EXIT: 0`; Hosting and Rules/indexes deployment completed. Split APKs: 30.3/31.8/33.3 MB; ARM64 install on R5GL22RGT9V returned `Success`. No business-data migration was performed.
+- The global Problems view retains diagnostics for deleted files; diagnostics scoped to current modified Dart files report no errors. Details are in SESSION_LOG.md.
+
+2026-10-22 inactive-tenant and ledger creation Rules hardening — source version v3.9.80+706:
+
+- Firestore Rules now require an active tenant for ordinary admin/seller
+  business access, in addition to active user profiles. The selected
+  super-admin tenant restoration path remains separately available.
+- Shop creation rejects nonzero opening balances and seeded
+  last-transaction metadata. Standalone transaction creates require a linked
+  same-batch shop/balance update; seller invoice rows use the invoice/shop
+  aggregate validation path to avoid duplicate per-row balance evaluation.
+- Regression coverage reproduces tenant-active, opening-balance, orphan
+  ledger, and mismatched-ledger findings. Full Rules Emulator suite:
+  `107 passing (21s)`. Valid seller invoice batches initially exceeded the
+  Rules expression limit; role-aware short-circuiting and reduced duplicate
+  seller invoice checks resolved the failure, then the full suite passed.
+- Rules and tests remain local. Production Firestore Rules/indexes, Hosting,
+  and production data were not changed; no release build, commit, or push was
+  performed.
+
+2026-10-22 custom access removal and workspace CRUD verification — source version v3.9.80+706:
+
+- Removed custom device registration, pairing approval, session-slot policy, client renewal/enforcement, related UI/routes/models/services, Firestore subcollection Rules, and obsolete composite indexes. Firebase Auth, active-profile/role checks, tenant boundaries, super-admin selected-workspace TTL, and append-only support-access logs remain.
+- Workspace-admin route/shop/ledger Rules regressions cover tenant-scoped CRUD; shop creation and route-counter changes and ledger creation/balance updates are tested as atomic batches. Route/shop/transaction sort implementations were not rewritten. Standalone cash-in/cash-out corrections retain the mandated audited soft-delete and exact balance reversal; invoice-linked rows remain protected.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 17.3s)`; `dart analyze test/`: `No issues found!`; full Flutter suite: `00:56 +528: All tests passed!`; Firestore Rules Emulator: `103 passing`; Markdown lint completed with exit 0 and no output.
+- Focused test runner: 49 passed. App/rules/index source scan for custom access identifiers: no matches. Production Rules/Hosting were not deployed; no APK/web release was built, no production documents were deleted, and no commit/push was made.
 
 2026-10-18 workspace access and transaction integrity — v3.9.80+706:
 
