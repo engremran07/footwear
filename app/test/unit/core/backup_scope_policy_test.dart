@@ -34,6 +34,20 @@ void main() {
     });
   });
 
+  test('workspace archives allow every expanded collection they serialize', () {
+    expect(BackupScopePolicy.archiveCollectionsFor(UserRole.tenantAdmin), {
+      'routes',
+      'shops',
+      'products',
+      'product_variants',
+      'seller_inventory',
+      'inventory_transactions',
+      'transactions',
+      'invoices',
+      'settings',
+    });
+  });
+
   test('seller backups contain only assigned-route business records', () {
     expect(
       BackupScopePolicy.scopeFor(UserRole.seller),
@@ -49,50 +63,106 @@ void main() {
     });
   });
 
+  test(
+    'seller archives allow serialized route data without workspace records',
+    () {
+      expect(BackupScopePolicy.archiveCollectionsFor(UserRole.seller), {
+        'routes',
+        'shops',
+        'seller_inventory',
+        'inventory_transactions',
+        'transactions',
+        'invoices',
+      });
+      expect(
+        BackupScopePolicy.archiveCollectionsFor(UserRole.seller),
+        isNot(contains('products')),
+      );
+      expect(
+        BackupScopePolicy.archiveCollectionsFor(UserRole.seller),
+        isNot(contains('settings')),
+      );
+    },
+  );
+
   test('seller and legacy admin accounts cannot initiate backups', () {
     expect(BackupScopePolicy.scopeFor(UserRole.admin), BackupScope.disabled);
     expect(BackupScopePolicy.collectionsFor(UserRole.admin), isEmpty);
   });
 
-  test('seller restore accepts only own unlinked cash rows in current scope', () {
-    final document = <String, dynamic>{
-      '__id': 'tx-1',
-      'tenant_id': 'tenant-1',
-      'route_id': 'route-1',
-      'created_by': 'seller-1',
-      'shop_id': 'shop-1',
-      'type': 'cash_in',
-      'amount': 25,
-      'items': <Object>[],
-      'created_at': Timestamp.fromMillisecondsSinceEpoch(0),
-    };
+  test(
+    'seller restore accepts only own unlinked cash rows in current scope',
+    () {
+      final document = <String, dynamic>{
+        '__id': 'tx-1',
+        'tenant_id': 'tenant-1',
+        'route_id': 'route-1',
+        'created_by': 'seller-1',
+        'shop_id': 'shop-1',
+        'type': 'cash_in',
+        'amount': 25,
+        'items': <Object>[],
+        'created_at': Timestamp.fromMillisecondsSinceEpoch(0),
+      };
 
-    bool eligible([Map<String, dynamic>? override]) =>
+      bool eligible([Map<String, dynamic>? override]) =>
+          BackupScopePolicy.isSellerTransactionRestorable(
+            document: {...document, ...?override},
+            sellerId: 'seller-1',
+            routeId: 'route-1',
+            tenantId: 'tenant-1',
+            assignedRouteIds: {'route-1'},
+          );
+
+      expect(eligible(), isTrue);
+      expect(eligible({'created_by': 'seller-2'}), isFalse);
+      expect(eligible({'route_id': 'route-2'}), isFalse);
+      expect(eligible({'tenant_id': 'tenant-2'}), isFalse);
+      expect(eligible({'invoice_id': 'invoice-1'}), isFalse);
+      expect(eligible({'invoice_number': 'INV-1'}), isFalse);
+      expect(eligible({'deleted': true}), isFalse);
+      expect(eligible({'edit_request_pending': true}), isFalse);
+      expect(
+        eligible({
+          'items': <Object>[
+            {'variant_id': 'variant-1'},
+          ],
+        }),
+        isFalse,
+      );
+      expect(eligible({'amount': double.nan}), isFalse);
+      expect(
         BackupScopePolicy.isSellerTransactionRestorable(
-          document: {...document, ...?override},
+          document: {...document, '__id': ''},
           sellerId: 'seller-1',
           routeId: 'route-1',
           tenantId: 'tenant-1',
           assignedRouteIds: {'route-1'},
-        );
+        ),
+        isFalse,
+      );
+    },
+  );
 
-    expect(eligible(), isTrue);
-    expect(eligible({'created_by': 'seller-2'}), isFalse);
-    expect(eligible({'route_id': 'route-2'}), isFalse);
-    expect(eligible({'tenant_id': 'tenant-2'}), isFalse);
-    expect(eligible({'invoice_id': 'invoice-1'}), isFalse);
-    expect(eligible({'invoice_number': 'INV-1'}), isFalse);
-    expect(eligible({'deleted': true}), isFalse);
-    expect(eligible({'edit_request_pending': true}), isFalse);
-    expect(eligible({'items': <Object>[{'variant_id': 'variant-1'}]}), isFalse);
-    expect(eligible({'amount': double.nan}), isFalse);
+  test('seller archives reject inventory records owned by another seller', () {
     expect(
-      BackupScopePolicy.isSellerTransactionRestorable(
-        document: {...document, '__id': ''},
+      BackupScopePolicy.isSellerOwnedArchiveRecord(
+        document: {'seller_id': 'seller-1'},
         sellerId: 'seller-1',
-        routeId: 'route-1',
-        tenantId: 'tenant-1',
-        assignedRouteIds: {'route-1'},
+      ),
+      isTrue,
+    );
+    expect(
+      BackupScopePolicy.isSellerOwnedArchiveRecord(
+        document: {'seller_id': 'seller-2'},
+        sellerId: 'seller-1',
+      ),
+      isFalse,
+    );
+    expect(
+      BackupScopePolicy.isSellerOwnedArchiveRecord(
+        document: const {},
+        sellerId: ' ',
       ),
       isFalse,
     );

@@ -22,7 +22,6 @@ final settingsProvider = StreamProvider<SettingsModel>((ref) {
     return Stream.value(
       SettingsModel(
         tenantId: settingsDocId,
-        companyName: 'My Business',
         currency: 'SAR',
         pairsPerCarton: 12,
         requireAdminApprovalForSellerTransactionEdits: false,
@@ -40,7 +39,6 @@ final settingsProvider = StreamProvider<SettingsModel>((ref) {
         if (data == null) {
           return SettingsModel(
             tenantId: settingsDocId,
-            companyName: 'My Business',
             currency: 'SAR',
             pairsPerCarton: 12,
             requireAdminApprovalForSellerTransactionEdits: false,
@@ -93,11 +91,20 @@ class SettingsNotifier extends AsyncNotifier<void> {
     }
     final currentUser = await ref.read(authUserProvider.future);
     final tenantId = TenantScope.requireTenant(currentUser?.tenantId);
+    final payload = Map<String, dynamic>.from(data);
+    final currentSettings = ref.read(settingsProvider).value;
+    if (currentSettings != null) {
+      payload.putIfAbsent(
+        'invoice_header',
+        () => currentSettings.invoiceHeader.toJson(),
+      );
+      payload['company_name'] = FieldValue.delete();
+    }
     await FirebaseFirestore.instance
         .collection(Collections.settings)
         .doc(tenantId)
         .set({
-          ...data,
+          ...payload,
           'tenant_id': tenantId,
           'updated_at': Timestamp.now(),
         }, SetOptions(merge: true));

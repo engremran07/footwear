@@ -366,6 +366,28 @@ class DatabaseBackupNotifier extends Notifier<void> {
     String? tenantScopeId,
   ) async {
     final result = <Map<String, dynamic>>[];
+    if (path == Collections.settings) {
+      final settingsId = TenantScope.requireTenant(tenantScopeId);
+      final settings = await _db
+          .collection(Collections.settings)
+          .doc(settingsId)
+          .get();
+      final settingsData = settings.data();
+      if (!settings.exists || settingsData == null) return result;
+      final storedTenantId = TenantScope.normalize(
+        settingsData['tenant_id'] as String?,
+      );
+      if (storedTenantId != null && storedTenantId != settingsId) {
+        throw StateError('Workspace settings are outside the backup scope');
+      }
+      return [
+        {
+          '__id': settings.id,
+          ..._sanitize(settingsData) as Map<String, dynamic>,
+        },
+      ];
+    }
+
     final queries = <Query<Map<String, dynamic>>>[];
     final baseQuery = TenantScope.applyToQuery(
       _db.collection(path),
@@ -968,7 +990,9 @@ class DatabaseBackupNotifier extends Notifier<void> {
     }
 
     if (user.isSeller && preview.scope == 'seller_route') {
-      const allowedSellerCollections = BackupScopePolicy.sellerRouteCollections;
+      final allowedSellerCollections = BackupScopePolicy.archiveCollectionsFor(
+        user.role,
+      );
       if (preview.createdByUid != user.id ||
           preview.rawData.keys.any(
             (key) => !allowedSellerCollections.contains(key),
@@ -1025,6 +1049,14 @@ class DatabaseBackupNotifier extends Notifier<void> {
               throw StateError('Seller backup route is no longer assigned');
             }
           }
+          if ((entry.key == 'seller_inventory' ||
+                  entry.key == 'inventory_transactions') &&
+              !BackupScopePolicy.isSellerOwnedArchiveRecord(
+                document: document,
+                sellerId: user.id,
+              )) {
+            throw StateError("Seller backup contains another seller's data");
+          }
         }
       }
 
@@ -1064,8 +1096,9 @@ class DatabaseBackupNotifier extends Notifier<void> {
         'Workspace data restore is not permitted for this backup',
       );
     }
-    const allowedWorkspaceCollections =
-        BackupScopePolicy.workspaceBusinessCollections;
+    final allowedWorkspaceCollections = BackupScopePolicy.archiveCollectionsFor(
+      user.role,
+    );
     if (preview.rawData.keys.any(
       (key) => !allowedWorkspaceCollections.contains(key),
     )) {
@@ -1093,12 +1126,12 @@ class DatabaseBackupNotifier extends Notifier<void> {
       'routes': Collections.routes,
       'shops': Collections.shops,
       'products': Collections.products,
-      'product_variants': Collections.productVariants,
-      'seller_inventory': Collections.sellerInventory,
-      'inventory_transactions': Collections.inventoryTransactions,
       'transactions': Collections.transactions,
       'invoices': Collections.invoices,
       'settings': Collections.settings,
+      'product_variants': Collections.productVariants,
+      'seller_inventory': Collections.sellerInventory,
+      'inventory_transactions': Collections.inventoryTransactions,
     };
 
     var totalRestored = 0;

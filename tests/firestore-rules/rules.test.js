@@ -666,6 +666,144 @@ describe('settings collection', () => {
       adminCtx(testEnv).firestore().collection('settings').doc('tenant-1').get(),
     );
   });
+
+  it('workspace backup reads settings by the tenant document ID', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedSettings({ company_name: 'Workspace One' });
+    const db = tenantAdminCtx(testEnv).firestore();
+
+    await assertFails(
+      db.collection('settings').where('tenant_id', '==', 'tenant-1').get(),
+    );
+    const settings = await assertSucceeds(
+      db.collection('settings').doc('tenant-1').get(),
+    );
+    assert.strictEqual(settings.data().company_name, 'Workspace One');
+  });
+});
+
+describe('backup read scopes', () => {
+  it('workspace admin can query every tenant-owned backup collection', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedSettings();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const collection of [
+        'routes',
+        'customers',
+        'products',
+        'product_variants',
+        'seller_inventory',
+        'inventory_transactions',
+        'transactions',
+        'invoices',
+      ]) {
+        await db.collection(collection).doc(`backup-${collection}`).set({
+          tenant_id: 'tenant-1',
+          route_id: 'route-1',
+          seller_id: 'tenant-admin-uid',
+        });
+      }
+    });
+
+    const db = tenantAdminCtx(testEnv).firestore();
+    for (const collection of [
+      'routes',
+      'customers',
+      'products',
+      'product_variants',
+      'seller_inventory',
+      'inventory_transactions',
+      'transactions',
+      'invoices',
+    ]) {
+      await assertSucceeds(
+        db.collection(collection)
+          .where('tenant_id', '==', 'tenant-1')
+          .orderBy(firebase.firestore.FieldPath.documentId())
+          .limit(500)
+          .get(),
+      );
+    }
+  });
+
+  it('seller can query only assigned-route backup data', async () => {
+    await seedUser('seller-uid', 'seller');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.collection('routes').doc('route-1').set({
+        tenant_id: 'tenant-1',
+        assigned_seller_ids: ['seller-uid'],
+      });
+      await db.collection('routes').doc('route-2').set({
+        tenant_id: 'tenant-1',
+        assigned_seller_ids: ['other-seller'],
+      });
+      for (const collection of ['customers', 'transactions', 'invoices']) {
+        await db.collection(collection).doc(`backup-${collection}`).set({
+          tenant_id: 'tenant-1',
+          route_id: 'route-1',
+        });
+        await db.collection(collection).doc(`foreign-${collection}`).set({
+          tenant_id: 'tenant-1',
+          route_id: 'route-2',
+        });
+      }
+      for (const collection of ['seller_inventory', 'inventory_transactions']) {
+        await db.collection(collection).doc(`backup-${collection}`).set({
+          tenant_id: 'tenant-1',
+          seller_id: 'seller-uid',
+        });
+        await db.collection(collection).doc(`foreign-${collection}`).set({
+          tenant_id: 'tenant-1',
+          seller_id: 'other-seller',
+        });
+      }
+    });
+
+    const db = sellerCtx(testEnv).firestore();
+    await assertSucceeds(
+      db.collection('routes')
+        .where('tenant_id', '==', 'tenant-1')
+        .where('assigned_seller_ids', 'array-contains', 'seller-uid')
+        .orderBy(firebase.firestore.FieldPath.documentId())
+        .limit(500)
+        .get(),
+    );
+    for (const collection of ['customers', 'transactions', 'invoices']) {
+      await assertSucceeds(
+        db.collection(collection)
+          .where('tenant_id', '==', 'tenant-1')
+          .where('route_id', 'in', ['route-1'])
+          .orderBy(firebase.firestore.FieldPath.documentId())
+          .limit(500)
+          .get(),
+      );
+      await assertFails(
+        db.collection(collection)
+          .where('tenant_id', '==', 'tenant-1')
+          .where('route_id', 'in', ['route-2'])
+          .get(),
+      );
+    }
+    for (const collection of ['seller_inventory', 'inventory_transactions']) {
+      await assertSucceeds(
+        db.collection(collection)
+          .where('tenant_id', '==', 'tenant-1')
+          .where('seller_id', '==', 'seller-uid')
+          .orderBy(firebase.firestore.FieldPath.documentId())
+          .limit(500)
+          .get(),
+      );
+      await assertFails(
+        db.collection(collection)
+          .where('tenant_id', '==', 'tenant-1')
+          .where('seller_id', '==', 'other-seller')
+          .get(),
+      );
+    }
+  });
+
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

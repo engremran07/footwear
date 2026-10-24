@@ -210,6 +210,33 @@ void main() {
       expect(json['deleted_at'], ts);
       expect(json['deleted_by'], 'admin1');
     });
+
+    test('preserves invoice-void audit metadata when round-tripping', () {
+      final original = TransactionModel.fromJson({
+        'shop_id': 's1',
+        'shop_name': 'Shop A',
+        'route_id': 'r1',
+        'type': 'cash_in',
+        'amount': 5000.0,
+        'created_by': 'u1',
+        'created_at': ts,
+        'voided': true,
+        'voided_at': ts,
+        'voided_by': 'admin1',
+        'voided_invoice_id': 'invoice-1',
+      }, 'voided-transaction');
+
+      final restored = TransactionModel.fromJson(
+        original.toJson(),
+        original.id,
+      );
+      expect(restored.voided, isTrue);
+      expect(restored.voidedAt, ts);
+      expect(restored.voidedBy, 'admin1');
+      expect(restored.voidedInvoiceId, 'invoice-1');
+      expect(restored.copyWith(voided: false).voided, isFalse);
+      expect(restored.isVisibleInCustomerLedger, isFalse);
+    });
   });
 
   group('TransactionModel constants', () {

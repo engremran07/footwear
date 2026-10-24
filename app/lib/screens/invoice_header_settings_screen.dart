@@ -12,6 +12,7 @@ import '../models/settings_model.dart';
 import '../models/transaction_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
+import '../widgets/app_pull_refresh.dart';
 import '../widgets/error_state.dart';
 
 class InvoiceHeaderSettingsScreen extends ConsumerStatefulWidget {
@@ -53,11 +54,13 @@ class _InvoiceHeaderSettingsScreenState
   late final Map<String, TextEditingController> _controllers = {
     for (final key in _fieldKeys.keys) key: TextEditingController(),
   };
-  bool _loaded = false;
+  bool _isDirty = false;
   bool _saving = false;
   bool _allowNonStockInvoices = false;
   String _template = 'classic';
+  String _titleScale = 'normal';
   String _accentColor = _accentColors.first;
+  bool _useLatestHeaderOnReprint = false;
   Set<String> _visibleFields = const {
     'logo',
     'phone',
@@ -75,7 +78,7 @@ class _InvoiceHeaderSettingsScreenState
   }
 
   void _load(SettingsModel settings) {
-    if (_loaded) return;
+    if (_isDirty) return;
     final header = settings.invoiceHeader;
     final values = <String, String>{
       'name_en': header.nameEn,
@@ -100,11 +103,16 @@ class _InvoiceHeaderSettingsScreenState
     }
     _allowNonStockInvoices = settings.allowNonStockInvoices;
     _template = header.template;
+    _titleScale = header.titleScale;
+    _useLatestHeaderOnReprint = header.useLatestHeaderOnReprint;
     _accentColor = _accentColors.contains(header.accentColor)
         ? header.accentColor
         : _accentColors.first;
     _visibleFields = header.visibleFields;
-    _loaded = true;
+  }
+
+  void _markDirty() {
+    if (!_isDirty) setState(() => _isDirty = true);
   }
 
   InvoiceHeaderConfig _config() => InvoiceHeaderConfig(
@@ -124,22 +132,25 @@ class _InvoiceHeaderSettingsScreenState
         _controllers['commercial_registration_number']!.text.trim(),
     template: _template,
     accentColor: _accentColor,
+    titleScale: _titleScale,
+    useLatestHeaderOnReprint: _useLatestHeaderOnReprint,
     visibleFields: _visibleFields,
   );
 
-  Future<void> _save(SettingsModel currentSettings) async {
+  Future<void> _save() async {
     if (_saving) return;
     setState(() => _saving = true);
     try {
       final config = _config();
       await ref.read(settingsNotifierProvider.notifier).save({
-        'company_name': config.nameEn.isEmpty
-            ? currentSettings.companyName
-            : config.nameEn,
         'allow_non_stock_invoices': _allowNonStockInvoices,
         'invoice_header': config.toJson(),
       });
       if (mounted) {
+        setState(() {
+          _isDirty = false;
+        });
+        ref.invalidate(settingsProvider);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
@@ -162,7 +173,6 @@ class _InvoiceHeaderSettingsScreenState
         : config.nameEn;
     final headerSnapshot = <String, dynamic>{
       ...config.toJson(),
-      'company_name': companyName,
       if (settings.logoBase64 != null) 'logo_base64': settings.logoBase64,
     };
     final now = Timestamp.now();
@@ -244,6 +254,7 @@ class _InvoiceHeaderSettingsScreenState
           labelText: tr(_fieldKeys[field]!, ref),
           counterText: '',
         ),
+        onChanged: (_) => _markDirty(),
       ),
     );
   }
@@ -280,117 +291,171 @@ class _InvoiceHeaderSettingsScreenState
         ),
         data: (settings) {
           _load(settings);
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                value: _allowNonStockInvoices,
-                title: Text(tr('allow_non_stock_invoices', ref)),
-                subtitle: Text(tr('allow_non_stock_invoices_hint', ref)),
-                onChanged: (value) =>
-                    setState(() => _allowNonStockInvoices = value),
-              ),
-              _sectionTitle('invoice_header_english'),
-              _textField('name_en'),
-              _textField('subtitle_en'),
-              _textField('address_en', maxLines: 2),
-              _sectionTitle('invoice_header_arabic'),
-              _textField('name_ar', rtl: true),
-              _textField('subtitle_ar', rtl: true),
-              _textField('address_ar', rtl: true, maxLines: 2),
-              _sectionTitle('invoice_header_urdu'),
-              _textField('name_ur', rtl: true),
-              _textField('subtitle_ur', rtl: true),
-              _textField('address_ur', rtl: true, maxLines: 2),
-              _sectionTitle('invoice_header_contact'),
-              _textField('phone'),
-              _textField('email'),
-              _textField('tax_number'),
-              _textField('commercial_registration_number'),
-              _sectionTitle('invoice_header_template'),
-              DropdownButtonFormField<String>(
-                initialValue: _template,
-                decoration: InputDecoration(
-                  labelText: tr('invoice_header_template', ref),
+          return AppPullRefresh(
+            onRefresh: () async {
+              ref.invalidate(settingsProvider);
+              await ref.read(settingsProvider.future);
+            },
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              children: [
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: _allowNonStockInvoices,
+                  title: Text(tr('allow_non_stock_invoices', ref)),
+                  subtitle: Text(tr('allow_non_stock_invoices_hint', ref)),
+                  onChanged: (value) => setState(() {
+                    _allowNonStockInvoices = value;
+                    _isDirty = true;
+                  }),
                 ),
-                items: [
-                  for (final template in ['classic', 'compact', 'centered'])
-                    DropdownMenuItem(
-                      value: template,
-                      child: Text(tr('invoice_template_$template', ref)),
-                    ),
-                ],
-                onChanged: (value) {
-                  if (value != null) setState(() => _template = value);
-                },
-              ),
-              _sectionTitle('invoice_header_accent'),
-              Wrap(
-                spacing: 12,
-                children: [
-                  for (final color in _accentColors)
-                    Semantics(
-                      label: color,
-                      selected: _accentColor == color,
-                      child: InkWell(
-                        onTap: () => setState(() => _accentColor = color),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: CircleAvatar(
-                            radius: 16,
-                            backgroundColor: Color(
-                              int.parse(color.substring(1), radix: 16) |
-                                  0xFF000000,
+                _sectionTitle('invoice_header_english'),
+                _textField('name_en'),
+                _textField('subtitle_en'),
+                _textField('address_en', maxLines: 2),
+                _sectionTitle('invoice_header_arabic'),
+                _textField('name_ar', rtl: true),
+                _textField('subtitle_ar', rtl: true),
+                _textField('address_ar', rtl: true, maxLines: 2),
+                _sectionTitle('invoice_header_urdu'),
+                _textField('name_ur', rtl: true),
+                _textField('subtitle_ur', rtl: true),
+                _textField('address_ur', rtl: true, maxLines: 2),
+                _sectionTitle('invoice_header_contact'),
+                _textField('phone'),
+                _textField('email'),
+                _textField('tax_number'),
+                _textField('commercial_registration_number'),
+                _sectionTitle('invoice_header_template'),
+                DropdownButtonFormField<String>(
+                  initialValue: _template,
+                  decoration: InputDecoration(
+                    labelText: tr('invoice_header_template', ref),
+                  ),
+                  items: [
+                    for (final template in ['classic', 'compact', 'centered'])
+                      DropdownMenuItem(
+                        value: template,
+                        child: Text(tr('invoice_template_$template', ref)),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _template = value;
+                        _isDirty = true;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _titleScale,
+                  decoration: InputDecoration(
+                    labelText: tr('invoice_header_title_scale', ref),
+                  ),
+                  items: [
+                    for (final scale in ['small', 'normal', 'large'])
+                      DropdownMenuItem(
+                        value: scale,
+                        child: Text(
+                          tr('invoice_header_title_scale_$scale', ref),
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _titleScale = value;
+                        _isDirty = true;
+                      });
+                    }
+                  },
+                ),
+                _sectionTitle('invoice_header_accent'),
+                Wrap(
+                  spacing: 12,
+                  children: [
+                    for (final color in _accentColors)
+                      Semantics(
+                        label: color,
+                        selected: _accentColor == color,
+                        child: InkWell(
+                          onTap: () => setState(() {
+                            _accentColor = color;
+                            _isDirty = true;
+                          }),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: CircleAvatar(
+                              radius: 16,
+                              backgroundColor: Color(
+                                int.parse(color.substring(1), radix: 16) |
+                                    0xFF000000,
+                              ),
+                              child: _accentColor == color
+                                  ? const Icon(
+                                      Icons.check,
+                                      size: 16,
+                                      color: Colors.white,
+                                    )
+                                  : null,
                             ),
-                            child: _accentColor == color
-                                ? const Icon(
-                                    Icons.check,
-                                    size: 16,
-                                    color: Colors.white,
-                                  )
-                                : null,
                           ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-              _sectionTitle('invoice_header_visible_fields'),
-              for (final entry in _visibilityKeys.entries)
-                CheckboxListTile.adaptive(
+                  ],
+                ),
+                _sectionTitle('invoice_header_visible_fields'),
+                for (final entry in _visibilityKeys.entries)
+                  CheckboxListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    value: _visibleFields.contains(entry.key),
+                    title: Text(tr(entry.value, ref)),
+                    onChanged: (value) => setState(() {
+                      _visibleFields = {..._visibleFields};
+                      if (value == true) {
+                        _visibleFields.add(entry.key);
+                      } else {
+                        _visibleFields.remove(entry.key);
+                      }
+                      _isDirty = true;
+                    }),
+                  ),
+                SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
-                  value: _visibleFields.contains(entry.key),
-                  title: Text(tr(entry.value, ref)),
+                  value: _useLatestHeaderOnReprint,
+                  title: Text(tr('invoice_use_latest_header_on_reprint', ref)),
+                  subtitle: Text(
+                    tr('invoice_use_latest_header_on_reprint_hint', ref),
+                  ),
                   onChanged: (value) => setState(() {
-                    _visibleFields = {..._visibleFields};
-                    if (value == true) {
-                      _visibleFields.add(entry.key);
-                    } else {
-                      _visibleFields.remove(entry.key);
-                    }
+                    _useLatestHeaderOnReprint = value;
+                    _isDirty = true;
                   }),
                 ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () => _preview(settings),
-                icon: const Icon(Icons.picture_as_pdf_outlined),
-                label: Text(tr('invoice_header_preview', ref)),
-              ),
-              const SizedBox(height: 8),
-              FilledButton.icon(
-                onPressed: _saving ? null : () => _save(settings),
-                icon: _saving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save_outlined),
-                label: Text(tr('save', ref)),
-              ),
-            ],
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _preview(settings),
+                  icon: const Icon(Icons.picture_as_pdf_outlined),
+                  label: Text(tr('invoice_header_preview', ref)),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: Text(tr('save', ref)),
+                ),
+              ],
+            ),
           );
         },
       ),

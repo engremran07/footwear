@@ -816,6 +816,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
           locale: locale,
           currency: acctCurrency,
           logoBytes: settings.logoBytes,
+          header: settings.invoiceHeader,
         ),
       );
     } catch (e) {
@@ -1080,6 +1081,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
             locale: locale,
             logoBytes: settings.logoBytes,
             companyName: settings.companyName,
+            header: settings.invoiceHeader,
           );
         },
       );

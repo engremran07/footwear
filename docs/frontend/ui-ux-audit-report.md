@@ -17,6 +17,15 @@ The existing Arctic blue/navy design system was retained. The changes use
 existing `AppTokens`, `AppAnimations`, localization, and shared widgets rather
 than introducing a second theme, navigation package, or component dependency.
 
+The 2026-10-24 operational UX follow-up addresses stale settings forms,
+currency-mixed shop summaries, missing invoice Pending filtering, shop-detail
+space use, and receipt/statement presentation. It keeps Firestore snapshot
+listeners as the real-time mechanism and adds explicit pull refresh to the
+data-backed shop, invoice, ledger, and settings surfaces. Invoice voiding also
+captures tenant-scoped linked settlement rows—including legacy rows absent
+from invoice references—so customer statements omit all voided invoice
+activity without losing valid credit-balance payments.
+
 ## Implementation
 
 - Added `AppTokens.minTouchTarget` (48 logical pixels) and applied it to the
@@ -244,3 +253,42 @@ listed in the register rather than being inferred from source or widget tests.
 
 No production-data operation, device install, authenticated business-screen
 visual review, or profile-mode performance review was performed.
+
+## Unreleased operational refresh and void-integrity verification
+
+The invoice-void regression covers retained customer credit, cash-refund
+exclusion, sale-debit rejection, and cross-invoice link rejection. The focused
+suite reported `00:00 +22: All tests passed!`; the full Flutter suite reported
+`01:08 +599: All tests passed!`. `flutter analyze lib --no-pub` reported
+`No issues found! (ran in 7.1s)` and `dart analyze test/` reported
+`No issues found!`.
+
+Rules and indexes were unchanged. No rules deployment, release build, Hosting
+deployment, APK install, commit, or push was performed. Authenticated web/APK
+cross-device data freshness, device rendering, and role-based visual
+acceptance remain unverified.
+
+## v3.9.84+710 backup and release verification (2026-10-24)
+
+The backup permission regression was traced to the settings list query: Rules
+authorize a workspace's known settings document ID, not a `tenant_id` query.
+The provider now reads that path directly. Role-specific archive validation
+uses the serialized collection names, and seller archives reject inventory
+records attributed to another seller. No Rules or index source changes were
+needed; tenant and selected-workspace boundaries remain unchanged.
+
+- Backup role tests: `00:07 +16: All tests passed!`.
+- Full Flutter suite: `01:15 +603: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 83.9s)`;
+  `dart analyze test/`: `No issues found!`.
+- Firestore Rules Emulator: `132 passing (48s)`.
+- Firestore Rules/index deployment to `shoeserp-clean-20260327`:
+  `Deploy complete!`; existing remote indexes and field overrides absent
+  locally were preserved.
+- Synchronized version: `3.9.84+710`. Split APKs built: ARMv7 30.4 MB,
+  ARM64 32.0 MB, x86_64 33.4 MB. The ARM64 APK was copied to the connected
+  phone and installed with `Success`; device reports versionName `3.9.84`,
+  versionCode `3101110`.
+- No web build or Hosting deployment was performed. Git publication is
+  pending because a push to `main` automatically triggers Hosting; no
+  authenticated cross-device business-data verification was performed.

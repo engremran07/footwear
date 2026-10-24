@@ -45,6 +45,72 @@ double _visibleLedgerImpactAfterVoid({
 // ── tests ────────────────────────────────────────────────────────────────────
 
 void main() {
+  group('voidInvoice — preserving customer credit', () {
+    test('preserves every linked cash payment for credit-balance voids', () {
+      expect(
+        shouldPreserveInvoicePaymentAsCustomerCredit(
+          invoiceId: 'invoice-1',
+          invoiceType: 'sale',
+          refundMode: VoidRefundMode.creditBalance,
+          transactionData: {
+            'invoice_id': 'invoice-1',
+            'type': 'cash_in',
+            'amount': 2000,
+          },
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not preserve payments when the invoice is cash-refunded', () {
+      expect(
+        shouldPreserveInvoicePaymentAsCustomerCredit(
+          invoiceId: 'invoice-1',
+          invoiceType: 'sale',
+          refundMode: VoidRefundMode.cashRefund,
+          transactionData: {
+            'invoice_id': 'invoice-1',
+            'type': 'cash_in',
+            'amount': 2000,
+          },
+        ),
+        isFalse,
+      );
+    });
+
+    test('does not preserve a sale debit as customer credit', () {
+      expect(
+        shouldPreserveInvoicePaymentAsCustomerCredit(
+          invoiceId: 'invoice-1',
+          invoiceType: 'sale',
+          refundMode: VoidRefundMode.creditBalance,
+          transactionData: {
+            'invoice_id': 'invoice-1',
+            'type': 'cash_out',
+            'amount': 5000,
+          },
+        ),
+        isFalse,
+      );
+    });
+
+    test('does not preserve a payment linked to another invoice', () {
+      expect(
+        shouldPreserveInvoicePaymentAsCustomerCredit(
+          invoiceId: 'invoice-1',
+          invoiceType: 'sale',
+          refundMode: VoidRefundMode.creditBalance,
+          transactionData: {
+            'invoice_id': 'invoice-2',
+            'type': 'cash_in',
+            'amount': 2000,
+          },
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('voidInvoice — creditBalance mode', () {
     // TEST-001
     test('reversalDelta equals -total for sale invoice', () {

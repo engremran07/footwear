@@ -62,10 +62,10 @@ void main() {
             (ref) => Stream.value(
               SettingsModel(
                 tenantId: 'tenant-1',
-                companyName: 'Workspace',
                 currency: 'SAR',
                 pairsPerCarton: 12,
                 allowNonStockInvoices: false,
+                invoiceHeader: const InvoiceHeaderConfig(nameEn: 'Workspace'),
                 updatedAt: now,
               ),
             ),

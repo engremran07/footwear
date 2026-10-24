@@ -8,6 +8,8 @@ The backup screen delegates persistence and authorization to `DatabaseBackupNoti
 
 Backups are scoped to the signed-in user's workspace and role. Tenant administrators merge records into their own workspace; only a platform administrator with an active support workspace may choose replacement and prune records in that selected workspace. Seller archives contain currently assigned-route data. Seller restore accepts only the seller's own eligible, unlinked cash-in/cash-out rows; each transaction and matching same-route shop-balance delta are written in one Firestore transaction. It never restores seller invoice, inventory, or another seller's ledger records. Restore previews and confirmation copy must describe the operation the selected role can actually perform.
 
+Workspace settings are fetched by `settings/{tenantId}` document ID rather than a tenant-field collection query, because Rules authorize the known tenant document path but cannot prove the broader query. Backup selection categories (such as `inventory`) are distinct from archive collection keys (`seller_inventory`, `inventory_transactions`, and `product_variants`); restore validates the concrete keys and each role's allowed scope before writing. Selected super-admins must have an active support workspace. Seller inventory records in an imported archive must belong to the signed-in seller.
+
 The restore preview shows one warning selected by the effective restore mode: merge keeps records absent from the archive, while replacement may prune within the selected support workspace. Restore re-authentication is owned by `AuthNotifier` and shared with destructive flush confirmation; backup restore uses backup-specific localized prompt text.
 
 App-private encrypted archives are listed through the shared restore picker and can be deleted after confirmation. Phone files use the system picker for save/import. Passphrases are required for encrypted backup creation and restore; creation asks for confirmation to catch entry mistakes. Archive checksum, workspace, creator, and current seller-route scope are validated before restore or Drive upload. Errors from preference, file-list, export, Drive, and restore operations are surfaced through the shared error mapper.
@@ -190,3 +192,42 @@ Invoice PDFs use the captured workspace branding snapshot, localized payment met
 Arabic and Urdu PDF text requires the `pdf` package's `use_arabic` compile-time option; its default enables bidirectional ordering without Arabic letter shaping. The shared font loader rejects PDF generation with a typed, localized configuration error when that option is absent, so PDF, print, share, and PNG flows cannot silently produce unshaped RTL text. All test, debug, web, and Android build commands pass `--dart-define=use_arabic=true`.
 
 PDFs embed Noto Sans Arabic for both Arabic and Urdu. Urdu output is Naskh-style rather than Nastaliq because the current PDF renderer does not support Nastaliq's complex OpenType shaping. The Flutter UI separately uses Noto Nastaliq Urdu. PNG pages are rasterized from the same PDF bytes; XLSX keeps Unicode text and RTL worksheet direction but relies on the spreadsheet app for font selection and shaping. Automated PDF tests check the embedded font name and Arabic/Urdu text across report builders; pixel-level verification in target browsers, PDF viewers, and printers remains a separate visual QA step.
+
+## Operational Refresh, Header Sync, and Void Visibility
+
+Workspace settings remain tenant-scoped Firestore snapshot streams. Invoice
+header and general settings forms now rehydrate from newer snapshots while
+their fields are clean, and keep local edits once the user changes a field.
+The invoice header is the canonical editable branding control; legacy
+`company_name` values are read for migration compatibility and are removed
+when settings are next saved. Data-backed shops, invoice lists, shop ledgers,
+and settings surfaces also expose pull-to-refresh without replacing the
+underlying real-time listeners.
+
+Shop analytics aggregate `cash_in`, `cash_out`, and outstanding balances by
+each shop's route currency, with full numeric values and horizontal scrolling
+instead of compact millions. The invoice Pending filter includes issued and
+partially paid sales with outstanding balance and excludes receipts, paid
+documents, and voids. Shop detail combines location and overdue age in one
+responsive row.
+
+Invoice voids retain append-only financial history: the invoice, shop balance,
+stock, linked transaction audit metadata, and reversal rows commit in one
+Firestore transaction. The provider also reads all invoice-linked transactions
+through a tenant-scoped, fully paged `invoice_id` query so settlement payments
+created by older versions are not missed. New settlement writes atomically add
+their transaction ID to the invoice for race-safe void handling. Customer-
+facing shop ledger streams and complete statement/report exports omit tagged
+voided originals and compensating reversals, while admin-wide transaction
+history remains available. Credit-balance void mode retains every valid
+cash-in payment as customer credit; cash-refund mode hides those payments.
+No hard deletion is introduced.
+
+Receipt PDFs use the configured workspace header and a prominent amount
+received panel with payment method/reference, before/after balance, receiver,
+and signature fields. Ledger summary labels now inherit the report locale's
+text direction; amounts remain explicitly LTR. Settings and PDF regressions
+are documented in `docs/frontend/screen-register.md`. The full Flutter suite
+reports `01:08 +599: All tests passed!`; the focused invoice-void suite reports
+`00:00 +22: All tests passed!`. Rendered APK/browser acceptance remains
+separate from these source and widget checks.

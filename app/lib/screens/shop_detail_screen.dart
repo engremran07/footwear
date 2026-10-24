@@ -26,6 +26,7 @@ import '../providers/shop_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/user_provider.dart';
 
+import '../widgets/app_pull_refresh.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
@@ -64,6 +65,15 @@ class ShopDetailScreen extends ConsumerStatefulWidget {
 
 class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   final ActionGuard _transactionGuard = ActionGuard();
+
+  Future<void> _refreshShopDetail() async {
+    final shopProvider = shopDetailProvider(widget.shopId);
+    final transactionsProvider = shopTransactionsProvider(widget.shopId);
+    ref.invalidate(shopProvider);
+    ref.invalidate(transactionsProvider);
+    await ref.read(shopProvider.future);
+    await ref.read(transactionsProvider.future);
+  }
 
   Future<void> _showEditTransactionDialog(TransactionModel tx) async {
     final UserModel? user;
@@ -768,6 +778,25 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
             ? AppTheme.debtBg(cs)
             : AppTheme.clearBg(cs);
         final currency = ref.watch(routeCurrencyProvider(shop.routeId));
+        final activeTransactions =
+            txAsync.value
+                ?.where((transaction) => !transaction.deleted)
+                .toList() ??
+            const <TransactionModel>[];
+        final daysOverdue = shop.balance > 0 && activeTransactions.isNotEmpty
+            ? DateTime.now()
+                  .difference(activeTransactions.last.createdAt.toDate())
+                  .inDays
+            : null;
+        final location =
+            [
+                  shop.area,
+                  shop.city,
+                  if (shop.category?.trim().isNotEmpty == true) shop.category,
+                ]
+                .whereType<String>()
+                .where((part) => part.trim().isNotEmpty)
+                .join(', ');
         final canManageShop =
             user?.isAdmin == true ||
             (user?.isSeller == true &&
@@ -968,6 +997,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                   locale: locale,
                                   currency: accountCurrency,
                                   logoBytes: settings.logoBytes,
+                                  header: settings.invoiceHeader,
                                 ),
                               );
                             } catch (e) {
@@ -1077,20 +1107,6 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               iconSize: 18,
                               onViewStatement: () =>
                                   context.push('/shops/${shop.id}'),
-                            ),
-                          ],
-                          if (shop.area != null ||
-                              shop.city != null ||
-                              shop.category?.trim().isNotEmpty == true) ...[
-                            const Spacer(),
-                            Text(
-                              [
-                                shop.area,
-                                shop.city,
-                                if (shop.category?.trim().isNotEmpty == true)
-                                  shop.category,
-                              ].whereType<String>().join(', '),
-                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ],
                         ],
@@ -1204,50 +1220,48 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           ),
                         ],
                       ),
-                      // Days overdue indicator
-                      if (shop.balance > 0)
-                        txAsync.whenOrNull(
-                              data: (txs) {
-                                final activeTxs = txs
-                                    .where((t) => !t.deleted)
-                                    .toList();
-                                if (activeTxs.isEmpty) {
-                                  return const SizedBox.shrink();
-                                }
-                                final oldest = activeTxs.last;
-                                final days = DateTime.now()
-                                    .difference(oldest.createdAt.toDate())
-                                    .inDays;
-                                final sev = days > 60
+                      if (location.isNotEmpty || daysOverdue != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            if (location.isNotEmpty)
+                              Expanded(
+                                child: Text(
+                                  location,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ),
+                            if (daysOverdue != null) ...[
+                              if (location.isNotEmpty) const SizedBox(width: 8),
+                              Icon(
+                                Icons.schedule,
+                                size: 14,
+                                color: daysOverdue > 60
                                     ? AppBrand.errorColor
-                                    : days > 30
+                                    : daysOverdue > 30
                                     ? AppBrand.warningColor
-                                    : cs.onSurfaceVariant;
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.schedule,
-                                        size: 14,
-                                        color: sev,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '$days ${tr('days_overdue', ref)}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: sev,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ) ??
-                            const SizedBox.shrink(),
+                                    : cs.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$daysOverdue ${tr('days_overdue', ref)}',
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: daysOverdue > 60
+                                      ? AppBrand.errorColor
+                                      : daysOverdue > 30
+                                      ? AppBrand.warningColor
+                                      : cs.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                       // Bad debt banner
                       if (shop.badDebt) ...[
                         const SizedBox(height: 12),
@@ -1384,9 +1398,20 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                   ),
                   data: (txs) {
                     if (txs.isEmpty) {
-                      return EmptyState(
-                        icon: Icons.receipt_long,
-                        message: tr('no_transactions', ref),
+                      return AppPullRefresh(
+                        onRefresh: _refreshShopDetail,
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.sizeOf(context).height * 0.4,
+                              child: EmptyState(
+                                icon: Icons.receipt_long,
+                                message: tr('no_transactions', ref),
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     }
                     final activeTxs = txs.where((t) => !t.deleted).toList();
@@ -1421,59 +1446,64 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                         _TxListItem(tx: tx, runningBalance: balanceMap[tx.id]),
                       );
                     }
-                    return ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      itemCount: items.length,
-                      itemBuilder: (_, i) {
-                        final item = items[i];
-                        if (item.monthHeader != null) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 6,
-                            ),
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                            child: Text(
-                              item.monthHeader!,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
+                    return AppPullRefresh(
+                      onRefresh: _refreshShopDetail,
+                      child: ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        itemCount: items.length,
+                        itemBuilder: (_, i) {
+                          final item = items[i];
+                          if (item.monthHeader != null) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 6,
                               ),
-                            ),
-                          );
-                        }
-                        final tx = item.tx!;
-                        return _TransactionTile(
-                          tx: tx,
-                          runningBalance: item.runningBalance,
-                          canEdit:
-                              !tx.deleted &&
-                              !tx.editRequestPending &&
-                              tx.isStandaloneCashTransaction &&
-                              (user?.isAdmin == true ||
-                                  (user?.isSeller == true &&
-                                      user?.id == tx.createdBy)),
-                          canApproveEdit:
-                              !tx.deleted &&
-                              user?.isAdmin == true &&
-                              tx.isStandaloneCashTransaction &&
-                              tx.editRequestPending,
-                          canDelete:
-                              !tx.deleted &&
-                              user?.isAdmin == true &&
-                              (tx.invoiceId == null || tx.invoiceId!.isEmpty) &&
-                              tx.isStandaloneCashTransaction,
-                          onEdit: () => _showEditTransactionDialog(tx),
-                          onApproveEdit: () => _reviewEditRequest(tx, true),
-                          onRejectEdit: () => _reviewEditRequest(tx, false),
-                          onDelete: () => _confirmDeleteTransaction(tx),
-                        ).listEntry(i);
-                      },
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
+                              child: Text(
+                                item.monthHeader!,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            );
+                          }
+                          final tx = item.tx!;
+                          return _TransactionTile(
+                            tx: tx,
+                            runningBalance: item.runningBalance,
+                            canEdit:
+                                !tx.deleted &&
+                                !tx.editRequestPending &&
+                                tx.isStandaloneCashTransaction &&
+                                (user?.isAdmin == true ||
+                                    (user?.isSeller == true &&
+                                        user?.id == tx.createdBy)),
+                            canApproveEdit:
+                                !tx.deleted &&
+                                user?.isAdmin == true &&
+                                tx.isStandaloneCashTransaction &&
+                                tx.editRequestPending,
+                            canDelete:
+                                !tx.deleted &&
+                                user?.isAdmin == true &&
+                                (tx.invoiceId == null ||
+                                    tx.invoiceId!.isEmpty) &&
+                                tx.isStandaloneCashTransaction,
+                            onEdit: () => _showEditTransactionDialog(tx),
+                            onApproveEdit: () => _reviewEditRequest(tx, true),
+                            onRejectEdit: () => _reviewEditRequest(tx, false),
+                            onDelete: () => _confirmDeleteTransaction(tx),
+                          ).listEntry(i);
+                        },
+                      ),
                     );
                   },
                 ),

@@ -73,6 +73,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView), const Offset(0, -700));
     await tester.pumpAndSettle();
+    final createBackup = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Save backup to phone storage'),
+    );
+    expect(createBackup.onPressed, isNotNull);
     expect(
       find.text(
         'Automatic Google Drive backup is unavailable until this build is configured.',
@@ -157,6 +161,69 @@ void main() {
       find.widgetWithText(OutlinedButton, 'Restore from phone storage'),
     );
     expect(restorePhone.onPressed, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('selected super-admin can use workspace backup controls', (
+    tester,
+  ) async {
+    final now = Timestamp.now();
+    final user = UserModel(
+      id: 'platform-admin-1',
+      email: 'admin@example.com',
+      displayName: 'Platform Admin',
+      role: UserRole.superAdmin,
+      activeWorkspaceId: 'tenant-1',
+      activeWorkspaceReason: 'Support backup verification',
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final tenant = TenantModel(
+      id: 'tenant-1',
+      name: 'Workspace One',
+      slug: 'workspace-one',
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(user)),
+          tenantProvider(tenant.id).overrideWith((ref) => Stream.value(tenant)),
+          databaseBackupProvider.overrideWith(() => backupNotifier),
+        ],
+        child: const MaterialApp(home: DatabaseBackupScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -700));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Save backup to phone storage'),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.widgetWithText(OutlinedButton, 'Restore from phone storage'),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      find.text(
+        'Only the selected workspace profile and its user profiles are included. Business records are excluded.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Routes'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

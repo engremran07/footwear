@@ -66,6 +66,45 @@ void main() {
     expect(find.text('300'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('pending filter includes issued and partial balances only', (
+    tester,
+  ) async {
+    final invoices = [
+      _invoice('issued', 100, 0, 100, InvoiceModel.statusIssued),
+      _invoice('partial', 100, 40, 60, InvoiceModel.statusPartial),
+      _invoice('paid', 100, 100, 0, InvoiceModel.statusPaid),
+      _invoice('void', 100, 0, 100, InvoiceModel.statusVoid),
+      _invoice(
+        'receipt',
+        100,
+        0,
+        100,
+        InvoiceModel.statusIssued,
+        type: InvoiceModel.typeCashReceipt,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(null)),
+          roleAwareInvoicesProvider.overrideWith((ref) => AsyncData(invoices)),
+        ],
+        child: const MaterialApp(home: InvoicesListScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Pending'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('INV-issued'), findsOneWidget);
+    expect(find.text('INV-partial'), findsOneWidget);
+    expect(find.text('INV-paid'), findsNothing);
+    expect(find.text('INV-void'), findsNothing);
+    expect(find.text('INV-receipt'), findsNothing);
+  });
 }
 
 InvoiceModel _invoice(
@@ -75,12 +114,13 @@ InvoiceModel _invoice(
   double outstanding,
   String status, {
   String currency = 'SAR',
+  String type = InvoiceModel.typeSale,
 }) {
   final now = Timestamp.now();
   return InvoiceModel(
     id: id,
     invoiceNumber: 'INV-$id',
-    type: InvoiceModel.typeSale,
+    type: type,
     shopId: 'shop-1',
     shopName: 'Shop',
     subtotal: total,

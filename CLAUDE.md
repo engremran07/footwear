@@ -403,6 +403,36 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- v3.9.84+710 backup hardening: tenant workspace settings are read
+  by their tenant document ID, avoiding the Rules-incompatible settings list
+  query; concrete archived collection keys are validated separately from
+  selectable categories. Seller archives retain assigned-route scope and
+  reject another seller's inventory records. Backup role tests:
+  `00:07 +16: All tests passed!`; full Flutter suite:
+  `01:15 +603: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 83.9s)`; `dart analyze test/`:
+  `No issues found!`; Rules Emulator: `132 passing (48s)`. Firestore
+  Rules/indexes deployed. Split APKs built (30.4/32.0/33.4 MB); ARM64
+  installed on `R5GL22RGT9V` (`Success`, versionCode `3101110`). Hosting and
+  Git publication remain pending because pushing to `main` triggers Hosting.
+- Unreleased 2026-10-24 operational refresh and financial presentation:
+  workspace settings/header forms follow real-time snapshots until locally
+  edited; pull refresh is available on shops, invoices, shop detail, and
+  settings. Shop totals remain full precision and are grouped by currency;
+  invoice Pending filters outstanding sale invoices. Invoice voids tag linked
+  ledger originals and reversals in the same transaction. A tenant-scoped
+  invoice-ID query also catches legacy settlement payments missing from older
+  invoice documents; new settlements append their transaction IDs atomically.
+  Credit-balance voids retain actual cash-in payments as customer credit,
+  while cash-refund voids hide them. Customer statements omit voided rows;
+  admin history retains them. Receipt PDFs emphasize received amounts and
+  include payment/balance/signature details; statement summary labels follow
+  Arabic/Urdu direction and workspace headers. Full Flutter suite:
+  `01:08 +599: All tests passed!`; focused invoice-void suite:
+  `00:00 +22: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 7.1s)`; `dart analyze test/`: `No issues found!`.
+  Cross-device authenticated acceptance, production deployment, and release
+  operations remain unperformed.
 - Unreleased 2026-10-24 reduced-motion hardening: all shared `AppAnimations`
   presets bypass nonessential effects when `MediaQuery.disableAnimations` is
   enabled. `PressableWidget` remains tappable and semantically actionable with

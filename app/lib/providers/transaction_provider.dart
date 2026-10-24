@@ -36,6 +36,9 @@ import 'auth_provider.dart';
 const _shopTransactionsLiveLimit = 150;
 const _shopsAnalyticsTransactionsLimit = 500;
 
+bool _isCustomerLedgerEntry(Map<String, dynamic> data) =>
+    data['deleted'] != true && data['voided'] != true;
+
 List<TransactionModel> sortTransactionsForExport(
   List<TransactionModel> transactions,
 ) {
@@ -70,7 +73,7 @@ final shopTransactionsProvider = StreamProvider.autoDispose
           .snapshots()
           .map(
             (snap) => snap.docs
-                .where((d) => d.data()['deleted'] != true)
+                .where((d) => _isCustomerLedgerEntry(d.data()))
                 .map((d) => TransactionModel.fromJson(d.data(), d.id))
                 .toList(),
           );
@@ -104,7 +107,7 @@ final shopTransactionsFallbackProvider = StreamProvider.autoDispose
           .map(
             (snap) =>
                 snap.docs
-                    .where((d) => d.data()['deleted'] != true)
+                    .where((d) => _isCustomerLedgerEntry(d.data()))
                     .map((d) => TransactionModel.fromJson(d.data(), d.id))
                     .toList()
                   ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
@@ -183,7 +186,7 @@ final shopsAnalyticsTransactionsProvider =
             .snapshots()
             .map(
               (snap) => snap.docs
-                  .where((d) => d.data()['deleted'] != true)
+                  .where((d) => _isCustomerLedgerEntry(d.data()))
                   .map((d) => TransactionModel.fromJson(d.data(), d.id))
                   .toList(),
             );
@@ -197,7 +200,7 @@ final shopsAnalyticsTransactionsProvider =
           .snapshots()
           .map(
             (snap) => snap.docs
-                .where((d) => d.data()['deleted'] != true)
+                .where((d) => _isCustomerLedgerEntry(d.data()))
                 .map((d) => TransactionModel.fromJson(d.data(), d.id))
                 .toList(),
           );
@@ -282,7 +285,7 @@ final shopTransactionsExportProvider =
       );
 
       final txs = docs
-          .where((d) => d.data()['deleted'] != true)
+          .where((d) => _isCustomerLedgerEntry(d.data()))
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList();
 
@@ -317,7 +320,7 @@ final routeTransactionsExportProvider =
             .orderBy('created_at', descending: true),
       );
       final txs = docs
-          .where((d) => d.data()['deleted'] != true)
+          .where((d) => _isCustomerLedgerEntry(d.data()))
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList();
       return sortTransactionsForExport(txs);
@@ -341,7 +344,7 @@ final allTransactionsExportProvider = FutureProvider<List<TransactionModel>>((
     query.orderBy('created_at', descending: true),
   );
   final txs = docs
-      .where((d) => d.data()['deleted'] != true)
+      .where((d) => _isCustomerLedgerEntry(d.data()))
       .map((d) => TransactionModel.fromJson(d.data(), d.id))
       .toList();
   return sortTransactionsForExport(txs);
@@ -375,7 +378,7 @@ final sellerTransactionsExportProvider =
             .orderBy('created_at', descending: true),
       );
       final txs = docs
-          .where((d) => d.data()['deleted'] != true)
+          .where((d) => _isCustomerLedgerEntry(d.data()))
           .map((d) => TransactionModel.fromJson(d.data(), d.id))
           .toList();
       return sortTransactionsForExport(txs);
@@ -615,24 +618,25 @@ class TransactionNotifier extends AsyncNotifier<void> {
     }
     final tenantId = TenantScope.requireTenant(user.tenantId);
     var restored = 0;
-    final eligibleDocuments = documents
-        .where(
-          (document) => BackupScopePolicy.isSellerTransactionRestorable(
-            document: document,
-            sellerId: user.id,
-            routeId: normalizedRouteId,
-            tenantId: tenantId,
-            assignedRouteIds: assignedRouteIds,
-          ),
-        )
-        .toList()
-      ..sort((a, b) {
-        final dateOrder = (a['created_at'] as Timestamp).compareTo(
-          b['created_at'] as Timestamp,
-        );
-        if (dateOrder != 0) return dateOrder;
-        return (a['__id'] as String).compareTo(b['__id'] as String);
-      });
+    final eligibleDocuments =
+        documents
+            .where(
+              (document) => BackupScopePolicy.isSellerTransactionRestorable(
+                document: document,
+                sellerId: user.id,
+                routeId: normalizedRouteId,
+                tenantId: tenantId,
+                assignedRouteIds: assignedRouteIds,
+              ),
+            )
+            .toList()
+          ..sort((a, b) {
+            final dateOrder = (a['created_at'] as Timestamp).compareTo(
+              b['created_at'] as Timestamp,
+            );
+            if (dateOrder != 0) return dateOrder;
+            return (a['__id'] as String).compareTo(b['__id'] as String);
+          });
 
     await _runWriteGuard(() async {
       final db = FirebaseFirestore.instance;

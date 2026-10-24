@@ -242,6 +242,8 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           currency: inv.currency,
           locale: locale,
           logoBytes: settings.logoBytes,
+          header: settings.invoiceHeader,
+          useLatestHeader: settings.invoiceHeader.useLatestHeaderOnReprint,
         );
       },
     );

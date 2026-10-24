@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/firestore_pagination.dart';
 import '../core/utils/notification_writer.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/invoice_model.dart';
@@ -23,7 +24,7 @@ import 'auth_provider.dart';
 //       └ atomic batch: credit_note invoice + return tx + balance decrease
 //                        + optional seller_inventory restore
 //   Void invoice            → voidInvoice() [admin only]
-//       └ atomic: marks invoice void, soft-deletes linked txs, reverses balance
+//       └ atomic: marks invoice void, hides linked txs, reverses balance
 //
 // PARAMETER NOTE:
 //   createSaleInvoice / createReturnInvoice use shopId/shopName as sole
@@ -86,6 +87,20 @@ VoidInvoiceAccountingPlan buildVoidInvoiceAccountingPlan({
     lastTransactionType: cashRefundAmount > 0 ? 'cash_out' : 'return',
     lastTransactionAmount: cashRefundAmount > 0 ? cashRefundAmount : total,
   );
+}
+
+bool shouldPreserveInvoicePaymentAsCustomerCredit({
+  required String invoiceId,
+  required String invoiceType,
+  required VoidRefundMode refundMode,
+  required Map<String, dynamic> transactionData,
+}) {
+  final amount = (transactionData['amount'] as num?)?.toDouble() ?? 0;
+  return invoiceType == InvoiceModel.typeSale &&
+      refundMode == VoidRefundMode.creditBalance &&
+      transactionData['invoice_id'] == invoiceId &&
+      transactionData['type'] == 'cash_in' &&
+      amount > 0;
 }
 
 /// Shop-scoped invoice query. Used in ShopDetailScreen invoice sections.
@@ -236,8 +251,15 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final header = Map<String, dynamic>.from(
       settings?['invoice_header'] as Map<String, dynamic>? ?? const {},
     );
-    header['company_name'] =
-        settings?['company_name'] as String? ?? 'My Business';
+    final hasLocalizedName = [
+      'name_en',
+      'name_ar',
+      'name_ur',
+    ].any((key) => (header[key] as String? ?? '').trim().isNotEmpty);
+    final legacyName = (settings?['company_name'] as String? ?? '').trim();
+    if (!hasLocalizedName && legacyName.isNotEmpty) {
+      header['name_en'] = legacyName;
+    }
     final logoBase64 = settings?['logo_base64'];
     if (logoBase64 is String && logoBase64.isNotEmpty) {
       header['logo_base64'] = logoBase64;
@@ -484,6 +506,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'total': total,
         'amount_received': amountReceived,
         if (paymentTxRef != null) 'payment_transaction_id': paymentTxRef.id,
+        'payment_transaction_ids': [if (paymentTxRef != null) paymentTxRef.id],
         'outstanding_amount': total - amountReceived,
         'currency': currency,
         'sale_type': saleType,
@@ -1084,11 +1107,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     return invoiceRef.id;
   }
 
-  /// Voids an invoice â€” admin only, reverses balance impact.
+  /// Voids an invoice — admin only, reversing its balance impact.
   ///
-  /// Original invoice-linked transactions remain visible for auditability.
-  /// We append explicit reversal entries so transaction-derived ledgers stay
-  /// aligned with `shop.balance` after a void.
+  /// Linked rows retain audit metadata but are excluded from customer-facing
+  /// ledgers. Admin history remains available, and the reversal keeps balances
+  /// aligned with `shop.balance`.
   Future<void> voidInvoice({
     required String invoiceId,
     required double total,
@@ -1114,6 +1137,15 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final invoiceRef = db.collection(Collections.invoices).doc(invoiceId);
     final now = Timestamp.now();
     final transactions = db.collection(Collections.transactions);
+
+    final transactionDocuments = await fetchAllQueryDocuments(
+      transactions
+          .where('tenant_id', isEqualTo: tenantId)
+          .where('invoice_id', isEqualTo: invoiceId),
+    );
+    final transactionIdsForInvoice = transactionDocuments
+        .map((document) => document.id)
+        .toSet();
 
     await db.runTransaction<void>((transaction) async {
       final invSnap = await transaction.get(invoiceRef);
@@ -1143,6 +1175,41 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       final routeId = data['route_id'] as String? ?? '';
       final shopId = (data['shop_id'] as String? ?? '').trim();
       final shopName = data['shop_name'] as String? ?? '';
+      final linkedTransactionRefs =
+          <String, DocumentReference<Map<String, dynamic>>>{};
+      for (final field in const [
+        'sale_transaction_id',
+        'payment_transaction_id',
+        'cash_receipt_transaction_id',
+        'return_transaction_id',
+      ]) {
+        final transactionId = (data[field] as String?)?.trim() ?? '';
+        if (transactionId.isNotEmpty) {
+          linkedTransactionRefs[transactionId] = transactions.doc(
+            transactionId,
+          );
+        }
+      }
+      final paymentTransactionIds = data['payment_transaction_ids'];
+      if (paymentTransactionIds is Iterable) {
+        for (final value in paymentTransactionIds) {
+          if (value is String && value.trim().isNotEmpty) {
+            linkedTransactionRefs[value.trim()] = transactions.doc(
+              value.trim(),
+            );
+          }
+        }
+      }
+      for (final transactionId in transactionIdsForInvoice) {
+        linkedTransactionRefs.putIfAbsent(
+          transactionId,
+          () => transactions.doc(transactionId),
+        );
+      }
+      final linkedTransactionEntries = linkedTransactionRefs.entries.toList();
+      final linkedTransactionSnapshots = await Future.wait(
+        linkedTransactionEntries.map((entry) => transaction.get(entry.value)),
+      );
       final rawItems = (data['items'] as List<dynamic>?) ?? const [];
       final rawDeductions =
           (data['seller_inventory_deductions'] as Map<String, dynamic>?) ??
@@ -1225,6 +1292,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         warehouseVariantData[entry.key] = snapshot.data()!;
       }
       DocumentReference<Map<String, dynamic>>? originalInvoiceRef;
+      double? updatedCreditNoteTotal;
       if (docType == InvoiceModel.typeCreditNote) {
         final linkedInvoiceId = (data['linked_invoice_id'] as String?)?.trim();
         if (linkedInvoiceId == null || linkedInvoiceId.isEmpty) {
@@ -1244,8 +1312,38 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             creditedTotal < docTotal) {
           throw StateError('Linked sale invoice is unavailable for reversal');
         }
+        updatedCreditNoteTotal = creditedTotal - docTotal;
+      }
+
+      for (var index = 0; index < linkedTransactionSnapshots.length; index++) {
+        final snapshot = linkedTransactionSnapshots[index];
+        final transactionData = snapshot.data();
+        final preservedCreditPayment =
+            transactionData != null &&
+            shouldPreserveInvoicePaymentAsCustomerCredit(
+              invoiceId: invoiceId,
+              invoiceType: docType,
+              refundMode: refundMode,
+              transactionData: transactionData,
+            );
+        if (!snapshot.exists ||
+            transactionData == null ||
+            transactionData['tenant_id'] != tenantId ||
+            transactionData['invoice_id'] != invoiceId ||
+            preservedCreditPayment) {
+          continue;
+        }
+        transaction.update(snapshot.reference, {
+          'voided': true,
+          'voided_invoice_id': invoiceId,
+          'voided_at': now,
+          'voided_by': currentUser.id,
+          'updated_at': now,
+        });
+      }
+      if (originalInvoiceRef != null && updatedCreditNoteTotal != null) {
         transaction.update(originalInvoiceRef, {
-          'credit_note_total': creditedTotal - docTotal,
+          'credit_note_total': updatedCreditNoteTotal,
           'updated_at': now,
         });
       }
@@ -1276,6 +1374,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'items': items,
         'invoice_id': invoiceId,
         'invoice_number': invoiceNumber,
+        'voided': true,
+        'voided_invoice_id': invoiceId,
+        'voided_at': now,
+        'voided_by': currentUser.id,
         'created_by': currentUser.id,
         'created_at': now,
         'deleted': false,
@@ -1483,6 +1585,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       }
       final now = Timestamp.now();
 
+      final payRef = outstanding > 0
+          ? db.collection(Collections.transactions).doc()
+          : null;
+
       // Update invoice: mark paid, zero outstanding
       txn.update(invRef, {
         'status': InvoiceModel.statusPaid,
@@ -1490,12 +1596,13 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           outstanding > 0 ? outstanding : 0,
         ),
         'outstanding_amount': 0,
+        if (payRef != null)
+          'payment_transaction_ids': FieldValue.arrayUnion([payRef.id]),
         'updated_at': now,
       });
 
       // Create cash_in transaction for the settled amount
-      if (outstanding > 0) {
-        final payRef = db.collection(Collections.transactions).doc();
+      if (payRef != null) {
         txn.set(payRef, {
           'tenant_id': tenantId,
           'shop_id': shopId,

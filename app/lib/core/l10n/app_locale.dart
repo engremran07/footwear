@@ -1127,6 +1127,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'balance_before': 'Balance Before',
     'balance_after': 'Balance After',
     'received_from': 'Received From',
+    'received_by': 'Received By',
+    'signature': 'Signature',
     'print_date': 'Printed',
     'tax_registration_number': 'Tax Registration Number',
     'commercial_registration_number': 'Commercial Registration Number',
@@ -1153,6 +1155,14 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'invoice_template_compact': 'Compact',
     'invoice_template_centered': 'Centered',
     'invoice_header_accent': 'Accent Color',
+    'invoice_header_title_scale': 'Header title size',
+    'invoice_header_title_scale_small': 'Small',
+    'invoice_header_title_scale_normal': 'Standard',
+    'invoice_header_title_scale_large': 'Large',
+    'invoice_use_latest_header_on_reprint':
+        'Use current header when reprinting',
+    'invoice_use_latest_header_on_reprint_hint':
+        'When off, issued documents keep their saved header.',
     'invoice_header_visible_fields': 'Visible Header Details',
     'invoice_show_logo': 'Show Logo',
     'invoice_show_subtitle': 'Show Subtitle',
@@ -1448,7 +1458,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_phone_save_cancelled': 'Phone backup save was cancelled',
     'backup_phone_save_success': 'Encrypted backup saved to phone storage',
     'backup_pick_phone_file_title': 'Choose a ShoesERP backup file',
-    'backup_upload_saved_phone_to_drive': 'Upload a saved backup to Google Drive',
+    'backup_upload_saved_phone_to_drive':
+        'Upload a saved backup to Google Drive',
     'backup_upload_when_online_hint':
         'Connect to the internet to upload this backup later.',
     'backup_to_google_drive': 'Back up to Google Drive',
@@ -2561,6 +2572,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'balance_before': 'الرصيد قبل',
     'balance_after': 'الرصيد بعد',
     'received_from': 'مستلم من',
+    'received_by': 'استلم بواسطة',
+    'signature': 'التوقيع',
     'print_date': 'تاريخ الطباعة',
     'tax_registration_number': 'الرقم الضريبي',
     'commercial_registration_number': 'رقم السجل التجاري',
@@ -2587,6 +2600,14 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'invoice_template_compact': 'مضغوط',
     'invoice_template_centered': 'وسطي',
     'invoice_header_accent': 'لون التمييز',
+    'invoice_header_title_scale': 'حجم عنوان الترويسة',
+    'invoice_header_title_scale_small': 'صغير',
+    'invoice_header_title_scale_normal': 'قياسي',
+    'invoice_header_title_scale_large': 'كبير',
+    'invoice_use_latest_header_on_reprint':
+        'استخدام الترويسة الحالية عند إعادة الطباعة',
+    'invoice_use_latest_header_on_reprint_hint':
+        'عند إيقافه، تحتفظ المستندات الصادرة بالترويسة المحفوظة وقت الإصدار.',
     'invoice_header_visible_fields': 'تفاصيل الترويسة الظاهرة',
     'invoice_show_logo': 'إظهار الشعار',
     'invoice_show_subtitle': 'إظهار العنوان الفرعي',
@@ -2879,10 +2900,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_phone_save_cancelled': 'تم إلغاء حفظ النسخة على الهاتف',
     'backup_phone_save_success': 'تم حفظ النسخة المشفرة في مساحة الهاتف',
     'backup_pick_phone_file_title': 'اختر ملف نسخة ShoesERP احتياطية',
-    'backup_upload_saved_phone_to_drive':
-        'رفع نسخة محفوظة إلى Google Drive',
-    'backup_upload_when_online_hint':
-        'اتصل بالإنترنت لرفع هذه النسخة لاحقاً.',
+    'backup_upload_saved_phone_to_drive': 'رفع نسخة محفوظة إلى Google Drive',
+    'backup_upload_when_online_hint': 'اتصل بالإنترنت لرفع هذه النسخة لاحقاً.',
     'backup_to_google_drive': 'النسخ الاحتياطي إلى Google Drive',
     'restore_from_device': 'الاستعادة من هذا الجهاز',
     'restore_from_app_backup': 'الاستعادة من نسخة التطبيق',
@@ -2905,7 +2924,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_restore_scope_denied':
         'صلاحية النسخ والاستعادة محدودة حسب دورك في مساحة العمل.',
     'backup_in_progress': 'جارٍ إنشاء النسخة الاحتياطية…',
-    'backup_share_text': 'نسخة ShoesERP احتياطية مشفرة. احفظ الملف في مكان آمن.',
+    'backup_share_text':
+        'نسخة ShoesERP احتياطية مشفرة. احفظ الملف في مكان آمن.',
     'backup_nav_subtitle': 'نسخ احتياطي، استعادة وجدولة تلقائية',
     'backup_never': 'لا يوجد',
     'backup_last_at': 'آخر نسخة: %s',
@@ -4004,6 +4024,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'balance_before': 'پہلے کا بیلنس',
     'balance_after': 'بعد کا بیلنس',
     'received_from': 'وصول کنندہ',
+    'received_by': 'وصول کنندہ',
+    'signature': 'دستخط',
     'print_date': 'پرنٹ کی تاریخ',
     'tax_registration_number': 'ٹیکس رجسٹریشن نمبر',
     'commercial_registration_number': 'کمرشل رجسٹریشن نمبر',
@@ -4030,6 +4052,14 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'invoice_template_compact': 'مختصر',
     'invoice_template_centered': 'درمیانی',
     'invoice_header_accent': 'نمایاں رنگ',
+    'invoice_header_title_scale': 'ہیڈر کے عنوان کا سائز',
+    'invoice_header_title_scale_small': 'چھوٹا',
+    'invoice_header_title_scale_normal': 'معیاری',
+    'invoice_header_title_scale_large': 'بڑا',
+    'invoice_use_latest_header_on_reprint':
+        'دوبارہ پرنٹ پر موجودہ ہیڈر استعمال کریں',
+    'invoice_use_latest_header_on_reprint_hint':
+        'بند ہونے پر جاری شدہ دستاویزات اپنا محفوظ ہیڈر برقرار رکھتی ہیں۔',
     'invoice_header_visible_fields': 'نمایاں ہیڈر کی تفصیلات',
     'invoice_show_logo': 'لوگو دکھائیں',
     'invoice_show_subtitle': 'ذیلی عنوان دکھائیں',
@@ -4351,7 +4381,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_restore_scope_denied':
         'بیک اپ اور ریسٹور کی اجازت آپ کے ورک اسپیس کردار تک محدود ہے۔',
     'backup_in_progress': 'بیک اپ بنایا جا رہا ہے…',
-    'backup_share_text': 'ShoesERP کا انکرپٹڈ بیک اپ۔ اس فائل کو محفوظ جگہ پر رکھیں۔',
+    'backup_share_text':
+        'ShoesERP کا انکرپٹڈ بیک اپ۔ اس فائل کو محفوظ جگہ پر رکھیں۔',
     'backup_nav_subtitle': 'بیک اپ، ریسٹور اور خودکار شیڈول',
     'backup_never': 'کبھی نہیں',
     'backup_last_at': 'آخری بیک اپ: %s',

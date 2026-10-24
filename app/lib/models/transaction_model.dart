@@ -114,6 +114,10 @@ class TransactionModel {
   final bool deleted;
   final Timestamp? deletedAt;
   final String? deletedBy;
+  final bool voided;
+  final String? voidedInvoiceId;
+  final Timestamp? voidedAt;
+  final String? voidedBy;
   final bool editRequestPending;
   final String? editRequestStatus;
   final String? editRequestRequestedBy;
@@ -144,6 +148,10 @@ class TransactionModel {
     this.deleted = false,
     this.deletedAt,
     this.deletedBy,
+    this.voided = false,
+    this.voidedInvoiceId,
+    this.voidedAt,
+    this.voidedBy,
     this.editRequestPending = false,
     this.editRequestStatus,
     this.editRequestRequestedBy,
@@ -160,6 +168,7 @@ class TransactionModel {
   bool get isCashIn => type == 'cash_in';
   bool get isCashOut => type == 'cash_out';
   bool get isReturn => type == 'return';
+  bool get isVisibleInCustomerLedger => !deleted && !voided;
   bool get isPayment => type == typePayment;
   bool get isWriteOff => type == typeWriteOff;
   bool get isStandaloneCashTransaction => isStandaloneCashType(type);
@@ -200,6 +209,10 @@ class TransactionModel {
       deleted: json['deleted'] as bool? ?? false,
       deletedAt: json['deleted_at'] as Timestamp?,
       deletedBy: json['deleted_by'] as String?,
+      voided: json['voided'] as bool? ?? false,
+      voidedInvoiceId: json['voided_invoice_id'] as String?,
+      voidedAt: json['voided_at'] as Timestamp?,
+      voidedBy: json['voided_by'] as String?,
       editRequestPending: json['edit_request_pending'] as bool? ?? false,
       editRequestStatus: json['edit_request_status'] as String?,
       editRequestRequestedBy: json['edit_request_requested_by'] as String?,
@@ -234,6 +247,10 @@ class TransactionModel {
     'deleted': deleted,
     if (deletedAt != null) 'deleted_at': deletedAt,
     if (deletedBy != null) 'deleted_by': deletedBy,
+    'voided': voided,
+    if (voidedInvoiceId != null) 'voided_invoice_id': voidedInvoiceId,
+    if (voidedAt != null) 'voided_at': voidedAt,
+    if (voidedBy != null) 'voided_by': voidedBy,
     'edit_request_pending': editRequestPending,
     if (editRequestStatus != null) 'edit_request_status': editRequestStatus,
     if (editRequestRequestedBy != null)
@@ -273,6 +290,10 @@ class TransactionModel {
     bool? deleted,
     Timestamp? deletedAt,
     String? deletedBy,
+    bool? voided,
+    String? voidedInvoiceId,
+    Timestamp? voidedAt,
+    String? voidedBy,
     bool? editRequestPending,
     String? editRequestStatus,
     String? editRequestRequestedBy,
@@ -303,6 +324,10 @@ class TransactionModel {
       deleted: deleted ?? this.deleted,
       deletedAt: deletedAt ?? this.deletedAt,
       deletedBy: deletedBy ?? this.deletedBy,
+      voided: voided ?? this.voided,
+      voidedInvoiceId: voidedInvoiceId ?? this.voidedInvoiceId,
+      voidedAt: voidedAt ?? this.voidedAt,
+      voidedBy: voidedBy ?? this.voidedBy,
       editRequestPending: editRequestPending ?? this.editRequestPending,
       editRequestStatus: editRequestStatus ?? this.editRequestStatus,
       editRequestRequestedBy:

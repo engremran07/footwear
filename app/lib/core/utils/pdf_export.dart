@@ -197,6 +197,7 @@ String pdfCurrencyLabel(AppLocale locale, String currency) {
 /// renderer cannot handle Nastaliq's complex GSUB/GPOS shaping tables —
 /// using it as primary causes boxes and scattered characters.
 class _PdfLocaleConfig {
+  final AppLocale locale;
   final bool isRtl;
   final pw.TextDirection dir;
   final pw.CrossAxisAlignment align;
@@ -205,6 +206,7 @@ class _PdfLocaleConfig {
   final String currencyStr;
 
   _PdfLocaleConfig._({
+    required this.locale,
     required this.isRtl,
     required this.dir,
     required this.align,
@@ -220,6 +222,7 @@ class _PdfLocaleConfig {
   }) {
     final isRtl = locale == AppLocale.ar || locale == AppLocale.ur;
     return _PdfLocaleConfig._(
+      locale: locale,
       isRtl: isRtl,
       dir: isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr,
       align: isRtl ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
@@ -247,6 +250,138 @@ class _PdfLocaleConfig {
   pw.Document buildDocument() => _buildDocument(primaryFont, ff);
 }
 
+double _headerTitleSize(String scale) => switch (scale) {
+  'small' => 11,
+  'large' => 16,
+  _ => 13,
+};
+
+pw.Widget _workspaceBrandHeader({
+  required InvoiceHeaderConfig header,
+  required String fallbackName,
+  required _PdfLocaleConfig localeConfig,
+  Uint8List? logoBytes,
+}) {
+  final locale = localeConfig.locale;
+  final rtl = localeConfig.isRtl;
+  final accent = _invoiceAccentColor(header.accentColor);
+  final localizedName = switch (locale) {
+    AppLocale.en => header.nameEn,
+    AppLocale.ar =>
+      header.nameAr.trim().isNotEmpty ? header.nameAr : header.nameEn,
+    AppLocale.ur =>
+      header.nameUr.trim().isNotEmpty
+          ? header.nameUr
+          : header.nameAr.trim().isNotEmpty
+          ? header.nameAr
+          : header.nameEn,
+  };
+  final primaryName = localizedName.trim().isNotEmpty
+      ? localizedName.trim()
+      : fallbackName.trim();
+  final otherNames = <(String, pw.TextDirection)>[
+    (header.nameEn.trim(), pw.TextDirection.ltr),
+    (header.nameAr.trim(), pw.TextDirection.rtl),
+    (header.nameUr.trim(), pw.TextDirection.rtl),
+  ].where((entry) => entry.$1.isNotEmpty && entry.$1 != primaryName);
+  final subtitle = rtl
+      ? (header.subtitleAr.trim().isNotEmpty
+            ? header.subtitleAr
+            : header.subtitleUr)
+      : header.subtitleEn;
+  final address = rtl
+      ? (header.addressAr.trim().isNotEmpty
+            ? header.addressAr
+            : header.addressUr)
+      : header.addressEn;
+  final details = <String>[
+    if (header.visibleFields.contains('phone') && header.phone.isNotEmpty)
+      '${trRead('phone', locale)}: ${_s(header.phone)}',
+    if (header.visibleFields.contains('email') && header.email.isNotEmpty)
+      '${trRead('email', locale)}: ${_s(header.email)}',
+    if (header.visibleFields.contains('tax_number') &&
+        header.taxNumber.isNotEmpty)
+      '${trRead('tax_registration_number', locale)}: ${_s(header.taxNumber)}',
+    if (header.visibleFields.contains('commercial_registration_number') &&
+        header.commercialRegistrationNumber.isNotEmpty)
+      '${trRead('commercial_registration_number', locale)}: '
+          '${_s(header.commercialRegistrationNumber)}',
+  ];
+  final textDirection = localeConfig.dir;
+
+  return pw.Container(
+    width: double.infinity,
+    padding: const pw.EdgeInsets.all(8),
+    decoration: pw.BoxDecoration(
+      color: PdfColors.grey50,
+      border: pw.Border.all(color: accent, width: 1),
+      borderRadius: pw.BorderRadius.circular(4),
+    ),
+    child: pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        if (logoBytes != null && header.visibleFields.contains('logo')) ...[
+          pw.Image(
+            pw.MemoryImage(logoBytes),
+            height: 32,
+            fit: pw.BoxFit.contain,
+          ),
+          pw.SizedBox(width: 8),
+        ],
+        pw.Expanded(
+          child: pw.Column(
+            crossAxisAlignment: localeConfig.align,
+            children: [
+              pw.Text(
+                _s(primaryName),
+                style: localeConfig.ts(
+                  size: _headerTitleSize(header.titleScale),
+                  fw: pw.FontWeight.bold,
+                  color: accent,
+                ),
+                textDirection: _cellDir(primaryName, textDirection),
+                textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
+              ),
+              for (final (name, direction) in otherNames)
+                pw.Text(
+                  _s(name),
+                  style: localeConfig.ts(size: 8, fw: pw.FontWeight.bold),
+                  textDirection: direction,
+                  textAlign: direction == pw.TextDirection.rtl
+                      ? pw.TextAlign.right
+                      : pw.TextAlign.left,
+                ),
+              if (header.visibleFields.contains('subtitle') &&
+                  subtitle.trim().isNotEmpty)
+                pw.Text(
+                  _s(subtitle),
+                  style: localeConfig.ts(size: 8),
+                  textDirection: _cellDir(subtitle, textDirection),
+                  textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
+                ),
+              if (header.visibleFields.contains('address') &&
+                  address.trim().isNotEmpty)
+                pw.Text(
+                  _s(address),
+                  style: localeConfig.ts(size: 8),
+                  textDirection: _cellDir(address, textDirection),
+                  textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
+                ),
+              for (final detail in details)
+                pw.Text(
+                  detail,
+                  style: localeConfig.ts(size: 7, color: PdfColors.grey700),
+                  textDirection: _cellDir(detail, textDirection),
+                  textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 /// Builds a PDF document from tabular data and returns bytes.
 /// When [locale] is Arabic or Urdu, loads the appropriate font and
 /// renders all text RTL.
@@ -257,6 +392,8 @@ Future<Uint8List> buildPdfTable({
   String? subtitle,
   AppLocale locale = AppLocale.en,
   Uint8List? logoBytes,
+  InvoiceHeaderConfig? header,
+  String? companyName,
   String? pageLabel,
 }) async {
   await _ensureFontBytes();
@@ -291,7 +428,15 @@ Future<Uint8List> buildPdfTable({
                 : pw.CrossAxisAlignment.start,
             children: [
               if (page == 0) ...[
-                if (logoBytes != null)
+                if (header != null) ...[
+                  _workspaceBrandHeader(
+                    header: header,
+                    fallbackName: companyName ?? 'My Business',
+                    localeConfig: lc,
+                    logoBytes: logoBytes,
+                  ),
+                  pw.SizedBox(height: 8),
+                ] else if (logoBytes != null)
                   pw.Padding(
                     padding: const pw.EdgeInsets.only(bottom: 6),
                     child: pw.Image(
@@ -398,6 +543,8 @@ String _fmtDate(DateTime d) =>
 PdfColor _invoiceAccentColor(String value) => switch (value.toUpperCase()) {
   '#1F4E79' => PdfColors.blue800,
   '#315C4C' => PdfColors.green800,
+  '#8A3A3A' => PdfColors.red800,
+  '#222222' => PdfColors.grey900,
   _ => PdfColors.black,
 };
 
@@ -460,6 +607,7 @@ Future<Uint8List> buildPdfLedger({
   AppLocale locale = AppLocale.en,
   String currency = 'SAR',
   Uint8List? logoBytes,
+  InvoiceHeaderConfig? header,
 }) async {
   _requireLabelKeys(labels, const <String>[
     'account_statement',
@@ -604,43 +752,26 @@ Future<Uint8List> buildPdfLedger({
             return pw.Column(
               crossAxisAlignment: align,
               children: [
-                // ── Header ──
+                _workspaceBrandHeader(
+                  header: header ?? const InvoiceHeaderConfig(),
+                  fallbackName: companyName,
+                  localeConfig: lc,
+                  logoBytes: logoBytes,
+                ),
+                pw.SizedBox(height: 4),
                 pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Row(
-                      crossAxisAlignment: pw.CrossAxisAlignment.center,
-                      children: [
-                        if (logoBytes != null) ...[
-                          pw.Image(
-                            pw.MemoryImage(logoBytes),
-                            height: 36,
-                            fit: pw.BoxFit.contain,
-                          ),
-                          pw.SizedBox(width: 8),
-                        ],
-                        pw.Column(
-                          crossAxisAlignment: align,
-                          children: [
-                            pw.Text(
-                              _s(companyName),
-                              style: ts(size: 16, fw: pw.FontWeight.bold),
-                              textDirection: _cellDir(companyName, dir),
-                            ),
-                            pw.Text(
-                              labels['account_statement'] ??
-                                  'Account Statement',
-                              style: ts(
-                                size: 11,
-                                fw: pw.FontWeight.bold,
-                                color: PdfColors.blue800,
-                              ),
-                              textDirection: dir,
-                            ),
-                          ],
+                    pw.Text(
+                      _pdfLabel(labels, 'account_statement', locale),
+                      style: ts(
+                        size: 11,
+                        fw: pw.FontWeight.bold,
+                        color: _invoiceAccentColor(
+                          header?.accentColor ?? '#315C4C',
                         ),
-                      ],
+                      ),
+                      textDirection: dir,
                     ),
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
@@ -702,6 +833,7 @@ Future<Uint8List> buildPdfLedger({
                         value: _fmtAmtC(summary.totalCredit, currencyStr),
                         color: PdfColors.green800,
                         primaryFont: primaryFont,
+                        direction: dir,
                         ff: ff,
                       ),
                       pw.Container(
@@ -714,6 +846,7 @@ Future<Uint8List> buildPdfLedger({
                         value: _fmtAmtC(summary.totalDebit, currencyStr),
                         color: PdfColors.red800,
                         primaryFont: primaryFont,
+                        direction: dir,
                         ff: ff,
                       ),
                       pw.Container(
@@ -731,6 +864,7 @@ Future<Uint8List> buildPdfLedger({
                             ? PdfColors.red800
                             : PdfColors.green800,
                         primaryFont: primaryFont,
+                        direction: dir,
                         ff: ff,
                         isBold: true,
                       ),
@@ -891,6 +1025,7 @@ pw.Widget _summaryCell({
   required String value,
   required PdfColor color,
   required pw.Font primaryFont,
+  required pw.TextDirection direction,
   required List<pw.Font> ff,
   bool isBold = false,
 }) {
@@ -909,6 +1044,7 @@ pw.Widget _summaryCell({
               fontFallback: ff,
             ),
             textAlign: pw.TextAlign.center,
+            textDirection: _cellDir(label, direction),
           ),
           pw.SizedBox(height: 2),
           pw.Text(
@@ -1103,6 +1239,7 @@ Future<Uint8List> buildPdfSellerReport({
   required Map<String, String> labels,
   AppLocale locale = AppLocale.en,
   Uint8List? logoBytes,
+  InvoiceHeaderConfig? header,
   String companyName =
       'FOOTWEAR', // ISSUE-015: was hardcoded; now parameterised
 }) async {
@@ -1135,43 +1272,24 @@ Future<Uint8List> buildPdfSellerReport({
         margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 24),
         textDirection: dir,
         build: (ctx) => [
-          // ── Title ──
+          _workspaceBrandHeader(
+            header: header ?? const InvoiceHeaderConfig(),
+            fallbackName: companyName,
+            localeConfig: lc,
+            logoBytes: logoBytes,
+          ),
+          pw.SizedBox(height: 4),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.center,
-                children: [
-                  if (logoBytes != null) ...[
-                    pw.Image(
-                      pw.MemoryImage(logoBytes),
-                      height: 32,
-                      fit: pw.BoxFit.contain,
-                    ),
-                    pw.SizedBox(width: 8),
-                  ],
-                  pw.Column(
-                    crossAxisAlignment: isRtl
-                        ? pw.CrossAxisAlignment.end
-                        : pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        _s(companyName),
-                        style: ts(size: 18, fw: pw.FontWeight.bold),
-                        textDirection: _cellDir(companyName, dir),
-                      ),
-                      pw.Text(
-                        _pdfLabel(labels, 'seller_report', locale),
-                        style: ts(
-                          size: 13,
-                          fw: pw.FontWeight.bold,
-                          color: PdfColors.blue800,
-                        ),
-                        textDirection: dir,
-                      ),
-                    ],
-                  ),
-                ],
+              pw.Text(
+                _pdfLabel(labels, 'seller_report', locale),
+                style: ts(
+                  size: 13,
+                  fw: pw.FontWeight.bold,
+                  color: _invoiceAccentColor(header?.accentColor ?? '#315C4C'),
+                ),
+                textDirection: dir,
               ),
               pw.Text(
                 '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(DateTime.now())}',
@@ -1437,21 +1555,29 @@ Future<Uint8List> generateInvoicePdf({
   AppLocale locale = AppLocale.en,
   Uint8List? logoBytes,
   InvoiceHeaderConfig? header,
+  bool useLatestHeader = false,
 }) async {
   await _ensureFontBytes();
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
-  final headerConfig = invoice.headerSnapshot.isNotEmpty
-      ? InvoiceHeaderConfig.fromJson(invoice.headerSnapshot)
+  final savedHeaderConfig = InvoiceHeaderConfig.fromJson(
+    invoice.headerSnapshot,
+  );
+  final headerConfig = useLatestHeader && header != null
+      ? header
+      : invoice.headerSnapshot.isNotEmpty
+      ? savedHeaderConfig
       : header ?? const InvoiceHeaderConfig();
   final savedCompanyName =
       (invoice.headerSnapshot['company_name'] as String?)?.trim() ?? '';
   final displayCompanyName = headerConfig.nameEn.trim().isNotEmpty
       ? headerConfig.nameEn.trim()
+      : useLatestHeader && companyName.trim().isNotEmpty
+      ? companyName.trim()
       : savedCompanyName.isNotEmpty
       ? savedCompanyName
       : companyName;
   var effectiveLogoBytes = logoBytes;
-  if (invoice.headerSnapshot.isNotEmpty) {
+  if (invoice.headerSnapshot.isNotEmpty && !useLatestHeader) {
     final savedLogo = invoice.headerSnapshot['logo_base64'] as String?;
     try {
       effectiveLogoBytes = savedLogo == null ? null : base64Decode(savedLogo);
@@ -1482,6 +1608,8 @@ Future<Uint8List> generateInvoicePdf({
   final lblPaymentReference = trRead('payment_reference', locale);
   final lblBalanceBefore = trRead('balance_before', locale);
   final lblBalanceAfter = trRead('balance_after', locale);
+  final lblReceivedBy = trRead('received_by', locale);
+  final lblSignature = trRead('signature', locale);
   final lblPhone = trRead('phone', locale);
   final lblEmail = trRead('email', locale);
   final lblTaxNumber = trRead('tax_registration_number', locale);
@@ -1597,7 +1725,10 @@ Future<Uint8List> generateInvoicePdf({
                   lines.add(
                     pw.Text(
                       _s(primaryName),
-                      style: ts(size: 13, fw: pw.FontWeight.bold),
+                      style: ts(
+                        size: _headerTitleSize(headerConfig.titleScale),
+                        fw: pw.FontWeight.bold,
+                      ),
                       textDirection: _cellDir(primaryName, brandDirection),
                       textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
                     ),
@@ -1900,32 +2031,101 @@ Future<Uint8List> generateInvoicePdf({
                 }),
               ],
             ),
-          pw.SizedBox(height: 14),
-
-          // Totals
-          pw.Align(
-            alignment: pw.Alignment.centerRight,
-            child: pw.Container(
-              width: 200,
+          if (isCashReceipt) ...[
+            pw.SizedBox(height: 12),
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.blue50,
+                border: pw.Border.all(color: accentColor, width: 1.2),
+                borderRadius: pw.BorderRadius.circular(6),
+              ),
               child: pw.Column(
                 children: [
-                  if (isCashReceipt)
-                    pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      children: [
-                        pw.Text(
-                          lblAmountReceived,
-                          style: ts(size: 10, fw: pw.FontWeight.bold),
-                          textDirection: dir,
+                  pw.Text(
+                    lblAmountReceived,
+                    style: ts(size: 10, color: PdfColors.grey700),
+                    textDirection: dir,
+                    textAlign: pw.TextAlign.center,
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.center,
+                    children: [
+                      pw.Text(
+                        currencyLabel,
+                        style: ts(size: 11, fw: pw.FontWeight.bold),
+                        textDirection: _cellDir(currencyLabel, dir),
+                      ),
+                      pw.SizedBox(width: 8),
+                      pw.Text(
+                        _fmtAmt(invoice.total),
+                        style: ts(
+                          size: 25,
+                          fw: pw.FontWeight.bold,
+                          color: accentColor,
                         ),
-                        pw.Text(
-                          _fmtAmt(invoice.total),
-                          style: ts(size: 10, fw: pw.FontWeight.bold),
-                          textDirection: _amountDir,
-                        ),
-                      ],
-                    )
-                  else
+                        textDirection: _amountDir,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 14),
+            pw.Row(
+              children: [
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: align,
+                    children: [
+                      pw.Text(
+                        '$lblReceivedBy: ${_s(invoice.sellerName)}',
+                        style: ts(size: 8, fw: pw.FontWeight.bold),
+                        textDirection: _cellDir(invoice.sellerName, dir),
+                      ),
+                      pw.SizedBox(height: 24),
+                      pw.Divider(color: PdfColors.grey500, thickness: 0.5),
+                      pw.Text(
+                        lblSignature,
+                        style: ts(size: 7, color: PdfColors.grey600),
+                        textDirection: dir,
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(width: 24),
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: align,
+                    children: [
+                      pw.SizedBox(height: 12),
+                      pw.SizedBox(height: 24),
+                      pw.Divider(color: PdfColors.grey500, thickness: 0.5),
+                      pw.Text(
+                        '$lblReceivedFrom: ${_s(invoice.shopName)}',
+                        style: ts(size: 7, color: PdfColors.grey600),
+                        textDirection: _cellDir(invoice.shopName, dir),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+          pw.SizedBox(height: 14),
+
+          if (!isCashReceipt)
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Container(
+                width: 200,
+                child: pw.Column(
+                  children: [
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
@@ -1941,25 +2141,24 @@ Future<Uint8List> generateInvoicePdf({
                         ),
                       ],
                     ),
-                  if (!isCashReceipt && invoice.discount > 0) ...[
-                    pw.SizedBox(height: 2),
-                    pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      children: [
-                        pw.Text(
-                          lblDiscount,
-                          style: ts(size: 9, color: PdfColors.green700),
-                          textDirection: dir,
-                        ),
-                        pw.Text(
-                          '-${_fmtAmt(invoice.discount)}',
-                          style: ts(size: 9, color: PdfColors.green700),
-                          textDirection: _amountDir,
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (!isCashReceipt) ...[
+                    if (invoice.discount > 0) ...[
+                      pw.SizedBox(height: 2),
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          pw.Text(
+                            lblDiscount,
+                            style: ts(size: 9, color: PdfColors.green700),
+                            textDirection: dir,
+                          ),
+                          pw.Text(
+                            '-${_fmtAmt(invoice.discount)}',
+                            style: ts(size: 9, color: PdfColors.green700),
+                            textDirection: _amountDir,
+                          ),
+                        ],
+                      ),
+                    ],
                     pw.Divider(thickness: 0.5),
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -1977,10 +2176,9 @@ Future<Uint8List> generateInvoicePdf({
                       ],
                     ),
                   ],
-                ],
+                ),
               ),
             ),
-          ),
           pw.SizedBox(height: 14),
 
           if (invoice.notes != null && invoice.notes!.isNotEmpty) ...[
@@ -2085,6 +2283,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
   required Map<String, String> labels,
   AppLocale locale = AppLocale.en,
   Uint8List? logoBytes,
+  InvoiceHeaderConfig? header,
   String currency = 'SAR',
   bool showEntryBy = false,
   Map<String, String> entryByMap = const {},
@@ -2290,41 +2489,26 @@ Future<Uint8List> buildPdfMultiShopLedger({
           final widgets = <pw.Widget>[];
           if (ctx.pageNumber == 1) {
             widgets.addAll([
+              _workspaceBrandHeader(
+                header: header ?? const InvoiceHeaderConfig(),
+                fallbackName: companyName,
+                localeConfig: lc,
+                logoBytes: logoBytes,
+              ),
+              pw.SizedBox(height: 4),
               pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Row(
-                    crossAxisAlignment: pw.CrossAxisAlignment.center,
-                    children: [
-                      if (logoBytes != null) ...[
-                        pw.Image(
-                          pw.MemoryImage(logoBytes),
-                          height: 36,
-                          fit: pw.BoxFit.contain,
-                        ),
-                        pw.SizedBox(width: 8),
-                      ],
-                      pw.Column(
-                        crossAxisAlignment: align,
-                        children: [
-                          pw.Text(
-                            _s(companyName),
-                            style: ts(size: 16, fw: pw.FontWeight.bold),
-                            textDirection: _cellDir(companyName, dir),
-                          ),
-                          pw.Text(
-                            _s(title),
-                            style: ts(
-                              size: 11,
-                              fw: pw.FontWeight.bold,
-                              color: PdfColors.blue800,
-                            ),
-                            textDirection: dir,
-                          ),
-                        ],
+                  pw.Text(
+                    _s(title),
+                    style: ts(
+                      size: 11,
+                      fw: pw.FontWeight.bold,
+                      color: _invoiceAccentColor(
+                        header?.accentColor ?? '#315C4C',
                       ),
-                    ],
+                    ),
+                    textDirection: _cellDir(title, dir),
                   ),
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
@@ -2364,6 +2548,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                       value: '$totalShops',
                       color: PdfColors.blue800,
                       primaryFont: primaryFont,
+                      direction: dir,
                       ff: ff,
                     ),
                     pw.Container(
@@ -2376,6 +2561,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                       value: balanceSummary,
                       color: PdfColors.blue800,
                       primaryFont: primaryFont,
+                      direction: dir,
                       ff: ff,
                       isBold: true,
                     ),
@@ -2603,6 +2789,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                         value: _fmtAmtC(totalCredit, currencyLabel),
                         color: PdfColors.green800,
                         primaryFont: primaryFont,
+                        direction: dir,
                         ff: ff,
                       ),
                       pw.Container(
@@ -2615,6 +2802,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                         value: _fmtAmtC(totalDebit, currencyLabel),
                         color: PdfColors.red800,
                         primaryFont: primaryFont,
+                        direction: dir,
                         ff: ff,
                       ),
                       pw.Container(
@@ -2629,6 +2817,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
                             ? PdfColors.red800
                             : PdfColors.green800,
                         primaryFont: primaryFont,
+                        direction: dir,
                         ff: ff,
                         isBold: true,
                       ),

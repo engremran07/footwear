@@ -185,9 +185,9 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
         });
         transaction.set(settingsRef, {
           'tenant_id': docId,
-          'company_name': tenantName,
           'currency': 'SAR',
           'pairs_per_carton': 12,
+          'invoice_header': {'name_en': tenantName},
           'require_admin_approval_for_seller_transaction_edits': false,
           'last_invoice_number': 0,
           'updated_at': FieldValue.serverTimestamp(),

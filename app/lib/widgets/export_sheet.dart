@@ -205,15 +205,17 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
         throw Exception('pdf export failed');
       }
     }
-    final logoBytes = ref.read(settingsProvider).value?.logoBytes;
     try {
+      final settings = await ref.read(settingsProvider.future);
       return await buildPdfTable(
         title: widget.title,
         headers: headers,
         rows: widget.rows,
         subtitle: widget.subtitle,
         locale: _locale,
-        logoBytes: logoBytes,
+        logoBytes: settings.logoBytes,
+        header: settings.invoiceHeader,
+        companyName: settings.companyName,
         pageLabel: trRead('page_x_of_y', _locale),
       );
     } catch (e, stack) {

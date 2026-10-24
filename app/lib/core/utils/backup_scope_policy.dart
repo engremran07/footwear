@@ -4,12 +4,7 @@ import '../../models/user_model.dart';
 import 'tenant_scope.dart';
 import 'role_names.dart';
 
-enum BackupScope {
-  disabled,
-  platformMetadata,
-  workspaceBusiness,
-  sellerRoute,
-}
+enum BackupScope { disabled, platformMetadata, workspaceBusiness, sellerRoute }
 
 class BackupScopePolicy {
   BackupScopePolicy._();
@@ -31,6 +26,25 @@ class BackupScopePolicy {
     'transactions',
     'invoices',
   };
+  static const workspaceBusinessArchiveCollections = <String>{
+    'routes',
+    'shops',
+    'products',
+    'product_variants',
+    'seller_inventory',
+    'inventory_transactions',
+    'transactions',
+    'invoices',
+    'settings',
+  };
+  static const sellerRouteArchiveCollections = <String>{
+    'routes',
+    'shops',
+    'seller_inventory',
+    'inventory_transactions',
+    'transactions',
+    'invoices',
+  };
 
   static BackupScope scopeFor(UserRole role) => switch (role) {
     UserRole.superAdmin => BackupScope.platformMetadata,
@@ -45,6 +59,14 @@ class BackupScopePolicy {
     BackupScope.sellerRoute => sellerRouteCollections,
     BackupScope.disabled => const <String>{},
   };
+
+  static Set<String> archiveCollectionsFor(UserRole role) =>
+      switch (scopeFor(role)) {
+        BackupScope.platformMetadata => platformMetadataCollections,
+        BackupScope.workspaceBusiness => workspaceBusinessArchiveCollections,
+        BackupScope.sellerRoute => sellerRouteArchiveCollections,
+        BackupScope.disabled => const <String>{},
+      };
 
   static String archiveScopeFor(UserRole role) => switch (scopeFor(role)) {
     BackupScope.platformMetadata => 'platform_metadata',
@@ -101,6 +123,15 @@ class BackupScopePolicy {
         document['edit_request_pending'] != true &&
         (items == null || (items is List && items.isEmpty)) &&
         TenantScope.matchesTenant(document, tenantId);
+  }
+
+  static bool isSellerOwnedArchiveRecord({
+    required Map<String, dynamic> document,
+    required String sellerId,
+  }) {
+    final normalizedSellerId = sellerId.trim();
+    return normalizedSellerId.isNotEmpty &&
+        document['seller_id'] == normalizedSellerId;
   }
 
   static String requireSelectedWorkspace({

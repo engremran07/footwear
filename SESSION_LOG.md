@@ -6,6 +6,50 @@
 
 ---
 
+## SESSION-020 — 2026-10-24 — Backup role fix and Android delivery
+
+**Agent:** GitHub Copilot
+
+**Baseline:** Branch `main`, HEAD `4a8dcd1`, matching `origin/main` after fetch.
+Existing frontend/invoice work and untracked skill directories were preserved.
+
+**Trigger:** Fix workspace-backup permission failures, validate all applicable
+backup roles, finish the prior source changes, deploy Rules/indexes, build and
+install the requested APK, and publish the release.
+
+### Work Performed
+
+- Workspace settings backup now reads `settings/{tenantId}` directly instead
+  of issuing a Rules-incompatible `tenant_id` collection query. Backup role
+  selection categories are validated separately from concrete archive keys.
+- Selected super-admin backup remains limited to the selected workspace and
+  metadata by default. Seller archive validation preserves route scope and
+  rejects inventory records attributed to another seller. Workspace-admin
+  role promotion remains restricted to selected platform super-admins.
+- Added backup query/role regressions and corrected the documented adb install
+  command to install the local APK path after copying it to phone storage.
+- Synchronized release metadata and trilingual changelog at `3.9.84+710`.
+
+### Verification and Delivery
+
+- Backup unit/widget tests: `00:07 +16: All tests passed!`.
+- Full Flutter suite: `01:15 +603: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 83.9s)`.
+- `dart analyze test/`: `No issues found!`.
+- Firestore Rules Emulator: `132 passing (48s)`.
+- Firestore Rules/indexes deployment to `shoeserp-clean-20260327`:
+  `Deploy complete!`; remote indexes and field overrides absent locally were
+  preserved.
+- Version evidence: `pubspec.yaml` `3.9.84+710`; `AppBrand` `3.9.84`/`710`.
+- Split APKs: ARMv7 30.4 MB, ARM64 32.0 MB, x86_64 33.4 MB.
+- ARM64 copied to `R5GL22RGT9V`; `adb install --streaming -r` reported
+  `Success`. Device reports versionName `3.9.84`, versionCode `3101110`.
+- Web build and Hosting deployment were not performed. Git publication is
+  pending because a push to `main` triggers Firebase Hosting; no authenticated
+  cross-device business-data verification was performed.
+
+---
+
 ## SESSION-019 — 2026-10-24 — Consolidated audit release
 
 **Agent:** GitHub Copilot

@@ -28,6 +28,45 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.84',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '💾',
+        text: {
+          AppLocale.en:
+              'Workspace backups now use role-scoped access, including workspace settings, and restore only records allowed for your account.',
+          AppLocale.ar:
+              'تستخدم النسخ الاحتياطية لمساحة العمل الآن صلاحيات محددة حسب الدور، بما في ذلك الإعدادات، ولا تستعيد إلا السجلات المسموح بها لحسابك.',
+          AppLocale.ur:
+              'ورک اسپیس بیک اپ اب کردار کے مطابق اجازتیں استعمال کرتا ہے، بشمول ورک اسپیس سیٹنگز، اور صرف آپ کے اکاؤنٹ کے مجاز ریکارڈ بحال کرتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔄',
+        text: {
+          AppLocale.en:
+              'Invoice headers and workspace settings refresh consistently across screens and devices.',
+          AppLocale.ar:
+              'تتحدّث ترويسات الفواتير وإعدادات مساحة العمل باستمرار عبر الشاشات والأجهزة.',
+          AppLocale.ur:
+              'انوائس ہیڈرز اور ورک اسپیس سیٹنگز اب مختلف اسکرینوں اور ڈیوائسز پر یکساں طور پر تازہ ہوتی ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Shop balances stay separated by route currency, with clearer invoice filters and financial document exports.',
+          AppLocale.ar:
+              'تبقى أرصدة المتاجر منفصلة حسب عملة المسار، مع مرشحات فواتير أوضح وتصدير محسّن للمستندات المالية.',
+          AppLocale.ur:
+              'دکانوں کے بیلنس روٹ کی کرنسی کے مطابق الگ رہتے ہیں، اور انوائس فلٹرز و مالی دستاویزات کی ایکسپورٹ زیادہ واضح ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.83',
     date: 'October 2026',
     items: [

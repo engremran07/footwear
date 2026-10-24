@@ -165,9 +165,10 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     final user = ref.watch(authUserProvider).value;
     final isSeller = user?.isSeller == true;
     final sellerRouteIds = user?.assignedRouteIds ?? [];
+    final settingsAsync = ref.watch(settingsProvider);
 
     // Seller sees shops from ALL assigned routes; admin sees all shops.
-    final shopsAsync = isSeller && sellerRouteIds.isNotEmpty
+    final shopsAsync = isSeller
         ? ref.watch(sellerAllShopsProvider)
         : ref.watch(shopsProvider);
     final transactionsAsync = ref.watch(shopsAnalyticsTransactionsProvider);
@@ -176,6 +177,11 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         : (isSeller && sellerRouteIds.isNotEmpty
               ? ref.watch(routesBySellerProvider(user!.id))
               : null);
+    final routeList = routesAsync?.value ?? const <RouteModel>[];
+    final currencyByRoute = <String, String>{
+      for (final route in routeList) route.id: route.currency,
+    };
+    final fallbackCurrency = settingsAsync.value?.currency ?? 'SAR';
     final canCreateShop =
         user != null && (user.isAdmin || sellerRouteIds.isNotEmpty);
 
@@ -210,6 +216,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
             shops: scopedStatsShops,
             transactions: transactionsAsync.value!,
           );
+    final routeMetadataReady = routesAsync == null || routesAsync.hasValue;
 
     return Scaffold(
       body: Column(
@@ -268,7 +275,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   onSelected: (value) {
                     final shops = shopsAsync.value;
                     if (shops == null || shops.isEmpty) return;
-                    final routes = routesAsync?.value ?? [];
+                    final routes = routeList;
                     if (value == 'all') {
                       _exportAllShops(shops, routes);
                     } else if (value == 'per_route') {
@@ -396,10 +403,14 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
           // Stats strip — derived from the live shop list
           if (currencyRouteScopeReady &&
               scopedStatsShops != null &&
-              flowByShop != null)
+              flowByShop != null &&
+              routeMetadataReady &&
+              settingsAsync.hasValue)
             _ShopStatsStrip(
               shops: scopedStatsShops,
               flowByShop: flowByShop,
+              currencyByRoute: currencyByRoute,
+              fallbackCurrency: fallbackCurrency,
               selected: _filter,
               onSelected: (f) => setState(() => _filter = f),
             )
@@ -505,19 +516,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                             _selectedRouteId != null ||
                             filterCurrency != null;
                         return AppPullRefresh(
-                          onRefresh: () async {
-                            if (isSeller && sellerRouteIds.isNotEmpty) {
-                              ref.invalidate(sellerAllShopsProvider);
-                              await ref.read(sellerAllShopsProvider.future);
-                            } else {
-                              ref.invalidate(shopsProvider);
-                              await ref.read(shopsProvider.future);
-                            }
-                            ref.invalidate(shopsAnalyticsTransactionsProvider);
-                            await ref.read(
-                              shopsAnalyticsTransactionsProvider.future,
-                            );
-                          },
+                          onRefresh: () => _refreshShopData(user),
                           child: ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
                             children: [
@@ -570,13 +569,16 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                       final shouldGroupByRoute =
                           user?.isAdmin == true || routes.length > 1;
                       if (shouldGroupByRoute && routes.isNotEmpty) {
-                        return _AdminGroupedShopsView(
-                          shops: filtered,
-                          routes: routes,
-                          selectedFilter: _filter,
-                          flowByShop: scopedFlowByShop,
-                          showAssignedSellerNames: user?.isAdmin == true,
-                          lastTxByShop: lastTxByShop,
+                        return AppPullRefresh(
+                          onRefresh: () => _refreshShopData(user),
+                          child: _AdminGroupedShopsView(
+                            shops: filtered,
+                            routes: routes,
+                            selectedFilter: _filter,
+                            flowByShop: scopedFlowByShop,
+                            showAssignedSellerNames: user?.isAdmin == true,
+                            lastTxByShop: lastTxByShop,
+                          ),
                         );
                       }
 
@@ -593,24 +595,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
                       // Pre-compute currency per routeId to avoid N per-tile
                       // provider subscriptions (prevents re-subscription flicker).
-                      final currencyByRoute = <String, String>{
-                        for (final r in routes) r.id: r.currency,
-                      };
-
                       return AppPullRefresh(
-                        onRefresh: () async {
-                          if (isSeller && sellerRouteIds.isNotEmpty) {
-                            ref.invalidate(sellerAllShopsProvider);
-                            await ref.read(sellerAllShopsProvider.future);
-                          } else {
-                            ref.invalidate(shopsProvider);
-                            await ref.read(shopsProvider.future);
-                          }
-                          ref.invalidate(shopsAnalyticsTransactionsProvider);
-                          await ref.read(
-                            shopsAnalyticsTransactionsProvider.future,
-                          );
-                        },
+                        onRefresh: () => _refreshShopData(user),
                         child: ListView.builder(
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.only(bottom: 88),
@@ -654,6 +640,28 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
             )
           : null,
     );
+  }
+
+  Future<void> _refreshShopData(UserModel? user) async {
+    if (user?.isSeller == true) {
+      ref.invalidate(sellerAllShopsProvider);
+      await ref.read(sellerAllShopsProvider.future);
+      if (user!.assignedRouteIds.isNotEmpty) {
+        ref.invalidate(routesBySellerProvider(user.id));
+        await ref.read(routesBySellerProvider(user.id).future);
+      }
+    } else {
+      ref.invalidate(shopsProvider);
+      await ref.read(shopsProvider.future);
+      if (user?.isAdmin == true) {
+        ref.invalidate(routesProvider);
+        await ref.read(routesProvider.future);
+      }
+    }
+    ref.invalidate(shopsAnalyticsTransactionsProvider);
+    await ref.read(shopsAnalyticsTransactionsProvider.future);
+    ref.invalidate(settingsProvider);
+    await ref.read(settingsProvider.future);
   }
 
   // ── Export helpers ──────────────────────────────────────────────────────
@@ -1013,6 +1021,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
           labels: labels,
           locale: locale,
           logoBytes: settings.logoBytes,
+          header: settings.invoiceHeader,
           currency: settings.currency,
           showEntryBy: user?.isAdmin == true,
           entryByMap: names.map,
@@ -1083,11 +1092,15 @@ Map<String, _ShopFlowStats> _buildShopFlowStats({
 class _ShopStatsStrip extends ConsumerWidget {
   final List<ShopModel> shops;
   final Map<String, _ShopFlowStats> flowByShop;
+  final Map<String, String> currencyByRoute;
+  final String fallbackCurrency;
   final _ShopQuickFilter selected;
   final ValueChanged<_ShopQuickFilter> onSelected;
   const _ShopStatsStrip({
     required this.shops,
     required this.flowByShop,
+    required this.currencyByRoute,
+    required this.fallbackCurrency,
     required this.selected,
     required this.onSelected,
   });
@@ -1097,112 +1110,126 @@ class _ShopStatsStrip extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     final width = MediaQuery.sizeOf(context).width;
     final isTablet = width >= 700;
-    final isSmallPhone = width < 360;
+    final cardWidth = isTablet ? 180.0 : 154.0;
 
     final cardPadding = isTablet
         ? const EdgeInsets.symmetric(horizontal: 8, vertical: 10)
-        : isSmallPhone
-        ? const EdgeInsets.symmetric(horizontal: 4, vertical: 6)
         : const EdgeInsets.symmetric(horizontal: 6, vertical: 8);
-    final valueFontSize = isTablet
-        ? 13.0
-        : isSmallPhone
-        ? 10.0
-        : 12.0;
-    final labelFontSize = isTablet
-        ? 11.0
-        : isSmallPhone
-        ? 9.0
-        : 10.0;
-    final iconSize = isTablet
-        ? 18.0
-        : isSmallPhone
-        ? 14.0
-        : 15.0;
+    final valueFontSize = isTablet ? 12.0 : 11.0;
+    final labelFontSize = isTablet ? 11.0 : 10.0;
+    final iconSize = isTablet ? 18.0 : 15.0;
 
-    final totalGave = shops.fold(
-      0.0,
-      (acc, s) => acc + (flowByShop[s.id]?.cashOut ?? 0),
+    Map<String, double> totalsByCurrency(
+      double Function(ShopModel shop) amountForShop,
+    ) {
+      final totals = <String, double>{};
+      for (final shop in shops) {
+        final currency = (currencyByRoute[shop.routeId] ?? fallbackCurrency)
+            .toUpperCase();
+        totals.update(
+          currency,
+          (total) => total + amountForShop(shop),
+          ifAbsent: () => amountForShop(shop),
+        );
+      }
+      return Map.fromEntries(
+        totals.entries.toList()
+          ..sort((left, right) => left.key.compareTo(right.key)),
+      );
+    }
+
+    final totalGave = totalsByCurrency(
+      (shop) => flowByShop[shop.id]?.cashOut ?? 0,
     );
-    final totalGot = shops.fold(
-      0.0,
-      (acc, s) => acc + (flowByShop[s.id]?.cashIn ?? 0),
+    final totalGot = totalsByCurrency(
+      (shop) => flowByShop[shop.id]?.cashIn ?? 0,
     );
-    final totalWillGet = shops
-        .where((s) => s.balance > 0)
-        .fold(0.0, (acc, s) => acc + s.balance);
+    final totalWillGet = totalsByCurrency(
+      (shop) => shop.balance > 0 ? shop.balance : 0,
+    );
     final totalCollective = shops.length;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: _FilterStatCard(
-              icon: Icons.arrow_circle_down,
-              label: tr('i_got', ref),
-              value: AppFormatters.compact(totalGot),
-              color: AppTheme.clearFg(cs),
-              selected: selected == _ShopQuickFilter.iGot,
-              onTap: () => onSelected(_ShopQuickFilter.iGot),
-              contentPadding: cardPadding,
-              iconSize: iconSize,
-              labelFontSize: labelFontSize,
-              valueFontSize: valueFontSize,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            SizedBox(
+              width: cardWidth,
+              child: _FilterStatCard(
+                icon: Icons.arrow_circle_down,
+                label: tr('i_got', ref),
+                value: _formatCurrencyTotals(totalGot),
+                color: AppTheme.clearFg(cs),
+                selected: selected == _ShopQuickFilter.iGot,
+                onTap: () => onSelected(_ShopQuickFilter.iGot),
+                contentPadding: cardPadding,
+                iconSize: iconSize,
+                labelFontSize: labelFontSize,
+                valueFontSize: valueFontSize,
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _FilterStatCard(
-              icon: Icons.arrow_circle_up,
-              label: tr('i_gave', ref),
-              value: AppFormatters.compact(totalGave),
-              color: AppTheme.debtFg(cs),
-              selected: selected == _ShopQuickFilter.iGave,
-              onTap: () => onSelected(_ShopQuickFilter.iGave),
-              contentPadding: cardPadding,
-              iconSize: iconSize,
-              labelFontSize: labelFontSize,
-              valueFontSize: valueFontSize,
+            const SizedBox(width: 8),
+            SizedBox(
+              width: cardWidth,
+              child: _FilterStatCard(
+                icon: Icons.arrow_circle_up,
+                label: tr('i_gave', ref),
+                value: _formatCurrencyTotals(totalGave),
+                color: AppTheme.debtFg(cs),
+                selected: selected == _ShopQuickFilter.iGave,
+                onTap: () => onSelected(_ShopQuickFilter.iGave),
+                contentPadding: cardPadding,
+                iconSize: iconSize,
+                labelFontSize: labelFontSize,
+                valueFontSize: valueFontSize,
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _FilterStatCard(
-              icon: Icons.schedule,
-              label: tr('i_will_get', ref),
-              value: AppFormatters.compact(totalWillGet),
-              color: totalWillGet >= 0
-                  ? AppTheme.warningFg(cs)
-                  : AppTheme.debtFg(cs),
-              selected: selected == _ShopQuickFilter.iWillGet,
-              onTap: () => onSelected(_ShopQuickFilter.iWillGet),
-              contentPadding: cardPadding,
-              iconSize: iconSize,
-              labelFontSize: labelFontSize,
-              valueFontSize: valueFontSize,
+            const SizedBox(width: 8),
+            SizedBox(
+              width: cardWidth,
+              child: _FilterStatCard(
+                icon: Icons.schedule,
+                label: tr('i_will_get', ref),
+                value: _formatCurrencyTotals(totalWillGet),
+                color: totalWillGet.values.every((amount) => amount == 0)
+                    ? AppTheme.warningFg(cs)
+                    : AppTheme.debtFg(cs),
+                selected: selected == _ShopQuickFilter.iWillGet,
+                onTap: () => onSelected(_ShopQuickFilter.iWillGet),
+                contentPadding: cardPadding,
+                iconSize: iconSize,
+                labelFontSize: labelFontSize,
+                valueFontSize: valueFontSize,
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _FilterStatCard(
-              icon: Icons.grid_view,
-              label: tr('collective', ref),
-              value: '$totalCollective',
-              color: cs.primary,
-              selected: selected == _ShopQuickFilter.collective,
-              onTap: () => onSelected(_ShopQuickFilter.collective),
-              contentPadding: cardPadding,
-              iconSize: iconSize,
-              labelFontSize: labelFontSize,
-              valueFontSize: valueFontSize,
+            const SizedBox(width: 8),
+            SizedBox(
+              width: cardWidth,
+              child: _FilterStatCard(
+                icon: Icons.grid_view,
+                label: tr('collective', ref),
+                value: '$totalCollective',
+                color: cs.primary,
+                selected: selected == _ShopQuickFilter.collective,
+                onTap: () => onSelected(_ShopQuickFilter.collective),
+                contentPadding: cardPadding,
+                iconSize: iconSize,
+                labelFontSize: labelFontSize,
+                valueFontSize: valueFontSize,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
+
+String _formatCurrencyTotals(Map<String, double> totals) => totals.entries
+    .map((entry) => '${entry.key} ${AppFormatters.number(entry.value)}')
+    .join('\n');
 
 class _FilterStatCard extends StatelessWidget {
   final IconData icon;
@@ -1252,9 +1279,10 @@ class _FilterStatCard extends StatelessWidget {
               const SizedBox(height: 3),
               Text(
                 value,
-                maxLines: 1,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
+                textDirection: TextDirection.ltr,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: valueFontSize,
@@ -1581,6 +1609,7 @@ class _AdminGroupedShopsViewState
     final sectionMap = {for (final s in sections) s.key: s};
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 88),
       itemCount: flatItems.length,
       itemBuilder: (context, index) {

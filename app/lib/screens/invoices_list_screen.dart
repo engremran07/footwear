@@ -24,6 +24,18 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
   String _search = '';
   String _statusFilter = 'all';
 
+  Future<void> _refreshInvoices() async {
+    final user = await ref.read(authUserProvider.future);
+    if (user?.isAdmin == true) {
+      ref.invalidate(allInvoicesProvider);
+      await ref.read(allInvoicesProvider.future);
+    } else if (user != null) {
+      final provider = sellerInvoicesProvider(user.id);
+      ref.invalidate(provider);
+      await ref.read(provider.future);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final invoicesAsync = ref.watch(roleAwareInvoicesProvider);
@@ -69,6 +81,8 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
                     cs,
                   ),
                   const SizedBox(width: 8),
+                  _filterChip('pending', tr('pending', ref), cs),
+                  const SizedBox(width: 8),
                   _filterChip('void', tr('void', ref), cs),
                 ],
               ),
@@ -78,7 +92,16 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
             child: invoicesAsync.when(
               data: (invoices) {
                 var filtered = invoices;
-                if (_statusFilter != 'all') {
+                if (_statusFilter == 'pending') {
+                  filtered = filtered
+                      .where(
+                        (invoice) =>
+                            invoice.isSale &&
+                            !invoice.isVoid &&
+                            invoice.outstandingAmount > 0,
+                      )
+                      .toList();
+                } else if (_statusFilter != 'all') {
                   filtered = filtered
                       .where((i) => i.status == _statusFilter)
                       .toList();
@@ -93,29 +116,27 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
                       )
                       .toList();
                 }
-                if (filtered.isEmpty) {
-                  return Center(child: Text(tr('no_data', ref)));
-                }
                 return AppPullRefresh(
-                  onRefresh: () async {
-                    if (user?.isAdmin == true) {
-                      ref.invalidate(allInvoicesProvider);
-                      await ref.read(allInvoicesProvider.future);
-                    } else if (user != null) {
-                      final provider = sellerInvoicesProvider(user.id);
-                      ref.invalidate(provider);
-                      await ref.read(provider.future);
-                    }
-                  },
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, i) {
-                      final inv = filtered[i];
-                      return _InvoiceTile(invoice: inv).listEntry(i);
-                    },
-                  ),
+                  onRefresh: _refreshInvoices,
+                  child: filtered.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.sizeOf(context).height * 0.45,
+                              child: Center(child: Text(tr('no_data', ref))),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final inv = filtered[i];
+                            return _InvoiceTile(invoice: inv).listEntry(i);
+                          },
+                        ),
                 );
               },
               loading: () => const ShimmerLoading(),

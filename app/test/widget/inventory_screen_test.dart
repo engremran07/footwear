@@ -294,9 +294,9 @@ void main() {
         settingsProvider.overrideWith(
           (ref) => Stream.value(
             SettingsModel(
-              companyName: 'Workspace One',
               currency: 'SAR',
               pairsPerCarton: 12,
+              invoiceHeader: const InvoiceHeaderConfig(nameEn: 'Workspace One'),
               updatedAt: now,
             ),
           ),
@@ -359,9 +359,9 @@ UserModel _testUser({
 
 SettingsModel _testSettings(Timestamp now) {
   return SettingsModel(
-    companyName: 'Workspace One',
     currency: 'SAR',
     pairsPerCarton: 12,
+    invoiceHeader: const InvoiceHeaderConfig(nameEn: 'Workspace One'),
     updatedAt: now,
   );
 }

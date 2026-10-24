@@ -1,4 +1,4 @@
-# FootWear ERP — Flutter App (v3.9.83+709)
+# FootWear ERP — Flutter App (v3.9.84+710)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
@@ -15,6 +15,17 @@ Admins with no available stock now see localized allocation and non-stock-mode
 guidance. Local Rules Emulator: `128 passing`; focused invoice widget tests:
 `00:01 +2: All tests passed!`. Production Rules deployment and release
 operations were not performed.
+
+The v3.9.84+710 backup follow-up reads workspace settings by the selected
+tenant document ID, separates selectable backup categories from serialized
+collection keys, and verifies seller inventory ownership in imported archives.
+Selected super-admin backup remains workspace-scoped; seller restore remains
+limited to eligible own cash transactions. Role tests: `00:07 +16: All tests
+passed!`; full suite: `01:15 +603: All tests passed!`; both analyzers are clean;
+Rules Emulator: `132 passing (48s)`. Firestore Rules/indexes deployed. Split APKs built (30.4/32.0/33.4 MB); the
+ARM64 APK installed on `R5GL22RGT9V` (`Success`, versionCode `3101110`).
+Hosting deployment and Git publication remain pending because pushing to
+`main` triggers the Hosting workflow.
 
 Route, shop, product, and variant edit forms wait for the active profile and
 matching record before enabling inputs or saving. Errors can be retried,
@@ -56,6 +67,25 @@ Router tests: `00:05 +6: All tests passed!`; current full suite:
 `No issues found! (ran in 102.3s)`; `dart analyze test/`: `No issues found!`.
 The debug APK attempt failed at `:app:mergeDebugJavaResource` with insufficient
 system resources; no release APK or device install was produced.
+
+The 2026-10-24 unreleased data-freshness pass keeps invoice-header and workspace
+settings forms synchronized with live Firestore snapshots while preserving
+unsaved edits. Shops, invoices, shop ledgers, and settings support pull-to-
+refresh. Shop flow totals are grouped by route currency and show full values;
+invoice Pending filters outstanding sales. Voided invoice-linked entries and
+their reversals are hidden from customer statements/exports, but remain in
+admin transaction history; collected cash remains visible as customer credit
+when applicable. Voids query all tenant-scoped ledger rows linked by invoice
+ID, including settlement transactions created by older app versions; current
+settlement writes also append their IDs to the invoice atomically. Receipt
+PDFs emphasize the received amount and provide
+payment, balance, received-by, and signature details. Ledger summary labels
+follow the active RTL direction, and statement/report PDFs use the complete
+workspace invoice header. Focused tests and both analyzers pass; full-suite and
+rendered device acceptance remain pending. The final full suite reports
+`01:08 +599: All tests passed!`; the invoice-void suite reports
+`00:00 +22: All tests passed!`. No production deployment or release operation
+was performed for this unreleased source change.
 
 Account-statement exports resolve the selected shop's route currency before
 building both spreadsheet rows and PDF output. Seller reports keep transaction

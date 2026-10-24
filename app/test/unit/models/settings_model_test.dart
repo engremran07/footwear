@@ -26,7 +26,7 @@ void main() {
     test('parses all fields correctly', () {
       final m = SettingsModel.fromJson(baseJson);
       expect(m.tenantId, 'jbm-impex');
-      expect(m.companyName, 'Test Co');
+      expect(m.companyName, 'Test Company');
       expect(m.currency, 'SAR');
       expect(m.pairsPerCarton, 12);
       expect(m.logoBase64, 'aGVsbG8=');
@@ -56,8 +56,19 @@ void main() {
 
       expect(snapshot['name_en'], 'Test Company');
       expect(snapshot['name_ar'], 'شركة الاختبار');
-      expect(snapshot['company_name'], 'Test Co');
+      expect(snapshot.containsKey('company_name'), isFalse);
       expect(snapshot['logo_base64'], 'aGVsbG8=');
+    });
+
+    test('migrates legacy company name into an otherwise empty header', () {
+      final settings = SettingsModel.fromJson({
+        'company_name': 'Legacy Workspace',
+        'currency': 'SAR',
+        'pairs_per_carton': 12,
+      });
+
+      expect(settings.invoiceHeader.nameEn, 'Legacy Workspace');
+      expect(settings.toJson().containsKey('company_name'), isFalse);
     });
   });
 
@@ -65,7 +76,6 @@ void main() {
     test('round-trips through fromJson/toJson', () {
       final ts = Timestamp.fromMillisecondsSinceEpoch(1000);
       final original = SettingsModel(
-        companyName: 'My Shop',
         currency: 'PKR',
         pairsPerCarton: 20,
         allowNonStockInvoices: false,
@@ -80,6 +90,7 @@ void main() {
       final json = original.toJson();
       final restored = SettingsModel.fromJson(json);
       expect(restored.companyName, original.companyName);
+      expect(json.containsKey('company_name'), isFalse);
       expect(restored.currency, original.currency);
       expect(restored.pairsPerCarton, original.pairsPerCarton);
       expect(restored.allowNonStockInvoices, isFalse);
@@ -91,9 +102,9 @@ void main() {
     test('copyWith can update and clear optional logo field', () {
       final ts = Timestamp.fromMillisecondsSinceEpoch(1000);
       final original = SettingsModel(
-        companyName: 'My Shop',
         currency: 'PKR',
         pairsPerCarton: 12,
+        invoiceHeader: const InvoiceHeaderConfig(nameEn: 'My Shop'),
         logoBase64: 'aGVsbG8=',
         updatedAt: ts,
       );
@@ -107,15 +118,15 @@ void main() {
     test('equality includes business fields', () {
       final ts = Timestamp.fromMillisecondsSinceEpoch(1000);
       final left = SettingsModel(
-        companyName: 'My Shop',
         currency: 'PKR',
         pairsPerCarton: 12,
+        invoiceHeader: const InvoiceHeaderConfig(nameEn: 'My Shop'),
         updatedAt: ts,
       );
       final right = SettingsModel(
-        companyName: 'My Shop',
         currency: 'PKR',
         pairsPerCarton: 12,
+        invoiceHeader: const InvoiceHeaderConfig(nameEn: 'My Shop'),
         updatedAt: ts,
       );
 
@@ -126,7 +137,6 @@ void main() {
     test('asserts when pairsPerCarton is not positive', () {
       expect(
         () => SettingsModel(
-          companyName: 'Broken',
           currency: 'PKR',
           pairsPerCarton: 0,
           updatedAt: Timestamp.fromMillisecondsSinceEpoch(0),

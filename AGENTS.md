@@ -511,8 +511,8 @@ no APK was requested or built, do not run this step.
 
 ```powershell
 adb devices   # if any device listed below header, MUST proceed with install
-adb -s <device-id> push "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" /sdcard/Download/
-adb -s <device-id> install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
+adb -s <device-id> push "app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" /sdcard/Download/
+adb -s <device-id> install --streaming -r "app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk"
 ```
 
 Evidence required: quote `Success` from adb output, OR quote exact `adb devices`
@@ -556,6 +556,33 @@ locale. Cover these contracts, actual color pairs, and RTL direction in focused
 widget tests.
 
 ## 10) Current Audit Status
+
+2026-10-24 operational data freshness and financial presentation — local,
+unreleased source:
+
+- Workspace invoice-header and business-settings forms now rehydrate from
+  Firestore snapshots while clean and preserve unsaved edits. The invoice
+  header is the editable branding source; settings saves remove the legacy
+  `company_name` field while older records remain readable during migration.
+- Pull-to-refresh covers shop lists, invoice lists (including empty filters),
+  shop ledgers, and settings forms. Firestore-backed views remain live streams.
+  Shop flow totals are full precision and grouped by route currency; invoice
+  lists have an outstanding-sale filter. Shop detail places location and
+  overdue age on one compact row.
+- Voiding atomically tags invoice-linked transactions and reversal rows for
+  exclusion from customer-facing ledgers and exports; admin transaction
+  history retains the audit rows. A collected payment remains visible as
+  customer credit when a sale is voided in credit-balance mode.
+- Receipt PDFs emphasize the received amount and include payment, balance,
+  received-by, and signature details. Ledger summary labels now use the
+  document's locale direction; statements/reports render the configured
+  workspace invoice header.
+- Focused invoice/currency/model/PDF suite: `00:03 +43: All tests passed!`;
+  live settings hydration: `00:01 +2: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 52.6s)`;
+  `dart analyze test/`: `No issues found!`. Full-suite validation is pending.
+  Firestore Rules were not changed or deployed; no release build, device
+  install, commit, or push was performed.
 
 2026-10-24 invoice permission re-audit — local source, not deployed:
 
@@ -1135,3 +1162,49 @@ Unreleased shared frontend accessibility foundation:
 - No device install, authenticated business-screen visual acceptance, or
   performance profile was performed. The wider frontend visual-acceptance
   mission remains partial.
+
+2026-10-24 unreleased operational refresh and invoice-void integrity:
+
+- Workspace settings/header forms rehydrate from Firestore snapshots until
+  locally edited. Shops, invoices, shop ledgers, and settings expose pull-to-
+  refresh. Shop flow totals keep route currencies separate and unabridged;
+  invoice Pending includes only outstanding sale invoices. Receipt PDFs
+  emphasize received amounts and include payment, balance, receiver, and
+  signature details.
+- Invoice voids now include every tenant-scoped transaction linked by
+  `invoice_id`, including legacy settlement payments not recorded on older
+  invoice documents. New settlement writes also append their transaction ID
+  atomically to the invoice. Customer statements omit voided rows; a
+  credit-balance void retains all actual cash-in payments as customer credit,
+  while cash-refund voids hide those payments. Admin transaction history
+  retains the audit rows.
+- Full Flutter suite: `01:08 +599: All tests passed!`; focused invoice-void
+  tests: `00:00 +22: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 7.1s)`; `dart analyze test/`: `No issues found!`.
+- Firestore Rules and indexes were not changed. No Rules deployment, release
+  build, Hosting deployment, APK installation, commit, or push was performed.
+- Authenticated web/APK cross-device freshness and visual acceptance remain
+  unverified. Workspace-admin role promotion remains restricted to the
+  selected platform super-admin path; no role authorization was changed.
+
+2026-10-24 workspace backup scope and role validation — v3.9.84+710:
+
+- Tenant backup reads now resolve `settings/{tenantId}` by its authorized
+  document path instead of issuing a tenant-field list query that Firestore
+  Rules cannot prove. Archive validation uses the concrete collection keys
+  actually serialized for products and inventory, while retaining each role's
+  narrower selection policy.
+- Selected super-admin workspace backup remains explicit and metadata-only by
+  default. Seller backups remain tenant- and assigned-route-scoped; restore
+  accepts only the seller's own eligible unlinked cash rows, and rejects
+  inventory records belonging to another seller. Workspace-admin role
+  promotion remains reserved for the selected platform-super-admin path.
+- Backup role widget/unit tests: `00:07 +16: All tests passed!`; full Flutter
+  suite: `01:15 +603: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 83.9s)`; `dart analyze test/`: `No issues found!`.
+  Firestore Rules Emulator: `132 passing (48s)`. Firestore Rules/index
+  deployment reported `Deploy complete!`; split APKs built at 30.4 MB,
+  32.0 MB, and 33.4 MB. ARM64 APK install on `R5GL22RGT9V` reported
+  `Success`; the device reports versionName `3.9.84`, versionCode `3101110`.
+  Hosting deployment and Git publication are pending; a push to `main`
+  triggers the Hosting workflow and requires explicit authorization.

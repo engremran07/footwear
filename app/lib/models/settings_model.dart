@@ -18,6 +18,8 @@ class InvoiceHeaderConfig {
   final String commercialRegistrationNumber;
   final String template;
   final String accentColor;
+  final String titleScale;
+  final bool useLatestHeaderOnReprint;
   final Set<String> visibleFields;
 
   const InvoiceHeaderConfig({
@@ -36,6 +38,8 @@ class InvoiceHeaderConfig {
     this.commercialRegistrationNumber = '',
     this.template = 'classic',
     this.accentColor = '#315C4C',
+    this.titleScale = 'normal',
+    this.useLatestHeaderOnReprint = false,
     this.visibleFields = const {
       'logo',
       'phone',
@@ -65,6 +69,13 @@ class InvoiceHeaderConfig {
           json['commercial_registration_number'] as String? ?? '',
       template: json['template'] as String? ?? 'classic',
       accentColor: json['accent_color'] as String? ?? '#315C4C',
+      titleScale: switch (json['title_scale']) {
+        'small' => 'small',
+        'large' => 'large',
+        _ => 'normal',
+      },
+      useLatestHeaderOnReprint:
+          json['use_latest_header_on_reprint'] as bool? ?? false,
       visibleFields: rawVisibleFields == null
           ? const {
               'logo',
@@ -93,6 +104,8 @@ class InvoiceHeaderConfig {
     'commercial_registration_number': commercialRegistrationNumber,
     'template': template,
     'accent_color': accentColor,
+    'title_scale': titleScale,
+    'use_latest_header_on_reprint': useLatestHeaderOnReprint,
     'visible_fields': visibleFields.toList()..sort(),
   };
 
@@ -112,6 +125,8 @@ class InvoiceHeaderConfig {
     String? commercialRegistrationNumber,
     String? template,
     String? accentColor,
+    String? titleScale,
+    bool? useLatestHeaderOnReprint,
     Set<String>? visibleFields,
   }) => InvoiceHeaderConfig(
     nameEn: nameEn ?? this.nameEn,
@@ -130,13 +145,15 @@ class InvoiceHeaderConfig {
         commercialRegistrationNumber ?? this.commercialRegistrationNumber,
     template: template ?? this.template,
     accentColor: accentColor ?? this.accentColor,
+    titleScale: titleScale ?? this.titleScale,
+    useLatestHeaderOnReprint:
+        useLatestHeaderOnReprint ?? this.useLatestHeaderOnReprint,
     visibleFields: visibleFields ?? this.visibleFields,
   );
 }
 
 class SettingsModel {
   final String tenantId;
-  final String companyName;
   final String currency;
   final int pairsPerCarton;
   final bool requireAdminApprovalForSellerTransactionEdits;
@@ -150,7 +167,6 @@ class SettingsModel {
 
   const SettingsModel({
     this.tenantId = '__global__',
-    required this.companyName,
     required this.currency,
     required this.pairsPerCarton,
     this.requireAdminApprovalForSellerTransactionEdits = false,
@@ -160,9 +176,19 @@ class SettingsModel {
     required this.updatedAt,
   }) : assert(pairsPerCarton > 0, 'pairsPerCarton must be greater than 0');
 
+  String get companyName {
+    for (final name in [
+      invoiceHeader.nameEn,
+      invoiceHeader.nameAr,
+      invoiceHeader.nameUr,
+    ]) {
+      if (name.trim().isNotEmpty) return name.trim();
+    }
+    return 'My Business';
+  }
+
   SettingsModel copyWith({
     String? tenantId,
-    String? companyName,
     String? currency,
     int? pairsPerCarton,
     bool? requireAdminApprovalForSellerTransactionEdits,
@@ -174,7 +200,6 @@ class SettingsModel {
   }) {
     return SettingsModel(
       tenantId: tenantId ?? this.tenantId,
-      companyName: companyName ?? this.companyName,
       currency: currency ?? this.currency,
       pairsPerCarton: pairsPerCarton ?? this.pairsPerCarton,
       requireAdminApprovalForSellerTransactionEdits:
@@ -201,15 +226,24 @@ class SettingsModel {
 
   Map<String, dynamic> get invoiceHeaderSnapshot => {
     ...invoiceHeader.toJson(),
-    'company_name': companyName,
     if (logoBase64 != null) 'logo_base64': logoBase64,
   };
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) {
     final tenantId = json['tenant_id'] as String? ?? '__global__';
+    final header = InvoiceHeaderConfig.fromJson(
+      json['invoice_header'] as Map<String, dynamic>?,
+    );
+    final legacyName = (json['company_name'] as String? ?? '').trim();
+    final canonicalHeader =
+        header.nameEn.trim().isEmpty &&
+            header.nameAr.trim().isEmpty &&
+            header.nameUr.trim().isEmpty &&
+            legacyName.isNotEmpty
+        ? header.copyWith(nameEn: legacyName)
+        : header;
     return SettingsModel(
       tenantId: tenantId,
-      companyName: json['company_name'] as String? ?? 'My Business',
       currency: json['currency'] as String? ?? 'SAR',
       pairsPerCarton: json['pairs_per_carton'] as int? ?? 12,
       requireAdminApprovalForSellerTransactionEdits:
@@ -217,9 +251,7 @@ class SettingsModel {
               as bool? ??
           false,
       allowNonStockInvoices: json['allow_non_stock_invoices'] as bool? ?? false,
-      invoiceHeader: InvoiceHeaderConfig.fromJson(
-        json['invoice_header'] as Map<String, dynamic>?,
-      ),
+      invoiceHeader: canonicalHeader,
       logoBase64: json['logo_base64'] as String?,
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
     );
@@ -227,7 +259,6 @@ class SettingsModel {
 
   Map<String, dynamic> toJson() => {
     'tenant_id': tenantId,
-    'company_name': companyName,
     'currency': currency,
     'pairs_per_carton': pairsPerCarton,
     'require_admin_approval_for_seller_transaction_edits':
@@ -243,7 +274,6 @@ class SettingsModel {
       identical(this, other) ||
       (other is SettingsModel &&
           other.tenantId == tenantId &&
-          other.companyName == companyName &&
           other.currency == currency &&
           other.pairsPerCarton == pairsPerCarton &&
           other.requireAdminApprovalForSellerTransactionEdits ==
@@ -257,7 +287,6 @@ class SettingsModel {
   @override
   int get hashCode => Object.hash(
     tenantId,
-    companyName,
     currency,
     pairsPerCarton,
     requireAdminApprovalForSellerTransactionEdits,

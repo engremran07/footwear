@@ -69,6 +69,8 @@ import 'widget/route_form_seller_load_test.dart'
 import 'widget/edit_form_loading_test.dart' as edit_form_loading_widget;
 import 'widget/settings_profile_error_test.dart'
     as settings_profile_error_widget;
+import 'widget/settings_realtime_hydration_test.dart'
+    as settings_realtime_hydration_widget;
 import 'widget/tenant_management_error_test.dart'
     as tenant_management_error_widget;
 import 'widget/inventory_screen_test.dart' as inventory_screen_widget;
@@ -136,6 +138,7 @@ void main() {
   route_form_seller_load_widget.main();
   edit_form_loading_widget.main();
   settings_profile_error_widget.main();
+  settings_realtime_hydration_widget.main();
   tenant_management_error_widget.main();
   inventory_screen_widget.main();
   database_backup_screen_widget.main();

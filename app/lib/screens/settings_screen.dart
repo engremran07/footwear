@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -11,11 +11,13 @@ import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/snack_helper.dart';
+import '../models/settings_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 
 import '../widgets/confirm_dialog.dart';
 import '../widgets/error_state.dart';
+import '../widgets/app_pull_refresh.dart';
 import '../widgets/whats_new_sheet.dart';
 
 Future<bool> _requireAdminSettingsAccess(
@@ -39,7 +41,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final _companyC = TextEditingController();
   final _ppcC = TextEditingController();
   bool _requireAdminApprovalForSellerTransactionEdits = false;
   bool _settingsLoaded = false;
@@ -48,28 +49,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   void dispose() {
-    _companyC.dispose();
     _ppcC.dispose();
     super.dispose();
   }
 
-  void _loadSettings() {
-    if (_settingsLoaded) return;
-    final s = ref.read(settingsProvider).value;
-    if (s != null) {
-      _companyC.value = TextEditingValue(
-        text: s.companyName,
-        selection: TextSelection.collapsed(offset: s.companyName.length),
-      );
-      final ppcStr = s.pairsPerCarton.toString();
-      _ppcC.value = TextEditingValue(
-        text: ppcStr,
-        selection: TextSelection.collapsed(offset: ppcStr.length),
-      );
-      _requireAdminApprovalForSellerTransactionEdits =
-          s.requireAdminApprovalForSellerTransactionEdits;
-      _settingsLoaded = true;
-    }
+  void _loadSettings(SettingsModel settings) {
+    if (_isDirty) return;
+    final ppcStr = settings.pairsPerCarton.toString();
+    _ppcC.value = TextEditingValue(
+      text: ppcStr,
+      selection: TextSelection.collapsed(offset: ppcStr.length),
+    );
+    _requireAdminApprovalForSellerTransactionEdits =
+        settings.requireAdminApprovalForSellerTransactionEdits;
+    _settingsLoaded = true;
   }
 
   Widget _buildPlatformSettingsHub() {
@@ -140,13 +133,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return;
       }
       await ref.read(settingsNotifierProvider.notifier).save({
-        'company_name': _companyC.text.trim(),
         'pairs_per_carton': pairsPerCarton,
         'require_admin_approval_for_seller_transaction_edits':
             _requireAdminApprovalForSellerTransactionEdits,
       });
       if (mounted) {
         setState(() => _isDirty = false);
+        ref.invalidate(settingsProvider);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
@@ -188,7 +181,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!currentUser.isAdmin) {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
-    settingsAsync.whenData((_) => _loadSettings());
+    settingsAsync.whenData(_loadSettings);
     if (!_settingsLoaded) {
       return Scaffold(
         body: settingsAsync.when(
@@ -215,171 +208,170 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (leave == true && context.mounted) Navigator.pop(context);
       },
       child: Scaffold(
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Business settings
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      tr('business_settings', ref),
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
+        body: AppPullRefresh(
+          onRefresh: () async {
+            ref.invalidate(settingsProvider);
+            await ref.read(settingsProvider.future);
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              // Business settings
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr('business_settings', ref),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _companyC,
-                      decoration: InputDecoration(
-                        labelText: tr('company_name', ref),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _ppcC,
+                        decoration: InputDecoration(
+                          labelText: tr('pairs_per_carton', ref),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (_) {
+                          if (!_isDirty) setState(() => _isDirty = true);
+                        },
                       ),
-                      onChanged: (_) {
-                        if (!_isDirty) setState(() => _isDirty = true);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _ppcC,
-                      decoration: InputDecoration(
-                        labelText: tr('pairs_per_carton', ref),
+                      const SizedBox(height: 8),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        value: _requireAdminApprovalForSellerTransactionEdits,
+                        onChanged: (value) {
+                          setState(() {
+                            _requireAdminApprovalForSellerTransactionEdits =
+                                value;
+                            _isDirty = true;
+                          });
+                        },
+                        title: Text(tr('require_approval_title', ref)),
+                        subtitle: Text(tr('require_approval_subtitle', ref)),
                       ),
-                      keyboardType: TextInputType.number,
-                      onChanged: (_) {
-                        if (!_isDirty) setState(() => _isDirty = true);
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      value: _requireAdminApprovalForSellerTransactionEdits,
-                      onChanged: (value) {
-                        setState(() {
-                          _requireAdminApprovalForSellerTransactionEdits =
-                              value;
-                          _isDirty = true;
-                        });
-                      },
-                      title: Text(tr('require_approval_title', ref)),
-                      subtitle: Text(tr('require_approval_subtitle', ref)),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _savingSettings ? null : _saveSettings,
-                        child: _savingSettings
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(tr('save', ref)),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _savingSettings ? null : _saveSettings,
+                          child: _savingSettings
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(tr('save', ref)),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Company Logo (admin only)
-            if (currentUser.isAdmin) ...[
-              const _LogoCard(),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.receipt_long_outlined),
-                title: Text(tr('invoice_header_settings', ref)),
-                subtitle: Text(tr('invoice_header_settings_hint', ref)),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/settings/invoice-header'),
               ),
               const SizedBox(height: 16),
-            ],
-            // About
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.info_outlined),
-              title: Text(tr('about_us', ref)),
-              subtitle: const Text(
-                AppBrand.versionDisplay,
-                style: TextStyle(fontSize: 12),
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/about'),
-            ),
-            const SizedBox(height: 16),
-            // â”€â”€ Backup & Restore â”€â”€
-            if (ref.watch(authUserProvider).value?.isAdmin == true) ...[
-              Card(
-                child: ListTile(
-                  leading: const Icon(
-                    Icons.backup_outlined,
-                    color: AppBrand.primaryColor,
-                  ),
-                  title: Text(tr('backup_title', ref)),
-                  subtitle: Text(tr('backup_nav_subtitle', ref)),
+              // Company Logo (admin only)
+              if (currentUser.isAdmin) ...[
+                const _LogoCard(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.receipt_long_outlined),
+                  title: Text(tr('invoice_header_settings', ref)),
+                  subtitle: Text(tr('invoice_header_settings_hint', ref)),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push('/settings/backup'),
+                  onTap: () => context.push('/settings/invoice-header'),
                 ),
+                const SizedBox(height: 16),
+              ],
+              // About
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.info_outlined),
+                title: Text(tr('about_us', ref)),
+                subtitle: const Text(
+                  AppBrand.versionDisplay,
+                  style: TextStyle(fontSize: 12),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/about'),
               ),
-              const SizedBox(height: 8),
-              if (ref.watch(authUserProvider).value?.isSuperAdmin == true)
+              const SizedBox(height: 16),
+              // â”€â”€ Backup & Restore â”€â”€
+              if (ref.watch(authUserProvider).value?.isAdmin == true) ...[
                 Card(
-                  color: AppBrand.errorColor.withAlpha(12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: AppBrand.errorColor.withAlpha(80)),
-                  ),
                   child: ListTile(
                     leading: const Icon(
-                      Icons.warning_amber_rounded,
-                      color: AppBrand.errorColor,
+                      Icons.backup_outlined,
+                      color: AppBrand.primaryColor,
                     ),
-                    title: Text(
-                      tr('danger_zone', ref),
-                      style: const TextStyle(
-                        color: AppBrand.errorColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    subtitle: Text(tr('danger_zone_subtitle', ref)),
-                    trailing: const Icon(
-                      Icons.chevron_right,
-                      color: AppBrand.errorColor,
-                    ),
-                    onTap: () => context.push('/settings/flush'),
+                    title: Text(tr('backup_title', ref)),
+                    subtitle: Text(tr('backup_nav_subtitle', ref)),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push('/settings/backup'),
                   ),
                 ),
-            ],
-            const SizedBox(height: 16),
-            // Sign out
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppBrand.errorColor,
-                  side: const BorderSide(color: AppBrand.errorColor),
+                const SizedBox(height: 8),
+                if (ref.watch(authUserProvider).value?.isSuperAdmin == true)
+                  Card(
+                    color: AppBrand.errorColor.withAlpha(12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: AppBrand.errorColor.withAlpha(80),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.warning_amber_rounded,
+                        color: AppBrand.errorColor,
+                      ),
+                      title: Text(
+                        tr('danger_zone', ref),
+                        style: const TextStyle(
+                          color: AppBrand.errorColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Text(tr('danger_zone_subtitle', ref)),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: AppBrand.errorColor,
+                      ),
+                      onTap: () => context.push('/settings/flush'),
+                    ),
+                  ),
+              ],
+              const SizedBox(height: 16),
+              // Sign out
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppBrand.errorColor,
+                    side: const BorderSide(color: AppBrand.errorColor),
+                  ),
+                  onPressed: () async {
+                    final confirmed = await ConfirmDialog.show(
+                      context,
+                      title: tr('sign_out', ref),
+                      message: tr('confirm_sign_out', ref),
+                    );
+                    if (confirmed == true) {
+                      ref.read(authNotifierProvider.notifier).signOut();
+                    }
+                  },
+                  icon: const Icon(Icons.logout),
+                  label: Text(tr('sign_out', ref)),
                 ),
-                onPressed: () async {
-                  final confirmed = await ConfirmDialog.show(
-                    context,
-                    title: tr('sign_out', ref),
-                    message: tr('confirm_sign_out', ref),
-                  );
-                  if (confirmed == true) {
-                    ref.read(authNotifierProvider.notifier).signOut();
-                  }
-                },
-                icon: const Icon(Icons.logout),
-                label: Text(tr('sign_out', ref)),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
