@@ -53,6 +53,8 @@ prepare the authorized `main` publication.
 - Firestore Rules/indexes deployment completed with `Deploy complete!`.
   Firebase reported 23 remote indexes and 2 field overrides not present in
   the local index file; no `--force` deletion was used.
+- Commit created: `96878ee` (`feat: complete backup and frontend audit
+  release — v3.9.83+709`). Push output: `6304214..96878ee  main -> main`.
 - No device installation or authenticated rendered business-screen review
   was performed. The complete UI visual redesign, exhaustive interaction
   inventory, locale/theme/text-scale acceptance, and profile-mode performance
