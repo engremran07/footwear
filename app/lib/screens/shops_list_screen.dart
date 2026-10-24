@@ -181,13 +181,21 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
     // When navigated with ?currency=X, restrict shops to routes of that currency.
     final filterCurrency = widget.filterCurrency?.toUpperCase();
-    final currencyRouteIds =
-        (filterCurrency != null && routesAsync?.value != null)
-        ? routesAsync!.value!
-              .where((r) => r.currency.toUpperCase() == filterCurrency)
-              .map((r) => r.id)
-              .toSet()
-        : null;
+    final Set<String>? currencyRouteIds;
+    if (filterCurrency == null) {
+      currencyRouteIds = null;
+    } else if (routesAsync == null) {
+      currencyRouteIds = const <String>{};
+    } else if (routesAsync.hasValue) {
+      currencyRouteIds = routesAsync.value!
+          .where((r) => r.currency.toUpperCase() == filterCurrency)
+          .map((r) => r.id)
+          .toSet();
+    } else {
+      currencyRouteIds = null;
+    }
+    final currencyRouteScopeReady =
+        filterCurrency == null || currencyRouteIds != null;
 
     final scopedStatsShops = shopsAsync.value == null
         ? null
@@ -386,7 +394,9 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
               ),
             ),
           // Stats strip — derived from the live shop list
-          if (scopedStatsShops != null && flowByShop != null)
+          if (currencyRouteScopeReady &&
+              scopedStatsShops != null &&
+              flowByShop != null)
             _ShopStatsStrip(
               shops: scopedStatsShops,
               flowByShop: flowByShop,
@@ -396,211 +406,244 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
           else
             const SizedBox.shrink(),
           Expanded(
-            child: shopsAsync.when(
-              skipLoadingOnRefresh: true,
-              data: (shops) {
-                final scopedShops = _scopeShopsByRoute(
-                  shops,
-                  currencyRouteIds: currencyRouteIds,
-                );
-                final scopedFlowByShop = _buildShopFlowStats(
-                  shops: scopedShops,
-                  transactions:
-                      transactionsAsync.value ?? const <TransactionModel>[],
-                );
-                // Pre-compute last transaction per shop from analytics data
-                // (fallback for shops whose Firestore doc does not yet have
-                // last_transaction_type cached — e.g. shops created before
-                // the field was introduced). Analytics are ordered desc by
-                // created_at, so the first entry per shop IS the latest tx.
-                final lastTxByShop =
-                    <String, ({String type, double amount, Timestamp at})>{};
-                for (final tx
-                    in transactionsAsync.value ?? const <TransactionModel>[]) {
-                  if (!lastTxByShop.containsKey(tx.shopId)) {
-                    lastTxByShop[tx.shopId] = (
-                      type: tx.type,
-                      amount: tx.amount,
-                      at: tx.createdAt,
-                    );
-                  }
-                }
-                final filtered = scopedShops.where((s) {
-                  final flowStats =
-                      scopedFlowByShop[s.id] ?? const _ShopFlowStats();
-                  return _matchesSearch(s, _search) &&
-                      _matchesQuickFilter(s, flowStats);
-                }).toList();
-
-                switch (_filter) {
-                  case _ShopQuickFilter.iGot:
-                    filtered.sort(
-                      (a, b) => (scopedFlowByShop[b.id]?.cashIn ?? 0).compareTo(
-                        scopedFlowByShop[a.id]?.cashIn ?? 0,
-                      ),
-                    );
-                  case _ShopQuickFilter.iGave:
-                    filtered.sort(
-                      (a, b) => (scopedFlowByShop[b.id]?.cashOut ?? 0)
-                          .compareTo(scopedFlowByShop[a.id]?.cashOut ?? 0),
-                    );
-                  case _ShopQuickFilter.iWillGet:
-                    filtered.sort((a, b) => b.balance.compareTo(a.balance));
-                  case _ShopQuickFilter.collective:
-                    // Sort by last transaction time DESC (null = least recent).
-                    // Use cached lastTransactionAt first; fall back to the
-                    // timestamp derived from analytics for old shop docs.
-                    filtered.sort((a, b) {
-                      final ta = a.lastTransactionAt ?? lastTxByShop[a.id]?.at;
-                      final tb = b.lastTransactionAt ?? lastTxByShop[b.id]?.at;
-                      if (ta == null && tb == null) {
-                        return a.name.compareTo(b.name);
+            child: !currencyRouteScopeReady
+                ? routesAsync?.hasError == true
+                      ? mappedErrorState(
+                          error: routesAsync!.error!,
+                          ref: ref,
+                          onRetry: () {
+                            if (user?.isAdmin == true) {
+                              ref.invalidate(routesProvider);
+                            } else if (user != null) {
+                              ref.invalidate(routesBySellerProvider(user.id));
+                            }
+                          },
+                        )
+                      : const ShimmerLoading()
+                : shopsAsync.when(
+                    skipLoadingOnRefresh: true,
+                    data: (shops) {
+                      final scopedShops = _scopeShopsByRoute(
+                        shops,
+                        currencyRouteIds: currencyRouteIds,
+                      );
+                      final scopedFlowByShop = _buildShopFlowStats(
+                        shops: scopedShops,
+                        transactions:
+                            transactionsAsync.value ??
+                            const <TransactionModel>[],
+                      );
+                      // Pre-compute last transaction per shop from analytics data
+                      // (fallback for shops whose Firestore doc does not yet have
+                      // last_transaction_type cached — e.g. shops created before
+                      // the field was introduced). Analytics are ordered desc by
+                      // created_at, so the first entry per shop IS the latest tx.
+                      final lastTxByShop =
+                          <
+                            String,
+                            ({String type, double amount, Timestamp at})
+                          >{};
+                      for (final tx
+                          in transactionsAsync.value ??
+                              const <TransactionModel>[]) {
+                        if (!lastTxByShop.containsKey(tx.shopId)) {
+                          lastTxByShop[tx.shopId] = (
+                            type: tx.type,
+                            amount: tx.amount,
+                            at: tx.createdAt,
+                          );
+                        }
                       }
-                      if (ta == null) return 1;
-                      if (tb == null) return -1;
-                      final byActivity = tb.compareTo(ta);
-                      if (byActivity != 0) return byActivity;
-                      return a.name.compareTo(b.name);
-                    });
-                }
+                      final filtered = scopedShops.where((s) {
+                        final flowStats =
+                            scopedFlowByShop[s.id] ?? const _ShopFlowStats();
+                        return _matchesSearch(s, _search) &&
+                            _matchesQuickFilter(s, flowStats);
+                      }).toList();
 
-                if (filtered.isEmpty) {
-                  final hasFilters =
-                      _search.isNotEmpty ||
-                      _filter != _ShopQuickFilter.collective ||
-                      _selectedRouteId != null ||
-                      filterCurrency != null;
-                  return AppPullRefresh(
-                    onRefresh: () async {
-                      if (isSeller && sellerRouteIds.isNotEmpty) {
-                        ref.invalidate(sellerAllShopsProvider);
-                        await ref.read(sellerAllShopsProvider.future);
-                      } else {
-                        ref.invalidate(shopsProvider);
-                        await ref.read(shopsProvider.future);
+                      switch (_filter) {
+                        case _ShopQuickFilter.iGot:
+                          filtered.sort(
+                            (a, b) => (scopedFlowByShop[b.id]?.cashIn ?? 0)
+                                .compareTo(scopedFlowByShop[a.id]?.cashIn ?? 0),
+                          );
+                        case _ShopQuickFilter.iGave:
+                          filtered.sort(
+                            (a, b) => (scopedFlowByShop[b.id]?.cashOut ?? 0)
+                                .compareTo(
+                                  scopedFlowByShop[a.id]?.cashOut ?? 0,
+                                ),
+                          );
+                        case _ShopQuickFilter.iWillGet:
+                          filtered.sort(
+                            (a, b) => b.balance.compareTo(a.balance),
+                          );
+                        case _ShopQuickFilter.collective:
+                          // Sort by last transaction time DESC (null = least recent).
+                          // Use cached lastTransactionAt first; fall back to the
+                          // timestamp derived from analytics for old shop docs.
+                          filtered.sort((a, b) {
+                            final ta =
+                                a.lastTransactionAt ?? lastTxByShop[a.id]?.at;
+                            final tb =
+                                b.lastTransactionAt ?? lastTxByShop[b.id]?.at;
+                            if (ta == null && tb == null) {
+                              return a.name.compareTo(b.name);
+                            }
+                            if (ta == null) return 1;
+                            if (tb == null) return -1;
+                            final byActivity = tb.compareTo(ta);
+                            if (byActivity != 0) return byActivity;
+                            return a.name.compareTo(b.name);
+                          });
                       }
-                      ref.invalidate(shopsAnalyticsTransactionsProvider);
-                      await ref.read(shopsAnalyticsTransactionsProvider.future);
-                    },
-                    child: ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: [
-                        SizedBox(
-                          height: MediaQuery.sizeOf(context).height * 0.45,
-                          child: EmptyState(
-                            icon: hasFilters ? Icons.search_off : Icons.store,
-                            message: hasFilters
-                                ? tr(
-                                    _search.isNotEmpty
-                                        ? 'no_results'
-                                        : 'msg_no_shops_found',
-                                    ref,
-                                  )
-                                : tr('no_shops', ref),
-                            actionLabel: hasFilters
-                                ? tr(
-                                    _search.isNotEmpty
-                                        ? 'clear_search'
-                                        : 'clear',
-                                    ref,
-                                  )
-                                : null,
-                            onAction: hasFilters
-                                ? () {
-                                    if (filterCurrency != null) {
-                                      context.go('/shops');
-                                      return;
-                                    }
-                                    setState(() {
-                                      _search = '';
-                                      _filter = _ShopQuickFilter.collective;
-                                      _selectedRouteId = null;
-                                    });
-                                  }
-                                : null,
+
+                      if (filtered.isEmpty) {
+                        final hasFilters =
+                            _search.isNotEmpty ||
+                            _filter != _ShopQuickFilter.collective ||
+                            _selectedRouteId != null ||
+                            filterCurrency != null;
+                        return AppPullRefresh(
+                          onRefresh: () async {
+                            if (isSeller && sellerRouteIds.isNotEmpty) {
+                              ref.invalidate(sellerAllShopsProvider);
+                              await ref.read(sellerAllShopsProvider.future);
+                            } else {
+                              ref.invalidate(shopsProvider);
+                              await ref.read(shopsProvider.future);
+                            }
+                            ref.invalidate(shopsAnalyticsTransactionsProvider);
+                            await ref.read(
+                              shopsAnalyticsTransactionsProvider.future,
+                            );
+                          },
+                          child: ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: [
+                              SizedBox(
+                                height:
+                                    MediaQuery.sizeOf(context).height * 0.45,
+                                child: EmptyState(
+                                  icon: hasFilters
+                                      ? Icons.search_off
+                                      : Icons.store,
+                                  message: hasFilters
+                                      ? tr(
+                                          _search.isNotEmpty
+                                              ? 'no_results'
+                                              : 'msg_no_shops_found',
+                                          ref,
+                                        )
+                                      : tr('no_shops', ref),
+                                  actionLabel: hasFilters
+                                      ? tr(
+                                          _search.isNotEmpty
+                                              ? 'clear_search'
+                                              : 'clear',
+                                          ref,
+                                        )
+                                      : null,
+                                  onAction: hasFilters
+                                      ? () {
+                                          if (filterCurrency != null) {
+                                            context.go('/shops');
+                                            return;
+                                          }
+                                          setState(() {
+                                            _search = '';
+                                            _filter =
+                                                _ShopQuickFilter.collective;
+                                            _selectedRouteId = null;
+                                          });
+                                        }
+                                      : null,
+                                ),
+                              ),
+                            ],
                           ),
+                        );
+                      }
+
+                      // Group by route for admin and sellers with multiple routes.
+                      final routes = routesAsync?.value ?? [];
+                      final shouldGroupByRoute =
+                          user?.isAdmin == true || routes.length > 1;
+                      if (shouldGroupByRoute && routes.isNotEmpty) {
+                        return _AdminGroupedShopsView(
+                          shops: filtered,
+                          routes: routes,
+                          selectedFilter: _filter,
+                          flowByShop: scopedFlowByShop,
+                          showAssignedSellerNames: user?.isAdmin == true,
+                          lastTxByShop: lastTxByShop,
+                        );
+                      }
+
+                      // Detect duplicate shop names within the current list
+                      final nameCount = <String, int>{};
+                      for (final s in filtered) {
+                        final k = s.name.toLowerCase();
+                        nameCount[k] = (nameCount[k] ?? 0) + 1;
+                      }
+                      final duplicateNames = nameCount.entries
+                          .where((e) => e.value > 1)
+                          .map((e) => e.key)
+                          .toSet();
+
+                      // Pre-compute currency per routeId to avoid N per-tile
+                      // provider subscriptions (prevents re-subscription flicker).
+                      final currencyByRoute = <String, String>{
+                        for (final r in routes) r.id: r.currency,
+                      };
+
+                      return AppPullRefresh(
+                        onRefresh: () async {
+                          if (isSeller && sellerRouteIds.isNotEmpty) {
+                            ref.invalidate(sellerAllShopsProvider);
+                            await ref.read(sellerAllShopsProvider.future);
+                          } else {
+                            ref.invalidate(shopsProvider);
+                            await ref.read(shopsProvider.future);
+                          }
+                          ref.invalidate(shopsAnalyticsTransactionsProvider);
+                          await ref.read(
+                            shopsAnalyticsTransactionsProvider.future,
+                          );
+                        },
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 88),
+                          itemCount: filtered.length,
+                          itemBuilder: (_, i) => _ShopTile(
+                            shop: filtered[i],
+                            selectedFilter: _filter,
+                            flowStats:
+                                scopedFlowByShop[filtered[i].id] ??
+                                const _ShopFlowStats(),
+                            currency:
+                                currencyByRoute[filtered[i].routeId] ?? 'SAR',
+                            hasDuplicate: duplicateNames.contains(
+                              filtered[i].name.toLowerCase(),
+                            ),
+                            lastTxFallback: lastTxByShop[filtered[i].id],
+                          ).listEntry(i),
                         ),
-                      ],
+                      );
+                    },
+                    loading: () => const ShimmerLoading(),
+                    error: (e, _) => mappedErrorState(
+                      error: e,
+                      ref: ref,
+                      onRetry: () {
+                        if (isSeller && sellerRouteIds.isNotEmpty) {
+                          ref.invalidate(sellerAllShopsProvider);
+                        } else {
+                          ref.invalidate(shopsProvider);
+                        }
+                      },
                     ),
-                  );
-                }
-
-                // Group by route for admin and sellers with multiple routes.
-                final routes = routesAsync?.value ?? [];
-                final shouldGroupByRoute =
-                    user?.isAdmin == true || routes.length > 1;
-                if (shouldGroupByRoute && routes.isNotEmpty) {
-                  return _AdminGroupedShopsView(
-                    shops: filtered,
-                    routes: routes,
-                    selectedFilter: _filter,
-                    flowByShop: scopedFlowByShop,
-                    showAssignedSellerNames: user?.isAdmin == true,
-                    lastTxByShop: lastTxByShop,
-                  );
-                }
-
-                // Detect duplicate shop names within the current list
-                final nameCount = <String, int>{};
-                for (final s in filtered) {
-                  final k = s.name.toLowerCase();
-                  nameCount[k] = (nameCount[k] ?? 0) + 1;
-                }
-                final duplicateNames = nameCount.entries
-                    .where((e) => e.value > 1)
-                    .map((e) => e.key)
-                    .toSet();
-
-                // Pre-compute currency per routeId to avoid N per-tile
-                // provider subscriptions (prevents re-subscription flicker).
-                final currencyByRoute = <String, String>{
-                  for (final r in routes) r.id: r.currency,
-                };
-
-                return AppPullRefresh(
-                  onRefresh: () async {
-                    if (isSeller && sellerRouteIds.isNotEmpty) {
-                      ref.invalidate(sellerAllShopsProvider);
-                      await ref.read(sellerAllShopsProvider.future);
-                    } else {
-                      ref.invalidate(shopsProvider);
-                      await ref.read(shopsProvider.future);
-                    }
-                    ref.invalidate(shopsAnalyticsTransactionsProvider);
-                    await ref.read(shopsAnalyticsTransactionsProvider.future);
-                  },
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(bottom: 88),
-                    itemCount: filtered.length,
-                    itemBuilder: (_, i) => _ShopTile(
-                      shop: filtered[i],
-                      selectedFilter: _filter,
-                      flowStats:
-                          scopedFlowByShop[filtered[i].id] ??
-                          const _ShopFlowStats(),
-                      currency: currencyByRoute[filtered[i].routeId] ?? 'SAR',
-                      hasDuplicate: duplicateNames.contains(
-                        filtered[i].name.toLowerCase(),
-                      ),
-                      lastTxFallback: lastTxByShop[filtered[i].id],
-                    ).listEntry(i),
                   ),
-                );
-              },
-              loading: () => const ShimmerLoading(),
-              error: (e, _) => mappedErrorState(
-                error: e,
-                ref: ref,
-                onRetry: () {
-                  if (isSeller && sellerRouteIds.isNotEmpty) {
-                    ref.invalidate(sellerAllShopsProvider);
-                  } else {
-                    ref.invalidate(shopsProvider);
-                  }
-                },
-              ),
-            ),
           ),
         ],
       ),

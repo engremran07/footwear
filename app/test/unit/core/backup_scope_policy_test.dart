@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/core/utils/backup_scope_policy.dart';
 import 'package:footwear_erp/models/user_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() {
   test(
@@ -33,11 +34,68 @@ void main() {
     });
   });
 
+  test('seller backups contain only assigned-route business records', () {
+    expect(
+      BackupScopePolicy.scopeFor(UserRole.seller),
+      BackupScope.sellerRoute,
+    );
+    expect(BackupScopePolicy.archiveScopeFor(UserRole.seller), 'seller_route');
+    expect(BackupScopePolicy.collectionsFor(UserRole.seller), {
+      'routes',
+      'shops',
+      'inventory',
+      'transactions',
+      'invoices',
+    });
+  });
+
   test('seller and legacy admin accounts cannot initiate backups', () {
-    expect(BackupScopePolicy.scopeFor(UserRole.seller), BackupScope.disabled);
     expect(BackupScopePolicy.scopeFor(UserRole.admin), BackupScope.disabled);
-    expect(BackupScopePolicy.collectionsFor(UserRole.seller), isEmpty);
     expect(BackupScopePolicy.collectionsFor(UserRole.admin), isEmpty);
+  });
+
+  test('seller restore accepts only own unlinked cash rows in current scope', () {
+    final document = <String, dynamic>{
+      '__id': 'tx-1',
+      'tenant_id': 'tenant-1',
+      'route_id': 'route-1',
+      'created_by': 'seller-1',
+      'shop_id': 'shop-1',
+      'type': 'cash_in',
+      'amount': 25,
+      'items': <Object>[],
+      'created_at': Timestamp.fromMillisecondsSinceEpoch(0),
+    };
+
+    bool eligible([Map<String, dynamic>? override]) =>
+        BackupScopePolicy.isSellerTransactionRestorable(
+          document: {...document, ...?override},
+          sellerId: 'seller-1',
+          routeId: 'route-1',
+          tenantId: 'tenant-1',
+          assignedRouteIds: {'route-1'},
+        );
+
+    expect(eligible(), isTrue);
+    expect(eligible({'created_by': 'seller-2'}), isFalse);
+    expect(eligible({'route_id': 'route-2'}), isFalse);
+    expect(eligible({'tenant_id': 'tenant-2'}), isFalse);
+    expect(eligible({'invoice_id': 'invoice-1'}), isFalse);
+    expect(eligible({'invoice_number': 'INV-1'}), isFalse);
+    expect(eligible({'deleted': true}), isFalse);
+    expect(eligible({'edit_request_pending': true}), isFalse);
+    expect(eligible({'items': <Object>[{'variant_id': 'variant-1'}]}), isFalse);
+    expect(eligible({'amount': double.nan}), isFalse);
+    expect(
+      BackupScopePolicy.isSellerTransactionRestorable(
+        document: {...document, '__id': ''},
+        sellerId: 'seller-1',
+        routeId: 'route-1',
+        tenantId: 'tenant-1',
+        assignedRouteIds: {'route-1'},
+      ),
+      isFalse,
+    );
   });
 
   test(
@@ -66,6 +124,22 @@ void main() {
     );
     expect(
       () => BackupScopePolicy.requireSelectedWorkspace(activeWorkspaceId: null),
+      throwsStateError,
+    );
+  });
+
+  test('backup access rejects the global placeholder as a workspace', () {
+    expect(
+      () => BackupScopePolicy.requireSelectedWorkspace(
+        activeWorkspaceId: '__global__',
+      ),
+      throwsStateError,
+    );
+    expect(
+      () => BackupScopePolicy.requireSelectedWorkspace(
+        activeWorkspaceId: 'tenant-1',
+        requestedWorkspaceId: 'global',
+      ),
       throwsStateError,
     );
   });

@@ -311,8 +311,8 @@ class _HistoryTile extends ConsumerWidget {
                         Expanded(
                           child: Text(
                             tx.shopName.isNotEmpty
-                              ? tx.shopName
-                              : tr('shop', ref),
+                                ? tx.shopName
+                                : tr('shop', ref),
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
@@ -369,12 +369,12 @@ class _HistoryTile extends ConsumerWidget {
                   color: accentColor,
                 ),
               ),
-              // Chevron
-              Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              if (tx.shopId.isNotEmpty)
+                Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
             ],
           ),
         ),
@@ -467,10 +467,6 @@ class _HistoryErrorView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return mappedErrorState(
-      error: error,
-      ref: ref,
-      onRetry: onRetry,
-    );
+    return mappedErrorState(error: error, ref: ref, onRetry: onRetry);
   }
 }

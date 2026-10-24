@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -361,8 +362,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minWidth: screenWidth - (horizontalPadding * 2),
-                  maxWidth: 420,
+                  maxWidth: math.min(
+                    420.0,
+                    screenWidth - (horizontalPadding * 2),
+                  ),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,

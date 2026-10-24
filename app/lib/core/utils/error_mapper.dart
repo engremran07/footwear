@@ -57,9 +57,15 @@ class AppErrorMapper {
 
     // ── Dart built-in errors ───────────────────────────────────────────
     final msg = error.toString().toLowerCase();
+    if (msg.contains('flush_data_reset_unavailable')) {
+      return 'flush_data_reset_unavailable';
+    }
     if (msg.contains('authorized workspace administration is required') ||
         msg.contains('active platform super-admin access is required')) {
       return 'err_permission_denied';
+    }
+    if (msg.contains('workspace lifecycle status changed')) {
+      return 'workspace_lifecycle_changed';
     }
     if (msg.contains('google drive') || msg.contains('oauth')) {
       return 'backup_drive_error';
@@ -86,6 +92,9 @@ class AppErrorMapper {
       return 'err_export_no_data';
     }
     if (msg.contains('workspace-disabled')) return 'workspace_disabled';
+    if (msg.contains('pdf_arabic_shaping_disabled')) {
+      return 'err_pdf_shaping_unavailable';
+    }
     if (msg.contains('pdf_export_failed') ||
         msg.contains('pdf export failed') ||
         msg.contains('pdf generation failed')) {

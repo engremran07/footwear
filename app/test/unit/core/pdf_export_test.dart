@@ -203,16 +203,45 @@ void main() {
     expect(const bool.fromEnvironment('use_arabic'), isTrue);
   });
 
+  test('Arabic PDF generation fails closed when shaping is disabled', () async {
+    final pdf = buildPdfTable(
+      title: 'تقرير الحساب',
+      headers: const ['المتجر'],
+      rows: const [
+        ['دکان'],
+      ],
+      locale: AppLocale.ar,
+    );
+
+    if (const bool.fromEnvironment('use_arabic')) {
+      expect(await pdf, isNotEmpty);
+    } else {
+      await expectLater(
+        pdf,
+        throwsA(
+          isA<PdfExportConfigurationException>().having(
+            (error) => error.code,
+            'code',
+            'pdf_arabic_shaping_disabled',
+          ),
+        ),
+      );
+    }
+  });
+
   test('Arabic and Urdu text builds across shared PDF report paths', () async {
     final date = Timestamp.fromDate(DateTime(2026, 10, 22));
     const arabic = 'تقرير الحساب';
-    const urdu = 'یہ اردو رپورٹ ٹیسٹ ہے';
+    const urdu = 'یہ اردو رپورٹ ٹیسٹ ہے؛ ٹ ڈ ڑ ں ھ ے';
     Map<String, String> labelsFor(AppLocale locale, List<String> keys) => {
       for (final key in keys) key: trRead(key, locale),
     };
     void expectPdf(List<int> bytes) {
       expect(bytes, isNotEmpty);
-      expect(latin1.decode(bytes.take(5).toList()), '%PDF-');
+      final pdf = latin1.decode(bytes, allowInvalid: true);
+      expect(pdf.substring(0, 5), '%PDF-');
+      expect(pdf, contains('NotoSansArabic'));
+      expect(pdf, contains('/FontFile2'));
     }
 
     final tablePdf = await buildPdfTable(
@@ -286,6 +315,14 @@ void main() {
           totalPairsSold: 12,
           totalRevenue: 50,
           outstandingBalance: 25,
+          currency: 'SAR',
+        ),
+        const SellerReportShop(
+          name: arabic,
+          totalPairsSold: 6,
+          totalRevenue: 75,
+          outstandingBalance: 10,
+          currency: 'PKR',
         ),
       ],
       stockReceived: 24,

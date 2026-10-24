@@ -411,9 +411,11 @@ class AuthNotifier extends AsyncNotifier<void> {
         .collection(Collections.tenants)
         .doc(normalizedId)
         .get();
-    if (!workspace.exists || workspace.data()?['active'] != true) {
+    if (!workspace.exists) {
       throw StateError('The selected workspace is unavailable.');
     }
+    // Selecting an inactive tenant only establishes audited lifecycle context;
+    // Firestore Rules still deny business-data access until it is restored.
     final batch = db.batch();
     final accessLogRef = db.collection(Collections.platformAccessLogs).doc();
     batch.update(db.collection(Collections.users).doc(user.id), {

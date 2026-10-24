@@ -4,12 +4,66 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:footwear_erp/core/l10n/app_locale.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/network_provider.dart';
 import 'package:footwear_erp/screens/login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets(
+    'login layout keeps normalized constraints across narrow and wide widths',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 800);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authNotifierProvider.overrideWith(
+              () => _DelayedAuthNotifier(Completer<void>()),
+            ),
+            isOnlineProvider.overrideWith((ref) => Stream.value(true)),
+          ],
+          child: MaterialApp(
+            home: Consumer(
+              builder: (context, ref, child) => Directionality(
+                textDirection: ref.watch(appLocaleProvider).direction,
+                child: const LoginScreen(),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(LoginScreen)),
+      );
+      for (final locale in AppLocale.values) {
+        await container.read(appLocaleProvider.notifier).set(locale);
+        await tester.pumpAndSettle();
+
+        for (final width in [320.0, 360.0, 420.0, 668.0, 719.0, 720.0]) {
+          tester.view.physicalSize = Size(width, 800);
+          await tester.pump();
+          await tester.pumpAndSettle();
+
+          expect(
+            tester.takeException(),
+            isNull,
+            reason:
+                'Login layout should render at $width logical pixels in '
+                '${locale.name}.',
+          );
+          expect(find.byType(TextFormField), findsNWidgets(2));
+        }
+      }
+    },
+  );
+
   testWidgets('slow sign-in hint is replaced by a persistent auth error', (
     tester,
   ) async {

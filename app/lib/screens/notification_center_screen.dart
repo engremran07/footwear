@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
+import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/snack_helper.dart';
 import '../models/notification_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/notification_provider.dart';
@@ -32,11 +34,21 @@ import '../widgets/shimmer_loading.dart';
 //   • Batch write capped at 50 (matches provider query limit).
 // =============================================================================
 
-class NotificationCenterScreen extends ConsumerWidget {
+class NotificationCenterScreen extends ConsumerStatefulWidget {
   const NotificationCenterScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationCenterScreen> createState() =>
+      _NotificationCenterScreenState();
+}
+
+class _NotificationCenterScreenState
+    extends ConsumerState<NotificationCenterScreen> {
+  bool _markingAllRead = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final user = ref.watch(authUserProvider).value;
 
     // Defense-in-depth: render nothing while role is resolving.
@@ -71,8 +83,14 @@ class NotificationCenterScreen extends ConsumerWidget {
         actions: [
           if (unreadCount > 0)
             TextButton.icon(
-              onPressed: () => _markAllRead(context, ref),
-              icon: const Icon(Icons.mark_email_read, size: 18),
+              onPressed: _markingAllRead ? null : _markAllRead,
+              icon: _markingAllRead
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.mark_email_read, size: 18),
               label: Text(tr('mark_all_read', ref)),
               style: TextButton.styleFrom(
                 foregroundColor:
@@ -107,8 +125,17 @@ class NotificationCenterScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _markAllRead(BuildContext context, WidgetRef ref) async {
-    await ref.read(notificationNotifierProvider.notifier).markAllAsRead();
+  Future<void> _markAllRead() async {
+    setState(() => _markingAllRead = true);
+    try {
+      await ref.read(notificationNotifierProvider.notifier).markAllAsRead();
+    } catch (error) {
+      if (!mounted) return;
+      final key = AppErrorMapper.key(error);
+      ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
+    } finally {
+      if (mounted) setState(() => _markingAllRead = false);
+    }
   }
 
   // ─── List helpers ──────────────────────────────────────────────────────────
@@ -375,12 +402,12 @@ class _NotificationTile extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: AppTokens.s4),
-              // Chevron
-              Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              if (n.shopId.isNotEmpty)
+                Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
             ],
           ),
         ),

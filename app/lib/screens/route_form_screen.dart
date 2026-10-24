@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/route_model.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_fonts.dart';
 import '../core/utils/app_sanitizer.dart';
@@ -40,26 +41,24 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
     super.dispose();
   }
 
-  void _loadExisting() {
-    if (_loaded || !isEdit) return;
-    final detail = ref.read(routeDetailProvider(widget.routeId!)).value;
-    if (detail != null) {
-      _nameC.value = TextEditingValue(
-        text: detail.name,
-        selection: TextSelection.collapsed(offset: detail.name.length),
-      );
-      _selectedSellerIds
-        ..clear()
-        ..addAll(detail.assignedSellerIds);
-      _selectedSellerNames
-        ..clear()
-        ..addAll(detail.assignedSellerNames);
-      _currency = detail.currency;
-      _loaded = true;
-    }
+  void _loadExisting(RouteModel detail) {
+    if (_loaded) return;
+    _nameC.value = TextEditingValue(
+      text: detail.name,
+      selection: TextSelection.collapsed(offset: detail.name.length),
+    );
+    _selectedSellerIds
+      ..clear()
+      ..addAll(detail.assignedSellerIds);
+    _selectedSellerNames
+      ..clear()
+      ..addAll(detail.assignedSellerNames);
+    _currency = detail.currency;
+    _loaded = true;
   }
 
   Future<void> _save() async {
+    if (_saving || (isEdit && !_loaded)) return;
     if (!_formKey.currentState!.validate()) {
       HapticFeedback.vibrate();
       return;
@@ -129,15 +128,53 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (isEdit) {
-      ref.watch(routeDetailProvider(widget.routeId!));
-      _loadExisting();
+    final userAsync = ref.watch(authUserProvider);
+    if (userAsync.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    final user = ref.watch(authUserProvider).value;
+    if (userAsync.hasError) {
+      return Scaffold(
+        body: mappedErrorState(
+          error: userAsync.error!,
+          ref: ref,
+          onRetry: () => ref.invalidate(authUserProvider),
+        ),
+      );
+    }
+
+    final user = userAsync.value;
     final isAdmin = user?.isAdmin ?? false;
 
     if (!isAdmin) {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
+    }
+
+    if (isEdit) {
+      final routeAsync = ref.watch(routeDetailProvider(widget.routeId!));
+      if (routeAsync.hasError) {
+        return Scaffold(
+          body: mappedErrorState(
+            error: routeAsync.error!,
+            ref: ref,
+            onRetry: () => ref.invalidate(routeDetailProvider(widget.routeId!)),
+          ),
+        );
+      }
+      if (routeAsync.isLoading && !routeAsync.hasValue) {
+        return const Scaffold(body: LinearProgressIndicator());
+      }
+
+      final route = routeAsync.value;
+      if (route == null) {
+        return Scaffold(
+          body: ErrorState(
+            message: tr('err_not_found', ref),
+            onRetry: () => ref.invalidate(routeDetailProvider(widget.routeId!)),
+            retryLabel: tr('retry', ref),
+          ),
+        );
+      }
+      _loadExisting(route);
     }
 
     final sellersAsync = ref.watch(sellersProvider);
@@ -247,7 +284,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
                     width: double.infinity,
                     height: 48,
                     child: FilledButton(
-                      onPressed: _saving ? null : _save,
+                      onPressed: _saving || (isEdit && !_loaded) ? null : _save,
                       child: _saving
                           ? const SizedBox(
                               width: 20,

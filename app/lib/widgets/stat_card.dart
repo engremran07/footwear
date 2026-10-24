@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../core/constants/app_brand.dart';
+import '../core/design/app_animations.dart';
 import '../core/design/app_tokens.dart';
 
 class StatCard extends StatelessWidget {
@@ -64,111 +65,116 @@ class StatCard extends StatelessWidget {
       );
     }
 
-    return Semantics(
-          key: ValueKey('stat_${title}_$staggerIndex'),
-          label: '$title: $value',
-          child: Card(
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onTap != null
-                  ? () {
-                      HapticFeedback.lightImpact();
-                      onTap!();
-                    }
-                  : null,
-              child: Padding(
-                padding: const EdgeInsets.all(AppTokens.s12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    final card = Semantics(
+      key: ValueKey('stat_${title}_$staggerIndex'),
+      label: '$title: $value',
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap != null
+              ? () {
+                  HapticFeedback.lightImpact();
+                  onTap!();
+                }
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.all(AppTokens.s12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: cardColor.withValues(alpha: 0.12),
-                            borderRadius: AppTokens.brSM,
-                          ),
-                          child: Icon(
-                            icon,
-                            color: cardColor,
-                            size: AppTokens.iconSizeSM,
-                          ),
-                        ),
-                      ],
-                    ),
                     Expanded(
-                      child: Align(
-                        alignment: AlignmentDirectional.bottomStart,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: AlignmentDirectional.bottomStart,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  AnimatedSwitcher(
-                                    duration: AppTokens.durNormal,
-                                    child: Text(
-                                      value,
-                                      key: ValueKey(value),
-                                      style: theme.textTheme.headlineSmall
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            color: cardColor,
-                                          ),
-                                    ),
-                                  ),
-                                  if (trend != null) ...[
-                                    const SizedBox(width: AppTokens.s4),
-                                    Icon(
-                                      trend! > 0
-                                          ? Icons.trending_up
-                                          : Icons.trending_down,
-                                      size: 16,
-                                      color: trend! > 0
-                                          ? AppBrand.successColor
-                                          : AppBrand.errorColor,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              if (subtitle != null) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  subtitle!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
+                      child: Text(
+                        title,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: cardColor.withValues(alpha: 0.12),
+                        borderRadius: AppTokens.brSM,
+                      ),
+                      child: Icon(
+                        icon,
+                        color: cardColor,
+                        size: AppTokens.iconSizeSM,
                       ),
                     ),
                   ],
                 ),
-              ),
+                Expanded(
+                  child: Align(
+                    alignment: AlignmentDirectional.bottomStart,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.bottomStart,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              AnimatedSwitcher(
+                                duration: AppMotion.duration(
+                                  context,
+                                  AppTokens.durNormal,
+                                ),
+                                child: Text(
+                                  value,
+                                  key: ValueKey(value),
+                                  style: theme.textTheme.headlineSmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: cardColor,
+                                      ),
+                                ),
+                              ),
+                              if (trend != null) ...[
+                                const SizedBox(width: AppTokens.s4),
+                                Icon(
+                                  trend! > 0
+                                      ? Icons.trending_up
+                                      : Icons.trending_down,
+                                  size: 16,
+                                  color: trend! > 0
+                                      ? AppBrand.successColor
+                                      : AppBrand.errorColor,
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (subtitle != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              subtitle!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        )
+        ),
+      ),
+    );
+    if (!AppMotion.isEnabled(context)) return card;
+    return card
         .animate()
         .fadeIn(
           duration: AppTokens.durNormal,

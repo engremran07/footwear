@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/shop_model.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/app_sanitizer.dart';
 import '../core/utils/error_mapper.dart';
@@ -12,6 +13,7 @@ import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/shop_provider.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/error_state.dart';
 
 class ShopFormScreen extends ConsumerStatefulWidget {
   final String? shopId;
@@ -51,37 +53,34 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     super.dispose();
   }
 
-  void _loadExisting() {
-    if (_loaded || !isEdit) return;
-    final shop = ref.read(shopDetailProvider(widget.shopId!)).value;
-    if (shop != null) {
-      _nameC.value = TextEditingValue(
-        text: shop.name,
-        selection: TextSelection.collapsed(offset: shop.name.length),
-      );
-      final phone = shop.phone ?? '';
-      _phoneC.value = TextEditingValue(
-        text: phone,
-        selection: TextSelection.collapsed(offset: phone.length),
-      );
-      final city = shop.city ?? '';
-      _cityC.value = TextEditingValue(
-        text: city,
-        selection: TextSelection.collapsed(offset: city.length),
-      );
-      final category = shop.category ?? '';
-      _categoryC.value = TextEditingValue(
-        text: category,
-        selection: TextSelection.collapsed(offset: category.length),
-      );
-      _routeId = shop.routeId;
-      _routeNumber = shop.routeNumber;
-      _loaded = true;
-    }
+  void _loadExisting(ShopModel shop) {
+    if (_loaded || !isEdit || shop.id != widget.shopId) return;
+    _nameC.value = TextEditingValue(
+      text: shop.name,
+      selection: TextSelection.collapsed(offset: shop.name.length),
+    );
+    final phone = shop.phone ?? '';
+    _phoneC.value = TextEditingValue(
+      text: phone,
+      selection: TextSelection.collapsed(offset: phone.length),
+    );
+    final city = shop.city ?? '';
+    _cityC.value = TextEditingValue(
+      text: city,
+      selection: TextSelection.collapsed(offset: city.length),
+    );
+    final category = shop.category ?? '';
+    _categoryC.value = TextEditingValue(
+      text: category,
+      selection: TextSelection.collapsed(offset: category.length),
+    );
+    _routeId = shop.routeId;
+    _routeNumber = shop.routeNumber;
+    _loaded = true;
   }
 
-  Future<void> _save() async {
-    if (_saving) return; // synchronous guard — prevents double-submit race
+  Future<void> _save({required bool routeDataReady}) async {
+    if (_saving || (isEdit && !_loaded) || !routeDataReady) return;
     if (!_formKey.currentState!.validate()) {
       HapticFeedback.vibrate();
       return;
@@ -152,32 +151,76 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (isEdit) {
-      ref.watch(shopDetailProvider(widget.shopId!));
-      _loadExisting();
+    final userAsync = ref.watch(authUserProvider);
+    if (userAsync.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    final user = ref.watch(authUserProvider).value;
-    final routesAsync = user?.isAdmin == true
+    if (userAsync.hasError) {
+      return Scaffold(
+        body: mappedErrorState(
+          error: userAsync.error!,
+          ref: ref,
+          onRetry: () => ref.invalidate(authUserProvider),
+        ),
+      );
+    }
+    final user = userAsync.value;
+    if (user == null || !user.active || (!user.isAdmin && !user.isSeller)) {
+      return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
+    }
+
+    if (isEdit) {
+      final shopAsync = ref.watch(shopDetailProvider(widget.shopId!));
+      if (shopAsync.hasError) {
+        return Scaffold(
+          body: mappedErrorState(
+            error: shopAsync.error!,
+            ref: ref,
+            onRetry: () => ref.invalidate(shopDetailProvider(widget.shopId!)),
+          ),
+        );
+      }
+      if (shopAsync.isLoading && !shopAsync.hasValue) {
+        return const Scaffold(body: LinearProgressIndicator());
+      }
+      final shop = shopAsync.value;
+      if (shop == null || shop.id != widget.shopId) {
+        return Scaffold(
+          body: ErrorState(
+            message: tr('err_not_found', ref),
+            onRetry: () => ref.invalidate(shopDetailProvider(widget.shopId!)),
+            retryLabel: tr('retry', ref),
+          ),
+        );
+      }
+      _loadExisting(shop);
+    }
+
+    final routesAsync = user.isAdmin
         ? ref.watch(routesProvider)
-        : ref.watch(routesBySellerProvider(user?.id ?? ''));
-    final routesLoading = user != null && routesAsync.isLoading;
+        : ref.watch(routesBySellerProvider(user.id));
+    final routesLoading = routesAsync.isLoading;
     final allRoutes = routesAsync.value ?? [];
-    final routes = user?.isAdmin == true
+    final routes = user.isAdmin
         ? allRoutes
-        : allRoutes
-              .where((r) => user?.assignedRouteIds.contains(r.id) ?? false)
-              .toList();
+        : allRoutes.where((r) => user.assignedRouteIds.contains(r.id)).toList();
+    final selectedRouteAvailable =
+        _routeId == null || routes.any((route) => route.id == _routeId);
+    final routeDataReady =
+        !routesLoading &&
+        !routesAsync.hasError &&
+        (selectedRouteAvailable || (isEdit && _loaded));
 
     // Seller: auto-assign first route from profile when creating a new shop.
     // Guard with !isEdit so edit-mode shops keep their stored route_id.
     if (!_routeAutoAssigned &&
         _routeId == null &&
         !isEdit &&
-        user?.isSeller == true &&
-        (user?.assignedRouteIds.isNotEmpty ?? false)) {
+        user.isSeller &&
+        user.assignedRouteIds.isNotEmpty) {
       _routeAutoAssigned = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _routeId = user!.assignedRouteIds.first);
+        if (mounted) setState(() => _routeId = user.assignedRouteIds.first);
       });
     }
     // Sync routeNumber once route list loads (works for both admin and seller).
@@ -261,7 +304,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                                 ]
                               : []),
                     validator: (v) => v == null ? tr('required', ref) : null,
-                    onChanged: user?.isAdmin == true
+                    onChanged: user.isAdmin
                         ? routesLoading
                               ? null
                               : (v) {
@@ -275,6 +318,33 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                                 }
                         : null,
                   ),
+                  if (routesAsync.hasError) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            tr(AppErrorMapper.key(routesAsync.error!), ref),
+                            key: const Key('shop_route_load_error'),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () {
+                            if (user.isAdmin) {
+                              ref.invalidate(routesProvider);
+                            } else {
+                              ref.invalidate(routesBySellerProvider(user.id));
+                            }
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: Text(tr('retry', ref)),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _nameC,
@@ -310,7 +380,8 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                     decoration: InputDecoration(labelText: tr('category', ref)),
                     inputFormatters: [AppInputFormatters.maxLength(80)],
                     textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _save(),
+                    onFieldSubmitted: (_) =>
+                        _save(routeDataReady: routeDataReady),
                   ),
                   const SizedBox(height: 32),
                   SizedBox(
@@ -318,12 +389,9 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                     height: 48,
                     child: FilledButton(
                       onPressed:
-                          _saving ||
-                              (routesLoading &&
-                                  user.isAdmin &&
-                                  _routeId == null)
+                          _saving || (isEdit && !_loaded) || !routeDataReady
                           ? null
-                          : _save,
+                          : () => _save(routeDataReady: routeDataReady),
                       child: _saving
                           ? const SizedBox(
                               width: 20,

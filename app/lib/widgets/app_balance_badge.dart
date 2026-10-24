@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../core/constants/app_brand.dart';
 import '../core/design/app_tokens.dart';
+import '../core/l10n/app_locale.dart';
 
 /// Red/green pill that shows a formatted currency balance.
-class AppBalanceBadge extends StatelessWidget {
+class AppBalanceBadge extends ConsumerWidget {
   final double amount;
   final String currencySymbol;
   final bool invertColors;
@@ -17,7 +19,7 @@ class AppBalanceBadge extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isNegative = amount < 0;
     final Color bg;
     final Color fg;
@@ -38,7 +40,8 @@ class AppBalanceBadge extends StatelessWidget {
     final text = '${isNegative ? '-' : ''}$formatted';
 
     return Semantics(
-      label: 'Balance: $text',
+      label: '${tr('balance', ref)}: $text',
+      excludeSemantics: true,
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppTokens.s8,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
@@ -355,6 +356,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
 
     return PopScope(
+      key: const Key('profile_pop_scope'),
       canPop: !_isDirty,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
@@ -383,6 +385,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                       const SizedBox(height: 8),
                       TextField(
+                        key: const Key('profile_display_name_field'),
                         controller: _nameC,
                         decoration: InputDecoration(
                           labelText: tr('lbl_display_name', ref),
@@ -390,8 +393,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         textCapitalization: TextCapitalization.words,
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => _saveName(),
-                        onChanged: (_) {
-                          if (!_isDirty) setState(() => _isDirty = true);
+                        onChanged: (value) {
+                          final isDirty =
+                              currentUser != null &&
+                              AppSanitizer.name(value) !=
+                                  currentUser.displayName;
+                          if (_isDirty != isDirty) {
+                            setState(() => _isDirty = isDirty);
+                          }
                         },
                         inputFormatters: [AppInputFormatters.maxLength(100)],
                       ),
@@ -464,6 +473,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              if (currentUser?.isSeller == true &&
+                  currentUser?.canCreateBackup == true) ...[
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.backup_outlined),
+                    title: Text(tr('backup_title', ref)),
+                    subtitle: Text(
+                      tr('backup_seller_route_backup_subtitle', ref),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push('/settings/backup'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),

@@ -1886,7 +1886,7 @@ describe('tenant destructive operations', () => {
     }
   });
 
-  it('selected super-admin can hard-delete only selected-tenant data', async () => {
+  it('selected super-admin can delete scoped data but not the workspace root', async () => {
     await seedDeleteTargets();
     await seedUser('delete-platform-uid', 'super_admin', true, {
       active_workspace_id: 'tenant-1',
@@ -1899,7 +1899,7 @@ describe('tenant destructive operations', () => {
         ? 'tenant-1'
         : `delete-target-${collection}`;
       const deletion = db.collection(collection).doc(docId).delete();
-      if (collection === 'transactions') {
+      if (collection === 'transactions' || collection === 'tenants') {
         await assertFails(deletion);
       } else {
         await assertSucceeds(deletion);
@@ -2880,6 +2880,52 @@ describe('platform super-admin workspace isolation', () => {
     );
   });
 
+  it('selected super-admin can select an inactive workspace to restore it', async () => {
+    await seedWorkspace('tenant-1');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('tenants').doc('tenant-1').update({
+        active: false,
+        archived_at: new Date(),
+      });
+    });
+    await seedUser('platform-inactive-restore-uid', 'super_admin');
+
+    const db = testEnv.authenticatedContext(
+      'platform-inactive-restore-uid',
+    ).firestore();
+    const userRef = db.collection('users').doc('platform-inactive-restore-uid');
+    const logRef = db.collection('platform_access_logs').doc('inactive-restore');
+    const selection = db.batch();
+    selection.update(userRef, {
+      active_workspace_id: 'tenant-1',
+      active_workspace_reason: 'Restore inactive workspace',
+      active_workspace_selected_at:
+        firebase.firestore.FieldValue.serverTimestamp(),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    selection.set(logRef, {
+      actor_user_id: 'platform-inactive-restore-uid',
+      workspace_id: 'tenant-1',
+      event_type: 'workspace_access_started',
+      reason: 'Restore inactive workspace',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertSucceeds(selection.commit());
+    const tenantRef = db.collection('tenants').doc('tenant-1');
+    await assertSucceeds(
+      db.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(tenantRef);
+        assert.strictEqual(snapshot.data().active, false);
+        transaction.update(tenantRef, {
+          active: true,
+          archived_at: firebase.firestore.FieldValue.delete(),
+          archived_by: firebase.firestore.FieldValue.delete(),
+          updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      }),
+    );
+  });
+
   it('unselected super-admin cannot change workspace lifecycle', async () => {
     await seedWorkspace('tenant-1');
     await seedUser('platform-unselected-lifecycle-uid', 'super_admin');
@@ -2896,7 +2942,7 @@ describe('platform super-admin workspace isolation', () => {
     );
   });
 
-  it('archive disables tenant users and restores prior activity', async () => {
+  it('inactive workspace blocks active members until it is restored', async () => {
     await seedWorkspace('tenant-1');
     await seedUser('seller-uid', 'seller');
     await seedUser('platform-archive-flow-uid', 'super_admin', true, {
@@ -2915,7 +2961,6 @@ describe('platform super-admin workspace isolation', () => {
     const db = testEnv.authenticatedContext('platform-archive-flow-uid')
       .firestore();
     const tenantRef = db.collection('tenants').doc('tenant-1');
-    const sellerRef = db.collection('users').doc('seller-uid');
     const archiveBatch = db.batch();
     archiveBatch.update(tenantRef, {
       active: false,
@@ -2923,12 +2968,11 @@ describe('platform super-admin workspace isolation', () => {
       archived_by: 'platform-archive-flow-uid',
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
-    archiveBatch.update(sellerRef, {
-      active: false,
-      workspace_was_active: true,
-      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-    });
     await assertSucceeds(archiveBatch.commit());
+    const sellerProfile = await assertSucceeds(
+      sellerCtx(testEnv).firestore().collection('users').doc('seller-uid').get(),
+    );
+    assert.strictEqual(sellerProfile.data().active, true);
     await assertFails(
       sellerCtx(testEnv).firestore()
         .collection('products')
@@ -2941,11 +2985,6 @@ describe('platform super-admin workspace isolation', () => {
       active: true,
       archived_at: firebase.firestore.FieldValue.delete(),
       archived_by: firebase.firestore.FieldValue.delete(),
-      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-    restoreBatch.update(sellerRef, {
-      active: true,
-      workspace_was_active: firebase.firestore.FieldValue.delete(),
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     await assertSucceeds(restoreBatch.commit());
@@ -3306,5 +3345,401 @@ describe('platform super-admin workspace isolation', () => {
         .doc('sa_credentials')
         .get(),
     );
+  });
+});
+
+describe('client transactions that read documents before creating them', () => {
+  it('admin and seller can read a missing invoice only in an active workspace', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedUser('seller-uid', 'seller');
+    const adminDb = adminCtx(testEnv).firestore();
+    const sellerDb = sellerCtx(testEnv).firestore();
+
+    await assertSucceeds(
+      adminDb.collection('invoices').doc('new-admin-invoice').get(),
+    );
+    await assertSucceeds(
+      sellerDb.collection('invoices').doc('new-seller-invoice').get(),
+    );
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('tenants').doc('tenant-1').update({
+        active: false,
+      });
+    });
+    await assertFails(
+      adminDb.collection('invoices').doc('inactive-workspace-invoice').get(),
+    );
+    await assertFails(
+      sellerDb.collection('invoices').doc('inactive-workspace-invoice').get(),
+    );
+  });
+
+  it('active sellers may probe a missing transaction id for route restore', async () => {
+    await seedUser('seller-uid', 'seller');
+    await seedShop('shop-1', { balance: 0 });
+    const db = sellerCtx(testEnv).firestore();
+    const transactionRef = db.collection('transactions').doc('restored-transaction');
+    const shopRef = db.collection('customers').doc('shop-1');
+    await assertSucceeds(db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(transactionRef);
+      const shop = await transaction.get(shopRef);
+      assert.strictEqual(snapshot.exists, false);
+      assert.ok(shop.exists);
+      transaction.set(transactionRef, {
+        tenant_id: 'tenant-1',
+        shop_id: 'shop-1',
+        shop_name: 'Seed Shop',
+        route_id: 'route-1',
+        created_by: 'seller-uid',
+        amount: 25,
+        type: 'cash_in',
+        description: 'Restored route transaction',
+        created_at: new Date(),
+        deleted: false,
+      });
+      transaction.update(shopRef, {
+        balance: -25,
+        updated_at: new Date(),
+        last_transaction_at: new Date(),
+        last_transaction_type: 'cash_in',
+        last_transaction_amount: 25,
+        last_transaction_id: transactionRef.id,
+      });
+    }));
+  });
+
+  it('only workspace admins may probe a missing seller inventory document', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedUser('seller-uid', 'seller');
+    const adminDb = adminCtx(testEnv).firestore();
+    const sellerDb = sellerCtx(testEnv).firestore();
+
+    await assertSucceeds(
+      adminDb.collection('seller_inventory').doc('seller-uid_variant-1').get(),
+    );
+    await assertFails(
+      sellerDb.collection('seller_inventory').doc('other-seller_variant-1').get(),
+    );
+  });
+
+  it('admin first-stock transfer reads and creates the missing seller inventory atomically', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedUser('seller-uid', 'seller');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('product_variants').doc('variant-1').set({
+        tenant_id: 'tenant-1',
+        product_id: 'product-1',
+        quantity_available: 5,
+        active: true,
+        updated_at: new Date('2026-01-01T00:00:00.000Z'),
+      });
+    });
+    const db = adminCtx(testEnv).firestore();
+    const variantRef = db.collection('product_variants').doc('variant-1');
+    const sellerInventoryRef = db
+      .collection('seller_inventory')
+      .doc('seller-uid_variant-1');
+    const inventoryAuditRef = db.collection('inventory_transactions').doc();
+
+    await assertSucceeds(db.runTransaction(async (transaction) => {
+      const variant = await transaction.get(variantRef);
+      const sellerInventory = await transaction.get(sellerInventoryRef);
+      assert.ok(variant.exists);
+      assert.strictEqual(sellerInventory.exists, false);
+      transaction.update(variantRef, {
+        quantity_available: 3,
+        updated_at: new Date(),
+      });
+      transaction.set(sellerInventoryRef, {
+        seller_id: 'seller-uid',
+        seller_name: 'Test User',
+        product_id: 'product-1',
+        variant_id: 'variant-1',
+        variant_name: 'Variant 1',
+        quantity_available: 2,
+        active: true,
+        tenant_id: 'tenant-1',
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+      transaction.set(inventoryAuditRef, {
+        type: 'transfer_out',
+        seller_id: 'seller-uid',
+        seller_name: 'Test User',
+        product_id: 'product-1',
+        variant_id: 'variant-1',
+        variant_name: 'Variant 1',
+        quantity: 2,
+        created_by: 'admin-uid',
+        created_at: new Date(),
+        tenant_id: 'tenant-1',
+      });
+    }));
+  });
+
+  it('selected super-admin can probe a missing invoice only in the selected workspace', async () => {
+    await seedTenant();
+    await seedUser('platform-selected-uid', 'super_admin', true, {
+      active_workspace_id: 'tenant-1',
+      active_workspace_reason: 'Support ticket verification',
+      active_workspace_selected_at: new Date(),
+    });
+    await seedUser('platform-unselected-uid', 'super_admin');
+    await seedUser('platform-expired-uid', 'super_admin', true, {
+      active_workspace_id: 'tenant-1',
+      active_workspace_reason: 'Support ticket verification',
+      active_workspace_selected_at: new Date(Date.now() - 9 * 60 * 60 * 1000),
+    });
+    const selectedDb = testEnv
+      .authenticatedContext('platform-selected-uid')
+      .firestore();
+    const unselectedDb = testEnv
+      .authenticatedContext('platform-unselected-uid')
+      .firestore();
+    const expiredDb = testEnv
+      .authenticatedContext('platform-expired-uid')
+      .firestore();
+
+    await assertSucceeds(
+      selectedDb.collection('invoices').doc('selected-missing-invoice').get(),
+    );
+    await assertFails(
+      unselectedDb.collection('invoices').doc('unselected-missing-invoice').get(),
+    );
+    await assertFails(
+      expiredDb.collection('invoices').doc('expired-missing-invoice').get(),
+    );
+  });
+
+  it('missing-document allowances do not reveal existing invoices from another tenant', async () => {
+    await seedTenant({ tenantId: 'tenant-2' });
+    await seedUser('admin-uid', 'admin');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('invoices').doc('foreign-existing-invoice').set({
+        tenant_id: 'tenant-2',
+        type: 'sale',
+      });
+    });
+
+    await assertFails(
+      adminCtx(testEnv).firestore()
+        .collection('invoices')
+        .doc('foreign-existing-invoice')
+        .get(),
+    );
+  });
+
+  it('super-admin can read missing settings only while creating a new workspace', async () => {
+    await seedUser('platform-create-workspace-uid', 'super_admin');
+    const db = testEnv
+      .authenticatedContext('platform-create-workspace-uid')
+      .firestore();
+    await seedTenant({ tenantId: 'tenant-without-settings' });
+    await assertFails(
+      db.collection('settings').doc('tenant-without-settings').get(),
+    );
+
+    const tenantRef = db.collection('tenants').doc('tenant-new');
+    const settingsRef = db.collection('settings').doc('tenant-new');
+
+    await assertSucceeds(db.runTransaction(async (transaction) => {
+      const tenant = await transaction.get(tenantRef);
+      const settings = await transaction.get(settingsRef);
+      assert.strictEqual(tenant.exists, false);
+      assert.strictEqual(settings.exists, false);
+      transaction.set(tenantRef, {
+        name: 'New Workspace',
+        slug: 'tenant-new',
+        tenant_id: 'tenant-new',
+        created_by: 'platform-create-workspace-uid',
+        created_at: firebase.firestore.FieldValue.serverTimestamp(),
+        active: true,
+      });
+      transaction.set(settingsRef, {
+        tenant_id: 'tenant-new',
+        company_name: 'New Workspace',
+        currency: 'SAR',
+        pairs_per_carton: 12,
+        last_invoice_number: 0,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }));
+  });
+
+  async function seedSale({ role, uid, lineCount = 1 }) {
+    await seedTenant();
+    await seedUser(uid, role, true, { assigned_route_ids: ['route-1'] });
+    await seedShop('shop-1', { balance: 0 });
+    await seedSettings({
+      company_name: 'Acme Footwear',
+      invoice_header: { show_phone: true },
+      logo_base64: null,
+      last_invoice_number: 0,
+    });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (let index = 1; index <= lineCount; index++) {
+        await db.collection('seller_inventory').doc(`inventory-${index}`).set({
+          seller_id: uid,
+          tenant_id: 'tenant-1',
+          quantity_available: 5,
+        });
+      }
+    });
+  }
+
+  function saleTransaction(db, uid, { lineCount = 1, amountReceived = 0 } = {}) {
+    const settingsRef = db.collection('settings').doc('tenant-1');
+    const shopRef = db.collection('customers').doc('shop-1');
+    const invoiceRef = db.collection('invoices').doc('invoice-client-shape');
+    const saleRef = db.collection('transactions').doc('sale-client-shape');
+    const paymentRef = db.collection('transactions').doc('payment-client-shape');
+    const inventoryRefs = Array.from({ length: lineCount }, (_, index) =>
+      db.collection('seller_inventory').doc(`inventory-${index + 1}`),
+    );
+    const total = lineCount * 100;
+    const items = Array.from({ length: lineCount }, (_, index) => ({
+      variant_id: `variant-${index + 1}`,
+      qty: 1,
+      unit_price: 100,
+    }));
+
+    return db.runTransaction(async (transaction) => {
+      const settingsSnapshot = await transaction.get(settingsRef);
+      const invoiceSnapshot = await transaction.get(invoiceRef);
+      const shopSnapshot = await transaction.get(shopRef);
+      const inventorySnapshots = [];
+      for (const inventoryRef of inventoryRefs) {
+        inventorySnapshots.push(await transaction.get(inventoryRef));
+      }
+      assert.strictEqual(invoiceSnapshot.exists, false);
+      assert.ok(settingsSnapshot.exists);
+      assert.ok(shopSnapshot.exists);
+      assert.ok(inventorySnapshots.every((snapshot) => snapshot.exists));
+
+      const now = new Date();
+      transaction.update(settingsRef, { last_invoice_number: 1 });
+      transaction.set(invoiceRef, {
+        tenant_id: 'tenant-1',
+        invoice_number: 'INV-2026-0001',
+        sale_transaction_id: saleRef.id,
+        idempotency_key: 'client-shape-key',
+        type: 'sale',
+        fulfillment_mode: 'stock',
+        invoice_header_snapshot: {
+          show_phone: true,
+          company_name: 'Acme Footwear',
+        },
+        shop_id: 'shop-1',
+        shop_name: 'Seed Shop',
+        route_id: 'route-1',
+        seller_id: uid,
+        seller_name: 'Test User',
+        items,
+        subtotal: total,
+        discount: 0,
+        total,
+        amount_received: amountReceived,
+        ...(amountReceived > 0 ? { payment_transaction_id: paymentRef.id } : {}),
+        outstanding_amount: total - amountReceived,
+        currency: 'SAR',
+        sale_type: amountReceived >= total ? 'cash' : 'credit',
+        status: amountReceived >= total
+          ? 'paid'
+          : (amountReceived > 0 ? 'partial' : 'issued'),
+        notes: null,
+        linked_invoice_id: null,
+        seller_inventory_deductions: Object.fromEntries(
+          inventoryRefs.map((ref) => [ref.id, 1]),
+        ),
+        created_by: uid,
+        created_at: now,
+        updated_at: now,
+      });
+      transaction.set(saleRef, {
+        tenant_id: 'tenant-1',
+        shop_id: 'shop-1',
+        shop_name: 'Seed Shop',
+        route_id: 'route-1',
+        type: 'cash_out',
+        sale_type: amountReceived >= total ? 'cash' : 'credit',
+        amount: total,
+        description: 'Invoice INV-2026-0001',
+        items,
+        invoice_id: invoiceRef.id,
+        invoice_number: 'INV-2026-0001',
+        created_by: uid,
+        created_at: now,
+        deleted: false,
+      });
+      if (amountReceived > 0) {
+        transaction.set(paymentRef, {
+          tenant_id: 'tenant-1',
+          shop_id: 'shop-1',
+          shop_name: 'Seed Shop',
+          route_id: 'route-1',
+          type: 'cash_in',
+          sale_type: 'cash',
+          amount: amountReceived,
+          description: 'Payment for INV-2026-0001',
+          items: [],
+          invoice_id: invoiceRef.id,
+          invoice_number: 'INV-2026-0001',
+          created_by: uid,
+          created_at: now,
+          deleted: false,
+        });
+      }
+      transaction.update(shopRef, {
+        balance: firebase.firestore.FieldValue.increment(total - amountReceived),
+        updated_at: now,
+        last_transaction_at: now,
+        last_transaction_type: 'cash_out',
+        last_transaction_amount: total,
+        last_transaction_id: saleRef.id,
+      });
+      for (const inventoryRef of inventoryRefs) {
+        transaction.update(inventoryRef, {
+          quantity_available: firebase.firestore.FieldValue.increment(-1),
+          updated_at: now,
+          last_sale_invoice_id: invoiceRef.id,
+        });
+      }
+    });
+  }
+
+  it('seller can create a stock invoice after reading its missing id', async () => {
+    await seedSale({ role: 'seller', uid: 'seller-uid' });
+    await assertSucceeds(saleTransaction(
+      sellerCtx(testEnv).firestore(),
+      'seller-uid',
+    ));
+  });
+
+  it('seller can create a paid sale invoice after reading its missing id', async () => {
+    await seedSale({ role: 'seller', uid: 'seller-uid' });
+    await assertSucceeds(saleTransaction(
+      sellerCtx(testEnv).firestore(),
+      'seller-uid',
+      { amountReceived: 100 },
+    ));
+  });
+
+  it('admin can create a sale invoice after reading its missing id', async () => {
+    await seedSale({ role: 'admin', uid: 'admin-uid' });
+    await assertSucceeds(saleTransaction(
+      adminCtx(testEnv).firestore(),
+      'admin-uid',
+    ));
+  });
+
+  it('three-line seller sale with payment stays within the Rules access budget', async () => {
+    await seedSale({ role: 'seller', uid: 'seller-uid', lineCount: 3 });
+    await assertSucceeds(saleTransaction(
+      sellerCtx(testEnv).firestore(),
+      'seller-uid',
+      { lineCount: 3, amountReceived: 40 },
+    ));
   });
 });

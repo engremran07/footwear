@@ -64,7 +64,7 @@ void main() {
       ProviderScope(
         overrides: [
           authUserProvider.overrideWith((ref) => Stream.value(user)),
-          tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
+          tenantProvider(tenant.id).overrideWith((ref) => Stream.value(tenant)),
           databaseBackupProvider.overrideWith(() => backupNotifier),
         ],
         child: const MaterialApp(home: DatabaseBackupScreen()),
@@ -79,12 +79,13 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Create encrypted backup file'), findsOneWidget);
+    expect(find.text('Save backup to phone storage'), findsOneWidget);
     expect(find.text('Backup Now'), findsNothing);
-    expect(find.text('Restore from this device'), findsOneWidget);
+    expect(find.text('Restore from app backup'), findsOneWidget);
+    expect(find.text('Restore from phone storage'), findsOneWidget);
     expect(find.text('Restore from Google Drive'), findsOneWidget);
 
-    await tester.tap(find.text('Restore from this device'));
+    await tester.tap(find.text('Restore from app backup'));
     await tester.pumpAndSettle();
     expect(find.text('test.shoesbackup'), findsOneWidget);
     expect(find.text('legacy.json'), findsOneWidget);
@@ -134,7 +135,6 @@ void main() {
       ProviderScope(
         overrides: [
           authUserProvider.overrideWith((ref) => Stream.value(user)),
-          tenantsProvider.overrideWith((ref) => Stream.value(const [])),
           databaseBackupProvider.overrideWith(() => backupNotifier),
         ],
         child: const MaterialApp(home: DatabaseBackupScreen()),
@@ -143,18 +143,151 @@ void main() {
     await tester.pumpAndSettle();
 
     final createBackup = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Create encrypted backup file'),
+      find.widgetWithText(FilledButton, 'Save backup to phone storage'),
     );
     expect(createBackup.onPressed, isNull);
 
     await tester.drag(find.byType(ListView), const Offset(0, -700));
     await tester.pumpAndSettle();
     final restoreLocal = tester.widget<OutlinedButton>(
-      find.widgetWithText(OutlinedButton, 'Restore from this device'),
+      find.widgetWithText(OutlinedButton, 'Restore from app backup'),
     );
     expect(restoreLocal.onPressed, isNull);
+    final restorePhone = tester.widget<OutlinedButton>(
+      find.widgetWithText(OutlinedButton, 'Restore from phone storage'),
+    );
+    expect(restorePhone.onPressed, isNull);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('seller can access route backup and limited restore controls', (
+    tester,
+  ) async {
+    final now = Timestamp.now();
+    final user = UserModel(
+      id: 'seller-1',
+      email: 'seller@example.com',
+      displayName: 'Seller One',
+      role: UserRole.seller,
+      tenantId: 'tenant-1',
+      assignedRouteIds: const ['route-1'],
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final tenant = TenantModel(
+      id: 'tenant-1',
+      name: 'Workspace One',
+      slug: 'workspace-one',
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(user)),
+          tenantProvider(tenant.id).overrideWith((ref) => Stream.value(tenant)),
+          databaseBackupProvider.overrideWith(() => backupNotifier),
+        ],
+        child: const MaterialApp(home: DatabaseBackupScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Includes assigned routes, shops, your inventory, transactions, and invoices. Restore imports only your unlinked cash transactions.',
+      ),
+      findsOneWidget,
+    );
+    await tester.drag(find.byType(ListView).first, const Offset(0, -700));
+    await tester.pumpAndSettle();
+
+    final localBackup = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Save backup to phone storage'),
+    );
+    expect(localBackup.onPressed, isNotNull);
+    expect(find.text('Routes'), findsOneWidget);
+    expect(find.text('Shops'), findsOneWidget);
+    expect(find.text('Transactions'), findsOneWidget);
+    expect(find.text('Invoices'), findsOneWidget);
+    expect(find.text('Products & Variants'), findsNothing);
+    expect(find.text('Workspace settings'), findsNothing);
+
+    final localRestore = tester.widget<OutlinedButton>(
+      find.widgetWithText(OutlinedButton, 'Restore from phone storage'),
+    );
+    expect(localRestore.onPressed, isNotNull);
+    expect(find.text('Restore from app backup'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'selected workspace metadata error retries before backup is enabled',
+    (tester) async {
+      var tenantAttempts = 0;
+      final now = Timestamp.now();
+      final user = UserModel(
+        id: 'tenant-admin-1',
+        email: 'admin@example.com',
+        displayName: 'Workspace Admin',
+        role: UserRole.tenantAdmin,
+        tenantId: 'tenant-1',
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final tenant = TenantModel(
+        id: 'tenant-1',
+        name: 'Workspace One',
+        slug: 'workspace-one',
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(user)),
+            tenantProvider(tenant.id).overrideWith((ref) {
+              tenantAttempts += 1;
+              return tenantAttempts == 1
+                  ? Stream.error(StateError('workspace unavailable'))
+                  : Stream.value(tenant);
+            }),
+            databaseBackupProvider.overrideWith(() => backupNotifier),
+          ],
+          child: const MaterialApp(home: DatabaseBackupScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Something went wrong. Please try again.'),
+        findsOneWidget,
+      );
+      await tester.drag(find.byType(ListView).first, const Offset(0, -700));
+      await tester.pumpAndSettle();
+      final backupButton = find.widgetWithText(
+        FilledButton,
+        'Save backup to phone storage',
+      );
+      expect(tester.widget<FilledButton>(backupButton).onPressed, isNull);
+
+      await tester.drag(find.byType(ListView).first, const Offset(0, 700));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Retry'));
+      await tester.pumpAndSettle();
+
+      expect(tenantAttempts, greaterThan(1));
+      expect(find.text('Workspace One'), findsOneWidget);
+      await tester.drag(find.byType(ListView).first, const Offset(0, -700));
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(backupButton).onPressed, isNotNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _FakeDatabaseBackupNotifier extends DatabaseBackupNotifier {

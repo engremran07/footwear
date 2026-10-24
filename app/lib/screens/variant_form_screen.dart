@@ -12,6 +12,7 @@ import '../models/product_variant_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/error_state.dart';
 
 class VariantFormScreen extends ConsumerStatefulWidget {
   final String productId;
@@ -36,20 +37,17 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
     super.dispose();
   }
 
-  void _loadExisting(List<ProductVariantModel> variants) {
-    if (_loaded || !isEdit) return;
-    final v = variants.where((v) => v.id == widget.variantId).firstOrNull;
-    if (v != null) {
-      _variantNameC.value = TextEditingValue(
-        text: v.variantName,
-        selection: TextSelection.collapsed(offset: v.variantName.length),
-      );
-      _loaded = true;
-    }
+  void _loadExisting(ProductVariantModel variant) {
+    if (_loaded || !isEdit || variant.id != widget.variantId) return;
+    _variantNameC.value = TextEditingValue(
+      text: variant.variantName,
+      selection: TextSelection.collapsed(offset: variant.variantName.length),
+    );
+    _loaded = true;
   }
 
   Future<void> _save() async {
-    if (_saving) return;
+    if (_saving || (isEdit && !_loaded)) return;
     if (!_formKey.currentState!.validate()) {
       HapticFeedback.vibrate();
       return;
@@ -101,9 +99,52 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userAsync = ref.watch(authUserProvider);
+    if (userAsync.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (userAsync.hasError) {
+      return Scaffold(
+        body: mappedErrorState(
+          error: userAsync.error!,
+          ref: ref,
+          onRetry: () => ref.invalidate(authUserProvider),
+        ),
+      );
+    }
+    if (userAsync.value?.isAdmin != true) {
+      return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
+    }
+
     final variantsAsync = ref.watch(productVariantsProvider(widget.productId));
     if (isEdit) {
-      variantsAsync.whenData((vars) => _loadExisting(vars));
+      if (variantsAsync.hasError) {
+        return Scaffold(
+          body: mappedErrorState(
+            error: variantsAsync.error!,
+            ref: ref,
+            onRetry: () =>
+                ref.invalidate(productVariantsProvider(widget.productId)),
+          ),
+        );
+      }
+      if (variantsAsync.isLoading && !variantsAsync.hasValue) {
+        return const Scaffold(body: LinearProgressIndicator());
+      }
+      final variant = variantsAsync.value
+          ?.where((candidate) => candidate.id == widget.variantId)
+          .firstOrNull;
+      if (variant == null || variant.id != widget.variantId) {
+        return Scaffold(
+          body: ErrorState(
+            message: tr('err_not_found', ref),
+            onRetry: () =>
+                ref.invalidate(productVariantsProvider(widget.productId)),
+            retryLabel: tr('retry', ref),
+          ),
+        );
+      }
+      _loadExisting(variant);
     }
 
     return PopScope(
@@ -147,7 +188,7 @@ class _VariantFormScreenState extends ConsumerState<VariantFormScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: _saving ? null : _save,
+                      onPressed: _saving || (isEdit && !_loaded) ? null : _save,
                       child: _saving
                           ? Row(
                               mainAxisAlignment: MainAxisAlignment.center,

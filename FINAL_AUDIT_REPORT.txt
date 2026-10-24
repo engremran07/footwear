@@ -1,0 +1,122 @@
+ShoesERP Final Audit Report
+==========================
+
+Date: 2026-10-22
+Repository: D:\Footwear
+Scope: Session/device-pairing purge, CRUD/sorting restoration, financial workflow audit, RTL Arabic/Urdu export rendering audit, local validation status, and release/deployment gate status.
+
+1) Executive Summary
+--------------------
+The project has been audited for the user’s core requests:
+- purge app-managed sessions and device pairing features to zero-trace, zero-tolerance,
+- reinstate the old business CRUD/sorting model with safer modernized auth and role handling,
+- remove the soft-delete model where it was introduced and avoid reintroducing it unless explicitly required,
+- validate workspace-admin transaction and invoice permission paths,
+- trace the centralized PDF/PNG/Excel export path and fix the shared root cause for mixed RTL Arabic/Urdu rendering,
+- keep all release/deploy/build/install actions explicitly gated and not claimed complete without authorization.
+
+The project currently reflects a local, validated state for the above work, but it is not a production release state unless the user explicitly authorizes deployment, APK build, web hosting deploy, device install, commit, and push.
+
+2) Recent Git Commit History
+----------------------------
+The recent repository log reviewed for context was:
+- 6304214 fix: harden financial workflows and RTL exports — v3.9.82+708
+- 0947e1f docs: record v3.9.81 release evidence
+- da780c7 feat: remove app-managed device access and release CRUD — v3.9.81+707
+- 32d843d want to purge off the all the sessions and device pairing feature
+- 79c1078 fix: ship workspace and invoice hardening v3.9.79+705
+
+This shows the flow of work across: (a) session/device pairing purge, (b) CRUD release hardening, (c) financial workflow fixes, and (d) RTL export stabilization work.
+
+3) Recent 3 Session/Checkpoint Summaries
+---------------------------------------
+The three most recent checkpoints reviewed were:
+
+A) Checkpoint 013 — Fixing Ledger and RTL Paths
+- Focus: tenant-admin transaction/invoice permissions, atomic ledger/balance safeguards, and the PDF/RTL rendering path.
+- Confirmed: workspace-admin operations were re-audited for transaction/invoice flows, correction logic, and bad-debt/business write safety.
+- Technical points: shop.balance remained the source of truth; write-off, corrections, and sale/invoice routes must stay atomic with balances; standalone transaction deletion remains protected and invoice-linked rows stay denied for hard deletion.
+- Validation: Rules emulator suite and targeted Flutter tests were run successfully for the financial path.
+
+B) Checkpoint 014 — Tracing RTL Export Rendering
+- Focus: unified export system for PDF, PNG/image, and Excel reports in English/Arabic/Urdu.
+- Confirmed: the shared export pipeline is central; PNG exports are produced from the same PDF bytes, so PDF defects propagate into image exports.
+- Root-cause direction: the `pdf` package requires `--dart-define=use_arabic=true` to enable Arabic shaper logic, and the current export path is sensitive to mixed-script direction issues and font selection.
+- Current conclusion: the problem is not just a screen-only bug; it is in the shared report pipeline and requires a root-service fix, not ad hoc fixes in one screen.
+
+C) Checkpoint 015 — Tracing RTL export rendering
+- Focus: export investigation before any code changes for this new rendering task.
+- Confirmed: no code edits had yet been made for the latest RTL rendering issue; the repo was clean at the start of the new issue.
+- Stated that the app intentionally uses Noto Sans Arabic as the primary PDF font, with Noto Nastaliq Urdu as fallback only, because complex Urdu shaping is not reliably handled by the current PDF renderer as a primary font.
+- Confirmed that mixed-text direction logic can misorder cells when Arabic/Urdu text combines with Latin labels, numeric values, invoice IDs, dates, and amounts.
+- Important note: the environment lacked direct PDF-render inspection tools; visual validation remains a pending step.
+
+4) Main Findings
+----------------
+
+4.1 Sessions and Device Pairing Purge
+- The codebase work on app-managed session/device pairing was intentionally removed, and the current runtime contract keeps Firebase Authentication as the only sign-in mechanism.
+- The final intent was zero-trace, zero-tolerance for session/device-pairing artifacts and custom access-slot logic. This is aligned with the project’s later work to strip deprecated pairing and session features from the app path and rules.
+- The app continues to use role and tenant context checks, with workspace-admin and tenant-admin logic treated as business-scoped, not as custom session enforcement.
+
+4.2 CRUD and Sorting Restoration
+- Business CRUD and route/shop/transaction/invoice access were re-audited and restored to tenant-scoped patterns for workspace admins.
+- The project intentionally moved away from session/device policy, and kept the safe modernized architecture: Auth + role + tenant + workspace context, not app-managed device pairing or extra access-slot logic.
+- The user’s request to remove soft-delete behavior was addressed by keeping hard-delete and ordinary CRUD logic anchored to the provider and rules path, while avoiding unnecessary soft-delete reintroductions in the current work.
+
+4.3 Financial Integrity / Invoice / Transaction Audit
+- The user’s financial reports were correctly treated as a critical business path: workspace admins were checked for transaction/invoice permission gaps.
+- The root issue was not “sellers vs admins only”; it was a combination of role/tenant alignment, provider guards, Firestore rules layers, atomic balance updates, and targeted regression tests.
+- Correct behavior retained:
+  - `shop.balance` remains the sole financial source of truth,
+  - writes must be atomic via provider notifier batch/transaction logic,
+  - standalone ledger rows require same-batch shop balance updates,
+  - invoice-linked flows and invoice voids remain guarded,
+  - bad-debt and write-off logic is validated through atomic workflows,
+  - soft deletes for standalone cash rows are not the default allowed path in the user’s desired final behavior.
+
+4.4 Arabic/Urdu Export Rendering Audit
+- The export issue was traced to the shared export system, not a single screen.
+- Findings:
+  - PNG exports are rasterized from generated PDF bytes; therefore any PDF text/layout problem automatically affects image exports.
+  - The `pdf` package’s Arabic shaping logic is only active when `--dart-define=use_arabic=true` is set.
+  - Mixed-string RTL detection is currently coarse: if a cell contains any Arabic/Urdu character, it may be treated as RTL as a whole, which can reorder mixed strings containing numbers, IDs, Latin text, dates, and currency values.
+  - The app uses a Noto Sans Arabic PDF font as the main font, with Nastaliq as fallback only, because complex Urdu shaping is not reliable as a primary PDF font for the current package.
+  - Excel export preserves Unicode but is limited by the spreadsheet client’s font/rendering behavior; this is a separate concern from the PDF path.
+
+5) Final Decision / Status
+-------------------------
+Overall conclusion:
+- The runtime is aligned toward zero-trace session/device pairing removal and a clean SaaS CRUD model.
+- Financial/business permissions, invoice/transaction atomicity, and tenant-admin role checks were revalidated and hardened locally.
+- The export bug is understood at the shared source level and needs a deeper shared fix for mixed Arabic/Urdu layout and shaping, not a screen-only patch.
+- No production deployment actions were treated as complete without explicit authorization.
+
+This means the project is in a local, audited, and functionally improved state, but it is not a production release final state until the user explicitly authorizes the final release pipeline: web deploy, Firebase Firestore rules/indexes deploy, APK build/install, commit, and push.
+
+6) Release / Deployment Gate Status
+----------------------------------
+Current status: NOT released / NOT deployed / NOT installed / NOT committed / NOT pushed.
+Reason: the earlier user instructions explicitly require separate production authorization before release actions are performed.
+
+This report intentionally distinguishes local validation from production deployment.
+
+7) Technical Notes / Guardrails
+-------------------------------
+- Firebase Auth remains the sole sign-in mechanism.
+- No custom device registration or session-slot enforcement is retained.
+- workspace-admin access remains tenant-scoped and business-scoped, not device-paired or session-bound.
+- `shop.balance` remains the authoritative financial value for all display logic.
+- The export pipeline is centralized and must be fixed at the shared builder layer for Arabic/Urdu/PDF/image/Excel output stability.
+- The use of `--dart-define=use_arabic=true` is required for local run/test/build validation of the PDF shaping path.
+
+8) Bottom Line
+--------------
+The project contains the right high-level direction:
+- remove session/device pairing,
+- keep robust Firebase Auth + role + tenant + workspace rules,
+- restore CRUD/sorting and financial integrity,
+- centralize the export fix at the shared PDF/image/Excel layer,
+- keep release/deploy actions explicitly authorized and separate from local code validation.
+
+This final report documents the current state of the audit and serves as the durable reference for the next implementation or deployment phase.

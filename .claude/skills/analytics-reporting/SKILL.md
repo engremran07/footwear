@@ -11,6 +11,14 @@ Generate production-quality reports from Firestore data using ExportSheet, PDF
 export, and role-aware data scoping. Support per-route, per-seller, per-shop
 and consolidated all-data reporting.
 
+## Invocation and required inputs
+
+Use for report data selection, PDF/XLSX/image generation, printing, sharing,
+export localization, and RTL font/rendering issues. Read the relevant screen,
+provider, export builder, `ExportContext`, and focused tests. Confirm user role,
+tenant/workspace context, locale, currency, and the exact report data shape
+before changing a report.
+
 ## Architecture
 
 ### Data Flow
@@ -30,9 +38,10 @@ Provider (StreamProvider) → Screen (ConsumerStatefulWidget) → ExportSheet.sh
 
 |------|-------|
 
-| Admin | All routes, all shops, all transactions |
-
-| Seller | Own route only, own transactions only |
+| Local admin / manager | Authorized records in the active tenant |
+| Tenant admin | Authorized records in the assigned active tenant |
+| Super admin | No business records without an explicitly selected, audited active workspace |
+| Seller | Assigned route and own permitted transactions |
 
 ### Export Formats
 
@@ -40,7 +49,7 @@ Provider (StreamProvider) → Screen (ConsumerStatefulWidget) → ExportSheet.sh
 
 - PDF — `buildPdfTable()` + custom `pdfBytesBuilder`
 
-- PNG (Image) — via `Printing.printPdf()`
+- PNG (Image) — rasterized from the same generated PDF bytes
 
 - Print — system dialog
 
@@ -225,6 +234,55 @@ keys from `app_locale.dart`. Key export-specific keys:
 
 | `unknown_user` | Unknown | غير معروف | نامعلوم |
 
+## Arabic and Urdu Font Contract
+
+All PDF builders load fonts through `_ensureFontBytes()` in
+`app/lib/core/utils/pdf_export.dart`. Every Flutter test, run, or build that
+can generate PDFs MUST pass `--dart-define=use_arabic=true`. Without that
+compile-time option, the `pdf` package can reorder RTL text but does not shape
+Arabic-script letters. The central loader fails closed with a typed,
+localized configuration error instead of returning a malformed report.
+
+PDFs embed Noto Sans Arabic for Arabic and Urdu, with the PDF package's Arabic
+shaping enabled. Urdu output is Naskh-style, not Nastaliq: the current PDF
+renderer does not support Nastaliq's complex OpenType GSUB/GPOS shaping. The
+Flutter UI uses Noto Nastaliq Urdu independently. Do not call the PDF output
+Nastaliq or install a reshaping dependency without first verifying Dart/PDF
+version compatibility, Web support, and mixed-direction behavior.
+
+`ExportSheet` builds one PDF byte sequence for PDF share, printing, and PNG
+page rasterization. Keep these paths unified so layout and embedded fonts
+cannot drift. XLSX preserves Unicode and sets RTL sheet direction, but fonts
+are chosen by the spreadsheet application and are not embedded; document this
+limitation rather than promising identical appearance in every viewer.
+
+Regression checks:
+
+- With `use_arabic=true`, verify generated report PDFs include the
+  `NotoSansArabic` font resource, embedded `/FontFile2` program, and
+  Arabic/Urdu-specific text fixtures.
+- Without the define, verify shared PDF generation fails with
+  `PdfExportConfigurationException` and that `ExportSheet` preserves it for
+  localized error mapping.
+- Verify XLSX XML retains Urdu/Arabic text and `rightToLeft="1"`.
+- The current PNG unit tests inject a rasterizer; they verify shared-byte
+  routing, not pixel-level font appearance. Do not claim browser/device
+  visual validation unless it was actually performed.
+- A screenshot/JPEG does not retain font metadata. To identify the actual
+  embedded family, inspect the original PDF's font resources; use screenshots
+  only for visual comparison.
+
+Open-source references reviewed 2026-10-22 (star counts are a point-in-time
+signal, not endorsement; do not copy skill text):
+
+- [anthropics/skills PDF](https://github.com/anthropics/skills/tree/main/skills/pdf)
+  and [XLSX](https://github.com/anthropics/skills/tree/main/skills/xlsx)
+  (about 183k stars): format-specific document workflows.
+- [github/awesome-copilot](https://github.com/github/awesome-copilot)
+  (about 40k stars): VS Code/Copilot customization patterns.
+- [obra/superpowers TDD](https://github.com/obra/superpowers/tree/main/skills/test-driven-development)
+  (about 304k stars): relevant test discipline, not font shaping.
+
 ## Rules
 
 1. All exports use `ExportSheet.show()` — no direct PDF generation in screens
@@ -256,3 +314,16 @@ keys from `app_locale.dart`. Key export-specific keys:
 
 12. Task continuity: when user adds new export/report work mid-session, merge into
     existing todo list. Never discard prior pending export tasks.
+
+## Output, boundaries, and validation
+
+Report affected formats and scope, exact builders, role/tenant rules, locale
+and font behavior, tests, and visual limitations. Keep all Firestore reads in
+providers and all writes in their existing notifier owners. Do not change
+financial calculations or authorization to simplify an export.
+
+Run focused PDF/XLSX/ExportSheet tests with
+`--dart-define=use_arabic=true`, relevant analysis, and Markdown lint when
+documentation changes. Verify embedded PDF fonts, RTL sheet metadata, and the
+shared PDF-byte path where applicable. State when pixel-level browser/viewer
+rendering was not inspected.

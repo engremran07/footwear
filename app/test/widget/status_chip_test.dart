@@ -57,6 +57,29 @@ void main() {
     );
   });
 
+  testWidgets('StatusChip disables transitions when requested', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(disableAnimations: true),
+            child: Scaffold(body: StatusChip(status: 'pending')),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher)).duration,
+      Duration.zero,
+    );
+  });
+
   test('high-contrast status colors meet AA text contrast on black', () {
     for (final status in ['paid', 'pending', 'rejected', 'processing']) {
       final color = AppTheme.statusColor(

@@ -260,9 +260,19 @@ class _InvoiceStatsStrip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final sales = invoices.where((i) => i.isSale && !i.isVoid).toList();
-    final totalSales = sales.fold(0.0, (sum, i) => sum + i.total);
-    final paidAmount = sales.fold(0.0, (sum, i) => sum + i.amountReceived);
-    final outstanding = sales.fold(0.0, (sum, i) => sum + i.outstandingAmount);
+    final totalByCurrency = _sumByCurrency(sales, (invoice) => invoice.total);
+    final paidByCurrency = _sumByCurrency(
+      sales,
+      (invoice) => invoice.amountReceived,
+    );
+    final outstandingByCurrency = _sumByCurrency(
+      sales,
+      (invoice) => invoice.outstandingAmount,
+    );
+    final outstanding = sales.fold(
+      0.0,
+      (sum, invoice) => sum + invoice.outstandingAmount,
+    );
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
@@ -272,41 +282,71 @@ class _InvoiceStatsStrip extends ConsumerWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _IStat(
-            icon: Icons.receipt_long,
-            label: tr('stats_total', ref),
-            value: AppFormatters.compact(totalSales),
-            color: cs.primary,
+          Expanded(
+            child: _IStat(
+              icon: Icons.receipt_long,
+              label: tr('stats_total', ref),
+              value: _formatCurrencyTotals(totalByCurrency),
+              color: cs.primary,
+            ),
           ),
           Container(
             height: 28,
             width: 1,
             color: Theme.of(context).dividerColor,
           ),
-          _IStat(
-            icon: Icons.check_circle,
-            label: tr('paid', ref),
-            value: AppFormatters.compact(paidAmount),
-            color: AppTheme.clearFg(cs),
+          Expanded(
+            child: _IStat(
+              icon: Icons.check_circle,
+              label: tr('paid', ref),
+              value: _formatCurrencyTotals(paidByCurrency),
+              color: AppTheme.clearFg(cs),
+            ),
           ),
           Container(
             height: 28,
             width: 1,
             color: Theme.of(context).dividerColor,
           ),
-          _IStat(
-            icon: Icons.pending,
-            label: tr('pending', ref),
-            value: AppFormatters.compact(outstanding),
-            color: outstanding > 0 ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
+          Expanded(
+            child: _IStat(
+              icon: Icons.pending,
+              label: tr('pending', ref),
+              value: _formatCurrencyTotals(outstandingByCurrency),
+              color: outstanding > 0
+                  ? AppTheme.debtFg(cs)
+                  : AppTheme.clearFg(cs),
+            ),
           ),
         ],
       ),
     );
   }
 }
+
+Map<String, double> _sumByCurrency(
+  Iterable<InvoiceModel> invoices,
+  double Function(InvoiceModel) amount,
+) {
+  final totals = <String, double>{};
+  for (final invoice in invoices) {
+    final currency = invoice.currency.toUpperCase();
+    totals.update(
+      currency,
+      (total) => total + amount(invoice),
+      ifAbsent: () => amount(invoice),
+    );
+  }
+  return Map.fromEntries(
+    totals.entries.toList()
+      ..sort((left, right) => left.key.compareTo(right.key)),
+  );
+}
+
+String _formatCurrencyTotals(Map<String, double> totals) => totals.entries
+    .map((entry) => '${entry.key} ${AppFormatters.compact(entry.value)}')
+    .join('\n');
 
 class _IStat extends StatelessWidget {
   final IconData icon;
@@ -328,6 +368,7 @@ class _IStat extends StatelessWidget {
       const SizedBox(height: 2),
       Text(
         value,
+        textAlign: TextAlign.center,
         style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 13,

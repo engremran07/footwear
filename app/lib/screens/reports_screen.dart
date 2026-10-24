@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/design/app_animations.dart';
@@ -10,6 +10,7 @@ import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
+import '../models/route_model.dart';
 import '../models/shop_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
@@ -24,6 +25,21 @@ import '../providers/transaction_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/export_sheet.dart';
 import '../widgets/error_state.dart';
+
+Future<List<RouteModel>> _loadExportRoutes(WidgetRef ref) async {
+  ref.invalidate(routesExportProvider);
+  return ref.read(routesExportProvider.future);
+}
+
+Future<Map<String, String>> _loadRouteCurrencies(WidgetRef ref) async {
+  final routes = await _loadExportRoutes(ref);
+  return {for (final route in routes) route.id: route.currency};
+}
+
+Future<List<ShopModel>> _loadExportShops(WidgetRef ref) async {
+  ref.invalidate(shopsExportProvider);
+  return ref.read(shopsExportProvider.future);
+}
 
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
@@ -43,12 +59,6 @@ class ReportsScreen extends ConsumerWidget {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(infoSnackBar(tr('no_data', ref)));
-  }
-
-  Future<Map<String, String>> _loadRouteCurrencies(WidgetRef ref) async {
-    ref.invalidate(routesExportProvider);
-    final routes = await ref.read(routesExportProvider.future);
-    return {for (final route in routes) route.id: route.currency};
   }
 
   @override
@@ -168,9 +178,7 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    ref.invalidate(shopsExportProvider);
-    final shops = await ref.read(shopsExportProvider.future);
-    if (!context.mounted) return;
+    final shops = await _loadExportShops(ref);
     if (!context.mounted) return;
     if (shops.isEmpty) {
       _showNoData(context, ref);
@@ -359,14 +367,9 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final shops = user.isAdmin
-        ? await ref.read(outstandingShopsProvider.future)
-        : (user.assignedRouteIds.isNotEmpty
-              ? (await ref.read(
-                  sellerAllShopsProvider.future,
-                )).where((shop) => shop.balance > 0).toList()
-              : <ShopModel>[]);
-    if (!context.mounted) return;
+    final shops = (await _loadExportShops(
+      ref,
+    )).where((shop) => shop.balance > 0).toList();
     if (!context.mounted) return;
     if (shops.isEmpty) {
       _showNoData(context, ref);
@@ -379,13 +382,8 @@ class ReportsScreen extends ConsumerWidget {
       triCol('phone'),
       triCol('balance'),
     ];
-    final reportRoutes = user.isAdmin
-        ? await ref.read(routesProvider.future)
-        : await ref.read(routesBySellerProvider(user.id).future);
+    final routeCurrencyMap2 = await _loadRouteCurrencies(ref);
     if (!context.mounted) return;
-    final routeCurrencyMap2 = <String, String>{
-      for (final route in reportRoutes) route.id: route.currency,
-    };
     final rows = shops
         .map(
           (s) => [
@@ -416,12 +414,7 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final shops = user.isAdmin
-        ? await ref.read(shopsProvider.future)
-        : (user.assignedRouteIds.isNotEmpty
-              ? await ref.read(sellerAllShopsProvider.future)
-              : <ShopModel>[]);
-    if (!context.mounted) return;
+    final shops = await _loadExportShops(ref);
     if (!context.mounted) return;
     final badDebtShops = shops.where((s) => s.badDebt).toList();
     if (badDebtShops.isEmpty) {
@@ -435,13 +428,8 @@ class ReportsScreen extends ConsumerWidget {
       triCol('bad_debt_amount'),
       triCol('date'),
     ];
-    final reportRoutes = user.isAdmin
-        ? await ref.read(routesProvider.future)
-        : await ref.read(routesBySellerProvider(user.id).future);
+    final routeCurrencyMap3 = await _loadRouteCurrencies(ref);
     if (!context.mounted) return;
-    final routeCurrencyMap3 = <String, String>{
-      for (final route in reportRoutes) route.id: route.currency,
-    };
     final rows = badDebtShops
         .map(
           (s) => [
@@ -493,10 +481,10 @@ class _Row extends StatelessWidget {
   }
 }
 
-class _ExportCard extends StatelessWidget {
+class _ExportCard extends ConsumerStatefulWidget {
   final IconData icon;
   final String title;
-  final VoidCallback onExport;
+  final Future<void> Function() onExport;
   const _ExportCard({
     required this.icon,
     required this.title,
@@ -504,14 +492,53 @@ class _ExportCard extends StatelessWidget {
   });
 
   @override
+  ConsumerState<_ExportCard> createState() => _ExportCardState();
+}
+
+class _ExportCardState extends ConsumerState<_ExportCard> {
+  bool _loading = false;
+
+  Future<void> _runExport() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      await widget.onExport();
+    } catch (error) {
+      debugPrint('Report export failed: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        trailing: const Icon(Icons.download),
-        onTap: onExport,
+        leading: Icon(
+          widget.icon,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        title: Text(
+          widget.title,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        trailing: _loading
+            ? Semantics(
+                label: tr('generating_report', ref),
+                child: const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : const Icon(Icons.download),
+        onTap: _loading ? null : _runExport,
       ),
     );
   }
@@ -747,7 +774,10 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       final netTx = txs.fold<double>(0.0, (s, t) => s + t.balanceImpact);
       final labels = _labels(ref);
       final openingBalance = shop.balance - netTx;
-      final acctCurrency = ref.read(routeCurrencyProvider(shop.routeId));
+      final accountRoute = shop.routeId.trim().isEmpty
+          ? null
+          : await ref.read(routeDetailProvider(shop.routeId).future);
+      final acctCurrency = accountRoute?.currency ?? 'SAR';
 
       if (!context.mounted) return;
       ExportSheet.show(
@@ -784,7 +814,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
           dateTo: txs.isNotEmpty ? txs.last.createdAt.toDate() : null,
           labels: labels,
           locale: locale,
-          currency: settings.currency,
+          currency: acctCurrency,
           logoBytes: settings.logoBytes,
         ),
       );
@@ -943,40 +973,63 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       );
 
       // Shops are already loaded for the admin UI â€” safe to read from cache.
-      final allShops = await ref.read(shopsProvider.future);
+      final allShops = await _loadExportShops(ref);
       if (!context.mounted) return;
+      final routes = await _loadExportRoutes(ref);
+      if (!context.mounted) return;
+      final shopsById = {for (final shop in allShops) shop.id: shop};
+      final routeCurrencyById = {
+        for (final route in routes) route.id: route.currency,
+      };
 
       // Build per-customer summary.
       // allTxs is already filtered to this seller by sellerTransactionsExportProvider.
-      final shopMap = <String, SellerReportShop>{};
+      final shopMap = <(String, String), SellerReportShop>{};
       for (final tx in allTxs) {
         final cid = tx.shopId;
         if (cid.isEmpty) continue;
         final cname = tx.shopName.isNotEmpty
             ? tx.shopName
-            : allShops.where((s) => s.id == cid).firstOrNull?.name ?? '';
-        final existing = shopMap[cid];
+            : shopsById[cid]?.name ?? '';
+        final shop = shopsById[cid];
+        final currency =
+            routeCurrencyById[tx.routeId] ??
+            (shop == null ? null : routeCurrencyById[shop.routeId]) ??
+            'SAR';
+        final rowKey = (cid, currency);
+        final existing = shopMap[rowKey];
         final pairsSold = tx.items.fold<int>(0, (acc, item) => acc + item.qty);
         final revenue = tx.isCashOut ? tx.amount : 0.0;
-        shopMap[cid] = SellerReportShop(
+        shopMap[rowKey] = SellerReportShop(
           name: cname,
           totalPairsSold: (existing?.totalPairsSold ?? 0) + pairsSold,
           totalRevenue: (existing?.totalRevenue ?? 0) + revenue,
-          outstandingBalance: 0,
+          outstandingBalance: existing?.outstandingBalance ?? 0,
+          currency: currency,
         );
       }
       // Add outstanding balance from shops collection
-      for (final entry in shopMap.entries) {
-        final match = allShops.where((s) => s.id == entry.key);
-        if (match.isNotEmpty) {
-          shopMap[entry.key] = SellerReportShop(
-            name: entry.value.name,
-            totalPairsSold: entry.value.totalPairsSold,
-            totalRevenue: entry.value.totalRevenue,
-            outstandingBalance: match.first.balance,
-          );
-        }
+      final shopIdsWithTransactions = shopMap.keys.map((key) => key.$1).toSet();
+      for (final shop in allShops) {
+        if (!shopIdsWithTransactions.contains(shop.id)) continue;
+        final currency = routeCurrencyById[shop.routeId] ?? 'SAR';
+        final rowKey = (shop.id, currency);
+        final existing = shopMap[rowKey];
+        shopMap[rowKey] = SellerReportShop(
+          name: existing?.name ?? shop.name,
+          totalPairsSold: existing?.totalPairsSold ?? 0,
+          totalRevenue: existing?.totalRevenue ?? 0,
+          outstandingBalance: shop.balance,
+          currency: currency,
+        );
       }
+      final sellerRoutes = routes
+          .where((route) => seller.assignedRouteIds.contains(route.id))
+          .toList();
+      final sellerRouteName = sellerRoutes
+          .map((route) => '${route.routeNumber} · ${route.name}')
+          .join(', ');
+      if (!context.mounted) return;
 
       final stockReceived = inventory.fold<int>(
         0,
@@ -989,13 +1042,6 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
 
       final settings = await ref.read(settingsProvider.future);
       final labels = _labels(ref);
-      final routes = await ref.read(routesProvider.future);
-      if (!context.mounted) return;
-      final sellerRoute = routes
-          .where((route) => seller.assignedRouteIds.contains(route.id))
-          .firstOrNull;
-      final sellerRouteCurrency = sellerRoute?.currency ?? 'SAR';
-      if (!context.mounted) return;
       ExportSheet.show(
         // ignore: use_build_context_synchronously
         context,
@@ -1012,11 +1058,8 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
               (c) => [
                 c.name,
                 c.totalPairsSold,
-                AppFormatters.currency(c.totalRevenue, sellerRouteCurrency),
-                AppFormatters.currency(
-                  c.outstandingBalance,
-                  sellerRouteCurrency,
-                ),
+                AppFormatters.currency(c.totalRevenue, c.currency),
+                AppFormatters.currency(c.outstandingBalance, c.currency),
               ],
             )
             .toList(),
@@ -1025,14 +1068,10 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
           seller.displayName,
         ),
         pdfBytesBuilder: () {
-          // Resolve route UID â†’ display name so PDF never shows raw IDs
-          final routeDisplayName = sellerRoute != null
-              ? '${sellerRoute.routeNumber} · ${sellerRoute.name}'
-              : '';
           return buildPdfSellerReport(
             sellerName: seller.displayName,
             sellerPhone: seller.phone ?? '',
-            routeName: routeDisplayName,
+            routeName: sellerRouteName,
             shops: shopMap.values.toList(),
             stockReceived: stockReceived,
             stockSold: stockSold,

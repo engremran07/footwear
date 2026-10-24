@@ -5,6 +5,30 @@ description: "Use when: writing new tests, auditing test coverage gaps, adding w
 
 # Skill: ShoesERP Testing Strategy
 
+## Purpose and invocation
+
+Choose risk-based tests for ShoesERP behavior, UI states, localization,
+authorization boundaries, exports, and regressions. Use before adding tests or
+when selecting validation for a code change.
+
+## Required inputs and workflow
+
+Inspect the current test tree, test runner, relevant implementation, and
+observable contract. Select the smallest test that proves the behavior, then
+expand when shared code, security, data integrity, or regressions warrant it.
+Verify APIs against the pinned Flutter/Dart version.
+
+## Output
+
+Report the exact command, test target, observed pass/failure output, and any
+behavior or environment not covered. Do not infer broad coverage from a
+focused test.
+
+## Dependencies and boundaries
+
+Follow `AGENTS.md` for runtime invariants and explicit release authorization.
+This skill owns test strategy, not application design or production operations.
+
 ## Coverage Status
 
 Test counts and coverage change over time. Never treat counts in this file as
@@ -135,6 +159,22 @@ void main() {
 
 ```
 
+## Accessibility and Visual UI Tests
+
+- Use widget tests for layout, visible state, semantics, and interactions that
+  are deterministic in the test environment.
+- When supported by the pinned Flutter SDK, apply the available
+  `AccessibilityGuideline` checks for target sizes, labels, and contrast.
+- Exercise supported locale/direction, text scaling, and narrow/expanded
+  constraints for the affected screen family.
+- Review golden changes rather than regenerating baselines blindly. A golden
+  test verifies pixels for its fixture; it does not prove all device, locale,
+  font, or assistive-technology behavior.
+- Use a browser, emulator, device, or assistive technology for checks that a
+  widget test cannot represent. Record checks that were unavailable instead of
+  inferring visual correctness from source inspection.
+- Verify test APIs against the repository's pinned Flutter SDK before use.
+
 ## TDD Discipline Rules (from Superpowers framework)
 
 1. **Write the test FIRST** — then write the code to make it pass
@@ -184,6 +224,14 @@ Pop-Location
   changes.
 - [ ] For release claims, run the requested release checks and quote their
   actual output. A local test pass does not prove production deployment.
+
+## Validation
+
+Run the focused test command with the repository-required PDF define when
+applicable. Run Dart analysis after Dart edits and Rules Emulator tests after
+Rules edits. Markdown lint is required after Markdown changes. Builds,
+deployments, device installs, commits, and pushes require explicit
+authorization.
 
 ## Firestore Rules Emulator Test Structure
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/product_model.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/app_sanitizer.dart';
 import '../core/utils/error_mapper.dart';
@@ -11,6 +12,7 @@ import '../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/error_state.dart';
 
 class ProductFormScreen extends ConsumerStatefulWidget {
   final String? productId;
@@ -34,20 +36,17 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     super.dispose();
   }
 
-  void _loadExisting() {
-    if (_loaded || !isEdit) return;
-    final p = ref.read(productDetailProvider(widget.productId!)).value;
-    if (p != null) {
-      _nameC.value = TextEditingValue(
-        text: p.name,
-        selection: TextSelection.collapsed(offset: p.name.length),
-      );
-      _loaded = true;
-    }
+  void _loadExisting(ProductModel product) {
+    if (_loaded || !isEdit || product.id != widget.productId) return;
+    _nameC.value = TextEditingValue(
+      text: product.name,
+      selection: TextSelection.collapsed(offset: product.name.length),
+    );
+    _loaded = true;
   }
 
   Future<void> _save() async {
-    if (_saving) return;
+    if (_saving || (isEdit && !_loaded)) return;
     if (!_formKey.currentState!.validate()) {
       HapticFeedback.vibrate();
       return;
@@ -94,9 +93,50 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userAsync = ref.watch(authUserProvider);
+    if (userAsync.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (userAsync.hasError) {
+      return Scaffold(
+        body: mappedErrorState(
+          error: userAsync.error!,
+          ref: ref,
+          onRetry: () => ref.invalidate(authUserProvider),
+        ),
+      );
+    }
+    if (userAsync.value?.isAdmin != true) {
+      return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
+    }
+
     if (isEdit) {
-      ref.watch(productDetailProvider(widget.productId!));
-      _loadExisting();
+      final productAsync = ref.watch(productDetailProvider(widget.productId!));
+      if (productAsync.hasError) {
+        return Scaffold(
+          body: mappedErrorState(
+            error: productAsync.error!,
+            ref: ref,
+            onRetry: () =>
+                ref.invalidate(productDetailProvider(widget.productId!)),
+          ),
+        );
+      }
+      if (productAsync.isLoading && !productAsync.hasValue) {
+        return const Scaffold(body: LinearProgressIndicator());
+      }
+      final product = productAsync.value;
+      if (product == null || product.id != widget.productId) {
+        return Scaffold(
+          body: ErrorState(
+            message: tr('err_not_found', ref),
+            onRetry: () =>
+                ref.invalidate(productDetailProvider(widget.productId!)),
+            retryLabel: tr('retry', ref),
+          ),
+        );
+      }
+      _loadExisting(product);
     }
 
     return PopScope(
@@ -140,7 +180,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     width: double.infinity,
                     height: 48,
                     child: FilledButton(
-                      onPressed: _saving ? null : _save,
+                      onPressed: _saving || (isEdit && !_loaded) ? null : _save,
                       child: _saving
                           ? const SizedBox(
                               width: 20,

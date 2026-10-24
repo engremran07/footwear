@@ -69,7 +69,6 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     final tenantId =
         TenantScope.normalize(currentUser.tenantId) ??
         TenantScope.noActiveWorkspaceId;
-    final routes = ref.watch(routesProvider).value ?? const <RouteModel>[];
 
     // ── Users for selected workspace ────────────────────────────────────
     final usersAsync = _showInactive
@@ -80,7 +79,6 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateUserDialog(
           tenantId,
-          routes,
           canAssignWorkspaceRoles: currentUser.isSuperAdmin,
         ),
         icon: const Icon(Icons.person_add),
@@ -189,11 +187,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                             currentUser: currentUser,
                             onEdit:
                                 currentUser.isSuperAdmin || !filtered[i].isAdmin
-                                ? () => _showEditUserDialog(
-                                    filtered[i],
-                                    tenantId,
-                                    routes,
-                                  )
+                                ? () =>
+                                      _showEditUserDialog(filtered[i], tenantId)
                                 : null,
                             onDelete:
                                 !currentUser.isSuperAdmin && filtered[i].isAdmin
@@ -249,8 +244,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   // ── Create user dialog ───────────────────────────────────────────────────
 
   void _showCreateUserDialog(
-    String tenantId,
-    List<RouteModel> routes, {
+    String tenantId, {
     required bool canAssignWorkspaceRoles,
   }) {
     final emailC = TextEditingController();
@@ -326,26 +320,16 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: routes.map((r) {
-                        final selected = selectedRouteIds.contains(r.id);
-                        return FilterChip(
-                          label: Text(r.name),
-                          selected: selected,
-                          onSelected: (_) => setS(() {
-                            if (selected) {
-                              final idx = selectedRouteIds.indexOf(r.id);
-                              selectedRouteIds.removeAt(idx);
-                              selectedRouteNames.removeAt(idx);
-                            } else {
-                              selectedRouteIds.add(r.id);
-                              selectedRouteNames.add(r.name);
-                            }
-                          }),
-                        );
-                      }).toList(),
+                    _RouteAssignmentOptions(
+                      selectedRouteIds: selectedRouteIds,
+                      onSelectionChanged: (route, selected) => setS(
+                        () => _updateRouteSelection(
+                          selectedRouteIds,
+                          selectedRouteNames,
+                          route,
+                          selected,
+                        ),
+                      ),
                     ),
                   ],
                 ],
@@ -371,12 +355,12 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     }
                     return;
                   }
-                  if (role == 'seller' && selectedRouteIds.isEmpty) {
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        warningSnackBar(tr('msg_seller_needs_route', ref)),
-                      );
-                    }
+                  if (role == 'seller' &&
+                      !_validateSellerRoutes(
+                        ctx,
+                        selectedRouteIds,
+                        selectedRouteNames,
+                      )) {
                     return;
                   }
                   try {
@@ -421,11 +405,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
   // ── Edit user dialog ─────────────────────────────────────────────────────
 
-  Future<void> _showEditUserDialog(
-    UserModel user,
-    String tenantId,
-    List<RouteModel> routes,
-  ) async {
+  Future<void> _showEditUserDialog(UserModel user, String tenantId) async {
     final currentUser = await ref.read(authUserProvider.future);
     if (!mounted || currentUser == null) return;
     final nameC = TextEditingController(text: user.displayName);
@@ -549,26 +529,16 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: routes.map((r) {
-                        final selected = selectedRouteIds.contains(r.id);
-                        return FilterChip(
-                          label: Text(r.name),
-                          selected: selected,
-                          onSelected: (_) => setS(() {
-                            if (selected) {
-                              final idx = selectedRouteIds.indexOf(r.id);
-                              selectedRouteIds.removeAt(idx);
-                              selectedRouteNames.removeAt(idx);
-                            } else {
-                              selectedRouteIds.add(r.id);
-                              selectedRouteNames.add(r.name);
-                            }
-                          }),
-                        );
-                      }).toList(),
+                    _RouteAssignmentOptions(
+                      selectedRouteIds: selectedRouteIds,
+                      onSelectionChanged: (route, selected) => setS(
+                        () => _updateRouteSelection(
+                          selectedRouteIds,
+                          selectedRouteNames,
+                          route,
+                          selected,
+                        ),
+                      ),
                     ),
                   ],
                 ],
@@ -582,6 +552,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
               ElevatedButton(
                 onPressed: () async {
                   final me = await ref.read(authUserProvider.future);
+                  if (!mounted || !ctx.mounted) return;
                   if (me?.isAdmin != true) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
@@ -591,12 +562,12 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     return;
                   }
                   if (nameC.text.trim().isEmpty) return;
-                  if (role == 'seller' && selectedRouteIds.isEmpty) {
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        warningSnackBar(tr('msg_seller_needs_route', ref)),
-                      );
-                    }
+                  if (role == 'seller' &&
+                      !_validateSellerRoutes(
+                        ctx,
+                        selectedRouteIds,
+                        selectedRouteNames,
+                      )) {
                     return;
                   }
                   try {
@@ -644,6 +615,66 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     });
   }
 
+  void _updateRouteSelection(
+    List<String> routeIds,
+    List<String> routeNames,
+    RouteModel route,
+    bool selected,
+  ) {
+    if (selected) {
+      if (routeIds.contains(route.id)) return;
+      routeIds.add(route.id);
+      routeNames.add(route.name);
+      return;
+    }
+    final index = routeIds.indexOf(route.id);
+    if (index < 0) return;
+    routeIds.removeAt(index);
+    if (index < routeNames.length) routeNames.removeAt(index);
+  }
+
+  bool _validateSellerRoutes(
+    BuildContext dialogContext,
+    List<String> selectedRouteIds,
+    List<String> selectedRouteNames,
+  ) {
+    final routeState = ref.read(routesProvider);
+    if (routeState.hasError) {
+      ScaffoldMessenger.of(dialogContext).showSnackBar(
+        errorSnackBar(tr(AppErrorMapper.key(routeState.error!), ref)),
+      );
+      return false;
+    }
+    if (routeState.isLoading || !routeState.hasValue) {
+      ScaffoldMessenger.of(
+        dialogContext,
+      ).showSnackBar(infoSnackBar(tr('loading', ref)));
+      return false;
+    }
+    if (selectedRouteIds.isEmpty) {
+      ScaffoldMessenger.of(
+        dialogContext,
+      ).showSnackBar(warningSnackBar(tr('msg_seller_needs_route', ref)));
+      return false;
+    }
+
+    final routeNamesById = {
+      for (final route in routeState.value!) route.id: route.name,
+    };
+    if (selectedRouteIds.any(
+      (routeId) => !routeNamesById.containsKey(routeId),
+    )) {
+      ScaffoldMessenger.of(
+        dialogContext,
+      ).showSnackBar(warningSnackBar(tr('route_unavailable', ref)));
+      return false;
+    }
+    selectedRouteNames
+      ..clear()
+      ..addAll(selectedRouteIds.map((routeId) => routeNamesById[routeId]!));
+    return true;
+  }
+
   // ── Reactivate user dialog ────────────────────────────────────────────────
 
   Future<void> _confirmReactivateUser(UserModel user) async {
@@ -676,7 +707,6 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       return;
     }
 
-    final routes = ref.read(routesProvider).value ?? [];
     final selectedRouteIds = <String>[];
     final selectedRouteNames = <String>[];
 
@@ -705,26 +735,16 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: routes.map((r) {
-                      final selected = selectedRouteIds.contains(r.id);
-                      return FilterChip(
-                        label: Text(r.name),
-                        selected: selected,
-                        onSelected: (_) => setS(() {
-                          if (selected) {
-                            final idx = selectedRouteIds.indexOf(r.id);
-                            selectedRouteIds.removeAt(idx);
-                            selectedRouteNames.removeAt(idx);
-                          } else {
-                            selectedRouteIds.add(r.id);
-                            selectedRouteNames.add(r.name);
-                          }
-                        }),
-                      );
-                    }).toList(),
+                  _RouteAssignmentOptions(
+                    selectedRouteIds: selectedRouteIds,
+                    onSelectionChanged: (route, selected) => setS(
+                      () => _updateRouteSelection(
+                        selectedRouteIds,
+                        selectedRouteNames,
+                        route,
+                        selected,
+                      ),
+                    ),
                   ),
                 ],
               ],
@@ -735,7 +755,17 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                 child: Text(tr('cancel', ref)),
               ),
               ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, true),
+                onPressed: () {
+                  if (user.isSeller &&
+                      !_validateSellerRoutes(
+                        ctx,
+                        selectedRouteIds,
+                        selectedRouteNames,
+                      )) {
+                    return;
+                  }
+                  Navigator.pop(ctx, true);
+                },
                 child: Text(tr('reactivate', ref)),
               ),
             ],
@@ -864,6 +894,55 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
         ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
       }
     }
+  }
+}
+
+class _RouteAssignmentOptions extends ConsumerWidget {
+  final List<String> selectedRouteIds;
+  final void Function(RouteModel route, bool selected) onSelectionChanged;
+
+  const _RouteAssignmentOptions({
+    required this.selectedRouteIds,
+    required this.onSelectionChanged,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final routesAsync = ref.watch(routesProvider);
+    return routesAsync.when(
+      loading: () => const LinearProgressIndicator(),
+      error: (error, _) => Row(
+        children: [
+          Expanded(
+            child: Text(
+              tr(AppErrorMapper.key(error), ref),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: () => ref.invalidate(routesProvider),
+            icon: const Icon(Icons.refresh),
+            label: Text(tr('retry', ref)),
+          ),
+        ],
+      ),
+      data: (routes) => routes.isEmpty
+          ? Text(tr('no_routes', ref))
+          : Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: routes
+                  .map(
+                    (route) => FilterChip(
+                      label: Text(route.name),
+                      selected: selectedRouteIds.contains(route.id),
+                      onSelected: (selected) =>
+                          onSelectionChanged(route, selected),
+                    ),
+                  )
+                  .toList(),
+            ),
+    );
   }
 }
 

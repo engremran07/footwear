@@ -94,6 +94,12 @@ void main() {
       expect(urKeys, contains('login_reset_email_hint'));
     });
 
+    test('admin stock guidance exists in all locales', () {
+      expect(enKeys, contains('admin_no_stock_guidance'));
+      expect(arKeys, contains('admin_no_stock_guidance'));
+      expect(urKeys, contains('admin_no_stock_guidance'));
+    });
+
     test('No duplicate keys in EN locale', () {
       final seen = <String>{};
       final dups = <String>[];

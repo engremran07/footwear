@@ -5,6 +5,32 @@ description: "Use when: fixing any issue, gap, or error in ShoesERP. This skill 
 
 # Skill: Inline Audit & Fix Workflow
 
+## Invocation and required inputs
+
+Use when fixing a ShoesERP bug, gap, or error. Read the affected screen/widget,
+provider, model, utility, and error mapping as required by the full-file rule,
+along with the current Git delta and runtime contract.
+
+## Workflow and output
+
+Trace the reported path, inspect related patterns, audit the relevant
+role/rules/provider/data invariants, implement the root-cause fix, and report
+what was changed and exactly how it was verified. Do not turn unrelated
+observations into scope creep.
+
+## Dependencies and boundaries
+
+Use `AGENTS.md`, `CLAUDE.md`, and the applicable specialist skill as sources of
+truth. This skill does not override their release authorization rules. Deploy,
+version, commit, push, install, or change production data only when explicitly
+authorized.
+
+## Validation
+
+Select focused tests and analyzers for the touched path. Use the Rules Emulator
+for Rules changes and Markdown lint for Markdown changes. Quote exact output
+for every validation claim.
+
 ## Philosophy
 
 Every change is also an audit pass. When you open a file to fix one thing, you
@@ -117,64 +143,23 @@ Always use client-side:
 
 - `app/pubspec.yaml` version == `AppBrand.appVersion + '+' + AppBrand.buildNumber`
 
-- After touching any user-visible feature: bump PATCH+BUILD, rebuild both APK and web
+- When a release is explicitly authorized, synchronize the version/build and
+  changelog before producing artifacts. A user-visible source change alone
+  does not authorize a version bump or release build.
 
-### 8. Mandatory Release Sequence (non-bypassable, every session)
+### 8. Scope-Aware Validation (mandatory)
 
-```powershell
+Select checks relevant to the change. For Dart edits, run focused tests and
+`flutter analyze lib --no-pub`; run `dart analyze test/` when tests change.
+Use `--dart-define=use_arabic=true` for Flutter actions that can generate PDFs.
+Run the Firestore Rules Emulator suite for Rules changes and Markdown lint for
+Markdown changes. Broaden validation when shared behavior or observed
+regressions warrant it, and quote exact tool output for every claim.
 
-# Step 1 — version bump + sync
-
-Select-String -Path "app\pubspec.yaml","app\lib\core\constants\app_brand.dart" -Pattern '^version:|appVersion|buildNumber'
-
-# If this session is producing release artifacts, bump PATCH+BUILD before continuing.
-
-# Step 2 — analyze
-
-flutter analyze lib --no-pub          # quote "No issues found!"
-dart analyze test/                    # quote "No issues found!"
-flutter test -r expanded --dart-define=use_arabic=true  # quote "All N tests passed!"
-
-# Step 3 — web build + hosting deploy
-
-$ErrorActionPreference='Continue'; flutter build web --release --dart-define=use_arabic=true; Write-Host "EXIT: $LASTEXITCODE"
-firebase deploy --only hosting        # quote "Deploy complete!"
-
-# Step 4 — APK build
-
-$freeRamGB = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB
-Write-Host ("Free RAM before APK build: {0:N2} GB" -f $freeRamGB)
-if ($freeRamGB -lt 3.2) { throw "At least 3.2 GB free RAM is required before starting the APK build." }
-flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true  # quote file size
-
-# Step 5 — deploy Firestore (ALWAYS, not just on rules change)
-
-firebase deploy --only firestore:rules,firestore:indexes   # quote "Deploy complete!"
-
-# Step 6 — commit audit + push
-
-git log --oneline -5                  # review; no unexpected commits
-git status --short                    # no unexpected artifacts
-git diff --stat HEAD                  # scope matches intent
-git add -A ; git commit -m "type: summary — vX.Y.Z+N"   # quote hash
-git push                              # quote branch + hash
-
-# Step 7 — device install (if device connected)
-
-adb devices
-adb -s <device-id> push "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" /sdcard/Download/
-adb -s <device-id> install --streaming -r "D:\Footwear\app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk"  # quote "Success"
-
-```
-
-Any step skipped = **incomplete session**. Next agent MUST check `git log`
-before starting new work and complete all missing steps first.
-
-The RAM preflight is required immediately before Gradle starts. If free RAM is
-below 3.2 GB, reclaim memory and recheck first. Device delivery order is build,
-`adb push` the matching ABI APK to `/sdcard/Download/`, then use its host-side
-path with `adb install --streaming -r` to stream-install it. The install command
-does not accept a remote device path as its APK argument.
+Consult `AGENTS.md` §8 for release steps only when the user explicitly
+authorizes a release. Builds, deployments, data changes, device installs,
+commits, pushes, and tags are separate operations and are not implicitly
+authorized by a user-visible code change.
 
 ## Inline Audit Checklist (run mentally on every PR)
 
@@ -186,8 +171,8 @@ does not accept a remote device path as its APK argument.
 [ ] Deleted-field filter is client-side !=true
 [ ] Every where(A)+orderBy(B) query has composite index
 [ ] Admin-as-seller paths: sellerId/sellerName always populated in invoice submit
-[ ] Split-per-ABI build command in all release scripts/docs
-[ ] version bumped in pubspec.yaml AND app_brand.dart
+[ ] Split-per-ABI command is correct when release scripts/docs are changed
+[ ] Version/build and changelog are synchronized when a release/version bump is authorized
 [ ] Every transaction/invoice write also updates shop.balance atomically in same batch
 [ ] No screen/widget writes directly to transactions, invoices, or shop.balance
 [ ] Every ExportSheet.show() with ledger data passes pdfBytesBuilder (not generic fallback)

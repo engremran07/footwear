@@ -30,6 +30,7 @@ class _TenantManagementScreenState
   String? _pendingOwnerId;
   bool _selectedWorkspaceForProvisioning = false;
   bool _isCreating = false;
+  String? _lifecycleTenantId;
 
   @override
   void dispose() {
@@ -179,6 +180,66 @@ class _TenantManagementScreenState
           .selectWorkspace(workspaceId: tenant.id, reason: reason);
     } catch (error) {
       _showMappedError(error);
+    }
+  }
+
+  Future<void> _changeTenantLifecycle(TenantModel tenant) async {
+    final restoring = !tenant.active;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          tr(
+            restoring
+                ? 'restore_workspace_confirmation_title'
+                : 'archive_workspace_confirmation_title',
+            ref,
+          ),
+        ),
+        content: Text(
+          tr(
+            restoring
+                ? 'restore_workspace_confirmation_message'
+                : 'archive_workspace_confirmation_message',
+            ref,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(tr('cancel', ref)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              tr(restoring ? 'restore_workspace' : 'archive_workspace', ref),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _lifecycleTenantId = tenant.id);
+    try {
+      final notifier = ref.read(tenantManagementNotifierProvider.notifier);
+      if (restoring) {
+        await notifier.restoreTenant(tenant.id);
+      } else {
+        await notifier.archiveTenant(tenant.id);
+      }
+      if (!mounted) return;
+      ref.invalidate(tenantsProvider);
+      ref.invalidate(tenantProvider(tenant.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        successSnackBar(
+          tr(restoring ? 'workspace_restored' : 'workspace_archived', ref),
+        ),
+      );
+    } catch (error) {
+      _showMappedError(error);
+    } finally {
+      if (mounted) setState(() => _lifecycleTenantId = null);
     }
   }
 
@@ -357,6 +418,10 @@ class _TenantManagementScreenState
         currentUser != null &&
         (currentUser.isSuperAdmin || currentUser.isTenantAdmin);
     final canCreateTenants = currentUser?.isSuperAdmin == true;
+    final canManageLifecycle =
+        currentUser?.isSuperAdmin == true &&
+        currentUser?.active == true &&
+        (currentUser?.activeWorkspaceReason?.trim().length ?? 0) >= 10;
 
     bool canEditTenant(TenantModel tenant) {
       return currentUser?.isSuperAdmin == true &&
@@ -437,6 +502,17 @@ class _TenantManagementScreenState
                       ),
                       const SizedBox(height: 8),
                       Text('${tr('slug', ref)}: ${tenant.slug}'),
+                      const SizedBox(height: 8),
+                      Chip(
+                        label: Text(
+                          tr(
+                            tenant.active
+                                ? 'workspace_status_active'
+                                : 'workspace_status_archived',
+                            ref,
+                          ),
+                        ),
+                      ),
                       if (tenant.ownerUserId == null)
                         Text(
                           tr('workspace_owner_missing', ref),
@@ -452,24 +528,54 @@ class _TenantManagementScreenState
                             '${tr('workspace_access_active', ref)}: ${currentUser!.activeWorkspaceReason}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
-                        Align(
-                          alignment: AlignmentDirectional.centerEnd,
-                          child: TextButton.icon(
-                            onPressed: () => _changeWorkspaceAccess(tenant),
-                            icon: Icon(
-                              currentUser?.activeWorkspaceId == tenant.id
-                                  ? Icons.lock_open
-                                  : Icons.admin_panel_settings_outlined,
-                            ),
-                            label: Text(
-                              tr(
+                        Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 8,
+                          children: [
+                            TextButton.icon(
+                              onPressed: () => _changeWorkspaceAccess(tenant),
+                              icon: Icon(
                                 currentUser?.activeWorkspaceId == tenant.id
-                                    ? 'end_workspace_access'
-                                    : 'access_workspace',
-                                ref,
+                                    ? Icons.lock_open
+                                    : Icons.admin_panel_settings_outlined,
+                              ),
+                              label: Text(
+                                tr(
+                                  currentUser?.activeWorkspaceId == tenant.id
+                                      ? 'end_workspace_access'
+                                      : 'access_workspace',
+                                  ref,
+                                ),
                               ),
                             ),
-                          ),
+                            if (canManageLifecycle &&
+                                currentUser?.activeWorkspaceId == tenant.id)
+                              OutlinedButton.icon(
+                                onPressed: _lifecycleTenantId == null
+                                    ? () => _changeTenantLifecycle(tenant)
+                                    : null,
+                                icon: _lifecycleTenantId == tenant.id
+                                    ? const SizedBox.square(
+                                        dimension: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Icon(
+                                        tenant.active
+                                            ? Icons.archive_outlined
+                                            : Icons.unarchive_outlined,
+                                      ),
+                                label: Text(
+                                  tr(
+                                    tenant.active
+                                        ? 'archive_workspace'
+                                        : 'restore_workspace',
+                                    ref,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ],
                     ],

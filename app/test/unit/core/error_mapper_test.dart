@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/core/utils/error_mapper.dart';
+import 'package:footwear_erp/core/utils/pdf_export.dart';
 
 void main() {
   group('AppErrorMapper.key — FirebaseAuthException', () {
@@ -130,6 +131,13 @@ void main() {
   });
 
   group('AppErrorMapper.key — plain Dart errors', () {
+    test('disabled workspace data reset uses its actionable message', () {
+      expect(
+        AppErrorMapper.key(UnsupportedError('flush_data_reset_unavailable')),
+        equals('flush_data_reset_unavailable'),
+      );
+    });
+
     test('archived workspace has a specific sign-in message', () {
       expect(
         AppErrorMapper.key(StateError('workspace-disabled')),
@@ -143,6 +151,15 @@ void main() {
           StateError('Authorized workspace administration is required.'),
         ),
         equals('err_permission_denied'),
+      );
+    });
+
+    test('stale workspace lifecycle actions ask the user to refresh', () {
+      expect(
+        AppErrorMapper.key(
+          StateError('Workspace lifecycle status changed. Refresh and retry.'),
+        ),
+        equals('workspace_lifecycle_changed'),
       );
     });
 
@@ -223,6 +240,15 @@ void main() {
       expect(
         AppErrorMapper.key(Exception('pdf_export_failed')),
         equals('err_pdf_failed'),
+      );
+    });
+
+    test('disabled Arabic PDF shaping has an actionable localized key', () {
+      expect(
+        AppErrorMapper.key(
+          const PdfExportConfigurationException('pdf_arabic_shaping_disabled'),
+        ),
+        equals('err_pdf_shaping_unavailable'),
       );
     });
   });

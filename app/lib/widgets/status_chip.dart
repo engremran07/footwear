@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/design/app_animations.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
@@ -113,7 +114,7 @@ class StatusChip extends ConsumerWidget {
     return Semantics(
       label: '${tr('status', ref)}: $readable',
       child: AnimatedSwitcher(
-        duration: AppTokens.durNormal,
+        duration: AppMotion.duration(context, AppTokens.durNormal),
         child: Container(
           key: ValueKey(status),
           padding: _padding(),

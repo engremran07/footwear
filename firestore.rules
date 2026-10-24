@@ -17,6 +17,38 @@ service cloud.firestore {
       return isAuthenticated() && userDoc().data.active == true;
     }
 
+    function hasMissingTenantDocumentReadAccess(allowSellers) {
+      let userData = userDoc().data;
+      let role = userData.get('role', '');
+      let tenantId = isSuperAdminRole(role)
+        ? userData.get('active_workspace_id', '')
+        : userData.get('tenant_id', '');
+      let isSelectedSuperAdmin = !isSuperAdminRole(role) ||
+        (userData.get('active_workspace_id', '') == tenantId &&
+          userData.get('active_workspace_reason', '') is string &&
+          userData.get('active_workspace_reason', '').size() >= 10 &&
+          userData.get('active_workspace_selected_at', null) is timestamp &&
+          userData.get('active_workspace_selected_at', null) >
+            request.time - duration.value(8, 'h'));
+      return isAuthenticated() &&
+        userData.get('active', false) == true &&
+        tenantId is string && tenantId != '' && tenantId != '__global__' &&
+        isTenantActive(tenantId) && isSelectedSuperAdmin &&
+        (isAdminRole(role) || (allowSellers && isSellerRole(role)));
+    }
+
+    function canReadMissingTenantDocument(allowSellers) {
+      return resource == null &&
+        hasMissingTenantDocumentReadAccess(allowSellers);
+    }
+
+    function canReadMissingWorkspaceSettings(docId) {
+      let tenantPath = /databases/$(database)/documents/tenants/$(docId);
+      return resource == null && isSuperAdmin() &&
+        docId is string && docId != '' && docId != '__global__' &&
+        !exists(tenantPath);
+    }
+
     function getUserRole() {
       return userDoc().data.role;
     }
@@ -214,6 +246,31 @@ service cloud.firestore {
         shopRouteId(shopId) in assignedRouteIds() &&
         isTenantActive(shopTenantId(shopId)) &&
         shopTenantId(shopId) == currentUserTenantId();
+    }
+
+    function sellerInvoiceScopeMatches(invoiceData) {
+      let userData = userDoc().data;
+      let role = userData.get('role', '');
+      let tenantId = invoiceData.get('tenant_id', '');
+      let routeId = invoiceData.get('route_id', '');
+      let shopId = invoiceData.get('shop_id', '');
+      let shop = get(
+        /databases/$(database)/documents/customers/$(shopId)
+      ).data;
+      return isAuthenticated() &&
+        userData.get('active', false) == true &&
+        isSellerRole(role) &&
+        invoiceData.get('created_by', '') == request.auth.uid &&
+        tenantId is string && tenantId != '' &&
+        tenantId == userData.get('tenant_id', '') &&
+        isTenantActive(tenantId) &&
+        routeId is string && routeId != '' &&
+        userData.get('assigned_route_ids', []) is list &&
+        routeId in userData.get('assigned_route_ids', []) &&
+        shopId is string && shopId != '' &&
+        shop is map &&
+        shop.get('tenant_id', '') == tenantId &&
+        shop.get('route_id', '') == routeId;
     }
 
     function shopTenantId(shopId) {
@@ -1164,7 +1221,9 @@ service cloud.firestore {
           validTenantLifecycleTransition(resource.data, request.resource.data) &&
           request.resource.data.updated_at == request.time && docSizeOk()
         );
-      allow delete: if isSuperAdminForSelectedWorkspace(tenantId);
+      // Workspace lifecycle is archive/restore only; hard-delete can orphan
+      // tenant-scoped business records.
+      allow delete: if false;
     }
 
     // --- products -----------------------------------------------------------
@@ -1374,7 +1433,9 @@ service cloud.firestore {
     match /transactions/{txId} {
       // Seller can read only route-owned transactions.
       // P0-2 FIX: transactions are tenant-owned; use isAdminForTenant check
-      allow read: if isAdminForTenant(resource.data.tenant_id) || isSellerRouteTransaction();
+      allow read: if canReadMissingTenantDocument(true) ||
+        isAdminForTenant(resource.data.tenant_id) ||
+        isSellerRouteTransaction();
       // Field validation: type must be in allowed set, amount must be positive
       allow create: if request.resource.data.tenant_id is string &&
         request.resource.data.tenant_id == currentUserTenantId() &&
@@ -1390,7 +1451,8 @@ service cloud.firestore {
           request.resource.data.route_id != null &&
           request.resource.data.route_id != '' &&
           isSellerForRoute(request.resource.data.route_id) &&
-          isSellerForShop(request.resource.data.shop_id)
+          (!('invoice_id' in request.resource.data) ||
+            isSellerForShop(request.resource.data.shop_id))
         )) && transactionCreateIsLinked(txId) && docSizeOk()
         // Admin also requires valid type and positive amount for integrity
         && (isSeller() || (
@@ -1465,7 +1527,8 @@ service cloud.firestore {
     // --- seller inventory ---------------------------------------------------
     match /seller_inventory/{docId} {
       // P0-2 FIX: seller_inventory is tenant-owned; use isAdminForTenant check
-      allow read: if isAdminForTenant(resource.data.tenant_id) ||
+      allow read: if canReadMissingTenantDocument(false) ||
+        isAdminForTenant(resource.data.tenant_id) ||
         (isSeller() && resource.data.seller_id == request.auth.uid &&
          isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
@@ -1522,7 +1585,8 @@ service cloud.firestore {
 
     // --- settings -----------------------------------------------------------
     match /settings/{docId} {
-      allow read: if isAdminForTenant(docId) ||
+      allow read: if canReadMissingWorkspaceSettings(docId) ||
+        isAdminForTenant(docId) ||
         (isActiveUser() &&
          isTenantActive(docId) &&
          (docId == currentUserTenantId() ||
@@ -1568,7 +1632,8 @@ service cloud.firestore {
     // --- invoices -----------------------------------------------------------
     match /invoices/{invoiceId} {
       // P0-2 FIX: invoices are tenant-owned; use isAdminForTenant check
-      allow read: if isAdminForTenant(resource.data.tenant_id) ||
+      allow read: if canReadMissingTenantDocument(true) ||
+        isAdminForTenant(resource.data.tenant_id) ||
         (
           isSeller() && (
             (resource.data.seller_id == request.auth.uid &&
@@ -1582,17 +1647,14 @@ service cloud.firestore {
         );
       allow create: if (isAdminForTenant(request.resource.data.tenant_id) ||
         (
-          isSeller() &&
+          sellerInvoiceScopeMatches(request.resource.data) &&
           request.resource.data.created_by == request.auth.uid &&
           (request.resource.data.type == 'sale' ||
            request.resource.data.type == 'cash_receipt') &&
           request.resource.data.shop_id != null &&
           request.resource.data.shop_id != '' &&
           request.resource.data.route_id != null &&
-          request.resource.data.route_id != '' &&
-          isSellerForRoute(request.resource.data.route_id) &&
-          isSellerForShop(request.resource.data.shop_id) &&
-          request.resource.data.tenant_id == currentUserTenantId()
+          request.resource.data.route_id != ''
         )) &&
         request.resource.data.created_by == request.auth.uid
         // Invoice math integrity: total must equal subtotal minus discount

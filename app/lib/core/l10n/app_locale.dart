@@ -198,6 +198,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_auth_generic': 'Authentication failed. Please try again.',
     'err_permission_denied':
         'You do not have permission to perform this action.',
+    'workspace_lifecycle_changed':
+        'The workspace status changed. Refresh and try again.',
     'err_not_found': 'The requested item was not found.',
     'err_already_exists': 'This item already exists.',
     'err_resource_exhausted': 'Service limit reached. Please try again later.',
@@ -218,6 +220,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_export_no_data':
         'No data to export. Apply different filters or add records first.',
     'err_pdf_failed': 'PDF generation failed.',
+    'err_pdf_shaping_unavailable':
+        'This build cannot safely export Arabic or Urdu PDFs. Update the app or contact your administrator.',
     'err_unknown': 'Something went wrong. Please try again.',
     'err_function_not_deployed':
         'Feature requires server setup — contact admin.',
@@ -701,6 +705,18 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'role_unknown': 'Unsupported role',
     'workspaces': 'Workspaces',
     'create_workspace': 'Create workspace',
+    'archive_workspace': 'Archive workspace',
+    'restore_workspace': 'Restore workspace',
+    'archive_workspace_confirmation_title': 'Archive this workspace?',
+    'archive_workspace_confirmation_message':
+        'This blocks business access for all members but preserves their profiles and records. You can restore it later.',
+    'restore_workspace_confirmation_title': 'Restore this workspace?',
+    'restore_workspace_confirmation_message':
+        'This reactivates business access for active members in this workspace.',
+    'workspace_archived': 'Workspace archived',
+    'workspace_restored': 'Workspace restored',
+    'workspace_status_active': 'Active',
+    'workspace_status_archived': 'Archived',
     'complete_workspace_setup': 'Create owner account',
     'edit_workspace': 'Edit workspace',
     'workspace_owner_account': 'Initial workspace admin account',
@@ -1071,6 +1087,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'create_cash_receipt': 'Create Cash Receipt',
     'invoice_created': 'Invoice created successfully',
     'no_inventory_items': 'No inventory items available',
+    'admin_no_stock_guidance':
+        'No stock is allocated to you. Transfer warehouse stock to your account, or choose a non-stock invoice if this workspace allows it.',
     'select_shop': 'Select Shop',
     'select_at_least_one_item': 'Select at least one item',
     'sale_amount': 'Sale Amount',
@@ -1362,6 +1380,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Danger Zone / Database Flush ──
     'danger_zone': 'Danger Zone',
     'danger_zone_subtitle': 'Irreversible database operations',
+    'flush_data_reset_unavailable':
+        'Workspace data cleanup is disabled because client-side deletes can leave invoices, balances, inventory, routes, and user profiles inconsistent. Use an encrypted backup and an approved, audited maintenance process.',
     'flush_financial': 'Flush Financial Data',
     'flush_financial_desc':
         'Delete all invoices, transactions, and reset shop balances to zero',
@@ -1408,6 +1428,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'Only the selected workspace profile and its user profiles are included. Business records are excluded.',
     'backup_workspace_backup_subtitle':
         'Includes workspace business data. User and seller account profiles are excluded.',
+    'backup_seller_route_backup_subtitle':
+        'Includes assigned routes, shops, your inventory, transactions, and invoices. Restore imports only your unlinked cash transactions.',
+    'backup_seller_restore_warning':
+        'Only your own unlinked cash transactions for routes currently assigned to you can be restored. Invoice-linked entries and other sellers’ transactions are not restored.',
     'backup_workspaces': 'Selected workspace profile',
     'backup_users': 'Workspace user profiles',
     'backup_routes': 'Routes',
@@ -1418,9 +1442,19 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_invoices': 'Invoices',
     'backup_settings': 'Workspace settings',
     'backup_now': 'Backup Now',
-    'backup_create_file': 'Create encrypted backup file',
+    'backup_create_file': 'Back up to this device',
+    'backup_save_phone_storage': 'Save backup to phone storage',
+    'backup_save_phone_dialog_title': 'Save encrypted backup',
+    'backup_phone_save_cancelled': 'Phone backup save was cancelled',
+    'backup_phone_save_success': 'Encrypted backup saved to phone storage',
+    'backup_pick_phone_file_title': 'Choose a ShoesERP backup file',
+    'backup_upload_saved_phone_to_drive': 'Upload a saved backup to Google Drive',
+    'backup_upload_when_online_hint':
+        'Connect to the internet to upload this backup later.',
     'backup_to_google_drive': 'Back up to Google Drive',
     'restore_from_device': 'Restore from this device',
+    'restore_from_app_backup': 'Restore from app backup',
+    'restore_from_phone_storage': 'Restore from phone storage',
     'restore_from_google_drive': 'Restore from Google Drive',
     'backup_drive_success': 'Backup uploaded to your Google Drive',
     'backup_drive_none': 'No ShoesERP backups found in your Google Drive',
@@ -1438,7 +1472,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'Backup and restore access is limited by your workspace role.',
     'backup_in_progress': 'Creating backup…',
     'backup_share_text':
-        'ShoesERP data backup — save to Google Drive for safekeeping',
+        'Encrypted ShoesERP backup. Save this file in a safe location.',
     'backup_nav_subtitle': 'Backup, restore & auto-schedule',
     'backup_never': 'Never',
     'backup_last_at': 'Last backup: %s',
@@ -1457,6 +1491,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_restore': 'Restore from Backup',
     'backup_restore_subtitle':
         'Select a saved backup to restore its data into this workspace',
+    'backup_seller_restore_subtitle':
+        'Restore only your own unlinked cash transactions for currently assigned routes.',
     'backup_restore_warning':
         'This will replace data covered by the backup. This action cannot be undone.',
     'backup_restore_merge_warning':
@@ -1602,6 +1638,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_requires_recent_login': 'الرجاء تسجيل الدخول مرة أخرى للمتابعة.',
     'err_auth_generic': 'فشلت المصادقة. حاول مرة أخرى.',
     'err_permission_denied': 'ليس لديك صلاحية لتنفيذ هذا الإجراء.',
+    'workspace_lifecycle_changed':
+        'تغيرت حالة مساحة العمل. أعد المحاولة بعد التحديث.',
     'err_not_found': 'العنصر المطلوب غير موجود.',
     'err_already_exists': 'هذا العنصر موجود بالفعل.',
     'err_resource_exhausted': 'تم الوصول للحد الأقصى. حاول لاحقاً.',
@@ -1621,6 +1659,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_export_no_data':
         'لا توجد بيانات للتصدير. جرّب فلاتر مختلفة أو أضف سجلات أولاً.',
     'err_pdf_failed': 'فشل إنشاء PDF.',
+    'err_pdf_shaping_unavailable':
+        'لا يمكن لهذا الإصدار إنشاء ملفات PDF عربية أو أردية بشكل صحيح. حدّث التطبيق أو تواصل مع المسؤول.',
     'err_unknown': 'حدث خطأ ما. حاول مرة أخرى.',
     'err_function_not_deployed':
         'هذه الميزة تتطلب إعداد الخادم — تواصل مع المسؤول.',
@@ -2103,6 +2143,18 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'role_unknown': 'دور غير مدعوم',
     'workspaces': 'المساحات',
     'create_workspace': 'إنشاء مساحة',
+    'archive_workspace': 'أرشفة مساحة العمل',
+    'restore_workspace': 'استعادة مساحة العمل',
+    'archive_workspace_confirmation_title': 'هل تريد أرشفة مساحة العمل؟',
+    'archive_workspace_confirmation_message':
+        'سيؤدي ذلك إلى إيقاف وصول الأعضاء إلى بيانات العمل مع الاحتفاظ بملفاتهم وسجلاتهم. يمكنك استعادتها لاحقاً.',
+    'restore_workspace_confirmation_title': 'هل تريد استعادة مساحة العمل؟',
+    'restore_workspace_confirmation_message':
+        'سيؤدي ذلك إلى إعادة وصول الأعضاء النشطين إلى بيانات مساحة العمل.',
+    'workspace_archived': 'تمت أرشفة مساحة العمل',
+    'workspace_restored': 'تمت استعادة مساحة العمل',
+    'workspace_status_active': 'نشطة',
+    'workspace_status_archived': 'مؤرشفة',
     'complete_workspace_setup': 'إنشاء حساب المالك',
     'edit_workspace': 'تعديل المساحة',
     'workspace_owner_account': 'حساب مسؤول مساحة العمل الأول',
@@ -2469,6 +2521,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'create_cash_receipt': 'إنشاء سند قبض',
     'invoice_created': 'تم إنشاء الفاتورة بنجاح',
     'no_inventory_items': 'لا توجد عناصر مخزون متاحة',
+    'admin_no_stock_guidance':
+        'لا يوجد مخزون مخصص لك. انقل المخزون من المستودع إلى حسابك، أو اختر فاتورة بدون مخزون إذا كانت مساحة العمل تسمح بذلك.',
     'select_shop': 'اختر المتجر',
     'select_at_least_one_item': 'اختر عنصرًا واحدًا على الأقل',
     'sale_amount': 'مبلغ البيع',
@@ -2760,6 +2814,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Danger Zone / Database Flush ──
     'danger_zone': 'منطقة الخطر',
     'danger_zone_subtitle': 'عمليات قاعدة بيانات لا رجعة فيها',
+    'flush_data_reset_unavailable':
+        'تم تعطيل تنظيف بيانات مساحة العمل لأن عمليات الحذف من التطبيق قد تؤدي إلى عدم اتساق الفواتير والأرصدة والمخزون والمسارات وملفات المستخدمين. استخدم نسخة احتياطية مشفرة وإجراء صيانة معتمداً ومسجلاً للتدقيق.',
     'flush_financial': 'مسح البيانات المالية',
     'flush_financial_desc':
         'حذف جميع الفواتير والمعاملات وإعادة أرصدة المحلات إلى صفر',
@@ -2803,6 +2859,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'تتضمن النسخة مساحة العمل المحددة وملفات مستخدميها فقط، ولا تتضمن سجلات العمل.',
     'backup_workspace_backup_subtitle':
         'تتضمن بيانات العمل لمساحة العمل، ولا تتضمن ملفات حسابات المستخدمين أو البائعين.',
+    'backup_seller_route_backup_subtitle':
+        'تتضمن المسارات والمحلات والمخزون والمعاملات والفواتير المخصصة لك. تستعيد العملية معاملاتك النقدية غير المرتبطة بفاتورة فقط.',
+    'backup_seller_restore_warning':
+        'تستعيد العملية معاملاتك النقدية غير المرتبطة بفاتورة للمسارات المخصصة لك حالياً فقط. لن تُستعاد المعاملات المرتبطة بالفواتير أو معاملات البائعين الآخرين.',
     'backup_workspaces': 'ملف مساحة العمل المحددة',
     'backup_users': 'ملفات مستخدمي مساحة العمل',
     'backup_routes': 'المسارات',
@@ -2813,9 +2873,20 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_invoices': 'الفواتير',
     'backup_settings': 'إعدادات مساحة العمل',
     'backup_now': 'نسخ الآن',
-    'backup_create_file': 'إنشاء ملف نسخة احتياطية مشفر',
+    'backup_create_file': 'نسخ احتياطي على هذا الجهاز',
+    'backup_save_phone_storage': 'حفظ النسخة الاحتياطية في مساحة الهاتف',
+    'backup_save_phone_dialog_title': 'حفظ نسخة احتياطية مشفرة',
+    'backup_phone_save_cancelled': 'تم إلغاء حفظ النسخة على الهاتف',
+    'backup_phone_save_success': 'تم حفظ النسخة المشفرة في مساحة الهاتف',
+    'backup_pick_phone_file_title': 'اختر ملف نسخة ShoesERP احتياطية',
+    'backup_upload_saved_phone_to_drive':
+        'رفع نسخة محفوظة إلى Google Drive',
+    'backup_upload_when_online_hint':
+        'اتصل بالإنترنت لرفع هذه النسخة لاحقاً.',
     'backup_to_google_drive': 'النسخ الاحتياطي إلى Google Drive',
     'restore_from_device': 'الاستعادة من هذا الجهاز',
+    'restore_from_app_backup': 'الاستعادة من نسخة التطبيق',
+    'restore_from_phone_storage': 'الاستعادة من مساحة الهاتف',
     'restore_from_google_drive': 'الاستعادة من Google Drive',
     'backup_drive_success':
         'تم رفع النسخة الاحتياطية إلى Google Drive الخاص بك',
@@ -2834,7 +2905,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_restore_scope_denied':
         'صلاحية النسخ والاستعادة محدودة حسب دورك في مساحة العمل.',
     'backup_in_progress': 'جارٍ إنشاء النسخة الاحتياطية…',
-    'backup_share_text': 'نسخة احتياطية من بيانات ShoesERP',
+    'backup_share_text': 'نسخة ShoesERP احتياطية مشفرة. احفظ الملف في مكان آمن.',
     'backup_nav_subtitle': 'نسخ احتياطي، استعادة وجدولة تلقائية',
     'backup_never': 'لا يوجد',
     'backup_last_at': 'آخر نسخة: %s',
@@ -2853,6 +2924,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_restore': 'استعادة من نسخة احتياطية',
     'backup_restore_subtitle':
         'اختر نسخة محفوظة لاستعادة بياناتها إلى مساحة العمل هذه',
+    'backup_seller_restore_subtitle':
+        'استعد معاملاتك النقدية غير المرتبطة بفاتورة للمسارات المخصصة لك حالياً فقط.',
     'backup_restore_warning':
         'ستستبدل هذه العملية البيانات الموجودة في النسخة الاحتياطية. لا يمكن التراجع عن هذا الإجراء.',
     'backup_restore_merge_warning':
@@ -2998,6 +3071,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_requires_recent_login': 'جاری رکھنے کے لیے دوبارہ سائن ان کریں۔',
     'err_auth_generic': 'تصدیق ناکام۔ دوبارہ کوشش کریں۔',
     'err_permission_denied': 'آپ کو یہ عمل کرنے کی اجازت نہیں۔',
+    'workspace_lifecycle_changed':
+        'ورک اسپیس کی حالت تبدیل ہو گئی ہے۔ تازہ کرنے کے بعد دوبارہ کوشش کریں۔',
     'err_not_found': 'مطلوبہ آئٹم نہیں ملی۔',
     'err_already_exists': 'یہ آئٹم پہلے سے موجود ہے۔',
     'err_resource_exhausted': 'سروس کی حد پوری ہو گئی۔ بعد میں کوشش کریں۔',
@@ -3018,6 +3093,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_export_no_data':
         'ایکسپورٹ کے لیے کوئی ڈیٹا نہیں۔ مختلف فلٹرز آزمائیں یا پہلے ریکارڈز شامل کریں۔',
     'err_pdf_failed': 'PDF بنانے میں ناکامی۔',
+    'err_pdf_shaping_unavailable':
+        'یہ ورژن عربی یا اردو PDF درست طور پر نہیں بنا سکتا۔ ایپ اپ ڈیٹ کریں یا منتظم سے رابطہ کریں۔',
     'err_unknown': 'کچھ غلط ہو گیا۔ دوبارہ کوشش کریں۔',
     'err_function_not_deployed':
         'اس فیچر کے لیے سرور سیٹ اپ درکار ہے — ایڈمن سے رابطہ کریں۔',
@@ -3508,6 +3585,18 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'role_unknown': 'غیر معاون کردار',
     'workspaces': 'ورک اسپیسز',
     'create_workspace': 'ورک اسپیس بنائیں',
+    'archive_workspace': 'ورک اسپیس آرکائیو کریں',
+    'restore_workspace': 'ورک اسپیس بحال کریں',
+    'archive_workspace_confirmation_title': 'کیا اس ورک اسپیس کو آرکائیو کریں؟',
+    'archive_workspace_confirmation_message':
+        'اس سے تمام ممبران کی کاروباری ڈیٹا تک رسائی بند ہو جائے گی، مگر ان کے پروفائل اور ریکارڈ محفوظ رہیں گے۔ آپ بعد میں اسے بحال کر سکتے ہیں۔',
+    'restore_workspace_confirmation_title': 'کیا اس ورک اسپیس کو بحال کریں؟',
+    'restore_workspace_confirmation_message':
+        'اس سے اس ورک اسپیس کے فعال ممبران کی کاروباری رسائی دوبارہ شروع ہو جائے گی۔',
+    'workspace_archived': 'ورک اسپیس آرکائیو ہو گئی',
+    'workspace_restored': 'ورک اسپیس بحال ہو گئی',
+    'workspace_status_active': 'فعال',
+    'workspace_status_archived': 'آرکائیو شدہ',
     'complete_workspace_setup': 'مالک کا اکاؤنٹ بنائیں',
     'edit_workspace': 'ورک اسپیس میں ترمیم',
     'workspace_owner_account': 'ابتدائی ورک اسپیس ایڈمن اکاؤنٹ',
@@ -3875,6 +3964,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'create_cash_receipt': 'نقد وصولی کی رسید بنائیں',
     'invoice_created': 'رسید کامیابی سے بنائی گئی',
     'no_inventory_items': 'کوئی انوینٹری آئٹم دستیاب نہیں',
+    'admin_no_stock_guidance':
+        'آپ کے لیے کوئی اسٹاک مختص نہیں ہے۔ گودام سے اپنے اکاؤنٹ میں اسٹاک منتقل کریں، یا اگر یہ ورک اسپیس اجازت دے تو بغیر اسٹاک کی انوائس منتخب کریں۔',
     'select_shop': 'دکان منتخب کریں',
     'select_at_least_one_item': 'کم از کم ایک آئٹم منتخب کریں',
     'sale_amount': 'فروخت کی رقم',
@@ -4168,6 +4259,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Danger Zone / Database Flush ──
     'danger_zone': 'خطرناک زون',
     'danger_zone_subtitle': 'ناقابل واپسی ڈیٹا بیس آپریشنز',
+    'flush_data_reset_unavailable':
+        'ورک اسپیس ڈیٹا کی صفائی بند ہے کیونکہ ایپ سے حذف کرنے پر انوائسز، بیلنس، انوینٹری، روٹس اور صارف پروفائلز میں عدم مطابقت ہو سکتی ہے۔ تصدیق شدہ انکرپٹڈ بیک اپ اور منظور شدہ آڈٹ شدہ مینٹیننس طریقہ استعمال کریں۔',
     'flush_financial': 'مالیاتی ڈیٹا صاف کریں',
     'flush_financial_desc':
         'تمام انوائسز، ٹرانزیکشنز حذف کریں اور دکان بیلنس صفر کریں',
@@ -4214,6 +4307,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'صرف منتخب ورک اسپیس اور اس کے صارف پروفائل شامل ہوں گے۔ کاروباری ریکارڈ شامل نہیں ہوں گے۔',
     'backup_workspace_backup_subtitle':
         'ورک اسپیس کا کاروباری ڈیٹا شامل ہوگا؛ صارف اور سیلر اکاؤنٹ پروفائل شامل نہیں ہوں گے۔',
+    'backup_seller_route_backup_subtitle':
+        'آپ کے روٹس، دکانیں، انوینٹری، ٹرانزیکشنز اور انوائسز شامل ہیں۔ ریسٹور صرف آپ کی غیر منسلک نقد ٹرانزیکشنز درآمد کرتا ہے۔',
+    'backup_seller_restore_warning':
+        'صرف آپ کی موجودہ تفویض کردہ روٹس کی اپنی غیر منسلک نقد ٹرانزیکشنز بحال ہوں گی۔ انوائس سے منسلک اور دوسرے سیلرز کی ٹرانزیکشنز بحال نہیں ہوں گی۔',
     'backup_workspaces': 'منتخب ورک اسپیس پروفائل',
     'backup_users': 'ورک اسپیس صارف پروفائلز',
     'backup_routes': 'روٹس',
@@ -4224,9 +4321,20 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_invoices': 'انوائسز',
     'backup_settings': 'ورک اسپیس سیٹنگز',
     'backup_now': 'ابھی بیک اپ کریں',
-    'backup_create_file': 'انکرپٹڈ بیک اپ فائل بنائیں',
+    'backup_create_file': 'اس ڈیوائس پر بیک اپ کریں',
+    'backup_save_phone_storage': 'فون اسٹوریج میں بیک اپ محفوظ کریں',
+    'backup_save_phone_dialog_title': 'انکرپٹڈ بیک اپ محفوظ کریں',
+    'backup_phone_save_cancelled': 'فون پر بیک اپ محفوظ کرنا منسوخ ہوا',
+    'backup_phone_save_success': 'انکرپٹڈ بیک اپ فون اسٹوریج میں محفوظ ہوگیا',
+    'backup_pick_phone_file_title': 'ShoesERP بیک اپ فائل منتخب کریں',
+    'backup_upload_saved_phone_to_drive':
+        'محفوظ بیک اپ Google Drive پر اپ لوڈ کریں',
+    'backup_upload_when_online_hint':
+        'بعد میں بیک اپ اپ لوڈ کرنے کے لیے انٹرنیٹ سے جڑیں۔',
     'backup_to_google_drive': 'Google Drive پر بیک اپ کریں',
     'restore_from_device': 'اس ڈیوائس سے ریسٹور کریں',
+    'restore_from_app_backup': 'ایپ بیک اپ سے ریسٹور کریں',
+    'restore_from_phone_storage': 'فون اسٹوریج سے ریسٹور کریں',
     'restore_from_google_drive': 'Google Drive سے ریسٹور کریں',
     'backup_drive_success': 'بیک اپ آپ کے Google Drive پر اپ لوڈ ہو گیا',
     'backup_drive_none': 'آپ کے Google Drive میں ShoesERP بیک اپ نہیں ملا',
@@ -4243,7 +4351,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_restore_scope_denied':
         'بیک اپ اور ریسٹور کی اجازت آپ کے ورک اسپیس کردار تک محدود ہے۔',
     'backup_in_progress': 'بیک اپ بنایا جا رہا ہے…',
-    'backup_share_text': 'ShoesERP ڈیٹا بیک اپ',
+    'backup_share_text': 'ShoesERP کا انکرپٹڈ بیک اپ۔ اس فائل کو محفوظ جگہ پر رکھیں۔',
     'backup_nav_subtitle': 'بیک اپ، ریسٹور اور خودکار شیڈول',
     'backup_never': 'کبھی نہیں',
     'backup_last_at': 'آخری بیک اپ: %s',
@@ -4262,6 +4370,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_restore': 'بیک اپ سے ریسٹور',
     'backup_restore_subtitle':
         'اس ورک اسپیس میں ڈیٹا بحال کرنے کے لیے بیک اپ منتخب کریں',
+    'backup_seller_restore_subtitle':
+        'صرف اپنی موجودہ تفویض کردہ روٹس کی غیر منسلک نقد ٹرانزیکشنز بحال کریں۔',
     'backup_restore_warning':
         'بیک اپ میں شامل ڈیٹا تبدیل ہو جائے گا۔ یہ عمل واپس نہیں ہو سکتا۔',
     'backup_restore_merge_warning':

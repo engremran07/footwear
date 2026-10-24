@@ -893,9 +893,14 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                 (s, t) => s + t.balanceImpact,
                               );
                               final openingBalance = shop.balance - netTx;
-                              final accountCurrency = ref.read(
-                                routeCurrencyProvider(shop.routeId),
-                              );
+                              final accountRoute = shop.routeId.trim().isEmpty
+                                  ? null
+                                  : await ref.read(
+                                      routeDetailProvider(shop.routeId).future,
+                                    );
+                              final accountCurrency =
+                                  accountRoute?.currency ?? 'SAR';
+                              if (!context.mounted) return;
                               final labels = trilingualLabels(<String, String>{
                                 for (final k in const [
                                   'date',

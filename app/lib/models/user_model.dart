@@ -79,6 +79,10 @@ class UserModel {
   bool get isTenantAdmin => role == UserRole.tenantAdmin;
   bool get isSuperAdmin => role == UserRole.superAdmin;
   bool get isRoleRecognized => role != UserRole.unknown;
+  bool get canCreateBackup =>
+      canCreateWorkspaceBackup || (isSeller && assignedRouteIds.isNotEmpty);
+  bool get canRestoreBackup =>
+      canRestoreWorkspaceBackup || (isSeller && assignedRouteIds.isNotEmpty);
   bool get canCreateWorkspaceBackup => isTenantAdmin || isSuperAdmin;
   bool get canRunAutomaticWorkspaceBackup => isTenantAdmin;
   bool get canRestoreWorkspaceBackup => isTenantAdmin || isSuperAdmin;

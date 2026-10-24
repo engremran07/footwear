@@ -1,0 +1,344 @@
+SHOESERP FRONTEND UX, SKILLS, AND APK AUDIT
+==========================================
+
+Review date: 2026-10-24
+Repository: D:\Footwear
+Branch: main
+Baseline commit: 6304214 (fix: harden financial workflows and RTL exports)
+Current app version/build observed: 3.9.83+709
+Status: Unreleased local source; this is not a complete visual acceptance or
+production release.
+
+MISSION AND SCOPE
+-----------------
+The complete user-supplied frontend mission was read. It requests a
+repository-wide Flutter UI/UX and skills audit, a premium redesign across the
+actual application, accessibility/responsive/motion improvements, tests, an
+Android APK check, and this report.
+
+The existing repository already contains a 32-route screen register, frontend
+skills modernization, upstream-source research, design-system ownership
+documentation, and fixes for the identified screen-state issues. This
+continuation verified those records against the current router and shell,
+identified and fixed one additional reduced-motion defect in custom route
+transitions, and reran the Flutter suite and analyzers.
+
+This report does NOT claim that every screen received a new visual design,
+that every dialog or state was interacted with, that all role/theme/locale
+combinations were rendered, or that the Android APK was built. The complete
+mission remains partially open because authenticated rendered acceptance,
+device review, performance profiling, and broader interaction audit could not
+be completed.
+
+1. REPOSITORY AND FRONTEND INVENTORY
+------------------------------------
+The checked-out branch was main at 6304214. The worktree was already heavily
+modified before this continuation: the initial status showed 113 changed or
+untracked entries, and the tracked diff summary showed 89 files changed
+(5,675 insertions and 3,544 deletions). These changes include prior backup,
+Rules, documentation, and UI work and are not all attributable to this
+frontend continuation. No existing changes were reverted.
+
+Frontend architecture and owners:
+- Flutter 3.41.6 / Dart 3.11.4, as recorded by the repository's SDK audit.
+- Riverpod for app state and providers.
+- go_router for route registration, redirects, and page transitions.
+- Material 3 themes for automatic, light, dark, and high-contrast modes.
+- EN/AR/UR localization and locale-derived RTL direction.
+- Firebase Auth, Firestore-backed providers, and tenant/role guards.
+- `app/lib/core/constants/app_brand.dart`: brand and semantic palette.
+- `app/lib/core/theme/app_theme.dart`: ThemeData and component themes.
+- `app/lib/core/design/app_tokens.dart`: spacing, shapes, controls,
+  breakpoints, and motion constants.
+- `app/lib/core/theme/app_fonts.dart`: locale-aware UI font configuration.
+- `app/lib/core/design/app_animations.dart`: optional shared motion helpers.
+- `app/lib/core/router/app_router.dart`: routes, access redirects, and
+  custom route transitions.
+- `app/lib/widgets/app_shell.dart`: role-filtered compact and wide navigation.
+- `app/lib/screens/`: screen task composition.
+- `app/lib/widgets/`: reusable state, input, status, and report components.
+
+The source-of-truth screen/state matrix is
+`docs/frontend/screen-register.md`. It covers all 32 registered route
+patterns and primary shell/contextual entry points, but it is a source and
+test map, not proof that every screen was visually accepted.
+
+2. SKILLS AND INSTRUCTION INVENTORY
+-----------------------------------
+First-party frontend guidance is discoverable through root AGENTS.md and
+CLAUDE.md, `.claude/skills/`, and path-scoped `.github/instructions/`.
+The canonical screen workflow is `flutter-frontend-modernization`; specialist
+guidance includes:
+- `frontend-ui-audit` for route/screen/state mapping and evidence.
+- `frontend-design-system` for shared tokens, theme, components, and UI
+  standards.
+- `flutter-accessibility-rtl` for semantics, localization, and direction.
+- `navigation-routing` and `flutter-navigation-ux` for GoRouter and shell.
+- `ui-mobile-forms` for form lifecycle and input behavior.
+- `performance-optimization` for measured performance work.
+- `testing-strategy` for widget, accessibility, and visual validation.
+- `analytics-reporting` for PDF/XLSX/image/print/share behavior.
+- Path instructions for frontend design, navigation/forms, tests, exports,
+  collections, financial integrity, and code quality.
+
+The skills modernization review found stale route catalogs, fixed navigation
+prescriptions, platform-specific assumptions, confused UI/PDF Urdu font
+guidance, unmeasured performance thresholds, incomplete visual/accessibility
+test guidance, and conflicting release side-effect instructions. These were
+corrected in the existing skill/instruction files rather than by introducing
+a competing agent system. Applicable domains remain separate rather than
+duplicating ownership.
+
+Upstream research and license decisions are recorded in
+`docs/frontend/skills-modernization-report.md`. Sources reviewed included:
+- Flutter Agent Plugins: BSD 3-Clause; compatible workflow principles adopted,
+  not copied.
+- Flutter App Skills: MIT; only compatible accessibility/design-system
+  principles used; conflicting styling prescriptions rejected.
+- Anthropic frontend-design: Apache-2.0; product-grounded critique method
+  adapted in original wording.
+- Addy Osmani frontend UI engineering: MIT; web-specific implementation
+  instructions not transplanted.
+- UI/UX Pro Max: MIT; optional ideation reference only.
+- Flutter Design Engineer and Flutter Skills: MIT; workflow/checklist ideas
+  only, with project SDK and architecture taking precedence.
+- flutterskills.md source: reuse license was not established, so it was not
+  copied or installed.
+- Flutter official docs: principles were cross-checked against the pinned app
+  SDK rather than assuming the newer documentation SDK APIs are available.
+
+No upstream source text, code, or dependency was copied into the app.
+
+3. FULL REGISTERED ROUTE INVENTORY
+----------------------------------
+Roles below describe current route/shell visibility and guards. They do not
+replace provider or Firestore authorization. All routes remain subject to
+active Firebase profile, tenant, role, and selected-workspace checks.
+
+Route                                | Role / purpose                         | Audit status
+-------------------------------------|-----------------------------------------|------------------------------
+/login                               | Signed-out authentication/recovery      | Responsive defect fixed; six widths and EN/AR/UR tested; public browser render only
+/bootstrap-profile                   | Signed-in profile bootstrap/recovery    | Source reviewed; no new change
+/                                    | Active-role dashboard                   | Source/register review; stat card motion and unlinked-row affordance fixed
+/routes                             | Admin route list/management             | Source reviewed; seller blocked
+/routes/new                         | Admin route creation                    | Source reviewed; no new change
+/routes/:id                         | Scoped route detail                     | Source reviewed; no new change
+/routes/:id/edit                    | Admin route edit                        | Load/retry/prefill safeguards tested in prior work
+/shops                              | Admin and assigned-seller shop list     | Route/currency loading and retry fixes tested
+/shops/new                          | Admin/seller constrained shop creation  | Route-query retry tested; slide transition reduced-motion coverage
+/shops/:id                          | Scoped shop ledger/detail                | Locale balance semantics tested; live data not reviewed
+/shops/:id/edit                     | Admin/seller shop edit                  | Load/retry/prefill safeguards tested in prior work
+/products                           | Product browsing                        | Source reviewed; no new change
+/products/new                       | Admin product creation                  | Source reviewed; no new change
+/products/:id                       | Product detail                          | Source reviewed; no new change
+/products/:id/edit                  | Admin product edit                      | Load/retry/prefill safeguards tested in prior work
+/products/:id/variants/new          | Admin variant creation                  | Source reviewed; no new change
+/products/:id/variants/:vid/edit     | Admin variant edit                      | Load/retry safeguards tested in prior work
+/inventory                          | Admin/seller inventory                  | Loading/empty/error/retry/settings states tested in prior work
+/invoices                           | Scoped invoice list                     | Multi-currency summaries tested
+/invoices/new                       | Scoped sale/receipt invoice entry        | Profile loading/error/retry tested; authenticated workflow not exercised
+/invoices/:id                       | Scoped invoice detail                   | Source reviewed; no new change
+/users                              | Account administration                  | Seller route options/retry tested
+/tenants                            | Workspace metadata/management           | Tenant-admin metadata-only branch tested
+/history                            | Recent activity                         | Missing-shop navigation affordance fixed; dedicated widget coverage open
+/notifications                      | Admin notification center               | Mark-all busy/error and missing-shop affordance tested/fixed
+/reports                            | Admin reports and exports               | Currency grouping and export feedback tested; role rendering unverified
+/profile                            | Personal profile/preferences             | Dirty-state reset tested/fixed
+/about                              | App information/changelog                | Source reviewed; no new change
+/settings                           | Admin workspace settings                 | Source reviewed; provider remains authority
+/settings/invoice-header            | Invoice branding                         | Source reviewed; no new change
+/settings/flush                     | Selected super-admin workspace flush     | Unsafe actions disabled; readiness/retry tested
+/settings/backup                    | Role-capable scoped backup/restore       | Workspace readiness/retry and seller access tested
+
+Source for the register and contextual entrypoints:
+`app/lib/core/router/app_router.dart`, `app/lib/widgets/app_shell.dart`, and
+`docs/frontend/screen-register.md`. The screen register records route guard
+context, purpose, data scope, shared components, findings, implementation,
+and test status.
+
+4. SCREEN FINDINGS AND DISPOSITION
+----------------------------------
+The source review and regression history dispositioned the following named
+findings. The detailed evidence and tests remain in the screen register and
+UI/UX audit report.
+
+ID    | Priority | Finding and disposition
+------|----------|---------------------------------------------------------------
+UI-01 | Medium   | Dashboard/history/notification rows without shop targets showed misleading navigation; fixed.
+UI-02 | Medium   | Notification mark-all lacked sufficient busy/failure feedback; fixed and tested.
+UI-03 | Medium   | Profile dirty state could remain after restoring saved value; fixed and tested.
+UI-04 | High     | Route/shop/product/variant edit forms could expose defaults before record readiness; gated with retry/missing states and tested.
+UI-05 | High     | Shop currency/route scope and route lookup failures needed readiness/retry; fixed and tested.
+UI-06 | High     | Inventory choice streams/settings failures could look empty or silently default carton size; explicit states and guards tested.
+UI-07 | High     | Mixed currencies could be combined or mislabeled in summaries/exports; route currency and currency-grouped totals fixed/tested.
+UI-08 | Medium   | Report exports lacked local busy/error feedback; fixed and tested.
+UI-09 | High     | Invoice creation could spin on unusable auth/profile state; explicit loading/error/retry/missing states tested.
+UI-10 | Medium   | User route choices and backup/flush workspace queries could hide errors; retry/readiness states fixed and tested.
+UI-11 | High     | Tenant-admin presentation could expose platform actions; metadata-only UI verified; authorization unchanged.
+UI-12 | High     | Storage usage allegation conflicted with zero-Storage contract; source scan found no Storage usage; no change needed.
+UI-13 | Medium   | Dashboard stat-card entrance motion ignored reduced motion; fixed and tested.
+UI-14 | Medium   | Shared AppAnimations presets ignored reduced motion; centralized guard fixed and tested.
+UI-15 | High     | Login at 668 logical pixels had min width 620 greater than max 420; fixed and tested at six widths in EN/AR/UR.
+UI-16 | Medium   | Custom GoRouter fade/scale and form slide transitions ignored reduced motion; fixed in both page builders and tested with motion enabled/disabled.
+
+The pre-existing 32-route register does not assert that every dialog, sheet,
+tab, unusual data state, or user action was manually exercised. Items without
+an identified defect are source-reviewed only, not declared fully audited.
+
+5. DESIGN SYSTEM: CURRENT STATE AND TARGET
+------------------------------------------
+Current single-source ownership is appropriate and retained:
+- `AppBrand` for product identity and semantic brand colors.
+- `AppTheme` for Material 3 light/dark/high-contrast theme construction.
+- `AppTokens` for spacing, shapes, dimensions, breakpoints, and durations.
+- `AppFonts` for English, Arabic, and Urdu UI typography.
+- `AppMotion` / `AppAnimations` for optional, reduced-motion-aware effects.
+- Existing shared widgets for feedback, filters, forms, status, balances, and
+  export entrypoints.
+
+The existing Arctic blue/navy identity was not replaced with an unvalidated
+new visual direction. The register and `docs/frontend/design-system-architecture.md`
+describe component ownership and intended consistency. Existing token coverage
+does not prove every screen has migrated away from one-off values; a full
+cross-screen literal/style census and visual review remain open.
+
+6. MOTION AND INTERACTION RESULTS
+---------------------------------
+Shared animation presets, empty/error illustrations, stat-card transitions
+and entrances, status-chip transitions, and PressableWidget now respect
+`MediaQuery.disableAnimations`. Press actions and semantics remain available
+when scale feedback is suppressed.
+
+The additional audit traced router navigation directly to `_fadePage` and
+`_slidePage` in `app_router.dart`. Both previously built optional transitions
+without checking the inherited preference. They now return the route child
+directly when reduced motion is enabled; existing behavior is retained when
+motion is permitted. Existing navigation history, redirects, roles, route
+parameters, and business behavior were not changed.
+
+7. FRONTEND WIRING AND FUNCTIONAL SAFEGUARDS
+--------------------------------------------
+Prior source work preserved provider/notifier write ownership and role/tenant
+guards while fixing async UI states, retry behavior, form readiness, currency
+labels, export progress, and misleading row affordances. This continuation
+changed only route presentation behavior and tests. No auth, Rules, schema,
+financial, stock, invoice, or provider write contract changed.
+
+8. FILES CHANGED AND PURPOSE
+----------------------------
+This continuation:
+- `app/lib/core/router/app_router.dart`: bypass optional route fade/scale and
+  form slide transitions when reduced motion is requested.
+- `app/test/widget/app_router_backup_access_test.dart`: verify enabled and
+  disabled fade and vertical-slide route effects using actual router pages.
+- `AGENTS.md`, `CLAUDE.md`, `README.md`, `app/README.md`, and
+  `SYSTEM_DEEP_DIVE_2026-03-27.md`: document reduced-motion behavior and
+  current validation.
+- `docs/frontend/screen-register.md`: add UI-16 and route-transition status.
+- `docs/frontend/ui-ux-audit-report.md` and
+  `docs/frontend/skills-modernization-report.md`: record implementation,
+  evidence, and limits.
+- This report and a dated `SESSION_LOG.md` entry provide durable audit and
+  continuity records.
+
+Prior modifications already in the worktree include the responsive login,
+shared motion/accessibility foundation, route-state UI sweep, backup/lifecycle
+work, localization/tests, instructions, and other independent audit changes.
+They were not reverted or rewritten in this continuation.
+
+9. INLINE REGRESSION LEDGER
+---------------------------
+The route regression first failed before the router fix: an active custom
+ScaleTransition remained around the backup page while
+`MediaQuery.disableAnimations` was true. This reproduced the exact missing
+reduced-motion guard. After the guard was added to both custom page builders:
+
+Focused router regression:
+`flutter test test\widget\app_router_backup_access_test.dart --dart-define=use_arabic=true -r expanded`
+Output: `00:05 +6: All tests passed!`
+
+Complete Flutter suite:
+`flutter test -r expanded --dart-define=use_arabic=true`
+Output: `01:01 +589: All tests passed!`
+
+Library analysis:
+`flutter analyze lib --no-pub`
+Output: `No issues found! (ran in 102.3s)`
+
+Test analysis:
+`dart analyze test/`
+Output: `No issues found!`
+
+Formatting:
+`dart format app\lib\core\router\app_router.dart app\test\widget\app_router_backup_access_test.dart`
+Output: `Formatted 2 files (0 changed) in 0.05 seconds.`
+
+An initial focused test attempt used a broad FadeTransition finder and
+correctly revealed framework-owned transitions; the assertion was narrowed to
+the custom ScaleTransition. A slide-route test was then narrowed to the
+vertical slide value so Flutter's default horizontal route animation is not
+mistaken for the custom form motion. The final focused suite passed.
+
+10. VISUAL, APK, AND PERFORMANCE EVIDENCE
+-----------------------------------------
+- The public signed-out login page was rendered in a local browser after the
+  width fix; it no longer showed the prior constraints crash. No screenshot
+  artifact was saved.
+- No authenticated admin, tenant-admin, super-admin, or seller credentials
+  were entered or used. Business-screen rendered acceptance was not performed.
+- No Android device was connected for APK installation, touch, screen-reader,
+  locale/font, or large-text checks.
+- No light/dark/high-contrast x EN/AR/UR screenshot matrix was produced.
+- No PDF viewer acceptance was performed in this frontend task.
+- Flutter DevTools/profile measurements were not captured. No frame-rate,
+  memory, or performance improvement is claimed.
+- A local Android debug APK build was attempted, then failed after 16m35 at
+  `:app:mergeDebugJavaResource` with
+  `java.io.IOException: Insufficient system resources exist to complete the
+  requested service`. A later release build succeeded after system capacity
+  recovered.
+- Web build: `EXIT: 0`; Hosting deployment to
+  `shoeserp-clean-20260327.web.app` reported `Deploy complete!`.
+- Split release APKs: ARMv7 30.4 MB, ARM64 31.9 MB, x86_64 33.4 MB.
+- Firestore Rules/indexes deployment reported `Deploy complete!`; 23 remote
+  indexes and 2 field overrides absent locally were not force-deleted.
+- Drive OAuth IDs were absent from the local build environment. Phone backup
+  and restricted restore remain available; Drive upload needs configured IDs
+  and a subsequent rebuild/redeploy.
+
+11. REMAINING WORK AND BLOCKERS
+-------------------------------
+The full attached mission is not complete. Remaining work includes:
+- Rendered inspection of all route families and materially different loading,
+  empty, error, permission, success, and destructive-confirmation states.
+- Dialog, sheet, tab, overflow-menu, focus, keyboard, back, and rapid-action
+  interaction inventory across roles.
+- Authenticated visual review for administrator, tenant administrator,
+  selected super-admin, and seller with real role-scoped data.
+- Cross-check across compact/expanded screens, EN/AR/UR, supported themes,
+  and large text scales, including mixed-direction identifiers and amounts.
+- Android device installation and runtime verification.
+- Profile-mode performance investigation before making any performance claim.
+- Broader shared-style duplication census and targeted migration only where
+  evidence shows drift; do not replace established screens speculatively.
+
+12. COMPLETION ASSESSMENT
+-------------------------
+Completed and verified in current source:
+- The full supplied mission text was read.
+- The 32-route register and skills/upstream research documents were checked.
+- The concrete source-review findings UI-01 through UI-16 are dispositioned.
+- Reduced-motion route-transition behavior was corrected and tested.
+- The 589-test Flutter suite and both analyzers pass.
+- Requested plain-text report is present.
+
+Not complete:
+- The mission's entire visual redesign and full interactive/rendered acceptance
+  criteria have not been completed. Existing source and widget coverage do not
+  substitute for that work.
+- APK creation completed; device installation, performance profiling,
+  authenticated screen captures, and accessibility technology checks remain
+  unperformed.
+
+Final status: PARTIAL IMPLEMENTATION WITH VERIFIED FINDING FIXES. Do not present
+this as a complete premium redesign or production-ready Android release.

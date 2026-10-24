@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:footwear_erp/core/constants/app_brand.dart';
 import 'package:footwear_erp/core/data/changelog_data.dart';
 import 'package:footwear_erp/core/l10n/app_locale.dart';
 
@@ -10,7 +11,7 @@ void main() {
 
     test('first entry is the current release', () {
       final first = kChangelog.first;
-      expect(first.version, isNotEmpty);
+      expect(first.version, AppBrand.appVersion);
       expect(first.date, isNotEmpty);
       expect(first.items, isNotEmpty);
     });

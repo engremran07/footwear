@@ -5,6 +5,35 @@ description: "Use when: building or fixing mobile form screens, TextEditingContr
 
 # ShoesERP Mobile Forms Skill
 
+## Purpose and invocation
+
+Use this skill when creating, reviewing, or fixing a ShoesERP form, text input,
+controller lifecycle, validation flow, dialog, or mobile overflow issue.
+
+## Required inputs and workflow
+
+Read the complete affected screen, its providers, current localization/font
+setup, and relevant widget tests. Trace create/edit loading and save behavior
+before changing the form. Reuse existing validators, formatters, error
+mapping, and shared widgets.
+
+## Output
+
+Record the affected form states, lifecycle and validation changes, tests, and
+any viewport/locale behavior that remains unverified.
+
+## Dependencies and boundaries
+
+Follow `.github/instructions/frontend-design-system.instructions.md` and the
+runtime/provider rules in `AGENTS.md`. This skill owns form presentation and
+input lifecycle only; authorization, business validation, and Firestore writes
+remain in their existing layers.
+
+## Validation
+
+Run the targeted form/widget tests and `flutter analyze lib --no-pub`. Include
+the supported RTL locale and text-scale cases when the change affects them.
+
 ## TextEditingController — Cursor Positioning
 
 **Problem:** `_controller.text = value` in `_loadExisting()` resets the cursor to position 0 on first user interaction.
@@ -49,46 +78,50 @@ subtitle: Column(
 
 ## Form Load Pattern
 
-Standard `_loadExisting()` guard:
+Edit forms must not allow partial defaults to be saved before the existing
+record has loaded. Do not treat loading or provider failure as an empty record.
+Keep the editable form gated until data arrives, and show a retryable mapped
+error if it fails.
 
-```dart
-
-void _loadExisting() {
-  if (_loaded || !isEdit) return;
-
-  final detail = ref.read(someProvider(widget.itemId)).valueOrNull;
-  if (detail == null) return;
-  _nameC.value = TextEditingValue(text: detail.name, selection: TextSelection.collapsed(offset: detail.name.length));
-  _loaded = true;
-}
-
-```
-
-Call from `build()` under `ref.watch(someProvider).whenData((_) => _loadExisting())`.
+Watch the edit provider's `AsyncValue` and handle loading, error/retry, and data
+states explicitly using the existing shared loading and error widgets.
+Initialize controllers once after data arrives. If fields can be edited before
+the first provider value, guard against overwriting user input. Disable submit
+until a required record is loaded and validate that the edit ID still matches
+the current route.
 
 ## RTL Text
 
-- Standard TextField handles RTL automatically when `textDirection` is set by locale
-
-- For Urdu/Arabic PDF: use NotoNastaliqUrdu.ttf / NotoSansArabic.ttf (already in assets)
-
-- For persistent RTL: wrap fields in `Directionality(textDirection: TextDirection.rtl, child: ...)`
+- Use the app locale's `Directionality` and test Arabic and Urdu separately.
+  Text fields, cursors, selections, validation messages, and mixed Latin
+  identifiers must remain usable.
+- UI Urdu uses the bundled Noto Nastaliq family and Arabic uses Noto Sans
+  Arabic. This is separate from report rendering: PDFs embed Noto Sans Arabic
+  for Arabic and Urdu and require `--dart-define=use_arabic=true`; the PDF
+  renderer does not provide full Nastaliq shaping. Follow
+  `.claude/skills/analytics-reporting/SKILL.md` for PDF, image, print, share,
+  and XLSX behavior.
+- Use `EdgeInsetsDirectional`, `AlignmentDirectional`, and directional icons
+  when the meaning is start/end rather than physical left/right. Do not wrap
+  the whole form in an additional `Directionality` unless the screen's actual
+  locale behavior requires it.
 
 ## Dialog Close — Context Safety
 
-When closing a dialog after an async operation:
+After an async operation, check that the owning context is still mounted and
+close the route that opened the dialog. Do not always force the root navigator;
+nested navigators and sheets can have a different owner.
 
 ```dart
 
-// WRONG — ctx may be stale after setState/rebuild during async
-if (ctx.mounted) Navigator.pop(ctx);
-
-// CORRECT — use outer screen context with rootNavigator
-if (mounted) Navigator.of(context, rootNavigator: true).pop();
+if (!dialogContext.mounted) return;
+Navigator.of(dialogContext).pop();
 
 ```
 
-The `rootNavigator: true` flag closes the topmost dialog regardless of nested Scaffolds.
+Use the exact dialog or sheet context when it remains mounted. Keep provider
+write errors mapped and visible; do not catch navigation failures as if the
+write itself failed.
 
 ## SnackBar Styling — Card-Style Design Pattern
 

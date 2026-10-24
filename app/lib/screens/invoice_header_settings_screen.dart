@@ -210,6 +210,15 @@ class _InvoiceHeaderSettingsScreenState
           canChangeOrientation: false,
           canChangePageFormat: false,
           canDebug: false,
+          onError: (context, error) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                tr(AppErrorMapper.key(error), ref),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
           build: (_) => generateInvoicePdf(
             invoice: invoice,
             companyName: companyName,

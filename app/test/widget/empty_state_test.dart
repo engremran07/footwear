@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:footwear_erp/widgets/empty_state.dart';
 
 void main() {
@@ -32,5 +33,20 @@ void main() {
 
     expect(primaryTapped, isTrue);
     expect(secondaryTapped, isTrue);
+  });
+
+  testWidgets('EmptyState disables entrance motion when requested', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(disableAnimations: true),
+          child: Scaffold(body: EmptyState(message: 'No data')),
+        ),
+      ),
+    );
+
+    expect(find.byType(Animate), findsNothing);
   });
 }

@@ -1,0 +1,273 @@
+SHOESERP FULL SAAS REPOSITORY AUDIT
+Date: 2026-10-24
+Status: Local source audit and implementation; production operations not authorized
+
+1. EXECUTIVE SUMMARY
+
+The repository implements an encrypted, tenant-scoped in-app backup workflow,
+but the legacy project-wide backup, plaintext whole-collection restore, and
+direct balance reset scripts were unsafe and incompatible with the app archive.
+The client database flush screen also exposed sequential destructive operations
+that could leave financial, inventory, route, and profile data inconsistent.
+Those reset paths now fail closed.
+
+The audit also found that Firestore Rules allowed hard deletion of a tenant
+root, and that the client could not select an inactive workspace to invoke the
+narrow Rules-authorized restoration path. Tenant-root deletion is now denied.
+The client now permits reasoned, audited selection of an existing inactive
+workspace and exposes explicit, confirmed archive/restore actions. These
+lifecycle changes do not alter member profiles; inactive-tenant Rules continue
+to block business access until the workspace is restored.
+
+Seller route-scoped backup is now enabled using encrypted archives that can be
+saved to phone storage, imported later, and explicitly uploaded to Google Drive
+when the device is online and OAuth is configured. Seller restore remains
+narrow: it accepts only the seller's own unlinked cash-in/cash-out transactions
+on currently assigned routes and atomically reconciles the matching shop
+balance. It does not restore invoices, inventory, or other sellers' ledger
+rows. Drive upload is user-triggered; background synchronization is not
+implemented.
+
+2. SCOPE AND METHOD
+
+Reviewed the supplied audit against the current worktree and traced the
+affected client, provider, Rules, emulator tests, and maintenance scripts.
+Validated dangerous or security-sensitive claims against implementation and
+regression tests. Existing unrelated worktree modifications were preserved.
+
+Inspected areas:
+- app/lib/providers/database_backup_provider.dart
+- app/lib/core/utils/backup_scope_policy.dart
+- app/lib/providers/database_flush_provider.dart
+- app/lib/screens/database_flush_screen.dart
+- app/lib/providers/auth_provider.dart
+- app/lib/providers/tenant_provider.dart
+- app/lib/screens/tenant_management_screen.dart
+- app/lib/core/models/tenant_model.dart
+- firestore.rules
+- tests/firestore-rules/rules.test.js
+- tool/backup_firestore.js
+- dev_restore.js
+- dev_reset.js
+- AGENTS.md, CLAUDE.md, README.md, app/README.md, and
+  SYSTEM_DEEP_DIVE_2026-03-27.md
+
+3. VALIDATED FINDINGS AND DISPOSITION
+
+F-01 — Legacy project-wide plaintext backup could expose/export data outside
+the app's tenant-scoped encrypted backup policy.
+Status: CONFIRMED; MITIGATED.
+Evidence: tool/backup_firestore.js previously performed project-wide export
+using a hardcoded project and machine-specific CLI dependency. It now prints a
+disabled message and exits nonzero without making a network request.
+
+F-02 — Legacy restore deleted whole collections before restoring plaintext
+JSON and was incompatible with the app's encrypted archive.
+Status: CONFIRMED; MITIGATED.
+Evidence: dev_restore.js previously used destructive whole-collection
+replacement without tenant scope or dry-run. It now fails closed and exits
+nonzero without touching Firebase.
+
+F-03 — Direct balance reset could break the invariant that shop.balance and
+its ledger/invoice changes are updated atomically.
+Status: CONFIRMED; MITIGATED.
+Evidence: dev_reset.js previously reset balances separately from linked
+financial records. It now fails closed and exits nonzero without data changes.
+
+F-04 — Client-side multi-collection flush could partially delete records and
+leave financial, inventory, route, and user references inconsistent.
+Status: CONFIRMED; MITIGATED.
+Evidence: public flush/reset methods now validate the authenticated role and
+selected workspace, then reject the unsupported operation. The screen explains
+the risk and disables every destructive control. No Firestore write remains in
+these reset methods.
+
+F-05 — A selected super-admin could hard-delete a tenant root and orphan
+tenant-owned business records.
+Status: CONFIRMED; FIXED IN LOCAL RULES.
+Evidence: tenant-root delete is now denied. Emulator regression coverage
+expects selected super-admin deletion to fail; archive/restore update paths
+remain available.
+
+F-06 — A super-admin could not select an inactive tenant, and the client had no
+archive/restore controls despite Rules providing a narrow restoration path.
+Status: CONFIRMED; FIXED IN CLIENT SOURCE.
+Evidence: AuthNotifier.selectWorkspace now requires that the tenant document
+exist but no longer rejects it solely because active is false. Tenant
+management now offers confirmation-gated archive/restore actions for the
+currently selected workspace. TenantManagementNotifier checks active
+super-admin identity, exact selected workspace, a support reason of at least
+10 characters, concrete tenant ID, and current lifecycle state, then uses a
+Firestore transaction to update only tenant lifecycle fields.
+The selected workspace and reason are still written to append-only
+platform_access_logs; the existing eight-hour Rules TTL remains authoritative.
+
+F-07 — Archive/restore member-profile semantics were unclear and older
+documentation described member deactivation that the current Rules path does
+not require.
+Status: VALIDATED AND DOCUMENTATION CORRECTED.
+Evidence: archive/restore updates the tenant document only. Active member
+profiles remain active, but Rules deny their business-data access while the
+tenant is inactive. The emulator regression now asserts that the seller
+profile remains active while business queries fail, and that the same query
+succeeds after restoration.
+
+F-08 — Backup scope accepted the global pseudo-tenant sentinel as a selected
+workspace.
+Status: CONFIRMED; FIXED IN BACKUP POLICY.
+Evidence: BackupScopePolicy.requireSelectedWorkspace rejects the normalized
+global sentinel for active and requested workspace IDs. A regression was
+observed failing before the fix and passes after it.
+
+F-09 — Seller route-scoped backup/restore described by the runtime contract was
+not supported by the original backup policy.
+Status: CONFIRMED; IMPLEMENTED WITH RESTRICTED RESTORE.
+Evidence: seller backups are restricted to assigned routes and the signed-in
+seller's tenant. Restore checks archive creator, tenant, route assignments,
+transaction owner, amount/type, deletion/pending-edit state, and invoice links.
+Only eligible cash-in/cash-out rows are passed to the transaction notifier.
+Each imported transaction and its same-route shop-balance delta commit in one
+Firestore transaction; cached last-transaction metadata changes only when the
+restored row is newer. Duplicate transaction IDs are skipped. Focused policy,
+screen, and transaction-provider suites pass. Phone save/import uses the
+system file picker. Existing phone archives can be uploaded to Drive after
+online/configuration checks; checksum and role/workspace/route scope are
+validated before upload.
+
+F-10 — The audit questioned direct audit_logs access and a backup collection
+mapping discrepancy.
+Status: NOT A CONFIRMED ACCESS GAP.
+Evidence: Rules are deny-by-default for unlisted paths, and no app consumer of
+an audit_logs collection was identified. Logical backup categories are mapped
+to physical collection names by the backup provider; no mismatched collection
+write was confirmed.
+
+4. BACKUP, RESTORE, RESET, AND LIFECYCLE MATRIX
+
+Encrypted app backup:
+- Tenant administrator: workspace-scoped backup; merge restore; no pruning.
+- Selected platform super-admin: explicit workspace context; replacement and
+  pruning only within the selected active support workspace.
+- Seller: encrypted assigned-route archive; phone-file save/import; restore is
+  limited to own unlinked cash ledger rows with atomic shop-balance
+  reconciliation. No invoice, inventory, or other seller transaction restore.
+- Drive upload of an existing phone archive is an explicit online action and
+  requires the relevant OAuth client configuration; it is not background sync.
+- Global pseudo-workspace: rejected.
+
+Legacy maintenance scripts:
+- tool/backup_firestore.js: disabled, nonzero exit.
+- dev_restore.js: disabled, nonzero exit.
+- dev_reset.js: disabled, nonzero exit.
+
+Client flush screen/provider:
+- Destructive controls disabled.
+- All public reset methods fail closed after authorization/scope checks.
+- No direct Firestore mutation occurs.
+
+Workspace lifecycle:
+- Archive/restore is the supported lifecycle path; tenant-root hard delete is
+  denied by Rules.
+- Only active selected platform super-admin context with a sufficient reason
+  may invoke lifecycle updates.
+- Lifecycle update changes tenant status/archive metadata only.
+- Member profiles are preserved. Inactive tenant status blocks business
+  reads/writes until restoration.
+- Workspace selection/exit events remain append-only in
+  platform_access_logs, with the eight-hour Rules expiry.
+
+5. CHANGED FILES
+
+Lifecycle and reset hardening:
+- app/lib/providers/database_flush_provider.dart
+- app/lib/screens/database_flush_screen.dart
+- app/lib/providers/auth_provider.dart
+- app/lib/providers/tenant_provider.dart
+- app/lib/screens/tenant_management_screen.dart
+- app/lib/core/l10n/app_locale.dart
+- app/lib/core/utils/error_mapper.dart
+- app/lib/core/utils/backup_scope_policy.dart
+- firestore.rules
+- tool/backup_firestore.js
+- dev_restore.js
+- dev_reset.js
+
+Seller backup, restore, and phone-file flow:
+- app/lib/core/utils/backup_scope_policy.dart
+- app/lib/providers/database_backup_provider.dart
+- app/lib/providers/transaction_provider.dart
+- app/lib/screens/database_backup_screen.dart
+- app/lib/screens/profile_screen.dart
+- app/lib/core/router/app_router.dart
+- app/lib/core/l10n/app_locale.dart
+- app/pubspec.yaml and app/pubspec.lock (file_picker)
+
+Regression tests:
+- app/test/unit/core/error_mapper_test.dart
+- app/test/unit/core/backup_scope_policy_test.dart
+- app/test/unit/providers/database_flush_provider_test.dart
+- app/test/widget/database_flush_screen_state_test.dart
+- app/test/widget/tenant_management_error_test.dart
+- app/test/widget/database_backup_screen_test.dart
+- app/test/unit/models/user_model_test.dart
+- tests/firestore-rules/rules.test.js
+- app/test/all_tests.dart
+
+Runtime documentation:
+- AGENTS.md
+- CLAUDE.md
+- README.md
+- app/README.md
+- SYSTEM_DEEP_DIVE_2026-03-27.md
+- SESSION_LOG.md
+
+6. VALIDATION EVIDENCE
+
+Focused workspace-management widget suite:
+00:07 +7: All tests passed!
+
+Combined localization, error-mapping, and tenant-management test run:
+00:04 +60: All tests passed!
+
+Flutter analysis:
+No issues found! (ran in 262.6s)
+
+Dart test analysis:
+No issues found!
+
+Complete Firestore Rules Emulator suite:
+129 passing (35s)
+
+Markdown lint: exit 0, no output.
+git diff --check: exit 0.
+
+Seller backup regression suites:
+`00:07 +43: All tests passed!` (backup screen, backup-scope policy, user-model
+capabilities, and transaction-provider export guards).
+
+Flutter analysis:
+`No issues found! (ran in 28.9s)`.
+
+Dart test analysis:
+`No issues found!`.
+
+Legacy utility fail-closed checks:
+tool/backup_firestore.js EXIT=1
+dev_restore.js EXIT=1
+dev_reset.js EXIT=1
+
+7. FOLLOW-UP RELEASE AND REMAINING LIMITATIONS
+
+Follow-up release completed on 2026-10-24 at version `3.9.83+709`:
+
+- Full Flutter suite: `01:32 +589: All tests passed!`; analyzers clean;
+  Firestore Rules Emulator: `129 passing (23s)`.
+- Hosting and Firestore Rules/indexes deployments each reported
+  `Deploy complete!`. No production data operation was performed.
+- Split APKs built: ARMv7 30.4 MB, ARM64 31.9 MB, x86_64 33.4 MB. No device
+  installation was performed.
+- Google Drive OAuth IDs were not available locally. The Drive upload
+  implementation is present but requires configured OAuth IDs and a
+  subsequent rebuild/redeploy; encrypted phone backup remains available.
+- The remaining authenticated visual acceptance, device accessibility checks,
+  and profile-mode performance review are not complete.

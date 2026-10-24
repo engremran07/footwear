@@ -1,6 +1,6 @@
 ﻿# ShoesERP AGENTS Runtime Contract
 
-Last updated: 2026-10-22
+Last updated: 2026-10-24
 
 ## 1) Runtime Truth (Authoritative)
 
@@ -36,6 +36,7 @@ Source of collection truth: app/lib/core/constants/collections.dart
 Defined in app/lib/core/router/app_router.dart:
 
 - /login
+- /bootstrap-profile
 - /
 - /routes
 - /routes/new
@@ -53,10 +54,19 @@ Defined in app/lib/core/router/app_router.dart:
 - /products/:id/variants/:vid/edit
 - /inventory
 - /invoices
+- /invoices/new
 - /invoices/:id
+- /users
+- /tenants
+- /history
+- /notifications
 - /reports
 - /profile
+- /about
 - /settings
+- /settings/invoice-header
+- /settings/flush
+- /settings/backup
 
 ## 3) Permission Matrix
 
@@ -179,10 +189,12 @@ Seller:
   from this single field — either by reading it directly or by summing the
   live transactions stream that drives it. Manual Firestore operations that
   delete or modify financial documents (transactions, invoices) WITHOUT
-  updating the corresponding `shop.balance` WILL produce stale UI. If you flush
-  data during dev, always also reset every shop's `balance` field to `0.0` and
-  reset `settings/global.last_invoice_number` to `0`. Use `dev_reset.js` in
-  the repo root for this.
+  updating the corresponding `shop.balance` WILL produce stale UI. Do not use
+  client-side bulk flush/reset tools or direct Firestore scripts to delete
+  ledger rows or rewrite balances. The app flush screen and legacy
+  backup/restore/reset scripts fail closed because multi-batch client
+  operations cannot preserve financial links atomically. Workspace lifecycle
+  is archive/restore only; tenant-root hard deletion is denied by Rules.
 
 1. **`StateProvider` is BANNED.** Riverpod 3.x removed `StateProvider` from
   the main export. All mutable reactive state must use
@@ -219,7 +231,12 @@ Seller:
   use `trRead()` with the current locale — no hardcoded English. Every Flutter
   test, run, and build that can generate PDFs must pass
   `--dart-define=use_arabic=true`; the `pdf` package otherwise performs bidi
-  reordering without Arabic-script letter shaping.
+  reordering without Arabic-script letter shaping. The shared PDF font loader
+  must fail closed with a localized configuration error when the flag is
+  missing; it must never return a success-shaped, unshaped RTL report. PDF
+  output embeds Noto Sans Arabic for Arabic and Urdu; full Nastaliq shaping is
+  unsupported by the current renderer. PNG, print, and PDF share the same PDF
+  bytes; XLSX does not embed a font and relies on the spreadsheet application.
 
 1. **Every `ExportSheet.show()` call MUST provide `pdfBytesBuilder`** when the
   data is a ledger, account statement, or seller report. The generic
@@ -256,6 +273,16 @@ Seller:
   Confidence Theater. Load `.claude/skills/vibe-debugging-discipline/SKILL.md`
   before any bug fix session.
 
+1. **Missing-document Firestore reads must remain scoped.** Invoice and
+  transaction idempotency reads require an active profile, a concrete active
+  tenant, and a permitted role; super-admin access additionally requires the
+  selected workspace, support reason, and unexpired context. Missing
+  seller-inventory reads are admin-equivalent only. A super-admin may read a
+  missing settings document only when its tenant document does not yet exist
+  for workspace creation. Never use a blanket `resource == null` allowance.
+  Rules tests must replay the relevant read inside the client transaction and
+  then validate its complete write set.
+
 ## 5) Known Failure Signatures
 
 1. permission-denied on route create/inventory add
@@ -283,6 +310,7 @@ Seller:
 
 - Drive backup uses the least-privilege `drive.file` scope and must be filtered by the authenticated Firebase user and workspace.
 - Tenant admins may back up and merge-restore their own workspace; they do not prune records absent from a backup. A selected super-admin may replace/prune only the active workspace. Sellers may back up assigned-route data and restore only their own transactions for a route that is currently assigned.
+- Seller archives are encrypted and route-scoped. Seller restore imports only the seller's own unlinked cash-in/cash-out rows and atomically reconciles each same-route shop balance; it never restores invoice, inventory, or other sellers' ledger records. Mobile users may save an encrypted archive to phone storage, restore an archive selected from storage, or explicitly retry Drive upload when online and OAuth is configured. This is not background sync.
 - Super admins must select a concrete workspace before backup or restore; a global all-workspace client snapshot is forbidden.
 - Web builds require `GOOGLE_DRIVE_CLIENT_ID`; Android builds require the matching web `GOOGLE_DRIVE_SERVER_CLIENT_ID` and a registered Android OAuth client for package `footwear.pk.com`.
 - The release keystore SHA-1 must be registered in Firebase/Google Cloud before Google Sign-In can authorize Drive on the APK.
@@ -515,7 +543,212 @@ Conflict resolution order for instructions:
 3. .claude/CLAUDE.md (local mirror/override helper)
 4. Skill files under .claude/skills/
 
+For Flutter UI implementation, `.github/instructions/frontend-design-system.instructions.md`
+is the authoritative visual/accessibility contract. Use the
+`.claude/skills/flutter-frontend-modernization/SKILL.md` orchestrator for
+cross-screen work; specialists must reference that contract instead of
+maintaining duplicate token, theme, route, or accessibility standards.
+Shared interactive controls use `AppTokens.minTouchTarget` where applicable.
+Optional shared-component transitions honor `MediaQuery.disableAnimations`
+through `AppMotion`; router fade/slide transitions must also bypass optional
+effects when reduced motion is enabled. Visible-value semantics use the active
+locale. Cover these contracts, actual color pairs, and RTL direction in focused
+widget tests.
+
 ## 10) Current Audit Status
+
+2026-10-24 invoice permission re-audit — local source, not deployed:
+
+- Firestore Rules now allow scoped reads of missing invoice/transaction IDs,
+  admin-only missing seller-inventory records, and missing workspace settings
+  only for a super-admin while the tenant is not yet created. Existing-document
+  reads still use their tenant/role rules; inactive tenants and unselected or
+  expired super-admin contexts remain denied.
+- Seller invoice authorization reuses a single scoped profile/shop check, and
+  linked invoice transactions avoid a redundant shop-route lookup. This keeps
+  the complete seller sale write set within the Rules expression budget.
+  The invoice form explains stock allocation and the workspace-gated non-stock
+  alternative to admins who have no available stock.
+- Firestore Rules Emulator: `128 passing`; focused invoice widget tests:
+  `00:01 +2: All tests passed!`. Production Rules/indexes deployment, release
+  builds, device acceptance, commit, and push were not performed.
+
+2026-10-24 inactive-workspace lifecycle recovery — unreleased source:
+
+- Selected platform super-admins can establish audited support context for an
+  existing inactive workspace, then restore it through the tenant lifecycle
+  notifier and confirmation UI. Archive/restore changes the tenant lifecycle
+  document only; it does not deactivate or reactivate member profiles.
+  Firestore Rules continue denying business access while the tenant is
+  inactive, and tenant-root hard deletion remains denied.
+- Focused localization, error-mapping, and tenant-management tests:
+  `00:04 +60: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 262.6s)`; `dart analyze test/`:
+  `No issues found!`; Rules Emulator: `129 passing (35s)`.
+- Markdown lint and `git diff --check` exited 0. The three legacy maintenance
+  scripts each exited 1 with a disabled message. No production Rules
+  deployment, release build, device install, commit, or push was performed.
+
+2026-10-24 seller phone backup and restricted restore — unreleased source:
+
+- Sellers can create encrypted assigned-route archives, save them to phone
+  storage, import them later, and explicitly upload saved archives to Drive
+  when online and OAuth is configured. Drive upload is not background sync.
+- Restore accepts only the seller's own eligible unlinked cash-in/cash-out
+  rows for currently assigned routes. Each imported ledger row and matching
+  shop-balance delta commit atomically; invoice, inventory, and other sellers'
+  rows are not restored. Cached latest-transaction fields update only when the
+  restored row is newer.
+- Focused backup, policy, user-model, and transaction-provider suites:
+  `00:07 +43: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 28.9s)`; `dart analyze test/`:
+  `No issues found!`. Release, deployment, visual-device acceptance, commit,
+  and push were not performed.
+- Router authorization now uses the same seller backup capability as the
+  profile entry point. A route-level regression confirms assigned-route sellers
+  can open `/settings/backup` and sellers without a route remain redirected.
+  Combined router, backup-screen, destination, and role suite:
+  `00:04 +33: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 6.4s)`; `dart analyze test/`: `No issues found!`.
+- Android debug build was attempted but Gradle could not resolve
+  `androidx.lifecycle:lifecycle-runtime:2.10.0` because DNS lookups for
+  `dl.google.com` and `repo.maven.apache.org` failed. It ended with
+  `BUILD FAILED in 1m 17s`; no release build, deployment, or installation was
+  performed.
+
+Unreleased shared frontend accessibility foundation:
+
+- `AppTokens.minTouchTarget` sets the shared 48-logical-pixel control target;
+  the filter-chip bar uses it. `AppMotion` respects reduced-motion settings in
+  empty/error illustrations, stat-card value transitions, and status-chip
+  transitions. Balance badge semantics follow EN/AR/UR.
+- Focused shared-widget suite: `00:05 +15: All tests passed!`. Full Flutter
+  suite: `00:57 +538: All tests passed!`. `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 7.3s)`; `dart analyze test/`: `No issues found!`.
+- Markdown lint and `git diff --check` exited 0. No authenticated browser/device
+  visual review, release build, deployment, commit, or push was performed.
+
+2026-10-24 reduced-motion preset hardening — unreleased source:
+
+- All `AppAnimations` entrance, list, shimmer, shake, slide, fade, bounce,
+  stagger, pop, and tab presets now bypass optional effects when
+  `MediaQuery.disableAnimations` is enabled. `PressableWidget` retains its tap
+  action without scale feedback.
+- Both custom GoRouter page-transition builders now return the route child
+  directly when reduced motion is enabled; normal fade/scale and form slide
+  transitions remain unchanged when motion is allowed.
+- Added widget coverage for disabled and enabled presets, visibility of their
+  children, press action, semantic tap action, and route fade/slide behavior.
+  Router regression: `00:05 +6: All tests passed!`; full Flutter suite:
+  `01:01 +589: All tests passed!`. `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 102.3s)`; `dart analyze test/`: `No issues found!`.
+- No business, provider, authorization, financial, inventory, route, or
+  release-version behavior changed. Android device and authenticated visual
+  acceptance remain unavailable. A local debug APK build failed during
+  `:app:mergeDebugJavaResource` with an insufficient-system-resources error;
+  no release build or production operation was performed.
+
+2026-10-24 login responsive layout hardening — unreleased source:
+
+- The narrow `/login` layout could construct invalid width constraints at
+  intermediate window sizes (for example, a 620-pixel minimum with a 420-pixel
+  maximum at 668 logical pixels). It now caps the content width to both 420
+  logical pixels and the available window width.
+- The regression covers 320, 360, 420, 668, 719, and 720 logical pixels in
+  EN/AR/UR with locale directionality. The pre-fix test reproduced the
+  normalized-constraints exception at 668 pixels. Focused login tests:
+  `00:03 +3: All tests passed!`; full Flutter suite:
+  `01:09 +585: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 65.8s)`; `dart analyze test/`: `No issues found!`.
+- The public login page was visually checked in the local browser after
+  hot reload with no runtime errors. Authenticated role/theme acceptance,
+  complete dialog/sheet interaction coverage, and Android device review
+  remain pending. No release build, deployment, install, commit, or push was
+  performed.
+
+2026-10-22 CRUD edit-form loading hardening — unreleased source:
+
+- Route, shop, product, and variant edit forms now wait for a usable auth
+  profile and matching source record before exposing editable fields. Failed
+  loads show mapped retry feedback; missing or out-of-scope records are not
+  presented as editable defaults. Existing route assignments and form values
+  are prefilled before submit is enabled.
+- Provider role, tenant, and write safeguards are unchanged. Verification
+  focused form suite: `00:08 +17: All tests passed!`; full Flutter suite:
+  `01:03 +551: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 43.2s)`; `dart analyze test/`: `No issues found!`.
+  Markdown lint and `git diff --check` exited 0. No release build or
+  production operation was performed. Details are in
+  `docs/frontend/ui-ux-audit-report.md`.
+
+2026-10-23 remaining screen-state sweep — unreleased source:
+
+- The frontend register now maps all 32 registered route patterns and
+  principal shell/contextual entry points. Invoice summaries group money by
+  invoice currency; currency-filtered shop lists wait for route scope; invoice
+  creation reports profile errors; profile dirty state resets when values are
+  restored; notification mark-all exposes progress and mapped failures.
+- Unlinked dashboard/history/notification rows no longer imply shop navigation.
+  Stat-card entrance animation is suppressed when reduced motion is enabled.
+  Provider, tenant, inventory, invoice, and authorization contracts are
+  unchanged.
+- Full Flutter suite: `01:20 +559: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 99.6s)`;
+  `dart analyze test/`: `No issues found!`. Details and the remaining
+  unreviewed/visually unverified scope are in
+  `docs/frontend/screen-register.md` and
+  `docs/frontend/ui-ux-audit-report.md`.
+- No authenticated browser page was shared, so rendered role/locale/theme
+  acceptance remains pending. No release build, deployment, device install,
+  version bump, commit, or push was performed.
+
+2026-10-23 remaining screen-state review — unreleased source:
+
+- Reviewed and dispositioned the named remaining route/screen findings:
+  report export busy/error handling, seller route-option loading/error/retry
+  and selection validation, shop-form route-query retry, backup/flush
+  workspace readiness and query errors, and tenant-admin metadata-only
+  presentation. Seller edit now checks both widget and dialog context
+  lifetimes after awaiting the active profile.
+- Follow-up currency tracing fixed account-statement PDF currency selection
+  in both report and shop-detail exports. Seller report rows now retain their
+  transaction route currency, current shop balances use the current route
+  currency, Excel/PDF rows label their own currency, and PDF grand totals are
+  grouped by currency. Admin export route metadata includes inactive routes
+  so historical transaction rows can retain route currency context.
+- Focused regressions passed for reports (`00:01 +1`), selected-workspace
+  backup retry (`00:02 +1`), flush workspace/user retry (`00:01 +1`),
+  tenant-admin role presentation (`00:00 +1`), user route options (`00:03 +1`),
+  and shop-form route lookup (`00:00 +1`). `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 21.7s)`; `dart analyze test/`: `No issues found!`.
+- Currency/PDF/export regressions: `00:07 +12: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 10.7s)`;
+  `dart analyze test/`: `No issues found!`.
+- A serial run of the complete backup-screen test file exhausted the Dart VM
+  after two cases with 1.71 GB free memory; the new retry regression passed
+  when isolated. The current full Flutter suite was not rerun. Markdown lint
+  and `git diff --check` are validated after this entry's documentation edits.
+- Remaining scope: comprehensive dialog/sheet interaction inventory and
+  authenticated browser/device acceptance across roles, themes, and locales.
+  No release build, deployment, device install, version bump, commit, or push
+  was performed.
+
+2026-10-22 local RTL export hardening — unreleased source change:
+
+- The shared PDF font-loading boundary now rejects builds without
+  `--dart-define=use_arabic=true` and maps the typed failure to a localized
+  message. Arabic and Urdu report tests verify the embedded Noto Sans Arabic
+  font program and Urdu-specific characters; XLSX tests verify Unicode text
+  and RTL worksheet direction. PDF, PNG, print, and share reuse the same PDF
+  bytes. Noto Nastaliq remains a UI font only; full Nastaliq PDF shaping is
+  unsupported by the current renderer.
+- Verification: focused PDF/error/XLSX/image tests reported `All tests passed!`
+  (54); locale parity reported `All tests passed!` (11);
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 23.3s)`;
+  `dart analyze test/`: `No issues found!`; Markdown lint exited 0 with no
+  output.
+- Source-only work: release builds, production deployment, commit, and push
+  have not been performed.
 
 2026-10-22 financial workflows and RTL PDF release — v3.9.82+708:
 
@@ -883,3 +1116,22 @@ Conflict resolution order for instructions:
 - Dark mode QA: theme-aware colors throughout
 - RTL QA: EdgeInsetsDirectional throughout
 - Release: v3.0.0+7, 3 ABI-split APKs built
+
+2026-10-24 consolidated release — v3.9.83+709:
+
+- Full Flutter suite: `01:32 +589: All tests passed!`; changelog regression:
+  `00:00 +10: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 10.6s)`; `dart analyze test/`:
+  `No issues found!`.
+- Firestore Rules Emulator: `129 passing (23s)`. Rules/indexes deployed with
+  `Deploy complete!`; 23 remote indexes and 2 field overrides absent locally
+  were preserved (no `--force`).
+- Web build `EXIT: 0`; Hosting deployment completed to
+  `shoeserp-clean-20260327.web.app`. Split APKs built: ARMv7 30.4 MB, ARM64
+  31.9 MB, x86_64 33.4 MB.
+- Google Drive OAuth IDs were not available in the local build environment.
+  Encrypted phone backup and restricted restore remain available; Drive
+  upload requires OAuth configuration and a subsequent rebuild/redeploy.
+- No device install, authenticated business-screen visual acceptance, or
+  performance profile was performed. The wider frontend visual-acceptance
+  mission remains partial.

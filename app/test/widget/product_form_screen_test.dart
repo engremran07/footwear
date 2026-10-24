@@ -4,9 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/screens/product_form_screen.dart';
 import 'package:footwear_erp/models/user_model.dart';
+import 'package:footwear_erp/widgets/error_state.dart';
 
 void main() {
-  testWidgets('profile stream failure is mapped during product save', (
+  testWidgets('product form shows retry when profile loading fails', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -20,12 +21,11 @@ void main() {
         child: const MaterialApp(home: ProductFormScreen()),
       ),
     );
-
-    await tester.enterText(find.byType(TextFormField), 'Canvas Shoe');
-    await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.byType(ErrorState), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

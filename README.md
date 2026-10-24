@@ -1,4 +1,4 @@
-# FootWear ERP — v3.9.81+707
+# FootWear ERP — v3.9.83+709
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
@@ -16,6 +16,10 @@ A mobile-first enterprise resource planning system for footwear distribution bus
 > **v3.9.78+704 (2026-10-16)** — Workspace owners are selected within the active workspace, editing requires active platform access, save errors are classified accurately, and launcher icon sizing is consistent across Android and web.
 > **v3.9.79+705 (2026-10-17)** — Workspace setup provisions an owner account; workspace admins can disable sellers and revoke or block their device/session access; PWA icon URLs refresh installed artwork.
 > **v3.9.81+707 (2026-10-22)** — Firebase Authentication remains the only sign-in mechanism, without app-managed device pairing or custom session approvals. Workspace admins retain tenant-scoped routes, shops, and transaction CRUD. Firestore Rules enforce active tenants, zero-balance shop creation, and atomic standalone ledger/shop balance links.
+> **v3.9.83+709 (2026-10-23)** — Multi-currency account and seller reports preserve route currencies and group PDF totals without adding unlike amounts. Screen workflows include retryable route/workspace loading, export progress/error feedback, safe form loading, and reduced-motion/accessibility improvements. Full Flutter suite: 567 tests passed. Web and split APKs built; Hosting and Firestore Rules/indexes deployed; ARM64 APK installed on R5GL22RGT9V. Authenticated visual acceptance remains pending.
+> **Unreleased 2026-10-24 source** — Invoice idempotency and first-allocation reads of missing documents are now explicitly tenant/role scoped in Firestore Rules; workspace creation may read a missing settings document only before its tenant exists. Seller invoice authorization was simplified to preserve Rules expression headroom. Admins without available self-allocated stock receive localized guidance. Local Rules Emulator: 128 passing; focused invoice widget tests: 2 passing. Production deployment and release operations remain pending.
+> **Unreleased 2026-10-24 lifecycle recovery** — Selected platform super-admins can restore an inactive workspace using an audited support context and explicit confirmation. Archive/restore changes the tenant lifecycle record only; member profiles are preserved, and business access remains denied until restoration. Client-side bulk reset and legacy plaintext utilities remain disabled.
+> **Unreleased 2026-10-24 frontend hardening** — Shared animation presets and custom router fade/slide transitions honor reduced-motion preferences; the responsive login layout caps content to the available viewport. Regression tests cover six widths in EN/AR/UR. Full Flutter suite: `01:01 +589: All tests passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 102.3s)`; `dart analyze test/`: `No issues found!`. The signed-out local browser render was checked. A debug APK attempt failed at `:app:mergeDebugJavaResource` because of insufficient system resources; no release APK or production operation was performed.
 >
 > Prior version bullets below are historical release notes.
 
@@ -62,11 +66,26 @@ English, Arabic (RTL), Urdu (RTL) — 372+ translation keys synced across all sc
 | Backend / Auth | Firebase (Firestore + Auth only) — zero Storage, zero Cloud Functions |
 | Design system | AppTokens, AppAnimations, AppSanitizer, AppInputFormatters |
 | Charts | fl_chart 1.2.0 (BarChart, LineChart, PieChart) |
-| PDF export | `pdf` package + `Isolate.run()` — Arabic shaping enabled with `--dart-define=use_arabic=true` |
+| PDF export | Shared `pdf` builders embed Noto Sans Arabic; Arabic shaping requires `--dart-define=use_arabic=true` and otherwise fails closed |
 | Excel export | Custom xlsx writer (`excel_export.dart`) using `archive ^4.0.0` |
 | Print / Share | `printing` + share_plus 13.0.0 |
 | Image compression | `flutter_image_compress` (base64 logo) |
 | Animations | `flutter_animate` + `shimmer` |
+
+Shared interactive controls use the design system's minimum target token.
+Optional shared animation presets, empty/error/status transitions, stat-card
+entrances and value changes, and custom router fade/slide transitions honor the
+operating system's reduced-motion preference; balance badges expose localized
+semantics.
+Focused widget tests cover RTL target sizing, locale labels, motion suppression,
+and semantic color contrast; these checks do not claim full WCAG conformance.
+
+PDF, print, share, and PNG exports reuse the same shaped PDF bytes. Urdu PDFs
+use a Naskh-style font because the current renderer does not implement full
+Nastaliq OpenType shaping. XLSX preserves Unicode and RTL worksheet direction,
+but its font is chosen by the spreadsheet application and is not embedded.
+Every Flutter action that can generate PDFs must include
+`--dart-define=use_arabic=true`.
 
 ---
 
@@ -195,6 +214,14 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 - Exports page to exhaustion. Tenant-admin restore is upsert-only; selected super-admin restore upserts before pruning obsolete documents. Plaintext legacy archives are rejected.
 - Transient token-refresh failures do not sign users out. If Firebase initialization fails, the app shows a retry state rather than opening an unusable shell.
 
+### Data Maintenance and Workspace Lifecycle
+
+- Supported backups are created and restored through the app's encrypted, workspace-scoped workflow. Tenant administrators merge records without pruning; selected super-admins may replace only the active support workspace. Sellers may save encrypted assigned-route archives to phone storage; restore imports only their own eligible unlinked cash ledger rows with atomic shop-balance reconciliation. Saved files can be explicitly uploaded to configured Google Drive when online; this is not background synchronization.
+- Bulk database flush/reset controls and the legacy plaintext export, whole-collection restore, and direct-balance reset scripts fail closed. Multi-batch client cleanup can leave financial links, balances, inventory, or references inconsistent.
+- Workspace lifecycle is archive/restore only. Firestore Rules deny hard deletion of a tenant root so business records cannot be orphaned by deleting the workspace document.
+- To restore an archived workspace, select it from the workspace list with a support reason of at least 10 characters, then confirm Restore. The selected context is recorded in `platform_access_logs`; active tenant status remains required by business-data Rules.
+- No production cleanup or backup was run as part of this source audit. A safe general-purpose transactional maintenance workflow remains a separate operational design.
+
 ---
 
 ## Roles & Permissions
@@ -244,6 +271,7 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 5. **Ledger-only collection:** `ShopDetailScreen` → `TransactionNotifier.create(type: 'cash_in')` remains available when no receipt document is needed.
 6. **Void/return:** `InvoiceNotifier.voidInvoice()` — admin only; stock returns only for stock-backed invoices, with one reversal transaction.
 7. Never create a sale invoice for cash-only collection. Never create a standalone transaction for a new goods sale.
+8. Client transaction reads of missing invoice/transaction IDs require an active profile and concrete active tenant; selected super-admins must retain valid support context. Missing seller-inventory reads are admin-equivalent only. Workspace-creation settings reads are limited to missing documents whose tenant has not yet been created. Existing-document reads remain governed by normal tenant and route rules.
 
 ---
 

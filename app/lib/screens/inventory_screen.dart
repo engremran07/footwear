@@ -23,6 +23,76 @@ import '../widgets/error_state.dart';
 import '../widgets/export_sheet.dart';
 import '../widgets/shimmer_loading.dart';
 
+bool _hasCurrentData<T>(AsyncValue<T> value) =>
+    value.hasValue && !value.isLoading && !value.hasError;
+
+Widget _selectionLoading(WidgetRef ref) {
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+      const SizedBox(width: 8),
+      Text(tr('loading', ref)),
+    ],
+  );
+}
+
+Widget _selectionError(
+  BuildContext context,
+  WidgetRef ref, {
+  required Object error,
+  required Key retryKey,
+  required VoidCallback onRetry,
+}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        tr(AppErrorMapper.key(error), ref),
+        style: TextStyle(color: Theme.of(context).colorScheme.error),
+      ),
+      Align(
+        alignment: AlignmentDirectional.centerEnd,
+        child: TextButton.icon(
+          key: retryKey,
+          onPressed: onRetry,
+          icon: const Icon(Icons.refresh),
+          label: Text(tr('retry', ref)),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _asyncSelection<T>({
+  required BuildContext context,
+  required WidgetRef ref,
+  required AsyncValue<List<T>> state,
+  required String emptyMessage,
+  required String retryKey,
+  required VoidCallback onRetry,
+  required Widget Function(List<T> values) builder,
+}) {
+  if (state.hasError) {
+    return _selectionError(
+      context,
+      ref,
+      error: state.error!,
+      retryKey: Key(retryKey),
+      onRetry: onRetry,
+    );
+  }
+  if (state.isLoading || !state.hasValue) return _selectionLoading(ref);
+  final values = state.requireValue;
+  if (values.isEmpty) return Text(emptyMessage);
+  return builder(values);
+}
+
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
   @override
@@ -171,12 +241,24 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     if (currentUser == null || authOperation.isLoading) {
       return Scaffold(body: ShimmerLoading.cards());
     }
+    if (settingsAsync.hasError) {
+      return Scaffold(
+        body: mappedErrorState(
+          error: settingsAsync.error!,
+          ref: ref,
+          onRetry: () => ref.invalidate(settingsProvider),
+        ),
+      );
+    }
+    if (settingsAsync.isLoading || !settingsAsync.hasValue) {
+      return Scaffold(body: ShimmerLoading.cards());
+    }
     final isAdmin = currentUser.isAdmin;
     final warehouseVariants = ref.watch(allVariantsProvider);
     final sellerInventoryAsync = ref.watch(
       sellerInventoryProvider(currentUser.id),
     );
-    final ppc = settingsAsync.value?.pairsPerCarton ?? 12;
+    final ppc = settingsAsync.requireValue.pairsPerCarton;
 
     return Scaffold(
       body: Column(
@@ -191,7 +273,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   IconButton(
                     icon: const Icon(Icons.history),
                     tooltip: tr('transfer_history', ref),
-                    onPressed: () => _showTransferHistory(context),
+                    onPressed: () => _showTransferHistory(context, ppc),
                   ),
                 settingsAsync.when(
                   data: (settings) => IconButton(
@@ -304,8 +386,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   label: Text(tr('inventory_transfer_to_seller', ref)),
                   onPressed: () => showDialog(
                     context: context,
-                    builder: (_) =>
-                        _TransferToSellerDialog(currentUserId: currentUser.id),
+                    builder: (_) => _TransferToSellerDialog(
+                      currentUserId: currentUser.id,
+                      pairsPerCarton: ppc,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -313,7 +397,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   heroTag: 'add_inventory',
                   icon: const Icon(Icons.add),
                   label: Text(tr('inventory_add_inventory', ref)),
-                  onPressed: _showAddInventoryDialog,
+                  onPressed: () => _showAddInventoryDialog(ppc),
                 ),
               ],
             )
@@ -321,7 +405,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               heroTag: 'view_warehouse',
               icon: const Icon(Icons.warehouse),
               label: Text(tr('lbl_warehouse', ref)),
-              onPressed: _showWarehouseStockSheet,
+              onPressed: () => _showWarehouseStockSheet(ppc),
             ),
     );
   }
@@ -621,7 +705,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     ).then((_) => qtyC.dispose());
   }
 
-  void _showTransferHistory(BuildContext context) {
+  void _showTransferHistory(BuildContext context, int ppc) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -631,7 +715,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         maxChildSize: 0.95,
         minChildSize: 0.4,
         builder: (ctx, scrollController) {
-          final ppc = ref.read(settingsProvider).value?.pairsPerCarton ?? 12;
           return Consumer(
             builder: (ctx, cRef, _) {
               final user = cRef.watch(authUserProvider).value;
@@ -730,7 +813,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     );
   }
 
-  void _showWarehouseStockSheet() {
+  void _showWarehouseStockSheet(int ppc) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -740,8 +823,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         maxChildSize: 0.95,
         minChildSize: 0.4,
         builder: (ctx, scrollController) {
-          final settingsAsync = ref.read(settingsProvider);
-          final ppc = settingsAsync.value?.pairsPerCarton ?? 12;
           return Consumer(
             builder: (ctx, cRef, _) {
               final variantsAsync = cRef.watch(allVariantsProvider);
@@ -808,13 +889,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     );
   }
 
-  void _showAddInventoryDialog() {
-    showDialog(context: context, builder: (_) => const _AddInventoryDialog());
+  void _showAddInventoryDialog(int ppc) {
+    showDialog(
+      context: context,
+      builder: (_) => _AddInventoryDialog(pairsPerCarton: ppc),
+    );
   }
 }
 
 class _AddInventoryDialog extends ConsumerStatefulWidget {
-  const _AddInventoryDialog();
+  final int pairsPerCarton;
+  const _AddInventoryDialog({required this.pairsPerCarton});
 
   @override
   ConsumerState<_AddInventoryDialog> createState() =>
@@ -837,7 +922,7 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
     super.dispose();
   }
 
-  int get _ppc => ref.read(settingsProvider).value?.pairsPerCarton ?? 12;
+  int get _ppc => widget.pairsPerCarton;
 
   int get _total {
     final c = int.tryParse(_cartonsC.text) ?? 0;
@@ -846,7 +931,24 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
   }
 
   Future<void> _submit() async {
-    if (_selectedVariant == null) return;
+    final selectedProduct = _selectedProduct;
+    final selectedVariant = _selectedVariant;
+    if (selectedProduct == null ||
+        selectedVariant == null ||
+        !_hasCurrentData(ref.read(productsProvider)) ||
+        !ref
+            .read(productsProvider)
+            .requireValue
+            .any((product) => product.id == selectedProduct.id)) {
+      return;
+    }
+    final variantsAsync = ref.read(productVariantsProvider(selectedProduct.id));
+    if (!_hasCurrentData(variantsAsync) ||
+        !variantsAsync.requireValue.any(
+          (variant) => variant.id == selectedVariant.id,
+        )) {
+      return;
+    }
     final total = _total;
     if (total <= 0) {
       ScaffoldMessenger.of(
@@ -858,7 +960,7 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
     try {
       await ref
           .read(productNotifierProvider.notifier)
-          .adjustStock(_selectedVariant!.id, total);
+          .adjustStock(selectedVariant.id, total);
       if (mounted) Navigator.pop(context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -882,10 +984,30 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final products = ref.watch(productsProvider).value ?? [];
-    final variants = _selectedProduct != null
-        ? ref.watch(productVariantsProvider(_selectedProduct!.id)).value ?? []
-        : <ProductVariantModel>[];
+    final productsAsync = ref.watch(productsProvider);
+    final products = _hasCurrentData(productsAsync)
+        ? productsAsync.requireValue
+        : const <ProductModel>[];
+    final selectedProductIsAvailable = products.any(
+      (product) => product.id == _selectedProduct?.id,
+    );
+    final selectedProduct = selectedProductIsAvailable
+        ? _selectedProduct
+        : null;
+    final variantsAsync = selectedProduct == null
+        ? null
+        : ref.watch(productVariantsProvider(selectedProduct.id));
+    final variants = variantsAsync != null && _hasCurrentData(variantsAsync)
+        ? variantsAsync.requireValue
+        : const <ProductVariantModel>[];
+    final selectedVariantIsAvailable = variants.any(
+      (variant) => variant.id == _selectedVariant?.id,
+    );
+    final selectionReady =
+        selectedProduct != null &&
+        variantsAsync != null &&
+        _hasCurrentData(variantsAsync) &&
+        selectedVariantIsAvailable;
     final ppc = _ppc;
 
     return AlertDialog(
@@ -899,48 +1021,69 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
               decoration: InputDecoration(
                 labelText: tr('lbl_product_required', ref),
               ),
-              child: DropdownButton<ProductModel>(
-                value: _selectedProduct,
-                hint: Text(tr('hint_select_product', ref)),
-                isExpanded: true,
-                underline: const SizedBox.shrink(),
-                items: products
-                    .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
-                    .toList(),
-                onChanged: (p) => setState(() {
-                  _selectedProduct = p;
-                  _selectedVariant = null;
-                }),
+              child: _asyncSelection(
+                context: context,
+                ref: ref,
+                state: productsAsync,
+                emptyMessage: tr('no_products', ref),
+                retryKey: 'inventory_product_retry',
+                onRetry: () => ref.invalidate(productsProvider),
+                builder: (availableProducts) => DropdownButton<ProductModel>(
+                  value: selectedProduct,
+                  hint: Text(tr('hint_select_product', ref)),
+                  isExpanded: true,
+                  underline: const SizedBox.shrink(),
+                  items: availableProducts
+                      .map(
+                        (p) => DropdownMenuItem(value: p, child: Text(p.name)),
+                      )
+                      .toList(),
+                  onChanged: (p) => setState(() {
+                    _selectedProduct = p;
+                    _selectedVariant = null;
+                  }),
+                ),
               ),
             ),
-            if (_selectedProduct != null) ...[
+            if (selectedProduct != null) ...[
               const SizedBox(height: 12),
               InputDecorator(
                 decoration: InputDecoration(
                   labelText: tr('lbl_variant_required', ref),
-                  helperText: variants.isEmpty
-                      ? tr('msg_no_variants_for_product', ref)
-                      : null,
                 ),
-                child: DropdownButton<ProductVariantModel>(
-                  value: _selectedVariant,
-                  hint: Text(tr('hint_select_variant', ref)),
-                  isExpanded: true,
-                  underline: const SizedBox.shrink(),
-                  items: variants
-                      .map(
-                        (v) => DropdownMenuItem(
-                          value: v,
-                          child: Text(
-                            '${v.variantName} (${AppFormatters.stock(v.quantityAvailable, ppc)})',
-                          ),
+                child: variantsAsync == null
+                    ? _selectionLoading(ref)
+                    : _asyncSelection(
+                        context: context,
+                        ref: ref,
+                        state: variantsAsync,
+                        emptyMessage: tr('msg_no_variants_for_product', ref),
+                        retryKey: 'inventory_variant_retry',
+                        onRetry: () => ref.invalidate(
+                          productVariantsProvider(selectedProduct.id),
                         ),
-                      )
-                      .toList(),
-                  onChanged: variants.isEmpty
-                      ? null
-                      : (v) => setState(() => _selectedVariant = v),
-                ),
+                        builder: (availableVariants) =>
+                            DropdownButton<ProductVariantModel>(
+                              value: selectedVariantIsAvailable
+                                  ? _selectedVariant
+                                  : null,
+                              hint: Text(tr('hint_select_variant', ref)),
+                              isExpanded: true,
+                              underline: const SizedBox.shrink(),
+                              items: availableVariants
+                                  .map(
+                                    (v) => DropdownMenuItem(
+                                      value: v,
+                                      child: Text(
+                                        '${v.variantName} (${AppFormatters.stock(v.quantityAvailable, ppc)})',
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setState(() => _selectedVariant = v),
+                            ),
+                      ),
               ),
             ],
             const SizedBox(height: 12),
@@ -989,7 +1132,7 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
           child: Text(tr('cancel', ref)),
         ),
         ElevatedButton(
-          onPressed: _saving || _selectedVariant == null ? null : _submit,
+          onPressed: _saving || !selectionReady ? null : _submit,
           child: _saving
               ? const SizedBox(
                   width: 16,
@@ -1009,7 +1152,11 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
 
 class _TransferToSellerDialog extends ConsumerStatefulWidget {
   final String currentUserId;
-  const _TransferToSellerDialog({required this.currentUserId});
+  final int pairsPerCarton;
+  const _TransferToSellerDialog({
+    required this.currentUserId,
+    required this.pairsPerCarton,
+  });
 
   @override
   ConsumerState<_TransferToSellerDialog> createState() =>
@@ -1034,7 +1181,7 @@ class _TransferToSellerDialogState
     super.dispose();
   }
 
-  int get _ppc => ref.read(settingsProvider).value?.pairsPerCarton ?? 12;
+  int get _ppc => widget.pairsPerCarton;
 
   int get _total {
     final c = int.tryParse(_cartonsC.text) ?? 0;
@@ -1045,8 +1192,40 @@ class _TransferToSellerDialogState
   bool get _exceedsStock =>
       _selectedVariant != null && _total > _selectedVariant!.quantityAvailable;
 
+  bool _selectionIsReady() {
+    final selectedProduct = _selectedProduct;
+    final selectedVariant = _selectedVariant;
+    final selectedSeller = _selectedSeller;
+    if (selectedProduct == null ||
+        selectedVariant == null ||
+        selectedSeller == null) {
+      return false;
+    }
+
+    final productsAsync = ref.read(productsProvider);
+    final sellersAsync = ref.read(allUsersProvider);
+    if (!_hasCurrentData(productsAsync) ||
+        !_hasCurrentData(sellersAsync) ||
+        !productsAsync.requireValue.any(
+          (product) => product.id == selectedProduct.id,
+        ) ||
+        !sellersAsync.requireValue.any(
+          (seller) => seller.id == selectedSeller.id,
+        )) {
+      return false;
+    }
+
+    final variantsAsync = ref.read(productVariantsProvider(selectedProduct.id));
+    return _hasCurrentData(variantsAsync) &&
+        variantsAsync.requireValue.any(
+          (variant) => variant.id == selectedVariant.id,
+        );
+  }
+
   Future<void> _submit() async {
-    if (_selectedVariant == null || _selectedSeller == null) return;
+    if (!_selectionIsReady()) return;
+    final selectedVariant = _selectedVariant!;
+    final selectedSeller = _selectedSeller!;
     final total = _total;
     if (total <= 0) {
       ScaffoldMessenger.of(
@@ -1070,11 +1249,11 @@ class _TransferToSellerDialogState
       await ref
           .read(productNotifierProvider.notifier)
           .transferToSeller(
-            variantId: _selectedVariant!.id,
-            variantName: _selectedVariant!.variantName,
-            productId: _selectedVariant!.productId,
-            sellerId: _selectedSeller!.id,
-            sellerName: _selectedSeller!.displayName,
+            variantId: selectedVariant.id,
+            variantName: selectedVariant.variantName,
+            productId: selectedVariant.productId,
+            sellerId: selectedSeller.id,
+            sellerName: selectedSeller.displayName,
             quantity: total,
             adminId: widget.currentUserId,
           );
@@ -1084,7 +1263,7 @@ class _TransferToSellerDialogState
           successSnackBar(
             tr('msg_transferred_stock', ref)
                 .replaceFirst('%s', AppFormatters.stock(total, _ppc))
-                .replaceFirst('%s', _selectedSeller!.displayName),
+                .replaceFirst('%s', selectedSeller.displayName),
           ),
         );
       }
@@ -1100,13 +1279,38 @@ class _TransferToSellerDialogState
 
   @override
   Widget build(BuildContext context) {
-    final products = ref.watch(productsProvider).value ?? [];
-    // Use allUsersProvider so admin can also select themselves as a recipient
-    // (admin loads stock into their own vehicle, same as a seller).
-    final sellers = ref.watch(allUsersProvider).value ?? [];
-    final variants = _selectedProduct != null
-        ? ref.watch(productVariantsProvider(_selectedProduct!.id)).value ?? []
-        : <ProductVariantModel>[];
+    final productsAsync = ref.watch(productsProvider);
+    final products = _hasCurrentData(productsAsync)
+        ? productsAsync.requireValue
+        : const <ProductModel>[];
+    final selectedProductIsAvailable = products.any(
+      (product) => product.id == _selectedProduct?.id,
+    );
+    final selectedProduct = selectedProductIsAvailable
+        ? _selectedProduct
+        : null;
+    final variantsAsync = selectedProduct == null
+        ? null
+        : ref.watch(productVariantsProvider(selectedProduct.id));
+    final variants = variantsAsync != null && _hasCurrentData(variantsAsync)
+        ? variantsAsync.requireValue
+        : const <ProductVariantModel>[];
+    final selectedVariantIsAvailable = variants.any(
+      (variant) => variant.id == _selectedVariant?.id,
+    );
+    final sellersAsync = ref.watch(allUsersProvider);
+    final sellers = _hasCurrentData(sellersAsync)
+        ? sellersAsync.requireValue
+        : const <UserModel>[];
+    final selectedSellerIsAvailable = sellers.any(
+      (seller) => seller.id == _selectedSeller?.id,
+    );
+    final selectionReady =
+        selectedProduct != null &&
+        selectedVariantIsAvailable &&
+        selectedSellerIsAvailable &&
+        variantsAsync != null &&
+        _hasCurrentData(variantsAsync);
     final ppc = _ppc;
 
     return AlertDialog(
@@ -1120,26 +1324,29 @@ class _TransferToSellerDialogState
             InputDecorator(
               decoration: InputDecoration(
                 labelText: tr('lbl_seller_required', ref),
-                helperText: sellers.isEmpty
-                    ? tr('msg_no_active_sellers', ref)
-                    : null,
               ),
-              child: DropdownButton<UserModel>(
-                value: _selectedSeller,
-                hint: Text(tr('hint_select_seller', ref)),
-                isExpanded: true,
-                underline: const SizedBox.shrink(),
-                items: sellers
-                    .map(
-                      (s) => DropdownMenuItem(
-                        value: s,
-                        child: Text(s.displayName),
-                      ),
-                    )
-                    .toList(),
-                onChanged: sellers.isEmpty
-                    ? null
-                    : (s) => setState(() => _selectedSeller = s),
+              child: _asyncSelection(
+                context: context,
+                ref: ref,
+                state: sellersAsync,
+                emptyMessage: tr('msg_no_active_sellers', ref),
+                retryKey: 'inventory_seller_retry',
+                onRetry: () => ref.invalidate(allUsersProvider),
+                builder: (availableSellers) => DropdownButton<UserModel>(
+                  value: selectedSellerIsAvailable ? _selectedSeller : null,
+                  hint: Text(tr('hint_select_seller', ref)),
+                  isExpanded: true,
+                  underline: const SizedBox.shrink(),
+                  items: availableSellers
+                      .map(
+                        (s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s.displayName),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (s) => setState(() => _selectedSeller = s),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -1148,48 +1355,69 @@ class _TransferToSellerDialogState
               decoration: InputDecoration(
                 labelText: tr('lbl_product_required', ref),
               ),
-              child: DropdownButton<ProductModel>(
-                value: _selectedProduct,
-                hint: Text(tr('hint_select_product', ref)),
-                isExpanded: true,
-                underline: const SizedBox.shrink(),
-                items: products
-                    .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
-                    .toList(),
-                onChanged: (p) => setState(() {
-                  _selectedProduct = p;
-                  _selectedVariant = null;
-                }),
+              child: _asyncSelection(
+                context: context,
+                ref: ref,
+                state: productsAsync,
+                emptyMessage: tr('no_products', ref),
+                retryKey: 'inventory_product_retry',
+                onRetry: () => ref.invalidate(productsProvider),
+                builder: (availableProducts) => DropdownButton<ProductModel>(
+                  value: selectedProduct,
+                  hint: Text(tr('hint_select_product', ref)),
+                  isExpanded: true,
+                  underline: const SizedBox.shrink(),
+                  items: availableProducts
+                      .map(
+                        (p) => DropdownMenuItem(value: p, child: Text(p.name)),
+                      )
+                      .toList(),
+                  onChanged: (p) => setState(() {
+                    _selectedProduct = p;
+                    _selectedVariant = null;
+                  }),
+                ),
               ),
             ),
-            if (_selectedProduct != null) ...[
+            if (selectedProduct != null) ...[
               const SizedBox(height: 12),
               InputDecorator(
                 decoration: InputDecoration(
                   labelText: tr('lbl_variant_required', ref),
-                  helperText: variants.isEmpty
-                      ? tr('msg_no_variants_for_product', ref)
-                      : null,
                 ),
-                child: DropdownButton<ProductVariantModel>(
-                  value: _selectedVariant,
-                  hint: Text(tr('hint_select_variant', ref)),
-                  isExpanded: true,
-                  underline: const SizedBox.shrink(),
-                  items: variants
-                      .map(
-                        (v) => DropdownMenuItem(
-                          value: v,
-                          child: Text(
-                            '${v.variantName}  •  ${AppFormatters.stock(v.quantityAvailable, ppc)} ${tr('lbl_in_stock', ref)}',
-                          ),
+                child: variantsAsync == null
+                    ? _selectionLoading(ref)
+                    : _asyncSelection(
+                        context: context,
+                        ref: ref,
+                        state: variantsAsync,
+                        emptyMessage: tr('msg_no_variants_for_product', ref),
+                        retryKey: 'inventory_variant_retry',
+                        onRetry: () => ref.invalidate(
+                          productVariantsProvider(selectedProduct.id),
                         ),
-                      )
-                      .toList(),
-                  onChanged: variants.isEmpty
-                      ? null
-                      : (v) => setState(() => _selectedVariant = v),
-                ),
+                        builder: (availableVariants) =>
+                            DropdownButton<ProductVariantModel>(
+                              value: selectedVariantIsAvailable
+                                  ? _selectedVariant
+                                  : null,
+                              hint: Text(tr('hint_select_variant', ref)),
+                              isExpanded: true,
+                              underline: const SizedBox.shrink(),
+                              items: availableVariants
+                                  .map(
+                                    (v) => DropdownMenuItem(
+                                      value: v,
+                                      child: Text(
+                                        '${v.variantName}  •  ${AppFormatters.stock(v.quantityAvailable, ppc)} ${tr('lbl_in_stock', ref)}',
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setState(() => _selectedVariant = v),
+                            ),
+                      ),
               ),
             ],
             const SizedBox(height: 12),
@@ -1258,11 +1486,7 @@ class _TransferToSellerDialogState
         ),
         ElevatedButton(
           onPressed:
-              (_saving ||
-                  _selectedVariant == null ||
-                  _selectedSeller == null ||
-                  _total <= 0 ||
-                  _exceedsStock)
+              (_saving || !selectionReady || _total <= 0 || _exceedsStock)
               ? null
               : _submit,
           child: _saving

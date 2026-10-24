@@ -64,6 +64,7 @@ class AppTokens {
   static const Curve curveDecel = Curves.decelerate;
 
   // ─── Component sizes ───
+  static const double minTouchTarget = 48;
   static const double buttonMinHeight = 48;
   static const double iconSizeSM = 18;
   static const double iconSizeMD = 24;

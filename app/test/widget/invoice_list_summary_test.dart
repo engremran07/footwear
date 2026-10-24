@@ -28,9 +28,42 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('200'), findsOneWidget);
-    expect(find.text('140'), findsOneWidget);
-    expect(find.text('60'), findsOneWidget);
+    expect(find.text('SAR 200'), findsOneWidget);
+    expect(find.text('SAR 140'), findsOneWidget);
+    expect(find.text('SAR 60'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('invoice summary keeps totals separate by currency', (
+    tester,
+  ) async {
+    final invoices = [
+      _invoice('sar', 100, 60, 40, InvoiceModel.statusPartial),
+      _invoice(
+        'pkr',
+        200,
+        150,
+        50,
+        InvoiceModel.statusPartial,
+        currency: 'PKR',
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(null)),
+          roleAwareInvoicesProvider.overrideWith((ref) => AsyncData(invoices)),
+        ],
+        child: const MaterialApp(home: InvoicesListScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('PKR 200\nSAR 100'), findsOneWidget);
+    expect(find.text('PKR 150\nSAR 60'), findsOneWidget);
+    expect(find.text('PKR 50\nSAR 40'), findsOneWidget);
+    expect(find.text('300'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
@@ -40,8 +73,9 @@ InvoiceModel _invoice(
   double total,
   double received,
   double outstanding,
-  String status,
-) {
+  String status, {
+  String currency = 'SAR',
+}) {
   final now = Timestamp.now();
   return InvoiceModel(
     id: id,
@@ -54,6 +88,7 @@ InvoiceModel _invoice(
     amountReceived: received,
     outstandingAmount: outstanding,
     status: status,
+    currency: currency,
     createdBy: 'admin-1',
     createdAt: now,
     updatedAt: now,

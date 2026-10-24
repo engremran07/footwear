@@ -28,6 +28,56 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.9.83',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '💱',
+        text: {
+          AppLocale.en:
+              'Seller and account reports now keep each route currency separate in exported totals.',
+          AppLocale.ar:
+              'تحافظ تقارير البائعين والحسابات الآن على فصل عملة كل مسار في الإجماليات المصدّرة.',
+          AppLocale.ur:
+              'سیلر اور اکاؤنٹ رپورٹس اب ایکسپورٹ شدہ ٹوٹلز میں ہر روٹ کی کرنسی الگ رکھتی ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📄',
+        text: {
+          AppLocale.en:
+              'Account statements and report exports use the correct shop and route currency.',
+          AppLocale.ar:
+              'تستخدم كشوف الحسابات والتقارير المصدّرة عملة المتجر والمسار الصحيحة.',
+          AppLocale.ur:
+              'اکاؤنٹ اسٹیٹمنٹس اور رپورٹ ایکسپورٹس میں دکان اور روٹ کی درست کرنسی استعمال ہوتی ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '💾',
+        text: {
+          AppLocale.en:
+              'Save encrypted seller backups on your device and restore eligible transactions for your assigned routes. Google Drive upload is available after OAuth setup.',
+          AppLocale.ar:
+              'احفظ نسخًا احتياطية مشفّرة للبائع على جهازك واستعد المعاملات المؤهلة لمساراتك المعيّنة. يتوفر الرفع إلى Google Drive بعد إعداد OAuth.',
+          AppLocale.ur:
+              'اپنے آلے پر سیلر کا انکرپٹڈ بیک اپ محفوظ کریں اور اپنے مقررہ روٹس کی اہل ٹرانزیکشنز بحال کریں۔ OAuth سیٹ اپ کے بعد Google Drive پر اپ لوڈ دستیاب ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '♿',
+        text: {
+          AppLocale.en:
+              'Forms and navigation now respect reduced-motion settings and provide clearer loading and retry feedback.',
+          AppLocale.ar:
+              'تحترم النماذج والتنقل الآن إعدادات تقليل الحركة وتعرض حالات تحميل وإعادة محاولة أوضح.',
+          AppLocale.ur:
+              'فارمز اور نیویگیشن اب کم حرکت کی ترتیبات کا احترام کرتے ہیں اور لوڈنگ و دوبارہ کوشش کے واضح پیغامات دکھاتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.82',
     date: 'October 2026',
     items: [

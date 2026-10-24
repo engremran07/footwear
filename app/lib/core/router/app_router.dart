@@ -36,6 +36,7 @@ import '../../screens/tenant_management_screen.dart';
 import '../../screens/database_flush_screen.dart';
 import '../../screens/database_backup_screen.dart';
 import '../../widgets/app_shell.dart';
+import '../design/app_animations.dart';
 import '../l10n/app_locale.dart';
 
 /// Normalize path: strip query params, trailing slashes, collapse double slashes.
@@ -83,6 +84,7 @@ CustomTransitionPage<void> _fadePage(Widget child, GoRouterState state) {
     transitionDuration: const Duration(milliseconds: 140),
     reverseTransitionDuration: const Duration(milliseconds: 120),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      if (!AppMotion.isEnabled(context)) return child;
       final fadeIn = CurvedAnimation(parent: animation, curve: Curves.easeOut);
       final scaleIn = CurvedAnimation(
         parent: animation,
@@ -107,6 +109,7 @@ CustomTransitionPage<void> _slidePage(Widget child, GoRouterState state) {
     transitionDuration: const Duration(milliseconds: 160),
     reverseTransitionDuration: const Duration(milliseconds: 120),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      if (!AppMotion.isEnabled(context)) return child;
       final slideIn =
           Tween<Offset>(begin: const Offset(0, 0.03), end: Offset.zero).animate(
             CurvedAnimation(parent: animation, curve: Curves.fastOutSlowIn),
@@ -198,7 +201,7 @@ class RouterNotifier extends ChangeNotifier {
     }
 
     if (state.matchedLocation == '/settings/backup' &&
-        !appUser.canCreateWorkspaceBackup) {
+        !appUser.canCreateBackup) {
       return '/';
     }
 
@@ -212,11 +215,6 @@ class RouterNotifier extends ChangeNotifier {
         appUser.tenantId == null &&
         _isTenantBusinessPath(state.matchedLocation)) {
       return '/tenants';
-    }
-
-    if (state.matchedLocation == '/settings/backup' &&
-        !appUser.canCreateWorkspaceBackup) {
-      return '/';
     }
 
     if (_isTenantManagementPath(state.matchedLocation) &&

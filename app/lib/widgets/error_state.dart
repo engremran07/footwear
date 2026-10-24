@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../core/design/app_animations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
@@ -52,17 +53,18 @@ class ErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final icon = Icon(_icon, size: 64, color: theme.colorScheme.error);
+    final iconWidget = AppMotion.isEnabled(context)
+        ? icon.animate().shakeX(hz: 3, amount: 5, duration: AppTokens.durSlow)
+        : icon;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppTokens.s32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              _icon,
-              size: 64,
-              color: theme.colorScheme.error,
-            ).animate().shakeX(hz: 3, amount: 5, duration: AppTokens.durSlow),
+            iconWidget,
             const SizedBox(height: AppTokens.s16),
             Text(
               message,

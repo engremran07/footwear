@@ -100,7 +100,9 @@ class DashboardScreen extends ConsumerWidget {
                         '${AppFormatters.dateTime(tx.createdAt)} • '
                         '${AppFormatters.currency(tx.amount)}',
                       ),
-                      trailing: const Icon(Icons.chevron_right),
+                      trailing: tx.shopId.isEmpty
+                          ? null
+                          : const Icon(Icons.chevron_right),
                       onTap: tx.shopId.isEmpty
                           ? null
                           : () {

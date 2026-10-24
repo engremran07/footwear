@@ -36,8 +36,10 @@ final routesProvider = StreamProvider.autoDispose<List<RouteModel>>((ref) {
   });
 });
 
-/// Complete role-scoped route dataset for explicit report/export actions.
-/// Live UI providers remain windowed; this query cursor-pages to exhaustion.
+/// Complete role-scoped route metadata for explicit report/export actions.
+/// Administrators can resolve historical transactions against inactive
+/// routes; sellers only receive routes that are currently active and assigned.
+/// This query cursor-pages to exhaustion.
 final routesExportProvider = FutureProvider<List<RouteModel>>((ref) async {
   final user = await ref.read(authUserProvider.future);
   if (user == null || !user.active) return const <RouteModel>[];
@@ -47,12 +49,14 @@ final routesExportProvider = FutureProvider<List<RouteModel>>((ref) async {
   var query = TenantScope.applyToQuery(
     FirebaseFirestore.instance.collection(Collections.routes),
     tenantId: tenantId,
-  ).where('active', isEqualTo: true);
+  );
   if (!user.isAdmin) {
     if (!user.isSeller || user.assignedRouteIds.isEmpty) {
       return const <RouteModel>[];
     }
-    query = query.where('assigned_seller_ids', arrayContains: user.id);
+    query = query
+        .where('active', isEqualTo: true)
+        .where('assigned_seller_ids', arrayContains: user.id);
   }
 
   final documents = await fetchAllQueryDocuments(query);

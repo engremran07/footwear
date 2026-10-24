@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 ///
 /// Returns the correct font family based on locale:
 /// - 'ur' → NotoNastaliqUrdu (bundled Nastaleeq, offline)
-/// - 'ar' → NotoNaskhArabic (bundled Naskh, offline)
+/// - 'ar' → NotoSansArabic (bundled Arabic, offline)
 /// - else → bundled Syne (headings) / DM Sans (body) fonts (offline)
 class AppFonts {
   AppFonts._();

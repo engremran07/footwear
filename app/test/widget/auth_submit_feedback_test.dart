@@ -6,6 +6,7 @@ import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/product_provider.dart';
 import 'package:footwear_erp/screens/profile_screen.dart';
 import 'package:footwear_erp/screens/variant_form_screen.dart';
+import 'package:footwear_erp/widgets/error_state.dart';
 
 void main() {
   testWidgets('profile save maps an auth-profile stream failure', (
@@ -31,7 +32,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('variant save maps an auth-profile stream failure', (
+  testWidgets('variant form shows retry when profile loading fails', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -51,11 +52,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextFormField), 'Large / Black');
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.byType(ErrorState), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

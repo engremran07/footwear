@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../core/design/app_animations.dart';
 import '../core/design/app_tokens.dart';
 
 class EmptyState extends StatelessWidget {
@@ -23,6 +24,23 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final icon = Icon(
+      this.icon,
+      size: 64,
+      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+    );
+    final iconWidget = AppMotion.isEnabled(context)
+        ? icon
+              .animate()
+              .fadeIn(duration: AppTokens.durSlow)
+              .scale(
+                begin: const Offset(0.6, 0.6),
+                end: const Offset(1.0, 1.0),
+                curve: AppTokens.curveSpring,
+                duration: AppTokens.durSlow,
+              )
+        : icon;
+
     return Center(
       key: ValueKey('empty_state_$message'),
       child: Padding(
@@ -30,21 +48,7 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-                  icon,
-                  size: 64,
-                  color: theme.colorScheme.onSurfaceVariant.withValues(
-                    alpha: 0.5,
-                  ),
-                )
-                .animate()
-                .fadeIn(duration: AppTokens.durSlow)
-                .scale(
-                  begin: const Offset(0.6, 0.6),
-                  end: const Offset(1.0, 1.0),
-                  curve: AppTokens.curveSpring,
-                  duration: AppTokens.durSlow,
-                ),
+            iconWidget,
             const SizedBox(height: AppTokens.s16),
             Text(
               message,

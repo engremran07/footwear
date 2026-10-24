@@ -135,6 +135,46 @@ void main() {
     expect(find.text('Seller Account'), findsNothing);
   });
 
+  testWidgets(
+    'tenant admins see only workspace metadata, not platform actions',
+    (tester) async {
+      final tenant = TenantModel(
+        id: 'workspace-1',
+        name: 'Workspace One',
+        slug: 'workspace-one',
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+      final tenantAdmin = UserModel(
+        id: 'tenant-admin',
+        email: 'tenant@example.com',
+        displayName: 'Workspace Admin',
+        role: UserRole.tenantAdmin,
+        tenantId: tenant.id,
+        active: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(tenantAdmin)),
+            tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
+          ],
+          child: const MaterialApp(home: TenantManagementScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Workspace One'), findsOneWidget);
+      expect(find.byIcon(Icons.add_business), findsNothing);
+      expect(find.byIcon(Icons.edit), findsNothing);
+      expect(find.byType(TextButton), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('workspace create does not wait for global owner users', (
     tester,
   ) async {
@@ -237,10 +277,103 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('selected platform admin can archive a workspace', (
+    tester,
+  ) async {
+    final tenant = TenantModel(
+      id: 'alpha',
+      name: 'Alpha',
+      slug: 'alpha',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final user = UserModel(
+      id: 'platform-admin',
+      email: 'platform@example.com',
+      displayName: 'Platform Admin',
+      role: UserRole.superAdmin,
+      active: true,
+      activeWorkspaceId: tenant.id,
+      activeWorkspaceReason: 'Workspace lifecycle audit',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final notifier = _RecordingTenantManagementNotifier();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(user)),
+          tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
+          tenantManagementNotifierProvider.overrideWith(() => notifier),
+        ],
+        child: const MaterialApp(home: TenantManagementScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Archive workspace'));
+    await tester.pumpAndSettle();
+    expect(find.text('Archive this workspace?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Archive workspace'));
+    await tester.pumpAndSettle();
+
+    expect(notifier.archivedTenantId, tenant.id);
+    expect(find.text('Workspace archived'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('selected platform admin can restore an archived workspace', (
+    tester,
+  ) async {
+    final tenant = TenantModel(
+      id: 'alpha',
+      name: 'Alpha',
+      slug: 'alpha',
+      active: false,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final user = UserModel(
+      id: 'platform-admin',
+      email: 'platform@example.com',
+      displayName: 'Platform Admin',
+      role: UserRole.superAdmin,
+      active: true,
+      activeWorkspaceId: tenant.id,
+      activeWorkspaceReason: 'Workspace lifecycle audit',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final notifier = _RecordingTenantManagementNotifier();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(user)),
+          tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
+          tenantManagementNotifierProvider.overrideWith(() => notifier),
+        ],
+        child: const MaterialApp(home: TenantManagementScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Restore workspace'));
+    await tester.pumpAndSettle();
+    expect(find.text('Restore this workspace?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Restore workspace'));
+    await tester.pumpAndSettle();
+
+    expect(notifier.restoredTenantId, tenant.id);
+    expect(find.text('Workspace restored'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _RecordingTenantManagementNotifier extends TenantManagementNotifier {
   String? assignedOwnerId;
+  String? archivedTenantId;
+  String? restoredTenantId;
 
   @override
   Future<String> createTenant({
@@ -260,6 +393,16 @@ class _RecordingTenantManagementNotifier extends TenantManagementNotifier {
   @override
   Future<void> assignTenantOwner(String tenantId, String ownerUserId) async {
     assignedOwnerId = ownerUserId;
+  }
+
+  @override
+  Future<void> archiveTenant(String tenantId) async {
+    archivedTenantId = tenantId;
+  }
+
+  @override
+  Future<void> restoreTenant(String tenantId) async {
+    restoredTenantId = tenantId;
   }
 }
 

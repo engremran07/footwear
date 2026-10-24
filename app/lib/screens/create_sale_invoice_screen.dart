@@ -238,9 +238,22 @@ class _CreateSaleInvoiceScreenState
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authUserProvider).value;
-    if (user == null) {
+    final userAsync = ref.watch(authUserProvider);
+    if (userAsync.isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (userAsync.hasError) {
+      return Scaffold(
+        body: mappedErrorState(
+          error: userAsync.error!,
+          ref: ref,
+          onRetry: () => ref.invalidate(authUserProvider),
+        ),
+      );
+    }
+    final user = userAsync.value;
+    if (user == null) {
+      return Scaffold(body: Center(child: Text(tr('no_access', ref))));
     }
 
     final routeIds = user.assignedRouteIds;
@@ -531,7 +544,12 @@ class _CreateSaleInvoiceScreenState
                       padding: const EdgeInsets.all(16),
                       child: Center(
                         child: Text(
-                          tr('no_inventory_items', ref),
+                          tr(
+                            user.isAdmin
+                                ? 'admin_no_stock_guidance'
+                                : 'no_inventory_items',
+                            ref,
+                          ),
                           style: ts.bodyMedium,
                         ),
                       ),

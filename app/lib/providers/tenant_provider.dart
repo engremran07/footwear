@@ -265,6 +265,76 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
     });
   }
 
+  Future<UserModel> _requireSelectedPlatformAdmin(
+    String requestedTenantId,
+  ) async {
+    final tenantId = TenantScope.normalize(requestedTenantId);
+    if (tenantId == null || tenantId == TenantScope.globalTenantId) {
+      throw ArgumentError('A concrete workspace ID is required.');
+    }
+    final actingUser = await ref.read(authUserProvider.future);
+    if (actingUser == null ||
+        !actingUser.active ||
+        !actingUser.isSuperAdmin ||
+        actingUser.activeWorkspaceId != tenantId ||
+        (actingUser.activeWorkspaceReason?.trim().length ?? 0) < 10) {
+      throw StateError('Authorized workspace administration is required.');
+    }
+    return actingUser;
+  }
+
+  Future<void> archiveTenant(String tenantId) async {
+    final actingUser = await _requireSelectedPlatformAdmin(tenantId);
+    final normalizedTenantId = TenantScope.requireTenant(tenantId);
+
+    await _runTenantWrite(() async {
+      final db = FirebaseFirestore.instance;
+      final tenantRef = db
+          .collection(Collections.tenants)
+          .doc(normalizedTenantId);
+      await db.runTransaction<void>((transaction) async {
+        final snapshot = await transaction.get(tenantRef);
+        if (!snapshot.exists || snapshot.data()?['active'] != true) {
+          throw StateError(
+            'Workspace lifecycle status changed. Refresh and retry.',
+          );
+        }
+        transaction.update(tenantRef, {
+          'active': false,
+          'archived_at': FieldValue.serverTimestamp(),
+          'archived_by': actingUser.id,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      });
+    });
+  }
+
+  Future<void> restoreTenant(String tenantId) async {
+    await _requireSelectedPlatformAdmin(tenantId);
+    final normalizedTenantId = TenantScope.requireTenant(tenantId);
+
+    await _runTenantWrite(() async {
+      final db = FirebaseFirestore.instance;
+      final tenantRef = db
+          .collection(Collections.tenants)
+          .doc(normalizedTenantId);
+      await db.runTransaction<void>((transaction) async {
+        final snapshot = await transaction.get(tenantRef);
+        if (!snapshot.exists || snapshot.data()?['active'] == true) {
+          throw StateError(
+            'Workspace lifecycle status changed. Refresh and retry.',
+          );
+        }
+        transaction.update(tenantRef, {
+          'active': true,
+          'archived_at': FieldValue.delete(),
+          'archived_by': FieldValue.delete(),
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      });
+    });
+  }
+
   Future<void> _validateTenantOwner(String tenantId, String ownerUserId) async {
     final normalizedOwnerId = ownerUserId.trim();
     if (normalizedOwnerId.isEmpty) {

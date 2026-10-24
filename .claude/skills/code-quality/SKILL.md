@@ -10,6 +10,31 @@ description: "Use when: detecting dead code, auditing vibe-coded debt, enforcing
 Prevent drift between layers (rules, app, docs) through automated hygiene gates
 and a recognizable catalog of vibe-coded debt signals.
 
+## Invocation and required inputs
+
+Use when implementing or reviewing a ShoesERP change that crosses app,
+provider, Rules, index, test, or documentation boundaries. Read the touched
+implementation and authoritative runtime contracts before running checks.
+
+## Workflow and output
+
+Identify only the relevant debt signals, run scoped hygiene checks, and report
+findings with file/line evidence and exact command results. Do not treat a
+pattern match as proof of a defect without reading its call site and
+surrounding contract.
+
+## Dependencies and boundaries
+
+Use `AGENTS.md` and `CLAUDE.md` as runtime authorities. This skill does not
+authorize release operations; follow the scope-aware validation and explicit
+authorization rules there.
+
+## Validation
+
+Run the checks relevant to changed code. Use Firestore Rules Emulator tests for
+Rules changes and local analyzers/tests for app changes. Do not deploy Rules,
+build a release, commit, or push unless explicitly authorized.
+
 ## Vibe-Coded Debt Signal Table
 
 | Pattern | Signal | Correct Pattern |
@@ -26,7 +51,7 @@ and a recognizable catalog of vibe-coded debt signals.
 
 | `flutter build apk --release --split-per-abi` | Correct Android release artifact path | `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true` |
 
-| Hardcoded `Colors.red`, `Colors.white` | Theme breakage in dark mode | `AppBrand.errorFg`, `AppBrand.errorBg`, etc. |
+| Unscoped literal colors on theme-sensitive screen surfaces | Possible contrast/theme drift | Prefer `Theme.of(context).colorScheme` or the semantic `AppTheme`/`AppBrand` value; allow literals when explicitly paired with a surface and verified |
 
 | `ScaffoldMessenger.of(context).showSnackBar(SnackBar(...))` | Unstyled raw SnackBar | `errorSnackBar()` / `successSnackBar()` helpers |
 

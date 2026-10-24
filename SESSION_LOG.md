@@ -6,6 +6,231 @@
 
 ---
 
+## SESSION-019 — 2026-10-24 — Consolidated audit release
+
+**Agent:** GitHub Copilot
+
+**Baseline:** Branch `main`, HEAD `6304214`, with the existing audit,
+backup/lifecycle, frontend, and regression changes preserved.
+
+**Trigger:** Validate and finish the previously requested work, produce the
+requested web/APK release, deploy Hosting and Firestore Rules/indexes, and
+prepare the authorized `main` publication.
+
+### Work Performed
+
+- Reconciled the prior task ledger and reports. The retained records say the
+  supplied SaaS audit and full frontend mission were read, and document the
+  resulting work. The exact original text for all four referenced prompts was
+  not present in this continuation, so independent line-by-line confirmation
+  of all four is not claimed.
+- Added trilingual changelog notes for encrypted phone backups, restricted
+  assigned-route restore, optional Drive upload after OAuth setup, and
+  reduced-motion/loading feedback.
+- Preserved the existing implementation: seller phone backup and restricted
+  ledger restore are functional; Drive upload is implemented but needs OAuth
+  build-time IDs. Those IDs were not present locally, at the user's direction
+  this release was built without them; Drive upload therefore remains
+  unavailable in these artifacts until the IDs are configured and the
+  artifacts are rebuilt.
+- Updated audit evidence to distinguish completed source findings from the
+  still-unverified authenticated visual, accessibility-device, and
+  performance-profile work.
+
+### Verification and Release
+
+- Full Flutter suite: `01:32 +589: All tests passed!`.
+- Changelog regression suite: `00:00 +10: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 10.6s)`.
+- `dart analyze test/`: `No issues found!`.
+- Firestore Rules Emulator: `129 passing (23s)`.
+- Markdown lint exited 0 with no output; `git diff --check` exited 0.
+- Version metadata is synchronized at `3.9.83+709`.
+- Web release build: `EXIT: 0`. Hosting deploy to
+  `shoeserp-clean-20260327` completed with `Deploy complete!`; URL:
+  `https://shoeserp-clean-20260327.web.app`.
+- Split release APKs built: ARMv7 30.4 MB, ARM64 31.9 MB, x86_64 33.4 MB.
+- Firestore Rules/indexes deployment completed with `Deploy complete!`.
+  Firebase reported 23 remote indexes and 2 field overrides not present in
+  the local index file; no `--force` deletion was used.
+- No device installation or authenticated rendered business-screen review
+  was performed. The complete UI visual redesign, exhaustive interaction
+  inventory, locale/theme/text-scale acceptance, and profile-mode performance
+  review remain incomplete.
+
+---
+
+## SESSION-018 — 2026-10-24 — Frontend mission follow-up and reduced-motion routing
+
+**Agent:** GitHub Copilot
+
+**Baseline:** Unreleased worktree with 113 changed/untracked status entries and
+an existing 32-route frontend register, skills research, UI fixes, and backup
+work. Existing changes were preserved. The complete attached frontend mission
+text was read.
+
+**Trigger:** Continue the full frontend audit request, verify the route and
+design-system register, complete reduced-motion coverage, record Android
+validation status, and create the requested plain-text audit deliverable.
+
+### Work Performed
+
+- Rechecked the actual GoRouter route declarations and AppShell entrypoints
+  against the 32-pattern screen register and reviewed current design-system
+  ownership and upstream skill research.
+- Found that the custom GoRouter fade/scale and form slide page transitions
+  still animated when `MediaQuery.disableAnimations` was enabled, even though
+  shared animation presets had been hardened.
+- Updated both custom route builders to return the child without optional
+  effects when reduced motion is enabled. Existing transitions remain for
+  users who allow motion; roles, route history, auth, providers, and business
+  behavior are unchanged.
+- Added actual-router regressions for reduced-motion and enabled-motion
+  fade/scale and vertical form-slide transitions. The original reduced-motion
+  regression failed before the fix by finding the active custom scale effect.
+- Updated the frontend register, UI report, skill report, runtime docs, and
+  this continuity log. Created
+  `FRONTEND_UX_SKILLS_AND_FULL_APK_AUDIT.txt` with route inventory, finding
+  dispositions, upstream/license decisions, verification, and explicit
+  incomplete-scope statements.
+
+### Verification
+
+- Focused router suite:
+  `00:05 +6: All tests passed!`.
+- Full Flutter suite:
+  `01:01 +589: All tests passed!`.
+- `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 102.3s)`.
+- `dart analyze test/`: `No issues found!`.
+- `dart format`:
+  `Formatted 2 files (0 changed) in 0.05 seconds.`
+- A local Android debug APK build failed after 16m35 at
+  `:app:mergeDebugJavaResource` with
+  `java.io.IOException: Insufficient system resources exist to complete the
+  requested service`. No APK artifact was created or installed.
+- No authenticated business-screen visual review, Android device check,
+  performance profile, release build, deployment, production data operation,
+  version bump, commit, or push was performed. The complete premium visual
+  redesign and all-route rendered acceptance remain open.
+
+---
+
+## SESSION-017 — 2026-10-24 — SaaS backup and workspace lifecycle audit
+
+**Agent:** GitHub Copilot
+
+**Baseline:** Unreleased local source with existing backup, reset, tenant, and
+Rules changes; unrelated worktree modifications preserved.
+
+**Trigger:** Validate the supplied repository audit, implement confirmed
+backup/reset and workspace lifecycle findings in one pass, and produce a
+plain-text report.
+
+### Work Performed
+
+- Disabled legacy plaintext whole-project backup/restore and direct-balance
+  reset scripts. Client flush/reset actions now fail closed because sequential
+  client deletes cannot preserve ledger, balance, inventory, and reference
+  invariants atomically.
+- Denied tenant-root hard deletion in Firestore Rules and strengthened
+  regression coverage for selected-super-admin lifecycle access.
+- Added reasoned selection of existing inactive workspaces for the
+  Rules-authorized restoration path, plus provider-owned transactional
+  archive/restore actions with explicit confirmation. Member profiles remain
+  active; business access remains denied by Rules while the workspace is
+  inactive.
+- Rejected the global pseudo-workspace in backup scope, corrected lifecycle
+  documentation, and created `FULL_SAAS_REPOSITORY_AUDIT.txt`.
+- Implemented seller route-scoped encrypted archives, system file-picker save
+  and import, and a user-triggered Drive upload for saved phone archives.
+  Restore is limited to the seller's own eligible, unlinked cash-in/cash-out
+  rows on currently assigned routes. Each transaction and shop-balance delta
+  commit atomically; invoices, inventory, and other sellers' ledger rows are
+  not restored. Upload validates checksum, creator, workspace, and current
+  route scope; it requires online access and configured OAuth and is not
+  background synchronization.
+- Consolidated the seller restore's shop balance and cached last-transaction
+  metadata into one transaction update; historical ledger imports always
+  reconcile balance, while cached latest-transaction fields change only for a
+  newer restored row.
+- Aligned the `/settings/backup` router guard with the seller backup capability
+  exposed from Profile. A router regression confirms sellers with assigned
+  routes reach the screen, while sellers without an assigned route are
+  redirected.
+
+### Verification
+
+- Focused error-mapping, localization, and tenant-management tests:
+  `00:04 +60: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 262.6s)`.
+  `dart analyze test/`: `No issues found!`.
+- Firestore Rules Emulator: `129 passing (35s)`.
+- Seller backup, scope, model, and transaction-provider focused tests:
+  `00:07 +43: All tests passed!`.
+- Follow-up `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 28.9s)`; `dart analyze test/`:
+  `No issues found!`.
+- Combined router, backup-screen, destination, and user-role tests:
+  `00:04 +33: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 6.4s)`; `dart analyze test/`:
+  `No issues found!`.
+- Android debug build ended during dependency resolution:
+  `androidx.lifecycle:lifecycle-runtime:2.10.0` could not be downloaded
+  because DNS resolution failed for `dl.google.com` and
+  `repo.maven.apache.org`. Output: `BUILD FAILED in 1m 17s`.
+- Markdown lint and `git diff --check` exited 0. Each disabled legacy script
+  printed its fail-closed message and exited 1.
+- No production Rules/indexes deployment, production data change, release
+  build, Hosting deployment, device install, commit, or push was performed.
+
+---
+
+## SESSION-016 — 2026-10-23 — Remaining frontend screen-state review
+
+**Agent:** GitHub Copilot
+**Baseline:** Unreleased 32-route frontend register and screen-state sweep.
+**Trigger:** Finish the remaining named route/screen-state findings while
+preserving prior RTL export, skill, frontend, and worktree changes.
+
+### Work Performed
+
+- Reviewed report export paths: export cards expose busy state, prevent
+  duplicate taps, and map failures; account-statement and seller-report cards
+  expose generation state and mapped errors. Account statements resolve the
+  shop route currency before generating spreadsheet/PDF output. Seller rows
+  retain transaction route currency, current balances use the shop's current
+  route currency, and PDF grand totals are grouped by currency.
+- Completed retry/readiness handling and source review for user route options,
+  shop-form route queries, backup/flush workspace and user queries, and
+  tenant-admin metadata-only presentation. The edit-user callback now guards
+  dialog and owning-widget lifetime after awaiting the auth profile.
+- Updated the 32-route screen register, audit report, runtime audit history,
+  app/repository overview, system deep dive, and this session log. No provider
+  write owner, role authorization, tenant scope, Firestore Rules, financial
+  calculation, inventory behavior, or release version changed.
+
+### Verification
+
+- Focused widget regressions passed individually: report feedback
+  `00:01 +1`, backup workspace retry `00:02 +1`, flush retry `00:01 +1`,
+  tenant-admin branch `00:00 +1`, user route options `00:03 +1`, and shop
+  route-query retry `00:00 +1`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 21.7s)`.
+  `dart analyze test/`: `No issues found!`.
+- A serial run of the whole backup-screen test file exhausted the Dart VM
+  after two tests with 1.71 GB free memory. Its new retry regression passed
+  in isolation. Currency/PDF/export regressions reported
+  `00:07 +12: All tests passed!`; final `flutter analyze lib --no-pub` reported
+  `No issues found! (ran in 10.7s)` and `dart analyze test/` reported
+  `No issues found!`. The full Flutter suite was not rerun; Markdown lint and
+  `git diff --check` were run after documentation edits.
+- Authenticated rendered role/locale/theme acceptance remains pending. No
+  release build, production deployment, version bump, device install, commit,
+  or push was performed.
+
+---
+
 ## SESSION-015 — 2026-10-22 — v3.9.81+707 release, deploy, and device install
 
 **Agent:** GitHub Copilot

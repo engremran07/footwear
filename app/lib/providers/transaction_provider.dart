@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/utils/backup_scope_policy.dart';
 import '../core/utils/firestore_pagination.dart';
 import '../core/utils/notification_writer.dart';
 import '../core/utils/tenant_scope.dart';
@@ -530,6 +531,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
       final txRef = db.collection(Collections.transactions).doc();
       batch.set(txRef, {
         'shop_id': shopId,
+        'customer_id': shopId,
         'shop_name': shopName,
         'route_id': routeId,
         'tenant_id': tenantId,
@@ -604,33 +606,39 @@ class TransactionNotifier extends AsyncNotifier<void> {
       throw StateError('Seller privileges required for route restore');
     }
     final normalizedRouteId = routeId.trim();
+    final assignedRouteIds = BackupScopePolicy.routeIdsFor(
+      user.assignedRouteIds,
+    );
     if (normalizedRouteId.isEmpty ||
-        !user.assignedRouteIds.contains(normalizedRouteId)) {
+        !assignedRouteIds.contains(normalizedRouteId)) {
       throw StateError('Route access has been revoked');
     }
     final tenantId = TenantScope.requireTenant(user.tenantId);
     var restored = 0;
+    final eligibleDocuments = documents
+        .where(
+          (document) => BackupScopePolicy.isSellerTransactionRestorable(
+            document: document,
+            sellerId: user.id,
+            routeId: normalizedRouteId,
+            tenantId: tenantId,
+            assignedRouteIds: assignedRouteIds,
+          ),
+        )
+        .toList()
+      ..sort((a, b) {
+        final dateOrder = (a['created_at'] as Timestamp).compareTo(
+          b['created_at'] as Timestamp,
+        );
+        if (dateOrder != 0) return dateOrder;
+        return (a['__id'] as String).compareTo(b['__id'] as String);
+      });
 
     await _runWriteGuard(() async {
       final db = FirebaseFirestore.instance;
-      for (final raw in documents) {
+      for (final raw in eligibleDocuments) {
         final txId = (raw['__id'] as String?)?.trim() ?? '';
-        final rawRouteId = (raw['route_id'] as String?)?.trim() ?? '';
-        final createdBy = (raw['created_by'] as String?)?.trim() ?? '';
         final shopId = (raw['shop_id'] as String?)?.trim() ?? '';
-        final type = (raw['type'] as String?)?.trim() ?? '';
-        final amount = (raw['amount'] as num?)?.toDouble() ?? 0;
-        if (txId.isEmpty ||
-            rawRouteId != normalizedRouteId ||
-            createdBy != user.id ||
-            shopId.isEmpty ||
-            (type != TransactionModel.typeCashIn &&
-                type != TransactionModel.typeCashOut) ||
-            amount <= 0 ||
-            !TenantScope.matchesTenant(raw, tenantId)) {
-          continue;
-        }
-
         final txRef = db.collection(Collections.transactions).doc(txId);
         final shopRef = db.collection(Collections.customers).doc(shopId);
         final imported = await db.runTransaction<bool>((transaction) async {
@@ -641,23 +649,32 @@ class TransactionNotifier extends AsyncNotifier<void> {
           if (!shop.exists ||
               shopData == null ||
               !TenantScope.matchesTenant(shopData, tenantId) ||
-              shopData['route_id'] != normalizedRouteId) {
+              shopData['route_id'] != normalizedRouteId ||
+              shopData['balance'] is! num) {
             return false;
           }
           final model = TransactionModel.fromJson(raw, txId);
+          final lastTransactionAt = shopData['last_transaction_at'];
           transaction.set(txRef, {
             ...model.toJson(),
+            'customer_id': model.shopId,
             'tenant_id': tenantId,
             'deleted': false,
           });
-          transaction.update(shopRef, {
+          final shopUpdate = <String, dynamic>{
             'balance': FieldValue.increment(model.balanceImpact),
             'updated_at': Timestamp.now(),
-            'last_transaction_at': model.createdAt,
-            'last_transaction_type': model.type,
-            'last_transaction_amount': model.amount,
-            'last_transaction_id': txId,
-          });
+          };
+          if (lastTransactionAt is! Timestamp ||
+              lastTransactionAt.compareTo(model.createdAt) <= 0) {
+            shopUpdate.addAll({
+              'last_transaction_at': model.createdAt,
+              'last_transaction_type': model.type,
+              'last_transaction_amount': model.amount,
+              'last_transaction_id': txId,
+            });
+          }
+          transaction.update(shopRef, shopUpdate);
           return true;
         });
         if (imported) restored++;

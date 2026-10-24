@@ -19,6 +19,30 @@ void main() {
       expect(bytes, isNotEmpty);
     });
 
+    test('preserves Arabic and Urdu text in an RTL worksheet', () {
+      final bytes = buildStyledExcelBytes(
+        sheetName: 'تقرير الحساب',
+        headers: const ['المتجر', 'دکان'],
+        rows: const [
+          ['شركة الأحذية', 'یہ اردو رپورٹ ٹ ڈ ڑ ں ھ ے'],
+        ],
+        isRtl: true,
+      );
+
+      final archive = ZipDecoder().decodeBytes(bytes!);
+      final sheet = utf8.decode(
+        archive.findFile('xl/worksheets/sheet1.xml')!.content as List<int>,
+      );
+      final workbook = utf8.decode(
+        archive.findFile('xl/workbook.xml')!.content as List<int>,
+      );
+
+      expect(sheet, contains('rightToLeft="1"'));
+      expect(sheet, contains('شركة الأحذية'));
+      expect(sheet, contains('یہ اردو رپورٹ ٹ ڈ ڑ ں ھ ے'));
+      expect(workbook, contains('تقرير الحساب'));
+    });
+
     test('guards against formula injection after trimming leading spaces', () {
       final bytes = buildStyledExcelBytes(
         sheetName: 'Audit',

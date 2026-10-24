@@ -1,137 +1,82 @@
 ---
-applyTo: "app/lib/**/*.dart"
+description: "Use for ShoesERP go_router, app-shell navigation, form entry, save feedback, and return behavior."
+applyTo: "app/lib/core/router/**/*.dart,app/lib/widgets/app_shell.dart,app/lib/screens/**/*.dart"
 ---
 
-# go_router Navigation Rules: Shell vs Form Screens
+# go_router Navigation and Form Rules
 
-## Rule: `context.push()` for all form/detail destinations
+The registered route and redirect source is
+`app/lib/core/router/app_router.dart`; shell navigation is in
+`app/lib/widgets/app_shell.dart`. Read both before changing route behavior.
+Follow `.github/instructions/frontend-design-system.instructions.md` for shared
+visual and accessibility standards.
 
-Form and detail screens (create, edit) MUST be opened with `context.push()`.
-**Never** use `context.go()` to navigate to a form screen.
+## Navigation history
 
-### Why
+Choose `context.go()`, `context.push()`, or `context.pop()` from the intended
+route history and entrypoint:
 
-`context.go()` **replaces** the entire GoRouter navigation stack.
-After `context.go('/routes/new')`, `GoRouter.canPop()` returns `false`.
-In go_router 14+, calling `context.pop()` with an empty stack throws
-`GoException: "pop called with no routes on stack"`.
-This exception is NOT a `FirebaseException`, so `AppErrorMapper.key()`
-returns `err_unknown` → l10n: **"Something went wrong. Please try again."**
-The user sees an error SnackBar even though the Firestore write succeeded.
+| Intent | Typical choice |
+| --- | --- |
+| Switch a top-level shell destination | `context.go()` |
+| Open a detail/form flow that should return to its caller | `context.push()` |
+| Return to the expected parent after success/cancel | `context.pop()` when the route is on the stack |
+| Open a screen from a direct link or replace an obsolete location | Follow the actual router and preserve any required return context |
 
-### Correct pattern
+These are not blanket rules. Quick actions, deep links, and nested routes can
+have different history. Never remove back-context or change a destination
+without checking every caller.
 
-```dart
+## Save and navigation feedback
 
-// ✅ CORRECT — form screens (create / edit)
-context.push('/routes/new');
-context.push('/routes/$id/edit');
-context.push('/shops/new');
-context.push('/shops/$id/edit');
-context.push('/products/new');
-context.push('/products/$id/edit');
-context.push('/products/$id/variants/new');
-context.push('/products/$id/variants/$vid/edit');
-
-// ✅ CORRECT — shell-level tab/section navigation
-context.go('/');
-context.go('/routes');
-context.go('/shops');
-context.go('/products');
-context.go('/inventory');
-context.go('/profile');
-
-```
-
-### Rule of thumb
-
-| Destination type | Method |
-
-|---|---|
-
-| Top-level shell tab (bottom nav / drawer) | `context.go()` |
-
-| Form screen (create / edit) | `context.push()` |
-
-| Detail screen reached from a list | `context.push()` |
-
-## Rule: `context.pop()` OUTSIDE the try-catch in form `_save()` methods
-
-All form `_save()` methods must use the `saved` flag pattern so that a
-navigation exception cannot produce a false error SnackBar:
+Keep the provider write and route transition separate. A navigation exception
+must not be reported as a failed Firestore write or show a false error after a
+successful save.
 
 ```dart
-
 Future<void> _save() async {
-  // ...validate...
+  if (!_formKey.currentState!.validate()) return;
   setState(() => _saving = true);
-  bool saved = false;
+  var saved = false;
   try {
-    await providerNotifier.create(data); // or update
+    await ref.read(itemNotifierProvider.notifier).save(item);
     saved = true;
-  } catch (e) {
+  } catch (error) {
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        errorSnackBar(tr(AppErrorMapper.key(error), ref)),
+      );
     }
   } finally {
     if (mounted) setState(() => _saving = false);
   }
-  // SUCCESS PATH — outside try-catch
-  // A navigation exception here will NOT show "Something went wrong".
-  if (saved && mounted) {
-    HapticFeedback.mediumImpact();
-    _isDirty = false;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
+
+  if (!saved || !mounted) return;
+  _isDirty = false;
+  ScaffoldMessenger.of(context).showSnackBar(
+    successSnackBar(tr('saved_successfully', ref)),
+  );
+  if (context.canPop()) {
     context.pop();
   }
 }
-
 ```
 
-**Anti-pattern** — DO NOT put `context.pop()` inside `try`:
+Use an existing project helper if available. For a direct-entry form with no
+caller route, choose an explicit fallback that matches that entrypoint; do not
+silently send every form to the dashboard.
 
-```dart
+## Edit form loading
 
-// ❌ WRONG — pop inside try-catch
-try {
-  await provider.save();
-  if (mounted) {
-    showSnackBar(success);
-    context.pop(); // GoException caught here → shows error SnackBar
-  }
-} catch (e) {
-  showSnackBar(error); // fires even after successful save!
-}
+- Keep edit fields and submit disabled until the requested record has loaded.
+- Show a mapped loading/error/retry state; do not let a failed query look like
+  an empty record or a valid set of defaults.
+- Do not overwrite user input if the record arrives after interaction begins.
+- Preserve route/role validation in the screen and notifier.
 
-```
+## Quick actions and tests
 
-## Callers: app_shell.dart FAB
-
-The FAB bottom sheet in `app_shell.dart` uses `action.route` from the
-`_fabActions()` map. **This action tap MUST use `context.push()`**, not
-`context.go()`, because all FAB routes are form screens:
-
-```dart
-
-onTap: () {
-  Navigator.pop(ctx);
-  context.push(action.route); // ← push, not go
-},
-
-```
-
-## Enforcement
-
-Add to the inline audit pass whenever touching any screen that opens a form:
-
-```bash
-
-# No context.go() for form routes
-
-grep -rn "context\.go.*/(new|edit)" app/lib/ | grep -v "// ok"
-
-```
-
-Expected output: zero matches.
+For `AppShell` quick actions, confirm whether the action should push or replace
+the current location and test its back behavior. Check that save/cancel,
+unsaved-change confirmation, deep links, and role redirects still behave as
+intended. Do not use a grep-only `go`/`push` rule as proof of correct navigation.

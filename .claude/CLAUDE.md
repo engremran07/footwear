@@ -49,6 +49,12 @@ whenever fixing any issue. Catch and fix culprits found while reading touched fi
 
 ## Current Guidance
 
+- For Flutter UI work, follow
+  `.github/instructions/frontend-design-system.instructions.md`; for
+  cross-screen work, start with
+  `.claude/skills/flutter-frontend-modernization/SKILL.md`. Existing
+  navigation, form, accessibility/RTL, performance, testing, and export skills
+  remain specialists rather than alternate design-system authorities.
 - `StateProvider` is banned in Riverpod 3; use `NotifierProvider` or another
   supported provider type.
 - Keep Markdown lint and Flutter analysis clean for the files and checks
@@ -61,6 +67,10 @@ whenever fixing any issue. Catch and fix culprits found while reading touched fi
 - Workspace admins and sellers retain their scoped CRUD capabilities. Firestore
   Rules enforce active-tenant access, tenant ownership, and linked financial
   writes; use the emulator suite when changing Rules.
+- Sellers can save encrypted assigned-route backups to phone storage and
+  restore only their own unlinked cash ledger rows with atomic shop-balance
+  reconciliation. Uploading a saved file to Drive is an explicit online action,
+  not background synchronization.
 - A Rules Emulator result is not production deployment evidence.
 - Run only the tests, builds, and operational steps relevant to the task.
   Production deploys, production data changes, release builds, device installs,

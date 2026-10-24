@@ -11,6 +11,20 @@ import '../../models/transaction_model.dart';
 import '../../models/invoice_model.dart';
 import '../../models/settings_model.dart';
 
+const _arabicShapingEnabled = bool.fromEnvironment(
+  'use_arabic',
+  defaultValue: false,
+);
+
+class PdfExportConfigurationException implements Exception {
+  const PdfExportConfigurationException(this.code);
+
+  final String code;
+
+  @override
+  String toString() => code;
+}
+
 /// Runs [computation] in an isolate on native platforms,
 /// or inline on web (which doesn't support Isolate.run).
 Future<R> _pdfCompute<R>(FutureOr<R> Function() computation) {
@@ -27,6 +41,9 @@ Completer<void>? _fontBytesLoader;
 /// Loads font byte data from assets (main-isolate only).
 /// Must be called before any PDF export function.
 Future<void> _ensureFontBytes() async {
+  if (!_arabicShapingEnabled) {
+    throw const PdfExportConfigurationException('pdf_arabic_shaping_disabled');
+  }
   if (_arabicFontBytes != null && _urduFontBytes != null) return;
   if (_fontBytesLoader != null) {
     await _fontBytesLoader!.future;
@@ -1041,12 +1058,33 @@ class SellerReportShop {
   final int totalPairsSold;
   final double totalRevenue;
   final double outstandingBalance;
+  final String currency;
+
   const SellerReportShop({
     required this.name,
     required this.totalPairsSold,
     required this.totalRevenue,
     required this.outstandingBalance,
+    this.currency = 'SAR',
   });
+}
+
+typedef SellerReportCurrencyTotals = ({double revenue, double outstanding});
+
+Map<String, SellerReportCurrencyTotals> sellerReportTotalsByCurrency(
+  List<SellerReportShop> shops,
+) {
+  final totals = <String, SellerReportCurrencyTotals>{};
+  for (final shop in shops) {
+    final normalizedCurrency = shop.currency.trim().toUpperCase();
+    final currency = normalizedCurrency.isEmpty ? 'SAR' : normalizedCurrency;
+    final current = totals[currency] ?? (revenue: 0.0, outstanding: 0.0);
+    totals[currency] = (
+      revenue: current.revenue + shop.totalRevenue,
+      outstanding: current.outstanding + shop.outstandingBalance,
+    );
+  }
+  return totals;
 }
 
 /// Builds a seller summary report PDF.
@@ -1083,12 +1121,9 @@ Future<Uint8List> buildPdfSellerReport({
       PdfColor color = PdfColors.black,
     }) => lc.ts(size: size, fw: fw, color: color);
 
-    double totalRevenue = 0;
-    double totalOutstanding = 0;
+    final currencyTotals = sellerReportTotalsByCurrency(shops);
     int totalPairs = 0;
     for (final c in shops) {
-      totalRevenue += c.totalRevenue;
-      totalOutstanding += c.outstandingBalance;
       totalPairs += c.totalPairsSold;
     }
 
@@ -1253,8 +1288,14 @@ Future<Uint8List> buildPdfSellerReport({
                   (c) => [
                     _s(c.name),
                     c.totalPairsSold.toString(),
-                    _fmtAmt(c.totalRevenue),
-                    _fmtAmt(c.outstandingBalance),
+                    _fmtAmtC(
+                      c.totalRevenue,
+                      pdfCurrencyLabel(locale, c.currency),
+                    ),
+                    _fmtAmtC(
+                      c.outstandingBalance,
+                      pdfCurrencyLabel(locale, c.currency),
+                    ),
                   ],
                 )
                 .toList(),
@@ -1294,30 +1335,41 @@ Future<Uint8List> buildPdfSellerReport({
               border: pw.Border.all(color: PdfColors.blue200, width: 0.8),
               borderRadius: pw.BorderRadius.circular(4),
             ),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            child: pw.Column(
+              crossAxisAlignment: isRtl
+                  ? pw.CrossAxisAlignment.end
+                  : pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(
                   '${_pdfLabel(labels, 'total', locale)} ${_pdfLabel(labels, 'stock_sold', locale)}: $totalPairs ${_pdfLabel(labels, 'pairs', locale)}',
                   style: ts(size: 9, fw: pw.FontWeight.bold),
                   textDirection: dir,
                 ),
-                pw.Text(
-                  '${_pdfLabel(labels, 'revenue', locale)}: ${_fmtAmt(totalRevenue)}',
-                  style: ts(size: 9, fw: pw.FontWeight.bold),
-                  textDirection: dir,
-                ),
-                pw.Text(
-                  '${_pdfLabel(labels, 'outstanding', locale)}: ${_fmtAmt(totalOutstanding)}',
-                  style: ts(
-                    size: 9,
-                    fw: pw.FontWeight.bold,
-                    color: totalOutstanding > 0
-                        ? PdfColors.red700
-                        : PdfColors.green700,
-                  ),
-                  textDirection: dir,
-                ),
+                ...currencyTotals.entries.map((entry) {
+                  final currencyLabel = pdfCurrencyLabel(locale, entry.key);
+                  final outstandingColor = entry.value.outstanding > 0
+                      ? PdfColors.red700
+                      : PdfColors.green700;
+                  return pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                        '$currencyLabel ${_pdfLabel(labels, 'revenue', locale)}: ${_fmtAmt(entry.value.revenue)}',
+                        style: ts(size: 9, fw: pw.FontWeight.bold),
+                        textDirection: dir,
+                      ),
+                      pw.Text(
+                        '$currencyLabel ${_pdfLabel(labels, 'outstanding', locale)}: ${_fmtAmt(entry.value.outstanding)}',
+                        style: ts(
+                          size: 9,
+                          fw: pw.FontWeight.bold,
+                          color: outstandingColor,
+                        ),
+                        textDirection: dir,
+                      ),
+                    ],
+                  );
+                }),
               ],
             ),
           ),

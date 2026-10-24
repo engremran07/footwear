@@ -1,7 +1,7 @@
 # ShoesERP Regression Registry
 
 **Maintained by:** Autonomous AI agent system (88-agent governance pack v2.0)  
-**Last updated:** 2026-10-16 — Authentication/session remediation / v3.9.76+702
+**Last updated:** 2026-10-24 — Invoice permission audit / unreleased source
 **Purpose:** Single source of truth for known regressions, deferred risks, and process improvements.
 
 ---
@@ -32,6 +32,9 @@
 | RR-019 | P1-FIXED (unit/Rules validated) | Workspace device pairing | The seller pairing switch gated workspace admins and stranded legacy pending admin devices. | Workspace admins bypass seller approval under shared platform caps and resume eligible pending slots in place; seller approval and self-approval denial remain. APK installed; authenticated approval/sign-in flow remains pending. | v3.9.75+102 |
 | RR-020 | P1-FIXED (unit/Rules validated) | Session renewal/logout | Old revoked records could veto a live installation renewal; logout could select a revoked record instead of active sessions; pending renewal could repeat. | Renewal distinguishes live and revoked-only records, logout batch-revokes matching active sessions, and pending renewal ends the checked UID. Provider/device-history integration and authenticated device flow remain pending. | v3.9.75+102 |
 | RR-021 | P1-FIXED (emulator/deploy validated) | Workspace-admin access policy | A missing `settings/platform_access_policy` document caused admin device registration to fail despite intended 3-device/2-session defaults. | Rules explicitly use defaults for an absent document; the no-policy registration regression passes in the emulator and rules are deployed. | v3.9.75+102 |
+| RR-022 | P0-FIXED (local emulator validated; deployment pending) | Invoice idempotency reads | Invoice and transaction create flows read deterministic/missing IDs inside Firestore transactions, while read Rules dereferenced `resource.data` on missing documents. First-time seller inventory allocation had the same failure. | Missing invoice/transaction reads now require an active concrete tenant and allowed role; selected super-admin support context and tenant activity are enforced. Missing seller inventory is admin-equivalent only. Client-shaped Rules regressions cover missing reads and full sale transactions. | 2026-10-24 |
+| RR-023 | P2-FIXED (local emulator validated; deployment pending) | Invoice Rules expression budget | Seller invoice checks repeated profile, route, and shop lookups; client-shaped transactions exceeded the Rules expression limit. | Seller invoice scope now evaluates a tenant/route/shop authorization helper once; invoice-linked transaction creation avoids the redundant shop-route lookup while retaining invoice linkage. Complete Rules Emulator suite: 128 passing. | 2026-10-24 |
+| RR-024 | P2-FIXED (widget/l10n tests; release pending) | Admin invoice stock empty state | Admin invoice entry required inventory allocated to the admin's own seller ID but showed only a generic empty message. | Localized guidance explains warehouse allocation and the workspace-enabled non-stock option. | 2026-10-24 |
 
 ---
 

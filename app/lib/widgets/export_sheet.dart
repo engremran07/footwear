@@ -201,6 +201,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
         return await widget.pdfBytesBuilder!();
       } catch (e, stack) {
         debugPrint('[ExportSheet] custom PDF build failed: $e\n$stack');
+        if (e is PdfExportConfigurationException) rethrow;
         throw Exception('pdf export failed');
       }
     }
@@ -217,6 +218,7 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
       );
     } catch (e, stack) {
       debugPrint('[ExportSheet] PDF build failed: $e\n$stack');
+      if (e is PdfExportConfigurationException) rethrow;
       throw Exception('pdf export failed');
     }
   }

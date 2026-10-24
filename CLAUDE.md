@@ -1,6 +1,6 @@
 ﻿# ShoesERP AI Coding Rules (CLAUDE.md)
 
-Last updated: 2026-10-22
+Last updated: 2026-10-24
 
 ## Runtime Override (Always First)
 
@@ -62,7 +62,12 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
     Use `trRead()` with locale for all export string literals — no hardcoded English.
     Every Flutter test, run, and build that can generate PDFs must pass
     `--dart-define=use_arabic=true`; without it, the PDF package reorders RTL
-    text but does not shape Arabic-script letters.
+    text but does not shape Arabic-script letters. The shared font loader
+    fails closed with a localized configuration error if the flag is missing.
+    PDFs embed Noto Sans Arabic for Arabic and Urdu; the renderer does not
+    provide full Nastaliq OpenType shaping, so Noto Nastaliq Urdu is UI-only.
+    PNG, print, and PDF share the generated PDF bytes. XLSX preserves Unicode
+    and RTL sheet direction but does not embed a font.
 19. Every `ExportSheet.show()` call MUST provide `pdfBytesBuilder` when the data is a
     ledger, account statement, or seller report. The generic `buildPdfTable()` fallback
     is only acceptable for simple flat tables (inventory list, shops list). If the export
@@ -86,6 +91,10 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
   `GOOGLE_DRIVE_SERVER_CLIENT_ID`. Sellers may restore only their own records
   for currently assigned routes. Super admins must select a concrete tenant
   before backup or restore. Never silently fall back to a global snapshot.
+  Sellers may save encrypted route archives to phone storage, restore only
+  their own unlinked cash rows with atomic shop-balance reconciliation, and
+  explicitly upload an existing archive to Drive when online. This is a
+  user-triggered retry, not background synchronization.
 23. Never store or ship service-account credentials. Arbitrary-user Auth administration belongs in a trusted backend; the client may not create/promote super-admins or mutate another user's Auth credentials.
 24. Platform super-admins may read workspace metadata globally, but every business-data operation must be scoped to the selected workspace and an auditable support reason. No selection means no business records.
 25. Super-admin business-context selection and exit events are append-only in `platform_access_logs`. Never create/promote platform super-admin accounts or mutate another user's Auth credentials from client code. Never store service-account credentials in Firestore, backups, APKs, or web builds.
@@ -98,6 +107,26 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 32. Export queries must cursor-page to exhaustion. Tenant-admin backup restore is upsert-only and never prunes; selected super-admin restore upserts before pruning obsolete records in the active tenant. Reject legacy plaintext backup archives.
 33. Keep users signed in through transient token-refresh/network failures. Firebase initialization failure must render a retry state and must not mount the normal app shell.
 34. Copilot chat history and request IDs do not merge across GitHub identities through repository changes. Preserve durable decisions, pending tasks, audit IDs, and verification evidence in `SESSION_LOG.md` and the current audit report. On an account/profile switch, read those plus `git status`/`git diff`; never store credentials or full chat transcripts in the repository or claim separate accounts were synchronized.
+35. Workspace-root hard deletion is denied; use the selected-workspace archive/restore lifecycle. Database flush/reset actions and legacy plaintext whole-project export, whole-collection restore, and direct-balance reset scripts must remain fail-closed until a transactional, audited maintenance path preserves tenant, ledger, and inventory invariants.
+36. Missing-document Rules reads must be narrowly scoped to an active profile and concrete active tenant; super-admins additionally require selected-workspace support context. Only admin-equivalent users may probe missing seller inventory, and only super-admins may probe settings for a tenant that does not yet exist. Cover client reads and their complete transaction writes in emulator regressions; do not use a blanket `resource == null` allowance.
+
+## Frontend UI Governance
+
+Use `.github/instructions/frontend-design-system.instructions.md` as the
+authoritative Flutter UI contract and
+`.claude/skills/flutter-frontend-modernization/SKILL.md` to coordinate broad
+screen work. Extend the existing `AppTokens`, `AppTheme`, `AppFonts`,
+`AppAnimations`, and shared widgets; do not create a parallel design system.
+Inspect the actual router and shell before changing navigation. Preserve
+authentication, tenant scope, provider write boundaries, financial and stock
+semantics, and role guards. Do not assume a user-visible change authorizes a
+version bump, build, deployment, commit, or push.
+Shared interactive controls use `AppTokens.minTouchTarget` where applicable.
+Optional shared-component transitions honor `MediaQuery.disableAnimations`
+through `AppMotion`; custom GoRouter fade/slide transitions must return their
+child without optional effects when reduced motion is enabled. Visible-value
+semantics use the active locale. Widget tests must cover these contracts,
+relevant theme contrast, and RTL direction where the component supports it.
 
 ## Financial Pathways (never mix these)
 
@@ -157,11 +186,16 @@ User action → Screen → Provider notifier (InvoiceNotifier / TransactionNotif
 or `invoices` WITHOUT also updating `shop.balance` will produce stale UI across
 all screens instantly.
 
-**Dev data flush:** If you delete transactions/invoices manually (e.g. in dev),
-always follow with `node dev_reset.js` from the repo root to reset:
-
-- All shop `balance` fields → `0.0`
-- `settings/global.last_invoice_number` → `0`
+**Database reset and workspace lifecycle:** Bulk client flush/reset actions and
+the legacy plaintext backup/restore and direct-balance reset scripts are
+disabled. Multi-batch client cleanup can partially delete linked records or
+violate the atomic shop-balance ledger contract. Use encrypted, workspace-
+scoped app backups for supported restore workflows. Workspace lifecycle is
+archive/restore only; Firestore Rules deny tenant-root hard deletion. A
+selected platform super-admin may select an existing inactive workspace with
+an audited reason to restore it. Lifecycle updates change only tenant status
+fields; member profiles remain unchanged and business Rules stay closed until
+the tenant is active.
 
 ## Failure Playbooks
 
@@ -269,6 +303,7 @@ Never keep ambiguity-driven workaround code without explicit justification.
 | `flutter build web --release` exits 1 with no Error lines | PowerShell `NativeCommandError` from Wasm dry-run stderr — build IS succeeding | Check `$LASTEXITCODE` explicitly; exit 0 = real success |
 | `StateProvider<T>` in any `.dart` file | Riverpod 3 removed `StateProvider` — instant compile failure on upgrade | Replace with `NotifierProvider<T, S>` + `Notifier` subclass — see Chain 6 |
 | `ExportSheet.show(` without `pdfBytesBuilder` on ledger data | PDF export fails or produces flat table instead of ledger | Always pass `pdfBytesBuilder: () => buildPdfLedger(...)` for ledger exports |
+| PDF generation without `--dart-define=use_arabic=true` | The PDF package can bidi-reorder Arabic/Urdu without shaping | Keep the flag on every PDF-capable action; the shared font loader rejects unshaped output |
 | `labels['key'] ?? 'English Fallback'` in PDF builders | Hardcoded English bypasses i18n | Use `trRead()` with locale; `??` fallback must be `'—'` or localized key |
 | Missing `ChangelogVersion` entry after version bump | Users see stale "What's New" content | Add trilingual entry to `changelog_data.dart` on every version bump |
 | `ref.read(authUserProvider).value` in async/export context | Null during stream loading → empty data or crash | `await ref.read(authUserProvider.future)` in all async/provider contexts |
@@ -368,6 +403,25 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- Unreleased 2026-10-24 reduced-motion hardening: all shared `AppAnimations`
+  presets bypass nonessential effects when `MediaQuery.disableAnimations` is
+  enabled. `PressableWidget` remains tappable and semantically actionable with
+  press-scale feedback suppressed. Both custom router transitions now bypass
+  fade/scale or slide effects under the same preference. Router regressions:
+  `00:05 +6: All tests passed!`; full Flutter suite:
+  `01:01 +589: All tests passed!`; both analyzers clean. No business or
+  authorization behavior changed.
+- Unreleased 2026-10-24 login responsive hardening: the narrow login content
+  width is capped to the available viewport as well as its 420-pixel maximum,
+  preventing invalid constraints at intermediate widths. Regression coverage
+  spans six widths and EN/AR/UR; the full Flutter suite and both analyzers pass.
+  A public local-browser render was checked; authenticated role/theme and
+  device acceptance remain pending.
+- Unreleased 2026-10-24 invoice-permission audit: missing invoice/transaction reads now require active tenant-scoped access; first-time seller-inventory reads are admin-equivalent only; super-admin missing-settings reads are limited to workspace creation before the tenant document exists. Seller invoice Rules reduce redundant route/shop authorization work to keep real invoice transactions within the expression budget. Admins see localized guidance when their own inventory is empty. Local Rules Emulator: 128 passing; focused invoice widget tests: 2 passing. Not deployed or released.
+- Unreleased v3.9.82+708 source inventory UI work: stock add/transfer choices distinguish loading, empty, and mapped error/retry states; the inventory screen waits for workspace carton settings rather than defaulting to 12 pairs during settings failures. Provider write and stock-audit behavior are unchanged.
+- Unreleased v3.9.82+708 source frontend work: route, shop, product, and variant edit forms gate inputs and save until the active profile and matching record load, with mapped retry/missing-record states and prefilled existing values. Provider tenant/role checks and write behavior are unchanged; no release build or deployment was performed.
+- Unreleased 2026-10-23 frontend sweep: invoice totals are currency-grouped; currency-filtered shops wait for route scope; invoice-profile failure, profile dirty state, and notification mark-all progress/errors are explicit; unlinked activity rows hide misleading navigation affordances; stat-card entrance motion respects reduced motion. Report account statements now use their shop route currency; seller report rows and PDF totals preserve currency groups across routes. The 32-route register also dispositions report-export feedback, user route options, backup/flush workspace states, tenant-admin presentation, and shop-form route-query retry. Focused regressions and both analyzers pass; the full current suite and authenticated rendered acceptance remain pending. No release operation was performed.
+- Unreleased local RTL export hardening: shared PDF generation now fails closed when Arabic shaping is not enabled; tests verify embedded Noto Sans Arabic, Urdu-specific characters, and XLSX RTL/Unicode content. PDFs remain Naskh-style for Urdu; full Nastaliq shaping is unsupported by the current renderer. No release build or deployment was performed.
 - v3.9.81+707 (2026-10-22): Removed app-managed device pairing and custom session approvals while retaining Firebase Auth, tenant-scoped workspace-admin CRUD/sorting, selected-super-admin support context, and financial protections. Shop opening balances, standalone ledger-to-shop batch links, and inactive-tenant access are covered by local Rules Emulator regressions. Release and deployment evidence is recorded in SESSION_LOG.md.
 - v3.9.80+706 (2026-10-18): Workspace admins can register unlimited paired devices while keeping a shared bounded active-session policy; tenant-scoped paired-device registry includes account email/name and device/app/OS metadata with 200-record read caps and duplicate suppression. Pairing-off pending seller registrations can activate. Workspace admins can audited-soft-delete standalone cash entries with an atomic balance reversal; hard transaction deletion and invoice-linked deletion are denied. Verification and APK artifact details are recorded after release checks.
 - v3.9.79+705 (2026-10-17): Workspace creation provisions its tenant-scoped owner account; workspace administrators can disable sellers with atomic active-session revocation and manage registered device/session access. Device/session slots remain per user, and client session enforcement is not a Firestore authorization boundary. PWA icon cache keys match this release.

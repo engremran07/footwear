@@ -1,26 +1,50 @@
 # ShoesERP System Deep Dive
 
-Last updated: 2026-10-22
+Last updated: 2026-10-24
 
 ## Backup and Restore
 
-The backup screen delegates persistence and authorization to `DatabaseBackupNotifier`. It exposes encrypted file export separately from Google Drive upload, shows destination-specific timestamps, and keeps automatic backups limited to configured Android Drive access. A Drive upload uses the generated encrypted bytes directly and does not create a second local archive.
+The backup screen delegates persistence and authorization to `DatabaseBackupNotifier`. It creates encrypted archives, saves them through the system file picker for phone storage, and supports later import from the selected file. A saved archive can be explicitly uploaded to Google Drive when online and Drive OAuth is configured; this action is user-triggered and is not background synchronization. The app also maintains its private local archive. Destination-specific timestamps are shown.
 
-Backups are scoped to the signed-in user's workspace and role. Tenant administrators merge records into their own workspace; only a platform administrator with an active support workspace may choose replacement and prune records in that selected workspace. Sellers are restricted to their assigned-route data and cannot start workspace backups. Restore previews and confirmation copy must describe the operation the selected role can actually perform.
+Backups are scoped to the signed-in user's workspace and role. Tenant administrators merge records into their own workspace; only a platform administrator with an active support workspace may choose replacement and prune records in that selected workspace. Seller archives contain currently assigned-route data. Seller restore accepts only the seller's own eligible, unlinked cash-in/cash-out rows; each transaction and matching same-route shop-balance delta are written in one Firestore transaction. It never restores seller invoice, inventory, or another seller's ledger records. Restore previews and confirmation copy must describe the operation the selected role can actually perform.
 
 The restore preview shows one warning selected by the effective restore mode: merge keeps records absent from the archive, while replacement may prune within the selected support workspace. Restore re-authentication is owned by `AuthNotifier` and shared with destructive flush confirmation; backup restore uses backup-specific localized prompt text.
 
-Local encrypted archives are listed through the shared restore picker and can be deleted after confirmation. Passphrases are required for encrypted backup creation and restore; creation asks for confirmation to catch entry mistakes. Errors from preference, file-list, export, Drive, and restore operations are surfaced through the shared error mapper.
+App-private encrypted archives are listed through the shared restore picker and can be deleted after confirmation. Phone files use the system picker for save/import. Passphrases are required for encrypted backup creation and restore; creation asks for confirmation to catch entry mistakes. Archive checksum, workspace, creator, and current seller-route scope are validated before restore or Drive upload. Errors from preference, file-list, export, Drive, and restore operations are surfaced through the shared error mapper.
 
 ## Workspace Archival
 
-Workspace archival is an ordered provider operation. It deactivates member profiles before recording the workspace's archived state. Business Rules require both an active profile and an active tenant document, so ordinary reads and writes are denied if either is inactive. A selected super-admin can reactivate an inactive workspace only through the explicit restoration path; ordinary business access stays denied until restoration completes. The emulator suite covers an inactive tenant while member profiles remain active.
+Workspace archival and restoration are selected-super-admin provider operations. The tenant lifecycle update does not change member profiles; Firestore Rules require both an active profile and active tenant, so business reads and writes stop while the tenant is archived and resume only after restoration. A super-admin may select an existing inactive tenant with a reason of at least 10 characters; selection is logged in `platform_access_logs`, and the selected context remains subject to the eight-hour Rules limit. The workspace screen requires explicit confirmation before archive or restore. Emulator tests cover inactive selection, restoration, and denial of member business access before restoration.
+
+## Database Flush and Reset
+
+The client flush/reset screen and its provider fail closed. Deleting multiple
+collections in sequential client batches can partially complete, leave
+references dangling, or violate the requirement that ledger rows and
+`shop.balance` changes are linked atomically. The legacy plaintext project
+export, destructive whole-collection restore, and direct-balance reset scripts
+also fail closed. The supported recovery path is the encrypted,
+workspace-scoped app backup; tenant administrators merge without pruning, and
+selected super-admins may replace only the active support workspace.
+
+Tenant roots cannot be hard-deleted by Firestore Rules. Archive/restore is the
+workspace lifecycle path and preserves the tenant anchor for its business
+records. A general-purpose destructive maintenance workflow requires separate
+transactional design and operational authorization; it is not provided by the
+client.
 
 ## Authentication and Workspace Access
 
 Firebase Authentication is the app's only sign-in mechanism. After Firebase Auth succeeds, the app loads the matching user profile and validates that it is active, has a supported role, and belongs to a concrete tenant unless it is a platform super-admin. The router and role-scoped providers wait for profile state and preserve mapped errors; no device registration, pairing approval, custom access slot, renewal timer, or app-managed session gate participates in sign-in.
 
 Firestore Rules enforce active-profile status, active-tenant status, role permissions, and tenant ownership on business documents. A platform super-admin may see workspace metadata globally, but business data requires a selected workspace and a support reason; selection and exit are recorded in append-only `platform_access_logs`, and Rules enforce the eight-hour support-context limit. This audited workspace context is distinct from the removed app-managed access controls.
+
+An inactive workspace can be selected to establish audited support context for
+its lifecycle restoration path. The client permits selection when the tenant
+document exists; Rules continue to deny ordinary business reads and writes
+until the tenant is restored. The tenant-management screen offers confirmed
+archive/restore actions only for the currently selected workspace and never
+changes member profile activity.
 
 ## Invoice Modes and Workspace Headers
 
@@ -39,6 +63,17 @@ through invoice references and aggregate shop-balance validation; seller
 invoice transaction Rules avoid redundant per-row delta evaluation to stay
 within Firestore's expression budget.
 
+Invoice, transaction, and seller-inventory client transactions may read
+missing documents before creating or allocating them. Firestore Rules allow
+these missing reads only within an active concrete tenant and the appropriate
+role scope; super-admin reads require valid selected-workspace support context.
+Missing seller-inventory reads are admin-equivalent only. During workspace
+creation, a super-admin may read a missing settings document only while its
+tenant document is also absent. Existing documents continue to use their
+ordinary tenant/route authorization. The seller invoice path reuses scoped
+profile/shop validation and keeps the complete atomic sale transaction within
+the Rules expression budget.
+
 Workspace administrators configure English, Arabic, and Urdu invoice names, subtitles, addresses, contact and registration details, template, accent color, and visible fields. New invoices store a header snapshot, and seller-created snapshots are checked against the workspace settings. PDF generation uses the invoice snapshot so later branding edits do not alter existing documents. Voiding a non-stock sale does not restore inventory.
 
 ## Release Surfaces
@@ -51,9 +86,92 @@ Workspace creation does not subscribe to a global user list. Editing an existing
 
 New workspace setup creates a tenant-scoped owner account after the workspace exists, then assigns that active `tenant_admin` as owner. Workspace user deactivation updates the active profile status; it does not manage custom device or session records. Route and shop updates remain guarded and tenant-scoped, and linked shop/route counts are reconciled atomically. Route, shop, and transaction sorting remains in the existing providers and screens.
 
+## Inventory Selection and Units
+
+The inventory screen reads the active workspace settings before rendering stock
+quantity actions. If settings are loading, the screen remains in its loading
+state; if settings fail, it shows the mapped retry state instead of silently
+assuming 12 pairs per carton. Add-stock and warehouse-transfer dialogs receive
+the loaded carton size and show localized loading, empty, or mapped retry
+feedback for product, variant, and seller selectors. Stock adjustments,
+transfers, and inventory audit writes remain in the existing provider
+notifiers.
+
+## Frontend Screen-State Sweep
+
+The route register maps all 32 registered route patterns and the principal
+role-filtered shell and contextual entry points. The latest unreleased UI pass
+groups invoice summary totals by currency, withholds currency-filtered shop
+rows until route scope is known, distinguishes invoice-profile loading/error
+states, resets profile dirty state when the saved name is restored, and gives
+notification bulk writes progress and mapped failure feedback. Feed rows
+without a shop target do not show a navigation chevron, and stat-card entrance
+motion is disabled when reduced motion is requested. The 2026-10-24 login
+follow-up caps the narrow form width to the available viewport, preventing
+invalid minimum/maximum constraints at intermediate window sizes; widget
+regressions cover six widths and EN/AR/UR.
+
+These changes leave provider writes, tenant scope, authorization, inventory
+accounting, and invoice calculations unchanged. The complete Flutter suite
+reported `01:20 +559: All tests passed!`; Flutter library and test analyzers
+reported no issues. A subsequent targeted screen-state review covered
+report-export busy/error handling, user route-option failures, backup/flush
+workspace states, tenant-admin presentation, and shop-form route-query retry.
+The named findings now have focused widget regressions and source dispositions;
+broader dialog/sheet interactions and rendered browser/device acceptance remain
+open because the user's browser pages were not shared into the session. The
+current full Flutter suite was not rerun after those targeted additions. See
+`docs/frontend/screen-register.md` and
+`docs/frontend/ui-ux-audit-report.md` for the evidence and outstanding scope.
+
+The follow-up multi-currency report review also fixed account-statement
+currency resolution in both report and shop-detail exports. Seller report rows
+now use their transaction route currency, current shop balances use the
+current route currency, and PDF grand totals are grouped by currency rather
+than combining unlike amounts. Admin report route metadata includes inactive
+routes to preserve currency labels for historical transactions.
+
 ## Frontend Audit Evidence
 
 The 2026-10-03 frontend review is recorded in `AUDIT_REPORT_FOOTWEAR_ERP.md`. It is source-led and includes a live Android login capture, but authenticated role flows, theme/locale matrix screenshots, expanded-size visual QA, and profile-mode performance measurements remain pending because the required account password was not entered into the tooling session.
+
+## Shared UI Accessibility Foundation
+
+`AppTokens.minTouchTarget` is the shared 48-logical-pixel target token used by
+the horizontal filter-chip bar. `AppMotion` exposes the `MediaQuery` reduced-
+motion preference for shared components. Empty/error illustrations, stat-card
+value switches and entrances, status-chip transitions, and all shared
+`AppAnimations` presets suppress optional motion when that preference is
+enabled. `PressableWidget` keeps its tap and semantic actions while suppressing
+scale feedback. Balance badge screen-reader labels use the selected locale and
+expose the formatted amount as one semantic value.
+The custom fade/scale and form slide transitions in `app_router.dart` also
+return the route child directly when reduced motion is enabled; normal route
+motion remains active otherwise.
+
+Regression tests cover the filter target under RTL, EN/AR/UR semantics, the
+success/error text-background contrast pairs used by the balance badge, and
+disabled/enabled animation presets, route transitions, and press semantics.
+The complete Flutter suite reports `01:01 +589: All tests passed!`; library
+analysis reports `No issues found! (ran in 102.3s)` and test analysis reports
+`No issues found!`. These results are not a substitute for full-screen reader,
+device, or WCAG conformance evaluation. See
+`docs/frontend/screen-register.md` and
+`docs/frontend/ui-ux-audit-report.md` for screen coverage and remaining checks.
+
+## Edit-Form Loading and Recovery
+
+Route, shop, product, and variant edit forms wait for the authenticated profile
+and the requested record before presenting editable fields or enabling save.
+Provider failures use the shared mapped error state with retry; missing or
+out-of-scope records are not represented as blank editable defaults. Loaded
+route assignments, currencies, and form values are applied before editing.
+The screen-level gate is defense in depth only: provider role/tenant checks
+and Firestore Rules remain the authorization boundary.
+
+Focused widget coverage exercises profile/record loading, provider failure and
+retry, missing records, and existing-value prefill. Browser/device visual
+verification across the theme and locale matrix remains pending.
 
 ## CRUD and Sorting Guarantees
 
@@ -69,4 +187,6 @@ Cash receipts carry a `cash_receipt_sequence` that must equal the `settings/{ten
 
 Invoice PDFs use the captured workspace branding snapshot, localized payment method labels, mode-specific line tables, and `pw.MultiPage` with localized current/total page numbering. Long catalog invoices are covered by a page-count regression.
 
-Arabic and Urdu PDF text requires the `pdf` package's `use_arabic` compile-time option; its default enables bidirectional ordering without Arabic letter shaping. All test, debug, web, and Android build commands therefore pass `--dart-define=use_arabic=true`. PDF-to-image export rasterizes these same generated bytes, so the shaping applies to both the PDF and its PNG pages.
+Arabic and Urdu PDF text requires the `pdf` package's `use_arabic` compile-time option; its default enables bidirectional ordering without Arabic letter shaping. The shared font loader rejects PDF generation with a typed, localized configuration error when that option is absent, so PDF, print, share, and PNG flows cannot silently produce unshaped RTL text. All test, debug, web, and Android build commands pass `--dart-define=use_arabic=true`.
+
+PDFs embed Noto Sans Arabic for both Arabic and Urdu. Urdu output is Naskh-style rather than Nastaliq because the current PDF renderer does not support Nastaliq's complex OpenType shaping. The Flutter UI separately uses Noto Nastaliq Urdu. PNG pages are rasterized from the same PDF bytes; XLSX keeps Unicode text and RTL worksheet direction but relies on the spreadsheet app for font selection and shaping. Automated PDF tests check the embedded font name and Arabic/Urdu text across report builders; pixel-level verification in target browsers, PDF viewers, and printers remains a separate visual QA step.

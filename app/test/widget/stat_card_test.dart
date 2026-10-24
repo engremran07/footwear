@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:footwear_erp/widgets/stat_card.dart';
 
 void main() {
@@ -56,5 +57,35 @@ void main() {
     await tester.pump();
 
     expect(tapped, isTrue);
+  });
+
+  testWidgets('StatCard value transition honors reduced motion', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(disableAnimations: true),
+          child: Scaffold(
+            body: SizedBox(
+              width: 240,
+              height: 140,
+              child: StatCard(
+                title: 'Revenue',
+                value: '1200',
+                icon: Icons.attach_money,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Animate), findsNothing);
+    expect(
+      tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher)).duration,
+      Duration.zero,
+    );
   });
 }

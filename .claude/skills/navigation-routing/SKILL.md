@@ -1,72 +1,64 @@
 ---
 name: navigation-routing
-description: "Use when: adding routes, fixing navigation guards, breadcrumb issues, go_router redirect logic, or role-based screen access."
+description: "Use when: adding or changing Flutter routes, redirects, deep links, nested navigation, role-aware destinations, or back behavior."
 ---
 
-# Skill: Navigation & Routing
+# ShoesERP Navigation and Routing
 
-## Domain
+## Purpose
 
-go_router navigation for Flutter ShoesERP with role-based redirect guards.
+Apply the existing go_router architecture without creating a second route
+catalog or weakening role and tenant boundaries.
 
-## Key File
+## Invocation
 
-- `app/lib/core/router/app_router.dart` — single source of route truth
+Use before changing `app_router.dart`, route names, shell navigation, redirects,
+back behavior, or navigation links in a screen.
 
-## Canonical Routes
+## Sources of truth
 
-```text
+- Registered routes and redirect logic:
+  `app/lib/core/router/app_router.dart`
+- Shell navigation and role-filtered entry points:
+  `app/lib/widgets/app_shell.dart`
+- Role semantics: `app/lib/models/user_model.dart`,
+  `app/lib/core/utils/role_utils.dart`, and the applicable runtime Rules.
+- Route constraints and UI conventions:
+  `.github/instructions/navigation-forms.instructions.md`
 
-/login         → LoginScreen
-/              → DashboardScreen  (shell route)
-/routes        → RouteListScreen
-/routes/new    → RouteFormScreen
-/routes/:id    → RouteDetailScreen
-/routes/:id/edit → RouteFormScreen
-/shops         → ShopListScreen   (alias for /customers for sellers)
-/shops/new     → CustomerFormScreen
-/shops/:id     → ShopDetailScreen (shop = customer in route context)
-/customers     → CustomerListScreen
-/customers/new → CustomerFormScreen
-/customers/:id → CustomerDetailScreen
-/customers/:id/edit → CustomerFormScreen
-/products      → ProductListScreen
-/products/new  → ProductFormScreen
-/products/:id  → ProductDetailScreen
-/products/:id/edit → ProductFormScreen
-/products/:id/variants/new → VariantFormScreen
-/products/:id/variants/:vid/edit → VariantFormScreen
-/inventory     → InventoryScreen
-/reports       → ReportsScreen
-/settings      → SettingsScreen
+Do not maintain a duplicated route list here. Shops are the customer entity;
+there is no separate `/customers` route or customer screen.
 
-```
+## Workflow
 
-## Shell + Breadcrumb
+1. Read the actual route declaration, redirect conditions, shell placement, and
+   the destination screen before changing a link or guard.
+2. Identify authenticated, tenant, workspace-selection, and role behavior.
+   UI visibility is not authorization; do not modify Rules or role contracts
+   as a navigation shortcut.
+3. Choose `go`, `push`, or `pop` based on the intended history and the router
+   hierarchy. Preserve back-to-origin context when entering detail or form
+   flows from lists, shops, or quick actions.
+4. Keep route parameters and query parameters typed, validated, and consistent
+   with the route builder. Do not create an unregistered destination.
+5. Verify allowed and redirected destinations, shell selection, deep-link
+   parsing, and back behavior for affected roles.
 
-- `AppShell` wraps all authenticated routes with bottom nav + AppBar
+## Output
 
-- `_BreadcrumbTitle` computes title from current route name segments
+Report changed paths, affected destinations/roles, preserved return behavior,
+and targeted navigation tests. List any route or role combination that was
+not verified.
 
-- NavigationBar items: Dashboard, Routes, Customers/Shops, Products, Reports
+## Boundaries
 
-## Role Guard Pattern
+This skill owns route composition and navigation UX only. Use
+`flutter-frontend-modernization` for cross-screen coordination and
+`flutter-accessibility-rtl` for focus and directionality. Do not alter
+authentication, tenant scope, business logic, or Firestore authorization.
 
-```dart
+## Validation
 
-redirect: (context, state) {
-  final user = ref.read(authUserProvider).valueOrNull;
-  if (user == null) return '/login';
-  if (adminOnlyPaths.contains(state.matchedLocation) && !user.isAdmin) return '/';
-  return null;
-}
-
-```
-
-## Common Pitfalls
-
-- Use `context.go()` for bottom-nav tabs (replace stack); `context.push()` for detail pages
-
-- `GoRouter.of(context).pop()` only works if there is a page to pop — use `canPop()` guard
-
-- Shell routes do NOT support `context.pop()` back to login — use `context.go('/login')` on sign-out
+Run affected router/widget tests and `flutter analyze lib --no-pub`. Use the
+current SDK pinned by the repository; do not add navigation dependencies
+without verified need and compatibility evidence.

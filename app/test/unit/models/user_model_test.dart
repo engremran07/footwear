@@ -45,6 +45,9 @@ void main() {
           email: 'user@example.com',
           displayName: 'Test User',
           role: role,
+          assignedRouteIds: role == UserRole.seller
+              ? const ['route-1']
+              : const [],
           active: true,
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
@@ -71,12 +74,15 @@ void main() {
       },
     );
 
-    test('seller and legacy admin cannot create workspace backups', () {
+    test('seller backup access remains route-scoped', () {
       UserModel userForRole(UserRole role) => UserModel(
         id: 'user-id',
         email: 'user@example.com',
         displayName: 'Test User',
         role: role,
+        assignedRouteIds: role == UserRole.seller
+            ? const ['route-1']
+            : const [],
         active: true,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
@@ -89,6 +95,12 @@ void main() {
       expect(userForRole(UserRole.superAdmin).canCreateWorkspaceBackup, isTrue);
       expect(userForRole(UserRole.seller).canCreateWorkspaceBackup, isFalse);
       expect(userForRole(UserRole.admin).canCreateWorkspaceBackup, isFalse);
+      expect(userForRole(UserRole.seller).canCreateBackup, isTrue);
+      expect(userForRole(UserRole.seller).canRestoreBackup, isTrue);
+      expect(userForRole(UserRole.admin).canCreateBackup, isFalse);
+      expect(userForRole(UserRole.admin).canRestoreBackup, isFalse);
+      expect(userForRole(UserRole.tenantAdmin).canCreateBackup, isTrue);
+      expect(userForRole(UserRole.superAdmin).canRestoreBackup, isTrue);
       expect(
         userForRole(UserRole.tenantAdmin).canRunAutomaticWorkspaceBackup,
         isTrue,
