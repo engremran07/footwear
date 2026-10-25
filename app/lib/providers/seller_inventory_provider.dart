@@ -52,7 +52,9 @@ final adminAllSellerInventoryProvider =
     StreamProvider.autoDispose<List<SellerInventoryModel>>((ref) {
       // Use select() so heartbeat writes to last_active do NOT restart the stream.
       final isAdmin = ref.watch(
-        authUserProvider.select((s) => s.value?.isAdmin ?? false),
+        authUserProvider.select(
+          (s) => s.value?.canManageOperationalData ?? false,
+        ),
       );
       final tenantId = ref.watch(
         authUserProvider.select(
@@ -92,7 +94,8 @@ final sellerInventoryExportProvider =
       final user = await ref.read(authUserProvider.future);
       if (user == null ||
           !user.active ||
-          (!user.isAdmin && (!user.isSeller || user.id != sellerId.trim()))) {
+          (!user.canManageOperationalData &&
+              (!user.isSeller || user.id != sellerId.trim()))) {
         return const <SellerInventoryModel>[];
       }
       final tenantId = TenantScope.normalize(user.tenantId);
@@ -122,7 +125,7 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
         .doc(authUser.uid)
         .get();
     final role = (me.data()?['role'] as String? ?? '').trim();
-    if (!isPrivilegedRoleName(role)) {
+    if (!canManageOperationalDataRole(role)) {
       throw StateError('Only admin can return stock to warehouse');
     }
   }

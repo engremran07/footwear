@@ -34,7 +34,7 @@ final shopsProvider = StreamProvider.autoDispose<List<ShopModel>>((ref) {
   // Use select() so this provider only rebuilds when the admin flag changes,
   // not on every user-doc heartbeat / field update.
   final isAdmin = ref.watch(
-    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+    authUserProvider.select((s) => s.value?.canManageOperationalData ?? false),
   );
   final tenantId = ref.watch(
     authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
@@ -99,7 +99,7 @@ final shopsExportProvider = FutureProvider<List<ShopModel>>((ref) async {
     tenantId: tenantId,
   );
   final queryParts = <Query<Map<String, dynamic>>>[];
-  if (user.isAdmin) {
+  if (user.canManageOperationalData) {
     queryParts.add(baseQuery.where('active', isEqualTo: true));
   } else if (user.isSeller) {
     final routeIds = user.assignedRouteIds.toSet().toList();
@@ -180,7 +180,7 @@ final shopDetailProvider = StreamProvider.autoDispose.family<ShopModel?, String>
       authUserProvider.select((s) {
         final u = s.value;
         if (u == null) return (false, false, '');
-        if (u.isAdmin) return (true, false, '');
+        if (u.canManageOperationalData) return (true, false, '');
         if (!u.isSeller) return (false, false, '');
         final sorted = List<String>.from(u.assignedRouteIds)..sort();
         return (false, true, sorted.join(','));
@@ -228,7 +228,7 @@ final outstandingShopsProvider = StreamProvider.autoDispose<List<ShopModel>>((
 ) {
   // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
   final isAdmin = ref.watch(
-    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+    authUserProvider.select((s) => s.value?.canManageOperationalData ?? false),
   );
   final tenantId = ref.watch(
     authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
@@ -296,7 +296,7 @@ class ShopNotifier extends AsyncNotifier<void> {
         currentUser.id != uid) {
       throw StateError('An active user profile is required');
     }
-    if (!currentUser.isAdmin && !currentUser.isSeller) {
+    if (!currentUser.canManageOperationalData && !currentUser.isSeller) {
       throw StateError('Only admins and assigned sellers can create shops');
     }
     final tenantId = TenantScope.requireTenant(currentUser.tenantId);
@@ -353,7 +353,7 @@ class ShopNotifier extends AsyncNotifier<void> {
         currentUser.id != uid) {
       throw StateError('An active user profile is required');
     }
-    if (!currentUser.isAdmin && !currentUser.isSeller) {
+    if (!currentUser.canManageOperationalData && !currentUser.isSeller) {
       throw StateError('Only admins and sellers can update shops');
     }
     final tenantId = TenantScope.requireTenant(currentUser.tenantId);
@@ -381,7 +381,9 @@ class ShopNotifier extends AsyncNotifier<void> {
       'latitude',
       'longitude',
     };
-    final allowedFields = currentUser.isAdmin ? adminFields : sellerFields;
+    final allowedFields = currentUser.canManageOperationalData
+        ? adminFields
+        : sellerFields;
     final filteredData = <String, dynamic>{
       for (final entry in data.entries)
         if (allowedFields.contains(entry.key)) entry.key: entry.value,
@@ -410,6 +412,11 @@ class ShopNotifier extends AsyncNotifier<void> {
           (currentRouteId.isEmpty ||
               !currentUser.assignedRouteIds.contains(currentRouteId))) {
         throw StateError('Sellers can only manage shops on assigned routes');
+      }
+      if (currentUser.isSupervisor &&
+          requestedRouteId.isNotEmpty &&
+          requestedRouteId != currentRouteId) {
+        throw StateError('Only admins can reassign shops to another route');
       }
 
       final targetRouteId = currentUser.isAdmin && requestedRouteId.isNotEmpty

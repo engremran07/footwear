@@ -19,7 +19,24 @@ fun computeAndroidVersionCode(versionName: String, buildNumber: Int): Int {
     val major = parts.getOrNull(0)?.toIntOrNull() ?: 0
     val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
     val patch = parts.getOrNull(2)?.toIntOrNull() ?: 0
-    return (major * 1_000_000) + (minor * 10_000) + (patch * 100) + buildNumber
+    if (major < 1 || minor !in 0..99 || patch !in 0..99 || buildNumber !in 0..9_999) {
+        throw GradleException(
+            "Version components exceed the Android versionCode encoding limits."
+        )
+    }
+    val versionCode =
+        major.toLong() * 100_000_000L +
+        minor.toLong() * 1_000_000L +
+        patch.toLong() * 10_000L +
+        buildNumber.toLong()
+    if (versionCode > 2_100_000_000L) {
+        throw GradleException("Android versionCode exceeds the Play Console limit.")
+    }
+    return versionCode.toInt()
+}
+
+val buildingAppBundle = gradle.startParameter.taskNames.any {
+    it.contains("bundle", ignoreCase = true)
 }
 
 android {
@@ -58,8 +75,8 @@ android {
 
     splits {
         abi {
-            isEnable = true
-            isUniversalApk = true
+            isEnable = !buildingAppBundle
+            isUniversalApk = !buildingAppBundle
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86_64")
         }

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:pdf/pdf.dart';
 import 'package:footwear_erp/core/l10n/app_locale.dart';
+import 'package:footwear_erp/core/l10n/financial_document_localization.dart';
 import 'package:footwear_erp/core/utils/pdf_export.dart';
 import 'package:footwear_erp/models/invoice_model.dart';
 import 'package:footwear_erp/models/settings_model.dart';
@@ -353,12 +354,15 @@ void main() {
       'total_entries',
       'page',
       'opening_balance',
+      'duration',
     ];
     final ledgerPdf = await buildPdfLedger(
       shopName: urdu,
       companyName: arabic,
       openingBalance: 10,
       transactions: [transaction],
+      dateFrom: DateTime(2026, 8, 23),
+      dateTo: DateTime(2026, 10, 25),
       labels: labelsFor(AppLocale.ur, ledgerKeys),
       locale: AppLocale.ur,
       logoBytes: _testLogoBytes,
@@ -366,12 +370,19 @@ void main() {
         nameEn: 'Footwear',
         nameAr: 'شركة الأحذية',
         phone: '+966500000000',
+        documentLanguagePair: FinancialDocumentLanguagePair.englishUrdu,
       ),
     );
     expectPdf(ledgerPdf);
     expect(
       latin1.decode(ledgerPdf, allowInvalid: true),
       contains('/Subtype/Image'),
+    );
+    expect(
+      RegExp(
+        r'/Count\s+(\d+)',
+      ).firstMatch(latin1.decode(ledgerPdf, allowInvalid: true))?.group(1),
+      '1',
     );
 
     const sellerReportKeys = [

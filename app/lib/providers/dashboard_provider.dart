@@ -125,7 +125,7 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
     return AsyncData(stats);
   }
 
-  if (user.isAdmin) {
+  if (user.canManageOperationalData) {
     routes = ref.watch(routesProvider);
     shops = ref.watch(shopsProvider);
   } else {

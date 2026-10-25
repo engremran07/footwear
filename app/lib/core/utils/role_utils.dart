@@ -18,6 +18,16 @@ bool canManageUserAccountsRole(String role) {
       normalized == 'super_admin';
 }
 
+bool canManageOperationalDataRole(String role) {
+  final normalized = normalizeRoleName(role);
+  return normalized == 'admin' ||
+      normalized == 'supervisor' ||
+      normalized == 'tenant_admin' ||
+      normalized == 'super_admin';
+}
+
+bool isOperationalRoleName(String role) => canManageOperationalDataRole(role);
+
 bool canManageWorkspaceRole(String role) {
   final normalized = normalizeRoleName(role);
   return normalized == 'super_admin';
@@ -46,6 +56,8 @@ String roleValueFromUserRole(UserRole role) {
       return 'tenant_admin';
     case UserRole.superAdmin:
       return 'super_admin';
+    case UserRole.supervisor:
+      return 'supervisor';
     case UserRole.unknown:
       return 'unknown';
   }
@@ -59,6 +71,8 @@ String roleLabelKeyFromRoleValue(String roleValue) {
       return 'lbl_seller';
     case 'tenant_admin':
       return 'role_tenant_admin';
+    case 'supervisor':
+      return 'role_supervisor';
     case 'super_admin':
       return 'role_super_admin';
     case 'unknown':

@@ -92,7 +92,7 @@ class ProductDetailScreen extends ConsumerWidget {
                             }
                           : null,
                     ),
-                    if (user?.isAdmin == true)
+                    if (user?.canManageOperationalData == true)
                       IconButton(
                         icon: const Icon(Icons.edit),
                         tooltip: tr('edit_product', ref),
@@ -285,7 +285,7 @@ class ProductDetailScreen extends ConsumerWidget {
                                 ),
                               ),
                             ),
-                            onTap: user?.isAdmin == true
+                            onTap: user?.canManageOperationalData == true
                                 ? () => context.push(
                                     '/products/$productId/variants/${v.id}/edit',
                                   )
@@ -299,7 +299,7 @@ class ProductDetailScreen extends ConsumerWidget {
               ),
             ],
           ),
-          floatingActionButton: user?.isAdmin == true
+          floatingActionButton: user?.canManageOperationalData == true
               ? FloatingActionButton(
                   onPressed: () =>
                       context.push('/products/$productId/variants/new'),

@@ -229,7 +229,7 @@ class ReportsScreen extends ConsumerWidget {
       return;
     }
     late final List<List<dynamic>> rows;
-    if (user.isAdmin) {
+    if (user.canManageOperationalData) {
       ref.invalidate(allVariantsExportProvider);
       final variants = await ref.read(allVariantsExportProvider.future);
       if (!context.mounted) return;
@@ -271,7 +271,7 @@ class ReportsScreen extends ConsumerWidget {
       return;
     }
 
-    if (user.isAdmin) {
+    if (user.canManageOperationalData) {
       ref.invalidate(allTransactionsExportProvider);
       final txs = await ref.read(allTransactionsExportProvider.future);
       if (!context.mounted) return;
@@ -573,7 +573,7 @@ class _OutstandingTopDebtors extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authUserProvider).value;
-    final shopsAsync = user?.isAdmin == true
+    final shopsAsync = user?.canManageOperationalData == true
         ? ref.watch(shopsProvider)
         : ref.watch(sellerAllShopsProvider);
 
@@ -583,7 +583,7 @@ class _OutstandingTopDebtors extends ConsumerWidget {
         error: error,
         ref: ref,
         onRetry: () {
-          if (user?.isAdmin == true) {
+          if (user?.canManageOperationalData == true) {
             ref.invalidate(shopsProvider);
           } else {
             ref.invalidate(sellerAllShopsProvider);
@@ -769,7 +769,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       final locale = ref.read(appLocaleProvider);
       final user = await ref.read(authUserProvider.future);
       if (!context.mounted) return;
-      final shops = user?.isAdmin == true
+      final shops = user?.canManageOperationalData == true
           ? await ref.read(shopsProvider.future)
           : (user?.assignedRouteIds.isNotEmpty == true
                 ? await ref.read(sellerAllShopsProvider.future)
@@ -858,7 +858,8 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).value;
-    final AsyncValue<List<ShopModel>> shopsAsync = user?.isAdmin == true
+    final AsyncValue<List<ShopModel>> shopsAsync =
+        user?.canManageOperationalData == true
         ? ref.watch(shopsProvider)
         : (user?.assignedRouteIds.isNotEmpty == true
               ? ref.watch(sellerAllShopsProvider)
@@ -893,7 +894,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
                 error: error,
                 ref: ref,
                 onRetry: () {
-                  if (user?.isAdmin == true) {
+                  if (user?.canManageOperationalData == true) {
                     ref.invalidate(shopsProvider);
                   } else if (user?.assignedRouteIds.isNotEmpty == true) {
                     ref.invalidate(sellerAllShopsProvider);
@@ -1128,7 +1129,9 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
   Widget build(BuildContext context) {
     final authAsync = ref.watch(authUserProvider);
     final user = authAsync.value;
-    if (user == null || !user.isAdmin) return const SizedBox.shrink();
+    if (user == null || !user.canManageOperationalData) {
+      return const SizedBox.shrink();
+    }
 
     final usersAsync = ref.watch(allUsersProvider);
     return Card(

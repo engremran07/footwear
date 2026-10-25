@@ -11,6 +11,8 @@ String canonicalRoleName(String value) {
     case 'super-admin':
     case 'superadmin':
       return 'super_admin';
+    case 'supervisor':
+      return 'supervisor';
     case 'seller':
       return 'seller';
     default:

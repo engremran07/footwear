@@ -56,6 +56,8 @@ void main() {
         generatedBy: 'tester',
         openingBalance: 0.0,
         transactions: txs,
+        dateFrom: txs.first.createdAt.toDate(),
+        dateTo: txs.last.createdAt.toDate(),
         labels: labels,
         locale: AppLocale.en,
       );

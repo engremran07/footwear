@@ -1,307 +1,201 @@
 ---
 name: apk-build-signing
-description: "Use when: building release APK, managing signing keys, CI/CD setup, version bumping, split-per-ABI builds, ProGuard rules, Android permission audits."
+description: "Use when: diagnosing Android Gradle builds, building or signing ShoesERP APK/AAB releases, preparing Play Console uploads, managing release version codes, or installing APKs on devices."
 ---
 
-# Skill: Android APK Build, Signing & Release Management
+# Android Release Builds, Signing, and Gradle
 
-## Version Convention
+## Verified ShoesERP Android Baseline
 
-```yaml
+| Component | Current configuration |
+| --- | --- |
+| Flutter | 3.41.6 |
+| Java / Kotlin JVM target | 17 |
+| Gradle build JDK | 17 or 21; the current workstation runs 21 |
+| Gradle wrapper | 8.14 |
+| Android Gradle Plugin | 8.11.1 |
+| Kotlin Android plugin | 2.2.20 |
+| Google Services plugin | 4.4.2 |
+| Compile / target SDK | 36 |
+| Minimum SDK | 29 |
+| Application ID | `footwear.pk.com` |
 
-# pubspec.yaml
+Use the checked-in Gradle wrapper. Do not install a separate Gradle version or
+upgrade the Android and Kotlin plugins independently of the wrapper. The app
+module applies the Android and Kotlin plugins before the Flutter Gradle plugin.
+Release builds require signing configuration and fail closed when it is absent.
 
-version: MAJOR.MINOR.PATCH+BUILD
+## Version and Android Version-Code Rules
 
-# e.g., 3.0.0+7
+The Flutter version is `MAJOR.MINOR.PATCH+BUILD`. Update
+`app/pubspec.yaml`, `app/lib/core/constants/app_brand.dart`, and the
+trilingual top entry in `app/lib/core/data/changelog_data.dart` together.
+Verify the exact matching values before building:
 
-# MAJOR: breaking changes / major feature releases
-
-# MINOR: new features, backward compatible
-
-# PATCH: bug fixes
-
-# BUILD: internal build counter (always increment on every release)
-
+```powershell
+Select-String -Path "app\pubspec.yaml","app\lib\core\constants\app_brand.dart" -Pattern '^version:|appVersion|buildNumber'
 ```
 
-**Tool to bump version:** `dart tool/bump_version.dart` (already in repo)
+`app/android/app/build.gradle.kts` encodes the Android `versionCode` as:
 
-## Release Build Command
-
-```bash
-
-# ── CANONICAL RELEASE ORDER ────────────────────────────────────────────────
-
-cd app
-grep -E "^version:|appVersion|buildNumber" pubspec.yaml lib/core/constants/app_brand.dart
-
-# Web first, because Hosting is part of the shared release surface.
-
-flutter build web --release --dart-define=use_arabic=true
-firebase deploy --only hosting
-
-# Split-per-ABI APK set — canonical phone-delivery artifact set.
-
-flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true
-
-# Output locations:
-
-# build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-# build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-# build/app/outputs/flutter-apk/app-x86_64-release.apk
-# build/app/outputs/flutter-apk/app-release.apk
-
-# Firestore rules/indexes complete the release before commit/push.
-
-cd ..
-firebase deploy --only firestore:rules,firestore:indexes
-
-# Install the phone-delivery artifact to a connected device.
-
-adb push build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /sdcard/Download/
-adb install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
-
+```text
+major * 100,000,000 + minor * 1,000,000 + patch * 10,000 + buildNumber
 ```
+
+The component bounds and Play Console's `2,100,000,000` maximum are checked
+before Gradle configures the release. This encoding keeps version segments
+ordered and prevents a newer semantic version from generating a lower code
+than a historical install. Confirm the built APK/AAB version metadata when
+changing this formula. Flutter adds an ABI-specific offset to split APK
+version codes; for example, the ARM64 APK may be higher than the base code
+used by the AAB. Compare the APK against the highest previously distributed
+code rather than assuming every ABI APK has the same code.
 
 ## Signing Configuration
 
-**Key file location:** `app/android/key.properties` (NOT committed to git)
+The release signing file is `app/android/key.properties`; it is local,
+gitignored configuration. The Gradle build reads its keystore path, alias,
+and passwords from that file. Never print, copy, commit, or place signing
+values in Dart defines, source, logs, CI output, or this skill. The referenced
+keystore must exist at the path configured locally. Do not generate a fallback
+debug-signed release.
 
-```properties
+The same release signing configuration signs both the split APKs and the
+Android App Bundle. Google Play App Signing should be enabled in Play Console;
+the uploaded AAB is signed with the registered upload key.
 
-storePassword=<password>
-keyPassword=<password>
-keyAlias=upload
-storeFile=../app-keystore.jks
+## Diagnose Before Changing Gradle
 
+From PowerShell:
+
+```powershell
+Set-Location D:\Footwear\app
+flutter doctor -v
+java -version
+Set-Location android
+.\gradlew.bat --version
 ```
 
-**In build.gradle.kts:**
+Then reproduce the failure with the Flutter command that produced it and
+inspect the first Gradle exception and its cause. Do not change dependencies,
+plugin versions, cache directories, or signing setup to mask a DNS, proxy,
+SDK-license, memory, or filesystem error. A missing remote artifact caused by
+DNS is not evidence that the dependency version is incompatible. Avoid
+`flutter clean` unless stale generated output is part of the demonstrated
+failure; it does not repair a version or network mismatch.
 
-```kotlin
+If `flutter doctor` reports unaccepted Android SDK licenses, ask the device
+owner to review and accept them with `flutter doctor --android-licenses`.
+Release builds that already succeed do not justify silently accepting legal
+terms on the owner's behalf.
 
-android {
-  signingConfigs {
-    create("release") {
-      val keyProps = Properties().apply {
-        load(rootProject.file("key.properties").inputStream())
-      }
-      keyAlias = keyProps["keyAlias"] as String
-      keyPassword = keyProps["keyPassword"] as String
-      storeFile = file(keyProps["storeFile"] as String)
-      storePassword = keyProps["storePassword"] as String
-    }
-  }
-  buildTypes {
-    release {
-      signingConfig = signingConfigs.getByName("release")
-      isMinifyEnabled = true
-      isShrinkResources = true
-      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-    }
-  }
-}
+Before release builds, check signing-file presence without printing its
+contents:
 
+```powershell
+Test-Path "android\key.properties"
 ```
 
-## ProGuard Rules for ShoesERP
+Use Gradle's wrapper for diagnostics and Flutter's build commands for release
+artifacts. When Windows reports memory pressure, run one release build at a
+time and close unnecessary applications rather than deleting caches or
+terminating unrelated processes.
 
-```proguard
+## Local Validation and Release Artifacts
 
-# proguard-rules.pro — additions for current dependencies
+Release actions are separate: local builds do not deploy Hosting or Firestore,
+and do not commit or push. User authorization is required for those operations.
+For app changes, first run relevant tests and analyzers. PDF-capable commands
+must retain `--dart-define=use_arabic=true`.
 
-# Firebase
+From `D:\Footwear`:
 
--keep class com.google.firebase.** { *; }
--dontwarn com.google.firebase.**
-
-# Firestore
-
--keep class com.google.cloud.firestore.** { *; }
-
-# flutter_riverpod / dart reflection
-
--keep class io.flutter.** { *; }
--keep class io.flutter.plugins.** { *; }
-
-# JSON serialization
-
--keep class * implements java.io.Serializable { *; }
-
-# printing (pdf)
-
--keep class com.github.gunnaraa.** { *; }
-
-# share_plus
-
--keep class dev.fluttercommunity.plus.share.** { *; }
-
+```powershell
+Set-Location app
+flutter analyze lib --no-pub
+dart analyze test/
+flutter test -r expanded --dart-define=use_arabic=true
 ```
 
-## Android Permissions Audit
+Build the phone-delivery split-per-ABI APK set:
 
-Current permissions in `AndroidManifest.xml` — verify only necessary:
-
-```xml
-
-<!-- Required -->
-<uses-permission android:name="android.permission.INTERNET" />
-
-<!-- For PDF share/download -->
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
-
-<!-- For notifications -->
-<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-<uses-permission android:name="android.permission.VIBRATE" />
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-<!-- For image picker -->
-<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-
-<!-- NOT needed (remove if present): -->
-<!-- android.permission.CAMERA — not used, image picker can work without it -->
-<!-- android.permission.ACCESS_FINE_LOCATION — not needed for route-based ERP -->
-
+```powershell
+flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true
 ```
 
-## Approval Cycles & Shared Installation Issues
+Canonical outputs:
 
-Problem spotted in user's request: "breaking changes in APK regarding approval cycles and shared installations"
-
-### Shared Installation Patterns
-
-When multiple technicians/sellers use the same device:
-
-- Firebase Auth sign-in/out handles user switching
-
-- Ensure `signOut()` clears ALL local state:
-
-  ```dart
-
-  Future<void> signOut() async {
-    // 1. Invalidate all providers
-    _invalidateRoleScopedProviders();
-    // 2. Clear SharedPreferences 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    // 3. Sign out Firebase
-    await _ref.read(firebaseAuthProvider).signOut();
-  }
-  ```
-
-- Issue: If seller A signs out and seller B signs in, Riverpod providers may cache seller A's data
-
-- Fix: `_invalidateRoleScopedProviders()` must invalidate ALL family providers
-
-### APK Uninstall Cleanup
-
-To clean all app data on uninstall:
-
-```xml
-
-<!-- AndroidManifest.xml -->
-<!-- Android automatically clears app data on uninstall -->
-<!-- Make sure no data is written outside app directories: -->
-<!-- /data/data/[package]/ — auto-cleared ✅ -->
-<!-- /sdcard/ — persists after uninstall unless explicitly cleaned -->
-<!-- Fix: Use getExternalFilesDir() (auto-cleared) instead of getExternalStorageDirectory() -->
-
+```text
+build\app\outputs\flutter-apk\app-arm64-v8a-release.apk
+build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk
+build\app\outputs\flutter-apk\app-x86_64-release.apk
+build\app\outputs\flutter-apk\app-release.apk
 ```
 
-In Dart (flutter):
+Build the signed Play Console bundle:
 
-```dart
-
-// Use app-specific external storage (auto-cleared on uninstall)
-final dir = await getApplicationDocumentsDirectory(); // auto-cleared
-// NOT: await getExternalStorageDirectory() on Android < 10
-
+```powershell
+flutter build appbundle --release --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true
 ```
 
-### Version Upgrade Breaking Changes Checklist
+The upload artifact is:
 
-When releasing a new version to devices with existing data:
-
-- [ ] Schema changes in Firestore: all new fields have defaults in `fromJson()`
-
-- [ ] New required keys in `l10n` files checked for all 3 languages
-
-- [ ] SharedPreferences key changes: add migration or default in `getOrNull()`
-
-- [ ] Firebase index changes: deploy before app update reaches users
-
-- [ ] Firestore rules changes: deploy before app update
-
-## CI/CD (Manual Github Actions Setup)
-
-```yaml
-
-# .github/workflows/build.yml
-
-name: Flutter Build
-on:
-  push:
-    branches: [main]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.41.6'
-      - name: Install dependencies
-        run: cd app && flutter pub get
-      - name: Validate version sync
-        run: |
-
-          PUBSPEC_VER=$(grep '^version:' app/pubspec.yaml | sed 's/version: //' | tr -d '[:space:]')
-
-          BRAND_VER=$(grep 'static const String appVersion' app/lib/core/constants/app_brand.dart | sed "s/.*'\(.*\)';/\1/" | tr -d '[:space:]')
-
-          BRAND_BUILD=$(grep 'static const String buildNumber' app/lib/core/constants/app_brand.dart | sed "s/.*'\(.*\)';/\1/" | tr -d '[:space:]')
-
-          if [ "$PUBSPEC_VER" != "${BRAND_VER}+${BRAND_BUILD}" ]; then
-            echo "❌ Version mismatch: pubspec=$PUBSPEC_VER app_brand=${BRAND_VER}+${BRAND_BUILD}"
-            exit 1
-          fi
-      - name: Analyze
-        run: cd app && flutter analyze lib --no-pub
-      - name: Test
-        run: cd app && flutter test -r expanded --dart-define=use_arabic=true
-      - name: Build web
-        run: cd app && flutter build web --release --dart-define=use_arabic=true
-      - name: Build APK
-        run: cd app && flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true
-
+```text
+build\app\outputs\bundle\release\app-release.aab
 ```
 
-## Minimum SDK Targets
+An AAB is for Play Console upload and cannot be installed directly. Install a
+matching APK on devices. Verify the release artifacts and report their exact
+paths and sizes:
 
-```kotlin
+The module's ABI split setting is enabled for APK builds and disabled when a
+`bundle` Gradle task is requested. Android Gradle Plugin rejects app bundles
+when multiple shrunk-resource APK outputs are configured in the same task.
+Keep this task-aware distinction and rebuild both requested artifacts after
+changing it.
 
-// build.gradle.kts
-android {
-  defaultConfig {
-    minSdk = 21           // Android 5.0+ (covers 99%+ devices)
-    targetSdk = 36        // Android 16 (tested on Samsung A56)
-    compileSdk = 36
-  }
-}
-
+```powershell
+apksigner verify --verbose "build\app\outputs\flutter-apk\app-arm64-v8a-release.apk"
+jarsigner -verify "build\app\outputs\bundle\release\app-release.aab"
+Get-Item "build\app\outputs\flutter-apk\app-arm64-v8a-release.apk","build\app\outputs\bundle\release\app-release.aab" | Select-Object FullName,Length
 ```
 
-## Device Compatibility Matrix
+## Copy and Install the Phone APK
 
-| Device | Android | API | Status |
+Check for an authorized, connected device before copying or installing:
 
-|--------|---------|-----|--------|
+```powershell
+adb devices
+```
 
-| Samsung A56 | 16 | 36 | ✅ Verified |
+Copy the ARM64 delivery APK to Downloads and install the same verified host
+artifact:
 
-| V2247 | 14 | 34 | ✅ Verified |
+```powershell
+$apk = "build\app\outputs\flutter-apk\app-arm64-v8a-release.apk"
+adb push $apk /sdcard/Download/app-arm64-v8a-release.apk
+adb install --streaming -r $apk
+```
 
-| Generic ARMv7 | 5+ | 21+ | Should work |
+If `adb devices` lists no device, report the exact output and skip device
+delivery. Do not uninstall an existing app to work around a version-code or
+signing mismatch; diagnose the package metadata and certificate instead.
+
+## Release Checklist
+
+- [ ] Version in `pubspec.yaml`, `AppBrand`, and changelog is synchronized.
+- [ ] Tests and both Dart analyzers pass with quoted output.
+- [ ] The release signing configuration is present without exposing values.
+- [ ] Split APK and signed AAB are built from the same source and version.
+- [ ] APK and AAB signatures verify; artifact paths and sizes are recorded.
+- [ ] ADB device availability is checked before phone delivery.
+- [ ] Rules/indexes, Hosting, commit, push, and Play Console publication are
+      performed only when separately authorized.
+
+## Android Permission Review
+
+Review the actual `app/android/app/src/main/AndroidManifest.xml` and plugin
+requirements whenever permissions change. Keep only permissions needed by
+current workflows. Do not add camera, location, storage, boot, or notification
+permissions based on this skill alone; test the relevant Android API levels
+and document any user-visible permission prompt.

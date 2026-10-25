@@ -67,7 +67,7 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
     bool saved = false;
     try {
       final user = await ref.read(authUserProvider.future);
-      if (user?.isAdmin != true) {
+      if (user?.canManageOperationalData != true) {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
@@ -143,7 +143,8 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
     }
 
     final user = userAsync.value;
-    final isAdmin = user?.isAdmin ?? false;
+    final isAdmin = user?.canManageOperationalData ?? false;
+    final canAssignSellers = user?.isAdmin ?? false;
 
     if (!isAdmin) {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
@@ -232,53 +233,54 @@ class _RouteFormScreenState extends ConsumerState<RouteFormScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  // Multi-seller selection chips
-                  Text(
-                    tr('assigned_sellers', ref),
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  sellersAsync.when(
-                    loading: () => const LinearProgressIndicator(),
-                    error: (error, _) => mappedErrorState(
-                      error: error,
-                      ref: ref,
-                      onRetry: () => ref.invalidate(sellersProvider),
+                  if (canAssignSellers) ...[
+                    Text(
+                      tr('assigned_sellers', ref),
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
-                    data: (sellers) {
-                      if (sellers.isEmpty) {
-                        return Text(
-                          tr('no_sellers', ref),
-                          style: TextStyle(color: cs.outline),
-                        );
-                      }
-                      return Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: sellers.map((seller) {
-                          final selected = _selectedSellerIds.contains(
-                            seller.id,
+                    const SizedBox(height: 8),
+                    sellersAsync.when(
+                      loading: () => const LinearProgressIndicator(),
+                      error: (error, _) => mappedErrorState(
+                        error: error,
+                        ref: ref,
+                        onRetry: () => ref.invalidate(sellersProvider),
+                      ),
+                      data: (sellers) {
+                        if (sellers.isEmpty) {
+                          return Text(
+                            tr('no_sellers', ref),
+                            style: TextStyle(color: cs.outline),
                           );
-                          return FilterChip(
-                            label: Text(
-                              seller.displayName,
-                              style: AppFonts.userName(
-                                ref
-                                    .watch(appLocaleProvider)
-                                    .locale
-                                    .languageCode,
-                                fontSize: 13,
-                                color: cs.onSurface,
+                        }
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: sellers.map((seller) {
+                            final selected = _selectedSellerIds.contains(
+                              seller.id,
+                            );
+                            return FilterChip(
+                              label: Text(
+                                seller.displayName,
+                                style: AppFonts.userName(
+                                  ref
+                                      .watch(appLocaleProvider)
+                                      .locale
+                                      .languageCode,
+                                  fontSize: 13,
+                                  color: cs.onSurface,
+                                ),
                               ),
-                            ),
-                            selected: selected,
-                            onSelected: (_) =>
-                                _toggleSeller(seller.id, seller.displayName),
-                          );
-                        }).toList(),
-                      );
-                    },
-                  ),
+                              selected: selected,
+                              onSelected: (_) =>
+                                  _toggleSeller(seller.id, seller.displayName),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,

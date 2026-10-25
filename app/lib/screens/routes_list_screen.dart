@@ -23,7 +23,7 @@ class _RoutesListScreenState extends ConsumerState<RoutesListScreen> {
   Widget build(BuildContext context) {
     final ref = this.ref;
     final user = ref.watch(authUserProvider).value;
-    final isAdmin = user?.isAdmin ?? false;
+    final isAdmin = user?.canManageOperationalData ?? false;
     final routesAsync = isAdmin
         ? ref.watch(routesProvider)
         : ref.watch(routesBySellerProvider(user?.id ?? ''));

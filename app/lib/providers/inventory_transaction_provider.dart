@@ -10,7 +10,9 @@ final allInventoryTransactionsProvider =
     StreamProvider.autoDispose<List<InventoryTransactionModel>>((ref) {
       // Use select() so heartbeat writes to last_active do NOT restart the stream.
       final isAdmin = ref.watch(
-        authUserProvider.select((s) => s.value?.isAdmin ?? false),
+        authUserProvider.select(
+          (s) => s.value?.canManageOperationalData ?? false,
+        ),
       );
       final tenantId = ref.watch(
         authUserProvider.select(

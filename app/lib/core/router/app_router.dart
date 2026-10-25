@@ -47,15 +47,17 @@ String _normalizePath(String raw) {
   return p;
 }
 
-bool _isAdminOnlyPath(String rawPath) {
+bool _isAccountAdminPath(String rawPath) {
   final path = _normalizePath(rawPath);
-  if (path == '/settings' ||
-      path == '/users' ||
-      path == '/notifications' ||
-      path == '/routes/new' ||
-      path == '/products/new') {
+  if (path == '/settings' || path == '/users' || path == '/notifications') {
     return true;
   }
+  return false;
+}
+
+bool _isOperationalAdminPath(String rawPath) {
+  final path = _normalizePath(rawPath);
+  if (path == '/routes/new' || path == '/products/new') return true;
   return RegExp(r'^/routes/[^/]+/edit$').hasMatch(path) ||
       RegExp(r'^/products/[^/]+/edit$').hasMatch(path) ||
       RegExp(r'^/products/[^/]+/variants/new$').hasMatch(path) ||
@@ -224,8 +226,12 @@ class RouterNotifier extends ChangeNotifier {
     if (state.matchedLocation == '/settings/flush' && !appUser.isSuperAdmin) {
       return '/';
     }
-    if (_isAdminOnlyPath(state.matchedLocation) &&
+    if (_isAccountAdminPath(state.matchedLocation) &&
         !canManageUserAccountsRole(roleValueFromUserRole(appUser.role))) {
+      return '/';
+    }
+    if (_isOperationalAdminPath(state.matchedLocation) &&
+        !appUser.canManageOperationalData) {
       return '/';
     }
     if (appUser.isSeller && _isSellerBlockedPath(state.matchedLocation)) {

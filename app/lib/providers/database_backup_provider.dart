@@ -1090,8 +1090,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
       return restoredCount;
     }
 
-    if (preview.scope != 'workspace' ||
-        (!user.isTenantAdmin && !user.isSuperAdmin)) {
+    if (preview.scope != 'workspace' || !user.canRestoreWorkspaceBackup) {
       throw StateError(
         'Workspace data restore is not permitted for this backup',
       );

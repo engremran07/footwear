@@ -30,6 +30,11 @@ function tenantAdminCtx(env) {
     email: 'tenant-admin@test.com',
   });
 }
+function supervisorCtx(env) {
+  return env.authenticatedContext('supervisor-uid', {
+    email: 'supervisor@test.com',
+  });
+}
 function sellerCtx(env) {
   return env.authenticatedContext('seller-uid', { email: 'seller@test.com' });
 }
@@ -404,28 +409,34 @@ describe('users collection', () => {
     );
   });
 
-  it('workspace admin can create an admin with an atomic seat increment', async () => {
+  it('workspace admin can create a supervisor with an atomic seat increment', async () => {
     await seedUser('tenant-admin-uid', 'tenant_admin');
     await seedTenant({ ownerUserId: 'tenant-admin-uid' });
     const db = tenantAdminCtx(testEnv).firestore();
 
     await assertSucceeds(
-      createUserWithSeat(db, 'workspace-admin-uid', {
-        role: 'admin',
+      createUserWithSeat(db, 'supervisor-uid', {
+        role: 'supervisor',
         createdBy: 'tenant-admin-uid',
         assignedRouteIds: [],
       }),
     );
   });
 
-  it('workspace admin can promote and demote non-owner admin and seller roles', async () => {
+  it('workspace admin cannot create or promote an admin role', async () => {
     await seedUser('tenant-admin-uid', 'tenant_admin');
     await seedUser('seller-uid', 'seller');
-    await seedUser('workspace-admin-uid', 'admin');
     await seedTenant({ ownerUserId: 'tenant-admin-uid' });
     const db = tenantAdminCtx(testEnv).firestore();
 
-    await assertSucceeds(
+    await assertFails(
+      createUserWithSeat(db, 'new-admin-uid', {
+        role: 'admin',
+        createdBy: 'tenant-admin-uid',
+        assignedRouteIds: [],
+      }),
+    );
+    await assertFails(
       db.collection('users').doc('seller-uid').update({
         role: 'admin',
         assigned_route_ids: [],
@@ -433,8 +444,24 @@ describe('users collection', () => {
         updated_at: firebase.firestore.FieldValue.serverTimestamp(),
       }),
     );
+  });
+
+  it('workspace admin can promote and demote a seller to supervisor', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedUser('seller-uid', 'seller');
+    await seedTenant({ ownerUserId: 'tenant-admin-uid' });
+    const db = tenantAdminCtx(testEnv).firestore();
+
     await assertSucceeds(
-      db.collection('users').doc('workspace-admin-uid').update({
+      db.collection('users').doc('seller-uid').update({
+        role: 'supervisor',
+        assigned_route_ids: [],
+        assigned_route_names: [],
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+    await assertSucceeds(
+      db.collection('users').doc('seller-uid').update({
         role: 'seller',
         assigned_route_ids: ['route-1'],
         assigned_route_names: ['Route 1'],
@@ -443,6 +470,21 @@ describe('users collection', () => {
     );
   });
 
+  it('workspace admin cannot change a peer admin role', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedUser('workspace-admin-uid', 'admin');
+    await seedTenant({ ownerUserId: 'tenant-admin-uid' });
+    const db = tenantAdminCtx(testEnv).firestore();
+
+    await assertFails(
+      db.collection('users').doc('workspace-admin-uid').update({
+        role: 'supervisor',
+        assigned_route_ids: [],
+        assigned_route_names: [],
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+  });
   it('workspace roster queries retain active legacy profiles without display_name', async () => {
     await seedUser('tenant-admin-uid', 'tenant_admin');
     await seedUser('legacy-user', 'seller');
@@ -685,6 +727,177 @@ describe('routes collection', () => {
         tenant_id: 'tenant-1',
       }),
     );
+  });
+});
+
+describe('supervisor operational access', () => {
+  it('can read tenant operations and update routes without reassigning sellers', async () => {
+    await seedUser('supervisor-uid', 'supervisor');
+    await seedShop('shop-1');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.collection('routes').doc('route-1').set({
+        name: 'Route One',
+        route_number: 1,
+        total_shops: 1,
+        active: true,
+        assigned_seller_ids: ['seller-uid'],
+        assigned_seller_names: ['Seller'],
+        tenant_id: 'tenant-1',
+      });
+      await db.collection('products').doc('product-1').set({
+        name: 'Product One',
+        tenant_id: 'tenant-1',
+      });
+      await db.collection('seller_inventory').doc('stock-1').set({
+        seller_id: 'seller-uid',
+        variant_id: 'variant-1',
+        quantity_available: 12,
+        tenant_id: 'tenant-1',
+      });
+      await db.collection('inventory_transactions').doc('movement-1').set({
+        type: 'stock_adjustment',
+        quantity: 1,
+        tenant_id: 'tenant-1',
+      });
+      await db.collection('invoices').doc('invoice-1').set({
+        type: 'sale',
+        tenant_id: 'tenant-1',
+      });
+    });
+
+    const db = supervisorCtx(testEnv).firestore();
+    await assertSucceeds(
+      db.collection('routes').where('tenant_id', '==', 'tenant-1').get(),
+    );
+    await assertSucceeds(
+      db.collection('customers').where('tenant_id', '==', 'tenant-1').get(),
+    );
+    await assertSucceeds(
+      db.collection('products').where('tenant_id', '==', 'tenant-1').get(),
+    );
+    await assertSucceeds(
+      db.collection('seller_inventory')
+        .where('tenant_id', '==', 'tenant-1')
+        .get(),
+    );
+    await assertSucceeds(
+      db.collection('inventory_transactions')
+        .where('tenant_id', '==', 'tenant-1')
+        .get(),
+    );
+    await assertSucceeds(
+      db.collection('invoices').where('tenant_id', '==', 'tenant-1').get(),
+    );
+    await assertSucceeds(
+      db.collection('products').doc('product-1').update({
+        name: 'Updated Product',
+      }),
+    );
+    await assertSucceeds(
+      db.collection('routes').doc('route-1').update({ name: 'Updated Route' }),
+    );
+    await assertSucceeds(
+      db.collection('inventory_transactions').doc('movement-2').set({
+        type: 'stock_adjustment',
+        quantity: 1,
+        tenant_id: 'tenant-1',
+      }),
+    );
+  });
+
+  it('cannot manage user accounts, notifications, or route assignments', async () => {
+    await seedUser('supervisor-uid', 'supervisor');
+    await seedUser('seller-uid', 'seller');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.collection('routes').doc('route-1').set({
+        name: 'Route One',
+        route_number: 1,
+        total_shops: 0,
+        active: true,
+        assigned_seller_ids: ['seller-uid'],
+        assigned_seller_names: ['Seller'],
+        tenant_id: 'tenant-1',
+      });
+      await db.collection('customers').doc('shop-1').set({
+        name: 'Shop One',
+        route_id: 'route-1',
+        balance: 0,
+        tenant_id: 'tenant-1',
+      });
+      await db.collection('notifications').doc('notification-1').set({
+        target_role: 'admin',
+        tenant_id: 'tenant-1',
+        read: false,
+      });
+    });
+
+    const db = supervisorCtx(testEnv).firestore();
+    await assertFails(
+      db.collection('users').where('tenant_id', '==', 'tenant-1').get(),
+    );
+    await assertFails(
+      db.collection('notifications').doc('notification-1').get(),
+    );
+    await assertFails(
+      db.collection('routes').doc('route-1').update({
+        assigned_seller_ids: [],
+        assigned_seller_names: [],
+      }),
+    );
+    await assertFails(
+      db.collection('customers').doc('shop-1').update({
+        route_id: 'route-2',
+      }),
+    );
+  });
+
+  it('can create a sale invoice only with the linked ledger and balance batch', async () => {
+    await seedUser('supervisor-uid', 'supervisor');
+    await seedShop('shop-1', { balance: 0 });
+    await seedSettings({ allow_non_stock_invoices: true });
+    const db = supervisorCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('supervisor-sale');
+    const saleRef = db.collection('transactions').doc('supervisor-sale-tx');
+    const batch = db.batch();
+    batch.set(invoiceRef, {
+      created_by: 'supervisor-uid',
+      seller_id: 'supervisor-uid',
+      type: 'sale',
+      invoice_number: 'INV-SUPERVISOR-1',
+      sale_transaction_id: saleRef.id,
+      fulfillment_mode: 'non_stock',
+      seller_inventory_deductions: {},
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
+      subtotal: 100,
+      discount: 0,
+      total: 100,
+      amount_received: 0,
+    });
+    batch.set(saleRef, {
+      created_by: 'supervisor-uid',
+      type: 'cash_out',
+      amount: 100,
+      invoice_id: invoiceRef.id,
+      invoice_number: 'INV-SUPERVISOR-1',
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 100,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 100,
+      last_transaction_id: saleRef.id,
+    });
+
+    await assertSucceeds(batch.commit());
   });
 });
 

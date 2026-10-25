@@ -6,6 +6,60 @@
 
 ---
 
+## SESSION-024 — 2026-10-25 — Supervisor, statements, and release v3.10.6
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Fix reports that backup navigation returned to the dashboard,
+workspace Users stayed loading, and the notification center repeatedly
+refreshed. Add a safer tenant-scoped supervisor role, update Gradle guidance,
+build signed Android APK/AAB artifacts, and improve bilingual statement
+layout before the authorized deployment and publication.
+
+### Root Causes and Changes
+
+- Legacy workspace `admin` was not consistently treated as admin-equivalent
+  for tenant user streams and merge-only backup access. Operational access
+  had also been coupled too broadly to admin checks, motivating a distinct
+  supervisor role rather than promoting sellers to account administrators.
+- Notification shop visibility subscribed to a changing notification value
+  rather than a stable sorted shop-ID set; read-state changes could restart
+  the shop listener. The subscription now uses a stable key.
+- ABI APK splits were enabled during `bundleRelease`, colliding with Android
+  Gradle Plugin bundle resource shrinking. Gradle now disables the ABI split
+  configuration for bundle tasks and retains it for APK tasks. Version-code
+  generation is bounded and monotonic; Flutter adds an ABI-specific APK code
+  offset.
+- Updated runtime docs, release records, and APK/Gradle signing skill. The
+  notification, role, backup, Users, and Rules changes have focused
+  regressions.
+- Account statements now use a three-column header: English details on the
+  left, shop name/date range centered, and selected Arabic/Urdu details on the
+  right. Both statement export surfaces share `buildPdfLedger()`; balance
+  calculations and financial writes are unchanged. Arabic and Urdu samples
+  were visually inspected in Chrome.
+
+### Verification and Delivery
+
+- Focused role/backup/notification/users suite: `00:22 +55: All tests passed!`;
+  focused PDF suite: `00:01 +12: All tests passed!`; full Flutter suite:
+  `01:14 +633: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 6.3s)`;
+  `dart analyze test/`: `No issues found!`.
+- Firestore Rules Emulator: `152 passing (30s)`. Markdown lint and
+  `git diff --check` exited 0.
+- Web `EXIT: 0`; Firebase Hosting and Firestore Rules/indexes each reported
+  `Deploy complete!`. Live shell and entry endpoints returned HTTP 200 with
+  no-store/no-cache headers; `version.json` reports `3.10.6`, build `1117`.
+- Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.7 MB; signed AAB:
+  54.8 MB. APK v2 and AAB JAR signature checks passed. ARM64 metadata:
+  versionName `3.10.6`, versionCode `310063117`. APK copy and install on
+  `R5GL22RGT9V` reported `Success`.
+- Android SDK licenses were not accepted or changed. Commit and push evidence
+  is available in the final release handoff and Git history.
+
+---
+
 ## SESSION-023 — 2026-10-25 — Workspace support and bilingual PDF release
 
 **Agent:** GitHub Copilot

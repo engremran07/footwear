@@ -130,7 +130,7 @@ class DashboardScreen extends ConsumerWidget {
     if (user.isSuperAdmin && user.tenantId == null) {
       return _SuperAdminDashboard(user: user);
     }
-    if (!user.isAdmin) {
+    if (!user.canManageOperationalData) {
       return _SellerDashboard(user: user);
     }
 
@@ -1087,7 +1087,9 @@ class _AdminSpeedDial extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authUserProvider).value;
-    if (user == null || !user.isAdmin) return const SizedBox.shrink();
+    if (user == null || !user.canManageOperationalData) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,

@@ -56,7 +56,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     bool saved = false;
     try {
       final user = await ref.read(authUserProvider.future);
-      if (user?.isAdmin != true) {
+      if (user?.canManageOperationalData != true) {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
@@ -106,7 +106,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         ),
       );
     }
-    if (userAsync.value?.isAdmin != true) {
+    if (userAsync.value?.canManageOperationalData != true) {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
 

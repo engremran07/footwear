@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -24,6 +25,18 @@ List<NotificationModel> filterVisibleNotifications(
 bool isNotificationShopVisible(Map<String, dynamic> shopData) =>
     shopData['active'] != false && shopData['deleted'] != true;
 
+@visibleForTesting
+String notificationShopIdsKey(AsyncValue<List<NotificationModel>> state) {
+  final shopIds =
+      state.value
+          ?.map((notification) => notification.shopId.trim())
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList()
+        ?..sort();
+  return jsonEncode(shopIds ?? const <String>[]);
+}
+
 /// Admin-only stream of the 50 most-recent notifications ordered newest-first,
 /// scoped to the current user's tenant.
 ///
@@ -34,11 +47,12 @@ bool isNotificationShopVisible(Map<String, dynamic> shopData) =>
 /// workspace seeing notifications from other workspaces.
 final notificationsProvider =
     StreamProvider.autoDispose<List<NotificationModel>>((ref) {
-      final authState = ref.watch(authUserProvider);
-      final isAdmin = authState.value?.isAdmin ?? false;
+      final (isAdmin, tenantId) = ref.watch(
+        authUserProvider.select(
+          (state) => (state.value?.isAdmin ?? false, state.value?.tenantId),
+        ),
+      );
       if (!isAdmin) return const Stream.empty();
-
-      final tenantId = authState.value?.tenantId;
 
       var query =
           FirebaseFirestore.instance.collection(Collections.notifications)
@@ -64,22 +78,23 @@ final notificationsProvider =
 /// all-shops query as an existence check.
 final activeNotificationShopIdsProvider =
     StreamProvider.autoDispose<Set<String>>((ref) {
-      final user = ref.watch(authUserProvider).value;
-      if (user?.isAdmin != true) return Stream.value(const <String>{});
+      final (isAdmin, tenantId) = ref.watch(
+        authUserProvider.select(
+          (state) => (state.value?.isAdmin ?? false, state.value?.tenantId),
+        ),
+      );
+      if (!isAdmin) return Stream.value(const <String>{});
 
-      final notifications = ref.watch(notificationsProvider).value;
-      final shopIds =
-          notifications
-              ?.map((notification) => notification.shopId.trim())
-              .where((id) => id.isNotEmpty)
-              .toSet()
-              .toList(growable: false) ??
-          const <String>[];
+      final encodedShopIds = ref.watch(
+        notificationsProvider.select(notificationShopIdsKey),
+      );
+      final shopIds = (jsonDecode(encodedShopIds) as List<dynamic>)
+          .cast<String>();
       if (shopIds.isEmpty) return Stream.value(const <String>{});
 
       final query = TenantScope.applyToQuery(
         FirebaseFirestore.instance.collection(Collections.shops),
-        tenantId: user!.tenantId,
+        tenantId: tenantId,
       );
       final chunks = <List<String>>[
         for (var start = 0; start < shopIds.length; start += 30)

@@ -257,7 +257,7 @@ class _CreateSaleInvoiceScreenState
     }
 
     final routeIds = user.assignedRouteIds;
-    final shopsAsync = user.isAdmin
+    final shopsAsync = user.canManageOperationalData
         ? ref.watch(shopsProvider)
         : (routeIds.isNotEmpty
               ? ref.watch(sellerAllShopsProvider)
@@ -472,7 +472,7 @@ class _CreateSaleInvoiceScreenState
                     error: e,
                     ref: ref,
                     onRetry: () {
-                      if (user.isAdmin) {
+                      if (user.canManageOperationalData) {
                         ref.invalidate(shopsProvider);
                       } else if (user.assignedRouteIds.isNotEmpty) {
                         ref.invalidate(sellerAllShopsProvider);
@@ -545,7 +545,7 @@ class _CreateSaleInvoiceScreenState
                       child: Center(
                         child: Text(
                           tr(
-                            user.isAdmin
+                            user.canManageOperationalData
                                 ? 'admin_no_stock_guidance'
                                 : 'no_inventory_items',
                             ref,

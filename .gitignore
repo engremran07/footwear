@@ -40,6 +40,7 @@ functions/package-lock.json
 app/build/
 app/flutter_analyze_output.txt
 app/flutter_test_output.txt
+app/flutter_test_summary.txt
 
 # Google Play upload artifacts and service account
 google-play-service-account.json

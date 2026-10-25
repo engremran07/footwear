@@ -14,6 +14,7 @@ import 'package:footwear_erp/providers/database_backup_provider.dart';
 import 'package:footwear_erp/providers/network_provider.dart';
 import 'package:footwear_erp/providers/tenant_provider.dart';
 import 'package:footwear_erp/screens/database_backup_screen.dart';
+import 'package:footwear_erp/screens/route_form_screen.dart';
 import 'package:footwear_erp/screens/shop_form_screen.dart';
 
 void main() {
@@ -121,11 +122,54 @@ void main() {
     expect(find.byType(DatabaseBackupScreen), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('legacy admin can open workspace backup screen', (tester) async {
+    final router = await _pumpBackupRoute(
+      tester,
+      role: UserRole.admin,
+      routeIds: const [],
+    );
+
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '/settings/backup',
+    );
+    expect(find.byType(DatabaseBackupScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('supervisor can open route creation but not admin-only screens', (
+    tester,
+  ) async {
+    final router = await _pumpBackupRoute(
+      tester,
+      role: UserRole.supervisor,
+      routeIds: const [],
+      location: '/routes/new',
+    );
+
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/routes/new');
+    expect(find.byType(RouteFormScreen), findsOneWidget);
+
+    router.go('/settings/backup');
+    await tester.pumpAndSettle();
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/');
+    expect(find.byType(DatabaseBackupScreen), findsNothing);
+
+    router.go('/notifications');
+    await tester.pumpAndSettle();
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/');
+    router.go('/users');
+    await tester.pumpAndSettle();
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/');
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<GoRouter> _pumpBackupRoute(
   WidgetTester tester, {
   required List<String> routeIds,
+  UserRole role = UserRole.seller,
   bool disableAnimations = false,
   String location = '/settings/backup',
   void Function(WidgetTester tester)? onTransitionFrame,
@@ -135,12 +179,12 @@ Future<GoRouter> _pumpBackupRoute(
   });
   final now = Timestamp.now();
   final user = UserModel(
-    id: 'seller-1',
-    email: 'seller@example.com',
-    displayName: 'Seller One',
-    role: UserRole.seller,
+    id: 'test-user',
+    email: 'test@example.com',
+    displayName: 'Test User',
+    role: role,
     tenantId: 'tenant-1',
-    assignedRouteIds: routeIds,
+    assignedRouteIds: role == UserRole.seller ? routeIds : const [],
     active: true,
     createdAt: now,
     updatedAt: now,
@@ -185,7 +229,7 @@ Future<GoRouter> _pumpBackupRoute(
   );
   await tester.pumpAndSettle();
   expect(renderedUser.value?.id, user.id);
-  expect(renderedUser.value?.canCreateBackup, routeIds.isNotEmpty);
+  expect(renderedUser.value?.canCreateBackup, user.canCreateBackup);
   router.go(location);
   if (onTransitionFrame != null) {
     await tester.pump();

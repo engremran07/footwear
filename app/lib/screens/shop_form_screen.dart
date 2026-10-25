@@ -100,7 +100,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       final canManageRoute =
           user != null &&
           user.active &&
-          (user.isAdmin ||
+          (user.canManageOperationalData ||
               (user.isSeller && user.assignedRouteIds.contains(_routeId)));
       if (!canManageRoute) {
         ScaffoldMessenger.of(
@@ -165,7 +165,9 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       );
     }
     final user = userAsync.value;
-    if (user == null || !user.active || (!user.isAdmin && !user.isSeller)) {
+    if (user == null ||
+        !user.active ||
+        (!user.canManageOperationalData && !user.isSeller)) {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
 
@@ -196,12 +198,12 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       _loadExisting(shop);
     }
 
-    final routesAsync = user.isAdmin
+    final routesAsync = user.canManageOperationalData
         ? ref.watch(routesProvider)
         : ref.watch(routesBySellerProvider(user.id));
     final routesLoading = routesAsync.isLoading;
     final allRoutes = routesAsync.value ?? [];
-    final routes = user.isAdmin
+    final routes = user.canManageOperationalData
         ? allRoutes
         : allRoutes.where((r) => user.assignedRouteIds.contains(r.id)).toList();
     final selectedRouteAvailable =
@@ -304,7 +306,9 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                                 ]
                               : []),
                     validator: (v) => v == null ? tr('required', ref) : null,
-                    onChanged: user.isAdmin
+                    onChanged:
+                        user.canManageOperationalData &&
+                            (!isEdit || user.isAdmin)
                         ? routesLoading
                               ? null
                               : (v) {
@@ -333,7 +337,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
                         ),
                         TextButton.icon(
                           onPressed: () {
-                            if (user.isAdmin) {
+                            if (user.canManageOperationalData) {
                               ref.invalidate(routesProvider);
                             } else {
                               ref.invalidate(routesBySellerProvider(user.id));

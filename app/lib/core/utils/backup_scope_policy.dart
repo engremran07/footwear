@@ -48,6 +48,7 @@ class BackupScopePolicy {
 
   static BackupScope scopeFor(UserRole role) => switch (role) {
     UserRole.superAdmin => BackupScope.platformMetadata,
+    UserRole.admin => BackupScope.workspaceBusiness,
     UserRole.tenantAdmin => BackupScope.workspaceBusiness,
     UserRole.seller => BackupScope.sellerRoute,
     _ => BackupScope.disabled,

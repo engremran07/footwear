@@ -10,6 +10,85 @@
 
 ---
 
+## Scope-Specific Addendum — v3.10.6+1117 (2026-10-25)
+
+This addendum records the account-statement layout and combined release. It is
+not a full re-audit and does not change the historical v13 scores.
+
+### Statement Layout
+
+Account-statement PDFs now position English title/date/entry information in
+the left column, shop name and date range in the center, and selected Arabic
+or Urdu information in the right column. Physical column order is pinned with
+an LTR directionality wrapper; child text retains explicit language direction.
+Both account-statement export call sites use `buildPdfLedger()`. No ledger
+calculation or write path changed. Generated Arabic and Urdu PDFs were
+visually inspected in Chrome.
+
+### Validation and Deployment
+
+- Focused PDF suite: `00:01 +12: All tests passed!`; full Flutter suite:
+  `01:14 +633: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 6.3s)`;
+  `dart analyze test/`: `No issues found!`; Rules Emulator:
+  `152 passing (30s)`.
+- Web build `EXIT: 0`; Hosting and Rules/indexes deployments reported
+  `Deploy complete!`. Live shell endpoints returned HTTP 200 with
+  `no-store, must-revalidate, no-cache`; `version.json` reports version
+  `3.10.6`, build `1117`.
+- Split APKs: 30.7/32.2/33.7 MB; signed AAB: 54.8 MB. APK v2 and AAB JAR
+  signatures verified. ARM64 versionCode `310063117` installed on
+  `R5GL22RGT9V` with `Success`.
+
+---
+
+## Scope-Specific Addendum — v3.10.5+1116 (2026-10-25)
+
+This addendum records the supervisor, workspace access, notification
+subscription, and Android release work. It is not a full re-audit and does not
+change the historical v13 scores above.
+
+### Findings and Remediation
+
+- Workspace user loading and backup access had inconsistent role predicates:
+  legacy workspace `admin` profiles did not receive the expected user-list
+  and merge-only backup capabilities. The predicates now recognize legacy
+  admins while retaining tenant scope and preserving the narrower backup
+  policy.
+- Promoting sellers directly to administrator roles would grant unrelated
+  account and workspace powers. A separate tenant-scoped `supervisor` role
+  now supports operational routes, shops, products, inventory, invoices, and
+  reports. It does not grant user administration, notifications, settings,
+  backups, financial corrections/approval, invoice voids, or reassignment
+  powers reserved for administrators.
+- Notification visibility listeners previously depended on changing
+  notification state. They now key on stable sorted shop IDs, avoiding
+  read-state-only listener restarts.
+- Android release ABI splits previously remained active during bundle
+  resource shrinking. Bundle tasks now disable APK ABI splits; APK tasks
+  retain them. Version-code generation is bounded and monotonic, with Flutter
+  ABI offsets accounted for when comparing split APKs.
+
+### Evidence and Remaining Release Gates
+
+- Focused role/backup/notification/users suite: `00:22 +55: All tests passed!`;
+  full Flutter suite: `01:59 +633: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 15.0s)`;
+  `dart analyze test/`: `No issues found!`; Rules Emulator:
+  `152 passing (33s)`.
+- Markdown lint and `git diff --check` exited 0.
+- Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. Signed AAB:
+  54.8 MB. APK v2 signature verified; AAB verification reported
+  `jar verified.`. ARM64 package metadata: versionName `3.10.5`,
+  versionCode `310053116`.
+- Android SDK license acceptance remains pending (release builds succeeded
+  without accepting licenses). No device was connected, so phone delivery was
+  skipped. Production Rules/indexes and Hosting deployments, installation,
+  commit, and push were not performed. Firestore Rules remain local and
+  undeployed.
+
+---
+
 ## Executive Summary
 
 ShoesERP is a production Flutter/Firebase ERP application for footwear distribution. This audit was performed using an 88-agent governance system examining security, architecture, financial integrity, CI/CD, testing, code quality, performance, and observability dimensions. The app has undergone 12 prior audit cycles before this report.

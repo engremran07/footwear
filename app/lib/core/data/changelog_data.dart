@@ -28,6 +28,51 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.10.6',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '📄',
+        text: {
+          AppLocale.en:
+              'Account statements now place the shop name and statement dates between the English and Arabic or Urdu details for a clearer, more compact page.',
+          AppLocale.ar:
+              'تعرض كشوف الحساب الآن اسم المتجر وفترة الكشف بين التفاصيل الإنجليزية والعربية أو الأردية بتنسيق أوضح وأكثر اختصارًا.',
+          AppLocale.ur:
+              'اکاؤنٹ اسٹیٹمنٹ میں دکان کا نام اور مدت اب انگریزی اور عربی یا اردو تفصیلات کے درمیان زیادہ واضح اور مختصر انداز میں دکھائی جاتی ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.10.5',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧑‍💼',
+        text: {
+          AppLocale.en:
+              'Workspace supervisors can manage day-to-day routes, shops, products, inventory, invoices, and reports without account-administration or support-access controls.',
+          AppLocale.ar:
+              'يمكن لمشرفي مساحة العمل إدارة المسارات والمتاجر والمنتجات والمخزون والفواتير والتقارير اليومية دون صلاحيات إدارة الحسابات أو وصول الدعم.',
+          AppLocale.ur:
+              'ورک اسپیس سپروائزر اکاؤنٹ ایڈمنسٹریشن یا سپورٹ رسائی کے اختیارات کے بغیر روزمرہ روٹس، دکانیں، مصنوعات، انوینٹری، انوائسز اور رپورٹس سنبھال سکتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔄',
+        text: {
+          AppLocale.en:
+              'Backup and workspace user lists now work for legacy administrators, and notification updates no longer restart the shop-visibility listener unnecessarily.',
+          AppLocale.ar:
+              'أصبحت النسخ الاحتياطية وقوائم مستخدمي مساحة العمل متاحة للمسؤولين القدامى، ولم تعد تحديثات الإشعارات تعيد تشغيل مستمع المتاجر دون حاجة.',
+          AppLocale.ur:
+              'پرانے ایڈمن اکاؤنٹس کے لیے بیک اپ اور ورک اسپیس صارفین کی فہرست درست کام کرتی ہے، اور نوٹیفکیشن اپ ڈیٹس اب دکانوں کا listener بلا ضرورت دوبارہ شروع نہیں کرتیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.10.4',
     date: 'October 2026',
     items: [

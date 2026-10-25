@@ -119,7 +119,9 @@ final allTransactionsProvider =
       // Admin-only unfiltered query: guard to prevent PERMISSION_DENIED.
       // Use select() so heartbeat writes to last_active do NOT restart the stream.
       final isAdmin = ref.watch(
-        authUserProvider.select((s) => s.value?.isAdmin ?? false),
+        authUserProvider.select(
+          (s) => s.value?.canManageOperationalData ?? false,
+        ),
       );
       final tenantId = ref.watch(
         authUserProvider.select(
@@ -157,7 +159,7 @@ final shopsAnalyticsTransactionsProvider =
         authUserProvider.select((s) {
           final u = s.value;
           if (u == null) return (false, false, '');
-          if (u.isAdmin) return (true, false, '');
+          if (u.canManageOperationalData) return (true, false, '');
           if (!u.isSeller || u.assignedRouteIds.isEmpty) {
             return (false, false, '');
           }
@@ -304,7 +306,7 @@ final routeTransactionsExportProvider =
       // potentially-null .value while the StreamProvider is still loading.
       final user = await ref.read(authUserProvider.future);
       if (user == null) return const <TransactionModel>[];
-      if (!user.isAdmin) {
+      if (!user.canManageOperationalData) {
         if (!user.isSeller || !user.assignedRouteIds.contains(normalizedId)) {
           return const <TransactionModel>[];
         }
@@ -334,7 +336,9 @@ final allTransactionsExportProvider = FutureProvider<List<TransactionModel>>((
   // Use .future to await first auth emission instead of reading a
   // potentially-null .value while the StreamProvider is still loading.
   final user = await ref.read(authUserProvider.future);
-  if (user == null || !user.isAdmin) return const <TransactionModel>[];
+  if (user == null || !user.canManageOperationalData) {
+    return const <TransactionModel>[];
+  }
   final tenantId = TenantScope.normalize(user.tenantId);
   final query = TenantScope.applyToQuery(
     FirebaseFirestore.instance.collection(Collections.transactions),
@@ -364,7 +368,8 @@ final sellerTransactionsExportProvider =
       final user = await ref.read(authUserProvider.future);
       if (user == null ||
           !user.active ||
-          (!user.isAdmin && (!user.isSeller || user.id != normalizedId))) {
+          (!user.canManageOperationalData &&
+              (!user.isSeller || user.id != normalizedId))) {
         return const <TransactionModel>[];
       }
       final tenantId = TenantScope.normalize(user.tenantId);

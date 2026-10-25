@@ -123,7 +123,7 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
           ),
         ],
       ),
-      floatingActionButton: user?.isAdmin == true
+      floatingActionButton: user?.canManageOperationalData == true
           ? FloatingActionButton(
               onPressed: () => context.push('/products/new'),
               child: const Icon(Icons.add),

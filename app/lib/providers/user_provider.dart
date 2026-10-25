@@ -68,8 +68,8 @@ final allUsersExportProvider = FutureProvider<List<UserModel>>((ref) async {
 });
 
 final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
-  // Route assignment includes workspace admins because tenant admins can also
-  // operate as field sellers.
+  // Route assignments are limited to seller accounts. Operational supervisors
+  // already see tenant routes and must not be represented as route sellers.
   final canManageUsers = ref.watch(
     authUserProvider.select(
       (s) => canManageUserAccountsRole(
@@ -92,7 +92,7 @@ final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
       .map(
         (snap) => snap.docs
             .map((d) => UserModel.fromJson(d.data(), d.id))
-            .where((user) => user.role != UserRole.superAdmin)
+            .where((user) => user.isSeller)
             .toList(),
       );
 });
@@ -369,18 +369,16 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         );
       }
       if (owner.isTenantAdmin &&
-          normalizedRole != 'admin' &&
+          normalizedRole != 'supervisor' &&
           normalizedRole != 'seller') {
         throw StateError(
-          'Workspace admins may create only admin and seller accounts.',
+          'Workspace admins may create only supervisor and seller accounts.',
         );
       }
       if (!owner.isSuperAdmin &&
           !owner.isTenantAdmin &&
           normalizedRole != 'seller') {
-        throw StateError(
-          'Only workspace administrators can create admin accounts.',
-        );
+        throw StateError('This account cannot assign the requested role.');
       }
       if (normalizedRole == 'seller' && assignedRouteIds.isEmpty) {
         throw ArgumentError(
@@ -618,11 +616,15 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       final targetRole = normalizeRoleName(
         targetData?['role'] as String? ?? '',
       );
+      const workspaceRoles = {'supervisor', 'seller'};
+      if (!workspaceRoles.contains(targetRole)) {
+        throw StateError('Workspace user administration is required.');
+      }
       if (requestedRole != null &&
-          ((requestedRole != 'admin' && requestedRole != 'seller') ||
-              (targetRole != 'admin' && targetRole != 'seller'))) {
+          (!workspaceRoles.contains(requestedRole) ||
+              !workspaceRoles.contains(targetRole))) {
         throw StateError(
-          'Workspace admins may change only admin and seller roles.',
+          'Workspace admins may change only supervisor and seller roles.',
         );
       }
 

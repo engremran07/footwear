@@ -19,7 +19,7 @@ import '../widgets/shimmer_loading.dart';
 // NotificationCenterScreen — admin-only in-app notification feed.
 //
 // PERMISSION RULES:
-//   • This route ('/notifications') is in _isAdminOnlyPath() → sellers are
+//   • This route ('/notifications') is in _isAccountAdminPath() → sellers are
 //     redirected to '/' by go_router before this widget renders.
 //   • The widget double-checks isAdmin as defense-in-depth and shows nothing
 //     if the role is absent (auth warm-up race guard).

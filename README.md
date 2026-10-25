@@ -1,7 +1,12 @@
-# FootWear ERP — v3.10.4+1115
+# FootWear ERP — v3.10.6+1117
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
+> **v3.10.6+1117 (2026-10-25)** — Account-statement PDFs now use three columns: English report details on the left, shop name and date range in the center, and selected Arabic or Urdu details on the right. This release also includes the tenant-scoped supervisor role, legacy-admin Users/merge-backup access, notification listener stability, and the APK/AAB Gradle fix.
+> Verification: full Flutter suite `01:14 +633: All tests passed!`; focused PDF suite `00:01 +12: All tests passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 6.3s)`; `dart analyze test/`: `No issues found!`; Firestore Rules Emulator: `152 passing (30s)`; Markdown lint and `git diff --check` exited 0.
+> Web build `EXIT: 0`; Firebase Hosting and Firestore Rules/indexes each reported `Deploy complete!`. Live `/`, `index.html`, `version.json`, and `main.dart.js` returned HTTP 200 with no-store/no-cache/must-revalidate headers; `version.json` reports `3.10.6+1117`. The 23 remote indexes and 2 field overrides absent locally were preserved without `--force`.
+> Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.7 MB; signed AAB 54.8 MB. APK v2 and AAB JAR signature verification passed. ARM64 installed on `R5GL22RGT9V` (`Success`), versionName `3.10.6`, versionCode `310063117`.
+> **v3.10.5+1116 (2026-10-25)** — Adds a tenant-scoped supervisor role for operational routes, shops, products, inventory, invoices, and reports without user-administration, notifications, settings, backup, financial-correction, or invoice-void privileges. Legacy admins regain workspace user-list and merge-only backup access. Notification shop-visibility subscriptions no longer restart for read-state-only changes. Android versionCode generation now preserves Play Store upgrade ordering. The local v3.10.5 artifacts were superseded by v3.10.6 before production deployment.
 > **v3.10.4+1115 (2026-10-25)** — Super-admin workspace support-access feedback now distinguishes start, switch, end, and failure states. Shared financial PDF rows preserve English-left and selected Arabic/Urdu-right ordering under RTL pages. Urdu remains readable Naskh-style; a Nastaliq renderer migration is deferred until logo, selectable-text, pagination, and Web/Android report parity are proven.
 > Verification: `01:16 +628: All tests passed!`; focused access/PDF suite `00:11 +65: All tests passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 132.4s)`; `dart analyze test/`: `No issues found!`; Rules Emulator: `147 passing (29s)`.
 > Web build `EXIT: 0`; Hosting and Firestore Rules/indexes each reported `Deploy complete!`; 23 remote indexes and 2 field overrides not listed locally were preserved. Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. No Android device was connected, so installation was skipped. Google Drive OAuth remains unconfigured.
@@ -242,7 +247,7 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 
 ### Data Maintenance and Workspace Lifecycle
 
-- Supported backups are created and restored through the app's encrypted, workspace-scoped workflow. Tenant administrators merge records without pruning; selected super-admins may replace only the active support workspace. Sellers may save encrypted assigned-route archives to phone storage; restore imports only their own eligible unlinked cash ledger rows with atomic shop-balance reconciliation. Saved files can be explicitly uploaded to configured Google Drive when online; this is not background synchronization.
+- Supported backups are created and restored through the app's encrypted, workspace-scoped workflow. Tenant administrators and legacy workspace admins merge records without pruning; selected super-admins may replace only the active support workspace. Supervisors have no backup access. Sellers may save encrypted assigned-route archives to phone storage; restore imports only their own eligible unlinked cash ledger rows with atomic shop-balance reconciliation. Saved files can be explicitly uploaded to configured Google Drive when online; this is not background synchronization.
 - Bulk database flush/reset controls and the legacy plaintext export, whole-collection restore, and direct-balance reset scripts fail closed. Multi-batch client cleanup can leave financial links, balances, inventory, or references inconsistent.
 - Workspace lifecycle is archive/restore only. Firestore Rules deny hard deletion of a tenant root so business records cannot be orphaned by deleting the workspace document.
 - To restore an archived workspace, select it from the workspace list with a support reason of at least 10 characters, then confirm Restore. The selected context is recorded in `platform_access_logs`; active tenant status remains required by business-data Rules.
@@ -252,20 +257,22 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 
 ## Roles & Permissions
 
-| Action | Admin | Seller |
-| --- | --- | --- |
-| Manage products / variants | ✅ | ❌ |
-| Manage routes | ✅ | ❌ |
-| Delete routes / shops | ✅ | ❌ |
-| Manage users | ✅ | ❌ |
-| View all shops | ✅ | Assigned route only |
-| Create / update shops | ✅ | Assigned route only |
-| Create transactions | ✅ | Assigned route only |
-| View reports | ✅ | ❌ |
-| Adjust inventory | ✅ | ❌ |
-| Profile (name/theme/language/password) | ✅ | ✅ |
+| Action | Admin | Supervisor | Seller |
+| --- | --- | --- | --- |
+| Manage products / variants | ✅ | ✅ | ❌ |
+| Operational route access | ✅ | ✅ (no seller assignment) | Assigned routes only |
+| Manage users | Authorized account roles | ❌ | ❌ |
+| View shops | All in workspace | All in workspace | Assigned routes only |
+| Create / update shops | ✅ | ✅ (no route reassignment) | Assigned routes only |
+| Access invoices and reports | ✅ | ✅ | Assigned-route workflows |
+| Adjust inventory | ✅ | ✅ | ❌ |
+| Notifications, settings, backup | Admin-equivalent only | ❌ | ❌ |
+| Financial correction / invoice void | Admin-equivalent only | ❌ | ❌ |
+| Profile (name/theme/language/password) | ✅ | ✅ | ✅ |
 
 > `manager` role is treated as admin-equivalent for legacy data compatibility.
+> Tenant admins may assign supervisor and seller roles to eligible members;
+> supervisor is not an account-administration or financial-approval role.
 
 ---
 

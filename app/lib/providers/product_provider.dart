@@ -109,7 +109,7 @@ final allVariantsExportProvider = FutureProvider<List<ProductVariantModel>>((
   ref,
 ) async {
   final user = await ref.read(authUserProvider.future);
-  if (user == null || !user.active || !user.isAdmin) {
+  if (user == null || !user.active || !user.canManageOperationalData) {
     return const <ProductVariantModel>[];
   }
   final tenantId = TenantScope.normalize(user.tenantId);
@@ -144,7 +144,7 @@ class ProductNotifier extends AsyncNotifier<void> {
         .doc(authUser.uid)
         .get();
     final role = (me.data()?['role'] as String? ?? '').trim();
-    if (!isPrivilegedRoleName(role)) {
+    if (!canManageOperationalDataRole(role)) {
       throw StateError('Only admin can manage products');
     }
   }

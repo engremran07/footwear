@@ -798,7 +798,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 .where((part) => part.trim().isNotEmpty)
                 .join(', ');
         final canManageShop =
-            user?.isAdmin == true ||
+            user?.canManageOperationalData == true ||
             (user?.isSeller == true &&
                 (user?.assignedRouteIds.contains(shop.routeId) ?? false));
 

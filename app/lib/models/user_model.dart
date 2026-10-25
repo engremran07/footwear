@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import '../core/utils/role_names.dart';
 
-enum UserRole { admin, seller, tenantAdmin, superAdmin, unknown }
+enum UserRole { admin, supervisor, seller, tenantAdmin, superAdmin, unknown }
 
 UserRole _roleFromString(String value) {
   switch (canonicalRoleName(value)) {
@@ -12,6 +12,8 @@ UserRole _roleFromString(String value) {
       return UserRole.tenantAdmin;
     case 'super_admin':
       return UserRole.superAdmin;
+    case 'supervisor':
+      return UserRole.supervisor;
     case 'seller':
       return UserRole.seller;
     default:
@@ -30,6 +32,8 @@ String _roleToString(UserRole r) {
       return 'tenant_admin';
     case UserRole.superAdmin:
       return 'super_admin';
+    case UserRole.supervisor:
+      return 'supervisor';
     case UserRole.unknown:
       return 'unknown';
   }
@@ -78,6 +82,8 @@ class UserModel {
       role == UserRole.tenantAdmin ||
       role == UserRole.superAdmin;
   bool get isSeller => role == UserRole.seller;
+  bool get isSupervisor => role == UserRole.supervisor;
+  bool get canManageOperationalData => isAdmin || isSupervisor;
   bool get isTenantAdmin => role == UserRole.tenantAdmin;
   bool get isSuperAdmin => role == UserRole.superAdmin;
   bool get isRoleRecognized => role != UserRole.unknown;
@@ -85,9 +91,9 @@ class UserModel {
       canCreateWorkspaceBackup || (isSeller && assignedRouteIds.isNotEmpty);
   bool get canRestoreBackup =>
       canRestoreWorkspaceBackup || (isSeller && assignedRouteIds.isNotEmpty);
-  bool get canCreateWorkspaceBackup => isTenantAdmin || isSuperAdmin;
+  bool get canCreateWorkspaceBackup => isAdmin;
   bool get canRunAutomaticWorkspaceBackup => isTenantAdmin;
-  bool get canRestoreWorkspaceBackup => isTenantAdmin || isSuperAdmin;
+  bool get canRestoreWorkspaceBackup => isAdmin;
   bool get canPruneWorkspaceBackup => isSuperAdmin;
   String? get tenantId => isSuperAdmin ? activeWorkspaceId : _tenantId;
 

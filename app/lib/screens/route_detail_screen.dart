@@ -30,9 +30,9 @@ class RouteDetailScreen extends ConsumerWidget {
     final shopsAsync = ref.watch(shopsByRouteProvider(routeId));
     final analyticsAsync = ref.watch(shopsAnalyticsTransactionsProvider);
     final user = ref.watch(authUserProvider).value;
-    final isAdmin = user?.isAdmin ?? false;
+    final canManageRoute = user?.canManageOperationalData ?? false;
     final canAddShop =
-        isAdmin ||
+        canManageRoute ||
         (user?.isSeller == true &&
             user?.assignedRouteIds.contains(routeId) == true);
     final theme = Theme.of(context);
@@ -46,7 +46,7 @@ class RouteDetailScreen extends ConsumerWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (isAdmin)
+              if (canManageRoute)
                 Padding(
                   padding: const EdgeInsetsDirectional.only(end: 4, top: 4),
                   child: Row(
@@ -57,34 +57,35 @@ class RouteDetailScreen extends ConsumerWidget {
                         tooltip: tr('tooltip_edit_route', ref),
                         onPressed: () => context.push('/routes/$routeId/edit'),
                       ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.delete,
-                          color: AppBrand.errorColor,
-                        ),
-                        tooltip: tr('tooltip_delete_route', ref),
-                        onPressed: () async {
-                          final ok = await ConfirmDialog.show(
-                            context,
-                            title: tr('delete', ref),
-                            message: tr('confirm_delete_route', ref),
-                          );
-                          if (ok != true) return;
-                          try {
-                            await ref
-                                .read(routeNotifierProvider.notifier)
-                                .delete(routeId);
-                            if (context.mounted) context.go('/routes');
-                          } catch (e) {
-                            if (context.mounted) {
-                              final key = AppErrorMapper.key(e);
-                              ScaffoldMessenger.of(
-                                context,
-                              ).showSnackBar(errorSnackBar(tr(key, ref)));
+                      if (user?.isAdmin == true)
+                        IconButton(
+                          icon: const Icon(
+                            Icons.delete,
+                            color: AppBrand.errorColor,
+                          ),
+                          tooltip: tr('tooltip_delete_route', ref),
+                          onPressed: () async {
+                            final ok = await ConfirmDialog.show(
+                              context,
+                              title: tr('delete', ref),
+                              message: tr('confirm_delete_route', ref),
+                            );
+                            if (ok != true) return;
+                            try {
+                              await ref
+                                  .read(routeNotifierProvider.notifier)
+                                  .delete(routeId);
+                              if (context.mounted) context.go('/routes');
+                            } catch (e) {
+                              if (context.mounted) {
+                                final key = AppErrorMapper.key(e);
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).showSnackBar(errorSnackBar(tr(key, ref)));
+                              }
                             }
-                          }
-                        },
-                      ),
+                          },
+                        ),
                     ],
                   ),
                 ),

@@ -172,7 +172,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         ? ref.watch(sellerAllShopsProvider)
         : ref.watch(shopsProvider);
     final transactionsAsync = ref.watch(shopsAnalyticsTransactionsProvider);
-    final routesAsync = user?.isAdmin == true
+    final routesAsync = user?.canManageOperationalData == true
         ? ref.watch(routesProvider)
         : (isSeller && sellerRouteIds.isNotEmpty
               ? ref.watch(routesBySellerProvider(user!.id))
@@ -183,7 +183,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     };
     final fallbackCurrency = settingsAsync.value?.currency ?? 'SAR';
     final canCreateShop =
-        user != null && (user.isAdmin || sellerRouteIds.isNotEmpty);
+        user != null &&
+        (user.canManageOperationalData || sellerRouteIds.isNotEmpty);
 
     // When navigated with ?currency=X, restrict shops to routes of that currency.
     final filterCurrency = widget.filterCurrency?.toUpperCase();
@@ -295,7 +296,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                         ],
                       ),
                     ),
-                    if (user?.isAdmin == true)
+                    if (user?.canManageOperationalData == true)
                       PopupMenuItem(
                         value: 'per_route',
                         child: Row(
@@ -389,7 +390,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                       tooltip: tr('retry', ref),
                       icon: const Icon(Icons.refresh),
                       onPressed: () {
-                        if (user?.isAdmin == true) {
+                        if (user?.canManageOperationalData == true) {
                           ref.invalidate(routesProvider);
                         } else if (user != null) {
                           ref.invalidate(routesBySellerProvider(user.id));
@@ -423,7 +424,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                           error: routesAsync!.error!,
                           ref: ref,
                           onRetry: () {
-                            if (user?.isAdmin == true) {
+                            if (user?.canManageOperationalData == true) {
                               ref.invalidate(routesProvider);
                             } else if (user != null) {
                               ref.invalidate(routesBySellerProvider(user.id));
@@ -567,7 +568,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                       // Group by route for admin and sellers with multiple routes.
                       final routes = routesAsync?.value ?? [];
                       final shouldGroupByRoute =
-                          user?.isAdmin == true || routes.length > 1;
+                          user?.canManageOperationalData == true ||
+                          routes.length > 1;
                       if (shouldGroupByRoute && routes.isNotEmpty) {
                         return AppPullRefresh(
                           onRefresh: () => _refreshShopData(user),
@@ -576,7 +578,8 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                             routes: routes,
                             selectedFilter: _filter,
                             flowByShop: scopedFlowByShop,
-                            showAssignedSellerNames: user?.isAdmin == true,
+                            showAssignedSellerNames:
+                                user?.canManageOperationalData == true,
                             lastTxByShop: lastTxByShop,
                           ),
                         );
@@ -653,7 +656,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
     } else {
       ref.invalidate(shopsProvider);
       await ref.read(shopsProvider.future);
-      if (user?.isAdmin == true) {
+      if (user?.canManageOperationalData == true) {
         ref.invalidate(routesProvider);
         await ref.read(routesProvider.future);
       }

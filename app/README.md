@@ -1,6 +1,57 @@
-# FootWear ERP — Flutter App (v3.10.3+1114)
+# FootWear ERP — Flutter App (v3.10.6+1117)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
+
+## v3.10.6 Bilingual Account Statement Layout
+
+Account-statement PDFs use a compact three-column information row below the
+shared workspace header. English title/date/entry details remain on the left;
+the shop name and statement date range are centered; selected Arabic or Urdu
+details remain on the right. The header pins physical order with an LTR
+directionality wrapper and keeps each text direction explicit. Both the shop
+detail and reports account-statement exports use the same `buildPdfLedger()`
+builder; ledger values, balances, and transaction writes are unchanged.
+
+Focused PDF suite: `00:01 +12: All tests passed!`; Arabic and Urdu generated
+samples were inspected in Chrome. Full Flutter suite: `01:14 +633: All tests
+passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 6.3s)`;
+`dart analyze test/`: `No issues found!`; Rules Emulator: `152 passing (30s)`.
+
+Web `EXIT: 0`; Hosting and Rules/indexes deployments reported
+`Deploy complete!`. Live shell endpoints returned HTTP 200 with
+`no-store, must-revalidate, no-cache`; `version.json` reports `3.10.6+1117`.
+Split APKs: 30.7/32.2/33.7 MB; signed AAB: 54.8 MB. APK v2 and AAB JAR
+signature verification passed. ARM64 versionName `3.10.6`, versionCode
+`310063117`, installed on `R5GL22RGT9V` with `Success`. Commit and push are
+covered by the source-control publication for this release.
+
+## v3.10.5 Operational Supervisor and Access Recovery
+
+The tenant-scoped `supervisor` role can use routes, shops, products, inventory,
+invoices, and reports. It cannot administer users, notifications, settings, or
+backups, and cannot correct financial transactions, approve corrections, void
+invoices, change route seller assignments, or move shops between routes.
+Tenant admins may assign only supervisor and seller roles to eligible
+non-owner profiles; admin and tenant-admin role changes remain restricted to
+the selected platform-super-admin flow.
+
+Legacy workspace `admin` accounts can access tenant user lists and perform
+merge-only workspace backup/restore. Notification shop-visibility listeners
+key off the sorted set of referenced shop IDs, so notification read-state
+changes do not restart those listeners. Release version `3.10.5+1116` also uses
+a monotonic, bounded Android `versionCode` encoding for Play Store upgrades.
+
+Verification: full Flutter suite `01:59 +633: All tests passed!`; focused
+role/backup/notification/users suite `00:22 +55: All tests passed!`;
+`flutter analyze lib --no-pub`: `No issues found! (ran in 15.0s)`;
+`dart analyze test/`: `No issues found!`; Rules Emulator: `152 passing (33s)`.
+Markdown lint and `git diff --check` exited 0.
+
+Split APKs built: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. Signed AAB:
+54.8 MB. APK v2 signature verified; AAB verification reported `jar verified.`;
+the local upload certificate chain is not publicly trusted, as expected for a
+locally held upload key. These v3.10.5 artifacts were superseded by the
+published v3.10.6+1117 release described above.
 
 ## v3.10.3 Workspace Roster Completeness
 
@@ -255,6 +306,10 @@ flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=tru
 #         build/app/outputs/flutter-apk/app-x86_64-release.apk
 #         build/app/outputs/flutter-apk/app-release.apk
 
+# Signed Play Console Android App Bundle (AAB)
+flutter build appbundle --release --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true
+# Output: build/app/outputs/bundle/release/app-release.aab
+
 # From the repo root, deploy Firestore rules/indexes before commit/push completes.
 # firebase deploy --only firestore:rules,firestore:indexes
 
@@ -345,6 +400,7 @@ Platform super-admin accounts are provisioned out of band. The client never embe
 | `manager` | Admin-equivalent (legacy) |
 | `tenant_admin` | Full CRUD within the tenant, subject to financial and role-management safeguards |
 | `super_admin` | Platform metadata globally; business data only in the explicitly selected, audited workspace |
+| `supervisor` | Tenant-scoped operational access to routes, shops, products, inventory, invoices, and reports; no user, notification, settings, or backup administration |
 | `seller` | Assigned route only — read + create transactions |
 
 Dashboard and inventory suppress transient permission-denied states during auth/profile stream warm-up. Role-scoped providers stay in loading or cached fallback until access is confirmed.

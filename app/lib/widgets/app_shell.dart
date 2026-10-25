@@ -83,6 +83,21 @@ class AppShell extends ConsumerStatefulWidget {
           )
           .toList();
     }
+    if (user.isSupervisor) {
+      return _navItems
+          .where(
+            (e) =>
+                e.route == '/' ||
+                e.route == '/routes' ||
+                e.route == '/shops' ||
+                e.route == '/products' ||
+                e.route == '/inventory' ||
+                e.route == '/invoices' ||
+                e.route == '/reports' ||
+                e.route == '/about',
+          )
+          .toList();
+    }
     return _navItems.where((e) {
       if (e.route == '/settings') return user.isAdmin;
       if (e.route == '/users') return canManageUsers(user);
@@ -1534,6 +1549,10 @@ class _RoleBadge extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final (label, color) = switch (role) {
       UserRole.admin => (tr('role_admin', ref), AppBrand.adminRoleColor),
+      UserRole.supervisor => (
+        tr('role_supervisor', ref),
+        AppBrand.adminRoleColor,
+      ),
       UserRole.seller => (tr('role_seller', ref), AppBrand.sellerRoleColor),
       UserRole.tenantAdmin => (
         tr('role_tenant_admin', ref),

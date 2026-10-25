@@ -101,7 +101,7 @@ final tenantUsersProvider = StreamProvider.autoDispose
         }
         final expiryTimer = Timer(remaining, ref.invalidateSelf);
         ref.onDispose(expiryTimer.cancel);
-      } else if (!currentUser.isTenantAdmin ||
+      } else if (!currentUser.isAdmin ||
           !currentUser.active ||
           TenantScope.normalize(currentUser.tenantId) != tenantId) {
         return const Stream<List<UserModel>>.empty();
@@ -169,7 +169,7 @@ final allInactiveUsersForTenantProvider =
       if (currentUser == null ||
           (currentUser.isSuperAdmin
               ? !currentUser.hasActiveWorkspaceSupportContextFor(tenantId)
-              : !currentUser.isTenantAdmin ||
+              : !currentUser.isAdmin ||
                     !currentUser.active ||
                     TenantScope.normalize(currentUser.tenantId) != tenantId)) {
         return const Stream<List<UserModel>>.empty();

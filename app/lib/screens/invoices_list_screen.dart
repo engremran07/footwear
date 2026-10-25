@@ -26,7 +26,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
 
   Future<void> _refreshInvoices() async {
     final user = await ref.read(authUserProvider.future);
-    if (user?.isAdmin == true) {
+    if (user?.canManageOperationalData == true) {
       ref.invalidate(allInvoicesProvider);
       await ref.read(allInvoicesProvider.future);
     } else if (user != null) {
@@ -43,7 +43,8 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      floatingActionButton: (user != null && (user.isSeller || user.isAdmin))
+      floatingActionButton:
+          (user != null && (user.isSeller || user.canManageOperationalData))
           ? FloatingActionButton.extended(
               onPressed: () => context.push('/invoices/new'),
               backgroundColor: AppBrand.primaryColor,

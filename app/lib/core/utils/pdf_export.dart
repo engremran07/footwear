@@ -878,6 +878,39 @@ Future<Uint8List> buildPdfLedger({
       documentPair,
       fallback: _pdfLabel(labels, 'account_statement', locale),
     );
+    final reportDate = _documentLabelWithSuffix(
+      'report_date',
+      _fmtDate(now),
+      documentPair,
+      locale,
+    );
+    final generatedByLabel = generatedBy.isEmpty
+        ? null
+        : _documentLabelWithSuffix(
+            'generated_by',
+            _s(generatedBy),
+            documentPair,
+            locale,
+          );
+
+    pw.Widget headerLine(
+      String text,
+      int languageIndex,
+      pw.TextAlign textAlign,
+      pw.TextStyle style,
+    ) {
+      final lines = text.split('\n');
+      if (languageIndex >= lines.length) return pw.SizedBox.shrink();
+      return pw.Text(
+        lines[languageIndex],
+        style: style,
+        textDirection: languageIndex == 0
+            ? pw.TextDirection.ltr
+            : pw.TextDirection.rtl,
+        textAlign: textAlign,
+        maxLines: 2,
+      );
+    }
 
     // NOTE (RR-017): Use pw.MultiPage so the PDF renderer measures and
     // flows content naturally across pages. This prevents the fixed-row
@@ -901,70 +934,128 @@ Future<Uint8List> buildPdfLedger({
                   logoBytes: logoBytes,
                 ),
                 pw.SizedBox(height: 4),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-                  children: [
-                    _bilingualHeaderText(
-                      statementTitle,
-                      style: ts(
-                        size: 11,
-                        fw: pw.FontWeight.bold,
-                        color: _invoiceAccentColor(
-                          header?.accentColor ?? '#315C4C',
+                pw.Directionality(
+                  textDirection: pw.TextDirection.ltr,
+                  child: pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Expanded(
+                        flex: 2,
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            headerLine(
+                              statementTitle,
+                              0,
+                              pw.TextAlign.left,
+                              ts(
+                                size: 11,
+                                fw: pw.FontWeight.bold,
+                                color: _invoiceAccentColor(
+                                  header?.accentColor ?? '#315C4C',
+                                ),
+                              ),
+                            ),
+                            pw.SizedBox(height: 3),
+                            headerLine(
+                              reportDate,
+                              0,
+                              pw.TextAlign.left,
+                              ts(size: 8, color: PdfColors.grey700),
+                            ),
+                            if (generatedByLabel != null) ...[
+                              pw.SizedBox(height: 2),
+                              headerLine(
+                                generatedByLabel,
+                                0,
+                                pw.TextAlign.left,
+                                ts(size: 8, color: PdfColors.grey700),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                    ),
-                    pw.SizedBox(height: 3),
-                    _bilingualHeaderText(
-                      _documentLabelWithSuffix(
-                        'report_date',
-                        _fmtDate(now),
-                        documentPair,
-                        locale,
-                      ),
-                      style: ts(size: 8, color: PdfColors.grey700),
-                    ),
-                    if (generatedBy.isNotEmpty) ...[
-                      pw.SizedBox(height: 2),
-                      _bilingualHeaderText(
-                        _documentLabelWithSuffix(
-                          'generated_by',
-                          _s(generatedBy),
-                          documentPair,
-                          locale,
+                      pw.SizedBox(width: 8),
+                      pw.Expanded(
+                        flex: 3,
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.center,
+                          children: [
+                            pw.Text(
+                              _s(shopName),
+                              style: ts(size: 14, fw: pw.FontWeight.bold),
+                              textDirection: _cellDir(shopName, dir),
+                              textAlign: pw.TextAlign.center,
+                              maxLines: 2,
+                            ),
+                            if (dateFrom != null && dateTo != null) ...[
+                              pw.SizedBox(height: 4),
+                              pw.Container(
+                                width: double.infinity,
+                                padding: const pw.EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: pw.BoxDecoration(
+                                  color: PdfColors.grey100,
+                                  borderRadius: pw.BorderRadius.circular(4),
+                                  border: pw.Border.all(
+                                    color: PdfColors.grey300,
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: _pairedLabelText(
+                                  '${_pdfLabel(labels, 'duration', locale)}: ${_fmtDate(dateFrom)} — ${_fmtDate(dateTo)}',
+                                  style: ts(size: 8, color: PdfColors.grey700),
+                                  align: pw.TextAlign.center,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                        style: ts(size: 8, color: PdfColors.grey700),
+                      ),
+                      pw.SizedBox(width: 8),
+                      pw.Expanded(
+                        flex: 2,
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.end,
+                          children: [
+                            headerLine(
+                              statementTitle,
+                              1,
+                              pw.TextAlign.right,
+                              ts(
+                                size: 11,
+                                fw: pw.FontWeight.bold,
+                                color: _invoiceAccentColor(
+                                  header?.accentColor ?? '#315C4C',
+                                ),
+                              ),
+                            ),
+                            pw.SizedBox(height: 3),
+                            headerLine(
+                              reportDate,
+                              1,
+                              pw.TextAlign.right,
+                              ts(size: 8, color: PdfColors.grey700),
+                            ),
+                            if (generatedByLabel != null) ...[
+                              pw.SizedBox(height: 2),
+                              headerLine(
+                                generatedByLabel,
+                                1,
+                                pw.TextAlign.right,
+                                ts(size: 8, color: PdfColors.grey700),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
                 pw.Divider(thickness: 1.5, color: PdfColors.blue800),
                 pw.SizedBox(height: 6),
-                pw.Text(
-                  _s(shopName),
-                  style: ts(size: 14, fw: pw.FontWeight.bold),
-                  textDirection: _cellDir(shopName, dir),
-                ),
-                pw.SizedBox(height: 4),
-                if (dateFrom != null && dateTo != null)
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: pw.BoxDecoration(
-                      color: PdfColors.grey100,
-                      borderRadius: pw.BorderRadius.circular(4),
-                      border: pw.Border.all(
-                        color: PdfColors.grey300,
-                        width: 0.5,
-                      ),
-                    ),
-                    child: _pairedLabelText(
-                      '${_pdfLabel(labels, 'duration', locale)}: ${_fmtDate(dateFrom)} — ${_fmtDate(dateTo)}',
-                      style: ts(size: 8, color: PdfColors.grey700),
-                    ),
-                  ),
                 pw.SizedBox(height: 8),
                 // Summary 3-column
                 pw.Container(

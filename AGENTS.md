@@ -6,9 +6,10 @@ Last updated: 2026-10-25
 
 This repository is a route/seller distribution ERP.
 
-- Roles: admin, seller
+- Roles: admin, supervisor, seller
 - Legacy role value manager must be treated as admin-equivalent in app and rules
 - Tenant-aware roles tenant_admin and super_admin are now supported and must be treated as privileged, tenant-scoped roles in app and rules
+- Supervisor is a tenant-scoped operational role: routes, shops, products, inventory, invoices, and reports are available, but user administration, notifications, settings, backup, financial corrections, invoice voids, route-seller assignment, and shop route reassignment remain restricted.
 - Super-admin is a platform operator, not a global business-data reader. By default it may access workspace metadata only; client business data requires an explicit `active_workspace_id`, a support reason of at least 10 characters, and an append-only `platform_access_logs` event. Access ends by clearing the active workspace context.
 - New tenant-scoped users carry a tenant_id and must not cross tenant boundaries in rules or providers. Firebase Authentication is the app's only sign-in/session mechanism; the app does not register devices, require pairing, or maintain custom access slots.
 - Business access requires both an active user profile and an active tenant
@@ -90,6 +91,14 @@ Seller:
 - Update own profile (name, theme, locale, password)
 - No writes to routes/products/product_variants/settings
 
+Supervisor:
+
+- Tenant-scoped access to operational routes, shops, products, inventory,
+  invoices, and reports
+- Cannot manage users, workspace/platform settings, notifications, or backups
+- Cannot change route seller assignments or move shops between routes
+- Cannot perform financial corrections, approve transaction edits, or void invoices
+
 ## 4) Non-Negotiable Engineering Rules
 
 1. Role alignment is mandatory in all three layers: app/lib/models/user_model.dart, firestore.rules, and provider write guards on security-critical fields.
@@ -113,7 +122,7 @@ Seller:
 
 1. New business writes must require a concrete tenant via `TenantScope.requireTenant`; `__global__` is never a missing-tenant fallback. Unassigned non-platform users must be stopped at sign-in with an actionable message, not silently provisioned into a shared workspace.
 
-1. Legacy `admin`/`manager` users may manage seller accounts only. Creating or changing workspace-admin roles is reserved to an active super-admin workspace context; tenant admins cannot promote roles or deactivate peer administrators.
+1. Legacy `admin`/`manager` users may manage seller accounts only. Tenant admins may create or assign only supervisor and seller roles to eligible non-owner profiles; admin, tenant-admin, and platform roles remain reserved to the selected platform-super-admin path. Tenant admins cannot deactivate peer administrators.
 
 1. Service-account credentials must never be stored in Firestore, backups, client code, or APK/web defines. Arbitrary-user Firebase Auth administration requires a trusted backend; client code must use owner-controlled Firebase Auth flows. Never create/promote super-admin accounts from the client.
 
@@ -1335,3 +1344,54 @@ Unreleased shared frontend accessibility foundation:
   showed only `List of devices attached`, so phone copy/install was skipped.
 - Google Drive OAuth IDs remain unconfigured; Drive backup is disabled in
   these artifacts. Markdown lint and `git diff --check` exited 0.
+
+2026-10-25 supervisor and Android bundle — v3.10.5+1116:
+
+- The tenant-scoped `supervisor` role grants operational access to routes,
+  shops, products, inventory, invoices, and reports without user
+  administration, notifications, settings, backup, financial corrections,
+  invoice voids, seller-route assignment, or shop-route reassignment.
+  Legacy workspace admins can load the user list and restore backups in
+  merge-only mode. Notification shop subscriptions now use stable sorted shop
+  IDs, so read-state updates do not restart them.
+- The Play Console AAB collision was caused by ABI APK splits remaining enabled
+  during `bundleRelease`; Gradle now disables ABI splits for bundle tasks and
+  retains them for APK tasks. Android versionCode generation is bounded and
+  monotonic. Flutter adds an ABI-specific offset to split APK version codes.
+- Full Flutter suite: `01:59 +633: All tests passed!`; focused role/backup/
+  notification/users suite: `00:22 +55: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 15.0s)`;
+  `dart analyze test/`: `No issues found!`; Firestore Rules Emulator:
+  `152 passing (33s)`. Markdown lint and `git diff --check` exited 0.
+- Split APKs built: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. Signed
+  AAB: 54.8 MB. APK v2 signature verified; AAB verification reported
+  `jar verified.`. ARM64 metadata reports versionName `3.10.5`,
+  versionCode `310053116`. `flutter doctor` still reports unaccepted Android
+  SDK licenses, although both release builds succeeded; licenses were not
+  accepted automatically. These local v3.10.5 artifacts were superseded by
+  the v3.10.6+1117 release below.
+
+2026-10-25 bilingual statement layout and combined release — v3.10.6+1117:
+
+- Account-statement PDFs now use an explicit three-column row under the shared
+  workspace brand header: English title/report date/entry details on the left,
+  shop name and statement duration centered, and selected Arabic or Urdu
+  details on the right. The `pw.Directionality` wrapper pins physical order;
+  individual text directions remain explicit. Both statement export screens
+  use the same `buildPdfLedger()` path. Financial calculations and ledger
+  writes are unchanged.
+- Full Flutter suite: `01:14 +633: All tests passed!`; focused PDF suite:
+  `00:01 +12: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 6.3s)`; `dart analyze test/`:
+  `No issues found!`; Firestore Rules Emulator: `152 passing (30s)`.
+- Web release build `EXIT: 0`; Hosting and Firestore Rules/indexes each
+  reported `Deploy complete!`. Live `/`, `index.html`, `version.json`, and
+  `main.dart.js` returned HTTP 200 with `no-store, must-revalidate, no-cache`;
+  live `version.json` reports version `3.10.6`, build `1117`. The existing
+  23 remote indexes and 2 field overrides absent from the local definition
+  were preserved; deployment did not use `--force`.
+- Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.7 MB; signed AAB:
+  54.8 MB. APK v2 signature and AAB JAR signature checks passed. ARM64
+  package metadata is versionName `3.10.6`, versionCode `310063117`; install
+  on `R5GL22RGT9V` reported `Success`.
+- Android SDK license acceptance was not changed; release builds succeeded.

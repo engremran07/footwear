@@ -550,7 +550,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       final confirmed = await _showPreviewDialog(
         preview,
         mergeRestore:
-            user.isTenantAdmin || preview.scope == 'platform_metadata',
+            !user.canPruneWorkspaceBackup ||
+            preview.scope == 'platform_metadata',
       );
       if (confirmed != true || !mounted) return;
       if (await _showPasswordCountdownDialog() != true || !mounted) return;

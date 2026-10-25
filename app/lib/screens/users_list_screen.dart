@@ -79,7 +79,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateUserDialog(
           tenantId,
-          canCreateWorkspaceAdmins:
+          canCreateAdmin: currentUser.isSuperAdmin,
+          canCreateSupervisor:
               currentUser.isSuperAdmin || currentUser.isTenantAdmin,
         ),
         icon: const Icon(Icons.person_add),
@@ -174,7 +175,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         ? _InactiveUserTile(
                             user: filtered[i],
                             onReactivate:
-                                currentUser.isSuperAdmin || !filtered[i].isAdmin
+                                currentUser.isSuperAdmin ||
+                                    (!filtered[i].isAdmin &&
+                                        !filtered[i].isSupervisor)
                                 ? () => _confirmReactivateUser(filtered[i])
                                 : null,
                             onSendReset: () =>
@@ -188,14 +191,18 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                             currentUser: currentUser,
                             onEdit:
                                 currentUser.isSuperAdmin ||
-                                    (!filtered[i].isTenantAdmin &&
-                                        (currentUser.isTenantAdmin ||
-                                            !filtered[i].isAdmin))
+                                    (currentUser.isTenantAdmin &&
+                                        (filtered[i].isSupervisor ||
+                                            filtered[i].isSeller)) ||
+                                    (currentUser.isAdmin &&
+                                        filtered[i].isSeller)
                                 ? () =>
                                       _showEditUserDialog(filtered[i], tenantId)
                                 : null,
                             onDelete:
-                                !currentUser.isSuperAdmin && filtered[i].isAdmin
+                                !currentUser.isSuperAdmin &&
+                                    (filtered[i].isAdmin ||
+                                        filtered[i].isSupervisor)
                                 ? null
                                 : () => _confirmDeleteUser(filtered[i]),
                             onToggle: (v) => _toggleUserActive(filtered[i], v),
@@ -217,7 +224,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       if (me == null ||
           !me.active ||
           !me.isAdmin ||
-          (!me.isSuperAdmin && user.isAdmin)) {
+          (!me.isSuperAdmin && (user.isAdmin || user.isSupervisor))) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
@@ -249,7 +256,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
   void _showCreateUserDialog(
     String tenantId, {
-    required bool canCreateWorkspaceAdmins,
+    required bool canCreateAdmin,
+    required bool canCreateSupervisor,
   }) {
     final emailC = TextEditingController();
     final passC = TextEditingController();
@@ -300,10 +308,15 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     initialValue: role,
                     decoration: InputDecoration(labelText: tr('role', ref)),
                     items: [
-                      if (canCreateWorkspaceAdmins)
+                      if (canCreateAdmin)
                         DropdownMenuItem(
                           value: 'admin',
                           child: Text(tr('lbl_admin', ref)),
+                        ),
+                      if (canCreateSupervisor)
+                        DropdownMenuItem(
+                          value: 'supervisor',
+                          child: Text(tr('role_supervisor', ref)),
                         ),
                       DropdownMenuItem(
                         value: 'seller',
@@ -433,8 +446,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
         !isSelf &&
         (currentUser.isSuperAdmin ||
             (currentUser.isTenantAdmin &&
-                !user.isTenantAdmin &&
-                (user.isAdmin || user.isSeller)));
+                (user.isSupervisor || user.isSeller)));
     final selectedRouteIds = List<String>.from(user.assignedRouteIds);
     final selectedRouteNames = List<String>.from(user.assignedRouteNames);
     final oldRouteIds = List<String>.from(user.assignedRouteIds);
@@ -530,9 +542,14 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                       initialValue: role,
                       decoration: InputDecoration(labelText: tr('role', ref)),
                       items: [
+                        if (currentUser.isSuperAdmin)
+                          DropdownMenuItem(
+                            value: 'admin',
+                            child: Text(tr('lbl_admin', ref)),
+                          ),
                         DropdownMenuItem(
-                          value: 'admin',
-                          child: Text(tr('lbl_admin', ref)),
+                          value: 'supervisor',
+                          child: Text(tr('role_supervisor', ref)),
                         ),
                         DropdownMenuItem(
                           value: 'seller',
@@ -1014,10 +1031,9 @@ class _UserTile extends ConsumerWidget {
     final canManageTarget =
         currentUser?.isSuperAdmin == true ||
         (currentUser?.isTenantAdmin == true &&
-            !user.isTenantAdmin &&
-            !user.isSuperAdmin) ||
-        !user.isAdmin;
-    final roleColor = user.isAdmin
+            (user.isSupervisor || user.isSeller)) ||
+        (currentUser?.isAdmin == true && user.isSeller);
+    final roleColor = user.isAdmin || user.isSupervisor
         ? AppBrand.adminRoleColor
         : AppBrand.sellerRoleColor;
 
@@ -1034,7 +1050,9 @@ class _UserTile extends ConsumerWidget {
                   radius: 18,
                   backgroundColor: roleColor.withAlpha(30),
                   child: Icon(
-                    user.isAdmin ? Icons.admin_panel_settings : Icons.person,
+                    user.isAdmin || user.isSupervisor
+                        ? Icons.admin_panel_settings
+                        : Icons.person,
                     size: 18,
                     color: roleColor,
                   ),
@@ -1154,7 +1172,7 @@ class _UserTile extends ConsumerWidget {
                     ),
                   ),
                 // Active toggle (not self)
-                if (!isSelf && canManageTarget)
+                if (!isSelf && canManageTarget && !user.isSupervisor)
                   SizedBox(
                     width: 44,
                     height: 28,
@@ -1188,7 +1206,7 @@ class _InactiveUserTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final roleColor = user.isAdmin
+    final roleColor = user.isAdmin || user.isSupervisor
         ? AppBrand.adminRoleColor
         : AppBrand.sellerRoleColor;
 
@@ -1205,7 +1223,9 @@ class _InactiveUserTile extends ConsumerWidget {
                 context,
               ).colorScheme.outline.withValues(alpha: 0.16),
               child: Icon(
-                user.isAdmin ? Icons.admin_panel_settings : Icons.person_off,
+                user.isAdmin || user.isSupervisor
+                    ? Icons.admin_panel_settings
+                    : Icons.person_off,
                 size: 18,
                 color: Theme.of(context).colorScheme.outline,
               ),

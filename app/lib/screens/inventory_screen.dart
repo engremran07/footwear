@@ -253,7 +253,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     if (settingsAsync.isLoading || !settingsAsync.hasValue) {
       return Scaffold(body: ShimmerLoading.cards());
     }
-    final isAdmin = currentUser.isAdmin;
+    final isAdmin = currentUser.canManageOperationalData;
     final warehouseVariants = ref.watch(allVariantsProvider);
     final sellerInventoryAsync = ref.watch(
       sellerInventoryProvider(currentUser.id),
@@ -565,7 +565,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: currentUser.isAdmin
+                        trailing: currentUser.canManageOperationalData
                             ? IconButton(
                                 icon: Icon(
                                   Icons.undo,
@@ -718,7 +718,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           return Consumer(
             builder: (ctx, cRef, _) {
               final user = cRef.watch(authUserProvider).value;
-              final historyAsync = user?.isAdmin == true
+              final historyAsync = user?.canManageOperationalData == true
                   ? cRef.watch(allInventoryTransactionsProvider)
                   : cRef.watch(
                       sellerInventoryTransactionsProvider(user?.id ?? ''),
@@ -791,7 +791,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           child: CircularProgressIndicator(),
                         ),
                         onRetry: () {
-                          if (user?.isAdmin == true) {
+                          if (user?.canManageOperationalData == true) {
                             cRef.invalidate(allInventoryTransactionsProvider);
                           } else {
                             cRef.invalidate(

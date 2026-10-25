@@ -1,4 +1,4 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/core/utils/role_utils.dart';
 import 'package:footwear_erp/models/user_model.dart';
@@ -10,13 +10,14 @@ void main() {
         UserRole.values,
         containsAll([
           UserRole.admin,
+          UserRole.supervisor,
           UserRole.seller,
           UserRole.tenantAdmin,
           UserRole.superAdmin,
           UserRole.unknown,
         ]),
       );
-      expect(UserRole.values.length, 5);
+      expect(UserRole.values.length, 6);
     });
   });
 
@@ -37,42 +38,36 @@ void main() {
       },
     );
 
-    test(
-      'only tenant admins and super admins can restore workspace backups',
-      () {
-        UserModel userForRole(UserRole role) => UserModel(
-          id: 'user-id',
-          email: 'user@example.com',
-          displayName: 'Test User',
-          role: role,
-          assignedRouteIds: role == UserRole.seller
-              ? const ['route-1']
-              : const [],
-          active: true,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        );
+    test('admin-equivalent roles can restore workspace backups', () {
+      UserModel userForRole(UserRole role) => UserModel(
+        id: 'user-id',
+        email: 'user@example.com',
+        displayName: 'Test User',
+        role: role,
+        assignedRouteIds: role == UserRole.seller
+            ? const ['route-1']
+            : const [],
+        active: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
 
-        expect(
-          userForRole(UserRole.tenantAdmin).canRestoreWorkspaceBackup,
-          isTrue,
-        );
-        expect(
-          userForRole(UserRole.superAdmin).canRestoreWorkspaceBackup,
-          isTrue,
-        );
-        expect(userForRole(UserRole.admin).canRestoreWorkspaceBackup, isFalse);
-        expect(userForRole(UserRole.seller).canRestoreWorkspaceBackup, isFalse);
-        expect(
-          userForRole(UserRole.tenantAdmin).canPruneWorkspaceBackup,
-          isFalse,
-        );
-        expect(
-          userForRole(UserRole.superAdmin).canPruneWorkspaceBackup,
-          isTrue,
-        );
-      },
-    );
+      expect(
+        userForRole(UserRole.tenantAdmin).canRestoreWorkspaceBackup,
+        isTrue,
+      );
+      expect(
+        userForRole(UserRole.superAdmin).canRestoreWorkspaceBackup,
+        isTrue,
+      );
+      expect(userForRole(UserRole.admin).canRestoreWorkspaceBackup, isTrue);
+      expect(userForRole(UserRole.seller).canRestoreWorkspaceBackup, isFalse);
+      expect(
+        userForRole(UserRole.tenantAdmin).canPruneWorkspaceBackup,
+        isFalse,
+      );
+      expect(userForRole(UserRole.superAdmin).canPruneWorkspaceBackup, isTrue);
+    });
 
     test('seller backup access remains route-scoped', () {
       UserModel userForRole(UserRole role) => UserModel(
@@ -94,11 +89,11 @@ void main() {
       );
       expect(userForRole(UserRole.superAdmin).canCreateWorkspaceBackup, isTrue);
       expect(userForRole(UserRole.seller).canCreateWorkspaceBackup, isFalse);
-      expect(userForRole(UserRole.admin).canCreateWorkspaceBackup, isFalse);
+      expect(userForRole(UserRole.admin).canCreateWorkspaceBackup, isTrue);
       expect(userForRole(UserRole.seller).canCreateBackup, isTrue);
       expect(userForRole(UserRole.seller).canRestoreBackup, isTrue);
-      expect(userForRole(UserRole.admin).canCreateBackup, isFalse);
-      expect(userForRole(UserRole.admin).canRestoreBackup, isFalse);
+      expect(userForRole(UserRole.admin).canCreateBackup, isTrue);
+      expect(userForRole(UserRole.admin).canRestoreBackup, isTrue);
       expect(userForRole(UserRole.tenantAdmin).canCreateBackup, isTrue);
       expect(userForRole(UserRole.superAdmin).canRestoreBackup, isTrue);
       expect(
@@ -109,6 +104,30 @@ void main() {
         userForRole(UserRole.superAdmin).canRunAutomaticWorkspaceBackup,
         isFalse,
       );
+      expect(userForRole(UserRole.admin).canCreateBackup, isTrue);
+      expect(userForRole(UserRole.admin).canRestoreBackup, isTrue);
+      expect(userForRole(UserRole.supervisor).canCreateBackup, isFalse);
+      expect(userForRole(UserRole.supervisor).canRestoreBackup, isFalse);
+      expect(userForRole(UserRole.supervisor).isAdmin, isFalse);
+      expect(userForRole(UserRole.supervisor).canManageOperationalData, isTrue);
+      expect(
+        canManageUserAccountsRole(roleValueFromUserRole(UserRole.supervisor)),
+        isFalse,
+      );
+    });
+
+    test('normalizes supervisor role and keeps it distinct from admin', () {
+      final supervisor = UserModel.fromJson({
+        'role': ' Supervisor ',
+        'active': true,
+        'created_at': Timestamp.now(),
+        'updated_at': Timestamp.now(),
+      }, 'supervisor-1');
+
+      expect(supervisor.role, UserRole.supervisor);
+      expect(supervisor.isSupervisor, isTrue);
+      expect(supervisor.isAdmin, isFalse);
+      expect(supervisor.canManageOperationalData, isTrue);
     });
 
     test('super admins manage both workspaces and user accounts', () {

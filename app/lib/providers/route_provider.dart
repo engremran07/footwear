@@ -15,7 +15,7 @@ final routesProvider = StreamProvider.autoDispose<List<RouteModel>>((ref) {
   // subscribe, avoiding PERMISSION_DENIED during auth transitions.
   // Use select() so heartbeat writes to last_active do NOT restart the stream.
   final isAdmin = ref.watch(
-    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+    authUserProvider.select((s) => s.value?.canManageOperationalData ?? false),
   );
   final tenantId = ref.watch(
     authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
@@ -50,7 +50,7 @@ final routesExportProvider = FutureProvider<List<RouteModel>>((ref) async {
     FirebaseFirestore.instance.collection(Collections.routes),
     tenantId: tenantId,
   );
-  if (!user.isAdmin) {
+  if (!user.canManageOperationalData) {
     if (!user.isSeller || user.assignedRouteIds.isEmpty) {
       return const <RouteModel>[];
     }
@@ -75,7 +75,7 @@ final routeDetailProvider = StreamProvider.autoDispose
         authUserProvider.select((s) {
           final u = s.value;
           if (u == null) return (false, false, '');
-          return (u.isAdmin, u.isSeller, u.id);
+          return (u.canManageOperationalData, u.isSeller, u.id);
         }),
       );
       final tenantId = ref.watch(
@@ -173,7 +173,7 @@ class RouteNotifier extends AsyncNotifier<void> {
     final db = FirebaseFirestore.instance;
     final me = await db.collection(Collections.users).doc(authUser.uid).get();
     final role = (me.data()?['role'] as String? ?? '').trim();
-    if (!isPrivilegedRoleName(role)) return;
+    if (!isOperationalRoleName(role)) return;
 
     final routesSnap = await TenantScope.applyToQuery(
       db.collection(Collections.routes),
@@ -234,7 +234,7 @@ class RouteNotifier extends AsyncNotifier<void> {
         currentUser.id != uid) {
       throw StateError('An active user profile is required');
     }
-    if (!currentUser.isAdmin) {
+    if (!currentUser.canManageOperationalData) {
       throw StateError('Only admin can create routes');
     }
     final tenantId = TenantScope.requireTenant(currentUser.tenantId);
@@ -255,6 +255,9 @@ class RouteNotifier extends AsyncNotifier<void> {
             ?.cast<String>()
             .toList() ??
         const <String>[];
+    if (currentUser.isSupervisor && sellerIds.isNotEmpty) {
+      throw StateError('Only admins can assign sellers to routes');
+    }
     final routeNumber = ((data['route_number'] as int?) ?? 0) > 0
         ? (data['route_number'] as int)
         : await _nextRouteNumber(db, tenantId);
@@ -311,7 +314,7 @@ class RouteNotifier extends AsyncNotifier<void> {
         currentUser.id != uid) {
       throw StateError('An active user profile is required');
     }
-    if (!currentUser.isAdmin) {
+    if (!currentUser.canManageOperationalData) {
       throw StateError('Only admin can update routes');
     }
     final routeRef = db.collection(Collections.routes).doc(id);
@@ -354,6 +357,12 @@ class RouteNotifier extends AsyncNotifier<void> {
               ?.cast<String>()
               .toList() ??
           const <String>[];
+
+      if (currentUser.isSupervisor &&
+          (newSellerIds.difference(oldSellerIds).isNotEmpty ||
+              oldSellerIds.difference(newSellerIds).isNotEmpty)) {
+        throw StateError('Only admins can assign sellers to routes');
+      }
 
       final removed = oldSellerIds.difference(newSellerIds);
       final added = newSellerIds.difference(oldSellerIds);

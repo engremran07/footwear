@@ -6,7 +6,10 @@ Last updated: 2026-10-25
 
 The live codebase is a route/seller distribution ERP.
 
-- Roles: admin, seller (manager must be admin-equivalent)
+- Roles: admin, supervisor, seller (manager must be admin-equivalent)
+- `supervisor` is a tenant-scoped operational role for routes, shops, products,
+  inventory, invoices, and reports. It does not grant user, notification,
+  settings, or backup access, nor financial-correction or invoice-void rights.
 - Super-admin is platform-only by default. Tenant business data requires explicit `active_workspace_id` plus a reasoned support context; selection start/end is written to append-only `platform_access_logs`.
 - Firebase Auth is the app's only sign-in mechanism. The app has no custom device registration, pairing approval, session slots, or session renewal; Firestore Rules enforce active profile, role, tenant, and selected-workspace scope.
 - Business-data access additionally requires an active tenant document. An active user profile does not override an inactive workspace; the explicitly selected super-admin restoration path is the limited exception.
@@ -103,11 +106,17 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 25. Super-admin business-context selection and exit events are append-only in `platform_access_logs`. Never create/promote platform super-admin accounts or mutate another user's Auth credentials from client code. Never store service-account credentials in Firestore, backups, APKs, or web builds.
 26. Super-admin business context expires after 8 hours in Firestore rules. Workspace admins may update only workspace-scoped business settings; workspace lifecycle and other platform configuration remain platform-controlled. Do not restore app-managed device registration, pairing, or session-slot enforcement.
 27. Require a concrete tenant for every new business write via `TenantScope.requireTenant`; never replace missing tenant identity with `__global__`. Unassigned users must not be silently self-healed into a shared tenant.
-28. Local admins manage seller profiles only. Workspace-admin role changes require an active platform super-admin workspace context.
+28. Legacy local admins manage seller profiles only. Tenant admins may create
+    or assign supervisor and seller roles only to eligible non-owner profiles;
+    admin, tenant-admin, and platform-role changes require the authorized
+    selected platform-super-admin path.
 29. Seller stock decrements must match a same-batch sale invoice's exact `seller_inventory_deductions` entry. Every warehouse stock mutation requires an atomic tenant-scoped inventory audit row.
 30. Admin financial corrections append the prior amount/type/date, actor, and a reason of at least 10 characters to `edit_history`; invoice-linked transaction amounts/types/dates are immutable outside void/credit-note flows. Standalone cash-in/cash-out transactions may only be soft-deleted by a tenant admin-equivalent with an exact atomic shop-balance reversal and correction transaction link. Clear cached last-transaction fields only if they point at the deleted row. Sellers, invoice-linked entries, and hard deletes are denied.
 31. Shop creation starts with a zero balance and no fabricated last-transaction fields. Standalone transactions must be linked to a same-batch shop/balance update. Invoice batches may contain multiple ledger rows and use validated invoice references plus aggregate balance changes; do not impose a one-row/one-delta rule.
-32. Export queries must cursor-page to exhaustion. Tenant-admin backup restore is upsert-only and never prunes; selected super-admin restore upserts before pruning obsolete records in the active tenant. Reject legacy plaintext backup archives.
+32. Export queries must cursor-page to exhaustion. Workspace-admin backup
+    restore (including legacy `admin`) is upsert-only and never prunes; selected
+    super-admin restore upserts before pruning obsolete records in the active
+    tenant. Reject legacy plaintext backup archives.
 33. Keep users signed in through transient token-refresh/network failures. Firebase initialization failure must render a retry state and must not mount the normal app shell.
 34. Copilot chat history and request IDs do not merge across GitHub identities through repository changes. Preserve durable decisions, pending tasks, audit IDs, and verification evidence in `SESSION_LOG.md` and the current audit report. On an account/profile switch, read those plus `git status`/`git diff`; never store credentials or full chat transcripts in the repository or claim separate accounts were synchronized.
 35. Workspace-root hard deletion is denied; use the selected-workspace archive/restore lifecycle. Database flush/reset actions and legacy plaintext whole-project export, whole-collection restore, and direct-balance reset scripts must remain fail-closed until a transactional, audited maintenance path preserves tenant, ledger, and inventory invariants.
@@ -413,6 +422,33 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- v3.10.6+1117 adds a three-column bilingual account-statement header:
+  English details left, shop name/date range centered, and selected Arabic or
+  Urdu details right. Both statement exporters share `buildPdfLedger()`;
+  financial calculations are unchanged. Full Flutter suite:
+  `01:14 +633: All tests passed!`; focused PDF suite:
+  `00:01 +12: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 6.3s)`; `dart analyze test/`:
+  `No issues found!`; Rules Emulator: `152 passing (30s)`. Web `EXIT: 0`;
+  Hosting and Rules/indexes deployments reported `Deploy complete!`.
+  Split APKs: 30.7/32.2/33.7 MB; signed AAB: 54.8 MB. APK v2 and AAB JAR
+  signature checks passed. ARM64 versionName `3.10.6`, versionCode
+  `310063117`, installed on `R5GL22RGT9V` (`Success`).
+- v3.10.5+1116 introduces a tenant-scoped operational supervisor for route,
+  shop, product, inventory, invoice, and report workflows while preserving
+  account-administration, notification, settings, backup, financial-correction,
+  invoice-void, and reassignment safeguards. Legacy admins regain workspace
+  Users and merge-only backup access. Notification shop-visibility listens to
+  a stable sorted ID key instead of restarting when notification read state
+  changes. The Android versionCode encoding was corrected so the current
+  release exceeds historical installed codes and rejects component overflow.
+  Full Flutter suite: `01:59 +633: All tests passed!`; focused regression
+  suite: `00:22 +55: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 15.0s)`; `dart analyze test/`: `No issues found!`;
+  Rules Emulator: `152 passing (33s)`. Split APKs: 30.7/32.2/33.6 MB;
+  signed AAB: 54.8 MB. APK v2 and AAB JAR signature checks succeeded; ARM64
+  metadata was versionName `3.10.5`, versionCode `310053116`. These local
+  artifacts were superseded by v3.10.6+1117 before production publication.
 - v3.10.4+1115 corrects super-admin workspace support feedback and inherited
   RTL row ordering using explicit LTR `pw.Directionality`; Arabic and Urdu
   statement samples were visually inspected in Chrome. Urdu output remains

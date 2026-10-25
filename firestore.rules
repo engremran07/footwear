@@ -34,7 +34,9 @@ service cloud.firestore {
         userData.get('active', false) == true &&
         tenantId is string && tenantId != '' && tenantId != '__global__' &&
         isTenantActive(tenantId) && isSelectedSuperAdmin &&
-        (isAdminRole(role) || (allowSellers && isSellerRole(role)));
+        (isAdminRole(role) ||
+          (allowSellers &&
+            (isSellerRole(role) || isSupervisorRole(role))));
     }
 
     function canReadMissingTenantDocument(allowSellers) {
@@ -57,6 +59,14 @@ service cloud.firestore {
       return role is string && role.matches('(?i)^\\s*(admin|manager|tenant_admin|super_admin)\\s*$');
     }
 
+    function isSupervisorRole(role) {
+      return role is string && role.matches('(?i)^\\s*supervisor\\s*$');
+    }
+
+    function isOperationalRole(role) {
+      return isAdminRole(role) || isSupervisorRole(role);
+    }
+
     function isTenantAdminOnlyRole(role) {
       return role is string && role.matches('(?i)^\\s*tenant_admin\\s*$');
     }
@@ -71,7 +81,8 @@ service cloud.firestore {
       return role is string && role.matches('(?i)^\\s*super_admin\\s*$');
     }
     function isWorkspaceAssignableRole(role) {
-      return role is string && (role == 'admin' || role == 'seller');
+      return role is string &&
+        (role == 'supervisor' || role == 'seller');
     }
 
     function isSuperAdmin() {
@@ -122,6 +133,23 @@ service cloud.firestore {
       return isAuthenticated() &&
         userData.get('active', false) == true &&
         isAdminRole(role) &&
+        hasTenantAccess &&
+        isTenantActive(tenantId);
+    }
+
+    function isOperationalForTenant(tenantId) {
+      let userData = userDoc().data;
+      let role = userData.get('role', '');
+      let isPlatformAdmin = isSuperAdminRole(role);
+      let isAssignedToTenant = userData.get('tenant_id', null) == tenantId ||
+        (tenantId == '__global__' &&
+          userData.get('tenant_id', null) == null);
+      let hasTenantAccess = isPlatformAdmin
+        ? hasSelectedWorkspaceSupportContext(userData, tenantId)
+        : isAssignedToTenant;
+      return isAuthenticated() &&
+        userData.get('active', false) == true &&
+        isOperationalRole(role) &&
         hasTenantAccess &&
         isTenantActive(tenantId);
     }
@@ -244,7 +272,7 @@ service cloud.firestore {
       let managedAccountUpdate = !isOwner &&
         !isTenantAdminOnlyRole(currentData.get('role', '')) &&
         !isSuperAdminRole(currentData.get('role', '')) &&
-        (isAdminRole(currentData.get('role', '')) ||
+        (isSupervisorRole(currentData.get('role', '')) ||
           isSellerRole(currentData.get('role', ''))) &&
         isWorkspaceAssignableRole(nextData.get('role', '')) &&
         changed.hasOnly([
@@ -590,7 +618,7 @@ service cloud.firestore {
     // Validates role values to prevent arbitrary role strings being stored
     function isValidRole(role) {
       return role is string &&
-        role.matches('(?i)^\\s*(admin|manager|tenant_admin|super_admin|seller)\\s*$');
+        role.matches('(?i)^\\s*(admin|manager|supervisor|tenant_admin|super_admin|seller)\\s*$');
     }
 
     function currentUserSettingsDocId() {
@@ -1281,7 +1309,7 @@ service cloud.firestore {
             isSuperAdmin() ||
             isSellerRole(request.resource.data.role) ||
             (isTenantAdmin() &&
-              request.resource.data.role == 'admin')
+              request.resource.data.role == 'supervisor')
           ) &&
           tenantSeatCounterMatches(
             get(/databases/$(database)/documents/tenants/$(request.resource.data.tenant_id)).data,
@@ -1424,19 +1452,19 @@ service cloud.firestore {
 
     // --- products -----------------------------------------------------------
     match /products/{productId} {
-      allow read: if isAdminForTenant(resource.data.tenant_id) ||
+      allow read: if isOperationalForTenant(resource.data.tenant_id) ||
         (isActiveUser() && !isSuperAdminRole(getUserRole()) &&
          isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
       // P0-2 FIX: products are tenant-owned; use isAdminForTenant check
-      allow create: if isAdminForTenant(request.resource.data.tenant_id) &&
+      allow create: if isOperationalForTenant(request.resource.data.tenant_id) &&
         request.resource.data.name is string &&
         request.resource.data.name != '' && docSizeOk()
         && (!('image_url' in request.resource.data)
           || !(request.resource.data.image_url is string)
           || request.resource.data.image_url == ''
           || request.resource.data.image_url.matches('https://.*'));
-      allow update: if isAdminForTenant(resource.data.tenant_id) &&
+      allow update: if isOperationalForTenant(resource.data.tenant_id) &&
         request.resource.data.tenant_id == resource.data.tenant_id &&
         (!('name' in request.resource.data) ||
           (request.resource.data.name is string &&
@@ -1447,24 +1475,24 @@ service cloud.firestore {
           || request.resource.data.image_url == ''
           || request.resource.data.image_url.matches('https://.*'));
       allow delete: if isSuperAdmin() &&
-        isAdminForTenant(resource.data.tenant_id);
+        isOperationalForTenant(resource.data.tenant_id);
     }
 
     // --- product_variants ---------------------------------------------------
     match /product_variants/{variantId} {
-      allow read: if isAdminForTenant(resource.data.tenant_id) ||
+      allow read: if isOperationalForTenant(resource.data.tenant_id) ||
         (isActiveUser() && !isSuperAdminRole(getUserRole()) &&
          isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
       // P0-2 FIX: product_variants are tenant-owned; use isAdminForTenant check
-      allow create: if isAdminForTenant(request.resource.data.tenant_id) &&
+      allow create: if isOperationalForTenant(request.resource.data.tenant_id) &&
         request.resource.data.product_id is string &&
         request.resource.data.product_id != '' &&
         request.resource.data.variant_name is string &&
         request.resource.data.variant_name != '' &&
         request.resource.data.quantity_available is number &&
         request.resource.data.quantity_available >= 0 && docSizeOk();
-      allow update: if isAdminForTenant(resource.data.tenant_id) &&
+      allow update: if isOperationalForTenant(resource.data.tenant_id) &&
         request.resource.data.tenant_id == resource.data.tenant_id &&
         (!('product_id' in request.resource.data) ||
           (request.resource.data.product_id is string &&
@@ -1476,7 +1504,7 @@ service cloud.firestore {
           (request.resource.data.quantity_available is number &&
             request.resource.data.quantity_available >= 0)) && docSizeOk();
       allow delete: if isSuperAdmin() &&
-        isAdminForTenant(resource.data.tenant_id);
+        isOperationalForTenant(resource.data.tenant_id);
     }
 
     // --- routes -------------------------------------------------------------
@@ -1486,14 +1514,14 @@ service cloud.firestore {
       // is NOT constrained by query filters, so Firestore can't prove it.
       // The second branch checks the document field directly — Firestore CAN
       // validate this against an arrayContains query constraint.
-      allow read: if isAdminForTenant(resource.data.tenant_id) ||
+      allow read: if isOperationalForTenant(resource.data.tenant_id) ||
         (isSeller() && isSellerForRoute(routeId) &&
          resource.data.tenant_id == currentUserTenantId()) ||
         (isSeller() && request.auth.uid in resource.data.assigned_seller_ids &&
          isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
       // P0-2 FIX: routes are tenant-owned; use isAdminForTenant check
-      allow create: if isAdminForTenant(request.resource.data.tenant_id) &&
+      allow create: if isOperationalForTenant(request.resource.data.tenant_id) &&
         request.resource.data.name is string &&
         request.resource.data.name != '' &&
         request.resource.data.route_number is int &&
@@ -1502,8 +1530,11 @@ service cloud.firestore {
         request.resource.data.total_shops >= 0 && docSizeOk();
       allow update: if (
         (
-          isAdminForTenant(resource.data.tenant_id) &&
+          isOperationalForTenant(resource.data.tenant_id) &&
           request.resource.data.tenant_id == resource.data.tenant_id &&
+          (!request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['assigned_seller_ids', 'assigned_seller_names']) ||
+            isAdminForTenant(resource.data.tenant_id)) &&
           (!('name' in request.resource.data) ||
             (request.resource.data.name is string &&
               request.resource.data.name != '')) &&
@@ -1517,7 +1548,7 @@ service cloud.firestore {
         sellerRouteShopCountUpdateIsLinked(routeId)
       ) && docSizeOk();
       allow delete: if isSuperAdmin() &&
-        isAdminForTenant(resource.data.tenant_id);
+        isOperationalForTenant(resource.data.tenant_id);
     }
 
     // --- customers (= shops) ------------------------------------------------
@@ -1528,7 +1559,7 @@ service cloud.firestore {
     // BALANCE FIELD: balance > 0 means shop owes us money (accounts receivable).
     // Updated atomically with every transaction/invoice write.
     match /customers/{customerId} {
-      allow read: if isAdminForTenant(resource.data.tenant_id) ||
+      allow read: if isOperationalForTenant(resource.data.tenant_id) ||
         (
           isSeller() &&
           resource.data.route_id != null &&
@@ -1543,7 +1574,7 @@ service cloud.firestore {
           'last_transaction_at', 'last_transaction_type',
           'last_transaction_amount', 'last_transaction_id'
         ]) &&
-        (isAdminForTenant(request.resource.data.tenant_id) ||
+        (isOperationalForTenant(request.resource.data.tenant_id) ||
         (
           isSeller() &&
           request.resource.data.name is string &&
@@ -1561,8 +1592,11 @@ service cloud.firestore {
       // (balance increments from invoice batches) must not be throttled; atomic
       // WriteBatch integrity is the correct guard, not a 1-second time gate.
       // P0-2 FIX: customers are tenant-owned; use isAdminForTenant check
-      allow update: if (isAdminForTenant(resource.data.tenant_id) &&
+      allow update: if (isOperationalForTenant(resource.data.tenant_id) &&
         request.resource.data.tenant_id == resource.data.tenant_id &&
+        (!request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['route_id']) ||
+          isAdminForTenant(resource.data.tenant_id)) &&
         (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'balance', 'last_transaction_at', 'last_transaction_type',
@@ -1616,7 +1650,7 @@ service cloud.firestore {
           )
         )) && docSizeOk();
       allow delete: if isSuperAdmin() &&
-        isAdminForTenant(resource.data.tenant_id);
+        isOperationalForTenant(resource.data.tenant_id);
     }
 
     // --- transactions -------------------------------------------------------
@@ -1630,12 +1664,12 @@ service cloud.firestore {
       // Seller can read only route-owned transactions.
       // P0-2 FIX: transactions are tenant-owned; use isAdminForTenant check
       allow read: if canReadMissingTenantDocument(true) ||
-        isAdminForTenant(resource.data.tenant_id) ||
+        isOperationalForTenant(resource.data.tenant_id) ||
         isSellerRouteTransaction();
       // Field validation: type must be in allowed set, amount must be positive
       allow create: if request.resource.data.tenant_id is string &&
         request.resource.data.tenant_id == currentUserTenantId() &&
-        (isAdminForTenant(request.resource.data.tenant_id) ||
+        (isOperationalForTenant(request.resource.data.tenant_id) ||
         (
           isSeller() &&
           request.resource.data.created_by == request.auth.uid &&
@@ -1724,20 +1758,20 @@ service cloud.firestore {
     match /seller_inventory/{docId} {
       // P0-2 FIX: seller_inventory is tenant-owned; use isAdminForTenant check
       allow read: if canReadMissingTenantDocument(false) ||
-        isAdminForTenant(resource.data.tenant_id) ||
+        isOperationalForTenant(resource.data.tenant_id) ||
         (isSeller() && resource.data.seller_id == request.auth.uid &&
          isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
-      allow create: if isAdminForTenant(request.resource.data.tenant_id);
+      allow create: if isOperationalForTenant(request.resource.data.tenant_id);
       allow delete: if isSuperAdmin() &&
-        isAdminForTenant(resource.data.tenant_id);
+        isOperationalForTenant(resource.data.tenant_id);
       // Sellers may only decrease their own stock; allocations are admin-only.
       // Post-state quantity_available must stay >= 0 to prevent negative stock.
       // SR-07: withinWriteRate() intentionally excluded here — rapid sequential
       // sales (two invoices < 1 ms apart) would otherwise block the second
       // stock deduction, creating ghost inventory discrepancies. The
       // quantity_available may not increase outside an admin allocation.
-        allow update: if (isAdminForTenant(resource.data.tenant_id) &&
+        allow update: if (isOperationalForTenant(resource.data.tenant_id) &&
           request.resource.data.tenant_id == resource.data.tenant_id &&
           request.resource.data.quantity_available is number &&
           request.resource.data.quantity_available >= 0 ||
@@ -1757,11 +1791,11 @@ service cloud.firestore {
     // --- inventory transactions (audit log for all stock movements) ---------
     match /inventory_transactions/{docId} {
       // P0-2 FIX: inventory_transactions are tenant-owned; use isAdminForTenant check
-      allow read: if isAdminForTenant(resource.data.tenant_id) ||
+      allow read: if isOperationalForTenant(resource.data.tenant_id) ||
         (isSeller() && resource.data.seller_id == request.auth.uid &&
          isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
-      allow create: if (isAdminForTenant(request.resource.data.tenant_id) ||
+      allow create: if (isOperationalForTenant(request.resource.data.tenant_id) ||
         (
           isSeller() &&
           request.resource.data.seller_id == request.auth.uid &&
@@ -1829,7 +1863,7 @@ service cloud.firestore {
     match /invoices/{invoiceId} {
       // P0-2 FIX: invoices are tenant-owned; use isAdminForTenant check
       allow read: if canReadMissingTenantDocument(true) ||
-        isAdminForTenant(resource.data.tenant_id) ||
+        isOperationalForTenant(resource.data.tenant_id) ||
         (
           isSeller() && (
             (resource.data.seller_id == request.auth.uid &&
@@ -1841,7 +1875,7 @@ service cloud.firestore {
              resource.data.tenant_id == currentUserTenantId())
           )
         );
-      allow create: if (isAdminForTenant(request.resource.data.tenant_id) ||
+      allow create: if (isOperationalForTenant(request.resource.data.tenant_id) ||
         (
           sellerInvoiceScopeMatches(request.resource.data) &&
           request.resource.data.created_by == request.auth.uid &&

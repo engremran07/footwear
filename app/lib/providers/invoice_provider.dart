@@ -139,7 +139,7 @@ final allInvoicesProvider = StreamProvider.autoDispose<List<InvoiceModel>>((
   // stream — use roleAwareInvoicesProvider or sellerInvoicesProvider instead.
   // Use select() so heartbeat writes to last_active do NOT restart the stream.
   final isAdmin = ref.watch(
-    authUserProvider.select((s) => s.value?.isAdmin ?? false),
+    authUserProvider.select((s) => s.value?.canManageOperationalData ?? false),
   );
   final tenantId = ref.watch(
     authUserProvider.select((s) => TenantScope.normalize(s.value?.tenantId)),
@@ -194,7 +194,7 @@ final roleAwareInvoicesProvider =
         authUserProvider.select((s) {
           final u = s.value;
           if (u == null) return (false, '');
-          return (u.isAdmin, u.id);
+          return (u.canManageOperationalData, u.id);
         }),
       );
       if (userId.isEmpty) return const AsyncData(<InvoiceModel>[]);

@@ -85,9 +85,20 @@ void main() {
     },
   );
 
-  test('seller and legacy admin accounts cannot initiate backups', () {
-    expect(BackupScopePolicy.scopeFor(UserRole.admin), BackupScope.disabled);
-    expect(BackupScopePolicy.collectionsFor(UserRole.admin), isEmpty);
+  test('admin-equivalent accounts can back up workspaces, not supervisors', () {
+    expect(
+      BackupScopePolicy.scopeFor(UserRole.admin),
+      BackupScope.workspaceBusiness,
+    );
+    expect(
+      BackupScopePolicy.collectionsFor(UserRole.admin),
+      BackupScopePolicy.workspaceBusinessCollections,
+    );
+    expect(
+      BackupScopePolicy.scopeFor(UserRole.supervisor),
+      BackupScope.disabled,
+    );
+    expect(BackupScopePolicy.collectionsFor(UserRole.supervisor), isEmpty);
   });
 
   test(

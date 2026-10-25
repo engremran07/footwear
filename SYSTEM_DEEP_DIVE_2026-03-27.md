@@ -6,7 +6,7 @@ Last updated: 2026-10-25
 
 The backup screen delegates persistence and authorization to `DatabaseBackupNotifier`. It creates encrypted archives, saves them through the system file picker for phone storage, and supports later import from the selected file. A saved archive can be explicitly uploaded to Google Drive when online and Drive OAuth is configured; this action is user-triggered and is not background synchronization. The app also maintains its private local archive. Destination-specific timestamps are shown.
 
-Backups are scoped to the signed-in user's workspace and role. Tenant administrators merge records into their own workspace; only a platform administrator with an active support workspace may choose replacement and prune records in that selected workspace. Seller archives contain currently assigned-route data. Seller restore accepts only the seller's own eligible, unlinked cash-in/cash-out rows; each transaction and matching same-route shop-balance delta are written in one Firestore transaction. It never restores seller invoice, inventory, or another seller's ledger records. Restore previews and confirmation copy must describe the operation the selected role can actually perform.
+Backups are scoped to the signed-in user's workspace and role. Tenant admins and legacy workspace admins merge records into their own workspace; only a platform administrator with an active support workspace may choose replacement and prune records in that selected workspace. Supervisors have no backup access. Seller archives contain currently assigned-route data. Seller restore accepts only the seller's own eligible, unlinked cash-in/cash-out rows; each transaction and matching same-route shop-balance delta are written in one Firestore transaction. It never restores seller invoice, inventory, or another seller's ledger records. Restore previews and confirmation copy must describe the operation the selected role can actually perform.
 
 Workspace settings are fetched by `settings/{tenantId}` document ID rather than a tenant-field collection query, because Rules authorize the known tenant document path but cannot prove the broader query. Backup selection categories (such as `inventory`) are distinct from archive collection keys (`seller_inventory`, `inventory_transactions`, and `product_variants`); restore validates the concrete keys and each role's allowed scope before writing. Selected super-admins must have an active support workspace. Seller inventory records in an imported archive must belong to the signed-in seller.
 
@@ -39,6 +39,13 @@ client.
 
 Firebase Authentication is the app's only sign-in mechanism. After Firebase Auth succeeds, the app loads the matching user profile and validates that it is active, has a supported role, and belongs to a concrete tenant unless it is a platform super-admin. The router and role-scoped providers wait for profile state and preserve mapped errors; no device registration, pairing approval, custom access slot, renewal timer, or app-managed session gate participates in sign-in.
 
+The tenant-scoped `supervisor` role grants operational access to routes,
+shops, products, inventory, invoices, and reports. It does not grant user,
+notification, settings, or backup access, or financial correction/approval,
+invoice-void, route-seller assignment, or shop-route reassignment rights.
+Tenant admins may create or assign only supervisor and seller roles to eligible
+non-owner accounts; admin, tenant-admin, and platform roles remain restricted.
+
 Firestore Rules enforce active-profile status, active-tenant status, role permissions, and tenant ownership on business documents. A platform super-admin may see workspace metadata globally, but business data requires a selected workspace and a support reason; selection and exit are recorded in append-only `platform_access_logs`, and Rules enforce the eight-hour support-context limit. This audited workspace context is distinct from the removed app-managed access controls.
 
 An inactive workspace can be selected to establish audited support context for
@@ -47,6 +54,15 @@ document exists; Rules continue to deny ordinary business reads and writes
 until the tenant is restored. The tenant-management screen offers confirmed
 archive/restore actions only for the currently selected workspace and never
 changes member profile activity.
+
+## Notification Feed Stability
+
+The notification center and unread badge use the same admin-equivalent,
+tenant-scoped notification stream. Shop visibility is resolved from only the
+shop IDs referenced by that bounded feed. The child shop listener depends on
+a sorted, deduplicated shop-ID key rather than notification objects, so
+read-state-only snapshots do not cancel and recreate the shop subscriptions.
+Supervisor and seller roles do not receive the admin notification feed.
 
 ## Invoice Modes and Workspace Headers
 
@@ -177,7 +193,7 @@ verification across the theme and locale matrix remains pending.
 
 ## CRUD and Sorting Guarantees
 
-Tenant administrators may create, read, and update business records inside their own workspace, subject to collection-specific financial and role-management safeguards. Sellers remain constrained to assigned routes and may not write administrator-only records. Provider guards validate the authenticated profile and tenant before writes; Firestore Rules independently enforce the same scope.
+Tenant administrators may create, read, and update business records inside their own workspace, subject to collection-specific financial and role-management safeguards. Supervisors have the explicitly limited operational access described above. Sellers remain constrained to assigned routes and may not write administrator-only records. Provider guards validate the authenticated profile and tenant before writes; Firestore Rules independently enforce the same scope.
 
 Route, shop, and transaction lists preserve their existing sort modes and query ordering. Shop creation and route-count reconciliation commit atomically, and administrator route reassignment adjusts both affected route counts in the same transaction. Referenced routes and shops use their existing deactivation workflow; invoice-linked ledger records remain immutable outside invoice correction flows. Standalone cash-in/cash-out removal retains the audited soft-delete and exact shop-balance reversal required by the financial-integrity contract.
 
@@ -272,8 +288,9 @@ non-platform-super-admin members. User activation and deactivation must update
 the tenant seat counter atomically with the corresponding profile transition;
 Firestore Rules reject profile-only or counter-only seat changes.
 
-Workspace administrators may create canonical admin and seller accounts and
-promote or demote eligible same-workspace admin/seller accounts. The permanent
+Tenant admins may create or assign supervisor and seller roles only to
+eligible non-owner accounts; they cannot promote users to admin or
+tenant-admin. Legacy admins may manage seller profiles only. The permanent
 owner, tenant-admin peers, and platform roles are protected, and workspace
 admins cannot deactivate peer administrators. Profile/seat changes remain
 atomic. A selected platform super-admin can reconcile a stored seat counter
@@ -364,3 +381,61 @@ Flutter analysis `No issues found! (ran in 132.4s)`; test analysis
 `No issues found!`; Rules Emulator `147 passing (29s)`. Web `EXIT: 0`;
 Hosting and Rules/indexes reported `Deploy complete!`; split APKs were
 30.7/32.2/33.6 MB. No Android device was connected for installation.
+
+## v3.10.5+1116 Supervisor and Android Bundle Verification
+
+The tenant-scoped `supervisor` role is operationally limited to routes, shops,
+products, inventory, invoices, and reports. User administration, notifications,
+settings, backup, financial corrections/approval, invoice voids, route seller
+assignment, and shop route reassignment remain outside this role. Tenant admins
+may assign supervisor or seller roles only to eligible non-owner profiles.
+Legacy workspace admins can load the tenant user list and restore workspace
+archives in merge-only mode. Notification shop subscriptions now use a stable,
+sorted set of feed shop IDs, avoiding restarts caused solely by read-state
+updates.
+
+The first Play Console AAB build exposed a Gradle configuration collision:
+release ABI APK splits also generated multiple shrunk-resource outputs during
+`bundleRelease`. `app/android/app/build.gradle.kts` now enables ABI splits for
+APK tasks and disables them for bundle tasks. The release version-code
+encoding is bounded and monotonic; Flutter adds an ABI-specific offset to split
+APK codes.
+
+Verification: full Flutter suite `01:59 +633: All tests passed!`; focused
+role/backup/notification/users suite `00:22 +55: All tests passed!`;
+`flutter analyze lib --no-pub`: `No issues found! (ran in 15.0s)`;
+`dart analyze test/`: `No issues found!`; Firestore Rules Emulator:
+`152 passing (33s)`. Markdown lint and `git diff --check` exited 0. Split APK
+build: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. Signed AAB:
+54.8 MB. APK v2 signature and AAB JAR signature checks succeeded; APK
+metadata reports versionName `3.10.5`, versionCode `310053116`. The Android
+SDK license checker still reports unaccepted licenses, although release APK
+and AAB builds succeeded. No ADB device was connected. Production Rules/indexes
+deployment, Hosting, installation, commit, and push were not performed.
+
+## v3.10.6+1117 Bilingual Statement Header and Combined Release
+
+Account-statement headers now place the English account title, report date,
+and generated-by value on the left; the shop name and localized statement
+duration in the center; and selected Arabic or Urdu details on the right.
+`pw.Directionality(textDirection: pw.TextDirection.ltr)` fixes physical
+column order regardless of document locale, while each text cell preserves
+its language direction. The shop-detail and report statement exports both
+use `buildPdfLedger()`. No balance calculation or ledger write behavior
+changed.
+
+Updated statement PDFs were generated with Arabic and Urdu language pairs and
+visually inspected in Chrome. Focused PDF suite: `00:01 +12: All tests
+passed!`; full Flutter suite: `01:14 +633: All tests passed!`;
+`flutter analyze lib --no-pub`: `No issues found! (ran in 6.3s)`;
+`dart analyze test/`: `No issues found!`; Firestore Rules Emulator:
+`152 passing (30s)`.
+
+Web build `EXIT: 0`; Firebase Hosting and Firestore Rules/indexes each
+reported `Deploy complete!`. Live `/`, `index.html`, `version.json`, and
+`main.dart.js` returned HTTP 200 with `no-store, must-revalidate, no-cache`;
+`version.json` reports version `3.10.6`, build `1117`. The 23 remote indexes
+and 2 field overrides absent locally were preserved without `--force`. Split APKs: ARMv7
+30.7 MB, ARM64 32.2 MB, x86_64 33.7 MB; signed AAB: 54.8 MB. APK v2 and
+AAB JAR verification passed. ARM64 metadata is versionName `3.10.6`,
+versionCode `310063117`; installation on `R5GL22RGT9V` returned `Success`.
