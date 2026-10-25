@@ -1245,4 +1245,5 @@ Unreleased shared frontend accessibility foundation:
    locally were preserved.
 - Split APKs built: ARMv7 30.6 MB, ARM64 32.1 MB, x86_64 33.6 MB.
    ARM64 copied to and installed on `R5GL22RGT9V` (`Success`); installed
-   versionName is `3.10.1`, versionCode `3103212`. Git publication follows.
+   versionName is `3.10.1`, versionCode `3103212`. Feature commit `4d41f93`
+   was pushed to `main`.
