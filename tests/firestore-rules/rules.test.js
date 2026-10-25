@@ -3511,6 +3511,55 @@ describe('platform super-admin workspace isolation', () => {
     );
   });
 
+  it('workspace selection can atomically end the old context and start the new one', async () => {
+    await seedWorkspace('tenant-a');
+    await seedWorkspace('tenant-b');
+    await seedUser('platform-switch-workspace-uid', 'super_admin', true, {
+      active_workspace_id: 'tenant-a',
+      active_workspace_reason: 'Previous support review',
+      active_workspace_selected_at: new Date(),
+    });
+
+    const db = testEnv.authenticatedContext(
+      'platform-switch-workspace-uid',
+    ).firestore();
+    const batch = db.batch();
+    const userRef = db.collection('users').doc('platform-switch-workspace-uid');
+    const endedLogRef = db.collection('platform_access_logs').doc('switch-end');
+    const startedLogRef = db.collection('platform_access_logs').doc('switch-start');
+    batch.update(userRef, {
+      active_workspace_id: 'tenant-b',
+      active_workspace_reason: 'New support request',
+      active_workspace_selected_at:
+        firebase.firestore.FieldValue.serverTimestamp(),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.set(endedLogRef, {
+      actor_user_id: 'platform-switch-workspace-uid',
+      workspace_id: 'tenant-a',
+      event_type: 'workspace_access_ended',
+      reason: 'Previous support review',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.set(startedLogRef, {
+      actor_user_id: 'platform-switch-workspace-uid',
+      workspace_id: 'tenant-b',
+      event_type: 'workspace_access_started',
+      reason: 'New support request',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await assertSucceeds(batch.commit());
+    const endedLog = await db.collection('platform_access_logs')
+      .doc('switch-end')
+      .get();
+    const startedLog = await db.collection('platform_access_logs')
+      .doc('switch-start')
+      .get();
+    assert.strictEqual(endedLog.data().event_type, 'workspace_access_ended');
+    assert.strictEqual(startedLog.data().event_type, 'workspace_access_started');
+  });
+
   it('unselected super-admin cannot change workspace lifecycle', async () => {
     await seedWorkspace('tenant-1');
     await seedUser('platform-unselected-lifecycle-uid', 'super_admin');

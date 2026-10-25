@@ -2,11 +2,18 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
+import 'package:pdf/pdf.dart';
 import 'package:footwear_erp/core/l10n/app_locale.dart';
 import 'package:footwear_erp/core/utils/pdf_export.dart';
 import 'package:footwear_erp/models/invoice_model.dart';
 import 'package:footwear_erp/models/settings_model.dart';
 import 'package:footwear_erp/models/transaction_model.dart';
+
+final _testLogoBase64 = base64Encode(
+  img.encodePng(img.Image(width: 2, height: 2)),
+);
+final _testLogoBytes = base64Decode(_testLogoBase64);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -67,7 +74,7 @@ void main() {
         createdBy: 'seller-1',
         createdAt: now,
         updatedAt: now,
-        headerSnapshot: const {
+        headerSnapshot: {
           'name_en': 'Saved Workspace Header',
           'visible_fields': [],
         },
@@ -128,10 +135,11 @@ void main() {
         createdAt: now,
         updatedAt: now,
         currency: 'SAR',
-        headerSnapshot: const {
+        headerSnapshot: {
           'name_en': 'Configured Workspace',
           'name_ar': 'مساحة العمل',
           'company_name': 'Configured Workspace',
+          'logo_base64': _testLogoBase64,
           'template': 'centered',
           'accent_color': '#315C4C',
           'visible_fields': ['phone'],
@@ -153,6 +161,20 @@ void main() {
       ).firstMatch(latin1.decode(bytes, allowInvalid: true));
       expect(pageCount, isNotNull);
       expect(int.parse(pageCount!.group(1)!), 1);
+      final pdf = latin1.decode(bytes, allowInvalid: true);
+      final mediaBox = RegExp(
+        r'/MediaBox\[0 0 ([\d.]+) ([\d.]+)\]',
+      ).firstMatch(pdf);
+      expect(mediaBox, isNotNull);
+      expect(
+        double.parse(mediaBox!.group(1)!),
+        closeTo(PdfPageFormat.a5.width, 0.1),
+      );
+      expect(
+        double.parse(mediaBox.group(2)!),
+        closeTo(PdfPageFormat.a5.height, 0.1),
+      );
+      expect(pdf, contains('/Subtype/Image'));
     },
   );
 
@@ -186,11 +208,11 @@ void main() {
       createdAt: now,
       updatedAt: now,
       currency: 'SAR',
-      headerSnapshot: const {
+      headerSnapshot: {
         'name_en': 'Configured Workspace',
         'name_ar': 'مساحة العمل',
         'company_name': 'Configured Workspace',
-        'visible_fields': [],
+        'logo_base64': _testLogoBase64,
       },
     );
 
@@ -199,10 +221,15 @@ void main() {
       companyName: 'Changed Workspace Name',
       currency: 'SAR',
       locale: AppLocale.en,
+      header: const InvoiceHeaderConfig(nameEn: 'Current Workspace Name'),
     );
 
     expect(invoice.isNonStockSale, isTrue);
     expect(bytes, isNotEmpty);
+    expect(
+      latin1.decode(bytes, allowInvalid: true),
+      contains('/Subtype/Image'),
+    );
   });
 
   test('generateInvoicePdf paginates invoices with long item lists', () async {
@@ -334,8 +361,18 @@ void main() {
       transactions: [transaction],
       labels: labelsFor(AppLocale.ur, ledgerKeys),
       locale: AppLocale.ur,
+      logoBytes: _testLogoBytes,
+      header: const InvoiceHeaderConfig(
+        nameEn: 'Footwear',
+        nameAr: 'شركة الأحذية',
+        phone: '+966500000000',
+      ),
     );
     expectPdf(ledgerPdf);
+    expect(
+      latin1.decode(ledgerPdf, allowInvalid: true),
+      contains('/Subtype/Image'),
+    );
 
     const sellerReportKeys = [
       'seller_report',

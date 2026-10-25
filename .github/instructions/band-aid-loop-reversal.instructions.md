@@ -63,6 +63,21 @@ Run this protocol when all are true:
 
 - Only root-cause + mandatory guards remain
 
+1. For recurring PDF/font/layout symptoms, preserve a deterministic input
+fixture and record the generated PDF, shaping flag, and target renderer.
+Compare actual rendered output when available; track font/shaping, text
+direction, header composition, and logo source as separate candidate fixes.
+Embedded-font metadata or text-input tests alone do not prove correct glyph
+rendering or column placement. Do not add another font, dependency, fallback
+layout, or retry until the reported failure is reproduced and assigned to
+its actual owner.
+
+For `pdf` 3.12.0 layouts, set physical row order through
+`pw.Directionality`; `pw.Row` does not expose a `textDirection` parameter.
+Treat a standalone shaping demo as feasibility evidence only. A renderer
+replacement is not a culprit fix until it preserves logo images, selectable
+text, page flow, and every production report on both Web and Android.
+
 ## Non-Negotiable Rules
 
 1. Do not keep a band-aid if it does not provide mandatory defense-in-depth.
@@ -82,3 +97,6 @@ Every ambiguity cleanup must end with:
 1. Mandatory guards retained and why
 
 1. Tests/reproduction evidence proving closure
+
+1. For rendering bugs, generated page count/format, font-resource evidence,
+   visual evidence when available, and any unverified viewer/platform scope

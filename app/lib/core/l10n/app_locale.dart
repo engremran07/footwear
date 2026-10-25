@@ -145,6 +145,19 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'workspace_access_reason': 'Reason for access',
     'workspace_access_reason_hint': 'Enter a support or operational reason',
     'workspace_access_active': 'Workspace support access is active',
+    'workspace_access_reason_invalid':
+        'Enter a reason of 10 to 240 characters.',
+    'workspace_access_unavailable':
+        'The selected workspace is unavailable. Refresh and try again.',
+    'workspace_access_started': 'Workspace support access started.',
+    'workspace_access_ended': 'Workspace support access ended.',
+    'workspace_access_end_title': 'End support access?',
+    'workspace_access_end_message':
+        'This clears the selected workspace and ends access to its business data.',
+    'workspace_support_context_required':
+        'Select a workspace and provide a support reason before accessing its business data.',
+    'workspace_support_context_other_workspace':
+        'Another workspace is currently selected. Selecting this one will switch the audited support context.',
     'credentials_owner_managed':
         'The account owner manages email and password changes.',
     'send_password_reset': 'Send password reset email',
@@ -737,6 +750,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'This workspace has reached its 10 active-user limit.',
     'workspace_seat_count_initialization_required':
         'Seat tracking must be initialized before managing workspace users.',
+    'workspace_seat_count_changed_retry':
+        'Workspace membership changed during reconciliation. Refresh and try again.',
     'workspace_member_summary': 'Workspace members',
     'workspace_active_users': 'Active users',
     'workspace_inactive_users': 'Inactive users',
@@ -1654,6 +1669,18 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'workspace_access_reason': 'سبب الوصول',
     'workspace_access_reason_hint': 'أدخل سبب الدعم أو العملية',
     'workspace_access_active': 'وصول دعم مساحة العمل نشط',
+    'workspace_access_reason_invalid': 'أدخل سببًا يتراوح بين 10 و240 حرفًا.',
+    'workspace_access_unavailable':
+        'مساحة العمل المحددة غير متاحة. حدّث القائمة وحاول مرة أخرى.',
+    'workspace_access_started': 'بدأ الوصول إلى مساحة العمل للدعم.',
+    'workspace_access_ended': 'انتهى الوصول إلى مساحة العمل للدعم.',
+    'workspace_access_end_title': 'هل تريد إنهاء وصول الدعم؟',
+    'workspace_access_end_message':
+        'سيؤدي ذلك إلى مسح مساحة العمل المحددة وإنهاء الوصول إلى بياناتها.',
+    'workspace_support_context_required':
+        'اختر مساحة عمل وأدخل سبب الدعم قبل الوصول إلى بياناتها.',
+    'workspace_support_context_other_workspace':
+        'تم تحديد مساحة عمل أخرى حاليًا. سيؤدي اختيار هذه المساحة إلى تبديل سياق الدعم المسجل.',
     'credentials_owner_managed':
         'يدير مالك الحساب تغييرات البريد وكلمة المرور.',
     'send_password_reset': 'إرسال بريد إعادة تعيين كلمة المرور',
@@ -2240,6 +2267,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'وصلت مساحة العمل إلى الحد الأقصى البالغ 10 مستخدمين نشطين.',
     'workspace_seat_count_initialization_required':
         'يجب تهيئة تتبع المقاعد قبل إدارة مستخدمي مساحة العمل.',
+    'workspace_seat_count_changed_retry':
+        'تغيرت عضوية مساحة العمل أثناء مطابقة العدد. حدّث القائمة وحاول مجددًا.',
     'workspace_member_summary': 'أعضاء مساحة العمل',
     'workspace_active_users': 'المستخدمون النشطون',
     'workspace_inactive_users': 'المستخدمون غير النشطين',
@@ -3148,6 +3177,18 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'workspace_access_reason': 'رسائی کی وجہ',
     'workspace_access_reason_hint': 'سپورٹ یا عملی وجہ درج کریں',
     'workspace_access_active': 'ورک اسپیس سپورٹ رسائی فعال ہے',
+    'workspace_access_reason_invalid': '10 سے 240 حروف پر مشتمل وجہ درج کریں۔',
+    'workspace_access_unavailable':
+        'منتخب کردہ ورک اسپیس دستیاب نہیں۔ تازہ کاری کرکے دوبارہ کوشش کریں۔',
+    'workspace_access_started': 'ورک اسپیس سپورٹ رسائی شروع ہو گئی۔',
+    'workspace_access_ended': 'ورک اسپیس سپورٹ رسائی ختم ہو گئی۔',
+    'workspace_access_end_title': 'سپورٹ رسائی ختم کریں؟',
+    'workspace_access_end_message':
+        'اس سے منتخب ورک اسپیس صاف ہو جائے گی اور اس کے کاروباری ڈیٹا تک رسائی ختم ہو جائے گی۔',
+    'workspace_support_context_required':
+        'کاروباری ڈیٹا تک رسائی سے پہلے ورک اسپیس منتخب کرکے سپورٹ کی وجہ درج کریں۔',
+    'workspace_support_context_other_workspace':
+        'اس وقت ایک دوسری ورک اسپیس منتخب ہے۔ اسے منتخب کرنے سے آڈٹ شدہ سپورٹ سیاق تبدیل ہو جائے گا۔',
     'credentials_owner_managed':
         'اکاؤنٹ کا مالک ای میل اور پاس ورڈ کی تبدیلی خود کرتا ہے۔',
     'send_password_reset': 'پاس ورڈ ری سیٹ ای میل بھیجیں',
@@ -3745,6 +3786,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'اس ورک اسپیس میں فعال صارفین کی زیادہ سے زیادہ حد 10 ہے۔',
     'workspace_seat_count_initialization_required':
         'ورک اسپیس صارفین کے انتظام سے پہلے نشستوں کی گنتی شروع کریں۔',
+    'workspace_seat_count_changed_retry':
+        'گنتی کے دوران ورک اسپیس کی رکنیت تبدیل ہوئی۔ تازہ کاری کرکے دوبارہ کوشش کریں۔',
     'workspace_member_summary': 'ورک اسپیس کے اراکین',
     'workspace_active_users': 'فعال صارفین',
     'workspace_inactive_users': 'غیر فعال صارفین',

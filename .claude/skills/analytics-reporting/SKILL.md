@@ -272,6 +272,49 @@ Regression checks:
   embedded family, inspect the original PDF's font resources; use screenshots
   only for visual comparison.
 
+### PDF Layout and Rendering Regressions
+
+When a user reports that a PDF looks broken, do not treat an embedded font
+assertion as proof that the rendered page is correct. Trace the complete
+screen → provider/settings → builder → PDF layout/font path, and reproduce the
+reported document type, language pair, current/snapshotted branding, logo
+visibility, and representative long values.
+
+For shared financial documents:
+
+- Keep one shared workspace brand header for invoices, receipts, statements,
+  and reports. Place English content on the left and the selected Arabic or
+  Urdu content on the right; set text direction explicitly for each side and
+  pin physical row order with
+  `pw.Directionality(textDirection: pw.TextDirection.ltr)` when a
+  page-level RTL direction could reverse children. `pw.Row` in `pdf` 3.12.0
+  does not accept a `textDirection` argument.
+- Prefer current workspace logo bytes when available, but preserve a saved
+  invoice logo when the current-header path has no usable logo bytes. Respect
+  the explicit `visibleFields` logo setting.
+- For half-sheet cash receipts, verify the generated PDF page is A5-sized and
+  remains exactly one page with bounded receipt identifiers/references. Keep
+  balance calculations and ledger writes outside the presentation change.
+- Assert page count, media-box dimensions, image resources, font embedding,
+  shaping configuration, and Arabic plus Urdu-specific text in focused tests.
+  If rendering tools are available, rasterize the generated PDF and inspect
+  English-left/RTL-right placement and connected glyphs in the actual output.
+- If pixel-level rendering is unavailable, state that limitation explicitly;
+  do not claim visual acceptance based only on source review, Unicode input,
+  or a font-resource assertion.
+
+Do not switch fonts, add a shaping dependency, or add a workaround until the
+actual PDF output and renderer compatibility establish that font selection or
+shaping is the culprit. Separate a confirmed font defect from a layout or
+direction defect and record the evidence for each.
+
+An isolated `payv` Nastaliq proof is not release evidence for the existing
+document pipeline. Before replacing the renderer, verify Web and Android
+compatibility, workspace-logo embedding, pagination, selectable/searchable
+text, and output parity for invoices, receipts, statements, seller reports,
+multi-shop reports, and flat tables. Until all gates pass, production Urdu PDF
+output remains Naskh-style and must not be described as Nastaliq.
+
 Open-source references reviewed 2026-10-22 (star counts are a point-in-time
 signal, not endorsement; do not copy skill text):
 

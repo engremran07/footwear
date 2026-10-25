@@ -6,6 +6,54 @@
 
 ---
 
+## SESSION-023 — 2026-10-25 — Workspace support and bilingual PDF release
+
+**Agent:** GitHub Copilot
+
+**Baseline:** Branch `main`, HEAD `dfea603`. The pre-existing untracked skill
+directories and `app/flutter_test_summary.txt` were preserved and excluded
+from release publication.
+
+**Trigger:** Complete the inherited v3.10.4+1115 work: repair super-admin
+workspace support-access feedback, correct bilingual financial PDF direction,
+re-audit Urdu PDF shaping, then validate and publish the authorized release.
+
+### Work Performed
+
+- Corrected support-access selection, switching, ending, and localized
+  success/error feedback across the screen, provider, mapper, and Rules
+  regressions.
+- Fixed the reproduced PDF column reversal: `pdf` 3.12.0 `pw.Row` has no
+  `textDirection` parameter, so bilingual rows and the shared brand row now
+  use an explicit LTR `pw.Directionality` parent while individual English and
+  Arabic/Urdu text directions remain explicit.
+- Visually inspected generated Arabic and Urdu account statements in Chrome.
+  English is physically left and the configured RTL language is right; Urdu
+  is connected and readable in Naskh style. A separate `payv` proof rendered
+  Nastaliq but was not integrated because logo embedding, selectable-text
+  extraction, pagination, and all-report Web/Android parity are unproven.
+
+### Verification and Delivery
+
+- Full Flutter suite: `01:16 +628: All tests passed!`; focused access/PDF
+  suite: `00:11 +65: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 132.4s)`;
+  `dart analyze test/`: `No issues found!`.
+- Complete Firestore Rules Emulator suite: `147 passing (29s)`.
+- Markdown lint and `git diff --check` exited 0.
+- Web build: `EXIT: 0`; Firebase Hosting reported `Deploy complete!`.
+  Live shell endpoints returned HTTP 200 with `no-cache, no-store,
+  must-revalidate`.
+- Rules/indexes deployment reported `Deploy complete!`. Firestore Rules were
+  already current; 23 remote indexes and 2 field overrides absent locally
+  were preserved without `--force`.
+- Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. `adb devices`
+  returned only `List of devices attached`; phone copy/install was skipped.
+- Google Drive OAuth client IDs were not configured, so Drive backup remains
+  unavailable in the release.
+
+---
+
 ## SESSION-022 — 2026-10-25 — Legacy workspace roster hotfix
 
 **Agent:** GitHub Copilot

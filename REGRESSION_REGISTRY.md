@@ -1,7 +1,7 @@
 # ShoesERP Regression Registry
 
 **Maintained by:** Autonomous AI agent system (88-agent governance pack v2.0)  
-**Last updated:** 2026-10-24 — Invoice permission audit / unreleased source
+**Last updated:** 2026-10-25 — Bilingual PDF direction and typography audit
 **Purpose:** Single source of truth for known regressions, deferred risks, and process improvements.
 
 ---
@@ -35,6 +35,8 @@
 | RR-022 | P0-FIXED (local emulator validated; deployment pending) | Invoice idempotency reads | Invoice and transaction create flows read deterministic/missing IDs inside Firestore transactions, while read Rules dereferenced `resource.data` on missing documents. First-time seller inventory allocation had the same failure. | Missing invoice/transaction reads now require an active concrete tenant and allowed role; selected super-admin support context and tenant activity are enforced. Missing seller inventory is admin-equivalent only. Client-shaped Rules regressions cover missing reads and full sale transactions. | 2026-10-24 |
 | RR-023 | P2-FIXED (local emulator validated; deployment pending) | Invoice Rules expression budget | Seller invoice checks repeated profile, route, and shop lookups; client-shaped transactions exceeded the Rules expression limit. | Seller invoice scope now evaluates a tenant/route/shop authorization helper once; invoice-linked transaction creation avoids the redundant shop-route lookup while retaining invoice linkage. Complete Rules Emulator suite: 128 passing. | 2026-10-24 |
 | RR-024 | P2-FIXED (widget/l10n tests; release pending) | Admin invoice stock empty state | Admin invoice entry required inventory allocated to the admin's own seller ID but showed only a generic empty message. | Localized guidance explains warehouse allocation and the workspace-enabled non-stock option. | 2026-10-24 |
+| RR-025 | P1-FIXED (PDF tests, Chrome render, released v3.10.4+1115) | Shared financial PDF branding/layout | When current invoice settings were supplied without logo bytes, the saved invoice logo was skipped; inherited page RTL could reverse English/RTL child columns, and cash receipts used full A4. Font-resource tests did not check actual layout. | Invoice/receipt PDFs fall back to the saved logo only when current bytes are absent and visibility allows it. Shared bilingual rows and the workspace-brand row are wrapped in explicit LTR `pw.Directionality`, with per-text LTR/RTL direction preserved. Arabic and Urdu ledger samples were visually checked in Chrome; English is left and the configured RTL language is right. Cash receipts remain A5 and one page. Authenticated business-data workflows and other production viewers remain unverified. | 2026-10-25 |
+| RR-026 | P2-DEFERRED | Urdu PDF typography | The existing `pdf` renderer produces connected, readable Naskh-style Urdu but does not support the complex Nastaliq shaping the UI font provides. A `payv` prototype visibly shaped a mixed Urdu/Latin sample, but the package path does not yet demonstrate workspace-logo embedding, selectable-text extraction, pagination, or parity across all report builders on Web and Android. | Do not advertise the prototype as production support or replace the renderer until an end-to-end proof preserves branding, text extraction, page flow, and all report formats on both platforms. | 2026-10-25 |
 
 ---
 

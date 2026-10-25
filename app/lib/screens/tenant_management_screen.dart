@@ -35,6 +35,7 @@ class _TenantManagementScreenState
   bool _isCreating = false;
   String? _lifecycleTenantId;
   String? _seatReconciliationTenantId;
+  String? _workspaceAccessTenantId;
 
   @override
   void dispose() {
@@ -149,48 +150,95 @@ class _TenantManagementScreenState
   }
 
   Future<void> _changeWorkspaceAccess(TenantModel tenant) async {
-    final reasonController = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(tr('access_workspace', ref)),
-        content: TextField(
-          controller: reasonController,
-          autofocus: true,
-          minLines: 2,
-          maxLines: 4,
-          maxLength: 240,
-          decoration: InputDecoration(
-            labelText: tr('workspace_access_reason', ref),
-            hintText: tr('workspace_access_reason_hint', ref),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(tr('cancel', ref)),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, reasonController.text.trim()),
-            child: Text(tr('confirm', ref)),
-          ),
-        ],
-      ),
-    );
-    reasonController.dispose();
-    if (reason == null || !mounted) return;
+    if (_workspaceAccessTenantId != null) return;
+    setState(() => _workspaceAccessTenantId = tenant.id);
     try {
+      final viewer = await ref.read(authUserProvider.future);
+      if (!mounted) return;
+      if (viewer == null || !viewer.active || !viewer.isSuperAdmin) {
+        _showMappedError(StateError('Active super-admin access is required.'));
+        return;
+      }
+
+      if (viewer.hasActiveWorkspaceSupportContextFor(tenant.id)) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(tr('workspace_access_end_title', ref)),
+            content: Text(tr('workspace_access_end_message', ref)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(tr('cancel', ref)),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(tr('confirm', ref)),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true || !mounted) return;
+        await ref.read(authNotifierProvider.notifier).endWorkspaceAccess();
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(successSnackBar(tr('workspace_access_ended', ref)));
+        return;
+      }
+
+      var reasonDraft = '';
+      final reason = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(tr('access_workspace', ref)),
+          content: TextField(
+            key: const Key('workspace_access_reason_field'),
+            autofocus: true,
+            minLines: 2,
+            maxLines: 4,
+            maxLength: 240,
+            onChanged: (value) => reasonDraft = value,
+            decoration: InputDecoration(
+              labelText: tr('workspace_access_reason', ref),
+              hintText: tr('workspace_access_reason_hint', ref),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(tr('cancel', ref)),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, reasonDraft.trim()),
+              child: Text(tr('confirm', ref)),
+            ),
+          ],
+        ),
+      );
+      if (reason == null || !mounted) return;
+
       await ref
           .read(authNotifierProvider.notifier)
           .selectWorkspace(workspaceId: tenant.id, reason: reason);
-      if (tenant.active) await _reconcileWorkspaceSeats(tenant);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(successSnackBar(tr('workspace_access_started', ref)));
+      if (tenant.active) {
+        await _reconcileWorkspaceSeats(tenant, showSuccess: false);
+      }
     } catch (error) {
       _showMappedError(error);
+    } finally {
+      if (mounted) setState(() => _workspaceAccessTenantId = null);
     }
   }
 
-  Future<void> _reconcileWorkspaceSeats(TenantModel tenant) async {
+  Future<void> _reconcileWorkspaceSeats(
+    TenantModel tenant, {
+    bool showSuccess = true,
+  }) async {
     if (_seatReconciliationTenantId != null || !tenant.active) return;
     setState(() => _seatReconciliationTenantId = tenant.id);
     try {
@@ -199,9 +247,11 @@ class _TenantManagementScreenState
           .reconcileWorkspaceSeatCount(tenant.id);
       if (!mounted) return;
       ref.invalidate(tenantsProvider);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(successSnackBar(tr('workspace_seats_reconciled', ref)));
+      if (showSuccess) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(successSnackBar(tr('workspace_seats_reconciled', ref)));
+      }
     } catch (error) {
       _showMappedError(error);
     } finally {
@@ -691,6 +741,17 @@ class _TenantManagementScreenState
     );
   }
 
+  String _supportContextStatusKey(UserModel? viewer, String workspaceId) {
+    final selectedWorkspaceId = viewer?.activeWorkspaceId;
+    if (selectedWorkspaceId == null || selectedWorkspaceId.trim().isEmpty) {
+      return 'workspace_support_context_required';
+    }
+    if (selectedWorkspaceId == workspaceId) {
+      return 'workspace_support_context_expired';
+    }
+    return 'workspace_support_context_other_workspace';
+  }
+
   Widget _buildWorkspaceMemberSummary(TenantModel tenant) {
     return Consumer(
       builder: (context, memberRef, _) {
@@ -704,7 +765,9 @@ class _TenantManagementScreenState
         if (!supportContextActive && !assignedWorkspaceAdmin) {
           return Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text(tr('workspace_support_context_expired', memberRef)),
+            child: Text(
+              tr(_supportContextStatusKey(viewer, tenant.id), memberRef),
+            ),
           );
         }
 
@@ -1038,6 +1101,14 @@ class _TenantManagementScreenState
                         ),
                       if (currentUser?.isSuperAdmin == true) ...[
                         const SizedBox(height: 12),
+                        if (!hasWorkspaceSupportContext)
+                          Text(
+                            tr(
+                              _supportContextStatusKey(currentUser, tenant.id),
+                              ref,
+                            ),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                         if (hasWorkspaceSupportContext &&
                             currentUser?.activeWorkspaceReason != null)
                           Text(
@@ -1049,12 +1120,21 @@ class _TenantManagementScreenState
                           spacing: 8,
                           children: [
                             TextButton.icon(
-                              onPressed: () => _changeWorkspaceAccess(tenant),
-                              icon: Icon(
-                                hasWorkspaceSupportContext
-                                    ? Icons.lock_open
-                                    : Icons.admin_panel_settings_outlined,
-                              ),
+                              onPressed: _workspaceAccessTenantId == null
+                                  ? () => _changeWorkspaceAccess(tenant)
+                                  : null,
+                              icon: _workspaceAccessTenantId == tenant.id
+                                  ? const SizedBox.square(
+                                      dimension: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Icon(
+                                      hasWorkspaceSupportContext
+                                          ? Icons.lock_open
+                                          : Icons.admin_panel_settings_outlined,
+                                    ),
                               label: Text(
                                 tr(
                                   hasWorkspaceSupportContext

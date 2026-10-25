@@ -421,6 +421,24 @@ class AuthNotifier extends AsyncNotifier<void> {
     // Selecting an inactive tenant only establishes audited lifecycle context;
     // Firestore Rules still deny business-data access until it is restored.
     final batch = db.batch();
+    final previousWorkspaceId = TenantScope.normalize(user.activeWorkspaceId);
+    final previousReason = user.activeWorkspaceReason?.trim();
+    if (previousWorkspaceId != null &&
+        previousWorkspaceId != TenantScope.globalTenantId &&
+        previousReason != null &&
+        previousReason.length >= 10 &&
+        previousReason.length <= 240) {
+      final previousAccessLogRef = db
+          .collection(Collections.platformAccessLogs)
+          .doc();
+      batch.set(previousAccessLogRef, {
+        'actor_user_id': user.id,
+        'workspace_id': previousWorkspaceId,
+        'event_type': 'workspace_access_ended',
+        'reason': previousReason,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+    }
     final accessLogRef = db.collection(Collections.platformAccessLogs).doc();
     batch.update(db.collection(Collections.users).doc(user.id), {
       'active_workspace_id': normalizedId,

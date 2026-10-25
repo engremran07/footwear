@@ -28,6 +28,45 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.10.4',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Financial documents now use a shared bilingual header with English on the left and Arabic or Urdu on the right.',
+          AppLocale.ar:
+              'تستخدم المستندات المالية الآن ترويسة موحدة بالإنجليزية على اليسار والعربية أو الأردية على اليمين.',
+          AppLocale.ur:
+              'مالی دستاویزات میں اب مشترک دو لسانی ہیڈر ہے جس میں انگریزی بائیں اور عربی یا اردو دائیں جانب ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Cash receipts now fit a single A5 page, and invoice logos remain available when current workspace image data is missing.',
+          AppLocale.ar:
+              'تظهر الإيصالات النقدية الآن في صفحة A5 واحدة، وتبقى شعارات الفواتير متاحة عند غياب صورة مساحة العمل الحالية.',
+          AppLocale.ur:
+              'نقد رسیدیں اب ایک A5 صفحے میں آتی ہیں، اور موجودہ ورک اسپیس کی تصویر دستیاب نہ ہو تو انوائس کا محفوظ لوگو استعمال ہوتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Workspace support access now gives clearer start, switch, and end feedback.',
+          AppLocale.ar:
+              'أصبحت رسائل بدء وصول الدعم إلى مساحة العمل وتبديله وإنهائه أوضح.',
+          AppLocale.ur:
+              'ورک اسپیس سپورٹ رسائی شروع کرنے، تبدیل کرنے اور ختم کرنے کے پیغامات اب زیادہ واضح ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.10.3',
     date: 'October 2026',
     items: [

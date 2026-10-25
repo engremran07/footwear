@@ -162,6 +162,45 @@ pw.Widget _pairedLabelText(
   );
 }
 
+pw.Widget _bilingualHeaderText(String text, {required pw.TextStyle style}) {
+  final lines = text.split('\n');
+  if (lines.length < 2) {
+    return pw.Text(
+      lines.first,
+      style: style,
+      textDirection: _cellDir(lines.first, pw.TextDirection.ltr),
+    );
+  }
+  // Keep physical column order stable when the containing page is RTL.
+  return pw.Directionality(
+    textDirection: pw.TextDirection.ltr,
+    child: pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Expanded(
+          child: pw.Text(
+            lines.first,
+            style: style,
+            textDirection: pw.TextDirection.ltr,
+            textAlign: pw.TextAlign.left,
+            maxLines: 2,
+          ),
+        ),
+        pw.SizedBox(width: 10),
+        pw.Expanded(
+          child: pw.Text(
+            lines[1],
+            style: style,
+            textDirection: pw.TextDirection.rtl,
+            textAlign: pw.TextAlign.right,
+            maxLines: 2,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 /// Returns true when [text] contains Arabic/Urdu script characters.
 /// Used to auto-apply RTL direction to individual cells regardless of locale.
 bool _containsRtlChars(String text) => RegExp(
@@ -309,7 +348,6 @@ pw.Widget _workspaceBrandHeader({
   required _PdfLocaleConfig localeConfig,
   Uint8List? logoBytes,
 }) {
-  final locale = localeConfig.locale;
   final pair = header.documentLanguagePair;
   final accent = _invoiceAccentColor(header.accentColor);
   final rtlName = pair == FinancialDocumentLanguagePair.englishArabic
@@ -318,29 +356,29 @@ pw.Widget _workspaceBrandHeader({
   final primaryName = header.nameEn.trim().isNotEmpty
       ? header.nameEn.trim()
       : fallbackName.trim();
-  final otherNames = <(String, pw.TextDirection)>[
-    if (rtlName.isNotEmpty && rtlName != primaryName)
-      (rtlName, pw.TextDirection.rtl),
-  ];
   final rtlSubtitle = pair == FinancialDocumentLanguagePair.englishArabic
       ? header.subtitleAr.trim()
       : header.subtitleUr.trim();
   final rtlAddress = pair == FinancialDocumentLanguagePair.englishArabic
       ? header.addressAr.trim()
       : header.addressUr.trim();
-  final details = <(String, pw.TextDirection)>[];
-  void addDetail(String key, String value) {
-    final labels = financialDocumentLabel(
-      key,
-      pair,
-      fallback: trRead(key, locale),
-    ).split('\n');
-    for (var index = 0; index < labels.length; index++) {
-      details.add((
-        '${labels[index]}: ${_s(value)}',
-        index == 0 ? pw.TextDirection.ltr : pw.TextDirection.rtl,
-      ));
+  final englishLines = <String>[];
+  final rtlLines = <String>[];
+  if (header.visibleFields.contains('subtitle')) {
+    if (header.subtitleEn.trim().isNotEmpty) {
+      englishLines.add(header.subtitleEn.trim());
     }
+    if (rtlSubtitle.isNotEmpty) rtlLines.add(rtlSubtitle);
+  }
+  if (header.visibleFields.contains('address')) {
+    if (header.addressEn.trim().isNotEmpty) {
+      englishLines.add(header.addressEn.trim());
+    }
+    if (rtlAddress.isNotEmpty) rtlLines.add(rtlAddress);
+  }
+  void addDetail(String key, String value) {
+    englishLines.add('${trRead(key, AppLocale.en)}: ${_s(value)}');
+    rtlLines.add('${trRead(key, pair.secondaryLocale)}: ${_s(value)}');
   }
 
   if (header.visibleFields.contains('phone') && header.phone.isNotEmpty) {
@@ -360,18 +398,24 @@ pw.Widget _workspaceBrandHeader({
       header.commercialRegistrationNumber,
     );
   }
-  final contentLines = <(String, pw.TextDirection)>[
-    if (header.visibleFields.contains('subtitle') &&
-        header.subtitleEn.trim().isNotEmpty)
-      (header.subtitleEn.trim(), pw.TextDirection.ltr),
-    if (header.visibleFields.contains('subtitle') && rtlSubtitle.isNotEmpty)
-      (rtlSubtitle, pw.TextDirection.rtl),
-    if (header.visibleFields.contains('address') &&
-        header.addressEn.trim().isNotEmpty)
-      (header.addressEn.trim(), pw.TextDirection.ltr),
-    if (header.visibleFields.contains('address') && rtlAddress.isNotEmpty)
-      (rtlAddress, pw.TextDirection.rtl),
-  ];
+  pw.Widget textLine(
+    String text, {
+    required pw.TextDirection direction,
+    required pw.TextAlign align,
+    double size = 8,
+    bool bold = false,
+    PdfColor color = PdfColors.black,
+  }) => pw.Text(
+    _s(text),
+    style: localeConfig.ts(
+      size: size,
+      fw: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+      color: color,
+    ),
+    textDirection: direction,
+    textAlign: align,
+    maxLines: 2,
+  );
 
   return pw.Container(
     width: double.infinity,
@@ -381,62 +425,82 @@ pw.Widget _workspaceBrandHeader({
       border: pw.Border.all(color: accent, width: 1),
       borderRadius: pw.BorderRadius.circular(4),
     ),
-    child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.center,
-      children: [
-        if (logoBytes != null && header.visibleFields.contains('logo')) ...[
-          pw.Image(
-            pw.MemoryImage(logoBytes),
-            height: 32,
-            fit: pw.BoxFit.contain,
-          ),
-          pw.SizedBox(width: 8),
-        ],
-        pw.Expanded(
-          child: pw.Column(
-            crossAxisAlignment: localeConfig.align,
-            children: [
-              pw.Text(
-                _s(primaryName),
-                style: localeConfig.ts(
+    // Keep the logo on the left even when the containing page is RTL.
+    child: pw.Directionality(
+      textDirection: pw.TextDirection.ltr,
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          if (logoBytes != null && header.visibleFields.contains('logo')) ...[
+            pw.Container(
+              width: 42,
+              alignment: pw.Alignment.center,
+              child: pw.Image(
+                pw.MemoryImage(logoBytes),
+                height: header.template == 'compact' ? 26 : 36,
+                fit: pw.BoxFit.contain,
+              ),
+            ),
+            pw.SizedBox(width: 8),
+          ],
+          pw.Expanded(
+            child: pw.Column(
+              mainAxisSize: pw.MainAxisSize.min,
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                textLine(
+                  primaryName,
+                  direction: _cellDir(primaryName, pw.TextDirection.ltr),
+                  align: pw.TextAlign.left,
                   size: _headerTitleSize(header.titleScale),
-                  fw: pw.FontWeight.bold,
+                  bold: true,
                   color: accent,
                 ),
-                textDirection: pw.TextDirection.ltr,
-                textAlign: pw.TextAlign.left,
-              ),
-              for (final (name, direction) in otherNames)
-                pw.Text(
-                  _s(name),
-                  style: localeConfig.ts(size: 8, fw: pw.FontWeight.bold),
-                  textDirection: direction,
-                  textAlign: direction == pw.TextDirection.rtl
-                      ? pw.TextAlign.right
-                      : pw.TextAlign.left,
+                ...englishLines.map(
+                  (line) => textLine(
+                    line,
+                    direction: _cellDir(line, pw.TextDirection.ltr),
+                    align: pw.TextAlign.left,
+                    size: 7,
+                    color: PdfColors.grey700,
+                  ),
                 ),
-              for (final (line, direction) in contentLines)
-                pw.Text(
-                  _s(line),
-                  style: localeConfig.ts(size: 8),
-                  textDirection: direction,
-                  textAlign: direction == pw.TextDirection.rtl
-                      ? pw.TextAlign.right
-                      : pw.TextAlign.left,
-                ),
-              for (final (detail, direction) in details)
-                pw.Text(
-                  detail,
-                  style: localeConfig.ts(size: 7, color: PdfColors.grey700),
-                  textDirection: direction,
-                  textAlign: direction == pw.TextDirection.rtl
-                      ? pw.TextAlign.right
-                      : pw.TextAlign.left,
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+          if (rtlName.isNotEmpty || rtlLines.isNotEmpty) ...[
+            pw.SizedBox(width: 8),
+            pw.Container(width: 0.5, height: 40, color: PdfColors.grey300),
+            pw.SizedBox(width: 8),
+            pw.Expanded(
+              child: pw.Column(
+                mainAxisSize: pw.MainAxisSize.min,
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  if (rtlName.isNotEmpty)
+                    textLine(
+                      rtlName,
+                      direction: pw.TextDirection.rtl,
+                      align: pw.TextAlign.right,
+                      size: _headerTitleSize(header.titleScale),
+                      bold: true,
+                      color: accent,
+                    ),
+                  ...rtlLines.map(
+                    (line) => textLine(
+                      line,
+                      direction: pw.TextDirection.rtl,
+                      align: pw.TextAlign.right,
+                      size: 7,
+                      color: PdfColors.grey700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     ),
   );
 }
@@ -806,6 +870,14 @@ Future<Uint8List> buildPdfLedger({
 
     final pdf = _buildDocument(primaryFont, ff);
     final now = DateTime.now();
+    final documentPair =
+        header?.documentLanguagePair ??
+        FinancialDocumentLanguagePair.englishArabic;
+    final statementTitle = financialDocumentLabel(
+      'account_statement',
+      documentPair,
+      fallback: _pdfLabel(labels, 'account_statement', locale),
+    );
 
     // NOTE (RR-017): Use pw.MultiPage so the PDF renderer measures and
     // flows content naturally across pages. This prevents the fixed-row
@@ -829,11 +901,11 @@ Future<Uint8List> buildPdfLedger({
                   logoBytes: logoBytes,
                 ),
                 pw.SizedBox(height: 4),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                   children: [
-                    _pairedLabelText(
-                      _pdfLabel(labels, 'account_statement', locale),
+                    _bilingualHeaderText(
+                      statementTitle,
                       style: ts(
                         size: 11,
                         fw: pw.FontWeight.bold,
@@ -842,20 +914,28 @@ Future<Uint8List> buildPdfLedger({
                         ),
                       ),
                     ),
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.end,
-                      children: [
-                        _pairedLabelText(
-                          '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(now)}',
-                          style: ts(size: 8, color: PdfColors.grey700),
-                        ),
-                        if (generatedBy.isNotEmpty)
-                          _pairedLabelText(
-                            '${_pdfLabel(labels, 'generated_by', locale)}: ${_s(generatedBy)}',
-                            style: ts(size: 8, color: PdfColors.grey700),
-                          ),
-                      ],
+                    pw.SizedBox(height: 3),
+                    _bilingualHeaderText(
+                      _documentLabelWithSuffix(
+                        'report_date',
+                        _fmtDate(now),
+                        documentPair,
+                        locale,
+                      ),
+                      style: ts(size: 8, color: PdfColors.grey700),
                     ),
+                    if (generatedBy.isNotEmpty) ...[
+                      pw.SizedBox(height: 2),
+                      _bilingualHeaderText(
+                        _documentLabelWithSuffix(
+                          'generated_by',
+                          _s(generatedBy),
+                          documentPair,
+                          locale,
+                        ),
+                        style: ts(size: 8, color: PdfColors.grey700),
+                      ),
+                    ],
                   ],
                 ),
                 pw.Divider(thickness: 1.5, color: PdfColors.blue800),
@@ -1315,6 +1395,9 @@ Future<Uint8List> buildPdfSellerReport({
     final dir = lc.dir;
     final primaryFont = lc.primaryFont;
     final ff = lc.ff;
+    final reportPair =
+        header?.documentLanguagePair ??
+        FinancialDocumentLanguagePair.englishArabic;
     pw.TextStyle ts({
       double size = 9,
       pw.FontWeight fw = pw.FontWeight.normal,
@@ -1342,22 +1425,30 @@ Future<Uint8List> buildPdfSellerReport({
             logoBytes: logoBytes,
           ),
           pw.SizedBox(height: 4),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
-              pw.Text(
-                _pdfLabel(labels, 'seller_report', locale),
+              _bilingualHeaderText(
+                financialDocumentLabel(
+                  'seller_report',
+                  reportPair,
+                  fallback: _pdfLabel(labels, 'seller_report', locale),
+                ),
                 style: ts(
                   size: 13,
                   fw: pw.FontWeight.bold,
                   color: _invoiceAccentColor(header?.accentColor ?? '#315C4C'),
                 ),
-                textDirection: dir,
               ),
-              pw.Text(
-                '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(DateTime.now())}',
+              pw.SizedBox(height: 3),
+              _bilingualHeaderText(
+                _documentLabelWithSuffix(
+                  'report_date',
+                  _fmtDate(DateTime.now()),
+                  reportPair,
+                  locale,
+                ),
                 style: ts(size: 8, color: PdfColors.grey700),
-                textDirection: dir,
               ),
             ],
           ),
@@ -1635,11 +1726,11 @@ Future<Uint8List> generateInvoicePdf({
       ? savedCompanyName
       : companyName;
   var effectiveLogoBytes = logoBytes;
-  if (header == null && invoice.headerSnapshot.isNotEmpty) {
+  if (effectiveLogoBytes == null && invoice.headerSnapshot.isNotEmpty) {
     final savedLogo = invoice.headerSnapshot['logo_base64'] as String?;
     try {
       effectiveLogoBytes = savedLogo == null ? null : base64Decode(savedLogo);
-    } catch (_) {
+    } on FormatException {
       effectiveLogoBytes = null;
     }
   }
@@ -1765,8 +1856,8 @@ Future<Uint8List> generateInvoicePdf({
 
       pdf.addPage(
         pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+          pageFormat: PdfPageFormat.a5,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           textDirection: dir,
           build: (_) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -1787,32 +1878,39 @@ Future<Uint8List> generateInvoicePdf({
                   color: PdfColors.grey100,
                   border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
                 ),
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                   children: [
-                    pw.Expanded(
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pairedLabel(
-                            docTitle,
-                            style: ts(
-                              size: 10,
-                              fw: pw.FontWeight.bold,
-                              color: accentColor,
-                            ),
-                          ),
-                          pw.Text(
+                    _bilingualHeaderText(
+                      docTitle,
+                      style: ts(
+                        size: 10,
+                        fw: pw.FontWeight.bold,
+                        color: accentColor,
+                      ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Row(
+                      children: [
+                        pw.Expanded(
+                          child: pw.Text(
                             _pdfExcerpt(invoice.invoiceNumber, maxRunes: 48),
                             style: ts(size: 11, fw: pw.FontWeight.bold),
                           ),
-                        ],
-                      ),
-                    ),
-                    pairedLabel(
-                      _documentLabelWithSuffix('date', dateStr, pair, locale),
-                      style: ts(size: 8, color: PdfColors.grey700),
-                      align: pw.TextAlign.right,
+                        ),
+                        pw.SizedBox(width: 8),
+                        pw.Expanded(
+                          child: _bilingualHeaderText(
+                            _documentLabelWithSuffix(
+                              'date',
+                              dateStr,
+                              pair,
+                              locale,
+                            ),
+                            style: ts(size: 8, color: PdfColors.grey700),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1831,10 +1929,9 @@ Future<Uint8List> generateInvoicePdf({
                 ),
                 child: pw.Column(
                   children: [
-                    pairedLabel(
+                    _bilingualHeaderText(
                       lblAmountReceived,
                       style: ts(size: 8, color: PdfColors.grey700),
-                      align: pw.TextAlign.center,
                     ),
                     pw.SizedBox(height: 3),
                     pw.Row(
@@ -1905,8 +2002,7 @@ Future<Uint8List> generateInvoicePdf({
                     ),
                 ],
               ),
-              pw.Spacer(),
-              pw.SizedBox(height: 10),
+              pw.SizedBox(height: 12),
               pw.Row(
                 children: [
                   pw.Expanded(
@@ -2022,45 +2118,45 @@ Future<Uint8List> generateInvoicePdf({
               color: PdfColors.grey100,
               border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
             ),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
               children: [
-                pw.Expanded(
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pairedLabel(
-                        docTitle,
-                        style: ts(
-                          size: 10,
-                          fw: pw.FontWeight.bold,
-                          color: isCreditNote
-                              ? PdfColors.green800
-                              : accentColor,
-                        ),
-                      ),
-                      pw.Text(
+                _bilingualHeaderText(
+                  docTitle,
+                  style: ts(
+                    size: 10,
+                    fw: pw.FontWeight.bold,
+                    color: isCreditNote ? PdfColors.green800 : accentColor,
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Row(
+                  children: [
+                    pw.Expanded(
+                      child: pw.Text(
                         _s(invoice.invoiceNumber),
                         style: ts(size: 10, fw: pw.FontWeight.bold),
                         textDirection: dir,
                       ),
-                    ],
-                  ),
-                ),
-                pairedLabel(
-                  _documentLabelWithSuffix('date', dateStr, pair, locale),
-                  style: ts(size: 8, color: PdfColors.grey700),
-                  align: pw.TextAlign.right,
-                ),
-                if (invoice.status == 'void')
-                  pairedLabel(
-                    lblVoid,
-                    style: ts(
-                      size: 10,
-                      fw: pw.FontWeight.bold,
-                      color: PdfColors.red,
                     ),
-                  ),
+                    pw.SizedBox(width: 8),
+                    pw.Expanded(
+                      child: _bilingualHeaderText(
+                        _documentLabelWithSuffix('date', dateStr, pair, locale),
+                        style: ts(size: 8, color: PdfColors.grey700),
+                      ),
+                    ),
+                    if (invoice.status == 'void')
+                      pairedLabel(
+                        lblVoid,
+                        style: ts(
+                          size: 10,
+                          fw: pw.FontWeight.bold,
+                          color: PdfColors.red,
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -2403,6 +2499,9 @@ Future<Uint8List> buildPdfMultiShopLedger({
 
     final pdf = lc.buildDocument();
     final now = DateTime.now();
+    final documentPair =
+        header?.documentLanguagePair ??
+        FinancialDocumentLanguagePair.englishArabic;
 
     // ── Ledger column widths (portrait A4 usable ≈ 539 pt) ──────────────────
     const double dateW = 54;
@@ -2582,42 +2681,54 @@ Future<Uint8List> buildPdfMultiShopLedger({
                 logoBytes: logoBytes,
               ),
               pw.SizedBox(height: 4),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                 children: [
-                  pw.Text(
-                    _s(title),
-                    style: ts(
-                      size: 11,
-                      fw: pw.FontWeight.bold,
-                      color: _invoiceAccentColor(
-                        header?.accentColor ?? '#315C4C',
-                      ),
-                    ),
-                    textDirection: _cellDir(title, dir),
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Text(
-                        '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(now)}',
-                        style: ts(size: 8, color: PdfColors.grey700),
-                        textDirection: dir,
-                      ),
-                      if (generatedBy.isNotEmpty)
-                        pw.Text(
-                          '${_pdfLabel(labels, 'generated_by', locale)}: ${_s(generatedBy)}',
-                          style: ts(size: 8, color: PdfColors.grey700),
-                          textDirection: dir,
+                      pw.Expanded(
+                        child: _bilingualHeaderText(
+                          _s(title),
+                          style: ts(
+                            size: 11,
+                            fw: pw.FontWeight.bold,
+                            color: _invoiceAccentColor(
+                              header?.accentColor ?? '#315C4C',
+                            ),
+                          ),
                         ),
+                      ),
                       if (subtitle.isNotEmpty)
                         pw.Text(
                           _s(subtitle),
                           style: ts(size: 8, color: PdfColors.grey500),
-                          textDirection: dir,
+                          textDirection: _cellDir(subtitle, dir),
                         ),
                     ],
                   ),
+                  pw.SizedBox(height: 3),
+                  _bilingualHeaderText(
+                    _documentLabelWithSuffix(
+                      'report_date',
+                      _fmtDate(now),
+                      documentPair,
+                      locale,
+                    ),
+                    style: ts(size: 8, color: PdfColors.grey700),
+                  ),
+                  if (generatedBy.isNotEmpty) ...[
+                    pw.SizedBox(height: 2),
+                    _bilingualHeaderText(
+                      _documentLabelWithSuffix(
+                        'generated_by',
+                        _s(generatedBy),
+                        documentPair,
+                        locale,
+                      ),
+                      style: ts(size: 8, color: PdfColors.grey700),
+                    ),
+                  ],
                 ],
               ),
               pw.Divider(thickness: 1.5, color: PdfColors.blue800),

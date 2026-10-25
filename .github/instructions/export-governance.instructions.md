@@ -68,12 +68,31 @@ Direct `PdfPreview` callers must provide an `onError` builder that maps the
 failure through `AppErrorMapper` and localizes it; do not leave a generic blank
 preview when font configuration is invalid.
 
+Financial PDFs reuse `_workspaceBrandHeader()` for invoices, receipts,
+statements, and reports. Keep English information on the left and the selected
+Arabic/Urdu information on the right, regardless of app locale. Use current
+workspace logo bytes when available; invoice/receipt snapshots are the
+fallback only when those bytes are unavailable, and `visibleFields` remains
+the user's visibility control. Pin physical row order with
+`pw.Directionality(textDirection: pw.TextDirection.ltr)` when the containing
+page may be RTL; in `pdf` 3.12.0, `pw.Row` has no `textDirection` parameter.
+Set each child `pw.Text` direction independently. Cash receipts are A5 and
+single-page.
+
 Focused regression coverage belongs in `pdf_export_test.dart`,
 `export_sheet_page_export_test.dart`, and `excel_export_test.dart`. Include
 Arabic plus Urdu-specific letters (`ٹ ڈ ڑ ں ھ ے`), verify the PDF embeds
 NotoSansArabic with a `/FontFile2` font program, and test fail-closed behavior
 both with and without the shaping define. Preserve the typed configuration
 exception through `ExportSheet` so the localized error mapper can report it.
+
+For a reported visual/font regression, trace the complete screen → settings /
+snapshot → builder → renderer path and add a deterministic reproduction.
+Validate page count, page dimensions, logo image resources, embedded font
+resources, and RTL-specific text. When a PDF rasterizer or target viewer is
+available, inspect the generated page itself for connected glyphs and the
+English-left/RTL-right layout. Do not describe font-resource assertions as
+pixel-level verification; document viewer coverage that could not be run.
 
 ## Changelog Requirement
 
@@ -117,3 +136,12 @@ skills:
 The evaluated [`pdf_text_shaper`](https://pub.dev/packages/pdf_text_shaper)
 was not adopted: its current Dart/PDF minimums exceed this app's toolchain, it
 does not support Web, and it documents mixed-direction limitations.
+
+A separate `payv` proof rendered a mixed Urdu/Latin sample with visible
+Nastaliq shaping in Chrome, but it is not an app integration. Its current
+public page API does not provide the image embedding needed to preserve
+workspace logos and the proof does not establish parity for invoices,
+receipts, pagination, selectable text, or all report builders. Keep the
+production renderer on Noto Sans Arabic until an end-to-end replacement
+passes those gates on Web and Android; describe current Urdu PDFs as Naskh,
+not Nastaliq.

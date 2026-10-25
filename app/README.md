@@ -219,6 +219,19 @@ current PDF renderer. The app UI uses Noto Nastaliq Urdu. XLSX preserves
 Unicode text and RTL worksheet direction, but fonts are selected by the
 spreadsheet application and are not embedded in the file.
 
+Invoice, cash-receipt, account-statement, and seller-report PDFs reuse one
+workspace brand header: English business information is left-aligned and the
+selected Arabic/Urdu information is right-aligned independently of app locale.
+Current workspace logo bytes take priority, with an invoice/receipt snapshot
+fallback when they are unavailable and the configured logo visibility allows
+it. Cash receipts use an A5 page and remain single-page. Font metadata tests
+and rendered-layout checks are separate; an embedded font does not prove
+correct glyph appearance. Rows use an explicit LTR `Directionality` wrapper
+because the page may be RTL and `pdf` 3.12.0 `Row` has no direction argument.
+The current Urdu renderer remains Naskh-style; a Nastaliq prototype has not
+passed logo, text-extraction, pagination, and cross-platform report parity
+gates.
+
 Place `google-services.json` in `android/app/` before running (obtain from Firebase Console — gitignored).
 
 Google Drive backup requires a Google OAuth web client and Android client for package `footwear.pk.com`. Configure the release SHA-1 in Google Cloud/Firebase, then provide `GOOGLE_DRIVE_CLIENT_ID` and `GOOGLE_DRIVE_SERVER_CLIENT_ID` as `--dart-define` values for web and Android builds. The app requests only the `drive.file` scope.
@@ -395,6 +408,25 @@ Cash receipt detail screens and PDFs present the receipt identifier, shop and
 payment context, amount received, resulting balance, and receiver/signature
 information where available. Receipt creation and all financial values continue
 to use the existing atomic invoice, ledger, and shop-balance pipeline.
+
+---
+
+## v3.10.4 Bilingual PDF and Support-Access Release
+
+Super-admin workspace support-access start, switch, and end actions now show
+distinct localized outcomes and use the active audited context. Shared
+financial PDF rows pin English-left/Arabic-or-Urdu-right order with explicit
+LTR `Directionality`; actual Arabic and Urdu statement samples were inspected
+in Chrome. Production Urdu remains Naskh-style. The separate Nastaliq proof is
+not integrated because image/logo embedding, text extraction, pagination, and
+full Web/Android report parity remain unverified.
+
+Release verification: full Flutter suite `01:16 +628: All tests passed!`;
+`flutter analyze lib --no-pub`: `No issues found! (ran in 132.4s)`;
+`dart analyze test/`: `No issues found!`; Rules Emulator: `147 passing (29s)`.
+Web `EXIT: 0`; Hosting and Rules/indexes reported `Deploy complete!`. Split
+APKs were built at 30.7/32.2/33.6 MB. No Android device was connected, so
+phone installation was skipped.
 
 ---
 

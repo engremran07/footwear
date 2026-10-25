@@ -171,6 +171,39 @@ void main() {
       );
     });
 
+    test('workspace support access failures use actionable localized keys', () {
+      expect(
+        AppErrorMapper.key(
+          ArgumentError(
+            'Choose a workspace and enter a reason of at least 10 characters.',
+          ),
+        ),
+        equals('workspace_access_reason_invalid'),
+      );
+      expect(
+        AppErrorMapper.key(
+          StateError('The selected workspace is unavailable.'),
+        ),
+        equals('workspace_access_unavailable'),
+      );
+      expect(
+        AppErrorMapper.key(
+          StateError('Active super-admin access is required.'),
+        ),
+        equals('err_permission_denied'),
+      );
+      expect(
+        AppErrorMapper.key(
+          StateError('An active workspace is required to reconcile seats.'),
+        ),
+        equals('workspace_support_context_required'),
+      );
+      expect(
+        AppErrorMapper.key(StateError('workspace_seat_count_changed_retry')),
+        equals('workspace_seat_count_changed_retry'),
+      );
+    });
+
     test('stale workspace lifecycle actions ask the user to refresh', () {
       expect(
         AppErrorMapper.key(

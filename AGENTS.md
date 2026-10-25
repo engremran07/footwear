@@ -247,6 +247,12 @@ Seller:
   (`buildPdfLedger`, `buildPdfSellerReport`, `buildPdfMultiShopLedger`).
   Grep gate: every `ExportSheet.show(` call site must be auditable.
 
+1. Bilingual financial PDF columns must keep English physically left and the
+  selected Arabic/Urdu content physically right, regardless of page locale.
+  With `pdf` 3.12.0, `pw.Row` has no `textDirection` argument; wrap the row in
+  `pw.Directionality(textDirection: pw.TextDirection.ltr)` and set each text
+  widget's direction explicitly. Verify actual Arabic and Urdu output.
+
 1. **`changelog_data.dart` MUST be updated on every version bump.** When
   `app/pubspec.yaml` version is bumped, a corresponding entry MUST be added
   to `app/lib/core/data/changelog_data.dart` with trilingual
@@ -282,6 +288,15 @@ Seller:
   for workspace creation. Never use a blanket `resource == null` allowance.
   Rules tests must replay the relevant read inside the client transaction and
   then validate its complete write set.
+
+1. Financial PDFs must reuse the shared workspace brand header: English
+  business information is on the left and the selected Arabic/Urdu information
+  is on the right, independent of app locale. Prefer current workspace logo
+  bytes; if current bytes are unavailable, invoice and receipt PDFs may use
+  the saved invoice logo while still honoring `visibleFields`. Cash receipts
+  use an A5 page and remain one page. Keep `use_arabic=true`, assert PDF font,
+  image, page-count, and page-size resources, and inspect rendered output when
+  available; font embedding alone is not visual proof.
 
 ## 5) Known Failure Signatures
 
@@ -1294,3 +1309,29 @@ Unreleased shared frontend accessibility foundation:
   index files changed for this provider-only hotfix.
 - Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. ARM64 installed
   on `R5GL22RGT9V` (`Success`, versionName `3.10.3`, versionCode `3103414`).
+
+2026-10-25 combined release — v3.10.4+1115:
+
+- Super-admin workspace support start/end now use the active context correctly,
+  context switching is explicit, and localized feedback distinguishes success
+  and failure. Regression coverage includes end-access, context switching,
+  selected-workspace feedback, and expired-context errors.
+- Bilingual PDF rows now pin physical LTR column order with
+  `pw.Directionality`, while English and RTL text directions stay explicit.
+  Fresh Arabic and Urdu account-statement PDFs were visually checked in
+  Chrome: English appears left, the configured RTL language right, and Urdu
+  is readable Naskh-style text.
+- Nastaliq PDF rendering remains unimplemented. A separate `payv` proof
+  showed shaped sample output, but logo embedding, text extraction, pagination,
+  and all-report Web/Android parity are not proven. Production PDFs must not be
+  described as Nastaliq.
+- Full Flutter suite: `01:16 +628: All tests passed!`; focused access/PDF
+  suite: `00:11 +65: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 132.4s)`; `dart analyze test/`: `No issues found!`.
+- Rules Emulator: `147 passing (29s)`. Web build `EXIT: 0`; Firebase Hosting
+  and Firestore Rules/indexes both reported `Deploy complete!`. The 23 remote
+  indexes and 2 field overrides absent locally were preserved.
+- Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. `adb devices`
+  showed only `List of devices attached`, so phone copy/install was skipped.
+- Google Drive OAuth IDs remain unconfigured; Drive backup is disabled in
+  these artifacts. Markdown lint and `git diff --check` exited 0.

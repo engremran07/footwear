@@ -1,7 +1,10 @@
-# FootWear ERP — v3.10.3+1114
+# FootWear ERP — v3.10.4+1115
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
+> **v3.10.4+1115 (2026-10-25)** — Super-admin workspace support-access feedback now distinguishes start, switch, end, and failure states. Shared financial PDF rows preserve English-left and selected Arabic/Urdu-right ordering under RTL pages. Urdu remains readable Naskh-style; a Nastaliq renderer migration is deferred until logo, selectable-text, pagination, and Web/Android report parity are proven.
+> Verification: `01:16 +628: All tests passed!`; focused access/PDF suite `00:11 +65: All tests passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 132.4s)`; `dart analyze test/`: `No issues found!`; Rules Emulator: `147 passing (29s)`.
+> Web build `EXIT: 0`; Hosting and Firestore Rules/indexes each reported `Deploy complete!`; 23 remote indexes and 2 field overrides not listed locally were preserved. Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. No Android device was connected, so installation was skipped. Google Drive OAuth remains unconfigured.
 > **v3.10.3+1114 (2026-10-25)** — Workspace member lists and seat reconciliation now include legacy active profiles without a display name. The release also includes on-device logo resizing, tenant-scoped admin/seller role management, accurate seat reconciliation, and compact bilingual single-page cash receipts without a balance-movement block. Google Drive backup remains disabled until OAuth client IDs are configured.
 > Verification: `01:21 +623: All tests passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 15.3s)`; `dart analyze test/`: `No issues found!`; Firestore Rules Emulator: `146 passing (37s)`.
 > Web build `EXIT: 0`; Hosting reported `Deploy complete!`. Firestore Rules/indexes were deployed with the preceding v3.10.2 build and did not change in this query-only hotfix. Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. ARM64 installed on `R5GL22RGT9V` (`Success`), versionName `3.10.3`, versionCode `3103414`.
@@ -98,6 +101,17 @@ Nastaliq OpenType shaping. XLSX preserves Unicode and RTL worksheet direction,
 but its font is chosen by the spreadsheet application and is not embedded.
 Every Flutter action that can generate PDFs must include
 `--dart-define=use_arabic=true`.
+
+Financial PDFs share a workspace brand header with English content on the
+left and the selected Arabic or Urdu content on the right, regardless of app
+locale. Current workspace logo bytes are preferred; invoice/receipt snapshots
+provide a logo fallback only when current bytes are unavailable and the
+configured `visibleFields` includes the logo. Cash receipt PDFs use an A5
+page and remain single-page. Pin row order with explicit PDF
+`Directionality`; the `pdf` 3.12.0 `Row` API does not accept a direction
+parameter. Urdu PDFs use Naskh-style shaping; a standalone Nastaliq proof is
+not production support until branding, selectable text, pagination, and
+Web/Android report parity are verified.
 
 ---
 

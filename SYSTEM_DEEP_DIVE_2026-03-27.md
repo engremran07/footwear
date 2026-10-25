@@ -223,14 +223,13 @@ history remains available. Credit-balance void mode retains every valid
 cash-in payment as customer credit; cash-refund mode hides those payments.
 No hard deletion is introduced.
 
-Receipt PDFs use the configured workspace header and a prominent amount
-received panel with payment method/reference, before/after balance, receiver,
-and signature fields. Ledger summary labels now inherit the report locale's
-text direction; amounts remain explicitly LTR. Settings and PDF regressions
-are documented in `docs/frontend/screen-register.md`. The full Flutter suite
-reports `01:08 +599: All tests passed!`; the focused invoice-void suite reports
-`00:00 +22: All tests passed!`. Rendered APK/browser acceptance remains
-separate from these source and widget checks.
+Receipt PDFs use the shared workspace header and a prominent amount-received
+panel with payment method/reference, receiver, and signature fields. They use
+an A5 page, remain single-page, and omit the account-balance-movement block;
+the accounting data and atomic ledger/balance writes are unchanged. Ledger
+summary labels inherit the report locale's text direction; amounts remain
+explicitly LTR. Embedded-font/image and A5-page regressions are structural
+tests, not substitutes for rendered browser/device acceptance.
 
 ## Financial Document Language Pair
 
@@ -245,6 +244,24 @@ directionally explicit lines; numeric amounts retain LTR formatting. Seller
 invoice Rules require the provider's selected language pair to match the
 workspace configuration without relaxing tenant, route, stock, or balance
 validation.
+
+The shared workspace brand header places English business information on the
+left and the configured Arabic or Urdu information on the right, independent
+of app locale. Current settings logo bytes take priority; invoice and receipt
+snapshots supply a fallback only when those bytes are unavailable, and the
+configured logo visibility remains authoritative. PDF tests cover embedded
+font/image resources and page geometry; these structural checks are distinct
+from visual inspection in an actual viewer.
+
+The page can inherit RTL direction from the selected report locale, so shared
+bilingual header rows must wrap `pw.Row` in explicit LTR
+`pw.Directionality`; child English and Arabic/Urdu text widgets retain their
+own directions. `pw.Row` in the pinned `pdf` 3.12.0 package does not expose a
+`textDirection` parameter. The current output was visually inspected for both
+Arabic and Urdu pairs in Chrome, with English on the left and the selected RTL
+language on the right. Urdu remains Naskh-style. A separate Nastaliq proof of
+concept is not integrated because it has not established logo embedding,
+selectable text, pagination, or report parity across Web and Android.
 
 ## Workspace Owner and Seat Overview
 
@@ -329,3 +346,21 @@ passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 15.3s)`;
 The web build exited 0 and Hosting deployment reported `Deploy complete!`.
 Split APKs were built at 30.7 MB, 32.2 MB, and 33.6 MB. ARM64 installed on
 `R5GL22RGT9V` (`Success`, versionName `3.10.3`, versionCode `3103414`).
+
+## v3.10.4+1115 Release Verification
+
+Super-admin workspace support-access start, switch, and end feedback now
+reflects the active audited context. Bilingual PDF rows use an explicit LTR
+`pw.Directionality` parent because the page inherits locale direction and
+`pw.Row` in `pdf` 3.12.0 has no direction parameter. Actual Arabic and Urdu
+account-statement samples were inspected in Chrome; English is left and the
+configured RTL language is right.
+
+Urdu remains readable Naskh-style output. A separate `payv` proof displayed
+Nastaliq shaping but is not integrated because logo embedding, text extraction,
+pagination, and full report parity across Web and Android remain unverified.
+Release verification: full Flutter suite `01:16 +628: All tests passed!`;
+Flutter analysis `No issues found! (ran in 132.4s)`; test analysis
+`No issues found!`; Rules Emulator `147 passing (29s)`. Web `EXIT: 0`;
+Hosting and Rules/indexes reported `Deploy complete!`; split APKs were
+30.7/32.2/33.6 MB. No Android device was connected for installation.

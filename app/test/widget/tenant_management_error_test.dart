@@ -376,12 +376,225 @@ void main() {
     expect(find.text('Workspace restored'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('selected platform admin can end workspace access', (
+    tester,
+  ) async {
+    final tenant = TenantModel(
+      id: 'alpha',
+      name: 'Alpha',
+      slug: 'alpha',
+      activeUserCount: 0,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final user = UserModel(
+      id: 'platform-admin',
+      email: 'platform@example.com',
+      displayName: 'Platform Admin',
+      role: UserRole.superAdmin,
+      active: true,
+      activeWorkspaceId: tenant.id,
+      activeWorkspaceReason: 'Workspace support review',
+      activeWorkspaceSelectedAt: Timestamp.now(),
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final authNotifier = _RecordingAuthNotifier();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(user)),
+          tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
+          tenantWorkspaceUsersProvider.overrideWith(
+            (ref, tenantId) => Stream.value(const <UserModel>[]),
+          ),
+          authNotifierProvider.overrideWith(() => authNotifier),
+        ],
+        child: const MaterialApp(home: TenantManagementScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('End workspace access'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.text('End support access?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Confirm'));
+    await tester.pumpAndSettle();
+
+    expect(authNotifier.accessEnded, isTrue);
+    expect(authNotifier.selectedWorkspaceId, isNull);
+    expect(find.text('Workspace support access ended.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('platform admin access selection reports success', (
+    tester,
+  ) async {
+    final tenant = TenantModel(
+      id: 'alpha',
+      name: 'Alpha',
+      slug: 'alpha',
+      active: false,
+      activeUserCount: 0,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final user = UserModel(
+      id: 'platform-admin',
+      email: 'platform@example.com',
+      displayName: 'Platform Admin',
+      role: UserRole.superAdmin,
+      active: true,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final authNotifier = _RecordingAuthNotifier();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(user)),
+          tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
+          authNotifierProvider.overrideWith(() => authNotifier),
+        ],
+        child: const MaterialApp(home: TenantManagementScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Select a workspace and provide a support reason before accessing its business data.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Access workspace'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.enterText(
+      find.byKey(const Key('workspace_access_reason_field')),
+      'Support ticket review',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Confirm'));
+    await tester.pumpAndSettle();
+
+    expect(authNotifier.selectedWorkspaceId, tenant.id);
+    expect(authNotifier.selectedWorkspaceReason, 'Support ticket review');
+    expect(authNotifier.accessEnded, isFalse);
+    expect(find.text('Workspace support access started.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('expired platform context is distinct from unselected access', (
+    tester,
+  ) async {
+    final tenant = TenantModel(
+      id: 'alpha',
+      name: 'Alpha',
+      slug: 'alpha',
+      activeUserCount: 0,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final user = UserModel(
+      id: 'platform-admin',
+      email: 'platform@example.com',
+      displayName: 'Platform Admin',
+      role: UserRole.superAdmin,
+      active: true,
+      activeWorkspaceId: tenant.id,
+      activeWorkspaceReason: 'Workspace support review',
+      activeWorkspaceSelectedAt: Timestamp.fromDate(
+        DateTime.now().subtract(const Duration(hours: 9)),
+      ),
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(user)),
+          tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
+        ],
+        child: const MaterialApp(home: TenantManagementScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Workspace support access has expired. Select the workspace again.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Access workspace'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('workspace access selection shows mapped failure feedback', (
+    tester,
+  ) async {
+    final tenant = TenantModel(
+      id: 'alpha',
+      name: 'Alpha',
+      slug: 'alpha',
+      active: false,
+      activeUserCount: 0,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final user = UserModel(
+      id: 'platform-admin',
+      email: 'platform@example.com',
+      displayName: 'Platform Admin',
+      role: UserRole.superAdmin,
+      active: true,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final authNotifier = _RecordingAuthNotifier()
+      ..selectionError = StateError('The selected workspace is unavailable.');
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(user)),
+          tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
+          authNotifierProvider.overrideWith(() => authNotifier),
+        ],
+        child: const MaterialApp(home: TenantManagementScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Access workspace'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.enterText(
+      find.byKey(const Key('workspace_access_reason_field')),
+      'Support ticket review',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Confirm'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'The selected workspace is unavailable. Refresh and try again.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Workspace support access started.'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _RecordingTenantManagementNotifier extends TenantManagementNotifier {
   String? assignedOwnerId;
   String? archivedTenantId;
   String? restoredTenantId;
+  String? reconciledTenantId;
 
   @override
   Future<String> createTenant({
@@ -412,18 +625,27 @@ class _RecordingTenantManagementNotifier extends TenantManagementNotifier {
   Future<void> restoreTenant(String tenantId) async {
     restoredTenantId = tenantId;
   }
+
+  @override
+  Future<void> reconcileWorkspaceSeatCount(String tenantId) async {
+    reconciledTenantId = tenantId;
+  }
 }
 
 class _RecordingAuthNotifier extends AuthNotifier {
   String? selectedWorkspaceId;
+  String? selectedWorkspaceReason;
   bool accessEnded = false;
+  Object? selectionError;
 
   @override
   Future<void> selectWorkspace({
     required String workspaceId,
     required String reason,
   }) async {
+    if (selectionError != null) throw selectionError!;
     selectedWorkspaceId = workspaceId;
+    selectedWorkspaceReason = reason;
   }
 
   @override

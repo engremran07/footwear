@@ -66,6 +66,9 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
     fails closed with a localized configuration error if the flag is missing.
     PDFs embed Noto Sans Arabic for Arabic and Urdu; the renderer does not
     provide full Nastaliq OpenType shaping, so Noto Nastaliq Urdu is UI-only.
+    Bilingual PDF rows must use an explicit LTR `pw.Directionality` wrapper
+    for English-left/RTL-right placement; `pw.Row` has no direction parameter
+    in the pinned `pdf` 3.12.0 API. Verify actual Arabic and Urdu renders.
     PNG, print, and PDF share the generated PDF bytes. XLSX preserves Unicode
     and RTL sheet direction but does not embed a font.
 19. Every `ExportSheet.show()` call MUST provide `pdfBytesBuilder` when the data is a
@@ -109,6 +112,13 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 34. Copilot chat history and request IDs do not merge across GitHub identities through repository changes. Preserve durable decisions, pending tasks, audit IDs, and verification evidence in `SESSION_LOG.md` and the current audit report. On an account/profile switch, read those plus `git status`/`git diff`; never store credentials or full chat transcripts in the repository or claim separate accounts were synchronized.
 35. Workspace-root hard deletion is denied; use the selected-workspace archive/restore lifecycle. Database flush/reset actions and legacy plaintext whole-project export, whole-collection restore, and direct-balance reset scripts must remain fail-closed until a transactional, audited maintenance path preserves tenant, ledger, and inventory invariants.
 36. Missing-document Rules reads must be narrowly scoped to an active profile and concrete active tenant; super-admins additionally require selected-workspace support context. Only admin-equivalent users may probe missing seller inventory, and only super-admins may probe settings for a tenant that does not yet exist. Cover client reads and their complete transaction writes in emulator regressions; do not use a blanket `resource == null` allowance.
+37. Financial PDFs use the shared workspace header with English content left
+    and the selected Arabic/Urdu content right, independent of app locale.
+    Current workspace logo bytes take priority; invoice snapshots provide a
+    logo fallback when current bytes are unavailable, subject to the saved
+    `visibleFields` setting. Cash receipts are A5 and single-page. Preserve
+    the `use_arabic=true` shaping gate; verify font/image resources, page size,
+    page count, and rendered layout separately.
 
 ## Frontend UI Governance
 
@@ -403,6 +413,14 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- v3.10.4+1115 corrects super-admin workspace support feedback and inherited
+  RTL row ordering using explicit LTR `pw.Directionality`; Arabic and Urdu
+  statement samples were visually inspected in Chrome. Urdu output remains
+  Naskh-style: an isolated `payv` Nastaliq proof lacks logo, text-extraction,
+  pagination, and all-report Web/Android parity. The full Flutter suite passed
+  628 tests, Rules Emulator passed 147 tests, both analyzers and Markdown lint
+  are clean, Web `EXIT: 0`, Hosting and Rules/indexes deployed, and split APKs
+  built at 30.7/32.2/33.6 MB. No Android device was connected for installation.
 - v3.10.3+1114 fixes incomplete legacy workspace roster and seat data.
   Active/inactive user lists sort client-side so documents without optional
   `display_name` remain visible; selected-workspace seat reconciliation counts

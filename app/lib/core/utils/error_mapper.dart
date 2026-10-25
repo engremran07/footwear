@@ -61,8 +61,18 @@ class AppErrorMapper {
       return 'flush_data_reset_unavailable';
     }
     if (msg.contains('authorized workspace administration is required') ||
-        msg.contains('active platform super-admin access is required')) {
+        msg.contains('active platform super-admin access is required') ||
+        msg.contains('active super-admin access is required')) {
       return 'err_permission_denied';
+    }
+    if (msg.contains('choose a workspace and enter a reason')) {
+      return 'workspace_access_reason_invalid';
+    }
+    if (msg.contains('the selected workspace is unavailable')) {
+      return 'workspace_access_unavailable';
+    }
+    if (msg.contains('an active workspace is required to reconcile seats')) {
+      return 'workspace_support_context_required';
     }
     if (msg.contains('workspace lifecycle status changed')) {
       return 'workspace_lifecycle_changed';
@@ -97,6 +107,9 @@ class AppErrorMapper {
     }
     if (msg.contains('workspace_seat_count_initialization_required')) {
       return 'workspace_seat_count_initialization_required';
+    }
+    if (msg.contains('workspace_seat_count_changed_retry')) {
+      return 'workspace_seat_count_changed_retry';
     }
     if (msg.contains('workspace_support_context_expired')) {
       return 'workspace_support_context_expired';

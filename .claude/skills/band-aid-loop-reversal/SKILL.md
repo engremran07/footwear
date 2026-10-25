@@ -71,6 +71,21 @@ Run all:
 
 4. Hygiene gates from AGENTS/CLAUDE
 
+For recurring PDF/font/layout symptoms, preserve the original PDF or a
+deterministic fixture, record the renderer and shaping flag, and compare the
+rendered page before and after each candidate change. Keep separate evidence
+for font selection/shaping, text direction, header composition, and logo
+source. An embedded-font assertion or passing unit test alone is not proof
+that glyphs or columns render correctly. Do not add a second font, package,
+fallback layout, or retry until the existing failure is reproduced and its
+owner is identified.
+
+For `pdf` 3.12.0 layouts, pin physical row order with
+`pw.Directionality`; `pw.Row` has no `textDirection` parameter. A successful
+standalone font-shaping proof is not an integrated fix until the chosen
+renderer preserves workspace logos, selectable text, pagination, and output
+parity across Web, Android, and every production report type.
+
 ## Step 5: Closure Report
 
 Must include:
@@ -82,6 +97,10 @@ Must include:
 3. Kept guards and rationale
 
 4. Evidence that issue remains fixed
+
+For rendering bugs, include generated PDF page count/format, embedded
+font-resource evidence, rendered-output evidence when available, and the exact
+viewer/platform coverage that remains unverified.
 
 ## Guardrails
 
