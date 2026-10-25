@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
+import '../core/utils/workspace_logo_processor.dart';
 import '../models/settings_model.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
@@ -86,7 +86,8 @@ class SettingsNotifier extends AsyncNotifier<void> {
   Future<void> save(Map<String, dynamic> data) async {
     await _requireAdmin();
     final logoBase64 = data['logo_base64'];
-    if (logoBase64 is String && utf8.encode(logoBase64).length > 50 * 1024) {
+    if (logoBase64 is String &&
+        logoBase64.length > SettingsModel.maxLogoBase64Bytes) {
       throw ArgumentError('Encoded logo must not exceed 50 KB');
     }
     final currentUser = await ref.read(authUserProvider.future);
@@ -115,8 +116,13 @@ class SettingsNotifier extends AsyncNotifier<void> {
   /// required. All connected devices receive the updated logo via the real-time
   /// stream.
   Future<void> uploadLogo(Uint8List imageBytes) async {
-    final encoded = base64Encode(imageBytes);
-    await save({'logo_base64': encoded, 'logo_url': null});
+    await _requireAdmin();
+    final processed = await WorkspaceLogoProcessor.process(imageBytes);
+    await saveProcessedLogo(processed);
+  }
+
+  Future<void> saveProcessedLogo(ProcessedWorkspaceLogo logo) async {
+    await save({'logo_base64': logo.base64, 'logo_url': null});
   }
 
   /// Clears the company logo from the settings document.

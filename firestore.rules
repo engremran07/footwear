@@ -83,12 +83,16 @@ service cloud.firestore {
 
     function isSuperAdminForSelectedWorkspace(tenantId) {
       return isSuperAdmin() &&
-        userDoc().data.active_workspace_id == tenantId &&
-        userDoc().data.active_workspace_reason is string &&
-        userDoc().data.active_workspace_reason.size() >= 10 &&
-        userDoc().data.active_workspace_selected_at is timestamp &&
-        userDoc().data.active_workspace_selected_at >
-          request.time - duration.value(8, 'h');
+        hasSelectedWorkspaceSupportContext(userDoc().data, tenantId);
+    }
+
+    function hasSelectedWorkspaceSupportContext(userData, tenantId) {
+      let reason = userData.get('active_workspace_reason', '');
+      let selectedAt = userData.get('active_workspace_selected_at', null);
+      return userData.get('active_workspace_id', '') == tenantId &&
+        reason is string && reason.size() >= 10 &&
+        selectedAt is timestamp &&
+        selectedAt > request.time - duration.value(8, 'h');
     }
 
     function isSuperAdminRestoringTenant(tenantId) {
@@ -103,17 +107,19 @@ service cloud.firestore {
     // the security boundary for all tenant-owned documents: routes, shops,
     // transactions, invoices, products, inventory, notifications, etc.
     function isAdminForTenant(tenantId) {
-      return isActiveUser() &&
-        isAdminRole(getUserRole()) &&
-        (
-          (isSuperAdminRole(getUserRole()) &&
-            isSuperAdminForSelectedWorkspace(tenantId)) ||
-          (!isSuperAdminRole(getUserRole()) &&
-            (
-              currentUserTenantId() == tenantId ||
-              (tenantId == '__global__' && currentUserTenantId() == null)
-            ))
-        ) &&
+      let userData = userDoc().data;
+      let role = userData.get('role', '');
+      let isPlatformAdmin = isSuperAdminRole(role);
+      let isAssignedToTenant = userData.get('tenant_id', null) == tenantId ||
+        (tenantId == '__global__' &&
+          userData.get('tenant_id', null) == null);
+      let hasTenantAccess = isPlatformAdmin
+        ? hasSelectedWorkspaceSupportContext(userData, tenantId)
+        : isAssignedToTenant;
+      return isAuthenticated() &&
+        userData.get('active', false) == true &&
+        isAdminRole(role) &&
+        hasTenantAccess &&
         isTenantActive(tenantId);
     }
 
@@ -168,6 +174,132 @@ service cloud.firestore {
         (nextData.active == true &&
           !('archived_at' in nextData) &&
           !('archived_by' in nextData));
+    }
+
+    function tenantSeatCounterMatches(tenantData, tenantId, userId, kind) {
+      let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
+      let after = getAfter(tenantPath).data;
+      let beforeRevision = tenantData.get('seat_count_revision', 0);
+      return tenantData.get('active', false) == true &&
+        beforeRevision is int &&
+        after.get('active', false) == true &&
+        after.get('seat_count_revision', null) == beforeRevision + 1 &&
+        after.get('seat_change_user_id', '') == userId &&
+        after.get('seat_change_kind', '') == kind;
+    }
+
+    function validUserSeatTransition(
+      userId, currentData, nextData, tenantData
+    ) {
+      let wasActive = currentData.get('active', false) == true;
+      let willBeActive = nextData.get('active', false) == true;
+      let tenantId = currentData.get('tenant_id', '');
+      return wasActive == willBeActive ||
+        (willBeActive &&
+          tenantSeatCounterMatches(tenantData, tenantId, userId, 'add')) ||
+        (!willBeActive &&
+          tenantSeatCounterMatches(tenantData, tenantId, userId, 'remove'));
+    }
+
+    function canAdminCreateUserForTenant(tenantId) {
+      let actor = userDoc().data;
+      let role = actor.get('role', '');
+      let isPlatformAdmin = isSuperAdminRole(role);
+      return actor.get('active', false) == true &&
+        isAdminRole(role) &&
+        (isPlatformAdmin
+          ? hasSelectedWorkspaceSupportContext(actor, tenantId)
+          : actor.get('tenant_id', '') == tenantId);
+    }
+
+    function canUpdateTenantSeatCounter(tenantId) {
+      let actor = userDoc().data;
+      let role = actor.get('role', '');
+      let isPlatformAdmin = isSuperAdminRole(role);
+      return actor.get('active', false) == true &&
+        isAdminRole(role) &&
+        resource.data.active == true &&
+        request.resource.data.active == true &&
+        (isPlatformAdmin
+          ? hasSelectedWorkspaceSupportContext(actor, tenantId)
+          : actor.get('tenant_id', '') == tenantId);
+    }
+
+    function canWorkspaceAdminUpdateSeller(userId, currentData, nextData) {
+      let actor = userDoc().data;
+      let role = actor.get('role', '');
+      let tenantId = currentData.get('tenant_id', '');
+      let tenantData = get(
+        /databases/$(database)/documents/tenants/$(tenantId)
+      ).data;
+      return actor.get('active', false) == true &&
+        isWorkspaceAdminRole(role) &&
+        actor.get('tenant_id', '') == tenantId &&
+        tenantData.get('active', false) == true &&
+        isSellerRole(currentData.get('role', '')) &&
+        nextData.get('tenant_id', '') == tenantId &&
+        nextData.diff(currentData).affectedKeys().hasOnly([
+          'display_name', 'phone', 'active', 'assigned_route_ids',
+          'assigned_route_names', 'updated_at'
+        ]) &&
+        nextData.active is bool &&
+        validUserSeatTransition(userId, currentData, nextData, tenantData) &&
+        docSizeOk();
+    }
+
+    function validTenantSeatCounterUpdate(tenantId) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let userId = request.resource.data.get('seat_change_user_id', '');
+      let kind = request.resource.data.get('seat_change_kind', '');
+      let userPath = /databases/$(database)/documents/users/$(userId);
+      let userBefore = exists(userPath) ? get(userPath).data : {};
+      let userAfter = existsAfter(userPath) ? getAfter(userPath).data : {};
+      let wasActive = userBefore.get('active', false) == true;
+      let willBeActive = userAfter.get('active', false) == true;
+      let beforeCount = resource.data.get('active_user_count', null);
+      let afterCount = request.resource.data.get('active_user_count', null);
+      let beforeRevision = resource.data.get('seat_count_revision', 0);
+      return changed.hasOnly([
+          'active_user_count', 'seat_count_revision',
+          'seat_change_user_id', 'seat_change_kind', 'updated_at'
+        ]) &&
+        changed.hasAll([
+          'active_user_count', 'seat_count_revision',
+          'seat_change_user_id', 'seat_change_kind', 'updated_at'
+        ]) &&
+        request.resource.data.tenant_id == tenantId &&
+        userId is string && userId != '' &&
+        request.resource.data.updated_at == request.time &&
+        beforeCount is int && afterCount is int &&
+        request.resource.data.seat_count_revision is int &&
+        request.resource.data.seat_count_revision == beforeRevision + 1 &&
+        request.resource.data.max_active_users == 10 &&
+        existsAfter(userPath) &&
+        userAfter.get('tenant_id', '') == tenantId &&
+        !isSuperAdminRole(userAfter.get('role', '')) &&
+        ((kind == 'add' && !wasActive && willBeActive &&
+            beforeCount < 10 && afterCount == beforeCount + 1) ||
+          (kind == 'remove' && wasActive && !willBeActive &&
+            beforeCount > 0 && afterCount == beforeCount - 1));
+    }
+
+    function validSeatCounterInitialization(tenantId) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return !('active_user_count' in resource.data) &&
+        changed.hasOnly([
+          'active_user_count', 'max_active_users',
+          'seat_count_revision', 'plan', 'updated_at'
+        ]) &&
+        request.resource.data.tenant_id == tenantId &&
+        request.resource.data.active_user_count is int &&
+        request.resource.data.active_user_count >= 0 &&
+        request.resource.data.max_active_users == 10 &&
+        request.resource.data.seat_count_revision == 0 &&
+        request.resource.data.updated_at == request.time &&
+        (!('plan' in resource.data) ||
+          request.resource.data.plan == resource.data.plan) &&
+        request.resource.data.plan == 'free' &&
+        docSizeOk();
     }
 
     // BUG-02: Sellers may only create cash_in or cash_out transactions.
@@ -1004,30 +1136,24 @@ service cloud.firestore {
       let settingsPath = /databases/$(database)/documents/settings/$(tenantId);
       let settingsData = get(settingsPath).data;
       let snapshot = request.resource.data.invoice_header_snapshot;
-      return settingsData is map && snapshot is map &&
-        (
-          (('company_name' in settingsData &&
-            snapshot.company_name == settingsData.company_name) ||
-           (!('company_name' in settingsData &&
-             snapshot.company_name != 'My Business'))) &&
-          (
-            (settingsData.invoice_header is map &&
-             snapshot.diff(settingsData.invoice_header).affectedKeys()
-               .hasOnly(['company_name', 'logo_base64'])) ||
-            (!('invoice_header' in settingsData) &&
-             snapshot.keys().hasOnly(['company_name', 'logo_base64']))
-          ) &&
-          (
-            (('logo_base64' in settingsData &&
-              settingsData.logo_base64 is string &&
-              snapshot.logo_base64 == settingsData.logo_base64) ||
-             ('logo_base64' in settingsData &&
-              settingsData.logo_base64 == null &&
-              (!('logo_base64' in snapshot) || snapshot.logo_base64 == null)) ||
-             (!('logo_base64' in settingsData) &&
-              !('logo_base64' in snapshot)))
-          )
-        );
+      let settingsHeader = settingsData is map
+          ? settingsData.get('invoice_header', {})
+          : {};
+      return settingsData is map &&
+        snapshot is map &&
+        settingsHeader is map &&
+        snapshot.get('company_name', '') ==
+          settingsData.get('company_name', '') &&
+        snapshot.get('logo_base64', null) ==
+          settingsData.get('logo_base64', null) &&
+        snapshot.get('document_language_pair', 'english_arabic') ==
+          settingsHeader.get('document_language_pair', 'english_arabic') &&
+        snapshot.diff(settingsHeader).affectedKeys()
+          .hasOnly([
+            'company_name',
+            'logo_base64',
+            'document_language_pair',
+          ]);
     }
 
     function sellerShopBalanceMatchesNewTransaction(shopId, transactionId) {
@@ -1082,12 +1208,17 @@ service cloud.firestore {
         isAdminForTenant(resource.data.tenant_id);
       allow list: if isAdminForTenant(resource.data.tenant_id);
       allow create: if (
-          isAdminForTenant(request.resource.data.tenant_id) &&
+          isAuthenticated() &&
+          canAdminCreateUserForTenant(request.resource.data.tenant_id) &&
           request.resource.data.created_by == request.auth.uid &&
           isValidRole(request.resource.data.role) &&
           !isSuperAdminRole(request.resource.data.role) &&
+          request.resource.data.active == true &&
           (isSuperAdmin() || isSellerRole(request.resource.data.role)) &&
-          request.resource.data.tenant_id == currentUserTenantId() &&
+          tenantSeatCounterMatches(
+            get(/databases/$(database)/documents/tenants/$(request.resource.data.tenant_id)).data,
+            request.resource.data.tenant_id, userId, 'add'
+          ) &&
           (
             request.resource.data.role != 'seller' ||
             (
@@ -1097,6 +1228,12 @@ service cloud.firestore {
           )
         ) && docSizeOk();
       allow update: if (
+          isAuthenticated() &&
+          canWorkspaceAdminUpdateSeller(
+            userId, resource.data, request.resource.data
+          )
+        ) ||
+        (
         // Admin can update any user fields (including route assignment) without
         // client write-rate throttling, which otherwise blocks bulk assignment.
         (
@@ -1104,22 +1241,14 @@ service cloud.firestore {
           (isAdminForTenant(resource.data.tenant_id) ||
             isSuperAdminRestoringTenant(resource.data.tenant_id)) &&
           request.resource.data.tenant_id == resource.data.tenant_id &&
+          validUserSeatTransition(
+            userId,
+            resource.data,
+            request.resource.data,
+            get(/databases/$(database)/documents/tenants/$(resource.data.tenant_id)).data
+          ) &&
           (!('role' in request.resource.data) ||
             !isSuperAdminRole(request.resource.data.role)) &&
-          docSizeOk()
-        ) ||
-        (
-          isActiveUser() &&
-          isWorkspaceAdminRole(getUserRole()) &&
-          isAdminForTenant(resource.data.tenant_id) &&
-          request.auth.uid != userId &&
-          isSellerRole(resource.data.role) &&
-          request.resource.data.role == resource.data.role &&
-          request.resource.data.tenant_id == resource.data.tenant_id &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['active', 'updated_at']) &&
-          request.resource.data.active is bool &&
-          request.resource.data.updated_at == request.time &&
           docSizeOk()
         ) ||
         (
@@ -1164,36 +1293,11 @@ service cloud.firestore {
           (!('last_notification_at' in resource.data) ||
             request.time > resource.data.last_notification_at + duration.value(5, 's')) &&
           docSizeOk()
-        ) ||
-        (
-          isActiveUser() &&
-          isTenantAdminRole(getUserRole()) &&
-          isTenantActive(resource.data.tenant_id) &&
-          resource.data.tenant_id == currentUserTenantId() &&
-          isSellerRole(resource.data.role) &&
-          request.resource.data.tenant_id == resource.data.tenant_id &&
-          // P1-7 FIX: tenant_admin can now manage seller fields (display_name, phone,
-          // active status, route assignment) within their tenant, but cannot change
-          // role or tenant_id (which remain admin/super_admin only).
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['display_name', 'phone', 'active', 'assigned_route_ids', 'assigned_route_names', 'updated_at']) &&
-          docSizeOk()
-        ) ||
-        (
-          isActiveUser() &&
-          isAdminRole(getUserRole()) &&
-          !isTenantAdminRole(getUserRole()) &&
-          isTenantActive(resource.data.tenant_id) &&
-          resource.data.tenant_id == currentUserTenantId() &&
-          isSellerRole(resource.data.role) &&
-          request.resource.data.tenant_id == resource.data.tenant_id &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['display_name', 'phone', 'active', 'assigned_route_ids', 'assigned_route_names', 'updated_at']) &&
-          docSizeOk()
         )
       );
       allow delete: if isSuperAdmin() &&
-        isAdminForTenant(resource.data.tenant_id);
+        isAdminForTenant(resource.data.tenant_id) &&
+        resource.data.get('active', false) != true;
     }
 
     // --- tenants -----------------------------------------------------------
@@ -1210,8 +1314,18 @@ service cloud.firestore {
         request.resource.data.created_by == request.auth.uid &&
         request.resource.data.created_at is timestamp &&
         request.resource.data.created_at == request.time &&
+        request.resource.data.plan == 'free' &&
+        request.resource.data.active_user_count == 0 &&
+        request.resource.data.max_active_users == 10 &&
+        request.resource.data.seat_count_revision == 0 &&
         docSizeOk();
       allow update: if (
+          isAuthenticated() &&
+          canUpdateTenantSeatCounter(tenantId) &&
+          validTenantSeatCounterUpdate(tenantId) &&
+          docSizeOk()
+        ) ||
+        (
           isSuperAdminForSelectedWorkspace(tenantId) &&
           request.resource.data.tenant_id == tenantId &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -1220,6 +1334,10 @@ service cloud.firestore {
           ]) &&
           validTenantLifecycleTransition(resource.data, request.resource.data) &&
           request.resource.data.updated_at == request.time && docSizeOk()
+        ) ||
+        (
+          isSuperAdminForSelectedWorkspace(tenantId) &&
+          validSeatCounterInitialization(tenantId)
         );
       // Workspace lifecycle is archive/restore only; hard-delete can orphan
       // tenant-scoped business records.

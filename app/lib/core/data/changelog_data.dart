@@ -28,6 +28,112 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.10.1',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '👥',
+        text: {
+          AppLocale.en:
+              'Workspace owners can review contact and verification details, live team roles, and the 10-member free-tier capacity.',
+          AppLocale.ar:
+              'يمكن لمالكي مساحة العمل مراجعة بيانات الاتصال والتحقق، وأدوار الفريق المباشرة، والسعة المجانية البالغة 10 أعضاء.',
+          AppLocale.ur:
+              'ورک اسپیس مالکان رابطے اور تصدیق کی تفصیلات، ٹیم کے تازہ کردار، اور مفت پلان کی 10 اراکین کی گنجائش دیکھ سکتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Cash receipt details and PDFs now include a clearer payment, balance, and recipient breakdown.',
+          AppLocale.ar:
+              'تتضمن تفاصيل الإيصال النقدي وملفات PDF الآن توضيحًا أفضل للدفع والرصيد والمستلم.',
+          AppLocale.ur:
+              'نقد رسید کی تفصیلات اور پی ڈی ایف میں اب ادائیگی، بقایا، اور وصول کنندہ کی معلومات زیادہ واضح ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.10.0',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔄',
+        text: {
+          AppLocale.en:
+              'Workspace settings, including invoice headers, now update across screens and devices. Reprints use the current workspace header.',
+          AppLocale.ar:
+              'تتحدّث إعدادات مساحة العمل، بما فيها ترويسة الفاتورة، عبر الشاشات والأجهزة. تستخدم إعادة الطباعة ترويسة مساحة العمل الحالية.',
+          AppLocale.ur:
+              'ورک اسپیس سیٹنگز، بشمول انوائس ہیڈر، اب اسکرینز اور ڈیوائسز پر اپ ڈیٹ ہوتی ہیں۔ دوبارہ پرنٹ میں موجودہ ورک اسپیس ہیڈر استعمال ہوتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔔',
+        text: {
+          AppLocale.en:
+              'Notifications now hide shops that are inactive or deleted, and history labels no longer cover shop names.',
+          AppLocale.ar:
+              'تخفي الإشعارات الآن المتاجر غير النشطة أو المحذوفة، ولم تعد تسميات السجل تغطي أسماء المتاجر.',
+          AppLocale.ur:
+              'نوٹیفکیشنز اب غیر فعال یا حذف شدہ دکانیں نہیں دکھاتیں، اور ہسٹری لیبل دکان کے نام پر نہیں آتے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🖼️',
+        text: {
+          AppLocale.en:
+              'Workspace logos are processed on your device, keep transparency, and show clear size guidance. The app publisher is Aeonis Labs.',
+          AppLocale.ar:
+              'تُعالج شعارات مساحة العمل على جهازك مع الحفاظ على الشفافية وإظهار إرشادات واضحة للحجم. ناشر التطبيق هو Aeonis Labs.',
+          AppLocale.ur:
+              'ورک اسپیس لوگو آپ کے آلے پر پروسیس ہوتا ہے، شفافیت برقرار رکھتا ہے اور سائز کی واضح رہنمائی دیتا ہے۔ ایپ پبلشر Aeonis Labs ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.9.85',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🌐',
+        text: {
+          AppLocale.en:
+              'Financial PDFs now show English with Arabic by default, or Urdu when selected by a workspace administrator.',
+          AppLocale.ar:
+              'تعرض ملفات PDF المالية الإنجليزية مع العربية افتراضيًا، أو الأردية عند اختيارها من مسؤول مساحة العمل.',
+          AppLocale.ur:
+              'مالی پی ڈی ایف میں انگریزی کے ساتھ عربی بطور ڈیفالٹ دکھائی جاتی ہے، یا ورک اسپیس منتظم کے انتخاب پر اردو دکھائی جاتی ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Invoice and receipt exports use consistent bilingual labels and preserve the saved workspace header.',
+          AppLocale.ar:
+              'تستخدم صادرات الفواتير والإيصالات تسميات ثنائية اللغة متسقة وتحافظ على ترويسة مساحة العمل المحفوظة.',
+          AppLocale.ur:
+              'انوائس اور رسید ایکسپورٹس میں یکساں دو لسانی لیبل استعمال ہوتے ہیں اور محفوظ شدہ ورک اسپیس ہیڈر برقرار رہتا ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔒',
+        text: {
+          AppLocale.en:
+              'Seller invoice creation validates the same workspace header settings used to create the document.',
+          AppLocale.ar:
+              'يتحقق إنشاء الفواتير للبائع من إعدادات ترويسة مساحة العمل نفسها المستخدمة لإنشاء المستند.',
+          AppLocale.ur:
+              'سیلر انوائس بناتے وقت اسی ورک اسپیس ہیڈر کی ترتیبات کی تصدیق کی جاتی ہے جو دستاویز میں محفوظ ہوتی ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.9.84',
     date: 'October 2026',
     items: [

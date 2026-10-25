@@ -251,14 +251,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final header = Map<String, dynamic>.from(
       settings?['invoice_header'] as Map<String, dynamic>? ?? const {},
     );
-    final hasLocalizedName = [
-      'name_en',
-      'name_ar',
-      'name_ur',
-    ].any((key) => (header[key] as String? ?? '').trim().isNotEmpty);
-    final legacyName = (settings?['company_name'] as String? ?? '').trim();
-    if (!hasLocalizedName && legacyName.isNotEmpty) {
-      header['name_en'] = legacyName;
+    final legacyName = settings?['company_name'] as String? ?? '';
+    if (legacyName.trim().isNotEmpty) {
+      header['company_name'] = legacyName;
     }
     final logoBase64 = settings?['logo_base64'];
     if (logoBase64 is String && logoBase64.isNotEmpty) {

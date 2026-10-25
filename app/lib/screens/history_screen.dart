@@ -307,6 +307,7 @@ class _HistoryTile extends ConsumerWidget {
                   children: [
                     // Shop name + invoice badge
                     Row(
+                      textDirection: TextDirection.ltr,
                       children: [
                         Expanded(
                           child: Text(

@@ -145,6 +145,23 @@ void main() {
       );
     });
 
+    test('workspace seat limits map to actionable localized messages', () {
+      expect(
+        AppErrorMapper.key(StateError('workspace_seat_limit_reached')),
+        equals('workspace_seat_limit_reached'),
+      );
+      expect(
+        AppErrorMapper.key(
+          StateError('workspace_seat_count_initialization_required'),
+        ),
+        equals('workspace_seat_count_initialization_required'),
+      );
+      expect(
+        AppErrorMapper.key(StateError('workspace_support_context_expired')),
+        equals('workspace_support_context_expired'),
+      );
+    });
+
     test('workspace admin context failures map to permission denied', () {
       expect(
         AppErrorMapper.key(

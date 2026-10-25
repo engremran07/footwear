@@ -1,4 +1,4 @@
-# FootWear ERP — Flutter App (v3.9.84+710)
+# FootWear ERP — Flutter App (v3.10.1+1112)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
 
@@ -26,6 +26,14 @@ Rules Emulator: `132 passing (48s)`. Firestore Rules/indexes deployed. Split APK
 ARM64 APK installed on `R5GL22RGT9V` (`Success`, versionCode `3101110`).
 Hosting deployment and Git publication remain pending because pushing to
 `main` triggers the Hosting workflow.
+
+In v3.9.85+711, workspace administrators can select English-Arabic
+(default) or English-Urdu as the paired language for financial PDFs. New
+invoice snapshots preserve that choice; invoice, receipt, account statement,
+seller, multi-shop, and flat financial-report PDFs use paired labels. Ledger
+summary and table cells render each language line with explicit text direction.
+Seller invoice Rules validate provider-shaped optional header fields and bind
+the saved language pair to the active workspace setting.
 
 Route, shop, product, and variant edit forms wait for the active profile and
 matching record before enabling inputs or saving. Errors can be retried,
@@ -327,6 +335,22 @@ VOID / RETURN (admin only)
 ```
 
 `shop.balance` is the sole monetary source of truth. It is updated **only** inside `InvoiceNotifier` or `TransactionNotifier` via atomic Firestore batch writes. Never write `shop.balance` from screens or widgets.
+
+## Workspace Owner and Seat Overview
+
+The selected workspace's live management view presents owner name, email,
+phone/WhatsApp contact, email-verification state, and account status alongside
+current member counts by role. The free-tier capacity is 10 active
+non-platform-super-admin members. User activation and deactivation update the
+tenant seat count atomically with the matching profile transition; rejected
+over-cap changes remain visible to the administrator.
+
+## Cash Receipt Detail
+
+Cash receipt detail screens and PDFs present the receipt identifier, shop and
+payment context, amount received, resulting balance, and receiver/signature
+information where available. Receipt creation and all financial values continue
+to use the existing atomic invoice, ledger, and shop-balance pipeline.
 
 ---
 

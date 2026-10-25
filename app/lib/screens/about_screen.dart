@@ -91,6 +91,11 @@ class AboutScreen extends ConsumerWidget {
                 _copyToClipboard(context, AppBrand.versionDisplay, ref),
           ),
           _InfoTile(
+            icon: Icons.business_outlined,
+            label: tr('published_by', ref),
+            value: AppBrand.publisherName,
+          ),
+          _InfoTile(
             icon: Icons.build_outlined,
             label: tr('build_number', ref),
             value: AppBrand.buildNumber,

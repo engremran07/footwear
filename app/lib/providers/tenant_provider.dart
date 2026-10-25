@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/collections.dart';
 import '../core/models/tenant_model.dart';
+import '../core/utils/firestore_pagination.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
@@ -65,39 +68,95 @@ final tenantProvider = StreamProvider.autoDispose.family<TenantModel?, String>((
 });
 
 /// Workspace-scoped active users for ownership and account-management flows.
-final tenantUsersProvider = StreamProvider.family<List<UserModel>, String>((
-  ref,
-  tenantId,
-) {
-  final currentUser = ref.watch(authUserProvider).value;
-  if (currentUser == null ||
-      (currentUser.isSuperAdmin
-          ? currentUser.activeWorkspaceId != tenantId
-          : !currentUser.isTenantAdmin ||
-                TenantScope.normalize(currentUser.tenantId) != tenantId)) {
-    return const Stream<List<UserModel>>.empty();
-  }
+final tenantUsersProvider = StreamProvider.autoDispose
+    .family<List<UserModel>, String>((ref, tenantId) {
+      final currentUser = ref.watch(authUserProvider).value;
+      if (currentUser == null) return const Stream<List<UserModel>>.empty();
 
-  return FirebaseFirestore.instance
-      .collection(Collections.users)
-      .where('tenant_id', isEqualTo: tenantId)
-      .where('active', isEqualTo: true)
-      .orderBy('display_name')
-      .snapshots()
-      .map(
-        (snap) => snap.docs
-            .map((doc) => UserModel.fromJson(doc.data(), doc.id))
-            .toList(),
-      );
-});
+      if (currentUser.isSuperAdmin) {
+        if (!currentUser.hasActiveWorkspaceSupportContextFor(tenantId)) {
+          return const Stream<List<UserModel>>.empty();
+        }
+        final selectedAt = currentUser.activeWorkspaceSelectedAt!.toDate();
+        final remaining = selectedAt
+            .add(const Duration(hours: 8))
+            .difference(DateTime.now());
+        if (remaining <= Duration.zero) {
+          return const Stream<List<UserModel>>.empty();
+        }
+        final expiryTimer = Timer(remaining, ref.invalidateSelf);
+        ref.onDispose(expiryTimer.cancel);
+      } else if (!currentUser.isTenantAdmin ||
+          !currentUser.active ||
+          TenantScope.normalize(currentUser.tenantId) != tenantId) {
+        return const Stream<List<UserModel>>.empty();
+      }
+
+      return FirebaseFirestore.instance
+          .collection(Collections.users)
+          .where('tenant_id', isEqualTo: tenantId)
+          .where('active', isEqualTo: true)
+          .orderBy('display_name')
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((doc) => UserModel.fromJson(doc.data(), doc.id))
+                .toList(),
+          );
+    });
+
+/// Live member details shown only inside an active, audited workspace context.
+final tenantWorkspaceUsersProvider = StreamProvider.autoDispose
+    .family<List<UserModel>, String>((ref, tenantId) {
+      final currentUser = ref.watch(authUserProvider).value;
+      final normalizedTenantId = TenantScope.normalize(tenantId);
+      if (currentUser == null || normalizedTenantId == null) {
+        return Stream.value(const <UserModel>[]);
+      }
+
+      if (currentUser.isSuperAdmin) {
+        if (!currentUser.hasActiveWorkspaceSupportContextFor(
+          normalizedTenantId,
+        )) {
+          return Stream.value(const <UserModel>[]);
+        }
+        final selectedAt = currentUser.activeWorkspaceSelectedAt!.toDate();
+        final remaining = selectedAt
+            .add(const Duration(hours: 8))
+            .difference(DateTime.now());
+        if (remaining <= Duration.zero) {
+          return Stream.value(const <UserModel>[]);
+        }
+        final expiryTimer = Timer(remaining, ref.invalidateSelf);
+        ref.onDispose(expiryTimer.cancel);
+      } else if (!currentUser.isTenantAdmin ||
+          !currentUser.active ||
+          TenantScope.normalize(currentUser.tenantId) != normalizedTenantId) {
+        return Stream.value(const <UserModel>[]);
+      }
+
+      return FirebaseFirestore.instance
+          .collection(Collections.users)
+          .where('tenant_id', isEqualTo: normalizedTenantId)
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map(
+                  (document) =>
+                      UserModel.fromJson(document.data(), document.id),
+                )
+                .toList(),
+          );
+    });
 
 final allInactiveUsersForTenantProvider =
     StreamProvider.family<List<UserModel>, String>((ref, tenantId) {
       final currentUser = ref.watch(authUserProvider).value;
       if (currentUser == null ||
           (currentUser.isSuperAdmin
-              ? currentUser.activeWorkspaceId != tenantId
+              ? !currentUser.hasActiveWorkspaceSupportContextFor(tenantId)
               : !currentUser.isTenantAdmin ||
+                    !currentUser.active ||
                     TenantScope.normalize(currentUser.tenantId) != tenantId)) {
         return const Stream<List<UserModel>>.empty();
       }
@@ -179,6 +238,10 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
           'created_by': actingUser.id,
           'active': true,
           'is_trial': false,
+          'plan': 'free',
+          'active_user_count': 0,
+          'max_active_users': TenantModel.freeSeatLimit,
+          'seat_count_revision': 0,
           'created_at': FieldValue.serverTimestamp(),
           'updated_at': FieldValue.serverTimestamp(),
           'owner_user_id': ownerUserId,
@@ -272,15 +335,67 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
     if (tenantId == null || tenantId == TenantScope.globalTenantId) {
       throw ArgumentError('A concrete workspace ID is required.');
     }
-    final actingUser = await ref.read(authUserProvider.future);
-    if (actingUser == null ||
-        !actingUser.active ||
-        !actingUser.isSuperAdmin ||
-        actingUser.activeWorkspaceId != tenantId ||
-        (actingUser.activeWorkspaceReason?.trim().length ?? 0) < 10) {
+    final uid = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
+    if (uid.isEmpty) {
+      throw StateError('Active platform super-admin access is required.');
+    }
+    final profileSnapshot = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(uid)
+        .get(const GetOptions(source: Source.server));
+    if (!profileSnapshot.exists) {
+      throw StateError('Active platform super-admin access is required.');
+    }
+    final actingUser = UserModel.fromJson(
+      profileSnapshot.data()!,
+      profileSnapshot.id,
+    );
+    if (!actingUser.hasActiveWorkspaceSupportContextFor(tenantId)) {
       throw StateError('Authorized workspace administration is required.');
     }
     return actingUser;
+  }
+
+  Future<void> initializeWorkspaceSeatCount(String tenantId) async {
+    await _requireSelectedPlatformAdmin(tenantId);
+    final normalizedTenantId = TenantScope.requireTenant(tenantId);
+    final db = FirebaseFirestore.instance;
+    final tenantRef = db
+        .collection(Collections.tenants)
+        .doc(normalizedTenantId);
+    final usersQuery = db
+        .collection(Collections.users)
+        .where('tenant_id', isEqualTo: normalizedTenantId)
+        .where('active', isEqualTo: true)
+        .orderBy('display_name');
+    final activeUsers = await fetchAllQueryDocuments(usersQuery, pageSize: 200);
+    final activeUserCount = activeUsers.where((document) {
+      final role = (document.data()['role'] as String? ?? '')
+          .trim()
+          .toLowerCase();
+      return role != 'super_admin';
+    }).length;
+
+    await _runTenantWrite(() async {
+      await db.runTransaction<void>((transaction) async {
+        final snapshot = await transaction.get(tenantRef);
+        final data = snapshot.data();
+        if (!snapshot.exists || data?['active'] != true) {
+          throw StateError(
+            'An active workspace is required to initialize seats.',
+          );
+        }
+        if (data!.containsKey('active_user_count')) return;
+
+        transaction.update(tenantRef, {
+          'active_user_count': activeUserCount,
+          'max_active_users': TenantModel.freeSeatLimit,
+          'seat_count_revision': 0,
+          if (!data.containsKey('plan')) 'plan': 'free',
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      });
+    });
   }
 
   Future<void> archiveTenant(String tenantId) async {

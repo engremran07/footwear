@@ -8,14 +8,15 @@ class AppBrand {
   // ─── Identity ────────────────────────────────────────────────────────────
   static const String appName = 'FootWear';
   static const String companyName = 'FootWear';
+  static const String publisherName = 'Aeonis Labs';
   static const IconData logoIcon = Icons.work_outline;
   static const String logoAsset = 'assets/images/app_icon.png';
 
   // ─── Version ─────────────────────────────────────────────────────────────
-  static const String appVersion = '3.9.84';
-  static const String buildNumber = '710';
+  static const String appVersion = '3.10.1';
+  static const String buildNumber = '1112';
   static const String versionDisplay = 'v$appVersion+$buildNumber';
-  static const String releaseDateIso = '2026-10-24';
+  static const String releaseDateIso = '2026-10-25';
 
   // ─── Contact / About ─────────────────────────────────────────────────────
   static const String contactEmail = 'engremran89@gmail.com';

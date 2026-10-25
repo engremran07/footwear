@@ -1,6 +1,6 @@
 ﻿# ShoesERP AI Coding Rules (CLAUDE.md)
 
-Last updated: 2026-10-24
+Last updated: 2026-10-25
 
 ## Runtime Override (Always First)
 
@@ -403,6 +403,28 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- v3.10.1+1112 workspace and receipt improvements: tenant management shows
+  owner contact/email verification, live role counts, and the free-tier cap
+  of 10 active non-platform-super-admin members; profile transitions and seat
+  counters are validated atomically. Cash receipt detail and PDFs provide a
+  fuller payment/balance/recipient breakdown without changing ledger math.
+  Google Drive OAuth was not configured for this release, so Drive backup is
+  unavailable while encrypted phone archives remain supported. Full Flutter
+  suite: `01:20 +623: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 98.8s)`; `dart analyze test/`: `No issues found!`.
+  Rules Emulator: `140 passing (31s)`. Web `EXIT: 0`; Hosting and
+  Rules/indexes deployments reported `Deploy complete!`. Split APKs built
+  (30.6/32.1/33.6 MB); ARM64 installed on `R5GL22RGT9V` (`Success`,
+  versionCode `3103212`).
+- v3.9.85+711 bilingual financial documents: workspace admins select
+  English-Arabic (default) or English-Urdu; the preference is saved in the
+  invoice-header configuration and copied into invoice snapshots. Invoice,
+  receipt, statement, seller, multi-shop, and flat financial PDFs use paired
+  labels with explicit RTL line direction in ledger summaries/tables. Seller
+  invoice Rules validate provider-shaped optional header data and enforce the
+  configured pair. Full suite: 609 passed; Rules Emulator: 133 passing; both
+  analyzers clean. Release build, production deployment, install, commit, and
+  push are pending.
 - v3.9.84+710 backup hardening: tenant workspace settings are read
   by their tenant document ID, avoiding the Rules-incompatible settings list
   query; concrete archived collection keys are validated separately from

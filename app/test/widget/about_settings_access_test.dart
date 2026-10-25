@@ -84,7 +84,8 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text(AppBrand.appName), findsOneWidget);
-      expect(find.text(trRead('whats_new', locale)), findsOneWidget);
+      expect(find.text('Aeonis Labs'), findsOneWidget);
+      expect(find.text(trRead('published_by', locale)), findsOneWidget);
     });
   }
 }

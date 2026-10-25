@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/l10n/financial_document_localization.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/name_resolver.dart';
@@ -311,6 +312,15 @@ class ReportsScreen extends ConsumerWidget {
         headers: headers,
         rows: rows,
         fileName: AppFormatters.exportFileName(ExportNames.transactionsReport),
+        pdfTitleKey: 'transactions_report',
+        pdfHeaderKeys: const [
+          'date',
+          'shop_name',
+          'type',
+          'amount',
+          'currency',
+          'description',
+        ],
       );
       return;
     }
@@ -357,6 +367,15 @@ class ReportsScreen extends ConsumerWidget {
       headers: headers,
       rows: rows,
       fileName: AppFormatters.exportFileName(ExportNames.transactionsReport),
+      pdfTitleKey: 'transactions_report',
+      pdfHeaderKeys: const [
+        'date',
+        'shop_name',
+        'type',
+        'amount',
+        'currency',
+        'description',
+      ],
     );
   }
 
@@ -404,6 +423,8 @@ class ReportsScreen extends ConsumerWidget {
       headers: headers,
       rows: rows,
       fileName: AppFormatters.exportFileName(ExportNames.outstandingReport),
+      pdfTitleKey: 'outstanding_report',
+      pdfHeaderKeys: const ['name', 'route', 'phone', 'balance'],
     );
   }
 
@@ -450,6 +471,8 @@ class ReportsScreen extends ConsumerWidget {
       headers: headers,
       rows: rows,
       fileName: AppFormatters.exportFileName(ExportNames.badDebtsReport),
+      pdfTitleKey: 'bad_debts_report',
+      pdfHeaderKeys: const ['name', 'phone', 'bad_debt_amount', 'date'],
     );
   }
 }
@@ -709,7 +732,10 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
     };
   }
 
-  Map<String, String> _labels(WidgetRef ref) {
+  Map<String, String> _labels(
+    WidgetRef ref,
+    FinancialDocumentLanguagePair pair,
+  ) {
     final keys = [
       'date',
       'description',
@@ -733,7 +759,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       'generated_by',
       'duration',
     ];
-    return trilingualLabels({for (final k in keys) k: tr(k, ref)});
+    return trilingualLabels({for (final k in keys) k: tr(k, ref)}, pair: pair);
   }
 
   Future<void> _generate() async {
@@ -772,7 +798,7 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       // Reconcile opening balance so the final running balance equals
       // the stored customer.balance regardless of transaction-count limits.
       final netTx = txs.fold<double>(0.0, (s, t) => s + t.balanceImpact);
-      final labels = _labels(ref);
+      final labels = _labels(ref, settings.invoiceHeader.documentLanguagePair);
       final openingBalance = shop.balance - netTx;
       final accountRoute = shop.routeId.trim().isEmpty
           ? null
@@ -927,7 +953,10 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
   String? _selectedSellerId;
   bool _generating = false;
 
-  Map<String, String> _labels(WidgetRef ref) {
+  Map<String, String> _labels(
+    WidgetRef ref,
+    FinancialDocumentLanguagePair pair,
+  ) {
     final keys = [
       'seller_report',
       'seller',
@@ -945,7 +974,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       'report_date',
       'page',
     ];
-    return trilingualLabels({for (final k in keys) k: tr(k, ref)});
+    return trilingualLabels({for (final k in keys) k: tr(k, ref)}, pair: pair);
   }
 
   Future<void> _generate() async {
@@ -1042,7 +1071,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
       final stockRemaining = (stockReceived - stockSold).clamp(0, 999999);
 
       final settings = await ref.read(settingsProvider.future);
-      final labels = _labels(ref);
+      final labels = _labels(ref, settings.invoiceHeader.documentLanguagePair);
       ExportSheet.show(
         // ignore: use_build_context_synchronously
         context,

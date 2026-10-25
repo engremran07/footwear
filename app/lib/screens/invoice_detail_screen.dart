@@ -243,7 +243,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           locale: locale,
           logoBytes: settings.logoBytes,
           header: settings.invoiceHeader,
-          useLatestHeader: settings.invoiceHeader.useLatestHeaderOnReprint,
         );
       },
     );
@@ -334,44 +333,36 @@ class _InvoiceBody extends ConsumerWidget {
                       : tr('credit_note', ref),
                   style: TextStyle(color: cs.onSurfaceVariant),
                 ),
-                // Payment status progression
-                const SizedBox(height: 12),
-                _PaymentProgressBar(invoice: invoice),
-                const Divider(height: 24),
-                _InfoRow(
-                  label: tr('shop', ref),
-                  value: invoice.shopName.isNotEmpty
-                      ? invoice.shopName
-                      : tr('shop', ref),
-                ),
-                _InfoRow(label: tr('date', ref), value: dateStr),
-                if (invoice.isCashReceipt && invoice.paymentMethod != null)
-                  _InfoRow(
-                    label: tr('payment_method', ref),
-                    value: tr('payment_method_${invoice.paymentMethod}', ref),
+                if (invoice.isCashReceipt) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.verified_outlined, color: cs.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        tr('receipt_completed', ref),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                if (invoice.isCashReceipt && invoice.paymentReference != null)
+                ] else ...[
+                  const SizedBox(height: 12),
+                  _PaymentProgressBar(invoice: invoice),
+                  const Divider(height: 24),
                   _InfoRow(
-                    label: tr('payment_reference', ref),
-                    value: invoice.paymentReference!,
+                    label: tr('shop', ref),
+                    value: invoice.shopName.isNotEmpty
+                        ? invoice.shopName
+                        : tr('shop', ref),
                   ),
-                if (invoice.isCashReceipt && invoice.shopBalanceBefore != null)
-                  _InfoRow(
-                    label: tr('balance_before', ref),
-                    value: AppFormatters.currency(
-                      invoice.shopBalanceBefore!,
-                      invoice.currency,
-                    ),
-                  ),
-                if (invoice.isCashReceipt && invoice.shopBalanceAfter != null)
-                  _InfoRow(
-                    label: tr('balance_after', ref),
-                    value: AppFormatters.currency(
-                      invoice.shopBalanceAfter!,
-                      invoice.currency,
-                    ),
-                  ),
-                if (invoice.linkedInvoiceId != null &&
+                  _InfoRow(label: tr('date', ref), value: dateStr),
+                ],
+                if (!invoice.isCashReceipt &&
+                    invoice.linkedInvoiceId != null &&
                     invoice.linkedInvoiceId!.isNotEmpty)
                   _InfoRow(
                     label: tr('linked_invoice', ref),
@@ -382,6 +373,137 @@ class _InvoiceBody extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 12),
+        if (invoice.isCashReceipt)
+          Card(
+            key: const Key('cash_receipt_balance_summary'),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.receipt_long_outlined, color: cs.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          tr('cash_receipt_details', ref),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 18,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          tr('amount_received', ref),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: cs.onPrimaryContainer),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          AppFormatters.currency(
+                            invoice.total,
+                            invoice.currency,
+                          ),
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(
+                                color: cs.onPrimaryContainer,
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (invoice.cashReceiptSequence != null)
+                    _InfoRow(
+                      label: tr('receipt_sequence', ref),
+                      value: invoice.cashReceiptSequence.toString(),
+                    ),
+                  _InfoRow(
+                    label: tr('received_from', ref),
+                    value: invoice.shopName.isNotEmpty
+                        ? invoice.shopName
+                        : tr('shop', ref),
+                  ),
+                  _InfoRow(label: tr('date', ref), value: dateStr),
+                  _InfoRow(
+                    label: tr('received_by', ref),
+                    value: invoice.sellerName.trim().isEmpty
+                        ? '—'
+                        : invoice.sellerName,
+                  ),
+                  if (invoice.paymentMethod != null)
+                    _InfoRow(
+                      label: tr('payment_method', ref),
+                      value: tr('payment_method_${invoice.paymentMethod}', ref),
+                    ),
+                  if (invoice.paymentReference?.trim().isNotEmpty == true)
+                    _InfoRow(
+                      label: tr('payment_reference', ref),
+                      value: invoice.paymentReference!,
+                    ),
+                  if (invoice.linkedInvoiceId?.trim().isNotEmpty == true)
+                    _InfoRow(
+                      label: tr('linked_invoice', ref),
+                      value: invoice.linkedInvoiceId!,
+                    ),
+                  if (invoice.shopBalanceBefore != null ||
+                      invoice.shopBalanceAfter != null) ...[
+                    const Divider(height: 24),
+                    Text(
+                      tr('receipt_balance_movement', ref),
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ReceiptBalanceMetric(
+                            label: tr('balance_before', ref),
+                            amount: invoice.shopBalanceBefore,
+                            currency: invoice.currency,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: _ReceiptBalanceMetric(
+                            label: tr('amount_received', ref),
+                            amount: invoice.total,
+                            currency: invoice.currency,
+                            emphasize: true,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: _ReceiptBalanceMetric(
+                            label: tr('balance_after', ref),
+                            amount: invoice.shopBalanceAfter,
+                            currency: invoice.currency,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        if (invoice.isCashReceipt) const SizedBox(height: 12),
         // Items table
         if (invoice.items.isNotEmpty) ...[
           Card(
@@ -457,12 +579,12 @@ class _InvoiceBody extends ConsumerWidget {
           const SizedBox(height: 12),
         ],
         // Totals card
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                if (!invoice.isCashReceipt)
+        if (!invoice.isCashReceipt)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
                   _TotalRow(
                     label: tr('subtotal', ref),
                     value: AppFormatters.currency(
@@ -470,49 +592,46 @@ class _InvoiceBody extends ConsumerWidget {
                       invoice.currency,
                     ),
                   ),
-                if (!invoice.isCashReceipt && invoice.discount > 0)
-                  _TotalRow(
-                    label: tr('discount', ref),
-                    value:
-                        '-${AppFormatters.currency(invoice.discount, invoice.currency)}',
-                    color: cs.primary,
-                  ),
-                const Divider(),
-                _TotalRow(
-                  label: tr(
-                    invoice.isCashReceipt ? 'amount_received' : 'total',
-                    ref,
-                  ),
-                  value: AppFormatters.currency(
-                    invoice.total,
-                    invoice.currency,
-                  ),
-                  bold: true,
-                  color: invoice.isSale ? cs.error : cs.primary,
-                ),
-                if (!invoice.isCashReceipt && invoice.amountReceived > 0)
-                  _TotalRow(
-                    label: tr('amount_received', ref),
-                    value: AppFormatters.currency(
-                      invoice.amountReceived,
-                      invoice.currency,
+                  if (invoice.discount > 0)
+                    _TotalRow(
+                      label: tr('discount', ref),
+                      value:
+                          '-${AppFormatters.currency(invoice.discount, invoice.currency)}',
+                      color: cs.primary,
                     ),
-                    color: cs.primary,
-                  ),
-                if (!invoice.isCashReceipt && invoice.outstandingAmount > 0)
+                  const Divider(),
                   _TotalRow(
-                    label: tr('outstanding_amount', ref),
+                    label: tr('total', ref),
                     value: AppFormatters.currency(
-                      invoice.outstandingAmount,
+                      invoice.total,
                       invoice.currency,
                     ),
                     bold: true,
-                    color: cs.error,
+                    color: invoice.isSale ? cs.error : cs.primary,
                   ),
-              ],
+                  if (invoice.amountReceived > 0)
+                    _TotalRow(
+                      label: tr('amount_received', ref),
+                      value: AppFormatters.currency(
+                        invoice.amountReceived,
+                        invoice.currency,
+                      ),
+                      color: cs.primary,
+                    ),
+                  if (invoice.outstandingAmount > 0)
+                    _TotalRow(
+                      label: tr('outstanding_amount', ref),
+                      value: AppFormatters.currency(
+                        invoice.outstandingAmount,
+                        invoice.currency,
+                      ),
+                      bold: true,
+                      color: cs.error,
+                    ),
+                ],
+              ),
             ),
           ),
-        ),
         if (invoice.notes != null && invoice.notes!.isNotEmpty) ...[
           const SizedBox(height: 12),
           Card(
@@ -599,6 +718,45 @@ class _TotalRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ReceiptBalanceMetric extends StatelessWidget {
+  final String label;
+  final double? amount;
+  final String currency;
+  final bool emphasize;
+
+  const _ReceiptBalanceMetric({
+    required this.label,
+    required this.amount,
+    required this.currency,
+    this.emphasize = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      children: [
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          amount == null ? '—' : AppFormatters.currency(amount!, currency),
+          textAlign: TextAlign.center,
+          style: textTheme.titleSmall?.copyWith(
+            fontWeight: emphasize ? FontWeight.bold : FontWeight.w600,
+            color: emphasize ? Theme.of(context).colorScheme.primary : null,
+          ),
+        ),
+      ],
     );
   }
 }

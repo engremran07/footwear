@@ -721,6 +721,33 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'edit_workspace': 'Edit workspace',
     'workspace_owner_account': 'Initial workspace admin account',
     'workspace_owner_missing': 'No workspace owner account is assigned.',
+    'workspace_seats': 'Workspace seats',
+    'free_tier': 'Free tier',
+    'workspace_seats_remaining': 'Seats remaining',
+    'workspace_seat_count_pending': 'Seat count not initialized',
+    'initialize_workspace_seats': 'Initialize seat tracking',
+    'workspace_seats_initialized': 'Seat tracking initialized',
+    'workspace_seat_limit_reached':
+        'This workspace has reached its 10 active-user limit.',
+    'workspace_seat_count_initialization_required':
+        'Seat tracking must be initialized before managing workspace users.',
+    'workspace_member_summary': 'Workspace members',
+    'workspace_active_users': 'Active users',
+    'workspace_inactive_users': 'Inactive users',
+    'workspace_admin_count': 'Workspace admins',
+    'workspace_seller_count': 'Sellers',
+    'workspace_other_roles': 'Other roles',
+    'workspace_seat_count_mismatch':
+        'The live user count does not match the seat counter.',
+    'workspace_owner_details': 'Workspace owner',
+    'workspace_owner_inactive': 'Owner account is inactive',
+    'workspace_owner_email_verified': 'Email verified',
+    'workspace_owner_email_unverified': 'Email not verified',
+    'workspace_owner_phone_missing': 'No contact number is recorded',
+    'contact_owner_whatsapp': 'Message owner on WhatsApp',
+    'contact_owner_email': 'Email owner',
+    'workspace_support_context_expired':
+        'Workspace support access has expired. Select the workspace again.',
     'workspace_owner_details_required':
         'Enter the owner name and a valid email address.',
     'workspace_owner_password_required':
@@ -735,6 +762,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'unlimited': 'Unlimited',
     'no_owner': 'No owner',
     'owner': 'Owner',
+    'receipt_number': 'Receipt Number',
+    'receipt_sequence': 'Receipt Sequence',
+    'receipt_balance_movement': 'Account Balance Movement',
+    'receipt_completed': 'Payment received',
     'save_changes': 'Save changes',
     'no_workspaces_yet': 'No workspaces yet',
     'no_members_yet': 'No members yet',
@@ -1134,6 +1165,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'commercial_registration_number': 'Commercial Registration Number',
     'invoice_header_settings': 'Invoice Header',
     'invoice_header_settings_hint': 'Configure this workspace invoice header',
+    'financial_document_language_pair': 'Financial document languages',
+    'financial_document_language_pair_hint':
+        'Use English with the selected Arabic or Urdu language in financial PDFs',
+    'financial_document_language_english_arabic': 'English + Arabic',
+    'financial_document_language_english_urdu': 'English + Urdu',
     'allow_non_stock_invoices': 'Allow Non-stock Invoices',
     'allow_non_stock_invoices_hint':
         'Allow invoices from the catalog without changing inventory',
@@ -1159,10 +1195,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'invoice_header_title_scale_small': 'Small',
     'invoice_header_title_scale_normal': 'Standard',
     'invoice_header_title_scale_large': 'Large',
-    'invoice_use_latest_header_on_reprint':
-        'Use current header when reprinting',
-    'invoice_use_latest_header_on_reprint_hint':
-        'When off, issued documents keep their saved header.',
     'invoice_header_visible_fields': 'Visible Header Details',
     'invoice_show_logo': 'Show Logo',
     'invoice_show_subtitle': 'Show Subtitle',
@@ -1264,13 +1296,22 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'Disable %s? They will lose access, and their route assignments will be cleared.',
     'settings_company_logo': 'Company Logo',
     'settings_logo_specs':
-        'PDF reports · PNG/JPG · max 800×400 px · max 300 KB',
+        'Lossless PNG · auto-oriented · resized proportionally up to 800×400 px · max 50 KB Base64. No upscaling or JPEG compression.',
+    'settings_logo_processing': 'Processing locally…',
+    'settings_logo_preview_details':
+        'PNG · %1×%2 px · %3 Base64 · source %4×%5 px',
+    'settings_logo_invalid_image':
+        'This file could not be decoded as an image. Choose a valid image file.',
+    'settings_logo_source_too_large':
+        'Source image is %s. Choose an image under 20 MB.',
+    'settings_logo_processing_failed':
+        'The image could not be processed. Try another image.',
     'settings_invalid_pairs_per_carton':
         'Pairs per carton must be a positive whole number.',
     'settings_logo_image_too_large':
         'Image is %s. Use a simpler image or reduce dimensions to 256×256 px.',
     'settings_logo_encoded_too_large':
-        'Encoded logo is %s, which exceeds the 50 KB limit.',
+        'Lossless PNG is %s at %1×%2 px, above the 50 KB limit. Use a simpler logo with fewer fine details.',
     'lbl_preview': 'Preview · %s',
     'settings_uploading_pct': 'Uploading… %s%%',
     'settings_uploading': 'Uploading…',
@@ -1282,6 +1323,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'confirm_remove_logo_msg': 'Remove the company logo from all reports?',
     'msg_logo_uploaded': 'Logo uploaded successfully',
     'msg_logo_removed': 'Logo removed',
+    'published_by': 'Published by',
 
     // ── Dashboard Screen ──
     'dashboard_outstanding_alert': 'Outstanding balance: %s',
@@ -2170,6 +2212,33 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'edit_workspace': 'تعديل المساحة',
     'workspace_owner_account': 'حساب مسؤول مساحة العمل الأول',
     'workspace_owner_missing': 'لم يتم تعيين حساب مالك لمساحة العمل.',
+    'workspace_seats': 'مقاعد مساحة العمل',
+    'free_tier': 'الباقة المجانية',
+    'workspace_seats_remaining': 'المقاعد المتبقية',
+    'workspace_seat_count_pending': 'لم يتم تهيئة عدّ المقاعد',
+    'initialize_workspace_seats': 'تهيئة تتبع المقاعد',
+    'workspace_seats_initialized': 'تمت تهيئة تتبع المقاعد',
+    'workspace_seat_limit_reached':
+        'وصلت مساحة العمل إلى الحد الأقصى البالغ 10 مستخدمين نشطين.',
+    'workspace_seat_count_initialization_required':
+        'يجب تهيئة تتبع المقاعد قبل إدارة مستخدمي مساحة العمل.',
+    'workspace_member_summary': 'أعضاء مساحة العمل',
+    'workspace_active_users': 'المستخدمون النشطون',
+    'workspace_inactive_users': 'المستخدمون غير النشطين',
+    'workspace_admin_count': 'مسؤولو مساحة العمل',
+    'workspace_seller_count': 'البائعون',
+    'workspace_other_roles': 'أدوار أخرى',
+    'workspace_seat_count_mismatch':
+        'عدد المستخدمين المباشر لا يطابق عداد المقاعد.',
+    'workspace_owner_details': 'مالك مساحة العمل',
+    'workspace_owner_inactive': 'حساب المالك غير نشط',
+    'workspace_owner_email_verified': 'البريد الإلكتروني موثّق',
+    'workspace_owner_email_unverified': 'البريد الإلكتروني غير موثّق',
+    'workspace_owner_phone_missing': 'لا يوجد رقم اتصال مسجل',
+    'contact_owner_whatsapp': 'مراسلة المالك عبر واتساب',
+    'contact_owner_email': 'مراسلة المالك بالبريد الإلكتروني',
+    'workspace_support_context_expired':
+        'انتهت صلاحية وصول الدعم. اختر مساحة العمل مرة أخرى.',
     'workspace_owner_details_required':
         'أدخل اسم المالك وبريداً إلكترونياً صالحاً.',
     'workspace_owner_password_required':
@@ -2184,6 +2253,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'unlimited': 'غير محدود',
     'no_owner': 'بدون مالك',
     'owner': 'المالك',
+    'receipt_number': 'رقم الإيصال',
+    'receipt_sequence': 'تسلسل الإيصال',
+    'receipt_balance_movement': 'حركة رصيد الحساب',
+    'receipt_completed': 'تم استلام الدفعة',
     'save_changes': 'حفظ التغييرات',
     'no_workspaces_yet': 'لا توجد مساحات بعد',
     'no_members_yet': 'لا يوجد أعضاء بعد',
@@ -2579,6 +2652,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'commercial_registration_number': 'رقم السجل التجاري',
     'invoice_header_settings': 'ترويسة الفاتورة',
     'invoice_header_settings_hint': 'إعداد ترويسة فواتير مساحة العمل',
+    'financial_document_language_pair': 'لغات المستندات المالية',
+    'financial_document_language_pair_hint':
+        'استخدم الإنجليزية مع العربية أو الأردية المحددة في ملفات PDF المالية',
+    'financial_document_language_english_arabic': 'الإنجليزية + العربية',
+    'financial_document_language_english_urdu': 'الإنجليزية + الأردية',
     'allow_non_stock_invoices': 'السماح بفواتير بدون مخزون',
     'allow_non_stock_invoices_hint':
         'السماح بالفوترة من الكتالوج دون تغيير المخزون',
@@ -2604,10 +2682,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'invoice_header_title_scale_small': 'صغير',
     'invoice_header_title_scale_normal': 'قياسي',
     'invoice_header_title_scale_large': 'كبير',
-    'invoice_use_latest_header_on_reprint':
-        'استخدام الترويسة الحالية عند إعادة الطباعة',
-    'invoice_use_latest_header_on_reprint_hint':
-        'عند إيقافه، تحتفظ المستندات الصادرة بالترويسة المحفوظة وقت الإصدار.',
     'invoice_header_visible_fields': 'تفاصيل الترويسة الظاهرة',
     'invoice_show_logo': 'إظهار الشعار',
     'invoice_show_subtitle': 'إظهار العنوان الفرعي',
@@ -2710,13 +2784,22 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'هل تريد تعطيل %s؟ سيفقد الوصول وستتم إزالة تعيينات المسارات.',
     'settings_company_logo': 'شعار الشركة',
     'settings_logo_specs':
-        'تقارير PDF · PNG/JPG · بحد أقصى 800×400 بكسل · 300 كيلوبايت',
+        'PNG دون فقدان الجودة · تصحيح الاتجاه تلقائيًا · تغيير متناسب حتى 800×400 بكسل · حد 50 كيلوبايت Base64. دون تكبير أو ضغط JPEG.',
+    'settings_logo_processing': 'جارٍ المعالجة محليًا…',
+    'settings_logo_preview_details':
+        'PNG · %1×%2 بكسل · %3 Base64 · الأصل %4×%5 بكسل',
+    'settings_logo_invalid_image':
+        'تعذر قراءة هذا الملف كصورة. اختر ملف صورة صالحًا.',
+    'settings_logo_source_too_large':
+        'حجم الصورة الأصلية %s. اختر صورة أصغر من 20 ميغابايت.',
+    'settings_logo_processing_failed':
+        'تعذرت معالجة الصورة. جرّب صورة أخرى.',
     'settings_invalid_pairs_per_carton':
         'يجب أن يكون عدد الأزواج في الكرتون رقمًا صحيحًا موجبًا.',
     'settings_logo_image_too_large':
         'حجم الصورة %s. استخدم صورة أبسط أو قلّل الأبعاد إلى 256×256 بكسل.',
     'settings_logo_encoded_too_large':
-        'حجم الشعار المشفّر %s ويتجاوز الحد الأقصى البالغ 50 كيلوبايت.',
+        'حجم PNG دون فقدان الجودة %s بأبعاد %1×%2 بكسل، ويتجاوز حد 50 كيلوبايت. استخدم شعارًا أبسط بتفاصيل دقيقة أقل.',
     'lbl_preview': 'معاينة · %s',
     'settings_uploading_pct': 'جارٍ الرفع… %s%%',
     'settings_uploading': 'جارٍ الرفع…',
@@ -2728,6 +2811,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'confirm_remove_logo_msg': 'هل تريد إزالة شعار الشركة من جميع التقارير؟',
     'msg_logo_uploaded': 'تم رفع الشعار بنجاح',
     'msg_logo_removed': 'تم إزالة الشعار',
+    'published_by': 'الناشر',
 
     // ── Dashboard Screen ──
     'dashboard_outstanding_alert': 'الرصيد المستحق: %s',
@@ -3621,6 +3705,33 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'edit_workspace': 'ورک اسپیس میں ترمیم',
     'workspace_owner_account': 'ابتدائی ورک اسپیس ایڈمن اکاؤنٹ',
     'workspace_owner_missing': 'ورک اسپیس کا مالک اکاؤنٹ مقرر نہیں ہے۔',
+    'workspace_seats': 'ورک اسپیس کی نشستیں',
+    'free_tier': 'مفت پلان',
+    'workspace_seats_remaining': 'باقی نشستیں',
+    'workspace_seat_count_pending': 'نشستوں کی گنتی شروع نہیں ہوئی',
+    'initialize_workspace_seats': 'نشستوں کی گنتی شروع کریں',
+    'workspace_seats_initialized': 'نشستوں کی گنتی شروع ہو گئی',
+    'workspace_seat_limit_reached':
+        'اس ورک اسپیس میں فعال صارفین کی زیادہ سے زیادہ حد 10 ہے۔',
+    'workspace_seat_count_initialization_required':
+        'ورک اسپیس صارفین کے انتظام سے پہلے نشستوں کی گنتی شروع کریں۔',
+    'workspace_member_summary': 'ورک اسپیس کے اراکین',
+    'workspace_active_users': 'فعال صارفین',
+    'workspace_inactive_users': 'غیر فعال صارفین',
+    'workspace_admin_count': 'ورک اسپیس منتظمین',
+    'workspace_seller_count': 'سیلرز',
+    'workspace_other_roles': 'دیگر کردار',
+    'workspace_seat_count_mismatch':
+        'فعال صارفین کی تعداد نشستوں کے کاؤنٹر سے مختلف ہے۔',
+    'workspace_owner_details': 'ورک اسپیس کا مالک',
+    'workspace_owner_inactive': 'مالک کا اکاؤنٹ غیر فعال ہے',
+    'workspace_owner_email_verified': 'ای میل تصدیق شدہ',
+    'workspace_owner_email_unverified': 'ای میل کی تصدیق نہیں ہوئی',
+    'workspace_owner_phone_missing': 'رابطہ نمبر درج نہیں ہے',
+    'contact_owner_whatsapp': 'واٹس ایپ پر مالک کو پیغام دیں',
+    'contact_owner_email': 'مالک کو ای میل کریں',
+    'workspace_support_context_expired':
+        'ورک اسپیس سپورٹ رسائی ختم ہو گئی۔ ورک اسپیس دوبارہ منتخب کریں۔',
     'workspace_owner_details_required': 'مالک کا نام اور درست ای میل درج کریں۔',
     'workspace_owner_password_required':
         'مالک کا پاس ورڈ کم از کم 8 حروف کا ہونا چاہیے۔',
@@ -3634,6 +3745,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'unlimited': 'لامحدود',
     'no_owner': 'کوئی مالک نہیں',
     'owner': 'مالک',
+    'receipt_number': 'رسید نمبر',
+    'receipt_sequence': 'رسید کی ترتیب',
+    'receipt_balance_movement': 'اکاؤنٹ بیلنس کی تبدیلی',
+    'receipt_completed': 'ادائیگی وصول ہو گئی',
     'save_changes': 'تبدیلیاں محفوظ کریں',
     'no_workspaces_yet': 'ابھی تک کوئی ورک اسپیس نہیں',
     'no_members_yet': 'ابھی تک کوئی ممبر نہیں',
@@ -4031,6 +4146,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'commercial_registration_number': 'کمرشل رجسٹریشن نمبر',
     'invoice_header_settings': 'انوائس ہیڈر',
     'invoice_header_settings_hint': 'اس ورک اسپیس کا انوائس ہیڈر ترتیب دیں',
+    'financial_document_language_pair': 'مالی دستاویزات کی زبانیں',
+    'financial_document_language_pair_hint':
+        'مالی PDF میں انگریزی کے ساتھ منتخب عربی یا اردو استعمال کریں',
+    'financial_document_language_english_arabic': 'انگریزی + عربی',
+    'financial_document_language_english_urdu': 'انگریزی + اردو',
     'allow_non_stock_invoices': 'بغیر اسٹاک انوائس کی اجازت',
     'allow_non_stock_invoices_hint':
         'اسٹاک تبدیل کیے بغیر کیٹلاگ سے انوائس بنانے دیں',
@@ -4056,10 +4176,6 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'invoice_header_title_scale_small': 'چھوٹا',
     'invoice_header_title_scale_normal': 'معیاری',
     'invoice_header_title_scale_large': 'بڑا',
-    'invoice_use_latest_header_on_reprint':
-        'دوبارہ پرنٹ پر موجودہ ہیڈر استعمال کریں',
-    'invoice_use_latest_header_on_reprint_hint':
-        'بند ہونے پر جاری شدہ دستاویزات اپنا محفوظ ہیڈر برقرار رکھتی ہیں۔',
     'invoice_header_visible_fields': 'نمایاں ہیڈر کی تفصیلات',
     'invoice_show_logo': 'لوگو دکھائیں',
     'invoice_show_subtitle': 'ذیلی عنوان دکھائیں',
@@ -4162,13 +4278,22 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'کیا %s کا اکاؤنٹ غیر فعال کریں؟ رسائی ختم ہوگی اور راستوں کی تفویض ہٹا دی جائے گی۔',
     'settings_company_logo': 'کمپنی لوگو',
     'settings_logo_specs':
-        'PDF رپورٹس · PNG/JPG · زیادہ سے زیادہ 800×400 px · 300 KB',
+        'بغیر کوالٹی نقصان PNG · سمت خود درست · 800×400 px تک متناسب سائز · زیادہ سے زیادہ 50 KB Base64۔ بڑا نہیں کیا جائے گا اور JPEG کمپریشن نہیں ہوگی۔',
+    'settings_logo_processing': 'مقامی طور پر پروسیس ہو رہا ہے…',
+    'settings_logo_preview_details':
+        'PNG · %1×%2 px · %3 Base64 · اصل %4×%5 px',
+    'settings_logo_invalid_image':
+        'یہ فائل تصویر کے طور پر نہیں پڑھی جا سکی۔ درست تصویر منتخب کریں۔',
+    'settings_logo_source_too_large':
+        'اصل تصویر کا سائز %s ہے۔ 20 MB سے کم تصویر منتخب کریں۔',
+    'settings_logo_processing_failed':
+        'تصویر پروسیس نہیں ہو سکی۔ کوئی دوسری تصویر آزمائیں۔',
     'settings_invalid_pairs_per_carton':
         'فی کارٹن جوڑوں کی تعداد مثبت مکمل عدد ہونی چاہیے۔',
     'settings_logo_image_too_large':
         'تصویر کا سائز %s ہے۔ آسان تصویر استعمال کریں یا سائز 256×256 px تک کم کریں۔',
     'settings_logo_encoded_too_large':
-        'انکوڈ شدہ لوگو کا سائز %s ہے، جو 50 KB کی حد سے زیادہ ہے۔',
+        'بغیر نقصان PNG کا سائز %s ہے (%1×%2 px)، جو 50 KB حد سے زیادہ ہے۔ کم باریک تفصیلات والا سادہ لوگو استعمال کریں۔',
     'lbl_preview': 'پیش نظارہ · %s',
     'settings_uploading_pct': 'اپلوڈ ہو رہا ہے… %s%%',
     'settings_uploading': 'اپلوڈ ہو رہا ہے…',
@@ -4181,6 +4306,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'کیا آپ تمام رپورٹس سے کمپنی لوگو ہٹانا چاہتے ہیں؟',
     'msg_logo_uploaded': 'لوگو کامیابی سے اپلوڈ ہو گیا',
     'msg_logo_removed': 'لوگو ہٹا دیا گیا',
+    'published_by': 'ناشر',
 
     // ── Dashboard Screen ──
     'dashboard_outstanding_alert': 'واجب الادا بیلنس: %s',

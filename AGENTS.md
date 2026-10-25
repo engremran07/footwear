@@ -1,6 +1,6 @@
 ﻿# ShoesERP AGENTS Runtime Contract
 
-Last updated: 2026-10-24
+Last updated: 2026-10-25
 
 ## 1) Runtime Truth (Authoritative)
 
@@ -1208,3 +1208,41 @@ Unreleased shared frontend accessibility foundation:
   `Success`; the device reports versionName `3.9.84`, versionCode `3101110`.
   Hosting deployment and Git publication are pending; a push to `main`
   triggers the Hosting workflow and requires explicit authorization.
+
+2026-10-25 bilingual financial PDFs and seller invoice Rules — v3.9.85+711:
+
+- Financial document language is workspace-configurable: English-Arabic is
+  the default and English-Urdu is available to workspace administrators.
+  New invoice snapshots preserve the selected pair; historical snapshots
+  continue to control document reprints.
+- Invoice, receipt, account-statement, seller, multi-shop, and flat financial
+  report PDFs use paired labels. Ledger summary and table labels render
+  English and RTL text on separate directionally explicit lines.
+- Seller invoice writes accept optional legacy company-name fields and require
+  the provider-generated language-pair snapshot to match the workspace setting.
+  Tenant, seller-route, inventory, and atomic-balance safeguards remain.
+- Full Flutter suite: `609` passed; Rules Emulator: `133 passing`; `flutter
+  analyze lib --no-pub`: `No issues found! (ran in 9.2s)`; `dart analyze
+  test/`: `No issues found!`. Release build, production deployment, device
+  install, commit, and push remain pending.
+
+2026-10-25 workspace administration and receipt detail — v3.10.1+1112:
+
+- Workspace management presents owner contact and verification details, live
+   member counts by role, and the free-tier limit of 10 active
+   non-platform-super-admin members. Profile activation/deactivation and the
+   tenant seat counter are checked as an atomic transition by Firestore Rules.
+- Cash receipt detail and PDFs show a fuller payment, balance, shop, and
+   receiver/signature breakdown without changing financial calculations.
+- Google Drive OAuth client IDs are not configured for this release; Drive
+   backup is disabled, while encrypted phone archives remain available.
+- Full Flutter suite: `01:20 +623: All tests passed!`; `flutter analyze lib
+   --no-pub`: `No issues found! (ran in 98.8s)`; `dart analyze test/`:
+   `No issues found!`; Markdown lint exited 0 with no output.
+- Firestore Rules Emulator: `140 passing (31s)`. Web build: `EXIT: 0`;
+   Hosting and Firestore Rules/indexes deployments both reported
+   `Deploy complete!`. The 23 remote indexes and 2 field overrides not listed
+   locally were preserved.
+- Split APKs built: ARMv7 30.6 MB, ARM64 32.1 MB, x86_64 33.6 MB.
+   ARM64 copied to and installed on `R5GL22RGT9V` (`Success`); installed
+   versionName is `3.10.1`, versionCode `3103212`. Git publication follows.

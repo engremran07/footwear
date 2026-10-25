@@ -66,7 +66,14 @@ async function seedUser(uid, role, active = true, extra = {}) {
       const tenantRef = db.collection('tenants').doc(tenantId);
       const tenant = await tenantRef.get();
       if (!tenant.exists) {
-        await tenantRef.set({ tenant_id: tenantId, active: true });
+        await tenantRef.set({
+          tenant_id: tenantId,
+          active: true,
+          plan: 'free',
+          active_user_count: 0,
+          max_active_users: 10,
+          seat_count_revision: 0,
+        });
       }
     }
     await db.collection('users').doc(uid).set({
@@ -78,6 +85,21 @@ async function seedUser(uid, role, active = true, extra = {}) {
       assigned_route_ids: ['route-1'],
       ...extra,
     });
+    if (
+      typeof tenantId === 'string' &&
+      tenantId !== '' &&
+      tenantId !== '__global__' &&
+      active &&
+      !/^\s*super_admin\s*$/i.test(role)
+    ) {
+      const tenantRef = db.collection('tenants').doc(tenantId);
+      const tenant = await tenantRef.get();
+      if (Number.isInteger(tenant.data()?.active_user_count)) {
+        await tenantRef.update({
+          active_user_count: tenant.data().active_user_count + 1,
+        });
+      }
+    }
   });
 }
 
@@ -85,14 +107,103 @@ async function seedTenant({
   tenantId = 'tenant-1',
   ownerUserId = 'tenant-admin-uid',
   includeTenantId = true,
+  activeUserCount,
+  initializeSeatCount = true,
 } = {}) {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
-    await ctx.firestore().collection('tenants').doc(tenantId).set({
+    const db = ctx.firestore();
+    let count = activeUserCount;
+    if (count == null) {
+      const users = await db
+        .collection('users')
+        .where('tenant_id', '==', tenantId)
+        .where('active', '==', true)
+        .get();
+      count = users.docs.filter(
+        (user) => !/^\s*super_admin\s*$/i.test(user.data().role ?? ''),
+      ).length;
+    }
+    await db.collection('tenants').doc(tenantId).set({
       ...(includeTenantId ? { tenant_id: tenantId } : {}),
       owner_user_id: ownerUserId,
       active: true,
+      ...(initializeSeatCount
+        ? {
+            plan: 'free',
+            active_user_count: count,
+            max_active_users: 10,
+            seat_count_revision: 0,
+          }
+        : {}),
     });
   });
+}
+
+function applySeatChange(batch, db, tenantId, userId, count, revision, kind) {
+  batch.update(db.collection('tenants').doc(tenantId), {
+    active_user_count: count,
+    seat_count_revision: revision + 1,
+    seat_change_user_id: userId,
+    seat_change_kind: kind,
+    updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+function createUserWithSeat(db, userId, {
+  tenantId = 'tenant-1',
+  role = 'seller',
+  createdBy = 'admin-uid',
+} = {}) {
+  const batch = db.batch();
+  const userRef = db.collection('users').doc(userId);
+  batch.set(userRef, {
+    role,
+    active: true,
+    display_name: 'New Seller',
+    email: `${userId}@test.com`,
+    tenant_id: tenantId,
+    created_by: createdBy,
+    assigned_route_ids: ['route-1'],
+  });
+  return db
+    .collection('tenants')
+    .doc(tenantId)
+    .get()
+    .then((snapshot) => {
+      const tenant = snapshot.data();
+      applySeatChange(
+        batch,
+        db,
+        tenantId,
+        userId,
+        tenant.active_user_count + 1,
+        tenant.seat_count_revision ?? 0,
+        'add',
+      );
+      return batch.commit();
+    });
+}
+
+async function setUserActiveWithSeat(db, tenantId, userId, active) {
+    const tenantRef = db.collection('tenants').doc(tenantId);
+    const userRef = db.collection('users').doc(userId);
+    const tenantSnapshot = await tenantRef.get();
+    const tenant = tenantSnapshot.data();
+    const batch = db.batch();
+    batch.update(userRef, {
+      active,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    applySeatChange(
+      batch,
+      db,
+      tenantId,
+      userId,
+      tenant.active_user_count + (active ? 1 : -1),
+      tenant.seat_count_revision ?? 0,
+      active ? 'add' : 'remove',
+    );
+    return batch.commit();
 }
 
 async function seedShop(shopId, data = {}) {
@@ -171,15 +282,88 @@ describe('users collection', () => {
   it('admin: can create new user doc', async () => {
     await seedUser('admin-uid', 'admin');
     await assertSucceeds(
-      adminCtx(testEnv).firestore().collection('users').doc('new-uid').set({
+      createUserWithSeat(
+        adminCtx(testEnv).firestore(),
+        'new-uid',
+      ),
+    );
+  });
+
+  it('admin: cannot create an active user without the atomic seat increment', async () => {
+    await seedUser('admin-uid', 'admin');
+    await assertFails(
+      adminCtx(testEnv).firestore().collection('users').doc('orphan-uid').set({
         role: 'seller',
         active: true,
-        display_name: 'New Seller',
-        email: 'new@test.com',
+        display_name: 'Uncounted Seller',
+        email: 'orphan@test.com',
         tenant_id: 'tenant-1',
         created_by: 'admin-uid',
         assigned_route_ids: ['route-1'],
       }),
+    );
+  });
+
+  it('admin: enforces the ten-seat limit and allows the tenth active account', async () => {
+    await seedUser('admin-uid', 'admin');
+    for (let index = 0; index < 8; index += 1) {
+      await seedUser(`seller-${index}`, 'seller');
+    }
+    const db = adminCtx(testEnv).firestore();
+    await assertSucceeds(createUserWithSeat(db, 'tenth-user'));
+    await assertFails(createUserWithSeat(db, 'eleventh-user'));
+  });
+
+  it('admin: cannot change a seat counter without its matching user transition', async () => {
+    await seedUser('admin-uid', 'admin');
+    const db = adminCtx(testEnv).firestore();
+    await assertFails(
+      db.collection('tenants').doc('tenant-1').update({
+        active_user_count: 2,
+        seat_count_revision: 1,
+        seat_change_user_id: 'missing-user',
+        seat_change_kind: 'add',
+        updated_at: new Date(),
+      }),
+    );
+  });
+
+  it('admin: must decrement active seats atomically when deactivating a seller', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedUser('seller-uid', 'seller');
+    const db = adminCtx(testEnv).firestore();
+    await assertSucceeds(
+      setUserActiveWithSeat(db, 'tenant-1', 'seller-uid', false),
+    );
+    const tenant = await db.collection('tenants').doc('tenant-1').get();
+    assert.strictEqual(tenant.data().active_user_count, 1);
+  });
+
+  it('admin: cannot reactivate an account when the workspace is at capacity', async () => {
+    await seedUser('admin-uid', 'admin');
+    for (let index = 0; index < 9; index += 1) {
+      await seedUser(`seller-${index}`, 'seller');
+    }
+    await seedUser('inactive-seller', 'seller', false);
+    const db = adminCtx(testEnv).firestore();
+    await assertFails(
+      setUserActiveWithSeat(db, 'tenant-1', 'inactive-seller', true),
+    );
+  });
+
+  it('grandfathered over-cap workspaces deny additions but allow a seat release', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedUser('seller-uid', 'seller');
+    await seedUser('inactive-seller', 'seller', false);
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('tenants').doc('tenant-1').update({
+        active_user_count: 11,
+      });
+    });
+    const db = adminCtx(testEnv).firestore();
+    await assertFails(createUserWithSeat(db, 'blocked-new-user'));
+    await assertSucceeds(
+      setUserActiveWithSeat(db, 'tenant-1', 'seller-uid', false),
     );
   });
 
@@ -415,6 +599,42 @@ describe('product_variants collection', () => {
 // 3b. customers collection
 // ═══════════════════════════════════════════════════════════════════════════
 describe('customers collection', () => {
+  it('tenant-scoped shop ID lookups exclude other workspaces', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedTenant({ tenantId: 'tenant-2', ownerUserId: 'other-admin' });
+    await seedShop('shop-active', { active: true });
+    await seedShop('shop-inactive', { active: false });
+    await seedShop('shop-other-tenant', {
+      tenant_id: 'tenant-2',
+      active: true,
+    });
+
+    const db = tenantAdminCtx(testEnv).firestore();
+    const result = await assertSucceeds(
+      db.collection('customers')
+        .where('tenant_id', '==', 'tenant-1')
+        .where(firebase.firestore.FieldPath.documentId(), 'in', [
+          'shop-active',
+          'shop-inactive',
+        ])
+        .get(),
+    );
+
+    assert.deepStrictEqual(
+      result.docs.map((doc) => doc.id).sort(),
+      ['shop-active', 'shop-inactive'],
+    );
+
+    await assertFails(
+      db.collection('customers')
+        .where('tenant_id', '==', 'tenant-2')
+        .where(firebase.firestore.FieldPath.documentId(), 'in', [
+          'shop-other-tenant',
+        ])
+        .get(),
+    );
+  });
+
   it('seller: cannot create shop with empty name', async () => {
     await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
     await assertFails(
@@ -987,6 +1207,15 @@ describe('invoices collection', () => {
   it('seller: can create invoice with valid items and route ownership', async () => {
     await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
     await seedShop('shop-1', { balance: 0 });
+    await seedSettings({
+      company_name: 'Workspace Name',
+      invoice_header: {
+        name_en: 'Workspace Name',
+        visible_fields: [],
+        document_language_pair: 'english_urdu',
+      },
+      logo_base64: 'workspace-logo',
+    });
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await context.firestore().collection('seller_inventory').doc('inventory-1').set({
         seller_id: 'seller-uid',
@@ -1003,6 +1232,13 @@ describe('invoices collection', () => {
       type: 'sale',
       invoice_number: 'INV-2026-0001',
       sale_transaction_id: saleRef.id,
+      invoice_header_snapshot: {
+        name_en: 'Workspace Name',
+        visible_fields: [],
+        document_language_pair: 'english_urdu',
+        company_name: 'Workspace Name',
+        logo_base64: 'workspace-logo',
+      },
       shop_id: 'shop-1',
       route_id: 'route-1',
       tenant_id: 'tenant-1',
@@ -1671,7 +1907,15 @@ describe('invoices collection', () => {
   it('seller: can atomically create a linked cash receipt and reduce shop balance', async () => {
     await seedUser('seller-uid', 'seller');
     await seedShop('shop-1', { balance: 100 });
-    await seedSettings();
+    await seedSettings({
+      company_name: 'Workspace Name',
+      invoice_header: {
+        name_en: 'Workspace Name',
+        visible_fields: [],
+        document_language_pair: 'english_arabic',
+      },
+      logo_base64: 'workspace-logo',
+    });
     const db = sellerCtx(testEnv).firestore();
     const invoiceRef = db.collection('invoices').doc('receipt-1');
     const transactionRef = db.collection('transactions').doc('receipt-tx');
@@ -1685,6 +1929,13 @@ describe('invoices collection', () => {
       fulfillment_mode: 'none',
       cash_receipt_transaction_id: transactionRef.id,
       cash_receipt_sequence: 1,
+      invoice_header_snapshot: {
+        name_en: 'Workspace Name',
+        visible_fields: [],
+        document_language_pair: 'english_arabic',
+        company_name: 'Workspace Name',
+        logo_base64: 'workspace-logo',
+      },
       shop_id: 'shop-1',
       shop_name: 'Seed Shop',
       route_id: 'route-1',
@@ -1715,6 +1966,70 @@ describe('invoices collection', () => {
       last_transaction_id: transactionRef.id,
     });
     await assertSucceeds(batch.commit());
+  });
+
+  it('seller: cannot snapshot a financial-document language pair not set by the workspace', async () => {
+    await seedUser('seller-uid', 'seller');
+    await seedShop('shop-1', { balance: 100 });
+    await seedSettings({
+      company_name: 'Workspace Name',
+      invoice_header: {
+        name_en: 'Workspace Name',
+        visible_fields: [],
+        document_language_pair: 'english_arabic',
+      },
+      logo_base64: 'workspace-logo',
+    });
+    const db = sellerCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('receipt-wrong-pair');
+    const transactionRef = db.collection('transactions').doc('receipt-tx-wrong-pair');
+    const batch = db.batch();
+    batch.update(db.collection('settings').doc('tenant-1'), {
+      last_cash_receipt_number: 1,
+    });
+    batch.set(invoiceRef, {
+      created_by: 'seller-uid',
+      type: 'cash_receipt',
+      fulfillment_mode: 'none',
+      cash_receipt_transaction_id: transactionRef.id,
+      cash_receipt_sequence: 1,
+      invoice_header_snapshot: {
+        name_en: 'Workspace Name',
+        visible_fields: [],
+        document_language_pair: 'english_urdu',
+        company_name: 'Workspace Name',
+        logo_base64: 'workspace-logo',
+      },
+      shop_id: 'shop-1',
+      shop_name: 'Seed Shop',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      seller_id: 'seller-uid',
+      items: [],
+      subtotal: 0,
+      discount: 0,
+      total: 25,
+      amount_received: 25,
+      status: 'paid',
+    });
+    batch.set(transactionRef, {
+      created_by: 'seller-uid',
+      type: 'cash_in',
+      amount: 25,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      invoice_id: invoiceRef.id,
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 75,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_in',
+      last_transaction_amount: 25,
+      last_transaction_id: transactionRef.id,
+    });
+    await assertFails(batch.commit());
   });
 
   it('seller: cannot create a cash receipt without advancing its workspace sequence', async () => {
@@ -2037,7 +2352,11 @@ describe('tenant destructive operations', () => {
         ? 'tenant-1'
         : `delete-target-${collection}`;
       const deletion = db.collection(collection).doc(docId).delete();
-      if (collection === 'transactions' || collection === 'tenants') {
+      if (
+        collection === 'transactions' ||
+        collection === 'tenants' ||
+        collection === 'users'
+      ) {
         await assertFails(deletion);
       } else {
         await assertSucceeds(deletion);
@@ -3229,6 +3548,10 @@ describe('platform super-admin workspace isolation', () => {
       created_by: 'platform-create-workspace-uid',
       created_at: firebase.firestore.FieldValue.serverTimestamp(),
       active: true,
+      plan: 'free',
+      active_user_count: 0,
+      max_active_users: 10,
+      seat_count_revision: 0,
     });
     batch.set(db.collection('settings').doc('tenant-new'), {
       tenant_id: 'tenant-new',
@@ -3395,7 +3718,7 @@ describe('platform super-admin workspace isolation', () => {
     );
   });
 
-  it('super-admin cannot access another tenant user profile', async () => {
+  it('super-admin user-list queries stay within the selected workspace', async () => {
     await seedWorkspace('tenant-a');
     await seedWorkspace('tenant-b');
     await seedUser('platform-user-read-uid', 'super_admin', true, {
@@ -3403,13 +3726,22 @@ describe('platform super-admin workspace isolation', () => {
       active_workspace_reason: 'Support ticket investigation',
       active_workspace_selected_at: new Date(),
     });
+    await seedUser('tenant-a-user', 'seller', true, {
+      tenant_id: 'tenant-a',
+    });
     await seedUser('tenant-b-user', 'seller', true, {
       tenant_id: 'tenant-b',
     });
+    const db = testEnv.authenticatedContext('platform-user-read-uid')
+      .firestore();
+    await assertSucceeds(
+      db.collection('users').where('tenant_id', '==', 'tenant-a').get(),
+    );
     await assertFails(
-      testEnv.authenticatedContext('platform-user-read-uid')
-        .firestore()
-        .collection('users')
+      db.collection('users').where('tenant_id', '==', 'tenant-b').get(),
+    );
+    await assertFails(
+      db.collection('users')
         .doc('tenant-b-user')
         .get(),
     );
@@ -3693,6 +4025,10 @@ describe('client transactions that read documents before creating them', () => {
         created_by: 'platform-create-workspace-uid',
         created_at: firebase.firestore.FieldValue.serverTimestamp(),
         active: true,
+        plan: 'free',
+        active_user_count: 0,
+        max_active_users: 10,
+        seat_count_revision: 0,
       });
       transaction.set(settingsRef, {
         tenant_id: 'tenant-new',

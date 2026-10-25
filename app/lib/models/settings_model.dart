@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/l10n/financial_document_localization.dart';
 
 class InvoiceHeaderConfig {
   final String nameEn;
@@ -19,7 +20,7 @@ class InvoiceHeaderConfig {
   final String template;
   final String accentColor;
   final String titleScale;
-  final bool useLatestHeaderOnReprint;
+  final FinancialDocumentLanguagePair documentLanguagePair;
   final Set<String> visibleFields;
 
   const InvoiceHeaderConfig({
@@ -39,7 +40,7 @@ class InvoiceHeaderConfig {
     this.template = 'classic',
     this.accentColor = '#315C4C',
     this.titleScale = 'normal',
-    this.useLatestHeaderOnReprint = false,
+    this.documentLanguagePair = FinancialDocumentLanguagePair.englishArabic,
     this.visibleFields = const {
       'logo',
       'phone',
@@ -74,8 +75,9 @@ class InvoiceHeaderConfig {
         'large' => 'large',
         _ => 'normal',
       },
-      useLatestHeaderOnReprint:
-          json['use_latest_header_on_reprint'] as bool? ?? false,
+      documentLanguagePair: FinancialDocumentLanguagePair.fromJson(
+        json['document_language_pair'],
+      ),
       visibleFields: rawVisibleFields == null
           ? const {
               'logo',
@@ -105,7 +107,7 @@ class InvoiceHeaderConfig {
     'template': template,
     'accent_color': accentColor,
     'title_scale': titleScale,
-    'use_latest_header_on_reprint': useLatestHeaderOnReprint,
+    'document_language_pair': documentLanguagePair.firestoreValue,
     'visible_fields': visibleFields.toList()..sort(),
   };
 
@@ -126,7 +128,7 @@ class InvoiceHeaderConfig {
     String? template,
     String? accentColor,
     String? titleScale,
-    bool? useLatestHeaderOnReprint,
+    FinancialDocumentLanguagePair? documentLanguagePair,
     Set<String>? visibleFields,
   }) => InvoiceHeaderConfig(
     nameEn: nameEn ?? this.nameEn,
@@ -146,13 +148,14 @@ class InvoiceHeaderConfig {
     template: template ?? this.template,
     accentColor: accentColor ?? this.accentColor,
     titleScale: titleScale ?? this.titleScale,
-    useLatestHeaderOnReprint:
-        useLatestHeaderOnReprint ?? this.useLatestHeaderOnReprint,
+    documentLanguagePair: documentLanguagePair ?? this.documentLanguagePair,
     visibleFields: visibleFields ?? this.visibleFields,
   );
 }
 
 class SettingsModel {
+  static const maxLogoBase64Bytes = 50 * 1024;
+
   final String tenantId;
   final String currency;
   final int pairsPerCarton;
@@ -160,7 +163,7 @@ class SettingsModel {
   final bool allowNonStockInvoices;
   final InvoiceHeaderConfig invoiceHeader;
 
-  /// Base64-encoded PNG/JPEG logo, stored directly in Firestore.
+  /// Base64-encoded lossless PNG logo, stored directly in Firestore.
   /// Use [logoBytes] to get the decoded bytes for Image.memory() or PDF.
   final String? logoBase64;
   final Timestamp updatedAt;

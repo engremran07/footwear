@@ -11,6 +11,7 @@ import '../core/utils/pdf_export.dart';
 import '../core/utils/share_helper.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/l10n/financial_document_localization.dart';
 import '../providers/settings_provider.dart';
 
 /// Unified export/share bottom sheet — single centralised path for all formats.
@@ -62,6 +63,8 @@ class ExportSheet {
     required List<List<dynamic>> rows,
     required String fileName,
     String? subtitle,
+    String? pdfTitleKey,
+    List<String>? pdfHeaderKeys,
 
     /// Optional override: when provided, used for PDF / Image / Print instead
     /// of the generic [buildPdfTable]. Useful for ledger-style exports.
@@ -85,6 +88,8 @@ class ExportSheet {
               rows: rows,
               fileName: fileName,
               subtitle: subtitle,
+              pdfTitleKey: pdfTitleKey,
+              pdfHeaderKeys: pdfHeaderKeys,
               pdfBytesBuilder: pdfBytesBuilder,
             ),
           ),
@@ -143,6 +148,8 @@ class _ExportSheetContent extends StatefulWidget {
   final List<List<dynamic>> rows;
   final String fileName;
   final String? subtitle;
+  final String? pdfTitleKey;
+  final List<String>? pdfHeaderKeys;
   final Future<Uint8List> Function()? pdfBytesBuilder;
 
   const _ExportSheetContent({
@@ -152,6 +159,8 @@ class _ExportSheetContent extends StatefulWidget {
     required this.rows,
     required this.fileName,
     this.subtitle,
+    this.pdfTitleKey,
+    this.pdfHeaderKeys,
     this.pdfBytesBuilder,
   });
 
@@ -207,9 +216,29 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
     }
     try {
       final settings = await ref.read(settingsProvider.future);
+      final pair = settings.invoiceHeader.documentLanguagePair;
+      final pdfHeaders = widget.pdfHeaderKeys;
+      if (pdfHeaders != null && pdfHeaders.length != headers.length) {
+        throw StateError('PDF header keys must match the export header count.');
+      }
       return await buildPdfTable(
-        title: widget.title,
-        headers: headers,
+        title: widget.pdfTitleKey == null
+            ? widget.title
+            : financialDocumentLabel(
+                widget.pdfTitleKey!,
+                pair,
+                fallback: widget.title,
+              ),
+        headers: pdfHeaders == null
+            ? headers
+            : [
+                for (final key in pdfHeaders)
+                  financialDocumentLabel(
+                    key,
+                    pair,
+                    fallback: trRead(key, _locale),
+                  ),
+              ],
         rows: widget.rows,
         subtitle: widget.subtitle,
         locale: _locale,

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
+import '../core/models/tenant_model.dart';
 import '../core/utils/firestore_pagination.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
@@ -181,7 +182,9 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       final currentProfile = await _currentProfileFromServer(adminUid);
       final activeTenantId = TenantScope.normalize(currentProfile?.tenantId);
       if (currentProfile == null ||
-          !currentProfile.active ||
+          !currentProfile.hasActiveWorkspaceSupportContextFor(
+            activeTenantId ?? '',
+          ) ||
           activeTenantId == null) {
         throw StateError(
           'Select a workspace support context before managing users.',
@@ -239,9 +242,12 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     required bool active,
     bool clearRouteAssignments = false,
     String? displayName,
+    List<String>? routeIdsToAssign,
+    List<String>? routeNamesToAssign,
   }) async {
     final db = FirebaseFirestore.instance;
     final userRef = db.collection(Collections.users).doc(userId);
+    final tenantRef = db.collection(Collections.tenants).doc(tenantId);
     final routeSnapshot = clearRouteAssignments
         ? await db
               .collection(Collections.routes)
@@ -253,6 +259,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
 
     await db.runTransaction<void>((transaction) async {
       final userSnapshot = await transaction.get(userRef);
+      final tenantSnapshot = await transaction.get(tenantRef);
       final userData = userSnapshot.data();
       final role = (userData?['role'] as String? ?? '').trim().toLowerCase();
       if (!userSnapshot.exists ||
@@ -263,6 +270,20 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       }
 
       if (active && userData?['active'] == true) return;
+      final tenantData = tenantSnapshot.data();
+      if (!tenantSnapshot.exists ||
+          tenantData?['active'] != true ||
+          tenantData?['active_user_count'] is! int ||
+          tenantData?['max_active_users'] != TenantModel.freeSeatLimit) {
+        throw StateError('workspace_seat_count_initialization_required');
+      }
+      final activeUserCount = tenantData!['active_user_count'] as int;
+      if (active && activeUserCount >= TenantModel.freeSeatLimit) {
+        throw StateError('workspace_seat_limit_reached');
+      }
+
+      final seatCountRevision =
+          (tenantData['seat_count_revision'] as num?)?.toInt() ?? 0;
       final userUpdate = <String, dynamic>{
         'active': active,
         'updated_at': FieldValue.serverTimestamp(),
@@ -271,9 +292,35 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         userUpdate['assigned_route_ids'] = <String>[];
         userUpdate['assigned_route_names'] = <String>[];
       }
+      if (routeIdsToAssign != null) {
+        userUpdate['assigned_route_ids'] = routeIdsToAssign;
+        userUpdate['assigned_route_names'] = routeNamesToAssign ?? <String>[];
+      }
       transaction.update(userRef, userUpdate);
 
-      if (active) return;
+      transaction.update(tenantRef, {
+        'active_user_count': active ? activeUserCount + 1 : activeUserCount - 1,
+        'seat_count_revision': seatCountRevision + 1,
+        'seat_change_user_id': userId,
+        'seat_change_kind': active ? 'add' : 'remove',
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      if (active) {
+        for (final routeId in routeIdsToAssign ?? const <String>[]) {
+          if (routeId.trim().isEmpty) continue;
+          transaction.update(db.collection(Collections.routes).doc(routeId), {
+            'assigned_seller_ids': FieldValue.arrayUnion([userId]),
+            'assigned_seller_names': FieldValue.arrayUnion(
+              displayName != null && displayName.isNotEmpty
+                  ? [displayName]
+                  : [],
+            ),
+            'updated_at': FieldValue.serverTimestamp(),
+          });
+        }
+        return;
+      }
       if (routeSnapshot != null) {
         for (final route in routeSnapshot.docs) {
           transaction.update(route.reference, {
@@ -331,10 +378,25 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'Seller accounts require at least one assigned route.',
         );
       }
+      final normalizedRouteIds = normalizedRole == 'seller'
+          ? assignedRouteIds.map((id) => id.trim()).toList()
+          : <String>[];
+      if (normalizedRouteIds.any((id) => id.isEmpty)) {
+        throw ArgumentError('Route IDs must not be empty.');
+      }
+      if (normalizedRouteIds.toSet().length != normalizedRouteIds.length) {
+        throw ArgumentError('Route IDs must not contain duplicates.');
+      }
+      if (normalizedRole == 'seller' && normalizedRouteIds.isEmpty) {
+        throw ArgumentError(
+          'Seller accounts require at least one assigned route.',
+        );
+      }
 
       final trimmedEmail = email.trim().toLowerCase();
       final trimmedName = displayName.trim();
       final trimmedPassword = password.trim();
+      final trimmedPhone = phone?.trim();
       if (trimmedPassword.length < 8) {
         throw FirebaseAuthException(
           code: 'weak-password',
@@ -345,6 +407,25 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       final effectiveTenantId = TenantScope.requireTenant(owner.tenantId);
       if (requestedTenantId != null && requestedTenantId != effectiveTenantId) {
         throw StateError('Users must belong to the active workspace');
+      }
+      final db = FirebaseFirestore.instance;
+      final tenantRef = db
+          .collection(Collections.tenants)
+          .doc(effectiveTenantId);
+      final initialTenant = await tenantRef.get(
+        const GetOptions(source: Source.server),
+      );
+      final initialTenantData = initialTenant.data();
+      if (!initialTenant.exists ||
+          initialTenantData?['active'] != true ||
+          initialTenantData?['active_user_count'] is! int ||
+          initialTenantData?['max_active_users'] !=
+              TenantModel.freeSeatLimit) {
+        throw StateError('workspace_seat_count_initialization_required');
+      }
+      if ((initialTenantData!['active_user_count'] as int) >=
+          TenantModel.freeSeatLimit) {
+        throw StateError('workspace_seat_limit_reached');
       }
 
       // Use a secondary FirebaseApp so the admin stays signed in
@@ -367,45 +448,81 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         );
         final newUid = cred.user!.uid;
         createdUserId = newUid;
-
-        // Sign out immediately from the temp app (we only needed the UID)
-        await tempAuth.signOut();
-
-        // Write the Firestore profile + route assignment in a batch
-        final db = FirebaseFirestore.instance;
-        final batch = db.batch();
+        final userRef = db.collection(Collections.users).doc(newUid);
+        final routeRefs = normalizedRouteIds
+            .map((routeId) => db.collection(Collections.routes).doc(routeId))
+            .toList();
         final now = Timestamp.now();
+        try {
+          await db.runTransaction<void>((transaction) async {
+            final tenantSnapshot = await transaction.get(tenantRef);
+            final tenantData = tenantSnapshot.data();
+            if (!tenantSnapshot.exists ||
+                tenantData?['active'] != true ||
+                tenantData?['active_user_count'] is! int ||
+                tenantData?['max_active_users'] !=
+                    TenantModel.freeSeatLimit) {
+              throw StateError('workspace_seat_count_initialization_required');
+            }
+            final activeUserCount = tenantData!['active_user_count'] as int;
+            if (activeUserCount >= TenantModel.freeSeatLimit) {
+              throw StateError('workspace_seat_limit_reached');
+            }
 
-        batch.set(db.collection(Collections.users).doc(newUid), {
-          'email': trimmedEmail,
-          'display_name': trimmedName,
-          'role': normalizedRole,
-          'tenant_id': effectiveTenantId,
-          'assigned_route_ids': normalizedRole == 'seller'
-              ? assignedRouteIds
-              : [],
-          'assigned_route_names': normalizedRole == 'seller'
-              ? assignedRouteNames
-              : [],
-          'active': true,
-          'created_by': adminUid,
-          'created_at': now,
-          'updated_at': now,
-        });
+            for (final routeRef in routeRefs) {
+              final routeSnapshot = await transaction.get(routeRef);
+              if (!routeSnapshot.exists ||
+                  routeSnapshot.data()?['tenant_id'] != effectiveTenantId ||
+                  routeSnapshot.data()?['active'] != true) {
+                throw StateError('Seller route is unavailable.');
+              }
+            }
 
-        // Add this seller to each assigned route
-        if (normalizedRole == 'seller') {
-          for (final routeId in assignedRouteIds) {
-            if (routeId.trim().isEmpty) continue;
-            batch.update(db.collection(Collections.routes).doc(routeId), {
-              'assigned_seller_ids': FieldValue.arrayUnion([newUid]),
-              'assigned_seller_names': FieldValue.arrayUnion([trimmedName]),
+            transaction.set(userRef, {
+              'email': trimmedEmail,
+              'display_name': trimmedName,
+              'phone': (trimmedPhone == null || trimmedPhone.isEmpty)
+                  ? null
+                  : trimmedPhone,
+              'email_verified': false,
+              'role': normalizedRole,
+              'tenant_id': effectiveTenantId,
+              'assigned_route_ids': normalizedRouteIds,
+              'assigned_route_names': normalizedRole == 'seller'
+                  ? assignedRouteNames
+                  : [],
+              'active': true,
+              'created_by': adminUid,
+              'created_at': now,
               'updated_at': now,
             });
+            transaction.update(tenantRef, {
+              'active_user_count': activeUserCount + 1,
+              'seat_count_revision':
+                  ((tenantData['seat_count_revision'] as num?)?.toInt() ?? 0) +
+                  1,
+              'seat_change_user_id': newUid,
+              'seat_change_kind': 'add',
+              'updated_at': FieldValue.serverTimestamp(),
+            });
+            for (final routeRef in routeRefs) {
+              transaction.update(routeRef, {
+                'assigned_seller_ids': FieldValue.arrayUnion([newUid]),
+                'assigned_seller_names': FieldValue.arrayUnion([trimmedName]),
+                'updated_at': FieldValue.serverTimestamp(),
+              });
+            }
+          });
+        } on StateError catch (error) {
+          if (error.message == 'workspace_seat_limit_reached' ||
+              error.message == 'workspace_seat_count_initialization_required') {
+            await cred.user!.delete();
+            createdUserId = null;
           }
+          rethrow;
+        } finally {
+          await tempAuth.signOut();
         }
-
-        await batch.commit();
       } on FirebaseAuthException {
         rethrow; // Let AppErrorMapper handle auth errors (email-in-use, etc.)
       } finally {
@@ -594,34 +711,29 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     required List<String> routeNames,
     required String displayName,
   }) async {
-    await _requireAdminUid();
-    final trimmedUid = uid.trim();
-    if (trimmedUid.isEmpty) throw ArgumentError('uid must not be empty');
-
-    final db = FirebaseFirestore.instance;
-    final batch = db.batch();
-    final now = Timestamp.now();
-    final trimmedName = displayName.trim();
-
-    batch.update(db.collection(Collections.users).doc(trimmedUid), {
-      'active': true,
-      'assigned_route_ids': routeIds,
-      'assigned_route_names': routeNames,
-      'updated_at': now,
-    });
-
-    for (final routeId in routeIds) {
-      if (routeId.trim().isEmpty) continue;
-      batch.update(db.collection(Collections.routes).doc(routeId.trim()), {
-        'assigned_seller_ids': FieldValue.arrayUnion([trimmedUid]),
-        'assigned_seller_names': FieldValue.arrayUnion(
-          trimmedName.isNotEmpty ? [trimmedName] : [],
-        ),
-        'updated_at': now,
-      });
+    final target = await _requireManageableUser(uid);
+    if (target.target.active) {
+      throw StateError('Only inactive users can be reactivated.');
     }
-
-    await batch.commit();
+    if (target.target.role != UserRole.seller) {
+      throw StateError('Seller route assignments are required for reactivation.');
+    }
+    final normalizedRouteIds = routeIds.map((id) => id.trim()).toList();
+    if (normalizedRouteIds.isEmpty ||
+        normalizedRouteIds.any((routeId) => routeId.isEmpty) ||
+        normalizedRouteIds.toSet().length != normalizedRouteIds.length) {
+      throw ArgumentError('Seller accounts require valid assigned routes.');
+    }
+    final trimmedName = displayName.trim();
+    await _setUserActiveAtomically(
+      userId: target.target.id,
+      tenantId: target.tenantId,
+      adminIsSuperAdmin: target.admin.isSuperAdmin,
+      active: true,
+      displayName: trimmedName,
+      routeIdsToAssign: normalizedRouteIds,
+      routeNamesToAssign: routeNames,
+    );
   }
 
   /// Hard-deletes the Firestore profile of a deactivated user.

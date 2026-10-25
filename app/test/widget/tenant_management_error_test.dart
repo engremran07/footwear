@@ -75,6 +75,7 @@ void main() {
       id: 'alpha',
       name: 'Alpha',
       slug: 'alpha',
+      activeUserCount: 0,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     );
@@ -85,6 +86,8 @@ void main() {
       role: UserRole.superAdmin,
       active: true,
       activeWorkspaceId: tenant.id,
+      activeWorkspaceReason: 'Workspace owner audit',
+      activeWorkspaceSelectedAt: Timestamp.now(),
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     );
@@ -142,6 +145,7 @@ void main() {
         id: 'workspace-1',
         name: 'Workspace One',
         slug: 'workspace-one',
+        activeUserCount: 1,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       );
@@ -285,6 +289,7 @@ void main() {
       id: 'alpha',
       name: 'Alpha',
       slug: 'alpha',
+      activeUserCount: 0,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     );
@@ -296,6 +301,7 @@ void main() {
       active: true,
       activeWorkspaceId: tenant.id,
       activeWorkspaceReason: 'Workspace lifecycle audit',
+      activeWorkspaceSelectedAt: Timestamp.now(),
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     );
@@ -330,6 +336,7 @@ void main() {
       id: 'alpha',
       name: 'Alpha',
       slug: 'alpha',
+      activeUserCount: 0,
       active: false,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
@@ -342,6 +349,7 @@ void main() {
       active: true,
       activeWorkspaceId: tenant.id,
       activeWorkspaceReason: 'Workspace lifecycle audit',
+      activeWorkspaceSelectedAt: Timestamp.now(),
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     );

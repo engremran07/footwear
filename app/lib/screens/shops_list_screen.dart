@@ -968,7 +968,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         'name': tr('name', ref),
         'route': tr('route', ref),
         'all_routes': tr('all_routes', ref),
-      });
+      }, pair: settings.invoiceHeader.documentLanguagePair);
 
       // Flatten transactions into rows for Excel export
       final excelHeaders = [

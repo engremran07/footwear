@@ -1,5 +1,6 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:footwear_erp/core/l10n/financial_document_localization.dart';
 import 'package:footwear_erp/models/settings_model.dart';
 
 void main() {
@@ -16,6 +17,7 @@ void main() {
         'name_en': 'Test Company',
         'name_ar': 'شركة الاختبار',
         'phone': '+966500000000',
+        'document_language_pair': 'english_urdu',
         'template': 'classic',
         'accent_color': '#345678',
         'visible_fields': ['phone', 'email'],
@@ -35,6 +37,10 @@ void main() {
       expect(m.invoiceHeader.nameEn, 'Test Company');
       expect(m.invoiceHeader.nameAr, 'شركة الاختبار');
       expect(m.invoiceHeader.phone, '+966500000000');
+      expect(
+        m.invoiceHeader.documentLanguagePair,
+        FinancialDocumentLanguagePair.englishUrdu,
+      );
       expect(m.invoiceHeader.visibleFields, containsAll(['phone', 'email']));
     });
 
@@ -48,6 +54,10 @@ void main() {
       expect(m.logoBytes, isNull);
       expect(m.allowNonStockInvoices, isFalse);
       expect(m.invoiceHeader.nameEn, '');
+      expect(
+        m.invoiceHeader.documentLanguagePair,
+        FinancialDocumentLanguagePair.englishArabic,
+      );
     });
 
     test('invoice header snapshot includes tenant branding and logo', () {
@@ -56,6 +66,7 @@ void main() {
 
       expect(snapshot['name_en'], 'Test Company');
       expect(snapshot['name_ar'], 'شركة الاختبار');
+      expect(snapshot['document_language_pair'], 'english_urdu');
       expect(snapshot.containsKey('company_name'), isFalse);
       expect(snapshot['logo_base64'], 'aGVsbG8=');
     });
@@ -70,6 +81,16 @@ void main() {
       expect(settings.invoiceHeader.nameEn, 'Legacy Workspace');
       expect(settings.toJson().containsKey('company_name'), isFalse);
     });
+
+    test('ignores the retired reprint-header toggle', () {
+      final header = InvoiceHeaderConfig.fromJson({
+        'name_en': 'Saved Name',
+        'use_latest_header_on_reprint': false,
+      });
+
+      expect(header.nameEn, 'Saved Name');
+      expect(header.toJson(), isNot(contains('use_latest_header_on_reprint')));
+    });
   });
 
   group('SettingsModel.toJson', () {
@@ -82,6 +103,7 @@ void main() {
         invoiceHeader: const InvoiceHeaderConfig(
           nameEn: 'Workshop',
           nameAr: 'ورشة',
+          documentLanguagePair: FinancialDocumentLanguagePair.englishUrdu,
           phone: '+966511111111',
           visibleFields: {'phone', 'tax_number'},
         ),
@@ -96,6 +118,10 @@ void main() {
       expect(restored.allowNonStockInvoices, isFalse);
       expect(restored.invoiceHeader.nameEn, 'Workshop');
       expect(restored.invoiceHeader.nameAr, 'ورشة');
+      expect(
+        restored.invoiceHeader.documentLanguagePair,
+        FinancialDocumentLanguagePair.englishUrdu,
+      );
       expect(restored.invoiceHeader.visibleFields, {'phone', 'tax_number'});
     });
 

@@ -92,6 +92,15 @@ class AppErrorMapper {
       return 'err_export_no_data';
     }
     if (msg.contains('workspace-disabled')) return 'workspace_disabled';
+    if (msg.contains('workspace_seat_limit_reached')) {
+      return 'workspace_seat_limit_reached';
+    }
+    if (msg.contains('workspace_seat_count_initialization_required')) {
+      return 'workspace_seat_count_initialization_required';
+    }
+    if (msg.contains('workspace_support_context_expired')) {
+      return 'workspace_support_context_expired';
+    }
     if (msg.contains('pdf_arabic_shaping_disabled')) {
       return 'err_pdf_shaping_unavailable';
     }

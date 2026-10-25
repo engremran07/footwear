@@ -59,7 +59,7 @@ class _NotificationCenterScreenState
       return Scaffold(body: Center(child: Text(tr('no_access', ref))));
     }
 
-    final notifAsync = ref.watch(notificationsProvider);
+    final notifAsync = ref.watch(visibleNotificationsProvider);
     final unreadCount = ref.watch(unreadNotificationCountProvider);
 
     final theme = Theme.of(context);
@@ -128,7 +128,16 @@ class _NotificationCenterScreenState
   Future<void> _markAllRead() async {
     setState(() => _markingAllRead = true);
     try {
-      await ref.read(notificationNotifierProvider.notifier).markAllAsRead();
+      final visibleNotifications =
+          ref.read(visibleNotificationsProvider).value ?? const [];
+      await ref
+          .read(notificationNotifierProvider.notifier)
+          .markAllAsRead(
+            visibleNotifications
+                .where((notification) => !notification.read)
+                .map((notification) => notification.id)
+                .toSet(),
+          );
     } catch (error) {
       if (!mounted) return;
       final key = AppErrorMapper.key(error);

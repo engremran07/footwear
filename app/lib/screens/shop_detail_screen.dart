@@ -930,27 +930,31 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                               final accountCurrency =
                                   accountRoute?.currency ?? 'SAR';
                               if (!context.mounted) return;
-                              final labels = trilingualLabels(<String, String>{
-                                for (final k in const [
-                                  'date',
-                                  'description',
-                                  'debit',
-                                  'credit',
-                                  'running_balance',
-                                  'account_statement',
-                                  'opening_balance',
-                                  'net_payable',
-                                  'cash_in',
-                                  'cash_out',
-                                  'total_entries',
-                                  'page',
-                                  'report_date',
-                                  'generated_by',
-                                  'entry_by',
-                                  'duration',
-                                ])
-                                  k: tr(k, ref),
-                              });
+                              final labels = trilingualLabels(
+                                <String, String>{
+                                  for (final k in const [
+                                    'date',
+                                    'description',
+                                    'debit',
+                                    'credit',
+                                    'running_balance',
+                                    'account_statement',
+                                    'opening_balance',
+                                    'net_payable',
+                                    'cash_in',
+                                    'cash_out',
+                                    'total_entries',
+                                    'page',
+                                    'report_date',
+                                    'generated_by',
+                                    'entry_by',
+                                    'duration',
+                                  ])
+                                    k: tr(k, ref),
+                                },
+                                pair:
+                                    settings.invoiceHeader.documentLanguagePair,
+                              );
                               ExportSheet.show(
                                 context,
                                 ref,

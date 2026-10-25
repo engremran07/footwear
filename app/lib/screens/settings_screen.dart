@@ -1,16 +1,13 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/snack_helper.dart';
+import '../core/utils/workspace_logo_processor.dart';
 import '../models/settings_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
@@ -389,8 +386,8 @@ class _LogoCard extends ConsumerStatefulWidget {
 
 class _LogoCardState extends ConsumerState<_LogoCard> {
   bool _uploading = false;
-  Uint8List? _pendingBytes;
-  String? _pendingSizeLabel;
+  bool _processing = false;
+  ProcessedWorkspaceLogo? _pendingLogo;
   double? _uploadProgress;
 
   String _fmtBytes(int n) {
@@ -400,57 +397,41 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
   }
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      // Auto-optimise: image_picker resizes + JPEG-compresses before returning bytes.
-      // 256Ã—256 for a logo icon is sufficient; keeps Firestore doc size small.
-      maxWidth: 256,
-      maxHeight: 256,
-      imageQuality: 70,
-    );
-    if (picked == null) return;
-    var bytes = await picked.readAsBytes();
-
-    // Secondary compression via flutter_image_compress (S-07 hardening).
+    setState(() => _processing = true);
     try {
-      final compressed = await FlutterImageCompress.compressWithList(
-        bytes,
-        minWidth: 256,
-        minHeight: 256,
-        quality: 65,
-        format: CompressFormat.jpeg,
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery);
+      if (picked == null || !mounted) return;
+      final processed = await WorkspaceLogoProcessor.process(
+        await picked.readAsBytes(),
       );
-      bytes = compressed;
-    } catch (_) {
-      // Fall through with original bytes if compress fails.
-    }
-
-    // Hard guard: base64 encoding adds ~33%, so cap raw at 37 KB â†’ ~50 KB base64
-    const maxRawBytes = 37 * 1024;
-    if (bytes.lengthInBytes > maxRawBytes) {
+      if (mounted) setState(() => _pendingLogo = processed);
+    } on WorkspaceLogoProcessingException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          warningSnackBar(
-            tr(
-              'settings_logo_image_too_large',
-              ref,
-            ).replaceAll('%s', _fmtBytes(bytes.lengthInBytes)),
-          ),
-        );
+        final message = tr(error.code, ref)
+            .replaceAll(
+              '%s',
+              _fmtBytes(error.encodedLength ?? error.sourceBytes ?? 0),
+            )
+            .replaceAll('%1', error.width?.toString() ?? '')
+            .replaceAll('%2', error.height?.toString() ?? '');
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(message));
       }
-      return;
+    } catch (error, stackTrace) {
+      debugPrint('Workspace logo processing failed: $error\n$stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+      }
+    } finally {
+      if (mounted) setState(() => _processing = false);
     }
-
-    setState(() {
-      _pendingBytes = bytes;
-      _pendingSizeLabel = _fmtBytes(bytes.lengthInBytes);
-    });
   }
 
   Future<void> _confirmUpload() async {
-    final bytes = _pendingBytes;
-    if (bytes == null) return;
+    final logo = _pendingLogo;
+    if (logo == null) return;
     setState(() {
       _uploading = true;
       _uploadProgress = null; // null = indeterminate LinearProgressIndicator
@@ -458,37 +439,10 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
 
     try {
       if (!await _requireAdminSettingsAccess(context, ref)) return;
-      // Encode bytes as Base64 and store directly in Firestore.
-      // The settingsProvider real-time stream propagates the new logo to every
-      // connected device instantly â€” no Firebase Storage or CDN involved.
-      final encoded = base64Encode(bytes);
-
-      // S-07: Final base64 size cap â€” 50 KB max to keep Firestore reads cheap.
-      if (encoded.length > 50 * 1024) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            warningSnackBar(
-              tr(
-                'settings_logo_encoded_too_large',
-                ref,
-              ).replaceAll('%s', _fmtBytes(encoded.length)),
-            ),
-          );
-        }
-        setState(() => _uploading = false);
-        return;
-      }
-
-      await ref.read(settingsNotifierProvider.notifier).save({
-        'logo_base64': encoded,
-        'logo_url': null,
-      });
+      await ref.read(settingsNotifierProvider.notifier).saveProcessedLogo(logo);
 
       if (mounted) {
-        setState(() {
-          _pendingBytes = null;
-          _pendingSizeLabel = null;
-        });
+        setState(() => _pendingLogo = null);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(successSnackBar(tr('msg_logo_uploaded', ref)));
@@ -564,21 +518,23 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
             const SizedBox(height: 12),
 
             // â”€â”€ Image area: local preview / uploaded logo / placeholder â”€â”€
-            if (_pendingBytes != null) ...[
+            if (_pendingLogo != null) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Image.memory(
-                  _pendingBytes!,
+                  _pendingLogo!.pngBytes,
                   height: 80,
                   fit: BoxFit.contain,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                tr(
-                  'lbl_preview',
-                  ref,
-                ).replaceAll('%s', _pendingSizeLabel ?? ''),
+                tr('settings_logo_preview_details', ref)
+                    .replaceAll('%1', '${_pendingLogo!.width}')
+                    .replaceAll('%2', '${_pendingLogo!.height}')
+                    .replaceAll('%3', _fmtBytes(_pendingLogo!.base64.length))
+                    .replaceAll('%4', '${_pendingLogo!.sourceWidth}')
+                    .replaceAll('%5', '${_pendingLogo!.sourceHeight}'),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -615,11 +571,13 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
             const SizedBox(height: 12),
 
             // â”€â”€ Upload progress bar â”€â”€
-            if (_uploading) ...[
+            if (_processing || _uploading) ...[
               LinearProgressIndicator(value: _uploadProgress),
               const SizedBox(height: 6),
               Text(
-                _uploadProgress != null
+                _processing
+                    ? tr('settings_logo_processing', ref)
+                    : _uploadProgress != null
                     ? tr(
                         'settings_uploading_pct',
                         ref,
@@ -631,8 +589,8 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
             ],
 
             // â”€â”€ Action buttons â”€â”€
-            if (!_uploading)
-              if (_pendingBytes != null)
+            if (!_uploading && !_processing)
+              if (_pendingLogo != null)
                 // Confirm / discard flow
                 Wrap(
                   spacing: 12,
@@ -645,8 +603,7 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
                     ),
                     OutlinedButton(
                       onPressed: () => setState(() {
-                        _pendingBytes = null;
-                        _pendingSizeLabel = null;
+                        _pendingLogo = null;
                       }),
                       child: Text(tr('cancel', ref)),
                     ),

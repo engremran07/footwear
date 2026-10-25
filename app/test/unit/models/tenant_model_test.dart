@@ -11,6 +11,8 @@ void main() {
         name: 'Acme Shoes',
         slug: 'acme',
         plan: 'pro',
+        activeUserCount: 8,
+        maxActiveUsers: 10,
         active: true,
         isTrial: false,
         createdAt: ts,
@@ -29,6 +31,8 @@ void main() {
       expect(restored.name, original.name);
       expect(restored.slug, original.slug);
       expect(restored.plan, original.plan);
+      expect(restored.activeUserCount, original.activeUserCount);
+      expect(restored.maxActiveUsers, original.maxActiveUsers);
       expect(restored.active, original.active);
       expect(restored.isTrial, original.isTrial);
       expect(restored.createdAt, original.createdAt);
@@ -50,6 +54,8 @@ void main() {
       expect(m.active, isTrue);
       expect(m.isTrial, isFalse);
       expect(m.plan, isNull);
+      expect(m.activeUserCount, isNull);
+      expect(m.maxActiveUsers, TenantModel.freeSeatLimit);
       expect(m.ownerUserId, isNull);
       expect(m.archivedAt, isNull);
       expect(m.archivedBy, isNull);

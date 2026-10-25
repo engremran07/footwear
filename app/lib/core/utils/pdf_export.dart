@@ -7,6 +7,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../l10n/app_locale.dart';
+import '../l10n/financial_document_localization.dart';
 import '../../models/transaction_model.dart';
 import '../../models/invoice_model.dart';
 import '../../models/settings_model.dart';
@@ -114,6 +115,46 @@ String _s(String raw) => raw
     .replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]'), '')
     .replaceAll(RegExp(r'\s{2,}'), ' ')
     .trim();
+
+String _documentLabelWithSuffix(
+  String key,
+  String suffix,
+  FinancialDocumentLanguagePair pair,
+  AppLocale locale, {
+  String separator = ': ',
+}) => financialDocumentLabel(
+  key,
+  pair,
+  fallback: trRead(key, locale),
+).split('\n').map((line) => '$line$separator$suffix').join('\n');
+
+pw.Widget _pairedLabelText(
+  String text, {
+  required pw.TextStyle style,
+  pw.TextAlign align = pw.TextAlign.left,
+}) {
+  final lines = text.split('\n');
+  final crossAxisAlignment = switch (align) {
+    pw.TextAlign.center => pw.CrossAxisAlignment.center,
+    pw.TextAlign.right => pw.CrossAxisAlignment.end,
+    _ => pw.CrossAxisAlignment.start,
+  };
+  return pw.Column(
+    mainAxisSize: pw.MainAxisSize.min,
+    crossAxisAlignment: crossAxisAlignment,
+    children: [
+      for (final (index, line) in lines.indexed)
+        pw.Text(
+          line,
+          style: style,
+          textAlign: align,
+          textDirection: index == 0
+              ? pw.TextDirection.ltr
+              : pw.TextDirection.rtl,
+        ),
+    ],
+  );
+}
 
 /// Returns true when [text] contains Arabic/Urdu script characters.
 /// Used to auto-apply RTL direction to individual cells regardless of locale.
@@ -263,51 +304,68 @@ pw.Widget _workspaceBrandHeader({
   Uint8List? logoBytes,
 }) {
   final locale = localeConfig.locale;
-  final rtl = localeConfig.isRtl;
+  final pair = header.documentLanguagePair;
   final accent = _invoiceAccentColor(header.accentColor);
-  final localizedName = switch (locale) {
-    AppLocale.en => header.nameEn,
-    AppLocale.ar =>
-      header.nameAr.trim().isNotEmpty ? header.nameAr : header.nameEn,
-    AppLocale.ur =>
-      header.nameUr.trim().isNotEmpty
-          ? header.nameUr
-          : header.nameAr.trim().isNotEmpty
-          ? header.nameAr
-          : header.nameEn,
-  };
-  final primaryName = localizedName.trim().isNotEmpty
-      ? localizedName.trim()
+  final rtlName = pair == FinancialDocumentLanguagePair.englishArabic
+      ? header.nameAr.trim()
+      : header.nameUr.trim();
+  final primaryName = header.nameEn.trim().isNotEmpty
+      ? header.nameEn.trim()
       : fallbackName.trim();
   final otherNames = <(String, pw.TextDirection)>[
-    (header.nameEn.trim(), pw.TextDirection.ltr),
-    (header.nameAr.trim(), pw.TextDirection.rtl),
-    (header.nameUr.trim(), pw.TextDirection.rtl),
-  ].where((entry) => entry.$1.isNotEmpty && entry.$1 != primaryName);
-  final subtitle = rtl
-      ? (header.subtitleAr.trim().isNotEmpty
-            ? header.subtitleAr
-            : header.subtitleUr)
-      : header.subtitleEn;
-  final address = rtl
-      ? (header.addressAr.trim().isNotEmpty
-            ? header.addressAr
-            : header.addressUr)
-      : header.addressEn;
-  final details = <String>[
-    if (header.visibleFields.contains('phone') && header.phone.isNotEmpty)
-      '${trRead('phone', locale)}: ${_s(header.phone)}',
-    if (header.visibleFields.contains('email') && header.email.isNotEmpty)
-      '${trRead('email', locale)}: ${_s(header.email)}',
-    if (header.visibleFields.contains('tax_number') &&
-        header.taxNumber.isNotEmpty)
-      '${trRead('tax_registration_number', locale)}: ${_s(header.taxNumber)}',
-    if (header.visibleFields.contains('commercial_registration_number') &&
-        header.commercialRegistrationNumber.isNotEmpty)
-      '${trRead('commercial_registration_number', locale)}: '
-          '${_s(header.commercialRegistrationNumber)}',
+    if (rtlName.isNotEmpty && rtlName != primaryName)
+      (rtlName, pw.TextDirection.rtl),
   ];
-  final textDirection = localeConfig.dir;
+  final rtlSubtitle = pair == FinancialDocumentLanguagePair.englishArabic
+      ? header.subtitleAr.trim()
+      : header.subtitleUr.trim();
+  final rtlAddress = pair == FinancialDocumentLanguagePair.englishArabic
+      ? header.addressAr.trim()
+      : header.addressUr.trim();
+  final details = <(String, pw.TextDirection)>[];
+  void addDetail(String key, String value) {
+    final labels = financialDocumentLabel(
+      key,
+      pair,
+      fallback: trRead(key, locale),
+    ).split('\n');
+    for (var index = 0; index < labels.length; index++) {
+      details.add((
+        '${labels[index]}: ${_s(value)}',
+        index == 0 ? pw.TextDirection.ltr : pw.TextDirection.rtl,
+      ));
+    }
+  }
+
+  if (header.visibleFields.contains('phone') && header.phone.isNotEmpty) {
+    addDetail('phone', header.phone);
+  }
+  if (header.visibleFields.contains('email') && header.email.isNotEmpty) {
+    addDetail('email', header.email);
+  }
+  if (header.visibleFields.contains('tax_number') &&
+      header.taxNumber.isNotEmpty) {
+    addDetail('tax_registration_number', header.taxNumber);
+  }
+  if (header.visibleFields.contains('commercial_registration_number') &&
+      header.commercialRegistrationNumber.isNotEmpty) {
+    addDetail(
+      'commercial_registration_number',
+      header.commercialRegistrationNumber,
+    );
+  }
+  final contentLines = <(String, pw.TextDirection)>[
+    if (header.visibleFields.contains('subtitle') &&
+        header.subtitleEn.trim().isNotEmpty)
+      (header.subtitleEn.trim(), pw.TextDirection.ltr),
+    if (header.visibleFields.contains('subtitle') && rtlSubtitle.isNotEmpty)
+      (rtlSubtitle, pw.TextDirection.rtl),
+    if (header.visibleFields.contains('address') &&
+        header.addressEn.trim().isNotEmpty)
+      (header.addressEn.trim(), pw.TextDirection.ltr),
+    if (header.visibleFields.contains('address') && rtlAddress.isNotEmpty)
+      (rtlAddress, pw.TextDirection.rtl),
+  ];
 
   return pw.Container(
     width: double.infinity,
@@ -339,8 +397,8 @@ pw.Widget _workspaceBrandHeader({
                   fw: pw.FontWeight.bold,
                   color: accent,
                 ),
-                textDirection: _cellDir(primaryName, textDirection),
-                textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
+                textDirection: pw.TextDirection.ltr,
+                textAlign: pw.TextAlign.left,
               ),
               for (final (name, direction) in otherNames)
                 pw.Text(
@@ -351,28 +409,23 @@ pw.Widget _workspaceBrandHeader({
                       ? pw.TextAlign.right
                       : pw.TextAlign.left,
                 ),
-              if (header.visibleFields.contains('subtitle') &&
-                  subtitle.trim().isNotEmpty)
+              for (final (line, direction) in contentLines)
                 pw.Text(
-                  _s(subtitle),
+                  _s(line),
                   style: localeConfig.ts(size: 8),
-                  textDirection: _cellDir(subtitle, textDirection),
-                  textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
+                  textDirection: direction,
+                  textAlign: direction == pw.TextDirection.rtl
+                      ? pw.TextAlign.right
+                      : pw.TextAlign.left,
                 ),
-              if (header.visibleFields.contains('address') &&
-                  address.trim().isNotEmpty)
-                pw.Text(
-                  _s(address),
-                  style: localeConfig.ts(size: 8),
-                  textDirection: _cellDir(address, textDirection),
-                  textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
-                ),
-              for (final detail in details)
+              for (final (detail, direction) in details)
                 pw.Text(
                   detail,
                   style: localeConfig.ts(size: 7, color: PdfColors.grey700),
-                  textDirection: _cellDir(detail, textDirection),
-                  textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
+                  textDirection: direction,
+                  textAlign: direction == pw.TextDirection.rtl
+                      ? pw.TextAlign.right
+                      : pw.TextAlign.left,
                 ),
             ],
           ),
@@ -552,6 +605,17 @@ String _fmtAmt(double v) => v.toStringAsFixed(2);
 String _fmtAmtC(double v, String currency) => currency.isEmpty
     ? v.toStringAsFixed(2)
     : '${v.toStringAsFixed(2)} $currency';
+
+InvoiceHeaderConfig resolveInvoiceHeaderForPrint({
+  required InvoiceModel invoice,
+  InvoiceHeaderConfig? currentHeader,
+}) {
+  if (currentHeader != null) return currentHeader;
+  if (invoice.headerSnapshot.isNotEmpty) {
+    return InvoiceHeaderConfig.fromJson(invoice.headerSnapshot);
+  }
+  return const InvoiceHeaderConfig();
+}
 
 class LedgerSummary {
   final double totalDebit;
@@ -762,7 +826,7 @@ Future<Uint8List> buildPdfLedger({
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Text(
+                    _pairedLabelText(
                       _pdfLabel(labels, 'account_statement', locale),
                       style: ts(
                         size: 11,
@@ -771,21 +835,18 @@ Future<Uint8List> buildPdfLedger({
                           header?.accentColor ?? '#315C4C',
                         ),
                       ),
-                      textDirection: dir,
                     ),
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
-                        pw.Text(
+                        _pairedLabelText(
                           '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(now)}',
                           style: ts(size: 8, color: PdfColors.grey700),
-                          textDirection: dir,
                         ),
                         if (generatedBy.isNotEmpty)
-                          pw.Text(
+                          _pairedLabelText(
                             '${_pdfLabel(labels, 'generated_by', locale)}: ${_s(generatedBy)}',
                             style: ts(size: 8, color: PdfColors.grey700),
-                            textDirection: dir,
                           ),
                       ],
                     ),
@@ -813,10 +874,9 @@ Future<Uint8List> buildPdfLedger({
                         width: 0.5,
                       ),
                     ),
-                    child: pw.Text(
+                    child: _pairedLabelText(
                       '${_pdfLabel(labels, 'duration', locale)}: ${_fmtDate(dateFrom)} — ${_fmtDate(dateTo)}',
                       style: ts(size: 8, color: PdfColors.grey700),
-                      textDirection: dir,
                     ),
                   ),
                 pw.SizedBox(height: 8),
@@ -872,10 +932,9 @@ Future<Uint8List> buildPdfLedger({
                   ),
                 ),
                 pw.SizedBox(height: 4),
-                pw.Text(
+                _pairedLabelText(
                   '${_pdfLabel(labels, 'total_entries', locale)}: $entryCount',
                   style: ts(size: 8, color: PdfColors.grey600),
-                  textDirection: dir,
                 ),
                 pw.SizedBox(height: 8),
                 _buildLedgerHeaderRow(
@@ -904,7 +963,7 @@ Future<Uint8List> buildPdfLedger({
             pw.Divider(thickness: 0.5, color: PdfColors.grey400),
             pw.Align(
               alignment: pw.Alignment.centerRight,
-              child: pw.Text(
+              child: _pairedLabelText(
                 '${_pdfLabel(labels, 'page', locale)} ${ctx.pageNumber} / ${ctx.pagesCount}',
                 style: ts(size: 7, color: PdfColors.grey500),
               ),
@@ -1035,7 +1094,7 @@ pw.Widget _summaryCell({
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
-          pw.Text(
+          _pairedLabelText(
             label,
             style: pw.TextStyle(
               fontSize: 7,
@@ -1043,8 +1102,7 @@ pw.Widget _summaryCell({
               font: primaryFont,
               fontFallback: ff,
             ),
-            textAlign: pw.TextAlign.center,
-            textDirection: _cellDir(label, direction),
+            align: pw.TextAlign.center,
           ),
           pw.SizedBox(height: 2),
           pw.Text(
@@ -1094,7 +1152,7 @@ pw.Widget _buildLedgerHeaderRow(
               right: const pw.BorderSide(color: PdfColors.blue300, width: 0.5),
             ),
           ),
-          child: pw.Text(
+          child: _pairedLabelText(
             labels[i],
             style: pw.TextStyle(
               fontSize: 8,
@@ -1103,8 +1161,7 @@ pw.Widget _buildLedgerHeaderRow(
               font: primaryFont,
               fontFallback: ff,
             ),
-            textAlign: pw.TextAlign.center,
-            textDirection: _cellDir(labels[i], dir),
+            align: pw.TextAlign.center,
           ),
         );
       }),
@@ -1555,29 +1612,24 @@ Future<Uint8List> generateInvoicePdf({
   AppLocale locale = AppLocale.en,
   Uint8List? logoBytes,
   InvoiceHeaderConfig? header,
-  bool useLatestHeader = false,
 }) async {
   await _ensureFontBytes();
   final aB = _arabicFontBytes!, uB = _urduFontBytes!;
-  final savedHeaderConfig = InvoiceHeaderConfig.fromJson(
-    invoice.headerSnapshot,
+  final headerConfig = resolveInvoiceHeaderForPrint(
+    invoice: invoice,
+    currentHeader: header,
   );
-  final headerConfig = useLatestHeader && header != null
-      ? header
-      : invoice.headerSnapshot.isNotEmpty
-      ? savedHeaderConfig
-      : header ?? const InvoiceHeaderConfig();
   final savedCompanyName =
       (invoice.headerSnapshot['company_name'] as String?)?.trim() ?? '';
   final displayCompanyName = headerConfig.nameEn.trim().isNotEmpty
       ? headerConfig.nameEn.trim()
-      : useLatestHeader && companyName.trim().isNotEmpty
+      : header != null && companyName.trim().isNotEmpty
       ? companyName.trim()
       : savedCompanyName.isNotEmpty
       ? savedCompanyName
       : companyName;
   var effectiveLogoBytes = logoBytes;
-  if (invoice.headerSnapshot.isNotEmpty && !useLatestHeader) {
+  if (header == null && invoice.headerSnapshot.isNotEmpty) {
     final savedLogo = invoice.headerSnapshot['logo_base64'] as String?;
     try {
       effectiveLogoBytes = savedLogo == null ? null : base64Decode(savedLogo);
@@ -1586,42 +1638,30 @@ Future<Uint8List> generateInvoicePdf({
     }
   }
   final accentColor = _invoiceAccentColor(headerConfig.accentColor);
-  final lblSubtotal = trRead('subtotal', locale);
-  final lblDiscount = trRead('discount', locale);
-  final lblNotes = trRead('notes', locale);
-  final lblInvoiceTitle = trRead('invoice_title', locale);
-  final lblCreditNote = trRead('credit_note', locale);
-  final lblDate = trRead('date', locale);
-  final lblShop = trRead('shop', locale);
-  final lblItem = trRead('item_number', locale);
-  final lblSize = trRead('size', locale);
-  final lblColor = trRead('color', locale);
-  final lblQty = trRead('qty', locale);
-  final lblUnitPrice = trRead('unit_price', locale);
-  final lblTotal = trRead('total', locale);
-  final lblReference = trRead('reference', locale);
-  final lblVoid = trRead('void', locale);
-  final lblReceivedFrom = trRead('received_from', locale);
-  final lblReceipt = trRead('cash_receipt', locale);
-  final lblAmountReceived = trRead('amount_received', locale);
-  final lblPaymentMethod = trRead('payment_method', locale);
-  final lblPaymentReference = trRead('payment_reference', locale);
-  final lblBalanceBefore = trRead('balance_before', locale);
-  final lblBalanceAfter = trRead('balance_after', locale);
-  final lblReceivedBy = trRead('received_by', locale);
-  final lblSignature = trRead('signature', locale);
-  final lblPhone = trRead('phone', locale);
-  final lblEmail = trRead('email', locale);
-  final lblTaxNumber = trRead('tax_registration_number', locale);
-  final lblCommercialRegistration = trRead(
-    'commercial_registration_number',
-    locale,
+  String label(String key) => financialDocumentLabel(
+    key,
+    headerConfig.documentLanguagePair,
+    fallback: trRead(key, locale),
   );
-  final lblPrintDate = trRead('print_date', locale);
+  final lblSubtotal = label('subtotal');
+  final lblDiscount = label('discount');
+  final lblNotes = label('notes');
+  final lblInvoiceTitle = label('invoice_title');
+  final lblCreditNote = label('credit_note');
+  final lblItem = label('item_number');
+  final lblSize = label('size');
+  final lblColor = label('color');
+  final lblQty = label('qty');
+  final lblUnitPrice = label('unit_price');
+  final lblTotal = label('total');
+  final lblVoid = label('void');
+  final lblReceipt = label('cash_receipt');
+  final lblAmountReceived = label('amount_received');
+  final lblSignature = label('signature');
   final paymentMethodLabel = switch (invoice.paymentMethod) {
-    'cash' => trRead('payment_method_cash', locale),
-    'bank_transfer' => trRead('payment_method_bank_transfer', locale),
-    'cheque' => trRead('payment_method_cheque', locale),
+    'cash' => label('payment_method_cash'),
+    'bank_transfer' => label('payment_method_bank_transfer'),
+    'cheque' => label('payment_method_cheque'),
     _ => null,
   };
   return _pdfCompute(() {
@@ -1641,6 +1681,63 @@ Future<Uint8List> generateInvoicePdf({
       PdfColor color = PdfColors.black,
     }) => lc.ts(size: size, fw: fw, color: color);
     final currencyLabel = lc.currencyStr;
+    final pair = headerConfig.documentLanguagePair;
+    pw.Widget pairedLabel(
+      String text, {
+      required pw.TextStyle style,
+      pw.TextAlign align = pw.TextAlign.left,
+    }) {
+      final lines = text.split('\n');
+      final crossAxisAlignment = switch (align) {
+        pw.TextAlign.center => pw.CrossAxisAlignment.center,
+        pw.TextAlign.right => pw.CrossAxisAlignment.end,
+        _ => pw.CrossAxisAlignment.start,
+      };
+      return pw.Column(
+        mainAxisSize: pw.MainAxisSize.min,
+        crossAxisAlignment: crossAxisAlignment,
+        children: [
+          for (final (index, line) in lines.indexed)
+            pw.Text(
+              line,
+              style: style,
+              textAlign: align,
+              textDirection: index == 0
+                  ? pw.TextDirection.ltr
+                  : pw.TextDirection.rtl,
+            ),
+        ],
+      );
+    }
+
+    pw.Widget receiptBalanceMetric(
+      String key,
+      double? amount, {
+      bool emphasize = false,
+    }) {
+      return pw.Expanded(
+        child: pw.Column(
+          children: [
+            pairedLabel(
+              label(key),
+              style: ts(size: 7, color: PdfColors.grey700),
+              align: pw.TextAlign.center,
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              amount == null ? '—' : _fmtAmtC(amount, currency),
+              textAlign: pw.TextAlign.center,
+              textDirection: _amountDir,
+              style: ts(
+                size: emphasize ? 10 : 9,
+                fw: pw.FontWeight.bold,
+                color: emphasize ? accentColor : PdfColors.black,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     final date = invoice.createdAt.toDate();
     final dateStr = _fmtDate(date);
@@ -1651,7 +1748,7 @@ Future<Uint8List> generateInvoicePdf({
         : isCreditNote
         ? lblCreditNote
         : invoice.isNonStockSale
-        ? trRead('invoice_non_stock_mode', locale)
+        ? label('invoice_non_stock_mode')
         : lblInvoiceTitle;
     final printAt = DateTime.now();
     final printDateTime =
@@ -1676,10 +1773,14 @@ Future<Uint8List> generateInvoicePdf({
                   style: ts(size: 7, color: PdfColors.grey500),
                   textDirection: _cellDir(displayCompanyName, dir),
                 ),
-                pw.Text(
-                  '$lblPrintDate: $printDateTime  |  ${trRead('page_x_of_y', locale).replaceAll('%1', '${ctx.pageNumber}').replaceAll('%2', '${ctx.pagesCount}')}',
+                pairedLabel(
+                  _documentLabelWithSuffix(
+                    'print_date',
+                    '$printDateTime  |  ${label('page_x_of_y').replaceAll('%1', '${ctx.pageNumber}').replaceAll('%2', '${ctx.pagesCount}')}',
+                    pair,
+                    locale,
+                  ),
                   style: ts(size: 7, color: PdfColors.grey600),
-                  textDirection: dir,
                 ),
               ],
             ),
@@ -1703,22 +1804,19 @@ Future<Uint8List> generateInvoicePdf({
                     ? pw.TextDirection.rtl
                     : pw.TextDirection.ltr;
                 final primaryName = rtl
-                    ? (locale == AppLocale.ur
-                          ? headerConfig.nameUr
-                          : headerConfig.nameAr)
+                    ? (pair == FinancialDocumentLanguagePair.englishArabic
+                          ? headerConfig.nameAr
+                          : headerConfig.nameUr)
                     : displayCompanyName;
-                final secondaryName = rtl && locale != AppLocale.ur
-                    ? headerConfig.nameUr
-                    : '';
                 final subtitle = rtl
-                    ? (locale == AppLocale.ur
-                          ? headerConfig.subtitleUr
-                          : headerConfig.subtitleAr)
+                    ? (pair == FinancialDocumentLanguagePair.englishArabic
+                          ? headerConfig.subtitleAr
+                          : headerConfig.subtitleUr)
                     : headerConfig.subtitleEn;
                 final address = rtl
-                    ? (locale == AppLocale.ur
-                          ? headerConfig.addressUr
-                          : headerConfig.addressAr)
+                    ? (pair == FinancialDocumentLanguagePair.englishArabic
+                          ? headerConfig.addressAr
+                          : headerConfig.addressUr)
                     : headerConfig.addressEn;
                 final lines = <pw.Widget>[];
                 if (primaryName.trim().isNotEmpty) {
@@ -1731,16 +1829,6 @@ Future<Uint8List> generateInvoicePdf({
                       ),
                       textDirection: _cellDir(primaryName, brandDirection),
                       textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
-                    ),
-                  );
-                }
-                if (secondaryName.trim().isNotEmpty) {
-                  lines.add(
-                    pw.Text(
-                      _s(secondaryName),
-                      style: ts(size: 10, fw: pw.FontWeight.bold),
-                      textDirection: pw.TextDirection.rtl,
-                      textAlign: pw.TextAlign.right,
                     ),
                   );
                 }
@@ -1766,31 +1854,46 @@ Future<Uint8List> generateInvoicePdf({
                     ),
                   );
                 }
-                for (final field in [
-                  if (headerConfig.visibleFields.contains('phone') &&
-                      headerConfig.phone.trim().isNotEmpty)
-                    '$lblPhone: ${_s(headerConfig.phone)}',
-                  if (headerConfig.visibleFields.contains('email') &&
-                      headerConfig.email.trim().isNotEmpty)
-                    '$lblEmail: ${_s(headerConfig.email)}',
-                  if (headerConfig.visibleFields.contains('tax_number') &&
-                      headerConfig.taxNumber.trim().isNotEmpty)
-                    '$lblTaxNumber: ${_s(headerConfig.taxNumber)}',
-                  if (headerConfig.visibleFields.contains(
-                        'commercial_registration_number',
-                      ) &&
-                      headerConfig.commercialRegistrationNumber
-                          .trim()
-                          .isNotEmpty)
-                    '$lblCommercialRegistration: ${_s(headerConfig.commercialRegistrationNumber)}',
-                ]) {
-                  lines.add(
-                    pw.Text(
-                      field,
-                      style: ts(size: 7, color: PdfColors.grey800),
-                      textDirection: _cellDir(field, brandDirection),
-                      textAlign: rtl ? pw.TextAlign.right : pw.TextAlign.left,
-                    ),
+                void addField(String key, String value) {
+                  for (final (index, fieldLabel) in label(
+                    key,
+                  ).split('\n').indexed) {
+                    lines.add(
+                      pw.Text(
+                        '$fieldLabel: ${_s(value)}',
+                        style: ts(size: 7, color: PdfColors.grey800),
+                        textDirection: index == 0
+                            ? pw.TextDirection.ltr
+                            : pw.TextDirection.rtl,
+                        textAlign: index == 0
+                            ? pw.TextAlign.left
+                            : pw.TextAlign.right,
+                      ),
+                    );
+                  }
+                }
+
+                if (headerConfig.visibleFields.contains('phone') &&
+                    headerConfig.phone.trim().isNotEmpty) {
+                  addField('phone', headerConfig.phone);
+                }
+                if (headerConfig.visibleFields.contains('email') &&
+                    headerConfig.email.trim().isNotEmpty) {
+                  addField('email', headerConfig.email);
+                }
+                if (headerConfig.visibleFields.contains('tax_number') &&
+                    headerConfig.taxNumber.trim().isNotEmpty) {
+                  addField('tax_registration_number', headerConfig.taxNumber);
+                }
+                if (headerConfig.visibleFields.contains(
+                      'commercial_registration_number',
+                    ) &&
+                    headerConfig.commercialRegistrationNumber
+                        .trim()
+                        .isNotEmpty) {
+                  addField(
+                    'commercial_registration_number',
+                    headerConfig.commercialRegistrationNumber,
                   );
                 }
                 return pw.Column(
@@ -1802,15 +1905,14 @@ Future<Uint8List> generateInvoicePdf({
               final metadata = pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  pw.Text(
+                  pairedLabel(
                     docTitle,
                     style: ts(
                       size: 12,
                       fw: pw.FontWeight.bold,
                       color: isCreditNote ? PdfColors.green800 : accentColor,
                     ),
-                    textAlign: pw.TextAlign.center,
-                    textDirection: dir,
+                    align: pw.TextAlign.center,
                   ),
                   pw.Text(
                     invoice.invoiceNumber,
@@ -1818,15 +1920,14 @@ Future<Uint8List> generateInvoicePdf({
                     textAlign: pw.TextAlign.center,
                     textDirection: dir,
                   ),
-                  pw.Text(
-                    '$lblDate: $dateStr',
+                  pairedLabel(
+                    _documentLabelWithSuffix('date', dateStr, pair, locale),
                     style: ts(size: 8, color: PdfColors.grey700),
-                    textAlign: pw.TextAlign.center,
-                    textDirection: dir,
+                    align: pw.TextAlign.center,
                   ),
                   if (invoice.status == 'void')
-                    pw.Text(
-                      lblVoid.toUpperCase(),
+                    pairedLabel(
+                      lblVoid,
                       style: ts(
                         size: 12,
                         fw: pw.FontWeight.bold,
@@ -1893,34 +1994,44 @@ Future<Uint8List> generateInvoicePdf({
             child: pw.Column(
               crossAxisAlignment: align,
               children: [
-                pw.Text(
-                  '${isCashReceipt ? lblReceivedFrom : lblShop}: ${_s(invoice.shopName)}',
+                pairedLabel(
+                  _documentLabelWithSuffix(
+                    isCashReceipt ? 'received_from' : 'shop',
+                    _s(invoice.shopName),
+                    pair,
+                    locale,
+                  ),
                   style: ts(size: 10, fw: pw.FontWeight.bold),
-                  textDirection: _cellDir(invoice.shopName, dir),
                 ),
-                if (isCashReceipt && paymentMethodLabel != null)
-                  pw.Text(
-                    '$lblPaymentMethod: $paymentMethodLabel',
+                if (isCashReceipt && invoice.cashReceiptSequence != null)
+                  pairedLabel(
+                    _documentLabelWithSuffix(
+                      'receipt_sequence',
+                      invoice.cashReceiptSequence.toString(),
+                      pair,
+                      locale,
+                    ),
                     style: ts(size: 8),
-                    textDirection: dir,
+                  ),
+                if (isCashReceipt && paymentMethodLabel != null)
+                  pairedLabel(
+                    _documentLabelWithSuffix(
+                      'payment_method',
+                      paymentMethodLabel,
+                      pair,
+                      locale,
+                    ),
+                    style: ts(size: 8),
                   ),
                 if (isCashReceipt && invoice.paymentReference != null)
-                  pw.Text(
-                    '$lblPaymentReference: ${_s(invoice.paymentReference!)}',
+                  pairedLabel(
+                    _documentLabelWithSuffix(
+                      'payment_reference',
+                      _s(invoice.paymentReference!),
+                      pair,
+                      locale,
+                    ),
                     style: ts(size: 8),
-                    textDirection: dir,
-                  ),
-                if (isCashReceipt && invoice.shopBalanceBefore != null)
-                  pw.Text(
-                    '$lblBalanceBefore: ${_fmtAmtC(invoice.shopBalanceBefore!, currency)}',
-                    style: ts(size: 8),
-                    textDirection: dir,
-                  ),
-                if (isCashReceipt && invoice.shopBalanceAfter != null)
-                  pw.Text(
-                    '$lblBalanceAfter: ${_fmtAmtC(invoice.shopBalanceAfter!, currency)}',
-                    style: ts(size: 8, fw: pw.FontWeight.bold),
-                    textDirection: dir,
                   ),
               ],
             ),
@@ -1967,7 +2078,7 @@ Future<Uint8List> generateInvoicePdf({
                                 horizontal: 4,
                                 vertical: 5,
                               ),
-                              child: pw.Text(
+                              child: pairedLabel(
                                 h,
                                 style: pw.TextStyle(
                                   fontSize: 8,
@@ -1976,8 +2087,7 @@ Future<Uint8List> generateInvoicePdf({
                                   font: primaryFont,
                                   fontFallback: ff,
                                 ),
-                                textAlign: pw.TextAlign.center,
-                                textDirection: dir,
+                                align: pw.TextAlign.center,
                               ),
                             ),
                           )
@@ -2046,11 +2156,10 @@ Future<Uint8List> generateInvoicePdf({
               ),
               child: pw.Column(
                 children: [
-                  pw.Text(
+                  pairedLabel(
                     lblAmountReceived,
                     style: ts(size: 10, color: PdfColors.grey700),
-                    textDirection: dir,
-                    textAlign: pw.TextAlign.center,
+                    align: pw.TextAlign.center,
                   ),
                   pw.SizedBox(height: 4),
                   pw.Row(
@@ -2076,6 +2185,48 @@ Future<Uint8List> generateInvoicePdf({
                 ],
               ),
             ),
+            if (invoice.shopBalanceBefore != null ||
+                invoice.shopBalanceAfter != null) ...[
+              pw.SizedBox(height: 10),
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(10),
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.grey100,
+                  border: pw.Border.all(color: accentColor, width: 0.8),
+                  borderRadius: pw.BorderRadius.circular(5),
+                ),
+                child: pw.Column(
+                  children: [
+                    pairedLabel(
+                      label('receipt_balance_movement'),
+                      style: ts(size: 9, fw: pw.FontWeight.bold),
+                      align: pw.TextAlign.center,
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Row(
+                      children: [
+                        receiptBalanceMetric(
+                          'balance_before',
+                          invoice.shopBalanceBefore,
+                        ),
+                        pw.SizedBox(width: 8),
+                        receiptBalanceMetric(
+                          'amount_received',
+                          invoice.total,
+                          emphasize: true,
+                        ),
+                        pw.SizedBox(width: 8),
+                        receiptBalanceMetric(
+                          'balance_after',
+                          invoice.shopBalanceAfter,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
             pw.SizedBox(height: 14),
             pw.Row(
               children: [
@@ -2083,17 +2234,20 @@ Future<Uint8List> generateInvoicePdf({
                   child: pw.Column(
                     crossAxisAlignment: align,
                     children: [
-                      pw.Text(
-                        '$lblReceivedBy: ${_s(invoice.sellerName)}',
+                      pairedLabel(
+                        _documentLabelWithSuffix(
+                          'received_by',
+                          _s(invoice.sellerName),
+                          pair,
+                          locale,
+                        ),
                         style: ts(size: 8, fw: pw.FontWeight.bold),
-                        textDirection: _cellDir(invoice.sellerName, dir),
                       ),
                       pw.SizedBox(height: 24),
                       pw.Divider(color: PdfColors.grey500, thickness: 0.5),
-                      pw.Text(
+                      pairedLabel(
                         lblSignature,
                         style: ts(size: 7, color: PdfColors.grey600),
-                        textDirection: dir,
                       ),
                     ],
                   ),
@@ -2106,10 +2260,14 @@ Future<Uint8List> generateInvoicePdf({
                       pw.SizedBox(height: 12),
                       pw.SizedBox(height: 24),
                       pw.Divider(color: PdfColors.grey500, thickness: 0.5),
-                      pw.Text(
-                        '$lblReceivedFrom: ${_s(invoice.shopName)}',
+                      pairedLabel(
+                        _documentLabelWithSuffix(
+                          'received_from',
+                          _s(invoice.shopName),
+                          pair,
+                          locale,
+                        ),
                         style: ts(size: 7, color: PdfColors.grey600),
-                        textDirection: _cellDir(invoice.shopName, dir),
                       ),
                     ],
                   ),
@@ -2129,11 +2287,7 @@ Future<Uint8List> generateInvoicePdf({
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text(
-                          lblSubtotal,
-                          style: ts(size: 9),
-                          textDirection: dir,
-                        ),
+                        pairedLabel(lblSubtotal, style: ts(size: 9)),
                         pw.Text(
                           _fmtAmt(invoice.subtotal),
                           style: ts(size: 9),
@@ -2146,10 +2300,9 @@ Future<Uint8List> generateInvoicePdf({
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
-                          pw.Text(
+                          pairedLabel(
                             lblDiscount,
                             style: ts(size: 9, color: PdfColors.green700),
-                            textDirection: dir,
                           ),
                           pw.Text(
                             '-${_fmtAmt(invoice.discount)}',
@@ -2163,10 +2316,15 @@ Future<Uint8List> generateInvoicePdf({
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text(
-                          '$lblTotal $currencyLabel',
+                        pairedLabel(
+                          _documentLabelWithSuffix(
+                            'total',
+                            currencyLabel,
+                            pair,
+                            locale,
+                            separator: ' ',
+                          ),
                           style: ts(size: 11, fw: pw.FontWeight.bold),
-                          textDirection: dir,
                         ),
                         pw.Text(
                           _fmtAmt(invoice.total),
@@ -2182,15 +2340,23 @@ Future<Uint8List> generateInvoicePdf({
           pw.SizedBox(height: 14),
 
           if (invoice.notes != null && invoice.notes!.isNotEmpty) ...[
-            pw.Text('$lblNotes:', style: ts(size: 9, fw: pw.FontWeight.bold)),
+            pairedLabel(
+              lblNotes.split('\n').map((line) => '$line:').join('\n'),
+              style: ts(size: 9, fw: pw.FontWeight.bold),
+            ),
             pw.Text(_s(invoice.notes!), style: ts(size: 9)),
             pw.SizedBox(height: 8),
           ],
 
           if (invoice.linkedInvoiceId != null &&
               invoice.linkedInvoiceId!.isNotEmpty) ...[
-            pw.Text(
-              '$lblReference: ${_s(invoice.linkedInvoiceId!)}', // ISSUE-036
+            pairedLabel(
+              _documentLabelWithSuffix(
+                'reference',
+                _s(invoice.linkedInvoiceId!),
+                pair,
+                locale,
+              ),
               style: ts(size: 8, color: PdfColors.grey600),
             ),
           ],

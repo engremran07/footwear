@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 
 import '../core/l10n/app_locale.dart';
+import '../core/l10n/financial_document_localization.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/snack_helper.dart';
@@ -60,7 +61,8 @@ class _InvoiceHeaderSettingsScreenState
   String _template = 'classic';
   String _titleScale = 'normal';
   String _accentColor = _accentColors.first;
-  bool _useLatestHeaderOnReprint = false;
+  FinancialDocumentLanguagePair _documentLanguagePair =
+      FinancialDocumentLanguagePair.englishArabic;
   Set<String> _visibleFields = const {
     'logo',
     'phone',
@@ -104,7 +106,7 @@ class _InvoiceHeaderSettingsScreenState
     _allowNonStockInvoices = settings.allowNonStockInvoices;
     _template = header.template;
     _titleScale = header.titleScale;
-    _useLatestHeaderOnReprint = header.useLatestHeaderOnReprint;
+    _documentLanguagePair = header.documentLanguagePair;
     _accentColor = _accentColors.contains(header.accentColor)
         ? header.accentColor
         : _accentColors.first;
@@ -133,7 +135,7 @@ class _InvoiceHeaderSettingsScreenState
     template: _template,
     accentColor: _accentColor,
     titleScale: _titleScale,
-    useLatestHeaderOnReprint: _useLatestHeaderOnReprint,
+    documentLanguagePair: _documentLanguagePair,
     visibleFields: _visibleFields,
   );
 
@@ -310,6 +312,39 @@ class _InvoiceHeaderSettingsScreenState
                     _isDirty = true;
                   }),
                 ),
+                DropdownButtonFormField<FinancialDocumentLanguagePair>(
+                  key: const ValueKey('financial_document_language_pair'),
+                  initialValue: _documentLanguagePair,
+                  decoration: InputDecoration(
+                    labelText: tr('financial_document_language_pair', ref),
+                    helperText: tr(
+                      'financial_document_language_pair_hint',
+                      ref,
+                    ),
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                      value: FinancialDocumentLanguagePair.englishArabic,
+                      child: Text(
+                        tr('financial_document_language_english_arabic', ref),
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: FinancialDocumentLanguagePair.englishUrdu,
+                      child: Text(
+                        tr('financial_document_language_english_urdu', ref),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _documentLanguagePair = value;
+                        _isDirty = true;
+                      });
+                    }
+                  },
+                ),
                 _sectionTitle('invoice_header_english'),
                 _textField('name_en'),
                 _textField('subtitle_en'),
@@ -424,18 +459,6 @@ class _InvoiceHeaderSettingsScreenState
                       _isDirty = true;
                     }),
                   ),
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  value: _useLatestHeaderOnReprint,
-                  title: Text(tr('invoice_use_latest_header_on_reprint', ref)),
-                  subtitle: Text(
-                    tr('invoice_use_latest_header_on_reprint_hint', ref),
-                  ),
-                  onChanged: (value) => setState(() {
-                    _useLatestHeaderOnReprint = value;
-                    _isDirty = true;
-                  }),
-                ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: () => _preview(settings),

@@ -1,6 +1,6 @@
 # ShoesERP System Deep Dive
 
-Last updated: 2026-10-24
+Last updated: 2026-10-25
 
 ## Backup and Restore
 
@@ -231,3 +231,48 @@ are documented in `docs/frontend/screen-register.md`. The full Flutter suite
 reports `01:08 +599: All tests passed!`; the focused invoice-void suite reports
 `00:00 +22: All tests passed!`. Rendered APK/browser acceptance remains
 separate from these source and widget checks.
+
+## Financial Document Language Pair
+
+Workspace invoice-header settings select English-Arabic by default or
+English-Urdu for financial PDFs. The pair is serialized in the canonical
+workspace settings and copied into each new invoice header snapshot, so
+historical invoice and receipt documents retain their original branding and
+language choice. The preference applies to invoice and cash-receipt PDFs,
+account statements, seller and multi-shop reports, and flat financial-report
+PDFs. Ledger summary/table labels render English and RTL text in separate
+directionally explicit lines; numeric amounts retain LTR formatting. Seller
+invoice Rules require the provider's selected language pair to match the
+workspace configuration without relaxing tenant, route, stock, or balance
+validation.
+
+## Workspace Owner and Seat Overview
+
+The tenant-management screen combines the selected workspace's owner profile
+with a live, tenant-scoped member roster. Owner contact and email-verification
+status appear with live role counts and the free-tier limit of 10 active
+non-platform-super-admin members. User activation and deactivation must update
+the tenant seat counter atomically with the corresponding profile transition;
+Firestore Rules reject profile-only or counter-only seat changes.
+
+## Cash Receipt Presentation
+
+Receipt detail and PDF surfaces expose the receipt identity, shop, payment
+method, received amount, resulting balance, and receiver/signature details
+where available. These are presentation changes only: receipt sequencing, the
+cash-in ledger row, and the shop-balance reduction remain one atomic operation.
+
+## Release Configuration Note
+
+The v3.10.1+1112 web and Android release was built without Google Drive OAuth
+client IDs. Drive upload is therefore unavailable in these release artifacts;
+encrypted phone archives and local restore remain available. Configure the
+approved OAuth client IDs and rebuild both surfaces before enabling Drive.
+
+Release evidence: the full Flutter suite reported `01:20 +623: All tests
+passed!`; `flutter analyze lib --no-pub` reported `No issues found! (ran in
+98.8s)`; and `dart analyze test/` reported `No issues found!`. The Rules
+Emulator reported `140 passing (31s)`. The web build exited 0, Hosting and
+Firestore Rules/indexes deployments reported `Deploy complete!`, and split
+APK artifacts were built at 30.6/32.1/33.6 MB. The ARM64 APK installed on
+`R5GL22RGT9V` (`Success`, versionName `3.10.1`, versionCode `3103212`).

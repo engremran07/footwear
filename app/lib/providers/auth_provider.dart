@@ -20,6 +20,7 @@ import 'route_provider.dart';
 import 'seller_inventory_provider.dart';
 import 'settings_provider.dart';
 import 'shop_provider.dart';
+import 'tenant_provider.dart';
 import 'transaction_provider.dart';
 import 'user_provider.dart';
 import 'notification_provider.dart';
@@ -112,6 +113,9 @@ class AuthNotifier extends AsyncNotifier<void> {
     // Notification + history providers scoped to role — flush on account change.
     ref.invalidate(notificationsProvider);
     ref.invalidate(recentTransactionsProvider);
+    ref.invalidate(tenantUsersProvider);
+    ref.invalidate(tenantWorkspaceUsersProvider);
+    ref.invalidate(allInactiveUsersForTenantProvider);
   }
 
   Future<void> _signOutIfCurrentUid(String expectedUid) async {

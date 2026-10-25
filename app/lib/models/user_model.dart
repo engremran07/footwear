@@ -44,6 +44,7 @@ class UserModel {
   final String? _tenantId;
   final String? activeWorkspaceId;
   final String? activeWorkspaceReason;
+  final Timestamp? activeWorkspaceSelectedAt;
 
   /// Multi-route assignment (many-to-many). Each seller can serve multiple routes.
   final List<String> assignedRouteIds;
@@ -63,6 +64,7 @@ class UserModel {
     String? tenantId,
     this.activeWorkspaceId,
     this.activeWorkspaceReason,
+    this.activeWorkspaceSelectedAt,
     this.assignedRouteIds = const [],
     this.assignedRouteNames = const [],
     required this.active,
@@ -88,6 +90,20 @@ class UserModel {
   bool get canRestoreWorkspaceBackup => isTenantAdmin || isSuperAdmin;
   bool get canPruneWorkspaceBackup => isSuperAdmin;
   String? get tenantId => isSuperAdmin ? activeWorkspaceId : _tenantId;
+
+  bool hasActiveWorkspaceSupportContextFor(
+    String workspaceId, {
+    DateTime? now,
+  }) {
+    final selectedAt = activeWorkspaceSelectedAt?.toDate();
+    final currentTime = now ?? DateTime.now();
+    return isSuperAdmin &&
+        active &&
+        activeWorkspaceId == workspaceId &&
+        (activeWorkspaceReason?.trim().length ?? 0) >= 10 &&
+        selectedAt != null &&
+        currentTime.isBefore(selectedAt.add(const Duration(hours: 8)));
+  }
 
   /// True for any user who can carry vehicle (seller) inventory.
   /// Admin is warehouse owner + field seller simultaneously — no assigned_route_id,
@@ -117,6 +133,9 @@ class UserModel {
       activeWorkspaceReason: role == UserRole.superAdmin
           ? json['active_workspace_reason'] as String?
           : null,
+      activeWorkspaceSelectedAt: role == UserRole.superAdmin
+          ? json['active_workspace_selected_at'] as Timestamp?
+          : null,
       assignedRouteIds: routeIds,
       assignedRouteNames: routeNames,
       active: json['active'] as bool? ?? true,
@@ -135,6 +154,8 @@ class UserModel {
     if (activeWorkspaceId != null) 'active_workspace_id': activeWorkspaceId,
     if (activeWorkspaceReason != null)
       'active_workspace_reason': activeWorkspaceReason,
+    if (activeWorkspaceSelectedAt != null)
+      'active_workspace_selected_at': activeWorkspaceSelectedAt,
     'assigned_route_ids': assignedRouteIds,
     'assigned_route_names': assignedRouteNames,
     'active': active,
@@ -152,6 +173,7 @@ class UserModel {
     String? tenantId,
     String? activeWorkspaceId,
     String? activeWorkspaceReason,
+    Timestamp? activeWorkspaceSelectedAt,
     List<String>? assignedRouteIds,
     List<String>? assignedRouteNames,
     bool? active,
@@ -169,6 +191,8 @@ class UserModel {
       activeWorkspaceId: activeWorkspaceId ?? this.activeWorkspaceId,
       activeWorkspaceReason:
           activeWorkspaceReason ?? this.activeWorkspaceReason,
+      activeWorkspaceSelectedAt:
+          activeWorkspaceSelectedAt ?? this.activeWorkspaceSelectedAt,
       assignedRouteIds: assignedRouteIds ?? this.assignedRouteIds,
       assignedRouteNames: assignedRouteNames ?? this.assignedRouteNames,
       active: active ?? this.active,

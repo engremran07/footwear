@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/models/tenant_model.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/share_helper.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
@@ -31,6 +33,7 @@ class _TenantManagementScreenState
   bool _selectedWorkspaceForProvisioning = false;
   bool _isCreating = false;
   String? _lifecycleTenantId;
+  String? _seatInitializationTenantId;
 
   @override
   void dispose() {
@@ -178,8 +181,70 @@ class _TenantManagementScreenState
       await ref
           .read(authNotifierProvider.notifier)
           .selectWorkspace(workspaceId: tenant.id, reason: reason);
+      if (tenant.active && tenant.activeUserCount == null) {
+        await _initializeWorkspaceSeats(tenant);
+      }
     } catch (error) {
       _showMappedError(error);
+    }
+  }
+
+  Future<void> _initializeWorkspaceSeats(TenantModel tenant) async {
+    if (_seatInitializationTenantId != null || !tenant.active) return;
+    setState(() => _seatInitializationTenantId = tenant.id);
+    try {
+      await ref
+          .read(tenantManagementNotifierProvider.notifier)
+          .initializeWorkspaceSeatCount(tenant.id);
+      if (!mounted) return;
+      ref.invalidate(tenantsProvider);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(successSnackBar(tr('workspace_seats_initialized', ref)));
+    } catch (error) {
+      _showMappedError(error);
+    } finally {
+      if (mounted) setState(() => _seatInitializationTenantId = null);
+    }
+  }
+
+  Future<void> _contactOwnerByEmail(String email) async {
+    try {
+      final opened = await launchUrl(
+        Uri(scheme: 'mailto', path: email),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr('err_url_open', ref)));
+      }
+    } on Exception {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr('err_url_open', ref)));
+      }
+    }
+  }
+
+  Future<void> _contactOwnerByWhatsApp(String phone) async {
+    try {
+      final opened = await openWhatsApp(
+        phone: phone,
+        message: tr('whatsapp_greeting', ref),
+      );
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr('err_whatsapp_unavailable', ref)));
+      }
+    } on Exception {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr('err_whatsapp_unavailable', ref)));
+      }
     }
   }
 
@@ -410,6 +475,218 @@ class _TenantManagementScreenState
     );
   }
 
+  Widget _buildWorkspaceMemberSummary(TenantModel tenant) {
+    return Consumer(
+      builder: (context, memberRef, _) {
+        final viewer = memberRef.watch(authUserProvider).value;
+        final supportContextActive =
+            viewer?.hasActiveWorkspaceSupportContextFor(tenant.id) ?? false;
+        final assignedWorkspaceAdmin =
+            viewer?.isTenantAdmin == true &&
+            viewer!.active &&
+            viewer.tenantId == tenant.id;
+        if (!supportContextActive && !assignedWorkspaceAdmin) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(tr('workspace_support_context_expired', memberRef)),
+          );
+        }
+
+        return memberRef
+            .watch(tenantWorkspaceUsersProvider(tenant.id))
+            .when(
+              data: (users) {
+                final activeMembers = users
+                    .where((user) => user.active && !user.isSuperAdmin)
+                    .toList();
+                final inactiveCount = users
+                    .where((user) => !user.active && !user.isSuperAdmin)
+                    .length;
+                final adminCount = activeMembers
+                    .where(
+                      (user) =>
+                          user.role == UserRole.admin ||
+                          user.role == UserRole.tenantAdmin,
+                    )
+                    .length;
+                final sellerCount = activeMembers
+                    .where((user) => user.role == UserRole.seller)
+                    .length;
+                final otherCount =
+                    activeMembers.length - adminCount - sellerCount;
+                UserModel? owner;
+                for (final user in users) {
+                  if (user.id == tenant.ownerUserId) {
+                    owner = user;
+                    break;
+                  }
+                }
+
+                Widget metric(String label, int value) =>
+                    Chip(label: Text('$label: $value'));
+
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Card(
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tr('workspace_member_summary', memberRef),
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 4,
+                            children: [
+                              metric(
+                                tr('workspace_active_users', memberRef),
+                                activeMembers.length,
+                              ),
+                              metric(
+                                tr('workspace_inactive_users', memberRef),
+                                inactiveCount,
+                              ),
+                              metric(
+                                tr('workspace_admin_count', memberRef),
+                                adminCount,
+                              ),
+                              metric(
+                                tr('workspace_seller_count', memberRef),
+                                sellerCount,
+                              ),
+                              if (otherCount > 0)
+                                metric(
+                                  tr('workspace_other_roles', memberRef),
+                                  otherCount,
+                                ),
+                            ],
+                          ),
+                          if (tenant.activeUserCount != null &&
+                              tenant.activeUserCount != activeMembers.length)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                tr('workspace_seat_count_mismatch', memberRef),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
+                            ),
+                          const Divider(height: 24),
+                          Text(
+                            tr('workspace_owner_details', memberRef),
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 4),
+                          if (owner == null)
+                            Text(tr('workspace_owner_missing', memberRef))
+                          else ...[
+                            Text(
+                              owner.displayName.trim().isNotEmpty
+                                  ? owner.displayName
+                                  : owner.email,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            if (owner.email.isNotEmpty)
+                              Row(
+                                children: [
+                                  const Icon(Icons.email_outlined, size: 18),
+                                  const SizedBox(width: 6),
+                                  Expanded(child: Text(owner.email)),
+                                  IconButton(
+                                    tooltip: tr(
+                                      'contact_owner_email',
+                                      memberRef,
+                                    ),
+                                    onPressed: () =>
+                                        _contactOwnerByEmail(owner!.email),
+                                    icon: const Icon(Icons.mail_outline),
+                                  ),
+                                ],
+                              ),
+                            if (owner.phone?.trim().isNotEmpty == true)
+                              Row(
+                                children: [
+                                  const Icon(Icons.phone_outlined, size: 18),
+                                  const SizedBox(width: 6),
+                                  Expanded(child: Text(owner.phone!)),
+                                  if (isValidWhatsAppPhone(owner.phone!))
+                                    IconButton(
+                                      tooltip: tr(
+                                        'contact_owner_whatsapp',
+                                        memberRef,
+                                      ),
+                                      onPressed: () => _contactOwnerByWhatsApp(
+                                        owner!.phone!,
+                                      ),
+                                      icon: const Icon(Icons.chat_outlined),
+                                    ),
+                                ],
+                              )
+                            else
+                              Text(
+                                tr('workspace_owner_phone_missing', memberRef),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                Chip(
+                                  avatar: Icon(
+                                    owner.emailVerified
+                                        ? Icons.verified_outlined
+                                        : Icons.info_outline,
+                                    size: 16,
+                                  ),
+                                  label: Text(
+                                    tr(
+                                      owner.emailVerified
+                                          ? 'workspace_owner_email_verified'
+                                          : 'workspace_owner_email_unverified',
+                                      memberRef,
+                                    ),
+                                  ),
+                                ),
+                                Chip(
+                                  label: Text(
+                                    tr(
+                                      owner.active
+                                          ? 'account_active'
+                                          : 'workspace_owner_inactive',
+                                      memberRef,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+              loading: () => const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: LinearProgressIndicator(),
+              ),
+              error: (error, _) => mappedErrorState(
+                error: error,
+                ref: memberRef,
+                onRetry: () => memberRef.invalidate(
+                  tenantWorkspaceUsersProvider(tenant.id),
+                ),
+              ),
+            );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tenantsAsync = ref.watch(tenantsProvider);
@@ -418,14 +695,9 @@ class _TenantManagementScreenState
         currentUser != null &&
         (currentUser.isSuperAdmin || currentUser.isTenantAdmin);
     final canCreateTenants = currentUser?.isSuperAdmin == true;
-    final canManageLifecycle =
-        currentUser?.isSuperAdmin == true &&
-        currentUser?.active == true &&
-        (currentUser?.activeWorkspaceReason?.trim().length ?? 0) >= 10;
-
     bool canEditTenant(TenantModel tenant) {
-      return currentUser?.isSuperAdmin == true &&
-          currentUser?.activeWorkspaceId == tenant.id;
+      return currentUser?.hasActiveWorkspaceSupportContextFor(tenant.id) ==
+          true;
     }
 
     return Scaffold(
@@ -478,6 +750,24 @@ class _TenantManagementScreenState
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final tenant = tenants[index];
+              final hasWorkspaceSupportContext =
+                  currentUser?.hasActiveWorkspaceSupportContextFor(tenant.id) ==
+                  true;
+              final isAssignedWorkspaceAdmin =
+                  currentUser?.isTenantAdmin == true &&
+                  currentUser!.active &&
+                  currentUser.tenantId == tenant.id;
+              final seatCount = tenant.activeUserCount;
+              final seatLimit = tenant.maxActiveUsers;
+              final remainingSeats = seatCount == null
+                  ? null
+                  : (seatLimit - seatCount).clamp(0, seatLimit);
+              final planLabel =
+                  tenant.plan == null || tenant.plan!.trim().isEmpty
+                  ? tr('free_tier', ref)
+                  : tenant.plan!.toLowerCase() == 'free'
+                  ? tr('free_tier', ref)
+                  : tenant.plan!;
               return Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -513,6 +803,100 @@ class _TenantManagementScreenState
                           ),
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      Card(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerLow,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.people_alt_outlined,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      tr('workspace_seats', ref),
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall,
+                                    ),
+                                  ),
+                                  Chip(label: Text(planLabel)),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    seatCount == null
+                                        ? '— / $seatLimit'
+                                        : '$seatCount / $seatLimit',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
+                                  ),
+                                  if (remainingSeats != null)
+                                    Text(
+                                      '${tr('workspace_seats_remaining', ref)}: $remainingSeats',
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              LinearProgressIndicator(
+                                value: seatCount == null
+                                    ? null
+                                    : seatLimit == 0
+                                    ? 1
+                                    : (seatCount / seatLimit).clamp(0, 1),
+                                semanticsLabel: tr('workspace_seats', ref),
+                              ),
+                              if (seatCount == null) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  tr('workspace_seat_count_pending', ref),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                if (hasWorkspaceSupportContext && tenant.active)
+                                  Align(
+                                    alignment: AlignmentDirectional.centerEnd,
+                                    child: TextButton.icon(
+                                      onPressed:
+                                          _seatInitializationTenantId == null
+                                          ? () => _initializeWorkspaceSeats(
+                                              tenant,
+                                            )
+                                          : null,
+                                      icon:
+                                          _seatInitializationTenantId ==
+                                              tenant.id
+                                          ? const SizedBox.square(
+                                              dimension: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Icon(Icons.sync, size: 18),
+                                      label: Text(
+                                        tr('initialize_workspace_seats', ref),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
                       if (tenant.ownerUserId == null)
                         Text(
                           tr('workspace_owner_missing', ref),
@@ -522,7 +906,7 @@ class _TenantManagementScreenState
                         ),
                       if (currentUser?.isSuperAdmin == true) ...[
                         const SizedBox(height: 12),
-                        if (currentUser?.activeWorkspaceId == tenant.id &&
+                        if (hasWorkspaceSupportContext &&
                             currentUser?.activeWorkspaceReason != null)
                           Text(
                             '${tr('workspace_access_active', ref)}: ${currentUser!.activeWorkspaceReason}',
@@ -535,21 +919,20 @@ class _TenantManagementScreenState
                             TextButton.icon(
                               onPressed: () => _changeWorkspaceAccess(tenant),
                               icon: Icon(
-                                currentUser?.activeWorkspaceId == tenant.id
+                                hasWorkspaceSupportContext
                                     ? Icons.lock_open
                                     : Icons.admin_panel_settings_outlined,
                               ),
                               label: Text(
                                 tr(
-                                  currentUser?.activeWorkspaceId == tenant.id
+                                  hasWorkspaceSupportContext
                                       ? 'end_workspace_access'
                                       : 'access_workspace',
                                   ref,
                                 ),
                               ),
                             ),
-                            if (canManageLifecycle &&
-                                currentUser?.activeWorkspaceId == tenant.id)
+                            if (hasWorkspaceSupportContext)
                               OutlinedButton.icon(
                                 onPressed: _lifecycleTenantId == null
                                     ? () => _changeTenantLifecycle(tenant)
@@ -578,6 +961,10 @@ class _TenantManagementScreenState
                           ],
                         ),
                       ],
+                      if ((hasWorkspaceSupportContext ||
+                              isAssignedWorkspaceAdmin) &&
+                          tenant.active)
+                        _buildWorkspaceMemberSummary(tenant),
                     ],
                   ),
                 ),

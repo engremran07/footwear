@@ -51,6 +51,47 @@ void main() {
     expect(summary.closingBalance, 68);
   });
 
+  test(
+    'current workspace header overrides the saved invoice header on print',
+    () {
+      final now = Timestamp.fromMillisecondsSinceEpoch(0);
+      final invoice = InvoiceModel(
+        id: 'header-reprint',
+        invoiceNumber: 'INV-HEADER-1',
+        type: InvoiceModel.typeSale,
+        shopId: 'shop-1',
+        shopName: 'Sample Shop',
+        subtotal: 0,
+        total: 0,
+        status: InvoiceModel.statusIssued,
+        createdBy: 'seller-1',
+        createdAt: now,
+        updatedAt: now,
+        headerSnapshot: const {
+          'name_en': 'Saved Workspace Header',
+          'visible_fields': [],
+        },
+      );
+
+      const current = InvoiceHeaderConfig(nameEn: 'Current Workspace Header');
+
+      expect(
+        resolveInvoiceHeaderForPrint(
+          invoice: invoice,
+          currentHeader: current,
+        ).nameEn,
+        'Current Workspace Header',
+      );
+      expect(
+        resolveInvoiceHeaderForPrint(
+          invoice: invoice,
+          currentHeader: null,
+        ).nameEn,
+        'Saved Workspace Header',
+      );
+    },
+  );
+
   test('paginateItems splits a list into page-sized chunks', () {
     final pages = paginateItems<int>(List.generate(60, (i) => i), 30);
 
@@ -80,6 +121,9 @@ void main() {
         paymentReference: 'BANK-123',
         shopBalanceBefore: 200,
         shopBalanceAfter: 75,
+        cashReceiptSequence: 1,
+        linkedInvoiceId: 'INV-2026-0001',
+        sellerName: 'Workspace Seller',
         createdBy: 'seller-1',
         createdAt: now,
         updatedAt: now,

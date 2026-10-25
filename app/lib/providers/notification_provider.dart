@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/collections.dart';
@@ -6,12 +9,27 @@ import '../core/utils/tenant_scope.dart';
 import '../models/notification_model.dart';
 import 'auth_provider.dart';
 
+@visibleForTesting
+List<NotificationModel> filterVisibleNotifications(
+  Iterable<NotificationModel> notifications,
+  Set<String> activeShopIds,
+) => notifications
+    .where((notification) {
+      final shopId = notification.shopId.trim();
+      return shopId.isEmpty || activeShopIds.contains(shopId);
+    })
+    .toList(growable: false);
+
+@visibleForTesting
+bool isNotificationShopVisible(Map<String, dynamic> shopData) =>
+    shopData['active'] != false && shopData['deleted'] != true;
+
 /// Admin-only stream of the 50 most-recent notifications ordered newest-first,
 /// scoped to the current user's tenant.
 ///
 /// Returns [Stream.empty] for non-admin users so the provider never fires a
 /// Firestore query that would fail with permission-denied.
-/// 
+///
 /// P1-10 FIX: Added TenantScope.applyToQuery() to prevent admins from one
 /// workspace seeing notifications from other workspaces.
 final notificationsProvider =
@@ -22,8 +40,9 @@ final notificationsProvider =
 
       final tenantId = authState.value?.tenantId;
 
-      var query = FirebaseFirestore.instance
-          .collection(Collections.notifications) as Query<Map<String, dynamic>>;
+      var query =
+          FirebaseFirestore.instance.collection(Collections.notifications)
+              as Query<Map<String, dynamic>>;
 
       // P1-10 FIX: Apply tenant scoping to prevent cross-tenant leakage
       query = TenantScope.applyToQuery(query, tenantId: tenantId);
@@ -40,9 +59,96 @@ final notificationsProvider =
           );
     });
 
+/// Watches only the shops referenced by the bounded notification feed. Missing,
+/// inactive, and soft-deleted shops are excluded without treating a capped
+/// all-shops query as an existence check.
+final activeNotificationShopIdsProvider =
+    StreamProvider.autoDispose<Set<String>>((ref) {
+      final user = ref.watch(authUserProvider).value;
+      if (user?.isAdmin != true) return Stream.value(const <String>{});
+
+      final notifications = ref.watch(notificationsProvider).value;
+      final shopIds =
+          notifications
+              ?.map((notification) => notification.shopId.trim())
+              .where((id) => id.isNotEmpty)
+              .toSet()
+              .toList(growable: false) ??
+          const <String>[];
+      if (shopIds.isEmpty) return Stream.value(const <String>{});
+
+      final query = TenantScope.applyToQuery(
+        FirebaseFirestore.instance.collection(Collections.shops),
+        tenantId: user!.tenantId,
+      );
+      final chunks = <List<String>>[
+        for (var start = 0; start < shopIds.length; start += 30)
+          shopIds.sublist(start, (start + 30).clamp(0, shopIds.length)),
+      ];
+
+      return Stream<Set<String>>.multi((controller) {
+        final latest = List<Set<String>?>.filled(chunks.length, null);
+        final subscriptions =
+            <StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>[];
+
+        void emitWhenReady(
+          int chunkIndex,
+          QuerySnapshot<Map<String, dynamic>> snapshot,
+        ) {
+          latest[chunkIndex] = {
+            for (final document in snapshot.docs)
+              if (isNotificationShopVisible(document.data())) document.id,
+          };
+          if (latest.every((ids) => ids != null)) {
+            controller.add({for (final ids in latest) ...?ids});
+          }
+        }
+
+        for (final (index, chunk) in chunks.indexed) {
+          subscriptions.add(
+            query
+                .where(FieldPath.documentId, whereIn: chunk)
+                .snapshots()
+                .listen(
+                  (snapshot) => emitWhenReady(index, snapshot),
+                  onError: controller.addError,
+                ),
+          );
+        }
+
+        controller.onCancel = () async {
+          await Future.wait(
+            subscriptions.map((subscription) => subscription.cancel()),
+          );
+        };
+      });
+    });
+
+/// The center, unread badge, and bulk-read action all consume this same
+/// role- and tenant-scoped visible notification set.
+final visibleNotificationsProvider =
+    Provider.autoDispose<AsyncValue<List<NotificationModel>>>((ref) {
+      final notifications = ref.watch(notificationsProvider);
+      return notifications.when(
+        data: (items) {
+          final activeShopIds = ref.watch(activeNotificationShopIdsProvider);
+          return activeShopIds.whenData(
+            (ids) => filterVisibleNotifications(items, ids),
+          );
+        },
+        loading: () => const AsyncLoading<List<NotificationModel>>(),
+        error: (error, stackTrace) =>
+            AsyncError<List<NotificationModel>>(error, stackTrace),
+      );
+    });
+
 /// Derived count of unread notifications (admin only).
 final unreadNotificationCountProvider = Provider.autoDispose<int>((ref) {
-  return ref.watch(notificationsProvider).value?.where((n) => !n.read).length ??
+  return ref
+          .watch(visibleNotificationsProvider)
+          .value
+          ?.where((notification) => !notification.read)
+          .length ??
       0;
 });
 
@@ -58,15 +164,20 @@ class NotificationNotifier extends AsyncNotifier<void> {
         .update({'read': true, 'read_at': Timestamp.now()});
   }
 
-  Future<void> markAllAsRead() async {
-    final notifications = ref.read(notificationsProvider).value ?? [];
-    final unread = notifications.where((n) => !n.read).toList();
-    if (unread.isEmpty) return;
+  Future<void> markAllAsRead(Set<String> visibleNotificationIds) async {
+    final unreadIds = visibleNotificationIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    if (unreadIds.isEmpty) return;
+    if (unreadIds.length > 50) {
+      throw ArgumentError('At most 50 notifications can be marked at once.');
+    }
 
     final db = FirebaseFirestore.instance;
     final batch = db.batch();
-    for (final n in unread) {
-      batch.update(db.collection(Collections.notifications).doc(n.id), {
+    for (final id in unreadIds) {
+      batch.update(db.collection(Collections.notifications).doc(id), {
         'read': true,
         'read_at': Timestamp.now(),
       });

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/models/settings_model.dart';
+import 'package:footwear_erp/core/l10n/financial_document_localization.dart';
 import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/settings_provider.dart';
@@ -74,6 +75,54 @@ void main() {
     expect(
       tester.widget<TextField>(headerNameField).controller!.text,
       'Unsaved phone edit',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('invoice header settings follow remote language pair changes', (
+    tester,
+  ) async {
+    final settingsStream = StreamController<SettingsModel>();
+    addTearDown(settingsStream.close);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(admin)),
+          settingsProvider.overrideWith((ref) => settingsStream.stream),
+        ],
+        child: const MaterialApp(home: InvoiceHeaderSettingsScreen()),
+      ),
+    );
+    settingsStream.add(settings());
+    await tester.pumpAndSettle();
+
+    final selector = find.byKey(
+      const ValueKey('financial_document_language_pair'),
+    );
+    expect(selector, findsOneWidget);
+    expect(
+      tester.widget<DropdownButtonFormField<FinancialDocumentLanguagePair>>(
+        selector,
+      ).initialValue,
+      FinancialDocumentLanguagePair.englishArabic,
+    );
+
+    settingsStream.add(
+      settings().copyWith(
+        invoiceHeader: settings().invoiceHeader.copyWith(
+          documentLanguagePair: FinancialDocumentLanguagePair.englishUrdu,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      tester.widget<DropdownButtonFormField<FinancialDocumentLanguagePair>>(
+        selector,
+      ).initialValue,
+      FinancialDocumentLanguagePair.englishUrdu,
     );
     expect(tester.takeException(), isNull);
   });
