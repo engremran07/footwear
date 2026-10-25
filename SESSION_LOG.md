@@ -6,6 +6,110 @@
 
 ---
 
+## SESSION-022 — 2026-10-25 — Legacy workspace roster hotfix
+
+**Agent:** GitHub Copilot
+
+**Baseline:** Branch `main`, HEAD `3d198c1`, matching `origin/main`. The
+v3.10.2 source, Hosting build, Rules/index deployment, and APK installation
+were completed first in this work session. A final audit then found that
+Firestore `orderBy(display_name)` excludes legacy profiles without that
+optional field, so the v3.10.2 artifacts were superseded by this corrected
+v3.10.3 release.
+
+### Work Performed
+
+- Removed optional-name ordering from active/inactive workspace member queries
+  and the selected-workspace seat-reconciliation query. Results are sorted
+  locally by display name, email, and document ID, preserving presentation
+  order while including the complete roster.
+- Added an emulator regression with an active legacy profile missing
+  `display_name`; it demonstrates that ordered queries omit the record and the
+  complete tenant-scoped query includes it.
+- Bumped and synchronized version metadata to `3.10.3+1114` and added a
+  trilingual changelog entry.
+
+### Verification and Delivery
+
+- Full Flutter suite: `01:21 +623: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 15.3s)`;
+  `dart analyze test/`: `No issues found!`.
+- Complete Firestore Rules Emulator suite: `146 passing (37s)`.
+- Web release build: `WEB_EXIT: 0`; Hosting deployment reported
+  `Deploy complete!` at `https://shoeserp-clean-20260327.web.app`.
+- Rules/indexes were successfully deployed with v3.10.2. This v3.10.3
+  correction changes no Rules/index file; Rules Emulator coverage was rerun.
+- Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB.
+- ARM64 copied to `/sdcard/Download/FootWear-3.10.3-arm64.apk` and installed
+  on `R5GL22RGT9V`; ADB reported `Success`. Device reports versionName `3.10.3`,
+  versionCode `3103414`. The app launch was triggered; no fatal/Flutter error
+  signature appeared in the recent 1,000 log lines. Authenticated business
+  workflow visual acceptance was not performed.
+- Google Drive OAuth IDs remain unavailable, so Drive backup remains disabled
+  in these artifacts. The user explicitly authorized Git publication; the
+  final commit hash and push result are reported with task completion.
+
+---
+
+## SESSION-021 — 2026-10-25 — Workspace roles, logo sizing, and receipts
+
+**Agent:** GitHub Copilot
+
+**Baseline:** Branch `main`, HEAD `3d198c1`, matching `origin/main`. The
+previous v3.10.1 release was already deployed and pushed. Existing untracked
+skill directories and the local test-summary text file were preserved and
+excluded from this release.
+
+**Trigger:** Correct the reported logo upload limit, workspace role and seat
+management, owner-contact feedback, and overly large/plain cash receipt UI/PDF,
+then build and publish the authorized web and Android release and deploy Rules.
+
+### Work Performed
+
+- Replaced the logo size-error path with on-device orientation-aware,
+  aspect-preserving, transparency-safe resizing and lossless PNG re-encoding
+  until the encoded Firestore limit is met. This deterministic processing does
+  not add an AI model or network dependency.
+- Enabled workspace admins to create admin/seller accounts and promote/demote
+  eligible same-tenant non-owner admin/seller accounts. Platform roles,
+  tenant-admin peers, the permanent owner, and peer-admin deactivation remain
+  protected. User changes and seat transitions continue to be validated by
+  Firestore Rules.
+- Added selected-workspace, revision-checked seat reconciliation from a fully
+  paged active roster. The workspace UI reports live role totals only where
+  roster access is authorized, uses a stable determinate capacity display, and
+  directs missing owner phone details toward an actionable add-contact flow.
+- Reworked cash-receipt detail into a bilingual metadata table and receipt PDF
+  into a compact one-page layout using the shared workspace header. Removed
+  only the account-balance-movement presentation; receipt and ledger accounting
+  remain unchanged.
+- Updated English, Arabic, and Urdu strings, regression coverage, version
+  metadata, changelog, and runtime documentation.
+
+### Verification
+
+- Focused regression suite: `00:06 +15: All tests passed!`.
+- Full Flutter suite: `01:26 +623: All tests passed!`.
+- Changelog regression: `00:00 +10: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 103.6s)`;
+  `dart analyze test/`: `No issues found!`.
+- Firestore Rules Emulator: `145 passing (31s)`.
+- Release version: `app/pubspec.yaml` `3.10.2+1113`; `AppBrand`
+  `3.10.2`/`1113`.
+- Web release build: `WEB_EXIT: 0`. Hosting deployment to
+  `shoeserp-clean-20260327` reported `Deploy complete!`.
+- Firestore Rules/indexes deployment reported `Deploy complete!`; the remote
+  23 indexes and 2 field overrides not present locally were preserved.
+- Split APKs built: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB.
+- ARM64 copied to `/sdcard/Download/FootWear-3.10.2-arm64.apk` and installed on
+  `R5GL22RGT9V`; ADB reported `Success`. The device reports versionName
+  `3.10.2`, versionCode `3103313`.
+- Google Drive OAuth IDs remain unavailable, so Drive backup is disabled in
+  this build; encrypted phone archives remain available. Authenticated
+  business-screen visual acceptance was not performed.
+
+---
+
 ## SESSION-020 — 2026-10-24 — Backup role fix and Android delivery
 
 **Agent:** GitHub Copilot

@@ -255,12 +255,35 @@ non-platform-super-admin members. User activation and deactivation must update
 the tenant seat counter atomically with the corresponding profile transition;
 Firestore Rules reject profile-only or counter-only seat changes.
 
+Workspace administrators may create canonical admin and seller accounts and
+promote or demote eligible same-workspace admin/seller accounts. The permanent
+owner, tenant-admin peers, and platform roles are protected, and workspace
+admins cannot deactivate peer administrators. Profile/seat changes remain
+atomic. A selected platform super-admin can reconcile a stored seat counter
+against the fully paged active roster; a revision check prevents the
+reconciliation from overwriting a concurrent membership change. Role counts
+are shown from live profile data only when the viewer has authorized roster
+access. Without that context, the screen uses stored metadata and offers an
+explicit workspace-access action instead of showing an endless loading bar.
+
+## Workspace Logo Processing
+
+Logo processing is local to the client and uses deterministic PNG decoding,
+orientation correction, proportional resizing, and lossless re-encoding. It
+retains transparency and reduces dimensions until the Base64 value is within
+the Firestore field limit. The operation has no network dependency and does
+not use an AI model; an image that still cannot meet the limit fails with a
+localized size error rather than reaching Firestore as a failed upload.
+
 ## Cash Receipt Presentation
 
-Receipt detail and PDF surfaces expose the receipt identity, shop, payment
-method, received amount, resulting balance, and receiver/signature details
-where available. These are presentation changes only: receipt sequencing, the
-cash-in ledger row, and the shop-balance reduction remain one atomic operation.
+Receipt detail uses a bilingual, bordered metadata table. Its PDF uses the
+shared compact workspace brand header, emphasizes the received amount, and
+places paired-language labels in a compact table with receiver/signature
+fields. The receipt PDF is built as a single page and bounds long user-provided
+values; it omits the account-balance-movement block. This is presentation-only:
+receipt sequencing, the cash-in ledger row, and the shop-balance reduction
+remain one atomic operation.
 
 ## Release Configuration Note
 
@@ -276,3 +299,33 @@ Emulator reported `140 passing (31s)`. The web build exited 0, Hosting and
 Firestore Rules/indexes deployments reported `Deploy complete!`, and split
 APK artifacts were built at 30.6/32.1/33.6 MB. The ARM64 APK installed on
 `R5GL22RGT9V` (`Success`, versionName `3.10.1`, versionCode `3103212`).
+
+## v3.10.2 Workspace and Receipt Correction
+
+Release version `3.10.2+1113` includes the workspace role, seat reconciliation,
+logo resizing, and bilingual receipt corrections described above. Verification
+reported `01:26 +623: All tests passed!`, `No issues found! (ran in 103.6s)`
+for Flutter analysis, `No issues found!` for test analysis, and `145 passing
+(31s)` in the Rules Emulator. The web build exited 0; Hosting and Rules/indexes
+deployment each reported `Deploy complete!`. Split APKs were built at 30.7 MB,
+32.2 MB, and 33.6 MB. The ARM64 APK was installed on `R5GL22RGT9V` with
+`Success`; the device reports versionName `3.10.2` and versionCode `3103313`.
+
+## v3.10.3 Legacy Workspace Roster Correction
+
+Firestore `orderBy(display_name)` excludes documents where the optional field
+does not exist. Workspace active/inactive member streams now retrieve their
+tenant-scoped role-filtered roster without that ordering and sort models
+client-side by display name, email, and ID. Seat reconciliation uses the same
+complete active-user query, so a legacy profile cannot be silently omitted
+from the saved total. The Firestore emulator regression demonstrates that the
+ordered query omits the seeded legacy document while the complete query
+returns it. This provider-only hotfix changes neither Rules nor indexes; those
+were deployed with v3.10.2.
+
+Version `3.10.3+1114` verification: full Flutter suite `01:21 +623: All tests
+passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 15.3s)`;
+`dart analyze test/`: `No issues found!`; Rules Emulator: `146 passing (37s)`.
+The web build exited 0 and Hosting deployment reported `Deploy complete!`.
+Split APKs were built at 30.7 MB, 32.2 MB, and 33.6 MB. ARM64 installed on
+`R5GL22RGT9V` (`Success`, versionName `3.10.3`, versionCode `3103414`).

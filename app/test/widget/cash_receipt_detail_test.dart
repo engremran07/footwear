@@ -9,7 +9,7 @@ import 'package:footwear_erp/providers/invoice_provider.dart';
 import 'package:footwear_erp/screens/invoice_detail_screen.dart';
 
 void main() {
-  testWidgets('cash receipt detail shows full payment and balance context', (
+  testWidgets('cash receipt detail shows a structured payment summary', (
     tester,
   ) async {
     final now = Timestamp.fromDate(DateTime(2026, 10, 25, 9, 30));
@@ -67,13 +67,11 @@ void main() {
     expect(find.text('Ayesha Khan'), findsOneWidget);
     expect(find.text('Bank Transfer'), findsOneWidget);
     expect(find.text('BANK-7788'), findsOneWidget);
-    expect(find.text('Account Balance Movement'), findsOneWidget);
-    expect(find.textContaining('800.00'), findsOneWidget);
-    expect(find.textContaining('550.00'), findsOneWidget);
-    expect(
-      find.byKey(const Key('cash_receipt_balance_summary')),
-      findsOneWidget,
-    );
+    expect(find.text('Account Balance Movement'), findsNothing);
+    expect(find.textContaining('800.00'), findsNothing);
+    expect(find.textContaining('550.00'), findsNothing);
+    expect(find.byKey(const Key('cash_receipt_details_table')), findsOneWidget);
+    expect(find.byType(Table), findsWidgets);
     expect(find.text('INV-2026-0040'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

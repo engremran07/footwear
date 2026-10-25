@@ -368,9 +368,18 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'Platform super-admin accounts require trusted out-of-band provisioning.',
         );
       }
-      if (!owner.isSuperAdmin && normalizedRole != 'seller') {
+      if (owner.isTenantAdmin &&
+          normalizedRole != 'admin' &&
+          normalizedRole != 'seller') {
         throw StateError(
-          'Only a selected platform super-admin can create workspace administrators',
+          'Workspace admins may create only admin and seller accounts.',
+        );
+      }
+      if (!owner.isSuperAdmin &&
+          !owner.isTenantAdmin &&
+          normalizedRole != 'seller') {
+        throw StateError(
+          'Only workspace administrators can create admin accounts.',
         );
       }
       if (normalizedRole == 'seller' && assignedRouteIds.isEmpty) {
@@ -419,8 +428,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       if (!initialTenant.exists ||
           initialTenantData?['active'] != true ||
           initialTenantData?['active_user_count'] is! int ||
-          initialTenantData?['max_active_users'] !=
-              TenantModel.freeSeatLimit) {
+          initialTenantData?['max_active_users'] != TenantModel.freeSeatLimit) {
         throw StateError('workspace_seat_count_initialization_required');
       }
       if ((initialTenantData!['active_user_count'] as int) >=
@@ -460,8 +468,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
             if (!tenantSnapshot.exists ||
                 tenantData?['active'] != true ||
                 tenantData?['active_user_count'] is! int ||
-                tenantData?['max_active_users'] !=
-                    TenantModel.freeSeatLimit) {
+                tenantData?['max_active_users'] != TenantModel.freeSeatLimit) {
               throw StateError('workspace_seat_count_initialization_required');
             }
             final activeUserCount = tenantData!['active_user_count'] as int;
@@ -581,21 +588,99 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       }
     }
 
-    if (!actingUser.isSuperAdmin && updateData.containsKey('role')) {
+    if (!actingUser.isSuperAdmin &&
+        !actingUser.isTenantAdmin &&
+        updateData.containsKey('role')) {
       throw StateError(
-        'Only a selected platform super-admin can change workspace roles',
+        'Only workspace administrators can change workspace roles.',
       );
     }
     if (!actingUser.isSuperAdmin && updateData.containsKey('tenant_id')) {
       throw StateError('Workspace administrators cannot change workspace');
     }
 
+    if (actingUser.isTenantAdmin) {
+      final tenantId = TenantScope.requireTenant(actingUser.tenantId);
+      final targetSnapshot = await db
+          .collection(Collections.users)
+          .doc(trimmedUid)
+          .get(const GetOptions(source: Source.server));
+      final targetData = targetSnapshot.data();
+      if (!targetSnapshot.exists ||
+          TenantScope.normalize(targetData?['tenant_id'] as String?) !=
+              tenantId ||
+          (targetData?['role'] as String?)?.trim().toLowerCase() ==
+              'super_admin') {
+        throw StateError('Workspace user administration is required.');
+      }
+
+      final requestedRole = updateData['role'] as String?;
+      final targetRole = normalizeRoleName(
+        targetData?['role'] as String? ?? '',
+      );
+      if (requestedRole != null &&
+          ((requestedRole != 'admin' && requestedRole != 'seller') ||
+              (targetRole != 'admin' && targetRole != 'seller'))) {
+        throw StateError(
+          'Workspace admins may change only admin and seller roles.',
+        );
+      }
+
+      final tenantSnapshot = await db
+          .collection(Collections.tenants)
+          .doc(tenantId)
+          .get(const GetOptions(source: Source.server));
+      final isOwner = tenantSnapshot.data()?['owner_user_id'] == trimmedUid;
+      if (isOwner && requestedRole != null) {
+        throw StateError(
+          'The permanent workspace owner role cannot be changed.',
+        );
+      }
+      if (targetRole == 'tenant_admin' &&
+          updateData.keys.any(
+            (key) => !{'display_name', 'phone'}.contains(key),
+          )) {
+        throw StateError(
+          'Workspace admins may update only owner contact details.',
+        );
+      }
+      const tenantAdminEditableKeys = {
+        'display_name',
+        'phone',
+        'role',
+        'assigned_route_ids',
+        'assigned_route_names',
+      };
+      if (updateData.keys.any(
+        (key) => !tenantAdminEditableKeys.contains(key),
+      )) {
+        throw StateError('Unsupported workspace user update.');
+      }
+    }
+
     final hasRoleUpdate = updateData.containsKey('role');
     final hasRouteIdsUpdate = updateData.containsKey('assigned_route_ids');
     final updatedRole = hasRoleUpdate ? updateData['role'] as String? : null;
-    final newRouteIds = hasRouteIdsUpdate
-        ? List<String>.from(updateData['assigned_route_ids'] as List? ?? [])
+    final routeIdsValue = updateData['assigned_route_ids'];
+    if (hasRouteIdsUpdate && routeIdsValue is! List) {
+      throw ArgumentError('assigned_route_ids must be a list.');
+    }
+    final newRouteIds = routeIdsValue is List
+        ? routeIdsValue.map((value) {
+            if (value is! String) {
+              throw ArgumentError('Route IDs must be strings.');
+            }
+            return value.trim();
+          }).toList()
         : <String>[];
+    if (hasRouteIdsUpdate &&
+        (newRouteIds.any((routeId) => routeId.isEmpty) ||
+            newRouteIds.toSet().length != newRouteIds.length)) {
+      throw ArgumentError('Route IDs must be non-empty and unique.');
+    }
+    if (hasRouteIdsUpdate) {
+      updateData['assigned_route_ids'] = newRouteIds;
+    }
     final displayName = (updateData['display_name'] as String?)?.trim();
 
     if (!isAdmin) {
@@ -615,7 +700,8 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       updateData.remove('assigned_route_names');
       updateData.remove('role');
     } else {
-      if (updatedRole == 'seller' && newRouteIds.isEmpty && hasRouteIdsUpdate) {
+      if (updatedRole == 'seller' &&
+          (!hasRouteIdsUpdate || newRouteIds.isEmpty)) {
         throw ArgumentError(
           'Seller accounts require at least one assigned route.',
         );
@@ -716,7 +802,9 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       throw StateError('Only inactive users can be reactivated.');
     }
     if (target.target.role != UserRole.seller) {
-      throw StateError('Seller route assignments are required for reactivation.');
+      throw StateError(
+        'Seller route assignments are required for reactivation.',
+      );
     }
     final normalizedRouteIds = routeIds.map((id) => id.trim()).toList();
     if (normalizedRouteIds.isEmpty ||

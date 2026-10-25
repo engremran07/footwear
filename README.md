@@ -1,7 +1,11 @@
-# FootWear ERP — v3.10.1+1112
+# FootWear ERP — v3.10.3+1114
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
+> **v3.10.3+1114 (2026-10-25)** — Workspace member lists and seat reconciliation now include legacy active profiles without a display name. The release also includes on-device logo resizing, tenant-scoped admin/seller role management, accurate seat reconciliation, and compact bilingual single-page cash receipts without a balance-movement block. Google Drive backup remains disabled until OAuth client IDs are configured.
+> Verification: `01:21 +623: All tests passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 15.3s)`; `dart analyze test/`: `No issues found!`; Firestore Rules Emulator: `146 passing (37s)`.
+> Web build `EXIT: 0`; Hosting reported `Deploy complete!`. Firestore Rules/indexes were deployed with the preceding v3.10.2 build and did not change in this query-only hotfix. Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. ARM64 installed on `R5GL22RGT9V` (`Success`), versionName `3.10.3`, versionCode `3103414`.
+> **v3.10.2+1113 (2026-10-25)** — Workspace logos are automatically resized on-device to fit the Firestore limit; tenant admins can manage workspace admin/seller roles within safeguards; seat totals reconcile against the selected workspace’s live roster; cash receipts use a compact bilingual single-page table without a balance-movement block.
 > **v3.10.1+1112 (2026-10-25)** — Workspace management now presents owner contact and verification details, live role counts, and the 10-member free-tier capacity. Cash receipt screens and PDFs provide a richer payment, balance, and recipient breakdown. Google Drive backup is disabled in this build until OAuth client IDs are securely configured; encrypted phone archives remain available.
 > Verification: `01:20 +623: All tests passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 98.8s)`; `dart analyze test/`: `No issues found!`; Rules Emulator: `140 passing (31s)`.
 > Web build `EXIT: 0`; Hosting and Rules/indexes deployments reported `Deploy complete!`. Split APKs: ARMv7 30.6 MB, ARM64 32.1 MB, x86_64 33.6 MB. ARM64 installation on `R5GL22RGT9V` reported `Success`; device versionName `3.10.1`, versionCode `3103212`.

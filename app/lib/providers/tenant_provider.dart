@@ -11,6 +11,21 @@ import '../core/utils/tenant_scope.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
 
+List<UserModel> _sortUsersByDisplayName(Iterable<UserModel> users) {
+  final sorted = users.toList();
+  sorted.sort((left, right) {
+    final byName = left.displayName.trim().toLowerCase().compareTo(
+      right.displayName.trim().toLowerCase(),
+    );
+    if (byName != 0) return byName;
+    final byEmail = left.email.toLowerCase().compareTo(
+      right.email.toLowerCase(),
+    );
+    return byEmail != 0 ? byEmail : left.id.compareTo(right.id);
+  });
+  return sorted;
+}
+
 final tenantsProvider = StreamProvider.autoDispose<List<TenantModel>>((ref) {
   final currentUser = ref.watch(authUserProvider).value;
   if (currentUser == null) return const Stream.empty();
@@ -96,12 +111,11 @@ final tenantUsersProvider = StreamProvider.autoDispose
           .collection(Collections.users)
           .where('tenant_id', isEqualTo: tenantId)
           .where('active', isEqualTo: true)
-          .orderBy('display_name')
           .snapshots()
           .map(
-            (snap) => snap.docs
-                .map((doc) => UserModel.fromJson(doc.data(), doc.id))
-                .toList(),
+            (snap) => _sortUsersByDisplayName(
+              snap.docs.map((doc) => UserModel.fromJson(doc.data(), doc.id)),
+            ),
           );
     });
 
@@ -165,12 +179,11 @@ final allInactiveUsersForTenantProvider =
           .collection(Collections.users)
           .where('tenant_id', isEqualTo: tenantId)
           .where('active', isEqualTo: false)
-          .orderBy('display_name')
           .snapshots()
           .map(
-            (snap) => snap.docs
-                .map((doc) => UserModel.fromJson(doc.data(), doc.id))
-                .toList(),
+            (snap) => _sortUsersByDisplayName(
+              snap.docs.map((doc) => UserModel.fromJson(doc.data(), doc.id)),
+            ),
           );
     });
 
@@ -356,18 +369,26 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
     return actingUser;
   }
 
-  Future<void> initializeWorkspaceSeatCount(String tenantId) async {
+  Future<void> reconcileWorkspaceSeatCount(String tenantId) async {
     await _requireSelectedPlatformAdmin(tenantId);
     final normalizedTenantId = TenantScope.requireTenant(tenantId);
     final db = FirebaseFirestore.instance;
     final tenantRef = db
         .collection(Collections.tenants)
         .doc(normalizedTenantId);
+    final tenantSnapshot = await tenantRef.get(
+      const GetOptions(source: Source.server),
+    );
+    final tenantData = tenantSnapshot.data();
+    if (!tenantSnapshot.exists || tenantData?['active'] != true) {
+      throw StateError('An active workspace is required to reconcile seats.');
+    }
+    final observedRevision =
+        (tenantData?['seat_count_revision'] as num?)?.toInt() ?? 0;
     final usersQuery = db
         .collection(Collections.users)
         .where('tenant_id', isEqualTo: normalizedTenantId)
-        .where('active', isEqualTo: true)
-        .orderBy('display_name');
+        .where('active', isEqualTo: true);
     final activeUsers = await fetchAllQueryDocuments(usersQuery, pageSize: 200);
     final activeUserCount = activeUsers.where((document) {
       final role = (document.data()['role'] as String? ?? '')
@@ -382,16 +403,19 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
         final data = snapshot.data();
         if (!snapshot.exists || data?['active'] != true) {
           throw StateError(
-            'An active workspace is required to initialize seats.',
+            'An active workspace is required to reconcile seats.',
           );
         }
-        if (data!.containsKey('active_user_count')) return;
+        final currentRevision =
+            (data?['seat_count_revision'] as num?)?.toInt() ?? 0;
+        if (currentRevision != observedRevision) {
+          throw StateError('workspace_seat_count_changed_retry');
+        }
 
         transaction.update(tenantRef, {
           'active_user_count': activeUserCount,
           'max_active_users': TenantModel.freeSeatLimit,
-          'seat_count_revision': 0,
-          if (!data.containsKey('plan')) 'plan': 'free',
+          'seat_count_revision': observedRevision + 1,
           'updated_at': FieldValue.serverTimestamp(),
         });
       });

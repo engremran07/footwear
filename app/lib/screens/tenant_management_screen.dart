@@ -27,13 +27,14 @@ class _TenantManagementScreenState
   final _ownerNameController = TextEditingController();
   final _ownerEmailController = TextEditingController();
   final _ownerPasswordController = TextEditingController();
+  final _ownerPhoneController = TextEditingController();
   String? _selectedOwnerId;
   String? _pendingTenantId;
   String? _pendingOwnerId;
   bool _selectedWorkspaceForProvisioning = false;
   bool _isCreating = false;
   String? _lifecycleTenantId;
-  String? _seatInitializationTenantId;
+  String? _seatReconciliationTenantId;
 
   @override
   void dispose() {
@@ -42,6 +43,7 @@ class _TenantManagementScreenState
     _ownerNameController.dispose();
     _ownerEmailController.dispose();
     _ownerPasswordController.dispose();
+    _ownerPhoneController.dispose();
     super.dispose();
   }
 
@@ -119,6 +121,7 @@ class _TenantManagementScreenState
               password: _ownerPasswordController.text,
               displayName: _ownerNameController.text.trim(),
               role: 'tenant_admin',
+              phone: _ownerPhoneController.text.trim(),
               tenantId: tenantId,
             );
         await notifier.assignTenantOwner(tenantId, _pendingOwnerId!);
@@ -181,30 +184,78 @@ class _TenantManagementScreenState
       await ref
           .read(authNotifierProvider.notifier)
           .selectWorkspace(workspaceId: tenant.id, reason: reason);
-      if (tenant.active && tenant.activeUserCount == null) {
-        await _initializeWorkspaceSeats(tenant);
-      }
+      if (tenant.active) await _reconcileWorkspaceSeats(tenant);
     } catch (error) {
       _showMappedError(error);
     }
   }
 
-  Future<void> _initializeWorkspaceSeats(TenantModel tenant) async {
-    if (_seatInitializationTenantId != null || !tenant.active) return;
-    setState(() => _seatInitializationTenantId = tenant.id);
+  Future<void> _reconcileWorkspaceSeats(TenantModel tenant) async {
+    if (_seatReconciliationTenantId != null || !tenant.active) return;
+    setState(() => _seatReconciliationTenantId = tenant.id);
     try {
       await ref
           .read(tenantManagementNotifierProvider.notifier)
-          .initializeWorkspaceSeatCount(tenant.id);
+          .reconcileWorkspaceSeatCount(tenant.id);
       if (!mounted) return;
       ref.invalidate(tenantsProvider);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(successSnackBar(tr('workspace_seats_initialized', ref)));
+      ).showSnackBar(successSnackBar(tr('workspace_seats_reconciled', ref)));
     } catch (error) {
       _showMappedError(error);
     } finally {
-      if (mounted) setState(() => _seatInitializationTenantId = null);
+      if (mounted) setState(() => _seatReconciliationTenantId = null);
+    }
+  }
+
+  Future<void> _editOwnerPhone(UserModel owner) async {
+    final controller = TextEditingController(text: owner.phone ?? '');
+    final phone = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('workspace_owner_phone_title', ref)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.phone,
+          decoration: InputDecoration(
+            labelText: tr('phone', ref),
+            helperText: tr('workspace_owner_phone_guidance', ref),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(tr('cancel', ref)),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: Text(tr('save_changes', ref)),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (phone == null || !mounted) return;
+
+    try {
+      await ref.read(userManagementNotifierProvider.notifier).updateUser(
+        owner.id,
+        {'phone': phone.isEmpty ? null : phone},
+      );
+      if (!mounted) return;
+      final ownerTenantId = owner.tenantId?.trim();
+      if (ownerTenantId != null && ownerTenantId.isNotEmpty) {
+        ref.invalidate(tenantWorkspaceUsersProvider(ownerTenantId));
+      }
+      ref.invalidate(tenantsProvider);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(successSnackBar(tr('workspace_owner_phone_saved', ref)));
+    } catch (error) {
+      _showMappedError(error);
     }
   }
 
@@ -316,6 +367,7 @@ class _TenantManagementScreenState
       _ownerNameController.clear();
       _ownerEmailController.clear();
       _ownerPasswordController.clear();
+      _ownerPhoneController.clear();
     } else {
       if (_pendingTenantId == null) {
         _nameController.clear();
@@ -323,6 +375,7 @@ class _TenantManagementScreenState
         _ownerNameController.clear();
         _ownerEmailController.clear();
         _ownerPasswordController.clear();
+        _ownerPhoneController.clear();
         _selectedOwnerId = null;
         _pendingOwnerId = null;
       }
@@ -439,6 +492,16 @@ class _TenantManagementScreenState
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      key: const Key('workspace_owner_phone'),
+                      controller: _ownerPhoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: tr('phone_optional', ref),
+                        helperText: tr('workspace_owner_phone_guidance', ref),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
                       key: const Key('workspace_owner_password'),
                       controller: _ownerPasswordController,
                       obscureText: true,
@@ -471,6 +534,159 @@ class _TenantManagementScreenState
             ),
           ],
         );
+      },
+    );
+  }
+
+  Widget _buildWorkspaceSeatCard(
+    TenantModel tenant, {
+    required bool canReadLiveUsers,
+    required bool canReconcile,
+  }) {
+    return Consumer(
+      builder: (context, seatRef, _) {
+        final seatLimit = tenant.maxActiveUsers;
+        final storedCount = tenant.activeUserCount;
+        final planLabel = tenant.plan == null || tenant.plan!.trim().isEmpty
+            ? tr('free_tier', seatRef)
+            : tenant.plan!.toLowerCase() == 'free'
+            ? tr('free_tier', seatRef)
+            : tenant.plan!;
+
+        Widget cardContent({
+          required int count,
+          required bool isLive,
+          String? statusMessage,
+          bool isError = false,
+          bool countKnown = true,
+        }) {
+          final remainingSeats = (seatLimit - count).clamp(0, seatLimit);
+          final progress = seatLimit == 0
+              ? 1.0
+              : (count / seatLimit).clamp(0.0, 1.0);
+          return Card(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.people_alt_outlined,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          tr('workspace_seats', seatRef),
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ),
+                      Chip(label: Text(planLabel)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        countKnown ? '$count / $seatLimit' : '— / $seatLimit',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        '${tr('workspace_seats_remaining', seatRef)}: '
+                        '${countKnown ? remainingSeats : '—'}',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  LinearProgressIndicator(
+                    value: progress,
+                    semanticsLabel: tr('workspace_seats', seatRef),
+                  ),
+                  if (statusMessage != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      statusMessage,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isError
+                            ? Theme.of(context).colorScheme.error
+                            : null,
+                      ),
+                    ),
+                  ],
+                  if (isLive &&
+                      storedCount != count &&
+                      canReconcile &&
+                      tenant.active)
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: TextButton.icon(
+                        onPressed: _seatReconciliationTenantId == null
+                            ? () => _reconcileWorkspaceSeats(tenant)
+                            : null,
+                        icon: _seatReconciliationTenantId == tenant.id
+                            ? const SizedBox.square(
+                                dimension: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.sync, size: 18),
+                        label: Text(tr('reconcile_workspace_seats', seatRef)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (!canReadLiveUsers || !tenant.active) {
+          return cardContent(
+            count: storedCount ?? 0,
+            isLive: false,
+            countKnown: storedCount != null,
+            statusMessage: storedCount == null
+                ? tr('workspace_seat_count_pending', seatRef)
+                : null,
+          );
+        }
+
+        return seatRef
+            .watch(tenantWorkspaceUsersProvider(tenant.id))
+            .when(
+              data: (users) {
+                final liveCount = users
+                    .where((user) => user.active && !user.isSuperAdmin)
+                    .length;
+                final mismatch = storedCount != liveCount;
+                return cardContent(
+                  count: liveCount,
+                  isLive: true,
+                  statusMessage: mismatch
+                      ? tr('workspace_seat_count_mismatch', seatRef)
+                      : null,
+                );
+              },
+              loading: () => cardContent(
+                count: storedCount ?? 0,
+                isLive: false,
+                countKnown: storedCount != null,
+                statusMessage: tr('workspace_seat_live_loading', seatRef),
+              ),
+              error: (error, _) => cardContent(
+                count: storedCount ?? 0,
+                isLive: false,
+                countKnown: storedCount != null,
+                statusMessage:
+                    '${tr('workspace_seat_live_unavailable', seatRef)} '
+                    '${tr(AppErrorMapper.key(error), seatRef)}',
+                isError: true,
+              ),
+            );
       },
     );
   }
@@ -609,30 +825,43 @@ class _TenantManagementScreenState
                                   ),
                                 ],
                               ),
-                            if (owner.phone?.trim().isNotEmpty == true)
-                              Row(
-                                children: [
-                                  const Icon(Icons.phone_outlined, size: 18),
-                                  const SizedBox(width: 6),
-                                  Expanded(child: Text(owner.phone!)),
-                                  if (isValidWhatsAppPhone(owner.phone!))
-                                    IconButton(
-                                      tooltip: tr(
-                                        'contact_owner_whatsapp',
-                                        memberRef,
-                                      ),
-                                      onPressed: () => _contactOwnerByWhatsApp(
-                                        owner!.phone!,
-                                      ),
-                                      icon: const Icon(Icons.chat_outlined),
+                            Row(
+                              children: [
+                                const Icon(Icons.phone_outlined, size: 18),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    owner.phone?.trim().isNotEmpty == true
+                                        ? owner.phone!
+                                        : tr(
+                                            'workspace_owner_phone_missing',
+                                            memberRef,
+                                          ),
+                                  ),
+                                ),
+                                if (owner.phone?.trim().isNotEmpty == true &&
+                                    isValidWhatsAppPhone(owner.phone!))
+                                  IconButton(
+                                    tooltip: tr(
+                                      'contact_owner_whatsapp',
+                                      memberRef,
                                     ),
-                                ],
-                              )
-                            else
-                              Text(
-                                tr('workspace_owner_phone_missing', memberRef),
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
+                                    onPressed: () =>
+                                        _contactOwnerByWhatsApp(owner!.phone!),
+                                    icon: const Icon(Icons.chat_outlined),
+                                  ),
+                                IconButton(
+                                  tooltip: tr(
+                                    owner.phone?.trim().isNotEmpty == true
+                                        ? 'edit_owner_phone'
+                                        : 'add_owner_phone',
+                                    memberRef,
+                                  ),
+                                  onPressed: () => _editOwnerPhone(owner!),
+                                  icon: const Icon(Icons.edit_outlined),
+                                ),
+                              ],
+                            ),
                             Wrap(
                               spacing: 8,
                               children: [
@@ -757,17 +986,6 @@ class _TenantManagementScreenState
                   currentUser?.isTenantAdmin == true &&
                   currentUser!.active &&
                   currentUser.tenantId == tenant.id;
-              final seatCount = tenant.activeUserCount;
-              final seatLimit = tenant.maxActiveUsers;
-              final remainingSeats = seatCount == null
-                  ? null
-                  : (seatLimit - seatCount).clamp(0, seatLimit);
-              final planLabel =
-                  tenant.plan == null || tenant.plan!.trim().isEmpty
-                  ? tr('free_tier', ref)
-                  : tenant.plan!.toLowerCase() == 'free'
-                  ? tr('free_tier', ref)
-                  : tenant.plan!;
               return Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -804,98 +1022,12 @@ class _TenantManagementScreenState
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Card(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerLow,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.people_alt_outlined,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      tr('workspace_seats', ref),
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleSmall,
-                                    ),
-                                  ),
-                                  Chip(label: Text(planLabel)),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    seatCount == null
-                                        ? '— / $seatLimit'
-                                        : '$seatCount / $seatLimit',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium,
-                                  ),
-                                  if (remainingSeats != null)
-                                    Text(
-                                      '${tr('workspace_seats_remaining', ref)}: $remainingSeats',
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              LinearProgressIndicator(
-                                value: seatCount == null
-                                    ? null
-                                    : seatLimit == 0
-                                    ? 1
-                                    : (seatCount / seatLimit).clamp(0, 1),
-                                semanticsLabel: tr('workspace_seats', ref),
-                              ),
-                              if (seatCount == null) ...[
-                                const SizedBox(height: 6),
-                                Text(
-                                  tr('workspace_seat_count_pending', ref),
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                if (hasWorkspaceSupportContext && tenant.active)
-                                  Align(
-                                    alignment: AlignmentDirectional.centerEnd,
-                                    child: TextButton.icon(
-                                      onPressed:
-                                          _seatInitializationTenantId == null
-                                          ? () => _initializeWorkspaceSeats(
-                                              tenant,
-                                            )
-                                          : null,
-                                      icon:
-                                          _seatInitializationTenantId ==
-                                              tenant.id
-                                          ? const SizedBox.square(
-                                              dimension: 16,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(Icons.sync, size: 18),
-                                      label: Text(
-                                        tr('initialize_workspace_seats', ref),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ],
-                          ),
-                        ),
+                      _buildWorkspaceSeatCard(
+                        tenant,
+                        canReadLiveUsers:
+                            hasWorkspaceSupportContext ||
+                            isAssignedWorkspaceAdmin,
+                        canReconcile: hasWorkspaceSupportContext,
                       ),
                       if (tenant.ownerUserId == null)
                         Text(

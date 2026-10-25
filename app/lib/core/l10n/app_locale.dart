@@ -549,6 +549,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'supplier': 'Supplier',
     'contact_name': 'Contact Name',
     'phone': 'Phone',
+    'phone_optional': 'Phone (optional)',
     'payment_terms': 'Payment Terms',
     'search_suppliers': 'Search suppliers…',
 
@@ -727,6 +728,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'workspace_seat_count_pending': 'Seat count not initialized',
     'initialize_workspace_seats': 'Initialize seat tracking',
     'workspace_seats_initialized': 'Seat tracking initialized',
+    'reconcile_workspace_seats': 'Reconcile live seat count',
+    'workspace_seats_reconciled': 'Workspace seat count reconciled',
+    'workspace_seat_live_loading': 'Loading live membership count…',
+    'workspace_seat_live_unavailable':
+        'Live membership count is temporarily unavailable.',
     'workspace_seat_limit_reached':
         'This workspace has reached its 10 active-user limit.',
     'workspace_seat_count_initialization_required':
@@ -743,7 +749,14 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'workspace_owner_inactive': 'Owner account is inactive',
     'workspace_owner_email_verified': 'Email verified',
     'workspace_owner_email_unverified': 'Email not verified',
-    'workspace_owner_phone_missing': 'No contact number is recorded',
+    'workspace_owner_phone_missing':
+        'No phone number is recorded. Add one to enable direct contact.',
+    'workspace_owner_phone_title': 'Workspace owner contact',
+    'workspace_owner_phone_guidance':
+        'Include the country code to enable WhatsApp, for example +966…',
+    'workspace_owner_phone_saved': 'Owner contact number saved',
+    'edit_owner_phone': 'Edit owner contact number',
+    'add_owner_phone': 'Add owner contact number',
     'contact_owner_whatsapp': 'Message owner on WhatsApp',
     'contact_owner_email': 'Email owner',
     'workspace_support_context_expired':
@@ -2038,6 +2051,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'supplier': 'المورد',
     'contact_name': 'اسم جهة الاتصال',
     'phone': 'الهاتف',
+    'phone_optional': 'الهاتف (اختياري)',
     'payment_terms': 'شروط الدفع',
     'search_suppliers': 'البحث عن الموردين…',
 
@@ -2218,6 +2232,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'workspace_seat_count_pending': 'لم يتم تهيئة عدّ المقاعد',
     'initialize_workspace_seats': 'تهيئة تتبع المقاعد',
     'workspace_seats_initialized': 'تمت تهيئة تتبع المقاعد',
+    'reconcile_workspace_seats': 'مطابقة العدد المباشر للمقاعد',
+    'workspace_seats_reconciled': 'تمت مطابقة عدد مقاعد مساحة العمل',
+    'workspace_seat_live_loading': 'جارٍ تحميل عدد الأعضاء المباشر…',
+    'workspace_seat_live_unavailable': 'عدد الأعضاء المباشر غير متاح مؤقتاً.',
     'workspace_seat_limit_reached':
         'وصلت مساحة العمل إلى الحد الأقصى البالغ 10 مستخدمين نشطين.',
     'workspace_seat_count_initialization_required':
@@ -2234,7 +2252,14 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'workspace_owner_inactive': 'حساب المالك غير نشط',
     'workspace_owner_email_verified': 'البريد الإلكتروني موثّق',
     'workspace_owner_email_unverified': 'البريد الإلكتروني غير موثّق',
-    'workspace_owner_phone_missing': 'لا يوجد رقم اتصال مسجل',
+    'workspace_owner_phone_missing':
+        'لا يوجد رقم هاتف مسجل. أضفه لتسهيل التواصل المباشر.',
+    'workspace_owner_phone_title': 'بيانات اتصال مالك مساحة العمل',
+    'workspace_owner_phone_guidance':
+        'أضف رمز الدولة لتفعيل واتساب، مثل ‎+966…',
+    'workspace_owner_phone_saved': 'تم حفظ رقم اتصال المالك',
+    'edit_owner_phone': 'تعديل رقم اتصال المالك',
+    'add_owner_phone': 'إضافة رقم اتصال المالك',
     'contact_owner_whatsapp': 'مراسلة المالك عبر واتساب',
     'contact_owner_email': 'مراسلة المالك بالبريد الإلكتروني',
     'workspace_support_context_expired':
@@ -2792,8 +2817,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'تعذر قراءة هذا الملف كصورة. اختر ملف صورة صالحًا.',
     'settings_logo_source_too_large':
         'حجم الصورة الأصلية %s. اختر صورة أصغر من 20 ميغابايت.',
-    'settings_logo_processing_failed':
-        'تعذرت معالجة الصورة. جرّب صورة أخرى.',
+    'settings_logo_processing_failed': 'تعذرت معالجة الصورة. جرّب صورة أخرى.',
     'settings_invalid_pairs_per_carton':
         'يجب أن يكون عدد الأزواج في الكرتون رقمًا صحيحًا موجبًا.',
     'settings_logo_image_too_large':
@@ -3528,6 +3552,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'supplier': 'سپلائر',
     'contact_name': 'رابطہ نام',
     'phone': 'فون',
+    'phone_optional': 'فون (اختیاری)',
     'payment_terms': 'ادائیگی کی شرائط',
     'search_suppliers': 'سپلائرز تلاش کریں…',
 
@@ -3711,6 +3736,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'workspace_seat_count_pending': 'نشستوں کی گنتی شروع نہیں ہوئی',
     'initialize_workspace_seats': 'نشستوں کی گنتی شروع کریں',
     'workspace_seats_initialized': 'نشستوں کی گنتی شروع ہو گئی',
+    'reconcile_workspace_seats': 'لائیو نشستوں کی گنتی درست کریں',
+    'workspace_seats_reconciled': 'ورک اسپیس نشستوں کی گنتی درست ہو گئی',
+    'workspace_seat_live_loading': 'لائیو ممبران کی گنتی لوڈ ہو رہی ہے…',
+    'workspace_seat_live_unavailable':
+        'لائیو ممبران کی گنتی عارضی طور پر دستیاب نہیں۔',
     'workspace_seat_limit_reached':
         'اس ورک اسپیس میں فعال صارفین کی زیادہ سے زیادہ حد 10 ہے۔',
     'workspace_seat_count_initialization_required':
@@ -3727,7 +3757,14 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'workspace_owner_inactive': 'مالک کا اکاؤنٹ غیر فعال ہے',
     'workspace_owner_email_verified': 'ای میل تصدیق شدہ',
     'workspace_owner_email_unverified': 'ای میل کی تصدیق نہیں ہوئی',
-    'workspace_owner_phone_missing': 'رابطہ نمبر درج نہیں ہے',
+    'workspace_owner_phone_missing':
+        'فون نمبر درج نہیں۔ براہ راست رابطے کے لیے نمبر شامل کریں۔',
+    'workspace_owner_phone_title': 'ورک اسپیس مالک کا رابطہ',
+    'workspace_owner_phone_guidance':
+        'واٹس ایپ کے لیے ملک کا کوڈ شامل کریں، مثلاً ‎+966…',
+    'workspace_owner_phone_saved': 'مالک کا رابطہ نمبر محفوظ ہو گیا',
+    'edit_owner_phone': 'مالک کا رابطہ نمبر تبدیل کریں',
+    'add_owner_phone': 'مالک کا رابطہ نمبر شامل کریں',
     'contact_owner_whatsapp': 'واٹس ایپ پر مالک کو پیغام دیں',
     'contact_owner_email': 'مالک کو ای میل کریں',
     'workspace_support_context_expired':

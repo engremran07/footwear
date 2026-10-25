@@ -1247,3 +1247,50 @@ Unreleased shared frontend accessibility foundation:
    ARM64 copied to and installed on `R5GL22RGT9V` (`Success`); installed
    versionName is `3.10.1`, versionCode `3103212`. Feature commit `4d41f93`
    was pushed to `main`.
+
+2026-10-25 workspace role, logo, and receipt corrections — v3.10.2+1113:
+
+- Workspace-admin account management now permits creating canonical admin and
+  seller accounts and promoting/demoting eligible same-workspace admin/seller
+  users. The permanent owner, tenant-admin peers, platform roles, and
+  peer-admin deactivation remain protected. User-profile changes and seat
+  counter transitions stay atomic.
+- Selected platform super-admins can reconcile a tenant's stored seat total
+  against its fully paged active roster with revision checks. Workspace cards
+  show role counts from the live roster only when the role has authorized
+  access; otherwise the UI displays stored metadata and an actionable support
+  context rather than a perpetual spinner. The free-tier limit remains 10
+  active non-platform members.
+- Workspace logos are resized and losslessly re-encoded locally, preserving
+  alpha while reducing dimensions until the encoded value fits Firestore's
+  limit. This deterministic image processing does not use offline AI.
+- Cash-receipt detail and PDFs use a compact bilingual table and a single-page
+  receipt layout. The balance-movement presentation was removed; financial
+  writes and shop-balance accounting are unchanged. Financial PDFs reuse the
+  shared compact bilingual workspace header.
+- Full Flutter suite: `01:26 +623: All tests passed!`; changelog regression:
+  `00:00 +10: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 103.6s)`; `dart analyze test/`: `No issues found!`.
+  Firestore Rules Emulator: `145 passing (31s)`.
+- Web build `EXIT: 0`; Firebase Hosting and Firestore Rules/indexes each
+  reported `Deploy complete!`. Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB,
+  x86_64 33.6 MB. ARM64 was copied to and installed on `R5GL22RGT9V`
+  (`Success`, versionName `3.10.2`, versionCode `3103313`).
+
+2026-10-25 legacy workspace roster completeness — v3.10.3+1114:
+
+- Active and inactive workspace user streams now retain profiles lacking the
+  optional `display_name` field and sort the complete results client-side.
+  Seat reconciliation uses a tenant-scoped active-user query without that
+  optional-field ordering, preventing legacy profiles from being omitted from
+  the stored seat total.
+- Added an emulator regression showing that Firestore `orderBy('display_name')`
+  excludes a seeded legacy profile while the complete scoped query includes it.
+- Full Flutter suite: `01:21 +623: All tests passed!`; `flutter analyze lib
+  --no-pub`: `No issues found! (ran in 15.3s)`; `dart analyze test/`:
+  `No issues found!`; Firestore Rules Emulator: `146 passing (37s)`.
+- Web build `EXIT: 0`; Hosting deployment reported `Deploy complete!`.
+  Firestore Rules/indexes were already deployed with v3.10.2 and no Rules or
+  index files changed for this provider-only hotfix.
+- Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. ARM64 installed
+  on `R5GL22RGT9V` (`Success`, versionName `3.10.3`, versionCode `3103414`).

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:isolate';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -112,15 +113,34 @@ class WorkspaceLogoProcessor {
               height: height,
               interpolation: image.Interpolation.linear,
             );
-      final pngBytes = Uint8List.fromList(image.encodePng(resized, level: 9));
-      final base64 = base64Encode(pngBytes);
-      if (base64.length > SettingsModel.maxLogoBase64Bytes) {
-        return {
-          'code': 'settings_logo_encoded_too_large',
-          'encoded_length': base64.length,
-          'width': width,
-          'height': height,
-        };
+      var output = resized;
+      var outputWidth = width;
+      var outputHeight = height;
+      Uint8List pngBytes;
+      String base64;
+      while (true) {
+        pngBytes = Uint8List.fromList(image.encodePng(output, level: 9));
+        base64 = base64Encode(pngBytes);
+        if (base64.length <= SettingsModel.maxLogoBase64Bytes) break;
+
+        final nextWidth = math.max(1, (outputWidth * 0.85).floor());
+        final nextHeight = math.max(1, (outputHeight * 0.85).floor());
+        if (nextWidth == outputWidth && nextHeight == outputHeight) {
+          return {
+            'code': 'settings_logo_encoded_too_large',
+            'encoded_length': base64.length,
+            'width': outputWidth,
+            'height': outputHeight,
+          };
+        }
+        outputWidth = nextWidth;
+        outputHeight = nextHeight;
+        output = image.copyResize(
+          oriented,
+          width: outputWidth,
+          height: outputHeight,
+          interpolation: image.Interpolation.linear,
+        );
       }
 
       return {
@@ -129,8 +149,8 @@ class WorkspaceLogoProcessor {
         'base64': base64,
         'source_width': oriented.width,
         'source_height': oriented.height,
-        'width': width,
-        'height': height,
+        'width': outputWidth,
+        'height': outputHeight,
       };
     } on RangeError {
       return const {'code': 'settings_logo_invalid_image'};

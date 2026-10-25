@@ -28,6 +28,62 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.10.3',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '👥',
+        text: {
+          AppLocale.en:
+              'Workspace member lists and seat reconciliation now include older active profiles even when a display name is missing.',
+          AppLocale.ar:
+              'تتضمن قوائم أعضاء مساحة العمل ومطابقة المقاعد الآن الملفات النشطة القديمة حتى عند غياب الاسم المعروض.',
+          AppLocale.ur:
+              'ورک اسپیس کے ممبران کی فہرست اور نشستوں کی مطابقت میں اب پرانے فعال پروفائل بھی شامل ہیں، چاہے دکھانے والا نام موجود نہ ہو۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.10.2',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧑‍💼',
+        text: {
+          AppLocale.en:
+              'Workspace admins can manage admin and seller roles in their own workspace, with seat totals checked against the live team.',
+          AppLocale.ar:
+              'يمكن لمسؤولي مساحة العمل إدارة أدوار المسؤولين والبائعين ضمن مساحتهم، مع مطابقة المقاعد لإجمالي الفريق المباشر.',
+          AppLocale.ur:
+              'ورک اسپیس منتظمین اپنی ورک اسپیس میں ایڈمن اور سیلر کے کردار سنبھال سکتے ہیں، جبکہ نشستوں کی تعداد ٹیم کے تازہ ریکارڈ سے ملائی جاتی ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🖼️',
+        text: {
+          AppLocale.en:
+              'Workspace logos are resized on your device to fit the upload limit while preserving transparency.',
+          AppLocale.ar:
+              'تُعاد تهيئة شعارات مساحة العمل على جهازك لتناسب حد الرفع مع الحفاظ على الشفافية.',
+          AppLocale.ur:
+              'ورک اسپیس کے لوگو شفافیت برقرار رکھتے ہوئے اپ لوڈ کی حد کے مطابق آپ کے آلے پر سائز کیے جاتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Cash receipts now use a compact bilingual table and a single-page layout without the balance-movement block.',
+          AppLocale.ar:
+              'تستخدم الإيصالات النقدية الآن جدولًا ثنائي اللغة وتنسيقًا مدمجًا في صفحة واحدة دون قسم حركة الرصيد.',
+          AppLocale.ur:
+              'نقد رسیدیں اب مختصر دو لسانی جدول اور ایک صفحے کے لے آؤٹ میں ہیں، اور ان میں بیلنس کی نقل و حرکت کا حصہ شامل نہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.10.1',
     date: 'October 2026',
     items: [

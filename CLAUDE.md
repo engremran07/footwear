@@ -403,6 +403,31 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- v3.10.3+1114 fixes incomplete legacy workspace roster and seat data.
+  Active/inactive user lists sort client-side so documents without optional
+  `display_name` remain visible; selected-workspace seat reconciliation counts
+  the full tenant-scoped active roster. The query-only hotfix does not change
+  Rules/indexes, which were deployed with v3.10.2. Full Flutter suite:
+  `01:21 +623: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 15.3s)`; `dart analyze test/`:
+  `No issues found!`; Rules Emulator: `146 passing (37s)`. Web `EXIT: 0`;
+  Hosting deploy: `Deploy complete!`; split APKs built (30.7/32.2/33.6 MB).
+  ARM64 installed on `R5GL22RGT9V` (`Success`, versionCode `3103414`).
+- v3.10.2+1113 corrects workspace role management, roster-based seat
+  reconciliation, logo size handling, and cash-receipt presentation.
+  Tenant admins can create admin/seller accounts and change roles only among
+  eligible non-owner users in their tenant; peer administrator deactivation,
+  owner-role changes, and platform-role assignment remain denied. Seat
+  reconciliations are selected-workspace-only, paged, and revision-checked.
+  Logos resize locally while preserving transparency and are not processed by
+  an AI service. Cash-receipt PDFs are compact bilingual one-page tables with
+  no balance-movement section; receipt/ledger/balance writes remain atomic.
+  Full Flutter suite: `01:26 +623: All tests passed!`; changelog regression:
+  `00:00 +10: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 103.6s)`; `dart analyze test/`: `No issues found!`;
+  Rules Emulator: `145 passing (31s)`. Web `EXIT: 0`; Hosting and
+  Rules/indexes deploy: `Deploy complete!`. Split APKs built at 30.7/32.2/33.6
+  MB; ARM64 installed on `R5GL22RGT9V` (`Success`, versionCode `3103313`).
 - v3.10.1+1112 workspace and receipt improvements: tenant management shows
   owner contact/email verification, live role counts, and the free-tier cap
   of 10 active non-platform-super-admin members; profile transitions and seat

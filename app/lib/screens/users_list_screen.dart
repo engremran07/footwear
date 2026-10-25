@@ -79,7 +79,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateUserDialog(
           tenantId,
-          canAssignWorkspaceRoles: currentUser.isSuperAdmin,
+          canCreateWorkspaceAdmins:
+              currentUser.isSuperAdmin || currentUser.isTenantAdmin,
         ),
         icon: const Icon(Icons.person_add),
         label: Text(tr('new_user', ref)),
@@ -186,7 +187,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                             user: filtered[i],
                             currentUser: currentUser,
                             onEdit:
-                                currentUser.isSuperAdmin || !filtered[i].isAdmin
+                                currentUser.isSuperAdmin ||
+                                    (!filtered[i].isTenantAdmin &&
+                                        (currentUser.isTenantAdmin ||
+                                            !filtered[i].isAdmin))
                                 ? () =>
                                       _showEditUserDialog(filtered[i], tenantId)
                                 : null,
@@ -245,11 +249,12 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
   void _showCreateUserDialog(
     String tenantId, {
-    required bool canAssignWorkspaceRoles,
+    required bool canCreateWorkspaceAdmins,
   }) {
     final emailC = TextEditingController();
     final passC = TextEditingController();
     final nameC = TextEditingController();
+    final phoneC = TextEditingController();
     String role = 'seller';
     final selectedRouteIds = <String>[];
     final selectedRouteNames = <String>[];
@@ -277,6 +282,14 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                   ),
                   const SizedBox(height: 8),
                   TextField(
+                    controller: phoneC,
+                    decoration: InputDecoration(
+                      labelText: tr('phone_optional', ref),
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
                     controller: passC,
                     decoration: InputDecoration(labelText: tr('password', ref)),
                     obscureText: true,
@@ -287,7 +300,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     initialValue: role,
                     decoration: InputDecoration(labelText: tr('role', ref)),
                     items: [
-                      if (canAssignWorkspaceRoles)
+                      if (canCreateWorkspaceAdmins)
                         DropdownMenuItem(
                           value: 'admin',
                           child: Text(tr('lbl_admin', ref)),
@@ -296,7 +309,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         value: 'seller',
                         child: Text(tr('lbl_seller', ref)),
                       ),
-                      if (canAssignWorkspaceRoles)
+                      if (ref.read(authUserProvider).value?.isSuperAdmin ==
+                          true)
                         DropdownMenuItem(
                           value: 'tenant_admin',
                           child: Text(tr('role_tenant_admin', ref)),
@@ -371,6 +385,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                           password: passC.text.trim(),
                           displayName: nameC.text.trim(),
                           role: role,
+                          phone: phoneC.text.trim(),
                           assignedRouteIds: selectedRouteIds,
                           assignedRouteNames: selectedRouteNames,
                           tenantId: tenantId,
@@ -400,6 +415,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       emailC.dispose();
       passC.dispose();
       nameC.dispose();
+      phoneC.dispose();
     });
   }
 
@@ -410,9 +426,15 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     if (!mounted || currentUser == null) return;
     final nameC = TextEditingController(text: user.displayName);
     final emailC = TextEditingController(text: user.email);
+    final phoneC = TextEditingController(text: user.phone ?? '');
     String role = roleValueFromUserRole(user.role);
     final isSelf = currentUser.id == user.id;
-    final canChangeRole = currentUser.isSuperAdmin && !isSelf;
+    final canChangeRole =
+        !isSelf &&
+        (currentUser.isSuperAdmin ||
+            (currentUser.isTenantAdmin &&
+                !user.isTenantAdmin &&
+                (user.isAdmin || user.isSeller)));
     final selectedRouteIds = List<String>.from(user.assignedRouteIds);
     final selectedRouteNames = List<String>.from(user.assignedRouteNames);
     final oldRouteIds = List<String>.from(user.assignedRouteIds);
@@ -432,6 +454,16 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     controller: nameC,
                     decoration: InputDecoration(labelText: tr('name', ref)),
                     textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    key: const Key('user_phone_field'),
+                    controller: phoneC,
+                    decoration: InputDecoration(
+                      labelText: tr('phone', ref),
+                      helperText: tr('contact_owner_whatsapp', ref),
+                    ),
+                    keyboardType: TextInputType.phone,
                   ),
                   const SizedBox(height: 8),
                   // Account credentials are controlled by the account owner.
@@ -506,10 +538,11 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                           value: 'seller',
                           child: Text(tr('lbl_seller', ref)),
                         ),
-                        DropdownMenuItem(
-                          value: 'tenant_admin',
-                          child: Text(tr('role_tenant_admin', ref)),
-                        ),
+                        if (currentUser.isSuperAdmin)
+                          DropdownMenuItem(
+                            value: 'tenant_admin',
+                            child: Text(tr('role_tenant_admin', ref)),
+                          ),
                       ],
                       onChanged: (v) => setS(() {
                         role = v ?? 'seller';
@@ -519,7 +552,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         }
                       }),
                     ),
-                  if (role == 'seller') ...[
+                  if (role == 'seller' && (canChangeRole || user.isSeller)) ...[
                     const SizedBox(height: 8),
                     Align(
                       alignment: AlignmentDirectional.centerStart,
@@ -577,11 +610,20 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                     // Profile and authorization changes remain provider/rules guarded.
                     final profileUpdate = <String, dynamic>{
                       'display_name': nameC.text.trim(),
-                      'assigned_route_ids': selectedRouteIds,
-                      'assigned_route_names': selectedRouteNames,
+                      'phone': phoneC.text.trim(),
                     };
                     if (canChangeRole) {
                       profileUpdate['role'] = role;
+                      profileUpdate['assigned_route_ids'] = role == 'seller'
+                          ? selectedRouteIds
+                          : <String>[];
+                      profileUpdate['assigned_route_names'] = role == 'seller'
+                          ? selectedRouteNames
+                          : <String>[];
+                    } else if (role == 'seller' && user.isSeller) {
+                      profileUpdate['assigned_route_ids'] = selectedRouteIds;
+                      profileUpdate['assigned_route_names'] =
+                          selectedRouteNames;
                     }
                     await notifier.updateUser(
                       user.id,
@@ -612,6 +654,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     ).whenComplete(() {
       nameC.dispose();
       emailC.dispose();
+      phoneC.dispose();
     });
   }
 
@@ -968,7 +1011,12 @@ class _UserTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isSelf = user.id == currentUser?.id;
-    final canManageTarget = currentUser?.isSuperAdmin == true || !user.isAdmin;
+    final canManageTarget =
+        currentUser?.isSuperAdmin == true ||
+        (currentUser?.isTenantAdmin == true &&
+            !user.isTenantAdmin &&
+            !user.isSuperAdmin) ||
+        !user.isAdmin;
     final roleColor = user.isAdmin
         ? AppBrand.adminRoleColor
         : AppBrand.sellerRoleColor;

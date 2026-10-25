@@ -153,17 +153,18 @@ function createUserWithSeat(db, userId, {
   tenantId = 'tenant-1',
   role = 'seller',
   createdBy = 'admin-uid',
+  assignedRouteIds = ['route-1'],
 } = {}) {
   const batch = db.batch();
   const userRef = db.collection('users').doc(userId);
   batch.set(userRef, {
     role,
     active: true,
-    display_name: 'New Seller',
+    display_name: 'New Workspace User',
     email: `${userId}@test.com`,
     tenant_id: tenantId,
     created_by: createdBy,
-    assigned_route_ids: ['route-1'],
+    assigned_route_ids: assignedRouteIds,
   });
   return db
     .collection('tenants')
@@ -399,6 +400,133 @@ describe('users collection', () => {
       adminCtx(testEnv).firestore().collection('users').doc('tenant-admin-uid').update({
         active: false,
         updated_at: new Date(),
+      }),
+    );
+  });
+
+  it('workspace admin can create an admin with an atomic seat increment', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedTenant({ ownerUserId: 'tenant-admin-uid' });
+    const db = tenantAdminCtx(testEnv).firestore();
+
+    await assertSucceeds(
+      createUserWithSeat(db, 'workspace-admin-uid', {
+        role: 'admin',
+        createdBy: 'tenant-admin-uid',
+        assignedRouteIds: [],
+      }),
+    );
+  });
+
+  it('workspace admin can promote and demote non-owner admin and seller roles', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedUser('seller-uid', 'seller');
+    await seedUser('workspace-admin-uid', 'admin');
+    await seedTenant({ ownerUserId: 'tenant-admin-uid' });
+    const db = tenantAdminCtx(testEnv).firestore();
+
+    await assertSucceeds(
+      db.collection('users').doc('seller-uid').update({
+        role: 'admin',
+        assigned_route_ids: [],
+        assigned_route_names: [],
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+    await assertSucceeds(
+      db.collection('users').doc('workspace-admin-uid').update({
+        role: 'seller',
+        assigned_route_ids: ['route-1'],
+        assigned_route_names: ['Route 1'],
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+  });
+
+  it('workspace roster queries retain active legacy profiles without display_name', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedUser('legacy-user', 'seller');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('users').doc('legacy-user').update({
+        display_name: firebase.firestore.FieldValue.delete(),
+      });
+    });
+    await seedTenant({ ownerUserId: 'tenant-admin-uid' });
+
+    const db = tenantAdminCtx(testEnv).firestore();
+    const rosterQuery = db
+      .collection('users')
+      .where('tenant_id', '==', 'tenant-1')
+      .where('active', '==', true);
+    const orderedSnapshot = await assertSucceeds(
+      rosterQuery.orderBy('display_name').get(),
+    );
+    const completeSnapshot = await assertSucceeds(rosterQuery.get());
+
+    assert.strictEqual(orderedSnapshot.size, 1);
+    assert.strictEqual(completeSnapshot.size, 2);
+    assert(
+      completeSnapshot.docs.some((document) => document.id === 'legacy-user'),
+    );
+  });
+
+  it('workspace admin cannot change the permanent owner or assign platform roles', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedUser('seller-uid', 'seller');
+    await seedTenant({ ownerUserId: 'tenant-admin-uid' });
+    const db = tenantAdminCtx(testEnv).firestore();
+
+    await assertFails(
+      db.collection('users').doc('tenant-admin-uid').update({
+        role: 'seller',
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      db.collection('users').doc('seller-uid').update({
+        role: 'tenant_admin',
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      db.collection('users').doc('seller-uid').update({
+        role: 'super_admin',
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+  });
+
+  it('workspace admin cannot manage a user in another tenant', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedUser('outside-seller', 'seller', true, {
+      tenant_id: 'tenant-2',
+    });
+    await seedTenant({ ownerUserId: 'tenant-admin-uid' });
+    const db = tenantAdminCtx(testEnv).firestore();
+
+    await assertFails(
+      db.collection('users').doc('outside-seller').update({
+        role: 'admin',
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+  });
+
+  it('selected platform admin can reconcile a stale workspace seat counter', async () => {
+    await seedTenant({ activeUserCount: 4 });
+    await seedUser('platform-seat-admin', 'super_admin', true, {
+      active_workspace_id: 'tenant-1',
+      active_workspace_reason: 'Seat counter reconciliation',
+      active_workspace_selected_at: new Date(),
+    });
+    const db = testEnv.authenticatedContext('platform-seat-admin').firestore();
+
+    await assertSucceeds(
+      db.collection('tenants').doc('tenant-1').update({
+        active_user_count: 2,
+        max_active_users: 10,
+        seat_count_revision: 1,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
       }),
     );
   });

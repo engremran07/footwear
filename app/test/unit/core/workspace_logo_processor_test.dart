@@ -43,36 +43,39 @@ void main() {
     );
   });
 
-  test('rejects lossless output above the Base64 storage cap', () async {
-    final random = Random(17);
-    final source = image.Image(width: 800, height: 400, numChannels: 4);
-    for (var y = 0; y < source.height; y++) {
-      for (var x = 0; x < source.width; x++) {
-        source.setPixelRgba(
-          x,
-          y,
-          random.nextInt(256),
-          random.nextInt(256),
-          random.nextInt(256),
-          255,
-        );
+  test(
+    'automatically resizes detailed PNGs to the Base64 storage cap',
+    () async {
+      final random = Random(17);
+      final source = image.Image(width: 400, height: 400, numChannels: 4);
+      for (var y = 0; y < source.height; y++) {
+        for (var x = 0; x < source.width; x++) {
+          source.setPixelRgba(
+            x,
+            y,
+            random.nextInt(256),
+            random.nextInt(256),
+            random.nextInt(256),
+            255,
+          );
+        }
       }
-    }
 
-    await expectLater(
-      WorkspaceLogoProcessor.process(
+      final processed = await WorkspaceLogoProcessor.process(
         Uint8List.fromList(image.encodePng(source)),
-      ),
-      throwsA(
-        isA<WorkspaceLogoProcessingException>()
-            .having(
-              (error) => error.code,
-              'code',
-              'settings_logo_encoded_too_large',
-            )
-            .having((error) => error.width, 'width', 800)
-            .having((error) => error.height, 'height', 400),
-      ),
-    );
-  });
+      );
+      final decoded = image.decodeImage(processed.pngBytes)!;
+
+      expect(processed.sourceWidth, 400);
+      expect(processed.sourceHeight, 400);
+      expect(processed.width, lessThan(400));
+      expect(processed.height, lessThan(400));
+      expect(decoded.width, processed.width);
+      expect(decoded.height, processed.height);
+      expect(
+        processed.base64.length,
+        lessThanOrEqualTo(SettingsModel.maxLogoBase64Bytes),
+      );
+    },
+  );
 }

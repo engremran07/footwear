@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/l10n/financial_document_localization.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/action_guard.dart';
 import '../core/utils/error_mapper.dart';
@@ -374,134 +375,145 @@ class _InvoiceBody extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         if (invoice.isCashReceipt)
-          Card(
-            key: const Key('cash_receipt_balance_summary'),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.receipt_long_outlined, color: cs.primary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          tr('cash_receipt_details', ref),
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
+          Builder(
+            builder: (context) {
+              final pair = FinancialDocumentLanguagePair.fromJson(
+                invoice.headerSnapshot['document_language_pair'],
+              );
+              Widget pairedLabel(String key) {
+                final lines = financialDocumentLabel(
+                  key,
+                  pair,
+                  fallback: tr(key, ref),
+                ).split('\n');
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      lines.first,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (lines.length > 1)
+                      Text(
+                        lines[1],
+                        textDirection: TextDirection.rtl,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant,
                         ),
+                      ),
+                  ],
+                );
+              }
+
+              final details = <(String, String)>[
+                (
+                  'received_from',
+                  invoice.shopName.isNotEmpty
+                      ? invoice.shopName
+                      : tr('shop', ref),
+                ),
+                ('date', dateStr),
+                if (invoice.cashReceiptSequence != null)
+                  ('receipt_sequence', invoice.cashReceiptSequence.toString()),
+                if (invoice.sellerName.trim().isNotEmpty)
+                  ('received_by', invoice.sellerName),
+                if (invoice.paymentMethod != null)
+                  (
+                    'payment_method',
+                    tr('payment_method_${invoice.paymentMethod}', ref),
+                  ),
+                if (invoice.paymentReference?.trim().isNotEmpty == true)
+                  ('payment_reference', invoice.paymentReference!.trim()),
+                if (invoice.linkedInvoiceId?.trim().isNotEmpty == true)
+                  ('linked_invoice', invoice.linkedInvoiceId!.trim()),
+              ];
+
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.receipt_long_outlined, color: cs.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              tr('cash_receipt_details', ref),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            pairedLabel('amount_received'),
+                            const SizedBox(height: 4),
+                            Text(
+                              AppFormatters.currency(
+                                invoice.total,
+                                invoice.currency,
+                              ),
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.headlineMedium
+                                  ?.copyWith(
+                                    color: cs.onPrimaryContainer,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Table(
+                        key: const Key('cash_receipt_details_table'),
+                        border: TableBorder.all(
+                          color: cs.outlineVariant,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        columnWidths: const {
+                          0: FlexColumnWidth(1.5),
+                          1: FlexColumnWidth(2.5),
+                        },
+                        children: [
+                          for (final (labelKey, value) in details)
+                            TableRow(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: pairedLabel(labelKey),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: SelectableText(
+                                    value,
+                                    textAlign: TextAlign.start,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 18,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          tr('amount_received', ref),
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: cs.onPrimaryContainer),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          AppFormatters.currency(
-                            invoice.total,
-                            invoice.currency,
-                          ),
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(
-                                color: cs.onPrimaryContainer,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (invoice.cashReceiptSequence != null)
-                    _InfoRow(
-                      label: tr('receipt_sequence', ref),
-                      value: invoice.cashReceiptSequence.toString(),
-                    ),
-                  _InfoRow(
-                    label: tr('received_from', ref),
-                    value: invoice.shopName.isNotEmpty
-                        ? invoice.shopName
-                        : tr('shop', ref),
-                  ),
-                  _InfoRow(label: tr('date', ref), value: dateStr),
-                  _InfoRow(
-                    label: tr('received_by', ref),
-                    value: invoice.sellerName.trim().isEmpty
-                        ? '—'
-                        : invoice.sellerName,
-                  ),
-                  if (invoice.paymentMethod != null)
-                    _InfoRow(
-                      label: tr('payment_method', ref),
-                      value: tr('payment_method_${invoice.paymentMethod}', ref),
-                    ),
-                  if (invoice.paymentReference?.trim().isNotEmpty == true)
-                    _InfoRow(
-                      label: tr('payment_reference', ref),
-                      value: invoice.paymentReference!,
-                    ),
-                  if (invoice.linkedInvoiceId?.trim().isNotEmpty == true)
-                    _InfoRow(
-                      label: tr('linked_invoice', ref),
-                      value: invoice.linkedInvoiceId!,
-                    ),
-                  if (invoice.shopBalanceBefore != null ||
-                      invoice.shopBalanceAfter != null) ...[
-                    const Divider(height: 24),
-                    Text(
-                      tr('receipt_balance_movement', ref),
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ReceiptBalanceMetric(
-                            label: tr('balance_before', ref),
-                            amount: invoice.shopBalanceBefore,
-                            currency: invoice.currency,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: _ReceiptBalanceMetric(
-                            label: tr('amount_received', ref),
-                            amount: invoice.total,
-                            currency: invoice.currency,
-                            emphasize: true,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: _ReceiptBalanceMetric(
-                            label: tr('balance_after', ref),
-                            amount: invoice.shopBalanceAfter,
-                            currency: invoice.currency,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         if (invoice.isCashReceipt) const SizedBox(height: 12),
         // Items table
@@ -718,45 +730,6 @@ class _TotalRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ReceiptBalanceMetric extends StatelessWidget {
-  final String label;
-  final double? amount;
-  final String currency;
-  final bool emphasize;
-
-  const _ReceiptBalanceMetric({
-    required this.label,
-    required this.amount,
-    required this.currency,
-    this.emphasize = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      children: [
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          amount == null ? '—' : AppFormatters.currency(amount!, currency),
-          textAlign: TextAlign.center,
-          style: textTheme.titleSmall?.copyWith(
-            fontWeight: emphasize ? FontWeight.bold : FontWeight.w600,
-            color: emphasize ? Theme.of(context).colorScheme.primary : null,
-          ),
-        ),
-      ],
     );
   }
 }

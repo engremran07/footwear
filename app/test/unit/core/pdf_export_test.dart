@@ -102,7 +102,7 @@ void main() {
   });
 
   test(
-    'generateInvoicePdf renders a receipt using its saved header snapshot',
+    'cash receipt PDF is a single page and omits balance movement',
     () async {
       final now = Timestamp.fromMillisecondsSinceEpoch(0);
       final invoice = InvoiceModel(
@@ -118,7 +118,7 @@ void main() {
         outstandingAmount: 0,
         status: InvoiceModel.statusPaid,
         paymentMethod: 'bank_transfer',
-        paymentReference: 'BANK-123',
+        paymentReference: List.filled(120, 'BANK-123 ').join(),
         shopBalanceBefore: 200,
         shopBalanceAfter: 75,
         cashReceiptSequence: 1,
@@ -148,7 +148,11 @@ void main() {
       );
 
       expect(invoice.isCashReceipt, isTrue);
-      expect(bytes, isNotEmpty);
+      final pageCount = RegExp(
+        r'/Count\s+(\d+)',
+      ).firstMatch(latin1.decode(bytes, allowInvalid: true));
+      expect(pageCount, isNotNull);
+      expect(int.parse(pageCount!.group(1)!), 1);
     },
   );
 

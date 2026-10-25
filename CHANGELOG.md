@@ -7,6 +7,40 @@ Most recent first.
 
 ---
 
+## [3.10.3+1114] — 2026-10-25 — Workspace roster completeness
+
+### Fixed
+
+- Workspace member streams and seat reconciliation no longer order Firestore queries by optional `display_name`. Legacy profiles without that field remain in the active/inactive lists and seat total; client-side sorting preserves alphabetical presentation.
+
+### Verification
+
+- Full Flutter suite: `01:21 +623: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 15.3s)`; `dart analyze test/`: `No issues found!`.
+- Firestore Rules Emulator: `146 passing (37s)`, including the legacy-profile query regression. Rules/indexes are unchanged from the v3.10.2 deployment.
+- Web build: `EXIT: 0`; Hosting deployment: `Deploy complete!`.
+- Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. ARM64 installed on `R5GL22RGT9V` (`Success`, versionCode `3103414`).
+
+## [3.10.2+1113] — 2026-10-25 — Workspace and receipt corrections
+
+### Added
+
+- Workspace admins can create workspace-scoped admin/seller accounts and promote or demote eligible non-owner admin/seller users. Owner roles, tenant-admin peers, platform roles, and peer-admin deactivation remain protected.
+- Selected platform super-admins can reconcile stored seat counts against a fully paged active workspace roster using revision checks. The free-tier limit remains 10 active non-platform members.
+- Workspace logo images are automatically resized and re-encoded on-device to fit the Firestore limit while preserving transparency.
+
+### Changed
+
+- Receipt detail and PDF use a compact bilingual table. Receipt PDFs fit one page, reuse the compact workspace header, and omit the account-balance-movement block without changing financial writes.
+
+### Verification
+
+- Full Flutter suite: `01:26 +623: All tests passed!`; changelog tests: `00:00 +10: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 103.6s)`; `dart analyze test/`: `No issues found!`.
+- Firestore Rules Emulator: `145 passing (31s)`.
+- Web build: `EXIT: 0`; Hosting and Firestore Rules/indexes deployment: `Deploy complete!`.
+- Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.6 MB. ARM64 installed on `R5GL22RGT9V` (`Success`, versionCode `3103313`).
+
 ## [3.9.81+707] — 2026-10-22 — Custom access removal and workspace CRUD
 
 ### Changed

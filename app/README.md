@@ -1,6 +1,50 @@
-# FootWear ERP — Flutter App (v3.10.1+1112)
+# FootWear ERP — Flutter App (v3.10.3+1114)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
+
+## v3.10.3 Workspace Roster Completeness
+
+Active and inactive workspace user lists now sort the queried profiles on-device
+instead of using Firestore `orderBy(display_name)`. That ordering omits legacy
+documents where the optional display-name field is absent. Seat reconciliation
+uses the same complete tenant-scoped active roster, so it no longer writes an
+under-count. This query-only hotfix does not change Firestore Rules or indexes;
+the Rules/indexes were deployed with v3.10.2.
+
+Verification for `3.10.3+1114`: full Flutter suite `01:21 +623: All tests
+passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 15.3s)`;
+`dart analyze test/`: `No issues found!`; Firestore Rules Emulator:
+`146 passing (37s)`. Web `EXIT: 0`; Hosting deployment reported
+`Deploy complete!`. Split APKs built at 30.7/32.2/33.6 MB. ARM64 installed on
+`R5GL22RGT9V` (`Success`, versionCode `3103414`).
+
+## v3.10.2 Workspace and Receipt Improvements
+
+Workspace administrators can create admin and seller accounts and promote or
+demote eligible same-workspace admin/seller accounts. They cannot alter the
+permanent workspace owner or platform roles, or deactivate peer administrators.
+Seat changes remain atomic with profile changes. Selected platform super-admins
+can reconcile a workspace's stored seat counter against its live active roster;
+the free-tier cap remains 10 non-platform members.
+
+Workspace logos are resized locally on the device, preserving transparency and
+reducing dimensions until the encoded logo fits the Firestore limit. This uses
+deterministic image processing and does not require an AI model or network
+service.
+
+Cash-receipt detail and PDFs use a compact bilingual table layout. Receipt PDFs
+are deliberately single-page and omit the account-balance-movement block; the
+underlying receipt, ledger, and shop-balance transaction remains atomic and
+unchanged. Invoice, receipt, and statement documents continue using the
+configured English-Arabic or English-Urdu language pair and shared compact
+workspace header.
+
+Verification for `3.10.2+1113`: full Flutter suite `01:26 +623: All tests
+passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 103.6s)`;
+`dart analyze test/`: `No issues found!`; Firestore Rules Emulator:
+`145 passing (31s)`. Web `EXIT: 0`; Hosting and Firestore Rules/indexes
+deployments reported `Deploy complete!`. Split APKs built at 30.7/32.2/33.6
+MB. ARM64 installed on `R5GL22RGT9V` (`Success`, versionCode `3103313`).
 
 > **v3.9.81+707 (2026-10-22)** — Firebase Authentication remains the only sign-in mechanism; app-managed device pairing and custom session approvals are removed. Workspace-admin CRUD and tenant-scoped financial safeguards remain.
 
