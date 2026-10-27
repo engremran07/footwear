@@ -12,6 +12,11 @@ void main() {
       expect(TenantScope.requireTenant(' tenant-1 '), 'tenant-1');
       expect(() => TenantScope.requireTenant(null), throwsStateError);
       expect(() => TenantScope.requireTenant('  '), throwsStateError);
+      expect(
+        () => TenantScope.requireTenant(TenantScope.globalTenantId),
+        throwsStateError,
+      );
+      expect(() => TenantScope.requireTenant('global'), throwsStateError);
     });
 
     test('applies tenant_id to data payloads', () {
@@ -20,6 +25,13 @@ void main() {
       }, tenantId: 'tenant-1');
       expect(data['tenant_id'], 'tenant-1');
       expect(data['name'], 'Demo');
+      expect(
+        () => TenantScope.applyToData(
+          {'name': 'Demo'},
+          tenantId: TenantScope.globalTenantId,
+        ),
+        throwsStateError,
+      );
     });
 
     test('extracts tenant_id from user data', () {

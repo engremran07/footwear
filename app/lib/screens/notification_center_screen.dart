@@ -16,13 +16,12 @@ import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
 
 // =============================================================================
-// NotificationCenterScreen — admin-only in-app notification feed.
+// NotificationCenterScreen — operational-admin in-app notification feed.
 //
 // PERMISSION RULES:
-//   • This route ('/notifications') is in _isAccountAdminPath() → sellers are
-//     redirected to '/' by go_router before this widget renders.
-//   • The widget double-checks isAdmin as defense-in-depth and shows nothing
-//     if the role is absent (auth warm-up race guard).
+//   • The router and widget require notification access; sellers are
+//     redirected before this widget renders.
+//   • The widget repeats the role/context check as defense in depth.
 //
 // NAVIGATION:
 //   • Tap tile → markAsRead(n.id) + context.push('/shops/<shopId>').
@@ -55,8 +54,21 @@ class _NotificationCenterScreenState
     if (user == null) return const Scaffold(body: ShimmerLoading());
 
     // Route guard should prevent sellers reaching here, but double-check.
-    if (!user.isAdmin) {
+    if (!user.canAccessNotifications) {
       return Scaffold(body: Center(child: Text(tr('no_access', ref))));
+    }
+    if (notificationTenantIdFor(user) == null) {
+      final key = !user.active
+          ? 'err_user_disabled'
+          : user.isSuperAdmin
+          ? 'workspace_support_context_required'
+          : 'err_account_not_assigned';
+      return Scaffold(
+        body: ErrorState(
+          message: tr(key, ref),
+          errorType: ErrorType.permission,
+        ),
+      );
     }
 
     final notifAsync = ref.watch(visibleNotificationsProvider);
@@ -429,11 +441,16 @@ class _NotificationTile extends ConsumerWidget {
     WidgetRef ref,
     NotificationModel n,
   ) async {
-    // Mark as read (best-effort — navigation proceeds regardless).
     if (!n.read) {
-      ref.read(notificationNotifierProvider.notifier).markAsRead(n.id).ignore();
+      try {
+        await ref.read(notificationNotifierProvider.notifier).markAsRead(n.id);
+      } catch (error) {
+        if (!context.mounted) return;
+        final key = AppErrorMapper.key(error);
+        ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
+      }
     }
-    // Navigate to the shop.
+    if (!context.mounted) return;
     context.push('/shops/${n.shopId}');
   }
 }

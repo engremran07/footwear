@@ -140,25 +140,57 @@ pw.Widget _pairedLabelText(
   pw.TextAlign align = pw.TextAlign.left,
 }) {
   final lines = text.split('\n');
-  final crossAxisAlignment = switch (align) {
-    pw.TextAlign.center => pw.CrossAxisAlignment.center,
-    pw.TextAlign.right => pw.CrossAxisAlignment.end,
-    _ => pw.CrossAxisAlignment.start,
+  if (lines.length < 2) {
+    return pw.Text(
+      lines.first,
+      style: style,
+      textAlign: align,
+      textDirection: _cellDir(lines.first, pw.TextDirection.ltr),
+      maxLines: 2,
+    );
+  }
+
+  final horizontalAlign = switch (align) {
+    pw.TextAlign.center => pw.Alignment.center,
+    pw.TextAlign.right => pw.Alignment.centerRight,
+    _ => pw.Alignment.centerLeft,
   };
-  return pw.Column(
-    mainAxisSize: pw.MainAxisSize.min,
-    crossAxisAlignment: crossAxisAlignment,
-    children: [
-      for (final (index, line) in lines.indexed)
-        pw.Text(
-          line,
-          style: style,
-          textAlign: align,
-          textDirection: index == 0
-              ? pw.TextDirection.ltr
-              : pw.TextDirection.rtl,
+
+  return pw.Directionality(
+    textDirection: pw.TextDirection.ltr,
+    child: pw.Row(
+      mainAxisSize: pw.MainAxisSize.min,
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        pw.Expanded(
+          child: pw.Align(
+            alignment: horizontalAlign,
+            child: pw.Text(
+              lines.first,
+              style: style,
+              textAlign: pw.TextAlign.left,
+              textDirection: pw.TextDirection.ltr,
+              maxLines: 2,
+            ),
+          ),
         ),
-    ],
+        if (lines.length > 1) ...[
+          pw.SizedBox(width: 6),
+          pw.Expanded(
+            child: pw.Align(
+              alignment: horizontalAlign,
+              child: pw.Text(
+                lines[1],
+                style: style,
+                textAlign: pw.TextAlign.right,
+                textDirection: pw.TextDirection.rtl,
+                maxLines: 2,
+              ),
+            ),
+          ),
+        ],
+      ],
+    ),
   );
 }
 
@@ -404,18 +436,33 @@ pw.Widget _workspaceBrandHeader({
     required pw.TextAlign align,
     double size = 8,
     bool bold = false,
+    bool fitSingleLine = false,
     PdfColor color = PdfColors.black,
-  }) => pw.Text(
-    _s(text),
-    style: localeConfig.ts(
-      size: size,
-      fw: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-      color: color,
-    ),
-    textDirection: direction,
-    textAlign: align,
-    maxLines: 2,
-  );
+  }) {
+    final textWidget = pw.Text(
+      _s(text),
+      style: localeConfig.ts(
+        size: size,
+        fw: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+        color: color,
+      ),
+      textDirection: direction,
+      textAlign: align,
+      softWrap: !fitSingleLine,
+      maxLines: fitSingleLine ? 1 : 2,
+    );
+    if (!fitSingleLine) return textWidget;
+    final alignment = switch (align) {
+      pw.TextAlign.center => pw.Alignment.center,
+      pw.TextAlign.right => pw.Alignment.centerRight,
+      _ => pw.Alignment.centerLeft,
+    };
+    return pw.FittedBox(
+      fit: pw.BoxFit.scaleDown,
+      alignment: alignment,
+      child: textWidget,
+    );
+  }
 
   return pw.Container(
     width: double.infinity,
@@ -425,24 +472,12 @@ pw.Widget _workspaceBrandHeader({
       border: pw.Border.all(color: accent, width: 1),
       borderRadius: pw.BorderRadius.circular(4),
     ),
-    // Keep the logo on the left even when the containing page is RTL.
+    // Keep the English, logo, and RTL columns in a stable physical order.
     child: pw.Directionality(
       textDirection: pw.TextDirection.ltr,
       child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
-          if (logoBytes != null && header.visibleFields.contains('logo')) ...[
-            pw.Container(
-              width: 42,
-              alignment: pw.Alignment.center,
-              child: pw.Image(
-                pw.MemoryImage(logoBytes),
-                height: header.template == 'compact' ? 26 : 36,
-                fit: pw.BoxFit.contain,
-              ),
-            ),
-            pw.SizedBox(width: 8),
-          ],
           pw.Expanded(
             child: pw.Column(
               mainAxisSize: pw.MainAxisSize.min,
@@ -454,6 +489,7 @@ pw.Widget _workspaceBrandHeader({
                   align: pw.TextAlign.left,
                   size: _headerTitleSize(header.titleScale),
                   bold: true,
+                  fitSingleLine: true,
                   color: accent,
                 ),
                 ...englishLines.map(
@@ -468,10 +504,26 @@ pw.Widget _workspaceBrandHeader({
               ],
             ),
           ),
-          if (rtlName.isNotEmpty || rtlLines.isNotEmpty) ...[
+          if (logoBytes != null && header.visibleFields.contains('logo')) ...[
+            pw.SizedBox(width: 8),
+            pw.Container(
+              width: 64,
+              alignment: pw.Alignment.center,
+              child: pw.Image(
+                pw.MemoryImage(logoBytes),
+                height: 46,
+                fit: pw.BoxFit.contain,
+              ),
+            ),
+            pw.SizedBox(width: 8),
+          ] else if (rtlName.isNotEmpty || rtlLines.isNotEmpty) ...[
             pw.SizedBox(width: 8),
             pw.Container(width: 0.5, height: 40, color: PdfColors.grey300),
             pw.SizedBox(width: 8),
+          ],
+          if (rtlName.isNotEmpty ||
+              rtlLines.isNotEmpty ||
+              (logoBytes != null && header.visibleFields.contains('logo')))
             pw.Expanded(
               child: pw.Column(
                 mainAxisSize: pw.MainAxisSize.min,
@@ -484,6 +536,7 @@ pw.Widget _workspaceBrandHeader({
                       align: pw.TextAlign.right,
                       size: _headerTitleSize(header.titleScale),
                       bold: true,
+                      fitSingleLine: true,
                       color: accent,
                     ),
                   ...rtlLines.map(
@@ -498,7 +551,6 @@ pw.Widget _workspaceBrandHeader({
                 ],
               ),
             ),
-          ],
         ],
       ),
     ),
@@ -551,23 +603,15 @@ Future<Uint8List> buildPdfTable({
                 : pw.CrossAxisAlignment.start,
             children: [
               if (page == 0) ...[
-                if (header != null) ...[
+                if (header != null || logoBytes != null) ...[
                   _workspaceBrandHeader(
-                    header: header,
+                    header: header ?? const InvoiceHeaderConfig(),
                     fallbackName: companyName ?? 'My Business',
                     localeConfig: lc,
                     logoBytes: logoBytes,
                   ),
                   pw.SizedBox(height: 8),
-                ] else if (logoBytes != null)
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(bottom: 6),
-                    child: pw.Image(
-                      pw.MemoryImage(logoBytes),
-                      height: 32,
-                      fit: pw.BoxFit.contain,
-                    ),
-                  ),
+                ],
                 pw.Text(
                   _s(title),
                   style: titleStyle,
@@ -1056,64 +1100,61 @@ Future<Uint8List> buildPdfLedger({
                 ),
                 pw.Divider(thickness: 1.5, color: PdfColors.blue800),
                 pw.SizedBox(height: 6),
-                pw.SizedBox(height: 8),
-                // Summary 3-column
+                // Summary 3-column — denser and tighter for the reference layout.
                 pw.Container(
                   decoration: pw.BoxDecoration(
                     border: pw.Border.all(color: PdfColors.blue100, width: 0.5),
                     borderRadius: pw.BorderRadius.circular(4),
                   ),
-                  child: pw.Row(
-                    children: [
-                      _summaryCell(
-                        label: _pdfLabel(labels, 'credit', locale),
-                        value: _fmtAmtC(summary.totalCredit, currencyStr),
-                        color: PdfColors.green800,
-                        primaryFont: primaryFont,
-                        direction: dir,
-                        ff: ff,
-                      ),
-                      pw.Container(
-                        width: 0.5,
-                        height: 40,
-                        color: PdfColors.blue100,
-                      ),
-                      _summaryCell(
-                        label: _pdfLabel(labels, 'debit', locale),
-                        value: _fmtAmtC(summary.totalDebit, currencyStr),
-                        color: PdfColors.red800,
-                        primaryFont: primaryFont,
-                        direction: dir,
-                        ff: ff,
-                      ),
-                      pw.Container(
-                        width: 0.5,
-                        height: 40,
-                        color: PdfColors.blue100,
-                      ),
-                      _summaryCell(
-                        label: _pdfLabel(labels, 'net_payable', locale),
-                        value: _fmtAmtC(
-                          summary.closingBalance.abs(),
-                          currencyStr,
+                  child: pw.Directionality(
+                    textDirection: pw.TextDirection.ltr,
+                    child: pw.Row(
+                      children: [
+                        _summaryCell(
+                          label: _pdfLabel(labels, 'credit', locale),
+                          value: _fmtAmtC(summary.totalCredit, currencyStr),
+                          color: PdfColors.green800,
+                          primaryFont: primaryFont,
+                          direction: dir,
+                          ff: ff,
                         ),
-                        color: balance > 0
-                            ? PdfColors.red800
-                            : PdfColors.green800,
-                        primaryFont: primaryFont,
-                        direction: dir,
-                        ff: ff,
-                        isBold: true,
-                      ),
-                    ],
+                        pw.Container(
+                          width: 0.5,
+                          height: 34,
+                          color: PdfColors.blue100,
+                        ),
+                        _summaryCell(
+                          label: _pdfLabel(labels, 'debit', locale),
+                          value: _fmtAmtC(summary.totalDebit, currencyStr),
+                          color: PdfColors.red800,
+                          primaryFont: primaryFont,
+                          direction: dir,
+                          ff: ff,
+                        ),
+                        pw.Container(
+                          width: 0.5,
+                          height: 34,
+                          color: PdfColors.blue100,
+                        ),
+                        _summaryCell(
+                          label: _pdfLabel(labels, 'net_payable', locale),
+                          value: _fmtAmtC(
+                            summary.closingBalance.abs(),
+                            currencyStr,
+                          ),
+                          color: balance > 0
+                              ? PdfColors.red800
+                              : PdfColors.green800,
+                          primaryFont: primaryFont,
+                          direction: dir,
+                          ff: ff,
+                          isBold: true,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 pw.SizedBox(height: 4),
-                _pairedLabelText(
-                  '${_pdfLabel(labels, 'total_entries', locale)}: $entryCount',
-                  style: ts(size: 8, color: PdfColors.grey600),
-                ),
-                pw.SizedBox(height: 8),
                 _buildLedgerHeaderRow(
                   headerLabels,
                   colWidths,
@@ -1135,14 +1176,25 @@ Future<Uint8List> buildPdfLedger({
           );
         },
         footer: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.end,
           children: [
             pw.Divider(thickness: 0.5, color: PdfColors.grey400),
-            pw.Align(
-              alignment: pw.Alignment.centerRight,
-              child: _pairedLabelText(
-                '${_pdfLabel(labels, 'page', locale)} ${ctx.pageNumber} / ${ctx.pagesCount}',
-                style: ts(size: 7, color: PdfColors.grey500),
+            pw.Directionality(
+              textDirection: pw.TextDirection.ltr,
+              child: pw.Row(
+                children: [
+                  if (ctx.pageNumber == ctx.pagesCount)
+                    pw.Text(
+                      '${_pdfLabel(labels, 'total_entries', locale)}: $entryCount',
+                      style: ts(size: 7, color: PdfColors.grey500),
+                      textDirection: dir,
+                    ),
+                  pw.Spacer(),
+                  _pairedLabelText(
+                    '${_pdfLabel(labels, 'page', locale)} ${ctx.pageNumber} / ${ctx.pagesCount}',
+                    style: ts(size: 7, color: PdfColors.grey500),
+                    align: pw.TextAlign.right,
+                  ),
+                ],
               ),
             ),
           ],
@@ -1176,57 +1228,60 @@ Future<Uint8List> buildPdfLedger({
                 bottom: pw.BorderSide(color: PdfColors.grey400, width: 0.5),
               ),
             ),
-            child: pw.Row(
-              children: [
-                pw.Container(
-                  width: colWidths
-                      .take(colCount - 1)
-                      .fold<double>(0, (a, b) => a + b),
-                  padding: const pw.EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 5,
-                  ),
-                  decoration: const pw.BoxDecoration(
-                    border: pw.Border(
-                      right: pw.BorderSide(
-                        color: PdfColors.grey400,
-                        width: 0.5,
+            child: pw.Directionality(
+              textDirection: pw.TextDirection.ltr,
+              child: pw.Row(
+                children: [
+                  pw.Container(
+                    width: colWidths
+                        .take(colCount - 1)
+                        .fold<double>(0, (a, b) => a + b),
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 5,
+                    ),
+                    decoration: const pw.BoxDecoration(
+                      border: pw.Border(
+                        right: pw.BorderSide(
+                          color: PdfColors.grey400,
+                          width: 0.5,
+                        ),
                       ),
                     ),
-                  ),
-                  child: pw.Text(
-                    _pdfLabel(labels, 'net_payable', locale),
-                    style: pw.TextStyle(
-                      fontSize: 9,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.blue800,
-                      font: primaryFont,
-                      fontFallback: ff,
+                    child: pw.Text(
+                      _pdfLabel(labels, 'net_payable', locale),
+                      style: pw.TextStyle(
+                        fontSize: 9,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.blue800,
+                        font: primaryFont,
+                        fontFallback: ff,
+                      ),
+                      textDirection: dir,
                     ),
-                    textDirection: dir,
                   ),
-                ),
-                pw.Container(
-                  width: colWidths.last,
-                  padding: const pw.EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 5,
-                  ),
-                  child: pw.Text(
-                    _fmtAmtC(summary.closingBalance, currencyStr),
-                    style: pw.TextStyle(
-                      fontSize: 9,
-                      fontWeight: pw.FontWeight.bold,
-                      color: balance > 0
-                          ? PdfColors.red800
-                          : PdfColors.green800,
-                      font: primaryFont,
-                      fontFallback: ff,
+                  pw.Container(
+                    width: colWidths.last,
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 5,
                     ),
-                    textDirection: _amountDir,
+                    child: pw.Text(
+                      _fmtAmtC(summary.closingBalance, currencyStr),
+                      style: pw.TextStyle(
+                        fontSize: 9,
+                        fontWeight: pw.FontWeight.bold,
+                        color: balance > 0
+                            ? PdfColors.red800
+                            : PdfColors.green800,
+                        font: primaryFont,
+                        fontFallback: ff,
+                      ),
+                      textDirection: _amountDir,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -1270,11 +1325,13 @@ pw.Widget _summaryCell({
       padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.center,
+        mainAxisSize: pw.MainAxisSize.min,
         children: [
+          pw.SizedBox(height: 1),
           _pairedLabelText(
             label,
             style: pw.TextStyle(
-              fontSize: 7,
+              fontSize: 6.5,
               color: PdfColors.grey600,
               font: primaryFont,
               fontFallback: ff,
@@ -1285,7 +1342,7 @@ pw.Widget _summaryCell({
           pw.Text(
             value,
             style: pw.TextStyle(
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
               color: color,
               font: primaryFont,
@@ -1293,6 +1350,7 @@ pw.Widget _summaryCell({
             ),
             textAlign: pw.TextAlign.center,
             textDirection: _amountDir,
+            maxLines: 2,
           ),
         ],
       ),
@@ -1316,32 +1374,38 @@ pw.Widget _buildLedgerHeaderRow(
         bottom: pw.BorderSide(color: PdfColors.grey400, width: 0.5),
       ),
     ),
-    child: pw.Row(
-      children: List.generate(count, (i) {
-        return pw.Container(
-          width: widths[i],
-          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-          decoration: pw.BoxDecoration(
-            border: pw.Border(
-              left: i == 0
-                  ? const pw.BorderSide(color: PdfColors.grey400, width: 0.5)
-                  : pw.BorderSide.none,
-              right: const pw.BorderSide(color: PdfColors.blue300, width: 0.5),
+    child: pw.Directionality(
+      textDirection: pw.TextDirection.ltr,
+      child: pw.Row(
+        children: List.generate(count, (i) {
+          return pw.Container(
+            width: widths[i],
+            padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+            decoration: pw.BoxDecoration(
+              border: pw.Border(
+                left: i == 0
+                    ? const pw.BorderSide(color: PdfColors.grey400, width: 0.5)
+                    : pw.BorderSide.none,
+                right: const pw.BorderSide(
+                  color: PdfColors.blue300,
+                  width: 0.5,
+                ),
+              ),
             ),
-          ),
-          child: _pairedLabelText(
-            labels[i],
-            style: pw.TextStyle(
-              fontSize: 8,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.white,
-              font: primaryFont,
-              fontFallback: ff,
+            child: _pairedLabelText(
+              labels[i],
+              style: pw.TextStyle(
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white,
+                font: primaryFont,
+                fontFallback: ff,
+              ),
+              align: pw.TextAlign.center,
             ),
-            align: pw.TextAlign.center,
-          ),
-        );
-      }),
+          );
+        }),
+      ),
     ),
   );
 }
@@ -1383,37 +1447,46 @@ pw.Widget _buildLedgerDataRow(
         bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5),
       ),
     ),
-    child: pw.Row(
-      children: List.generate(count, (i) {
-        PdfColor? color;
-        if (i == cashInIdx && r.cashIn > 0) color = PdfColors.green800;
-        if (i == cashOutIdx && r.cashOut > 0) color = PdfColors.red800;
-        return pw.Container(
-          width: widths[i],
-          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          decoration: pw.BoxDecoration(
-            border: pw.Border(
-              left: i == 0
-                  ? const pw.BorderSide(color: PdfColors.grey300, width: 0.5)
-                  : pw.BorderSide.none,
-              right: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+    child: pw.Directionality(
+      textDirection: pw.TextDirection.ltr,
+      child: pw.Row(
+        children: List.generate(count, (i) {
+          PdfColor? color;
+          if (i == cashInIdx && r.cashIn > 0) color = PdfColors.green800;
+          if (i == cashOutIdx && r.cashOut > 0) color = PdfColors.red800;
+          return pw.Container(
+            width: widths[i],
+            padding: const pw.EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: 2.5,
             ),
-          ),
-          child: pw.Text(
-            cells[i],
-            style: pw.TextStyle(
-              fontSize: 8,
-              color: color,
-              font: primaryFont,
-              fontFallback: ff,
+            decoration: pw.BoxDecoration(
+              border: pw.Border(
+                left: i == 0
+                    ? const pw.BorderSide(color: PdfColors.grey300, width: 0.5)
+                    : pw.BorderSide.none,
+                right: const pw.BorderSide(
+                  color: PdfColors.grey300,
+                  width: 0.5,
+                ),
+              ),
             ),
-            textAlign: pw.TextAlign.center,
-            textDirection: i >= cashOutIdx
-                ? _amountDir
-                : _cellDir(cells[i], dir),
-          ),
-        );
-      }),
+            child: pw.Text(
+              cells[i],
+              style: pw.TextStyle(
+                fontSize: 7.5,
+                color: color,
+                font: primaryFont,
+                fontFallback: ff,
+              ),
+              textAlign: pw.TextAlign.center,
+              textDirection: i >= cashOutIdx
+                  ? _amountDir
+                  : _cellDir(cells[i], dir),
+            ),
+          );
+        }),
+      ),
     ),
   );
 }
@@ -1562,19 +1635,19 @@ Future<Uint8List> buildPdfSellerReport({
                   children: [
                     pw.Text(
                       '${_pdfLabel(labels, 'seller', locale)}: ${_s(sellerName)}',
-                      style: ts(size: 10, fw: pw.FontWeight.bold),
+                      style: ts(size: 9.5, fw: pw.FontWeight.bold),
                       textDirection: _cellDir(sellerName, dir),
                     ),
                     pw.Text(
                       _s(sellerPhone),
-                      style: ts(size: 9),
+                      style: ts(size: 8.5),
                       textDirection: dir,
                     ),
                   ],
                 ),
                 pw.Text(
                   '${_pdfLabel(labels, 'route', locale)}: ${_s(routeName)}',
-                  style: ts(size: 10, fw: pw.FontWeight.bold),
+                  style: ts(size: 9.5, fw: pw.FontWeight.bold),
                   textDirection: _cellDir(routeName, dir),
                 ),
               ],
@@ -1844,7 +1917,6 @@ Future<Uint8List> generateInvoicePdf({
   final lblTotal = label('total');
   final lblVoid = label('void');
   final lblReceipt = label('cash_receipt');
-  final lblAmountReceived = label('amount_received');
   final lblSignature = label('signature');
   final paymentMethodLabel = switch (invoice.paymentMethod) {
     'cash' => label('payment_method_cash'),
@@ -1916,246 +1988,365 @@ Future<Uint8List> generateInvoicePdf({
     final pdf = _buildDocument(primaryFont, ff);
 
     if (isCashReceipt) {
-      final receiptHeader = headerConfig.copyWith(
-        template: 'compact',
-        titleScale: 'small',
-        visibleFields: headerConfig.visibleFields.intersection({
-          'logo',
-          'phone',
-          'email',
-        }),
-      );
-      final receiptRows = <(String, String)>[
-        ('received_from', invoice.shopName),
-        ('date', dateStr),
-        if (invoice.cashReceiptSequence != null)
-          ('receipt_sequence', invoice.cashReceiptSequence.toString()),
-        if (invoice.sellerName.trim().isNotEmpty)
-          ('received_by', invoice.sellerName),
-        if (paymentMethodLabel != null) ('payment_method', paymentMethodLabel),
-        if (invoice.paymentReference?.trim().isNotEmpty == true)
-          ('payment_reference', invoice.paymentReference!),
-        if (invoice.linkedInvoiceId?.trim().isNotEmpty == true)
-          ('linked_invoice', invoice.linkedInvoiceId!),
-      ];
       final printLabel = _documentLabelWithSuffix(
         'print_date',
         printDateTime,
         pair,
         locale,
       );
+      final receiptNumber =
+          invoice.cashReceiptSequence?.toString().padLeft(4, '0') ??
+          _pdfExcerpt(invoice.invoiceNumber, maxRunes: 24);
+      final receiptPhoneNumbers = [
+        headerConfig.receiptPhone2,
+        headerConfig.receiptPhone3,
+      ].map(_s).where((phone) => phone.isNotEmpty).toList();
+      String amountOrDash(double? value) =>
+          value == null ? '—' : _fmtAmtC(value, currencyLabel);
+
+      pw.Widget receiptSummaryCell(String key, int language) {
+        final lines = label(key).split('\n');
+        final text = language == 0
+            ? lines.first
+            : lines.length > 1
+            ? lines[1]
+            : '';
+        return pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+          child: pw.Text(
+            text,
+            style: ts(size: 6.5, fw: pw.FontWeight.bold),
+            textAlign: language == 1 ? pw.TextAlign.right : pw.TextAlign.left,
+            textDirection: language == 1
+                ? pw.TextDirection.rtl
+                : pw.TextDirection.ltr,
+            maxLines: 1,
+          ),
+        );
+      }
+
+      pw.Widget receiptField(String key, String value, {int maxRunes = 88}) {
+        final lines = label(key).split('\n');
+        return pw.Container(
+          height: key == 'receipt_account_of' ? 30 : 24,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 4),
+          decoration: const pw.BoxDecoration(
+            border: pw.Border(
+              bottom: pw.BorderSide(color: PdfColors.grey500, width: 0.45),
+            ),
+          ),
+          child: pw.Directionality(
+            textDirection: pw.TextDirection.ltr,
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.SizedBox(
+                  width: 78,
+                  child: pw.Text(
+                    lines.first,
+                    style: ts(size: 6.8, fw: pw.FontWeight.bold),
+                    textDirection: pw.TextDirection.ltr,
+                    maxLines: 2,
+                  ),
+                ),
+                pw.SizedBox(width: 5),
+                pw.Expanded(
+                  child: pw.Text(
+                    _pdfExcerpt(value, maxRunes: maxRunes),
+                    style: ts(
+                      size: key == 'receipt_sum_of' ? 9 : 7.8,
+                      fw: key == 'receipt_sum_of'
+                          ? pw.FontWeight.bold
+                          : pw.FontWeight.normal,
+                      color: key == 'receipt_sum_of'
+                          ? accentColor
+                          : PdfColors.black,
+                    ),
+                    textDirection: _cellDir(value, pw.TextDirection.ltr),
+                    textAlign: key == 'receipt_sum_of'
+                        ? pw.TextAlign.center
+                        : pw.TextAlign.left,
+                    maxLines: key == 'receipt_account_of' ? 2 : 1,
+                  ),
+                ),
+                pw.SizedBox(width: 5),
+                pw.SizedBox(
+                  width: 78,
+                  child: pw.Text(
+                    lines.length > 1 ? lines[1] : '',
+                    style: ts(size: 6.8, fw: pw.FontWeight.bold),
+                    textAlign: pw.TextAlign.right,
+                    textDirection: pw.TextDirection.rtl,
+                    maxLines: 2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
 
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a5,
-          margin: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          margin: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           textDirection: dir,
           build: (_) => pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            mainAxisSize: pw.MainAxisSize.min,
             children: [
               _workspaceBrandHeader(
-                header: receiptHeader,
+                header: headerConfig,
                 fallbackName: displayCompanyName,
                 localeConfig: lc,
                 logoBytes: effectiveLogoBytes,
               ),
-              pw.SizedBox(height: 10),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                decoration: pw.BoxDecoration(
-                  color: PdfColors.grey100,
-                  border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-                  children: [
-                    _bilingualHeaderText(
-                      docTitle,
-                      style: ts(
-                        size: 10,
-                        fw: pw.FontWeight.bold,
-                        color: accentColor,
-                      ),
+              pw.SizedBox(height: 6),
+              pw.Directionality(
+                textDirection: pw.TextDirection.ltr,
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(3),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: accentColor, width: 1.4),
+                    borderRadius: pw.BorderRadius.circular(9),
+                  ),
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.all(7),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: accentColor, width: 0.7),
+                      borderRadius: pw.BorderRadius.circular(7),
                     ),
-                    pw.SizedBox(height: 4),
-                    pw.Row(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                       children: [
-                        pw.Expanded(
-                          child: pw.Text(
-                            _pdfExcerpt(invoice.invoiceNumber, maxRunes: 48),
-                            style: ts(size: 11, fw: pw.FontWeight.bold),
-                          ),
-                        ),
-                        pw.SizedBox(width: 8),
-                        pw.Expanded(
-                          child: _bilingualHeaderText(
-                            _documentLabelWithSuffix(
-                              'date',
-                              dateStr,
-                              pair,
-                              locale,
+                        pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.SizedBox(
+                              width: 132,
+                              child: pw.Table(
+                                border: pw.TableBorder.all(
+                                  color: PdfColors.grey500,
+                                  width: 0.5,
+                                ),
+                                columnWidths: const {
+                                  0: pw.FlexColumnWidth(1.1),
+                                  1: pw.FlexColumnWidth(0.9),
+                                  2: pw.FlexColumnWidth(1.1),
+                                },
+                                children: [
+                                  for (final row in [
+                                    (
+                                      'total',
+                                      amountOrDash(invoice.shopBalanceBefore),
+                                    ),
+                                    (
+                                      'advance',
+                                      _fmtAmtC(
+                                        invoice.amountReceived,
+                                        currencyLabel,
+                                      ),
+                                    ),
+                                    (
+                                      'balance',
+                                      amountOrDash(invoice.shopBalanceAfter),
+                                    ),
+                                  ])
+                                    pw.TableRow(
+                                      children: [
+                                        receiptSummaryCell(row.$1, 0),
+                                        pw.Padding(
+                                          padding:
+                                              const pw.EdgeInsets.symmetric(
+                                                horizontal: 2,
+                                                vertical: 3,
+                                              ),
+                                          child: pw.Text(
+                                            row.$2,
+                                            style: ts(size: 6.5),
+                                            textAlign: pw.TextAlign.center,
+                                            textDirection: _amountDir,
+                                            maxLines: 1,
+                                          ),
+                                        ),
+                                        receiptSummaryCell(row.$1, 1),
+                                      ],
+                                    ),
+                                ],
+                              ),
                             ),
-                            style: ts(size: 8, color: PdfColors.grey700),
-                          ),
+                            pw.SizedBox(width: 10),
+                            pw.Expanded(
+                              child: pw.Column(
+                                children: [
+                                  pw.Row(
+                                    crossAxisAlignment:
+                                        pw.CrossAxisAlignment.center,
+                                    children: [
+                                      pw.Expanded(
+                                        child: pw.Center(
+                                          child: pairedLabel(
+                                            docTitle,
+                                            style: ts(
+                                              size: 11,
+                                              fw: pw.FontWeight.bold,
+                                              color: accentColor,
+                                            ),
+                                            align: pw.TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                      pw.Text(
+                                        receiptNumber,
+                                        style: ts(
+                                          size: 12,
+                                          fw: pw.FontWeight.bold,
+                                          color: PdfColors.red800,
+                                        ),
+                                        textDirection: _amountDir,
+                                      ),
+                                    ],
+                                  ),
+                                  pw.SizedBox(height: 5),
+                                  pw.Align(
+                                    alignment: pw.Alignment.centerRight,
+                                    child: pairedLabel(
+                                      _documentLabelWithSuffix(
+                                        'date',
+                                        dateStr,
+                                        pair,
+                                        locale,
+                                      ),
+                                      style: ts(
+                                        size: 7.2,
+                                        color: PdfColors.grey700,
+                                      ),
+                                      align: pw.TextAlign.right,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              pw.SizedBox(height: 10),
-              pw.Container(
-                width: double.infinity,
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: pw.BoxDecoration(
-                  color: PdfColors.blue50,
-                  border: pw.Border.all(color: accentColor, width: 1),
-                  borderRadius: pw.BorderRadius.circular(5),
-                ),
-                child: pw.Column(
-                  children: [
-                    _bilingualHeaderText(
-                      lblAmountReceived,
-                      style: ts(size: 8, color: PdfColors.grey700),
-                    ),
-                    pw.SizedBox(height: 3),
-                    pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.center,
-                      children: [
-                        pw.Text(
-                          currencyLabel,
-                          style: ts(size: 10, fw: pw.FontWeight.bold),
-                          textDirection: _cellDir(currencyLabel, dir),
+                        pw.SizedBox(height: 7),
+                        receiptField('received_from', invoice.shopName),
+                        receiptField(
+                          'receipt_sum_of',
+                          _fmtAmtC(invoice.amountReceived, currencyLabel),
                         ),
-                        pw.SizedBox(width: 8),
-                        pw.Text(
-                          _fmtAmt(invoice.total),
-                          style: ts(
-                            size: 22,
-                            fw: pw.FontWeight.bold,
-                            color: accentColor,
-                          ),
-                          textDirection: _amountDir,
+                        receiptField(
+                          'payment_method',
+                          paymentMethodLabel ?? '—',
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              pw.SizedBox(height: 10),
-              pw.Table(
-                border: pw.TableBorder.all(
-                  color: PdfColors.grey400,
-                  width: 0.5,
-                ),
-                columnWidths: const {
-                  0: pw.FlexColumnWidth(2),
-                  1: pw.FlexColumnWidth(3),
-                },
-                children: [
-                  for (final (index, row) in receiptRows.indexed)
-                    pw.TableRow(
-                      decoration: pw.BoxDecoration(
-                        color: index.isEven
-                            ? PdfColors.white
-                            : PdfColors.grey50,
-                      ),
-                      children: [
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 5,
-                          ),
-                          child: pairedLabel(
-                            label(row.$1),
-                            style: ts(size: 7, fw: pw.FontWeight.bold),
-                          ),
+                        receiptField(
+                          'receipt_bank_reference',
+                          invoice.paymentReference?.trim().isNotEmpty == true
+                              ? invoice.paymentReference!.trim()
+                              : '—',
+                          maxRunes: 100,
                         ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 5,
-                          ),
-                          child: pw.Text(
-                            _pdfExcerpt(row.$2),
-                            style: ts(size: 8),
-                            maxLines: 2,
-                            textDirection: _cellDir(row.$2, dir),
-                          ),
+                        receiptField('date', dateStr),
+                        receiptField(
+                          'receipt_account_of',
+                          invoice.notes?.trim().isNotEmpty == true
+                              ? invoice.notes!.trim()
+                              : invoice.linkedInvoiceId?.trim().isNotEmpty ==
+                                    true
+                              ? invoice.linkedInvoiceId!.trim()
+                              : '—',
+                          maxRunes: 110,
                         ),
-                      ],
-                    ),
-                ],
-              ),
-              pw.SizedBox(height: 12),
-              pw.Row(
-                children: [
-                  pw.Expanded(
-                    child: pw.Column(
-                      crossAxisAlignment: align,
-                      children: [
-                        pairedLabel(
-                          _documentLabelWithSuffix(
-                            'received_by',
-                            _pdfExcerpt(invoice.sellerName, maxRunes: 48),
-                            pair,
-                            locale,
-                          ),
-                          style: ts(size: 8, fw: pw.FontWeight.bold),
-                        ),
-                        pw.SizedBox(height: 22),
-                        pw.Divider(color: PdfColors.grey500, thickness: 0.5),
-                        pairedLabel(
-                          lblSignature,
-                          style: ts(size: 7, color: PdfColors.grey600),
+                        pw.SizedBox(height: 9),
+                        pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.end,
+                          children: [
+                            pw.Expanded(
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                children: [
+                                  pairedLabel(
+                                    _documentLabelWithSuffix(
+                                      'received_by',
+                                      _pdfExcerpt(
+                                        invoice.sellerName,
+                                        maxRunes: 40,
+                                      ),
+                                      pair,
+                                      locale,
+                                    ),
+                                    style: ts(
+                                      size: 7.2,
+                                      fw: pw.FontWeight.bold,
+                                    ),
+                                  ),
+                                  pw.SizedBox(height: 13),
+                                  pw.Divider(
+                                    color: PdfColors.grey500,
+                                    thickness: 0.5,
+                                  ),
+                                  pairedLabel(
+                                    lblSignature,
+                                    style: ts(
+                                      size: 6.8,
+                                      color: PdfColors.grey600,
+                                    ),
+                                    align: pw.TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            pw.SizedBox(width: 22),
+                            pw.Expanded(
+                              child: pw.Column(
+                                children: [
+                                  pw.SizedBox(height: 23),
+                                  pw.Divider(
+                                    color: PdfColors.grey500,
+                                    thickness: 0.5,
+                                  ),
+                                  pairedLabel(
+                                    lblSignature,
+                                    style: ts(
+                                      size: 6.8,
+                                      color: PdfColors.grey600,
+                                    ),
+                                    align: pw.TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                  pw.SizedBox(width: 24),
-                  pw.Expanded(
-                    child: pw.Column(
-                      crossAxisAlignment: align,
-                      children: [
-                        pw.SizedBox(height: 12),
-                        pw.SizedBox(height: 22),
-                        pw.Divider(color: PdfColors.grey500, thickness: 0.5),
-                        pairedLabel(
-                          _documentLabelWithSuffix(
-                            'received_from',
-                            _pdfExcerpt(invoice.shopName, maxRunes: 48),
-                            pair,
-                            locale,
-                          ),
-                          style: ts(size: 7, color: PdfColors.grey600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
-              pw.SizedBox(height: 8),
-              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text(
-                    '${_pdfExcerpt(displayCompanyName, maxRunes: 48)} • $dateStr',
-                    style: ts(size: 7, color: PdfColors.grey500),
-                    textDirection: _cellDir(displayCompanyName, dir),
+              if (receiptPhoneNumbers.isNotEmpty) ...[
+                pw.SizedBox(height: 5),
+                pw.Directionality(
+                  textDirection: pw.TextDirection.ltr,
+                  child: pw.Text(
+                    receiptPhoneNumbers.join('   /   '),
+                    style: ts(
+                      size: 8,
+                      fw: pw.FontWeight.bold,
+                      color: accentColor,
+                    ),
+                    textAlign: pw.TextAlign.center,
+                    textDirection: _amountDir,
+                    maxLines: 1,
                   ),
-                  pairedLabel(
-                    printLabel,
-                    style: ts(size: 7, color: PdfColors.grey600),
-                    align: pw.TextAlign.right,
-                  ),
-                ],
+                ),
+              ],
+              pw.SizedBox(height: 2),
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pairedLabel(
+                  printLabel,
+                  style: ts(size: 6, color: PdfColors.grey600),
+                  align: pw.TextAlign.right,
+                ),
               ),
             ],
           ),
@@ -2256,7 +2447,7 @@ Future<Uint8List> generateInvoicePdf({
           // Customer or receipt payer details.
           pw.Container(
             width: double.infinity,
-            padding: const pw.EdgeInsets.all(10),
+            padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(
               color: PdfColors.grey100,
               border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
@@ -2281,170 +2472,183 @@ Future<Uint8List> generateInvoicePdf({
 
           // Items table
           if (invoice.items.isNotEmpty)
-            pw.Table(
-              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
-              columnWidths: invoice.isNonStockSale
-                  ? {
-                      0: const pw.FlexColumnWidth(4),
-                      1: const pw.FlexColumnWidth(1),
-                      2: const pw.FlexColumnWidth(2),
-                      3: const pw.FlexColumnWidth(2),
-                    }
-                  : {
-                      0: const pw.FlexColumnWidth(3),
-                      1: const pw.FlexColumnWidth(1.5),
-                      2: const pw.FlexColumnWidth(1.5),
-                      3: const pw.FlexColumnWidth(1),
-                      4: const pw.FlexColumnWidth(2),
-                      5: const pw.FlexColumnWidth(2),
-                    },
-              children: [
-                // header row
-                pw.TableRow(
-                  decoration: pw.BoxDecoration(color: accentColor),
-                  children:
-                      (invoice.isNonStockSale
-                              ? [lblItem, lblQty, lblUnitPrice, lblTotal]
-                              : [
-                                  lblItem,
-                                  lblSize,
-                                  lblColor,
-                                  lblQty,
-                                  lblUnitPrice,
-                                  lblTotal,
-                                ])
+            pw.Directionality(
+              textDirection: pw.TextDirection.ltr,
+              child: pw.Table(
+                border: pw.TableBorder.all(
+                  color: PdfColors.grey400,
+                  width: 0.5,
+                ),
+                columnWidths: invoice.isNonStockSale
+                    ? {
+                        0: const pw.FlexColumnWidth(4),
+                        1: const pw.FlexColumnWidth(1),
+                        2: const pw.FlexColumnWidth(2),
+                        3: const pw.FlexColumnWidth(2),
+                      }
+                    : {
+                        0: const pw.FlexColumnWidth(3),
+                        1: const pw.FlexColumnWidth(1.5),
+                        2: const pw.FlexColumnWidth(1.5),
+                        3: const pw.FlexColumnWidth(1),
+                        4: const pw.FlexColumnWidth(2),
+                        5: const pw.FlexColumnWidth(2),
+                      },
+                children: [
+                  // header row
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(color: accentColor),
+                    children:
+                        (invoice.isNonStockSale
+                                ? [lblItem, lblQty, lblUnitPrice, lblTotal]
+                                : [
+                                    lblItem,
+                                    lblSize,
+                                    lblColor,
+                                    lblQty,
+                                    lblUnitPrice,
+                                    lblTotal,
+                                  ])
+                            .map(
+                              (h) => pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 3,
+                                ),
+                                child: pairedLabel(
+                                  h,
+                                  style: pw.TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: pw.FontWeight.bold,
+                                    color: PdfColors.white,
+                                    font: primaryFont,
+                                    fontFallback: ff,
+                                  ),
+                                  align: pw.TextAlign.center,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                  ),
+                  // data rows
+                  ...invoice.items.asMap().entries.map((e) {
+                    final i = e.key;
+                    final item = e.value;
+                    final bg = i % 2 == 0 ? PdfColors.white : PdfColors.grey50;
+                    final cells = invoice.isNonStockSale
+                        ? [
+                            _s(item.productName),
+                            item.qty.toString(),
+                            _fmtAmt(item.unitPrice),
+                            _fmtAmt(item.subtotal),
+                          ]
+                        : [
+                            _s(
+                              item.productName,
+                            ), // ISSUE-014: sanitize user input
+                            _s(item.size),
+                            _s(item.color),
+                            item.qty.toString(),
+                            _fmtAmt(item.unitPrice),
+                            _fmtAmt(item.subtotal),
+                          ];
+                    return pw.TableRow(
+                      decoration: pw.BoxDecoration(color: bg),
+                      children: cells
                           .map(
-                            (h) => pw.Padding(
+                            (c) => pw.Padding(
                               padding: const pw.EdgeInsets.symmetric(
                                 horizontal: 4,
-                                vertical: 5,
+                                vertical: 3,
                               ),
-                              child: pairedLabel(
-                                h,
+                              child: pw.Text(
+                                c,
                                 style: pw.TextStyle(
                                   fontSize: 8,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: PdfColors.white,
                                   font: primaryFont,
                                   fontFallback: ff,
                                 ),
-                                align: pw.TextAlign.center,
+                                textAlign: pw.TextAlign.center,
+                                textDirection: _cellDir(c, dir),
                               ),
                             ),
                           )
                           .toList(),
-                ),
-                // data rows
-                ...invoice.items.asMap().entries.map((e) {
-                  final i = e.key;
-                  final item = e.value;
-                  final bg = i % 2 == 0 ? PdfColors.white : PdfColors.grey50;
-                  final cells = invoice.isNonStockSale
-                      ? [
-                          _s(item.productName),
-                          item.qty.toString(),
-                          _fmtAmt(item.unitPrice),
-                          _fmtAmt(item.subtotal),
-                        ]
-                      : [
-                          _s(
-                            item.productName,
-                          ), // ISSUE-014: sanitize user input
-                          _s(item.size),
-                          _s(item.color),
-                          item.qty.toString(),
-                          _fmtAmt(item.unitPrice),
-                          _fmtAmt(item.subtotal),
-                        ];
-                  return pw.TableRow(
-                    decoration: pw.BoxDecoration(color: bg),
-                    children: cells
-                        .map(
-                          (c) => pw.Padding(
-                            padding: const pw.EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 4,
-                            ),
-                            child: pw.Text(
-                              c,
-                              style: pw.TextStyle(
-                                fontSize: 8,
-                                font: primaryFont,
-                                fontFallback: ff,
-                              ),
-                              textAlign: pw.TextAlign.center,
-                              textDirection: _cellDir(c, dir),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  );
-                }),
-              ],
+                    );
+                  }),
+                ],
+              ),
             ),
-          pw.SizedBox(height: 14),
+          pw.SizedBox(height: 8),
 
           if (!isCashReceipt)
             pw.Align(
               alignment: pw.Alignment.centerRight,
               child: pw.Container(
                 width: 200,
-                child: pw.Column(
-                  children: [
-                    pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      children: [
-                        pairedLabel(lblSubtotal, style: ts(size: 9)),
-                        pw.Text(
-                          _fmtAmt(invoice.subtotal),
-                          style: ts(size: 9),
-                          textDirection: _amountDir,
+                child: pw.Directionality(
+                  textDirection: pw.TextDirection.ltr,
+                  child: pw.Column(
+                    children: [
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          pairedLabel(lblSubtotal, style: ts(size: 9)),
+                          pw.Text(
+                            _fmtAmt(invoice.subtotal),
+                            style: ts(size: 9),
+                            textDirection: _amountDir,
+                          ),
+                        ],
+                      ),
+                      if (invoice.discount > 0) ...[
+                        pw.SizedBox(height: 2),
+                        pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pairedLabel(
+                              lblDiscount,
+                              style: ts(size: 9, color: PdfColors.green700),
+                            ),
+                            pw.Text(
+                              '-${_fmtAmt(invoice.discount)}',
+                              style: ts(size: 9, color: PdfColors.green700),
+                              textDirection: _amountDir,
+                            ),
+                          ],
                         ),
                       ],
-                    ),
-                    if (invoice.discount > 0) ...[
-                      pw.SizedBox(height: 2),
+                      pw.Row(
+                        children: [
+                          pw.Expanded(child: pw.Divider(thickness: 0.5)),
+                        ],
+                      ),
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
                           pairedLabel(
-                            lblDiscount,
-                            style: ts(size: 9, color: PdfColors.green700),
+                            _documentLabelWithSuffix(
+                              'total',
+                              currencyLabel,
+                              pair,
+                              locale,
+                              separator: ' ',
+                            ),
+                            style: ts(size: 11, fw: pw.FontWeight.bold),
                           ),
                           pw.Text(
-                            '-${_fmtAmt(invoice.discount)}',
-                            style: ts(size: 9, color: PdfColors.green700),
+                            _fmtAmt(invoice.total),
+                            style: ts(size: 11, fw: pw.FontWeight.bold),
                             textDirection: _amountDir,
                           ),
                         ],
                       ),
                     ],
-                    pw.Divider(thickness: 0.5),
-                    pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      children: [
-                        pairedLabel(
-                          _documentLabelWithSuffix(
-                            'total',
-                            currencyLabel,
-                            pair,
-                            locale,
-                            separator: ' ',
-                          ),
-                          style: ts(size: 11, fw: pw.FontWeight.bold),
-                        ),
-                        pw.Text(
-                          _fmtAmt(invoice.total),
-                          style: ts(size: 11, fw: pw.FontWeight.bold),
-                          textDirection: _amountDir,
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          pw.SizedBox(height: 14),
+          pw.SizedBox(height: 8),
 
           if (invoice.notes != null && invoice.notes!.isNotEmpty) ...[
             pairedLabel(

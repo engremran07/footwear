@@ -1,6 +1,6 @@
 ﻿# ShoesERP AI Coding Rules (CLAUDE.md)
 
-Last updated: 2026-10-25
+Last updated: 2026-10-27
 
 ## Runtime Override (Always First)
 
@@ -8,11 +8,21 @@ The live codebase is a route/seller distribution ERP.
 
 - Roles: admin, supervisor, seller (manager must be admin-equivalent)
 - `supervisor` is a tenant-scoped operational role for routes, shops, products,
-  inventory, invoices, and reports. It does not grant user, notification,
-  settings, or backup access, nor financial-correction or invoice-void rights.
+  inventory, invoices, reports, and tenant notifications. It does not grant
+  user, settings, or backup access, nor financial-correction or invoice-void
+  rights.
+- Active admins, tenant admins, supervisors, and sellers may create sale
+  invoices and cash receipts within their tenant scope; sellers remain
+  assigned-route scoped. Creation does not grant invoice settlement,
+  correction, credit-note, or void capabilities.
 - Super-admin is platform-only by default. Tenant business data requires explicit `active_workspace_id` plus a reasoned support context; selection start/end is written to append-only `platform_access_logs`.
 - Firebase Auth is the app's only sign-in mechanism. The app has no custom device registration, pairing approval, session slots, or session renewal; Firestore Rules enforce active profile, role, tenant, and selected-workspace scope.
 - Business-data access additionally requires an active tenant document. An active user profile does not override an inactive workspace; the explicitly selected super-admin restoration path is the limited exception.
+- App-side role/capability checks use `RoleCapabilities` and
+  `PermissionPolicy` in `app/lib/core/utils/role_names.dart` and
+  `app/lib/core/utils/permission_policy.dart`. Routes, screens, and providers
+  must reuse them; Firestore Rules independently enforce authorization and
+  remain the security boundary.
 - Collections: users, products, product_variants, seller_inventory, inventory_transactions,
   routes, shops [Firestore name: 'customers' — legacy, use Collections.shops],
   transactions, invoices, settings
@@ -121,13 +131,14 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 34. Copilot chat history and request IDs do not merge across GitHub identities through repository changes. Preserve durable decisions, pending tasks, audit IDs, and verification evidence in `SESSION_LOG.md` and the current audit report. On an account/profile switch, read those plus `git status`/`git diff`; never store credentials or full chat transcripts in the repository or claim separate accounts were synchronized.
 35. Workspace-root hard deletion is denied; use the selected-workspace archive/restore lifecycle. Database flush/reset actions and legacy plaintext whole-project export, whole-collection restore, and direct-balance reset scripts must remain fail-closed until a transactional, audited maintenance path preserves tenant, ledger, and inventory invariants.
 36. Missing-document Rules reads must be narrowly scoped to an active profile and concrete active tenant; super-admins additionally require selected-workspace support context. Only admin-equivalent users may probe missing seller inventory, and only super-admins may probe settings for a tenant that does not yet exist. Cover client reads and their complete transaction writes in emulator regressions; do not use a blanket `resource == null` allowance.
-37. Financial PDFs use the shared workspace header with English content left
-    and the selected Arabic/Urdu content right, independent of app locale.
-    Current workspace logo bytes take priority; invoice snapshots provide a
-    logo fallback when current bytes are unavailable, subject to the saved
-    `visibleFields` setting. Cash receipts are A5 and single-page. Preserve
-    the `use_arabic=true` shaping gate; verify font/image resources, page size,
-    page count, and rendered layout separately.
+37. Financial PDFs use the shared workspace header with English content left,
+    the company logo centered, and selected Arabic/Urdu content right,
+    independent of app locale. Every PDF builder uses one logo size and
+    placement. Current workspace logo bytes take priority; invoice snapshots
+    provide a logo fallback when current bytes are unavailable, subject to the
+    saved `visibleFields` setting. Cash receipts are A5 and single-page.
+    Preserve the `use_arabic=true` shaping gate; verify font/image resources,
+    page size, page count, and rendered layout separately.
 
 ## Frontend UI Governance
 
@@ -396,15 +407,20 @@ unmodified.
 
 An AI agent that provides claims without quoting actual tool output is in violation of AGENTS.md Rule 21 and the claim is invalid. Never accept "I ran the tests and they passed" — always demand the exact output.
 
-## Admin Auth Pipeline
+## Firebase Auth Recovery
 
-When an admin's ID token is rejected mid-session (INVALID_ID_TOKEN):
+Firebase Auth owns credential and token refresh. Do not add a
+`signInWithCustomToken` recovery path or use the account-creation
+secondary-app flow to mint credentials; the client has no trusted custom-token
+issuer.
 
-1. `auth.currentUser?.getIdToken(forceRefresh: true)` → if OK, continue
-2. If step 1 fails → `auth.signInWithCustomToken(token)` from secondary FirebaseApp
-3. If step 2 fails → `authNotifier.signOut()` + redirect to `/login`
-
-Never silently swallow `INVALID_ID_TOKEN` — always force refresh or sign out.
+- Preserve Firebase Auth persistence after transient network, timeout, or
+  token-refresh failures and provide retryable feedback.
+- Sign out only for a confirmed disabled/deleted account, explicit invalid
+  credentials, or user action. Scope automatic sign-out to the UID that was
+  checked.
+- Trace the actual auth exception and `auth_provider.dart` before changing
+  recovery logic; do not turn every token error into a sign-out.
 
 ## Pre-Release Verification
 
@@ -422,6 +438,81 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- The 2026-10-27 notification regression was caused by singleton provider
+  caches surviving a workspace switch. Feed and shop-visibility streams now
+  use tenant-keyed families and reject missing/global notification scope;
+  same-tenant refresh behavior remains cached. The root platform settings hub
+  has a distinct capability from tenant business-settings descendants.
+  Local Rules Emulator: `172 passing (42s)`; full Flutter suite:
+  `01:20 +654: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 5.6s)`; `dart analyze test/`:
+  `No issues found!`; updated changelog test: `00:00 +10: All tests passed!`.
+  Version `3.10.8+1119` is synchronized. Split APKs built (30.7/32.2/33.7
+  MB), and the signed AAB built (54.8 MB); APK v2 and AAB JAR verification
+  succeeded. ARM64 APK copy reported `1 file pushed`; streamed install
+  reported `Success` on `R5GL22RGT9V`, versionName `3.10.8`, versionCode
+  `310083119`. Production deployments remain unperformed.
+- Local multi-tenant policy work centralizes app capabilities, applies the
+  active support-context TTL to dashboard/router access, and rejects sentinel
+  tenant IDs for new writes. The Users screen now distinguishes profile
+  loading, mapped profile-stream failures with retry, and missing profiles;
+  its regression changed from an indefinite-shimmer test timeout to
+  `00:04 +4: All tests passed!`.
+- Local invoice authorization permits active admins, tenant admins,
+  supervisors, and route-scoped sellers to create sale invoices and cash
+  receipts without granting settlement, credit-note, correction, or void
+  rights. Firestore Rules reject unsupported invoice types and require invoice
+  sequence updates to link to the same-batch invoice. The 15-workspace test
+  covers own/other-tenant shop and invoice reads. Current local results:
+  Rules Emulator `180 passing`; full Flutter suite `01:17 +655: All tests
+  passed!`; focused invoice/permission suite `00:08 +50: All tests passed!`;
+  both analyzers clean. This is not a production release.
+- Findings 4, 5, and 26 are verified fixed locally; finding 6 is partially
+  addressed; the remaining 29 of the 33 attached findings still require
+  evidence-based disposition. Hosting and Rules/indexes deployed to
+  `shoeserp-clean-20260327`; live version is `3.10.9+1120`. Web build:
+  `EXIT: 0`; live shell and main bundle return
+  `no-cache, no-store, must-revalidate`. Version `3.10.9+1120` split APKs
+  (30.7/32.2/33.7 MB) and a signed 54.8 MB AAB were built and verified.
+  ARM64 installation on `R5GL22RGT9V` reported `Success`, versionCode
+  `310093120`. No Play Console upload, commit, or push occurred.
+
+- Local v3.10.8+1119 adds supervisor read/mark-read access to the tenant
+  notification feed without granting seller access or cross-tenant scope. The
+  notification view retains cached data during both feed and shop-visibility
+  refreshes, and mark-read failures remain visible. Best-effort notification
+  create failures are logged without affecting the committed financial write.
+  Shared PDF business names now scale to one line to avoid increasing the A5
+  receipt header height. These changes are included in the later local
+  `3.10.9+1120` validation: Rules Emulator `180 passing`, full Flutter suite
+  `01:21 +655: All tests passed!`, both analyzers clean, and APK/AAB builds
+  verified. Production deployment remains unperformed.
+- Local v3.10.8+1119 logo follow-up centers one shared, slightly larger company
+  logo between English-left and Arabic/Urdu-right content in the workspace
+  brand header for every logo-enabled financial PDF. Generic flat-table PDF
+  logos now use that shared header as well. Focused PDF tests passed, and
+  generated Arabic statement and receipt samples were visually inspected.
+  The local APK/AAB were subsequently rebuilt as `3.10.9+1120`; no web build
+  or production deployment is claimed for that version.
+- Local notification/PDF follow-up: notification shop visibility
+  keeps its last successful result while the replacement listener refreshes;
+  first-load loading and real stream errors remain distinct. Role/tenant/
+  support-context checks now gate notification subscriptions and read-state
+  writes, while mark-as-read failures are mapped and visible. Arabic/Urdu
+  statement table, summary, and final-balance rows pin their physical LTR
+  order; PDF layout changes do not alter financial math. The v3.10.7+1118
+  local follow-up matches the available receipt reference's compact bilingual
+  body, preserves the shared workspace header, and adds two optional
+  receipt-footer contacts.
+  Arabic and Urdu receipt samples were visually inspected in the browser.
+  Full Flutter suite: `01:29 +639: All tests passed!`; focused PDF/settings
+  suite: `00:15 +24: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 13.3s)`; `dart analyze test/`:
+  `No issues found!`; Rules Emulator: `154 passing (30s)`. Split APKs:
+  30.7/32.2/33.7 MB; signed AAB: 54.8 MB. All APK signatures verified; the
+  AAB reported `jar verified.`. ARM64 was copied to `/sdcard/Download/` and
+  installed on `R5GL22RGT9V` (`Success`), versionName `3.10.7`, versionCode
+  `310073118`. No production deploy, commit, or push occurred.
 - v3.10.6+1117 adds a three-column bilingual account-statement header:
   English details left, shop name/date range centered, and selected Arabic or
   Urdu details right. Both statement exporters share `buildPdfLedger()`;

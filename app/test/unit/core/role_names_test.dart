@@ -24,57 +24,66 @@ void main() {
     expect(canManageWorkspaceRole('seller'), isFalse);
   });
 
-  test('tenant security route is scoped to tenant admin or active workspace', () {
-    UserModel user({
-      required UserRole role,
-      String? tenantId,
-      String? activeWorkspaceId,
-    }) => UserModel(
-      id: 'user-1',
-      email: 'user@example.com',
-      displayName: 'User',
-      role: role,
-      tenantId: tenantId,
-      activeWorkspaceId: activeWorkspaceId,
-      active: true,
-      createdAt: Timestamp.fromMillisecondsSinceEpoch(0),
-      updatedAt: Timestamp.fromMillisecondsSinceEpoch(0),
-    );
+  test(
+    'tenant security route is scoped to tenant admin or active workspace',
+    () {
+      UserModel user({
+        required UserRole role,
+        String? tenantId,
+        String? activeWorkspaceId,
+      }) => UserModel(
+        id: 'user-1',
+        email: 'user@example.com',
+        displayName: 'User',
+        role: role,
+        tenantId: tenantId,
+        activeWorkspaceId: activeWorkspaceId,
+        activeWorkspaceReason: activeWorkspaceId == null
+            ? null
+            : 'Investigating a report',
+        activeWorkspaceSelectedAt: activeWorkspaceId == null
+            ? null
+            : Timestamp.fromDate(DateTime.now()),
+        active: true,
+        createdAt: Timestamp.fromMillisecondsSinceEpoch(0),
+        updatedAt: Timestamp.fromMillisecondsSinceEpoch(0),
+      );
 
-    expect(
-      canManageTenantSecurity(
-        user(role: UserRole.tenantAdmin, tenantId: 'tenant-1'),
-        'tenant-1',
-      ),
-      isTrue,
-    );
-    expect(
-      canManageTenantSecurity(
-        user(role: UserRole.tenantAdmin, tenantId: 'tenant-1'),
-        'tenant-2',
-      ),
-      isFalse,
-    );
-    expect(
-      canManageTenantSecurity(
-        user(role: UserRole.superAdmin, activeWorkspaceId: 'tenant-1'),
-        'tenant-1',
-      ),
-      isTrue,
-    );
-    expect(
-      canManageTenantSecurity(
-        user(role: UserRole.superAdmin, activeWorkspaceId: 'tenant-1'),
-        'tenant-2',
-      ),
-      isFalse,
-    );
-    expect(
-      canManageTenantSecurity(
-        user(role: UserRole.admin, tenantId: 'tenant-1'),
-        'tenant-1',
-      ),
-      isFalse,
-    );
-  });
+      expect(
+        canManageTenantSecurity(
+          user(role: UserRole.tenantAdmin, tenantId: 'tenant-1'),
+          'tenant-1',
+        ),
+        isTrue,
+      );
+      expect(
+        canManageTenantSecurity(
+          user(role: UserRole.tenantAdmin, tenantId: 'tenant-1'),
+          'tenant-2',
+        ),
+        isFalse,
+      );
+      expect(
+        canManageTenantSecurity(
+          user(role: UserRole.superAdmin, activeWorkspaceId: 'tenant-1'),
+          'tenant-1',
+        ),
+        isTrue,
+      );
+      expect(
+        canManageTenantSecurity(
+          user(role: UserRole.superAdmin, activeWorkspaceId: 'tenant-1'),
+          'tenant-2',
+        ),
+        isFalse,
+      );
+      expect(
+        canManageTenantSecurity(
+          user(role: UserRole.admin, tenantId: 'tenant-1'),
+          'tenant-1',
+        ),
+        isFalse,
+      );
+    },
+  );
 }

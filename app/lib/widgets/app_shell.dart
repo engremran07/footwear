@@ -16,9 +16,10 @@ import '../core/constants/app_brand.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/services/permissions_service.dart';
-import '../core/utils/role_utils.dart';
+import '../core/utils/permission_policy.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/snack_helper.dart';
 import '../providers/changelog_provider.dart';
 import '../providers/database_backup_provider.dart';
@@ -32,13 +33,11 @@ class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.child});
 
   static bool canManageWorkspaces(UserModel? user) {
-    if (user == null) return false;
-    return canManageWorkspaceRole(roleValueFromUserRole(user.role));
+    return PermissionPolicy.can(user, AppCapability.manageWorkspaces);
   }
 
   static bool canManageUsers(UserModel? user) {
-    if (user == null) return false;
-    return canManageUserAccountsRole(roleValueFromUserRole(user.role));
+    return PermissionPolicy.can(user, AppCapability.manageUsers);
   }
 
   static const _navItems = [
@@ -49,6 +48,12 @@ class AppShell extends ConsumerStatefulWidget {
     (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
     (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
     (icon: Icons.analytics, key: 'reports', route: '/reports'),
+    (icon: Icons.history, key: 'history', route: '/history'),
+    (
+      icon: Icons.notifications_outlined,
+      key: 'notifications',
+      route: '/notifications',
+    ),
     (icon: Icons.apartment, key: 'workspaces', route: '/tenants'),
     (icon: Icons.manage_accounts, key: 'users', route: '/users'),
     (icon: Icons.settings, key: 'settings', route: '/settings'),
@@ -59,51 +64,9 @@ class AppShell extends ConsumerStatefulWidget {
     UserModel? user,
   ) {
     if (user == null) return [];
-    if (user.isSuperAdmin && user.tenantId == null) {
-      return _navItems
-          .where(
-            (e) =>
-                e.route == '/' ||
-                e.route == '/tenants' ||
-                e.route == '/settings' ||
-                e.route == '/about',
-          )
-          .toList();
-    }
-    if (user.isSeller) {
-      return _navItems
-          .where(
-            (e) =>
-                e.route == '/' ||
-                e.route == '/shops' ||
-                e.route == '/products' ||
-                e.route == '/inventory' ||
-                e.route == '/invoices' ||
-                e.route == '/about',
-          )
-          .toList();
-    }
-    if (user.isSupervisor) {
-      return _navItems
-          .where(
-            (e) =>
-                e.route == '/' ||
-                e.route == '/routes' ||
-                e.route == '/shops' ||
-                e.route == '/products' ||
-                e.route == '/inventory' ||
-                e.route == '/invoices' ||
-                e.route == '/reports' ||
-                e.route == '/about',
-          )
-          .toList();
-    }
-    return _navItems.where((e) {
-      if (e.route == '/settings') return user.isAdmin;
-      if (e.route == '/users') return canManageUsers(user);
-      if (e.route == '/tenants') return canManageWorkspaces(user);
-      return true;
-    }).toList();
+    return _navItems
+        .where((item) => PermissionPolicy.canAccessRoute(user, item.route))
+        .toList();
   }
 
   static List<String> navigationRoutesFor(UserModel? user) =>
@@ -289,38 +252,25 @@ class _AppShellState extends ConsumerState<AppShell>
     UserModel? user,
   ) {
     if (user == null) return [];
+    final allowed = AppShell._filteredItems(user);
+    final primaryRoutes = <String>{
+      '/',
+      '/shops',
+      '/invoices',
+      '/history',
+      '/inventory',
+    };
+    if (PermissionPolicy.can(user, AppCapability.manageWorkspaces)) {
+      primaryRoutes.add('/tenants');
+    }
     if (user.isSuperAdmin && user.tenantId == null) {
-      return const [
-        (icon: Icons.dashboard, key: 'dashboard', route: '/'),
-        (icon: Icons.apartment, key: 'workspaces', route: '/tenants'),
-        (icon: Icons.settings, key: 'settings', route: '/settings'),
-      ];
+      primaryRoutes
+        ..remove('/shops')
+        ..remove('/invoices')
+        ..remove('/history')
+        ..remove('/inventory');
     }
-    if (user.isSeller) {
-      return const [
-        (icon: Icons.dashboard, key: 'dashboard', route: '/'),
-        (icon: Icons.storefront, key: 'shops', route: '/shops'),
-        (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
-        (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
-        (icon: Icons.history, key: 'history', route: '/history'),
-      ];
-    }
-
-    final items = <({IconData icon, String key, String route})>[
-      const (icon: Icons.dashboard, key: 'dashboard', route: '/'),
-      const (icon: Icons.storefront, key: 'shops', route: '/shops'),
-      const (icon: Icons.receipt_long, key: 'invoices', route: '/invoices'),
-      const (icon: Icons.history, key: 'history', route: '/history'),
-      const (icon: Icons.warehouse, key: 'inventory', route: '/inventory'),
-    ];
-    if (AppShell.canManageWorkspaces(user)) {
-      items.add(const (
-        icon: Icons.apartment,
-        key: 'workspaces',
-        route: '/tenants',
-      ));
-    }
-    return items;
+    return allowed.where((item) => primaryRoutes.contains(item.route)).toList();
   }
 
   int _selectedIndex(
@@ -405,7 +355,8 @@ class _AppShellState extends ConsumerState<AppShell>
     final isWide = screenWidth >= AppTokens.breakpointNavigationRail;
     final isOnline = ref.watch(isOnlineProvider).value ?? true;
     final currentLocation = GoRouterState.of(context).uri.path;
-    final unreadCount = (user?.isAdmin ?? false)
+    final unreadCount =
+        PermissionPolicy.can(user, AppCapability.viewNotifications)
         ? ref.watch(unreadNotificationCountProvider)
         : 0;
 
@@ -827,8 +778,8 @@ class _WhatsAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
       title: _BreadcrumbTitle(location: currentLocation, isOnline: isOnline),
       actions: [
-        // Bell icon — admin-only; hidden when unread count is zero
-        if (user?.isAdmin == true)
+        // Bell icon — shown only to roles that can access notifications.
+        if (PermissionPolicy.can(user, AppCapability.viewNotifications))
           Builder(
             builder: (ctx) => Stack(
               alignment: Alignment.center,

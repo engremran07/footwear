@@ -109,6 +109,8 @@ void main() {
       expect(userForRole(UserRole.supervisor).canCreateBackup, isFalse);
       expect(userForRole(UserRole.supervisor).canRestoreBackup, isFalse);
       expect(userForRole(UserRole.supervisor).isAdmin, isFalse);
+      expect(userForRole(UserRole.supervisor).canAccessNotifications, isTrue);
+      expect(userForRole(UserRole.seller).canAccessNotifications, isFalse);
       expect(userForRole(UserRole.supervisor).canManageOperationalData, isTrue);
       expect(
         canManageUserAccountsRole(roleValueFromUserRole(UserRole.supervisor)),

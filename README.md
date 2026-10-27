@@ -1,11 +1,69 @@
-# FootWear ERP — v3.10.6+1117
+# FootWear ERP — v3.10.9+1120
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
+> **Local v3.10.7+1118 follow-up (not deployed):** Cash-receipt PDFs now use
+> a compact bilingual body based on the supplied receipt reference, preserve
+> the existing shared workspace header, and support two optional receipt
+> footer contact numbers. Arabic and Urdu samples were visually inspected.
+> Full Flutter suite: `01:29 +639: All tests passed!`; focused PDF/settings
+> suite: `00:15 +24: All tests passed!`; both analyzers clean; Rules Emulator:
+> `154 passing (30s)`. Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB,
+> x86_64 33.7 MB; signed AAB: 54.8 MB. All APK signatures verified and the
+> AAB reported `jar verified.`. ARM64 was copied to `/sdcard/Download/` and
+> installed on `R5GL22RGT9V` (`Success`), versionName `3.10.7`,
+> versionCode `310073118`. Firestore Rules/indexes and Hosting were not
+> deployed; no commit or push was performed.
+>
+> **Local v3.10.8+1119 follow-up (not deployed):** Logo-enabled financial
+> PDFs now use one shared header with the company logo centered between
+> English and Arabic/Urdu details, at the same slightly larger size. The
+> generic flat-table fallback uses the shared header too. The company-name
+> line scales to fit instead of wrapping in the compact A5 receipt header.
+> Supervisors can read and mark their own workspace's notifications; sellers
+> remain excluded. Tenant-keyed notification feed and shop listeners prevent
+> cached rows from crossing a workspace switch; missing/global scope does not
+> query. Root platform settings remain available without exposing tenant
+> settings descendants. Rules Emulator: `172 passing (42s)`; full Flutter
+> suite: `01:20 +654: All tests passed!`; `flutter analyze lib --no-pub`:
+> `No issues found! (ran in 5.6s)`; `dart analyze test/`:
+> `No issues found!`; updated changelog test: `00:00 +10: All tests passed!`.
+> Version `3.10.8+1119` produced split APKs (30.7/32.2/33.7 MB) and a signed
+> 54.8 MB Play Console AAB. APK v2 and AAB JAR signatures verified. ARM64
+> copied to and installed on `R5GL22RGT9V` (`Success`), versionName `3.10.8`,
+> versionCode `310083119`. Production deployment remains unperformed.
+>
+> **v3.10.9+1120:** Active workspace admins,
+> tenant admins, supervisors, and route-scoped sellers can create sale
+> invoices and cash receipts without gaining settlement, credit-note,
+> correction, or void rights. Firestore Rules reject unsupported invoice
+> types, bind invoice counters to same-batch sale/credit-note records, and
+> enforce seller identity on invoice creation. A 15-workspace isolation test
+> covers shop and invoice reads. Rules Emulator: `180 passing`; full Flutter
+> suite: `01:21 +655: All tests passed!`; both analyzers are clean. Fresh
+> release artifacts use synchronized version `3.10.9+1120`: split APKs are
+> ARMv7 30.7 MB, ARM64 32.2 MB, and x86_64 33.7 MB; the signed Play Console
+> AAB is 54.8 MB. APK v2 signatures and the AAB JAR signature verified.
+> Web build: `EXIT: 0`; Hosting and Firestore Rules/indexes each reported
+> `Deploy complete!`. Live `version.json` reports `3.10.9`, build `1120`;
+> shell and main bundle return `no-cache, no-store, must-revalidate`.
+> ARM64 was copied to the connected phone and installed (`Success`),
+> versionName `3.10.9`, versionCode `310093120`. No Play Console upload,
+> commit, or push was performed. The wider 33-finding audit remains open.
+>
 > **v3.10.6+1117 (2026-10-25)** — Account-statement PDFs now use three columns: English report details on the left, shop name and date range in the center, and selected Arabic or Urdu details on the right. This release also includes the tenant-scoped supervisor role, legacy-admin Users/merge-backup access, notification listener stability, and the APK/AAB Gradle fix.
 > Verification: full Flutter suite `01:14 +633: All tests passed!`; focused PDF suite `00:01 +12: All tests passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 6.3s)`; `dart analyze test/`: `No issues found!`; Firestore Rules Emulator: `152 passing (30s)`; Markdown lint and `git diff --check` exited 0.
 > Web build `EXIT: 0`; Firebase Hosting and Firestore Rules/indexes each reported `Deploy complete!`. Live `/`, `index.html`, `version.json`, and `main.dart.js` returned HTTP 200 with no-store/no-cache/must-revalidate headers; `version.json` reports `3.10.6+1117`. The 23 remote indexes and 2 field overrides absent locally were preserved without `--force`.
 > Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.7 MB; signed AAB 54.8 MB. APK v2 and AAB JAR signature verification passed. ARM64 installed on `R5GL22RGT9V` (`Success`), versionName `3.10.6`, versionCode `310063117`.
+>
+> **Earlier local follow-up:** Notification refreshes preserve the last
+> visible shop-filtered feed while reloading and expose mapped read-state
+> failures. RTL statement rows and summary columns are physically pinned;
+> Arabic and Urdu samples were inspected. Full Flutter suite:
+> `01:14 +638: All tests passed!`; Rules Emulator: `154 passing (54s)`;
+> both analyzers and Markdown lint are clean.
+> Receipt-reference matching and its release build are tracked in the
+> v3.10.7+1118 local follow-up above.
 > **v3.10.5+1116 (2026-10-25)** — Adds a tenant-scoped supervisor role for operational routes, shops, products, inventory, invoices, and reports without user-administration, notifications, settings, backup, financial-correction, or invoice-void privileges. Legacy admins regain workspace user-list and merge-only backup access. Notification shop-visibility subscriptions no longer restart for read-state-only changes. Android versionCode generation now preserves Play Store upgrade ordering. The local v3.10.5 artifacts were superseded by v3.10.6 before production deployment.
 > **v3.10.4+1115 (2026-10-25)** — Super-admin workspace support-access feedback now distinguishes start, switch, end, and failure states. Shared financial PDF rows preserve English-left and selected Arabic/Urdu-right ordering under RTL pages. Urdu remains readable Naskh-style; a Nastaliq renderer migration is deferred until logo, selectable-text, pagination, and Web/Android report parity are proven.
 > Verification: `01:16 +628: All tests passed!`; focused access/PDF suite `00:11 +65: All tests passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 132.4s)`; `dart analyze test/`: `No issues found!`; Rules Emulator: `147 passing (29s)`.
@@ -244,6 +302,10 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 - Financial corrections preserve prior values, actor, and a correction reason; invoice-linked transactions are corrected through invoice void/credit-note flows.
 - Exports page to exhaustion. Tenant-admin restore is upsert-only; selected super-admin restore upserts before pruning obsolete documents. Plaintext legacy archives are rejected.
 - Transient token-refresh failures do not sign users out. If Firebase initialization fails, the app shows a retry state rather than opening an unusable shell.
+- App-side role capabilities are defined by `RoleCapabilities` and
+  `PermissionPolicy`; routing, screen actions, and provider guards reuse that
+  policy. Firestore Rules remain an independent authorization boundary and
+  must be emulator-tested for both allowed and denied tenant operations.
 
 ### Data Maintenance and Workspace Lifecycle
 
@@ -265,14 +327,24 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 | View shops | All in workspace | All in workspace | Assigned routes only |
 | Create / update shops | ✅ | ✅ (no route reassignment) | Assigned routes only |
 | Access invoices and reports | ✅ | ✅ | Assigned-route workflows |
+| Create sale invoices / cash receipts | ✅ | ✅ | Assigned-route shops only |
 | Adjust inventory | ✅ | ✅ | ❌ |
-| Notifications, settings, backup | Admin-equivalent only | ❌ | ❌ |
+| Notifications | Admin-equivalent; supervisor may use the tenant feed | Tenant feed only | ❌ |
+| Settings and workspace backup | Admin-equivalent only | ❌ | ❌ |
 | Financial correction / invoice void | Admin-equivalent only | ❌ | ❌ |
 | Profile (name/theme/language/password) | ✅ | ✅ | ✅ |
 
 > `manager` role is treated as admin-equivalent for legacy data compatibility.
 > Tenant admins may assign supervisor and seller roles to eligible members;
 > supervisor is not an account-administration or financial-approval role.
+
+`RoleCapabilities` and `PermissionPolicy` are the canonical app-side
+capability matrix. Legacy `admin`/`manager` may administer seller accounts
+only; tenant admins manage eligible same-workspace seller/supervisor accounts;
+supervisors receive operational access and notification-feed access without
+financial-correction, invoice-void, backup, settings, or user-administration
+rights. Firestore Rules must independently enforce each operation and tenant
+boundary; client visibility is never the security control.
 
 ---
 

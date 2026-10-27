@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
-import '../utils/role_utils.dart';
+import '../utils/permission_policy.dart';
 import '../../screens/login_screen.dart';
 import '../../screens/dashboard_screen.dart';
 import '../../screens/routes_list_screen.dart';
@@ -36,47 +36,10 @@ import '../../screens/tenant_management_screen.dart';
 import '../../screens/database_flush_screen.dart';
 import '../../screens/database_backup_screen.dart';
 import '../../widgets/app_shell.dart';
+import '../../widgets/role_guard.dart';
 import '../design/app_animations.dart';
 import '../l10n/app_locale.dart';
-
-/// Normalize path: strip query params, trailing slashes, collapse double slashes.
-String _normalizePath(String raw) {
-  var p = Uri.parse(raw).path;
-  p = p.replaceAll(RegExp(r'/+'), '/'); // collapse double slashes
-  if (p.length > 1 && p.endsWith('/')) p = p.substring(0, p.length - 1);
-  return p;
-}
-
-bool _isAccountAdminPath(String rawPath) {
-  final path = _normalizePath(rawPath);
-  if (path == '/settings' || path == '/users' || path == '/notifications') {
-    return true;
-  }
-  return false;
-}
-
-bool _isOperationalAdminPath(String rawPath) {
-  final path = _normalizePath(rawPath);
-  if (path == '/routes/new' || path == '/products/new') return true;
-  return RegExp(r'^/routes/[^/]+/edit$').hasMatch(path) ||
-      RegExp(r'^/products/[^/]+/edit$').hasMatch(path) ||
-      RegExp(r'^/products/[^/]+/variants/new$').hasMatch(path) ||
-      RegExp(r'^/products/[^/]+/variants/[^/]+/edit$').hasMatch(path);
-}
-
-bool _isTenantManagementPath(String rawPath) {
-  final path = _normalizePath(rawPath);
-  return path == '/tenants';
-}
-
-bool _isSellerBlockedPath(String rawPath) {
-  final path = _normalizePath(rawPath);
-  return path == '/routes' ||
-      path == '/reports' ||
-      path == '/settings' ||
-      path == '/routes/new' ||
-      RegExp(r'^/routes/[^/]+/edit$').hasMatch(path);
-}
+import '../utils/role_names.dart';
 
 /// Material shared-axis Z transition (scale+fade) for all routes.
 CustomTransitionPage<void> _fadePage(Widget child, GoRouterState state) {
@@ -134,6 +97,7 @@ CustomTransitionPage<void> _slidePage(Widget child, GoRouterState state) {
 class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
   Timer? _debounceTimer;
+  Timer? _workspaceExpiryTimer;
 
   RouterNotifier(this._ref) {
     _ref.listen<AsyncValue<User?>>(authStateProvider, (prev, next) {
@@ -151,7 +115,11 @@ class RouterNotifier extends ChangeNotifier {
           prevUser?.role != nextUser?.role ||
           prevUser?.active != nextUser?.active ||
           prevUser?.tenantId != nextUser?.tenantId ||
-          prevUser?.activeWorkspaceId != nextUser?.activeWorkspaceId;
+          prevUser?.activeWorkspaceId != nextUser?.activeWorkspaceId ||
+          prevUser?.activeWorkspaceReason != nextUser?.activeWorkspaceReason ||
+          prevUser?.activeWorkspaceSelectedAt !=
+              nextUser?.activeWorkspaceSelectedAt;
+      _scheduleWorkspaceExpiry(nextUser);
       if (authRelevantChanged || prev?.isLoading != next.isLoading) {
         _scheduleNotify();
       }
@@ -169,9 +137,23 @@ class RouterNotifier extends ChangeNotifier {
     _debounceTimer = Timer(const Duration(milliseconds: 100), notifyListeners);
   }
 
+  void _scheduleWorkspaceExpiry(UserModel? user) {
+    _workspaceExpiryTimer?.cancel();
+    if (user?.isSuperAdmin != true) return;
+    final selectedAt = user!.activeWorkspaceSelectedAt?.toDate();
+    if (selectedAt == null) return;
+    final expiresAt = selectedAt.add(const Duration(hours: 8));
+    final remaining = expiresAt.difference(DateTime.now());
+    _workspaceExpiryTimer = Timer(
+      remaining.isNegative ? Duration.zero : remaining,
+      _scheduleNotify,
+    );
+  }
+
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _workspaceExpiryTimer?.cancel();
     super.dispose();
   }
 
@@ -202,11 +184,6 @@ class RouterNotifier extends ChangeNotifier {
       return isBootstrapRoute ? null : '/bootstrap-profile';
     }
 
-    if (state.matchedLocation == '/settings/backup' &&
-        !appUser.canCreateBackup) {
-      return '/';
-    }
-
     if (!appUser.isSuperAdmin && appUser.tenantId == null) {
       return isBootstrapRoute ? null : '/bootstrap-profile';
     }
@@ -214,27 +191,13 @@ class RouterNotifier extends ChangeNotifier {
     if (isLoginRoute || isBootstrapRoute) return '/';
 
     if (appUser.isSuperAdmin &&
-        appUser.tenantId == null &&
-        _isTenantBusinessPath(state.matchedLocation)) {
+        !PermissionPolicy.can(appUser, AppCapability.viewDashboard) &&
+        (state.matchedLocation == '/' ||
+            _isTenantBusinessPath(state.matchedLocation))) {
       return '/tenants';
     }
 
-    if (_isTenantManagementPath(state.matchedLocation) &&
-        !canManageWorkspaceRole(roleValueFromUserRole(appUser.role))) {
-      return '/';
-    }
-    if (state.matchedLocation == '/settings/flush' && !appUser.isSuperAdmin) {
-      return '/';
-    }
-    if (_isAccountAdminPath(state.matchedLocation) &&
-        !canManageUserAccountsRole(roleValueFromUserRole(appUser.role))) {
-      return '/';
-    }
-    if (_isOperationalAdminPath(state.matchedLocation) &&
-        !appUser.canManageOperationalData) {
-      return '/';
-    }
-    if (appUser.isSeller && _isSellerBlockedPath(state.matchedLocation)) {
+    if (!PermissionPolicy.canAccessRoute(appUser, state.matchedLocation)) {
       return '/';
     }
     return null;
@@ -409,7 +372,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Users (admin-only)
           GoRoute(
             path: '/users',
-            pageBuilder: (_, s) => _fadePage(const UsersListScreen(), s),
+            pageBuilder: (_, s) => _fadePage(
+              const RoleGuard(
+                capability: AppCapability.manageUsers,
+                child: UsersListScreen(),
+              ),
+              s,
+            ),
           ),
           // Reports
           GoRoute(
@@ -426,11 +395,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/history',
             pageBuilder: (_, s) => _fadePage(const HistoryScreen(), s),
           ),
-          // Notification center (admin-only — also guarded by _isAdminOnlyPath)
+          // Notification center (operational-role access, scoped by provider and Rules).
           GoRoute(
             path: '/notifications',
-            pageBuilder: (_, s) =>
-                _fadePage(const NotificationCenterScreen(), s),
+            pageBuilder: (_, s) => _fadePage(
+              const RoleGuard(
+                capability: AppCapability.viewNotifications,
+                child: NotificationCenterScreen(),
+              ),
+              s,
+            ),
           ),
           // Profile
           GoRoute(
@@ -445,22 +419,43 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Settings
           GoRoute(
             path: '/settings',
-            pageBuilder: (_, s) => _fadePage(const SettingsScreen(), s),
+            pageBuilder: (_, s) => _fadePage(
+              const RoleGuard(
+                capability: AppCapability.manageSettings,
+                child: SettingsScreen(),
+              ),
+              s,
+            ),
             routes: [
               GoRoute(
                 path: 'invoice-header',
-                pageBuilder: (_, s) =>
-                    _fadePage(const InvoiceHeaderSettingsScreen(), s),
+                pageBuilder: (_, s) => _fadePage(
+                  const RoleGuard(
+                    capability: AppCapability.manageSettings,
+                    child: InvoiceHeaderSettingsScreen(),
+                  ),
+                  s,
+                ),
               ),
               GoRoute(
                 path: 'flush',
-                pageBuilder: (_, s) =>
-                    _fadePage(const DatabaseFlushScreen(), s),
+                pageBuilder: (_, s) => _fadePage(
+                  const RoleGuard(
+                    capability: AppCapability.manageDataMaintenance,
+                    child: DatabaseFlushScreen(),
+                  ),
+                  s,
+                ),
               ),
               GoRoute(
                 path: 'backup',
-                pageBuilder: (_, s) =>
-                    _fadePage(const DatabaseBackupScreen(), s),
+                pageBuilder: (_, s) => _fadePage(
+                  const RoleGuard(
+                    capability: AppCapability.manageBackup,
+                    child: DatabaseBackupScreen(),
+                  ),
+                  s,
+                ),
               ),
             ],
           ),

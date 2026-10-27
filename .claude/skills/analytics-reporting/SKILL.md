@@ -283,12 +283,14 @@ visibility, and representative long values.
 For shared financial documents:
 
 - Keep one shared workspace brand header for invoices, receipts, statements,
-  and reports. Place English content on the left and the selected Arabic or
-  Urdu content on the right; set text direction explicitly for each side and
-  pin physical row order with
-  `pw.Directionality(textDirection: pw.TextDirection.ltr)` when a
-  page-level RTL direction could reverse children. `pw.Row` in `pdf` 3.12.0
-  does not accept a `textDirection` argument.
+  and reports. Place English content on the left, the consistently sized
+  company logo in the center, and selected Arabic or Urdu content on the
+  right. Every builder, including the flat-table fallback, must use this same
+  placement and size; set text direction explicitly for each side and pin
+  physical row order with
+  `pw.Directionality(textDirection: pw.TextDirection.ltr)` when a page-level
+  RTL direction could reverse children. `pw.Row` in `pdf` 3.12.0 does not
+  accept a `textDirection` argument.
 - Prefer current workspace logo bytes when available, but preserve a saved
   invoice logo when the current-header path has no usable logo bytes. Respect
   the explicit `visibleFields` logo setting.
@@ -302,6 +304,28 @@ For shared financial documents:
 - If pixel-level rendering is unavailable, state that limitation explicitly;
   do not claim visual acceptance based only on source review, Unicode input,
   or a font-resource assertion.
+
+  For RTL financial tables, verify physical columns in the rendered PDF, not
+  only the extracted text or successful PDF generation. In `pdf` 3.12.0, the
+  page-level RTL direction can reverse `pw.Row`/table children. Wrap table
+  headers, data rows, summary blocks, and final-balance rows in explicit LTR
+  directionality when the intended physical order is English-left and
+  amount/balance-right; give each Arabic/Urdu text widget its own RTL direction.
+  Keep amount direction explicit as well.
+
+  Statement-specific density changes must preserve the shared workspace
+  header and financial calculations. Centralized logo placement and sizing
+  apply across all financial PDFs, including receipts. Place the entry count
+  in the final-page footer and tune table padding only with rendered multi-row
+  and paginated samples. Treat statement and receipt references as separate
+  artifacts.
+  Before making a receipt layout claim, confirm and inspect an actual receipt
+  image. The available 2026-10-24 cash-receipt reference includes a compact
+  three-row Total/Advance/Balance summary, receipt number/date, bilingual
+  payer/amount/payment/account lines, signature area, and footer phone numbers.
+  Reproduce the body while passing the configured workspace header unchanged;
+  keep optional extra contacts in the receipt footer and preserve A5,
+  single-page output.
 
 Do not switch fonts, add a shaping dependency, or add a workaround until the
 actual PDF output and renderer compatibility establish that font selection or

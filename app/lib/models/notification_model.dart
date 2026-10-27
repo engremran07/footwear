@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 // =============================================================================
 // NotificationModel — in-app notification written by provider notifiers after
-// financial events (transactions, invoices). Admin-only feed, Firestore-listener
+// financial events (transactions, invoices). Operational-admin feed, listener
 // based, NO FCM, NO Cloud Functions (Spark free tier).
 //
 // WRITE PIPELINE:
@@ -20,8 +20,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 //   transactionType: 'cash_in' | 'cash_out' | 'return' | 'payment' | 'write_off'
 //   invoiceNumber : set for type=='invoice' (null otherwise)
 //   refId         : Firestore doc ID of the source transaction / invoice
-//   targetRole    : 'admin' — the role that should see this notification
-//   read          : false by default; toggled by admin via NotificationNotifier
+//   targetRole    : 'admin' — the audience includes admins and supervisors
+//   read          : false by default; toggled by authorized users via notifier
 //   readAt        : timestamp when read was set to true
 //   createdBy     : UID of the user who triggered the event
 //   createdAt     : server timestamp

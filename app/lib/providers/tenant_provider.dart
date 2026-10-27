@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../core/models/tenant_model.dart';
 import '../core/utils/firestore_pagination.dart';
+import '../core/utils/permission_policy.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
@@ -86,25 +88,21 @@ final tenantProvider = StreamProvider.autoDispose.family<TenantModel?, String>((
 final tenantUsersProvider = StreamProvider.autoDispose
     .family<List<UserModel>, String>((ref, tenantId) {
       final currentUser = ref.watch(authUserProvider).value;
-      if (currentUser == null) return const Stream<List<UserModel>>.empty();
+      if (!PermissionPolicy.can(
+        currentUser,
+        AppCapability.manageUsers,
+        tenantId: tenantId,
+      )) {
+        return const Stream<List<UserModel>>.empty();
+      }
 
-      if (currentUser.isSuperAdmin) {
-        if (!currentUser.hasActiveWorkspaceSupportContextFor(tenantId)) {
-          return const Stream<List<UserModel>>.empty();
-        }
+      if (currentUser!.isSuperAdmin) {
         final selectedAt = currentUser.activeWorkspaceSelectedAt!.toDate();
         final remaining = selectedAt
             .add(const Duration(hours: 8))
             .difference(DateTime.now());
-        if (remaining <= Duration.zero) {
-          return const Stream<List<UserModel>>.empty();
-        }
         final expiryTimer = Timer(remaining, ref.invalidateSelf);
         ref.onDispose(expiryTimer.cancel);
-      } else if (!currentUser.isAdmin ||
-          !currentUser.active ||
-          TenantScope.normalize(currentUser.tenantId) != tenantId) {
-        return const Stream<List<UserModel>>.empty();
       }
 
       return FirebaseFirestore.instance
@@ -166,13 +164,21 @@ final tenantWorkspaceUsersProvider = StreamProvider.autoDispose
 final allInactiveUsersForTenantProvider =
     StreamProvider.family<List<UserModel>, String>((ref, tenantId) {
       final currentUser = ref.watch(authUserProvider).value;
-      if (currentUser == null ||
-          (currentUser.isSuperAdmin
-              ? !currentUser.hasActiveWorkspaceSupportContextFor(tenantId)
-              : !currentUser.isAdmin ||
-                    !currentUser.active ||
-                    TenantScope.normalize(currentUser.tenantId) != tenantId)) {
+      if (!PermissionPolicy.can(
+        currentUser,
+        AppCapability.manageUsers,
+        tenantId: tenantId,
+      )) {
         return const Stream<List<UserModel>>.empty();
+      }
+
+      if (currentUser!.isSuperAdmin) {
+        final selectedAt = currentUser.activeWorkspaceSelectedAt!.toDate();
+        final remaining = selectedAt
+            .add(const Duration(hours: 8))
+            .difference(DateTime.now());
+        final expiryTimer = Timer(remaining, ref.invalidateSelf);
+        ref.onDispose(expiryTimer.cancel);
       }
 
       return FirebaseFirestore.instance

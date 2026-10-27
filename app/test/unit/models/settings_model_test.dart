@@ -7,7 +7,7 @@ void main() {
   group('SettingsModel.fromJson', () {
     final ts = Timestamp.fromMillisecondsSinceEpoch(0);
     final baseJson = <String, dynamic>{
-      'tenant_id': 'jbm-impex',
+      'tenant_id': 'workspace-a',
       'company_name': 'Test Co',
       'currency': 'SAR',
       'pairs_per_carton': 12,
@@ -17,6 +17,8 @@ void main() {
         'name_en': 'Test Company',
         'name_ar': 'شركة الاختبار',
         'phone': '+966500000000',
+        'receipt_phone_2': '+966511111111',
+        'receipt_phone_3': '+966522222222',
         'document_language_pair': 'english_urdu',
         'template': 'classic',
         'accent_color': '#345678',
@@ -27,7 +29,7 @@ void main() {
 
     test('parses all fields correctly', () {
       final m = SettingsModel.fromJson(baseJson);
-      expect(m.tenantId, 'jbm-impex');
+      expect(m.tenantId, 'workspace-a');
       expect(m.companyName, 'Test Company');
       expect(m.currency, 'SAR');
       expect(m.pairsPerCarton, 12);
@@ -37,6 +39,8 @@ void main() {
       expect(m.invoiceHeader.nameEn, 'Test Company');
       expect(m.invoiceHeader.nameAr, 'شركة الاختبار');
       expect(m.invoiceHeader.phone, '+966500000000');
+      expect(m.invoiceHeader.receiptPhone2, '+966511111111');
+      expect(m.invoiceHeader.receiptPhone3, '+966522222222');
       expect(
         m.invoiceHeader.documentLanguagePair,
         FinancialDocumentLanguagePair.englishUrdu,
@@ -54,6 +58,8 @@ void main() {
       expect(m.logoBytes, isNull);
       expect(m.allowNonStockInvoices, isFalse);
       expect(m.invoiceHeader.nameEn, '');
+      expect(m.invoiceHeader.receiptPhone2, '');
+      expect(m.invoiceHeader.receiptPhone3, '');
       expect(
         m.invoiceHeader.documentLanguagePair,
         FinancialDocumentLanguagePair.englishArabic,
@@ -67,6 +73,8 @@ void main() {
       expect(snapshot['name_en'], 'Test Company');
       expect(snapshot['name_ar'], 'شركة الاختبار');
       expect(snapshot['document_language_pair'], 'english_urdu');
+      expect(snapshot['receipt_phone_2'], '+966511111111');
+      expect(snapshot['receipt_phone_3'], '+966522222222');
       expect(snapshot.containsKey('company_name'), isFalse);
       expect(snapshot['logo_base64'], 'aGVsbG8=');
     });
@@ -105,6 +113,8 @@ void main() {
           nameAr: 'ورشة',
           documentLanguagePair: FinancialDocumentLanguagePair.englishUrdu,
           phone: '+966511111111',
+          receiptPhone2: '+966522222222',
+          receiptPhone3: '+966533333333',
           visibleFields: {'phone', 'tax_number'},
         ),
         updatedAt: ts,
@@ -122,6 +132,8 @@ void main() {
         restored.invoiceHeader.documentLanguagePair,
         FinancialDocumentLanguagePair.englishUrdu,
       );
+      expect(restored.invoiceHeader.receiptPhone2, '+966522222222');
+      expect(restored.invoiceHeader.receiptPhone3, '+966533333333');
       expect(restored.invoiceHeader.visibleFields, {'phone', 'tax_number'});
     });
 

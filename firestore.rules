@@ -29,7 +29,8 @@ service cloud.firestore {
           userData.get('active_workspace_reason', '').size() >= 10 &&
           userData.get('active_workspace_selected_at', null) is timestamp &&
           userData.get('active_workspace_selected_at', null) >
-            request.time - duration.value(8, 'h'));
+            request.time - duration.value(8, 'h') &&
+          userData.get('active_workspace_selected_at', null) <= request.time);
       return isAuthenticated() &&
         userData.get('active', false) == true &&
         tenantId is string && tenantId != '' && tenantId != '__global__' &&
@@ -56,7 +57,8 @@ service cloud.firestore {
     }
 
     function isAdminRole(role) {
-      return role is string && role.matches('(?i)^\\s*(admin|manager|tenant_admin|super_admin)\\s*$');
+      return role is string &&
+        role.matches('(?i)^\\s*(admin|manager|tenant[_-]?admin|super[_-]?admin)\\s*$');
     }
 
     function isSupervisorRole(role) {
@@ -68,17 +70,14 @@ service cloud.firestore {
     }
 
     function isTenantAdminOnlyRole(role) {
-      return role is string && role.matches('(?i)^\\s*tenant_admin\\s*$');
-    }
-    function isTenantAdminRole(role) {
-      return isTenantAdminOnlyRole(role);
+      return role is string && role.matches('(?i)^\\s*tenant[_-]?admin\\s*$');
     }
     function isWorkspaceAdminRole(role) {
       return role is string &&
-        role.matches('(?i)^\\s*(admin|manager|tenant_admin)\\s*$');
+        role.matches('(?i)^\\s*(admin|manager|tenant[_-]?admin)\\s*$');
     }
     function isSuperAdminRole(role) {
-      return role is string && role.matches('(?i)^\\s*super_admin\\s*$');
+      return role is string && role.matches('(?i)^\\s*super[_-]?admin\\s*$');
     }
     function isWorkspaceAssignableRole(role) {
       return role is string &&
@@ -95,6 +94,11 @@ service cloud.firestore {
           get(/databases/$(database)/documents/tenants/$(tenantId)).data.active == true);
     }
 
+    function isConcreteTenantId(tenantId) {
+      return tenantId is string && tenantId != '' &&
+        tenantId != '__global__';
+    }
+
     function isSuperAdminForSelectedWorkspace(tenantId) {
       return isSuperAdmin() &&
         hasSelectedWorkspaceSupportContext(userDoc().data, tenantId);
@@ -106,7 +110,8 @@ service cloud.firestore {
       return userData.get('active_workspace_id', '') == tenantId &&
         reason is string && reason.size() >= 10 &&
         selectedAt is timestamp &&
-        selectedAt > request.time - duration.value(8, 'h');
+        selectedAt > request.time - duration.value(8, 'h') &&
+        selectedAt <= request.time;
     }
 
     function isSuperAdminRestoringTenant(tenantId) {
@@ -187,6 +192,12 @@ service cloud.firestore {
 
     function isOwnDoc(userId) {
       return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function selfUpdateDoesNotChangeEmailVerified(userId) {
+      return !isOwnDoc(userId) ||
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['email_verified']);
     }
 
     // S-07: cap document field count (request.resource.data.size() returns
@@ -291,6 +302,30 @@ service cloud.firestore {
         nextData.get('tenant_id', '') == tenantId &&
         (ownerContactUpdate ||
           (userId != request.auth.uid && managedAccountUpdate)) &&
+        nextData.get('updated_at', null) is timestamp &&
+        docSizeOk();
+    }
+
+    function canTenantAdminUpdateSupervisorActive(
+      userId, currentData, nextData
+    ) {
+      let actor = userDoc().data;
+      let tenantId = currentData.get('tenant_id', '');
+      let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
+      let tenantAfter = getAfter(tenantPath).data;
+      let changed = nextData.diff(currentData).affectedKeys();
+      let seatKind = nextData.get('active', false) ? 'add' : 'remove';
+      return actor.get('active', false) == true &&
+        isTenantAdminOnlyRole(actor.get('role', '')) &&
+        actor.get('tenant_id', '') == tenantId &&
+        isSupervisorRole(currentData.get('role', '')) &&
+        changed.hasOnly(['active', 'updated_at']) &&
+        currentData.get('active', false) != nextData.get('active', false) &&
+        nextData.get('active', false) is bool &&
+        tenantAfter.get('active', false) == true &&
+        tenantAfter.get('seat_change_user_id', '') == userId &&
+        tenantAfter.get('seat_change_kind', '') == seatKind &&
+        tenantAfter.get('updated_at', null) == request.time &&
         nextData.get('updated_at', null) is timestamp &&
         docSizeOk();
     }
@@ -484,6 +519,7 @@ service cloud.firestore {
         userData.get('active', false) == true &&
         isSellerRole(role) &&
         invoiceData.get('created_by', '') == request.auth.uid &&
+        invoiceData.get('seller_id', '') == request.auth.uid &&
         tenantId is string && tenantId != '' &&
         tenantId == userData.get('tenant_id', '') &&
         isTenantActive(tenantId) &&
@@ -537,7 +573,7 @@ service cloud.firestore {
          type == 'payment' || type == 'write_off');
     }
 
-    function isValidCreditNoteLink() {
+    function isValidCreditNoteLink(invoiceId) {
       let invoicePath = /databases/$(database)/documents/invoices/$(request.resource.data.linked_invoice_id);
       let original = get(invoicePath).data;
       let originalAfter = getAfter(invoicePath).data;
@@ -555,6 +591,7 @@ service cloud.firestore {
         request.resource.data.total <= original.total &&
         originalAfter.credit_note_total is number &&
         originalAfter.credit_note_total == creditedBefore + request.resource.data.total &&
+        originalAfter.latest_credit_note_invoice_id == invoiceId &&
         originalAfter.credit_note_total <= original.total;
     }
 
@@ -600,6 +637,39 @@ service cloud.firestore {
          type == 'stock_adjustment');
     }
 
+    function sellerInventoryCreateMatchesWarehouse() {
+      let tenantId = request.resource.data.tenant_id;
+      let sellerPath = /databases/$(database)/documents/users/$(request.resource.data.seller_id);
+      let variantPath = /databases/$(database)/documents/product_variants/$(request.resource.data.variant_id);
+      let seller = get(sellerPath).data;
+      let variantBefore = get(variantPath).data;
+      let variantAfter = getAfter(variantPath).data;
+      return request.resource.data.seller_id is string &&
+        request.resource.data.seller_id != '' &&
+        request.resource.data.product_id is string &&
+        request.resource.data.product_id != '' &&
+        request.resource.data.variant_id is string &&
+        request.resource.data.variant_id != '' &&
+        request.resource.data.quantity_available is int &&
+        request.resource.data.quantity_available > 0 &&
+        request.resource.data.active == true &&
+        seller is map &&
+        seller.get('active', false) == true &&
+        seller.get('tenant_id', '') == tenantId &&
+        (isSellerRole(seller.get('role', '')) ||
+          isOperationalRole(seller.get('role', ''))) &&
+        variantBefore is map &&
+        variantAfter is map &&
+        variantBefore.get('tenant_id', '') == tenantId &&
+        variantAfter.get('tenant_id', '') == tenantId &&
+        variantBefore.get('product_id', '') == request.resource.data.product_id &&
+        variantAfter.get('product_id', '') == request.resource.data.product_id &&
+        variantBefore.get('quantity_available', -1) is number &&
+        variantAfter.get('quantity_available', -1) is number &&
+        variantBefore.quantity_available - variantAfter.quantity_available ==
+          request.resource.data.quantity_available;
+    }
+
     function sellerInventoryDecreaseMatchesInvoice(docId) {
       let invoiceId = request.resource.data.last_sale_invoice_id;
       let invoicePath = /databases/$(database)/documents/invoices/$(invoiceId);
@@ -615,10 +685,11 @@ service cloud.firestore {
           resource.data.quantity_available - request.resource.data.quantity_available;
     }
 
-    // Validates role values to prevent arbitrary role strings being stored
+    // Writes store canonical role values; role-read helpers accept legacy aliases.
     function isValidRole(role) {
-      return role is string &&
-        role.matches('(?i)^\\s*(admin|manager|supervisor|tenant_admin|super_admin|seller)\\s*$');
+      return role in [
+        'admin', 'supervisor', 'tenant_admin', 'super_admin', 'seller'
+      ];
     }
 
     function currentUserSettingsDocId() {
@@ -673,9 +744,12 @@ service cloud.firestore {
       let saleId = request.resource.data.sale_transaction_id;
       let salePath = /databases/$(database)/documents/transactions/$(saleId);
       let shopPath = /databases/$(database)/documents/customers/$(request.resource.data.shop_id);
+      let tenantId = request.resource.data.tenant_id;
+      let sequence = request.resource.data.invoice_sequence;
       let sale = getAfter(salePath).data;
       let shop = getAfter(shopPath).data;
       return saleId is string && saleId != '' &&
+        invoiceSequenceIsLinked(tenantId, sequence, invoiceId) &&
         !exists(salePath) && existsAfter(salePath) &&
         sale.type == 'cash_out' &&
         sale.amount == request.resource.data.total &&
@@ -683,6 +757,41 @@ service cloud.firestore {
         sale.shop_id == request.resource.data.shop_id &&
         sale.route_id == request.resource.data.route_id &&
         shop is map && shop.last_transaction_id == saleId;
+    }
+
+    function invoiceSequenceIsLinked(tenantId, sequence, invoiceId) {
+      let settingsPath = /databases/$(database)/documents/settings/$(tenantId);
+      let settingsBefore = get(settingsPath).data;
+      let settingsAfter = getAfter(settingsPath).data;
+      return isConcreteTenantId(tenantId) &&
+        sequence is int && sequence > 0 &&
+        settingsBefore is map && settingsAfter is map &&
+        ((settingsBefore.get('last_invoice_number', null) is number &&
+            sequence == settingsBefore.last_invoice_number + 1) ||
+          (!('last_invoice_number' in settingsBefore) && sequence == 1)) &&
+        settingsAfter.last_invoice_number == sequence &&
+        settingsAfter.last_invoice_id == invoiceId;
+    }
+
+    function invoiceCounterUpdateIsLinked(tenantId) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let sequence = request.resource.data.last_invoice_number;
+      let invoiceId = request.resource.data.last_invoice_id;
+      let invoicePath = /databases/$(database)/documents/invoices/$(invoiceId);
+      let invoice = getAfter(invoicePath).data;
+      return isConcreteTenantId(tenantId) &&
+        changed.hasOnly(['last_invoice_number', 'last_invoice_id']) &&
+        changed.hasAll(['last_invoice_number', 'last_invoice_id']) &&
+        sequence is int &&
+        ((resource.data.get('last_invoice_number', null) is number &&
+            sequence == resource.data.last_invoice_number + 1) ||
+          (!('last_invoice_number' in resource.data) && sequence == 1)) &&
+        invoiceId is string && invoiceId != '' &&
+        !exists(invoicePath) && existsAfter(invoicePath) &&
+        invoice.tenant_id == tenantId &&
+        invoice.invoice_sequence == sequence &&
+        invoice.created_by == request.auth.uid &&
+        invoice.type in ['sale', 'credit_note'];
     }
 
     function sellerCashReceiptBalanceMatches(shopId, transactionId, transactionData) {
@@ -742,6 +851,11 @@ service cloud.firestore {
       let shopPath = /databases/$(database)/documents/customers/$(request.resource.data.shop_id);
       let shopAfter = getAfter(shopPath).data;
       return transactionId is string && transactionId != '' &&
+        invoiceSequenceIsLinked(
+          request.resource.data.tenant_id,
+          request.resource.data.invoice_sequence,
+          invoiceId
+        ) &&
         !exists(transactionPath) && existsAfter(transactionPath) &&
         transactionData.type == 'return' &&
         transactionData.amount == request.resource.data.total &&
@@ -1045,6 +1159,202 @@ service cloud.firestore {
             )));
     }
 
+    function invoiceSettlementUpdateIsLinked(invoiceId) {
+      let paymentId = request.resource.data.get(
+        'latest_payment_transaction_id',
+        '__missing__'
+      );
+      let paymentPath = /databases/$(database)/documents/transactions/$(paymentId);
+      let payment = getAfter(paymentPath).data;
+      let shopPath = /databases/$(database)/documents/customers/$(resource.data.shop_id);
+      let shopBefore = get(shopPath).data;
+      let shopAfter = getAfter(shopPath).data;
+      let oldPaymentIds = resource.data.get('payment_transaction_ids', []);
+      let newPaymentIds = request.resource.data.get('payment_transaction_ids', []);
+      let oldAmountReceived = resource.data.get('amount_received', 0);
+      return resource.data.type == 'sale' &&
+        resource.data.status != 'paid' &&
+        request.resource.data.status == 'paid' &&
+        resource.data.total is number &&
+        oldAmountReceived is number &&
+        request.resource.data.amount_received == resource.data.total &&
+        request.resource.data.outstanding_amount == 0 &&
+        paymentId is string && paymentId != '__missing__' &&
+        paymentId != resource.data.get('latest_payment_transaction_id', '') &&
+        oldPaymentIds is list && newPaymentIds is list &&
+        newPaymentIds.size() == oldPaymentIds.size() + 1 &&
+        newPaymentIds.hasAll(oldPaymentIds) &&
+        newPaymentIds.hasAny([paymentId]) &&
+        !exists(paymentPath) && existsAfter(paymentPath) &&
+        payment is map &&
+        payment.type == 'cash_in' &&
+        payment.amount == resource.data.total - oldAmountReceived &&
+        payment.invoice_id == invoiceId &&
+        payment.shop_id == resource.data.shop_id &&
+        payment.route_id == resource.data.route_id &&
+        payment.tenant_id == resource.data.tenant_id &&
+        payment.created_by == request.auth.uid &&
+        shopAfter is map &&
+        shopAfter.last_transaction_id == paymentId &&
+        shopAfter.last_transaction_type == 'cash_in' &&
+        shopAfter.last_transaction_amount == payment.amount &&
+        shopBalanceMatchesDataDelta(shopBefore, shopAfter, -payment.amount);
+    }
+
+    function invoicePaidStatusRepairIsValid() {
+      let oldPaymentIds = resource.data.get('payment_transaction_ids', []);
+      let newPaymentIds = request.resource.data.get('payment_transaction_ids', []);
+      return resource.data.type == 'sale' &&
+        resource.data.status != 'paid' &&
+        request.resource.data.status == 'paid' &&
+        resource.data.total is number &&
+        resource.data.get('amount_received', 0) == resource.data.total &&
+        request.resource.data.amount_received == resource.data.amount_received &&
+        request.resource.data.outstanding_amount == 0 &&
+        oldPaymentIds is list && newPaymentIds is list &&
+        newPaymentIds == oldPaymentIds &&
+        request.resource.data.get(
+            'latest_payment_transaction_id',
+            ''
+        ) == resource.data.get('latest_payment_transaction_id', '');
+    }
+
+    function invoiceVoidUpdateIsLinked(invoiceId) {
+      let reversalId = request.resource.data.get(
+        'void_reversal_transaction_id',
+        '__missing__'
+      );
+      let reversalPath = /databases/$(database)/documents/transactions/$(reversalId);
+      let reversal = getAfter(reversalPath).data;
+      let shopPath = /databases/$(database)/documents/customers/$(resource.data.shop_id);
+      let shopBefore = get(shopPath).data;
+      let shopAfter = getAfter(shopPath).data;
+      let total = resource.data.total;
+      let amountReceived = resource.data.get('amount_received', 0);
+      let expectedType = resource.data.type == 'sale' ? 'return' : 'cash_out';
+      let expectedBalanceDelta = resource.data.type == 'sale'
+        ? -(total - amountReceived)
+        : total;
+      return resource.data.status != 'void' &&
+        request.resource.data.status == 'void' &&
+        total is number && amountReceived is number &&
+        request.resource.data.get('credit_note_total', 0) ==
+          resource.data.get('credit_note_total', 0) &&
+        reversalId is string && reversalId != '__missing__' &&
+        reversalId != resource.data.get('void_reversal_transaction_id', '') &&
+        !exists(reversalPath) && existsAfter(reversalPath) &&
+        reversal is map &&
+        reversal.type == expectedType &&
+        reversal.amount == total &&
+        reversal.invoice_id == invoiceId &&
+        reversal.voided == true &&
+        reversal.voided_invoice_id == invoiceId &&
+        reversal.tenant_id == resource.data.tenant_id &&
+        reversal.shop_id == resource.data.shop_id &&
+        reversal.route_id == resource.data.route_id &&
+        reversal.created_by == request.auth.uid &&
+        shopBalanceMatchesDataDelta(
+            shopBefore,
+            shopAfter,
+            expectedBalanceDelta
+        );
+    }
+
+    function invoiceCreditNoteCreateUpdateIsLinked(invoiceId) {
+      let creditId = request.resource.data.get(
+        'latest_credit_note_invoice_id',
+        '__missing__'
+      );
+      let creditPath = /databases/$(database)/documents/invoices/$(creditId);
+      let credit = getAfter(creditPath).data;
+      let creditAmount = request.resource.data.credit_note_total -
+        resource.data.get('credit_note_total', 0);
+      return creditId is string && creditId != '__missing__' &&
+        resource.data.get('credit_note_total', 0) is number &&
+        request.resource.data.credit_note_total is number &&
+        creditAmount > 0 &&
+        !exists(creditPath) && existsAfter(creditPath) &&
+        credit is map &&
+        credit.type == 'credit_note' &&
+        credit.linked_invoice_id == invoiceId &&
+        credit.tenant_id == resource.data.tenant_id &&
+        credit.shop_id == resource.data.shop_id &&
+        credit.route_id == resource.data.get('route_id', '') &&
+        credit.total == creditAmount &&
+        credit.created_by == request.auth.uid;
+    }
+
+    function invoiceCreditNoteVoidUpdateIsLinked(invoiceId) {
+      let creditId = request.resource.data.get(
+        'voided_credit_note_id',
+        '__missing__'
+      );
+      let creditPath = /databases/$(database)/documents/invoices/$(creditId);
+      let creditBefore = get(creditPath).data;
+      let creditAfter = getAfter(creditPath).data;
+      let creditTotal = creditBefore is map
+        ? creditBefore.get('total', 0)
+        : 0;
+      return creditId is string && creditId != '__missing__' &&
+        resource.data.get('credit_note_total', 0) is number &&
+        request.resource.data.credit_note_total is number &&
+        exists(creditPath) && existsAfter(creditPath) &&
+        creditBefore is map && creditAfter is map &&
+        creditBefore.status != 'void' &&
+        creditTotal is number &&
+        creditBefore.type == 'credit_note' &&
+        creditBefore.linked_invoice_id == invoiceId &&
+        creditAfter.status == 'void' &&
+        creditAfter.linked_invoice_id == invoiceId &&
+        creditAfter.tenant_id == resource.data.tenant_id &&
+        creditAfter.shop_id == resource.data.shop_id &&
+        request.resource.data.credit_note_total ==
+          resource.data.get('credit_note_total', 0) - creditTotal;
+    }
+
+    function invoiceUpdateIsLinked(invoiceId) {
+      let totalBefore = resource.data.get('credit_note_total', 0);
+      let totalAfter = request.resource.data.get('credit_note_total', 0);
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return (
+            request.resource.data.status == 'paid' &&
+            changed.hasOnly([
+              'status',
+              'amount_received',
+              'outstanding_amount',
+              'payment_transaction_ids',
+              'latest_payment_transaction_id',
+              'updated_at',
+            ]) &&
+            (invoiceSettlementUpdateIsLinked(invoiceId) ||
+              invoicePaidStatusRepairIsValid())
+        ) ||
+        (request.resource.data.status == 'void' &&
+            changed.hasOnly([
+              'status',
+              'void_by',
+              'void_at',
+              'void_reason',
+              'void_reversal_transaction_id',
+              'updated_at',
+            ]) &&
+            invoiceVoidUpdateIsLinked(invoiceId)) ||
+        (totalAfter > totalBefore &&
+            changed.hasOnly([
+              'credit_note_total',
+              'latest_credit_note_invoice_id',
+              'updated_at',
+            ]) &&
+            invoiceCreditNoteCreateUpdateIsLinked(invoiceId)) ||
+        (totalAfter < totalBefore &&
+            changed.hasOnly([
+              'credit_note_total',
+              'voided_credit_note_id',
+              'updated_at',
+            ]) &&
+            invoiceCreditNoteVoidUpdateIsLinked(invoiceId));
+    }
+
     function sellerInvoiceTransactionIsLinked(txId, txData) {
       let invoiceId = txData.get('invoice_id', '');
       let invoicePath = /databases/$(database)/documents/invoices/$(invoiceId);
@@ -1300,6 +1610,7 @@ service cloud.firestore {
       allow list: if isAdminForTenant(resource.data.tenant_id);
       allow create: if (
           isAuthenticated() &&
+          isConcreteTenantId(request.resource.data.tenant_id) &&
           canAdminCreateUserForTenant(request.resource.data.tenant_id) &&
           request.resource.data.created_by == request.auth.uid &&
           isValidRole(request.resource.data.role) &&
@@ -1324,14 +1635,24 @@ service cloud.firestore {
           )
         ) && docSizeOk();
       allow update: if (
+        isTenantAdminOnlyRole(getUserRole()) &&
+        isSupervisorRole(resource.data.get('role', '')) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['active'])
+      ) ? (
+        isAuthenticated() &&
+        canTenantAdminUpdateSupervisorActive(
+          userId, resource.data, request.resource.data
+        )
+      ) : selfUpdateDoesNotChangeEmailVerified(userId) ? ((
           isAuthenticated() &&
-          canWorkspaceAdminUpdateUser(
+          canWorkspaceAdminUpdateSeller(
             userId, resource.data, request.resource.data
           )
         ) ||
         (
           isAuthenticated() &&
-          canWorkspaceAdminUpdateSeller(
+          canWorkspaceAdminUpdateUser(
             userId, resource.data, request.resource.data
           )
         ) ||
@@ -1350,13 +1671,16 @@ service cloud.firestore {
             get(/databases/$(database)/documents/tenants/$(resource.data.tenant_id)).data
           ) &&
           (!('role' in request.resource.data) ||
-            !isSuperAdminRole(request.resource.data.role)) &&
+            (!isSuperAdminRole(request.resource.data.role) &&
+              (!request.resource.data.diff(resource.data).affectedKeys()
+                  .hasAny(['role']) ||
+                isValidRole(request.resource.data.role)))) &&
           docSizeOk()
         ) ||
         (
           isOwnDoc(userId) &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['display_name', 'phone', 'updated_at', 'last_active', 'email_verified', 'email']) &&
+            .hasOnly(['display_name', 'phone', 'updated_at', 'last_active', 'email']) &&
           (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email']) ||
             (request.resource.data.email == request.auth.token.email &&
               request.auth.token.email_verified == true)) &&
@@ -1396,7 +1720,7 @@ service cloud.firestore {
             request.time > resource.data.last_notification_at + duration.value(5, 's')) &&
           docSizeOk()
         )
-      );
+      )) : false;
       allow delete: if isSuperAdmin() &&
         isAdminForTenant(resource.data.tenant_id) &&
         resource.data.get('active', false) != true;
@@ -1412,6 +1736,7 @@ service cloud.firestore {
         resource.data.tenant_id == currentUserTenantId()
       );
       allow create: if isSuperAdmin() &&
+        tenantId != '__global__' &&
         request.resource.data.tenant_id == tenantId &&
         request.resource.data.created_by == request.auth.uid &&
         request.resource.data.created_at is timestamp &&
@@ -1458,6 +1783,7 @@ service cloud.firestore {
          resource.data.tenant_id == currentUserTenantId());
       // P0-2 FIX: products are tenant-owned; use isAdminForTenant check
       allow create: if isOperationalForTenant(request.resource.data.tenant_id) &&
+        isConcreteTenantId(request.resource.data.tenant_id) &&
         request.resource.data.name is string &&
         request.resource.data.name != '' && docSizeOk()
         && (!('image_url' in request.resource.data)
@@ -1486,6 +1812,7 @@ service cloud.firestore {
          resource.data.tenant_id == currentUserTenantId());
       // P0-2 FIX: product_variants are tenant-owned; use isAdminForTenant check
       allow create: if isOperationalForTenant(request.resource.data.tenant_id) &&
+        isConcreteTenantId(request.resource.data.tenant_id) &&
         request.resource.data.product_id is string &&
         request.resource.data.product_id != '' &&
         request.resource.data.variant_name is string &&
@@ -1522,6 +1849,7 @@ service cloud.firestore {
          resource.data.tenant_id == currentUserTenantId());
       // P0-2 FIX: routes are tenant-owned; use isAdminForTenant check
       allow create: if isOperationalForTenant(request.resource.data.tenant_id) &&
+        isConcreteTenantId(request.resource.data.tenant_id) &&
         request.resource.data.name is string &&
         request.resource.data.name != '' &&
         request.resource.data.route_number is int &&
@@ -1568,7 +1896,8 @@ service cloud.firestore {
         );
       // Sellers must include a non-empty route_id when creating customers
       // P0-2 FIX: customers are tenant-owned; use isAdminForTenant check
-      allow create: if request.resource.data.balance is number &&
+      allow create: if isConcreteTenantId(request.resource.data.tenant_id) &&
+        request.resource.data.balance is number &&
         request.resource.data.balance == 0 &&
         !request.resource.data.keys().hasAny([
           'last_transaction_at', 'last_transaction_type',
@@ -1668,6 +1997,7 @@ service cloud.firestore {
         isSellerRouteTransaction();
       // Field validation: type must be in allowed set, amount must be positive
       allow create: if request.resource.data.tenant_id is string &&
+        isConcreteTenantId(request.resource.data.tenant_id) &&
         request.resource.data.tenant_id == currentUserTenantId() &&
         (isOperationalForTenant(request.resource.data.tenant_id) ||
         (
@@ -1683,7 +2013,11 @@ service cloud.firestore {
           isSellerForRoute(request.resource.data.route_id) &&
           (!('invoice_id' in request.resource.data) ||
             isSellerForShop(request.resource.data.shop_id))
-        )) && transactionCreateIsLinked(txId) && docSizeOk()
+        )) &&
+        (isAdminRole(getUserRole()) ||
+          request.resource.data.type == 'cash_in' ||
+          request.resource.data.type == 'cash_out') &&
+        transactionCreateIsLinked(txId) && docSizeOk()
         // Admin also requires valid type and positive amount for integrity
         && (isSeller() || (
           isValidTransactionType(request.resource.data.type) &&
@@ -1762,7 +2096,10 @@ service cloud.firestore {
         (isSeller() && resource.data.seller_id == request.auth.uid &&
          isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
-      allow create: if isOperationalForTenant(request.resource.data.tenant_id);
+      allow create: if isOperationalForTenant(request.resource.data.tenant_id) &&
+        isConcreteTenantId(request.resource.data.tenant_id) &&
+        request.resource.data.tenant_id == currentUserTenantId() &&
+        sellerInventoryCreateMatchesWarehouse() && docSizeOk();
       allow delete: if isSuperAdmin() &&
         isOperationalForTenant(resource.data.tenant_id);
       // Sellers may only decrease their own stock; allocations are admin-only.
@@ -1795,7 +2132,8 @@ service cloud.firestore {
         (isSeller() && resource.data.seller_id == request.auth.uid &&
          isTenantActive(resource.data.tenant_id) &&
          resource.data.tenant_id == currentUserTenantId());
-      allow create: if (isOperationalForTenant(request.resource.data.tenant_id) ||
+      allow create: if isConcreteTenantId(request.resource.data.tenant_id) &&
+        (isOperationalForTenant(request.resource.data.tenant_id) ||
         (
           isSeller() &&
           request.resource.data.seller_id == request.auth.uid &&
@@ -1807,10 +2145,7 @@ service cloud.firestore {
         && request.resource.data.quantity is int
         && request.resource.data.quantity > 0
         && docSizeOk();
-      allow update: if isAdminForTenant(resource.data.tenant_id) &&
-        request.resource.data.tenant_id == resource.data.tenant_id;
-      allow delete: if isSuperAdmin() &&
-        isAdminForTenant(resource.data.tenant_id);
+      allow update, delete: if false;
     }
 
     // --- settings -----------------------------------------------------------
@@ -1822,31 +2157,35 @@ service cloud.firestore {
          (docId == currentUserTenantId() ||
           (docId == '__global__' && currentUserTenantId() == null)));
       // P0-2 FIX: settings docs are tenant-owned (docId = tenant_id); use isAdminForTenant check
-      allow create: if isAdminForTenant(docId) || (
+      allow create: if isConcreteTenantId(docId) &&
+        (isAdminForTenant(docId) || (
         isSuperAdmin() &&
         !exists(/databases/$(database)/documents/tenants/$(docId)) &&
         existsAfter(/databases/$(database)/documents/tenants/$(docId)) &&
         getAfter(/databases/$(database)/documents/tenants/$(docId)).data.created_by == request.auth.uid &&
         getAfter(/databases/$(database)/documents/tenants/$(docId)).data.created_at == request.time &&
         request.resource.data.tenant_id == docId
-      );
+      ));
       allow delete: if isSuperAdmin() && isAdminForTenant(docId);
       // Admin: full update.
       // Sellers may increment either tenant-scoped sequence by exactly 1.
-      allow update: if isAdminForTenant(docId) ||
+      allow update: if (
+        isAdminForTenant(docId) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['last_invoice_number', 'last_invoice_id']) ||
+          invoiceCounterUpdateIsLinked(docId)
+        )
+      ) ||
         (isActiveUser() &&
          isTenantActive(docId) &&
          docId == currentUserTenantId() &&
          (
            (request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['last_invoice_number']) &&
-            request.resource.data.last_invoice_number is number &&
-            ((('last_invoice_number' in resource.data) &&
-              resource.data.last_invoice_number is number &&
-              request.resource.data.last_invoice_number ==
-                resource.data.last_invoice_number + 1) ||
-             (!('last_invoice_number' in resource.data) &&
-              request.resource.data.last_invoice_number == 1))) ||
+              .hasOnly(['last_invoice_number', 'last_invoice_id']) &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasAll(['last_invoice_number', 'last_invoice_id']) &&
+            invoiceCounterUpdateIsLinked(docId)) ||
            (request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['last_cash_receipt_number']) &&
             request.resource.data.last_cash_receipt_number is number &&
@@ -1875,7 +2214,13 @@ service cloud.firestore {
              resource.data.tenant_id == currentUserTenantId())
           )
         );
-      allow create: if (isOperationalForTenant(request.resource.data.tenant_id) ||
+      allow create: if request.resource.data.type in [
+          'sale',
+          'cash_receipt',
+          'credit_note',
+        ] &&
+        isConcreteTenantId(request.resource.data.tenant_id) &&
+        (isOperationalForTenant(request.resource.data.tenant_id) ||
         (
           sellerInvoiceScopeMatches(request.resource.data) &&
           request.resource.data.created_by == request.auth.uid &&
@@ -1924,7 +2269,8 @@ service cloud.firestore {
              workspaceAllowsNonStockInvoices(request.resource.data.tenant_id))
           ))
         && (request.resource.data.type != 'credit_note' ||
-          (isValidCreditNoteLink() && creditNoteIsLinked(invoiceId)))
+          (isAdminForTenant(request.resource.data.tenant_id) &&
+           isValidCreditNoteLink(invoiceId) && creditNoteIsLinked(invoiceId)))
         && (request.resource.data.type != 'sale' || saleInvoiceIsLinked(invoiceId))
         && (!isSeller() ||
           !('invoice_header_snapshot' in request.resource.data) ||
@@ -1933,7 +2279,24 @@ service cloud.firestore {
           ))
         && docSizeOk();
       allow update: if isAdminForTenant(resource.data.tenant_id) &&
-        request.resource.data.tenant_id == resource.data.tenant_id && docSizeOk();
+        request.resource.data.tenant_id == resource.data.tenant_id &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'amount_received',
+          'outstanding_amount',
+          'payment_transaction_ids',
+          'latest_payment_transaction_id',
+          'credit_note_total',
+          'latest_credit_note_invoice_id',
+          'voided_credit_note_id',
+          'void_reversal_transaction_id',
+          'void_by',
+          'void_at',
+          'void_reason',
+          'updated_at',
+        ]) &&
+        invoiceUpdateIsLinked(invoiceId) &&
+        docSizeOk();
       allow delete: if isSuperAdmin() &&
         isAdminForTenant(resource.data.tenant_id);
     }
@@ -1948,19 +2311,21 @@ service cloud.firestore {
     }
 
     // --- notifications (Firestore-listener notification feed) ----------------
-    // Admin reads/marks-read; any active user can create for the admin feed.
-    // P0-2 FIX: notifications are tenant-owned; use isAdminForTenant check
+    // Admins and supervisors read/mark-read within their tenant. Any active
+    // user can create for the admin feed after the rate-limit checks.
+    // Notifications remain tenant-owned and require active-tenant access.
     match /notifications/{notifId} {
-      allow read: if isAdminForTenant(resource.data.tenant_id) && isActiveUser();
+      allow read: if isOperationalForTenant(resource.data.tenant_id);
       allow create: if isActiveUser()
           && request.resource.data.created_by == request.auth.uid
+          && isConcreteTenantId(request.resource.data.tenant_id)
           && isTenantActive(request.resource.data.tenant_id)
           && request.resource.data.tenant_id == currentUserTenantId()
           && request.resource.data.created_at is timestamp
           && request.resource.data.created_at == request.time
           && notificationRateAllowed()
           && docSizeOk();
-      allow update: if isAdminForTenant(resource.data.tenant_id) && isActiveUser()
+      allow update: if isOperationalForTenant(resource.data.tenant_id)
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['read', 'read_at']);
       allow delete: if false;
@@ -1972,6 +2337,7 @@ service cloud.firestore {
       allow create: if isSuperAdmin() &&
         request.resource.data.actor_user_id == request.auth.uid &&
         request.resource.data.workspace_id is string &&
+        isConcreteTenantId(request.resource.data.workspace_id) &&
         exists(/databases/$(database)/documents/tenants/$(request.resource.data.workspace_id)) &&
         request.resource.data.event_type in ['workspace_access_started', 'workspace_access_ended'] &&
         request.resource.data.reason is string &&

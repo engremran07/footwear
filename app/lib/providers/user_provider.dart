@@ -1,10 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../core/models/tenant_model.dart';
 import '../core/utils/firestore_pagination.dart';
+import '../core/utils/permission_policy.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
 import '../firebase_options.dart';
@@ -12,13 +15,9 @@ import '../models/user_model.dart';
 import 'auth_provider.dart';
 
 final allUsersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
-  // Account management is separate from tenant/workspace administration.
-  // Only legacy admins and super admins can access this provider.
   final canManageUsers = ref.watch(
     authUserProvider.select(
-      (s) => canManageUserAccountsRole(
-        roleValueFromUserRole(s.value?.role ?? UserRole.seller),
-      ),
+      (s) => PermissionPolicy.can(s.value, AppCapability.manageUsers),
     ),
   );
   final tenantId = ref.watch(
@@ -52,8 +51,7 @@ final allUsersExportProvider = FutureProvider<List<UserModel>>((ref) async {
   // Use .future to await the first auth emission instead of reading a
   // potentially-null .value while the StreamProvider is still loading.
   final user = await ref.read(authUserProvider.future);
-  if (user == null ||
-      !canManageUserAccountsRole(roleValueFromUserRole(user.role))) {
+  if (user == null || !PermissionPolicy.can(user, AppCapability.manageUsers)) {
     return const <UserModel>[];
   }
   final tenantId = TenantScope.normalize(user.tenantId);
@@ -72,9 +70,7 @@ final sellersProvider = StreamProvider.autoDispose<List<UserModel>>((ref) {
   // already see tenant routes and must not be represented as route sellers.
   final canManageUsers = ref.watch(
     authUserProvider.select(
-      (s) => canManageUserAccountsRole(
-        roleValueFromUserRole(s.value?.role ?? UserRole.seller),
-      ),
+      (s) => PermissionPolicy.can(s.value, AppCapability.manageUsers),
     ),
   );
   final tenantId = ref.watch(
@@ -104,9 +100,7 @@ final inactiveUsersProvider = StreamProvider.autoDispose<List<UserModel>>((
   // Use select() so heartbeat writes to last_active do NOT restart the stream.
   final canManageUsers = ref.watch(
     authUserProvider.select(
-      (s) => canManageUserAccountsRole(
-        roleValueFromUserRole(s.value?.role ?? UserRole.seller),
-      ),
+      (s) => PermissionPolicy.can(s.value, AppCapability.manageUsers),
     ),
   );
   final tenantId = ref.watch(
@@ -136,25 +130,6 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     return normalizeRoleName(role);
   }
 
-  Future<bool> _isCurrentUserAdmin() async {
-    final cachedUser = ref.read(authUserProvider).value;
-    if (cachedUser != null) {
-      return canManageUserAccountsRole(roleValueFromUserRole(cachedUser.role));
-    }
-
-    final authUser = FirebaseAuth.instance.currentUser;
-    if (authUser == null) return false;
-
-    final profileSnap = await FirebaseFirestore.instance
-        .collection(Collections.users)
-        .doc(authUser.uid)
-        .get();
-    if (!profileSnap.exists) return false;
-
-    final role = (profileSnap.data()?['role'] as String? ?? '').trim();
-    return canManageUserAccountsRole(role);
-  }
-
   Future<UserModel?> _currentProfileFromServer(String userId) async {
     if (FirebaseAuth.instance.currentUser?.uid != userId) return null;
     final profileSnap = await FirebaseFirestore.instance
@@ -174,26 +149,22 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     if (adminUid.isEmpty) {
       throw StateError('No authenticated user found');
     }
-    if (!await _isCurrentUserAdmin()) {
-      throw StateError('Admin privileges required');
+    final currentProfile = await _currentProfileFromServer(adminUid);
+    final activeTenantId = TenantScope.normalize(currentProfile?.tenantId);
+    if (currentProfile == null ||
+        !currentProfile.active ||
+        activeTenantId == null ||
+        activeTenantId == TenantScope.globalTenantId ||
+        !PermissionPolicy.can(
+          currentProfile,
+          AppCapability.manageUsers,
+          tenantId: activeTenantId,
+        )) {
+      throw StateError('Active, scoped user-administration access is required');
     }
-    final profile = await ref.read(authUserProvider.future);
-    if (profile?.isSuperAdmin == true) {
-      final currentProfile = await _currentProfileFromServer(adminUid);
-      final activeTenantId = TenantScope.normalize(currentProfile?.tenantId);
-      if (currentProfile == null ||
-          !currentProfile.hasActiveWorkspaceSupportContextFor(
-            activeTenantId ?? '',
-          ) ||
-          activeTenantId == null) {
-        throw StateError(
-          'Select a workspace support context before managing users.',
-        );
-      }
-      final requestedTenantId = TenantScope.normalize(requiredTenantId);
-      if (requestedTenantId != null && requestedTenantId != activeTenantId) {
-        throw StateError('Users must belong to the active workspace');
-      }
+    final requestedTenantId = TenantScope.normalize(requiredTenantId);
+    if (requestedTenantId != null && requestedTenantId != activeTenantId) {
+      throw StateError('Users must belong to the active workspace');
     }
     return adminUid;
   }
@@ -222,9 +193,13 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       targetSnapshot.data()!,
       targetSnapshot.id,
     );
-    if (target.tenantId != tenantId ||
-        target.isSuperAdmin ||
-        (!admin.isSuperAdmin && target.role != UserRole.seller)) {
+    if (TenantScope.normalize(target.tenantId) != tenantId ||
+        !PermissionPolicy.can(
+          admin,
+          AppCapability.manageUsers,
+          tenantId: tenantId,
+          targetRole: roleValueFromUserRole(target.role),
+        )) {
       throw StateError('Workspace user administration is required.');
     }
     return (
@@ -238,7 +213,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
   Future<void> _setUserActiveAtomically({
     required String userId,
     required String tenantId,
-    required bool adminIsSuperAdmin,
+    required String managerRole,
     required bool active,
     bool clearRouteAssignments = false,
     String? displayName,
@@ -261,11 +236,10 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       final userSnapshot = await transaction.get(userRef);
       final tenantSnapshot = await transaction.get(tenantRef);
       final userData = userSnapshot.data();
-      final role = (userData?['role'] as String? ?? '').trim().toLowerCase();
+      final role = normalizeRoleName(userData?['role'] as String? ?? '');
       if (!userSnapshot.exists ||
           userData?['tenant_id'] != tenantId ||
-          role == 'super_admin' ||
-          (!adminIsSuperAdmin && role != 'seller')) {
+          !RoleCapabilities.canManageTargetRole(managerRole, role)) {
         throw StateError('Workspace user administration is required.');
       }
 
@@ -368,16 +342,11 @@ class UserManagementNotifier extends AsyncNotifier<void> {
           'Platform super-admin accounts require trusted out-of-band provisioning.',
         );
       }
-      if (owner.isTenantAdmin &&
-          normalizedRole != 'supervisor' &&
-          normalizedRole != 'seller') {
-        throw StateError(
-          'Workspace admins may create only supervisor and seller accounts.',
-        );
-      }
-      if (!owner.isSuperAdmin &&
-          !owner.isTenantAdmin &&
-          normalizedRole != 'seller') {
+      if (!PermissionPolicy.can(
+        owner,
+        AppCapability.manageUsers,
+        targetRole: normalizedRole,
+      )) {
         throw StateError('This account cannot assign the requested role.');
       }
       if (normalizedRole == 'seller' && assignedRouteIds.isEmpty) {
@@ -402,9 +371,9 @@ class UserManagementNotifier extends AsyncNotifier<void> {
 
       final trimmedEmail = email.trim().toLowerCase();
       final trimmedName = displayName.trim();
-      final trimmedPassword = password.trim();
+      final passwordValue = password;
       final trimmedPhone = phone?.trim();
-      if (trimmedPassword.length < 8) {
+      if (passwordValue.length < 8) {
         throw FirebaseAuthException(
           code: 'weak-password',
           message: 'Password is too weak. Use at least 8 characters.',
@@ -450,7 +419,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         // Create the Auth account via the disposable secondary app
         final cred = await tempAuth.createUserWithEmailAndPassword(
           email: trimmedEmail,
-          password: trimmedPassword,
+          password: passwordValue,
         );
         final newUid = cred.user!.uid;
         createdUserId = newUid;
@@ -518,15 +487,28 @@ class UserManagementNotifier extends AsyncNotifier<void> {
               });
             }
           });
-        } on StateError catch (error) {
-          if (error.message == 'workspace_seat_limit_reached' ||
-              error.message == 'workspace_seat_count_initialization_required') {
+        } catch (error, stackTrace) {
+          try {
             await cred.user!.delete();
             createdUserId = null;
+          } on FirebaseAuthException catch (cleanupError, cleanupStackTrace) {
+            Error.throwWithStackTrace(
+              StateError(
+                'User profile creation failed and the new Auth account could '
+                'not be removed (${cleanupError.code}).',
+              ),
+              cleanupStackTrace,
+            );
           }
-          rethrow;
+          Error.throwWithStackTrace(error, stackTrace);
         } finally {
-          await tempAuth.signOut();
+          try {
+            await tempAuth.signOut();
+          } on FirebaseAuthException catch (error) {
+            debugPrint(
+              '[USER_CREATE] Secondary Auth sign-out failed: ${error.code}',
+            );
+          }
         }
       } on FirebaseAuthException {
         rethrow; // Let AppErrorMapper handle auth errors (email-in-use, etc.)
@@ -534,7 +516,11 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         // S-04: Dispose the secondary app to prevent resource leaks
         try {
           await tempApp.delete();
-        } catch (_) {}
+        } on FirebaseException catch (error) {
+          debugPrint(
+            '[USER_CREATE] Secondary Firebase app cleanup failed: ${error.code}',
+          );
+        }
       }
     });
     if (state.hasError) {
@@ -561,12 +547,31 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       throw StateError('No authenticated user found');
     }
 
-    final isAdmin = await _isCurrentUserAdmin();
     final actingUser = await ref.read(authUserProvider.future);
     if (actingUser == null || !actingUser.active) {
       throw StateError('An active user profile is required');
     }
+    final isAdmin = PermissionPolicy.can(actingUser, AppCapability.manageUsers);
     final db = FirebaseFirestore.instance;
+    final targetSnapshot = await db
+        .collection(Collections.users)
+        .doc(trimmedUid)
+        .get(const GetOptions(source: Source.server));
+    final targetData = targetSnapshot.data();
+    final targetTenantId = TenantScope.normalize(
+      targetData?['tenant_id'] as String?,
+    );
+    final targetRole = normalizeRoleName(targetData?['role'] as String? ?? '');
+    if (!targetSnapshot.exists ||
+        !PermissionPolicy.can(
+          actingUser,
+          AppCapability.manageUsers,
+          tenantId: targetTenantId,
+          targetRole: targetRole,
+        )) {
+      throw StateError('Workspace user administration is required.');
+    }
+
     final updateData = <String, dynamic>{...data};
     if (updateData['tenant_id'] != null) {
       final normalizedTenant = TenantScope.normalize(
@@ -579,52 +584,46 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     }
     if (updateData['role'] is String) {
       updateData['role'] = _normalizeRole(updateData['role'] as String);
-      if (updateData['role'] == 'super_admin') {
-        throw StateError(
-          'Platform super-admin roles cannot be granted from the client.',
-        );
+      if (!PermissionPolicy.can(
+        actingUser,
+        AppCapability.manageUsers,
+        targetRole: updateData['role'] as String,
+      )) {
+        throw StateError('This account cannot assign the requested role.');
       }
     }
 
-    if (!actingUser.isSuperAdmin &&
-        !actingUser.isTenantAdmin &&
-        updateData.containsKey('role')) {
-      throw StateError(
-        'Only workspace administrators can change workspace roles.',
-      );
-    }
     if (!actingUser.isSuperAdmin && updateData.containsKey('tenant_id')) {
       throw StateError('Workspace administrators cannot change workspace');
     }
 
+    const editableProfileKeys = {
+      'display_name',
+      'phone',
+      'role',
+      'assigned_route_ids',
+      'assigned_route_names',
+    };
+    if (updateData.keys.any((key) => !editableProfileKeys.contains(key))) {
+      throw StateError('Unsupported workspace user update.');
+    }
+
     if (actingUser.isTenantAdmin) {
       final tenantId = TenantScope.requireTenant(actingUser.tenantId);
-      final targetSnapshot = await db
-          .collection(Collections.users)
-          .doc(trimmedUid)
-          .get(const GetOptions(source: Source.server));
-      final targetData = targetSnapshot.data();
-      if (!targetSnapshot.exists ||
-          TenantScope.normalize(targetData?['tenant_id'] as String?) !=
-              tenantId ||
-          (targetData?['role'] as String?)?.trim().toLowerCase() ==
-              'super_admin') {
+      if (targetTenantId != tenantId) {
         throw StateError('Workspace user administration is required.');
       }
 
       final requestedRole = updateData['role'] as String?;
-      final targetRole = normalizeRoleName(
-        targetData?['role'] as String? ?? '',
-      );
-      const workspaceRoles = {'supervisor', 'seller'};
-      if (!workspaceRoles.contains(targetRole)) {
-        throw StateError('Workspace user administration is required.');
-      }
       if (requestedRole != null &&
-          (!workspaceRoles.contains(requestedRole) ||
-              !workspaceRoles.contains(targetRole))) {
+          !PermissionPolicy.can(
+            actingUser,
+            AppCapability.manageUsers,
+            tenantId: tenantId,
+            targetRole: requestedRole,
+          )) {
         throw StateError(
-          'Workspace admins may change only supervisor and seller roles.',
+          'Workspace admins may assign only permitted workspace roles.',
         );
       }
 
@@ -645,18 +644,6 @@ class UserManagementNotifier extends AsyncNotifier<void> {
         throw StateError(
           'Workspace admins may update only owner contact details.',
         );
-      }
-      const tenantAdminEditableKeys = {
-        'display_name',
-        'phone',
-        'role',
-        'assigned_route_ids',
-        'assigned_route_names',
-      };
-      if (updateData.keys.any(
-        (key) => !tenantAdminEditableKeys.contains(key),
-      )) {
-        throw StateError('Unsupported workspace user update.');
       }
     }
 
@@ -763,7 +750,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     await _setUserActiveAtomically(
       userId: target.target.id,
       tenantId: target.tenantId,
-      adminIsSuperAdmin: target.admin.isSuperAdmin,
+      managerRole: roleValueFromUserRole(target.admin.role),
       active: active,
     );
   }
@@ -775,7 +762,7 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     await _setUserActiveAtomically(
       userId: target.target.id,
       tenantId: target.tenantId,
-      adminIsSuperAdmin: target.admin.isSuperAdmin,
+      managerRole: roleValueFromUserRole(target.admin.role),
       active: false,
       clearRouteAssignments: true,
       displayName: target.target.displayName,
@@ -784,11 +771,16 @@ class UserManagementNotifier extends AsyncNotifier<void> {
 
   /// Send a password-reset email to the seller.
   /// Email is immutable after creation; password can only be reset via email.
-  Future<void> sendPasswordResetForSeller({required String email}) async {
-    await _requireAdminUid();
-    final trimmedEmail = email.trim().toLowerCase();
-    if (trimmedEmail.isEmpty) return;
-    await FirebaseAuth.instance.sendPasswordResetEmail(email: trimmedEmail);
+  Future<void> sendPasswordResetForSeller({required String userId}) async {
+    final target = await _requireManageableUser(userId);
+    if (!target.target.isSeller) {
+      throw StateError('Password reset is available only for seller accounts.');
+    }
+    final email = target.target.email.trim().toLowerCase();
+    if (email.isEmpty) {
+      throw StateError('The selected seller has no registered email address.');
+    }
+    await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
   }
 
   /// Reactivates a soft-deleted user and re-assigns them to routes atomically.
@@ -803,22 +795,26 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     if (target.target.active) {
       throw StateError('Only inactive users can be reactivated.');
     }
-    if (target.target.role != UserRole.seller) {
+    if (target.target.isSeller) {
+      if (routeIds.isEmpty) {
+        throw ArgumentError('Seller accounts require valid assigned routes.');
+      }
+    } else if (routeIds.isNotEmpty) {
       throw StateError(
-        'Seller route assignments are required for reactivation.',
+        'Non-seller accounts cannot be assigned to seller routes.',
       );
     }
     final normalizedRouteIds = routeIds.map((id) => id.trim()).toList();
-    if (normalizedRouteIds.isEmpty ||
-        normalizedRouteIds.any((routeId) => routeId.isEmpty) ||
-        normalizedRouteIds.toSet().length != normalizedRouteIds.length) {
+    if (normalizedRouteIds.any((routeId) => routeId.isEmpty) ||
+        normalizedRouteIds.toSet().length != normalizedRouteIds.length ||
+        (target.target.isSeller && normalizedRouteIds.isEmpty)) {
       throw ArgumentError('Seller accounts require valid assigned routes.');
     }
     final trimmedName = displayName.trim();
     await _setUserActiveAtomically(
       userId: target.target.id,
       tenantId: target.tenantId,
-      adminIsSuperAdmin: target.admin.isSuperAdmin,
+      managerRole: roleValueFromUserRole(target.admin.role),
       active: true,
       displayName: trimmedName,
       routeIdsToAssign: normalizedRouteIds,
@@ -840,10 +836,13 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     final tenantId = TenantScope.normalize(actor?.tenantId);
     if (authUid.isEmpty ||
         authUid != currentAdminUid.trim() ||
-        actor == null ||
-        !actor.active ||
-        !actor.isSuperAdmin ||
-        tenantId == null) {
+        !PermissionPolicy.can(
+          actor,
+          AppCapability.manageDataMaintenance,
+          tenantId: tenantId,
+        ) ||
+        tenantId == null ||
+        tenantId == TenantScope.globalTenantId) {
       throw StateError(
         'Only a super-admin in an active workspace may permanently delete users',
       );
@@ -896,12 +895,10 @@ class UserManagementNotifier extends AsyncNotifier<void> {
       );
     }
 
-    final trimmedCurrent = currentPassword.trim();
-    final trimmedNew = newPassword.trim();
-    if (trimmedCurrent.isEmpty || trimmedNew.isEmpty) {
+    if (currentPassword.isEmpty || newPassword.isEmpty) {
       throw ArgumentError('Passwords must not be empty');
     }
-    if (trimmedNew.length < 8) {
+    if (newPassword.length < 8) {
       throw FirebaseAuthException(
         code: 'weak-password',
         message: 'Password is too weak. Use at least 8 characters.',
@@ -910,11 +907,11 @@ class UserManagementNotifier extends AsyncNotifier<void> {
 
     final credential = EmailAuthProvider.credential(
       email: email,
-      password: trimmedCurrent,
+      password: currentPassword,
     );
 
     await currentUser.reauthenticateWithCredential(credential);
-    await currentUser.updatePassword(trimmedNew);
+    await currentUser.updatePassword(newPassword);
   }
 }
 

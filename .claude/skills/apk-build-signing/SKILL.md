@@ -108,6 +108,13 @@ and do not commit or push. User authorization is required for those operations.
 For app changes, first run relevant tests and analyzers. PDF-capable commands
 must retain `--dart-define=use_arabic=true`.
 
+When a release changes Firestore Rules or the client write schema, a successful
+local build does not prove production compatibility. Do not describe the
+artifact as production-ready or use it for authenticated business-flow
+acceptance until the matching Rules are deployed with explicit authorization.
+Keep local Rules tests, local artifacts, production deployment, and device
+installation as separately reported gates.
+
 From `D:\Footwear`:
 
 ```powershell

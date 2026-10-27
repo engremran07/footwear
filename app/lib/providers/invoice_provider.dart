@@ -1,12 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:logger/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/firestore_pagination.dart';
 import '../core/utils/notification_writer.dart';
+import '../core/utils/permission_policy.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/invoice_model.dart';
+import '../models/user_model.dart';
 import 'auth_provider.dart';
+
+final _logger = Logger();
 
 // =============================================================================
 // InvoiceProvider — all invoice lifecycle operations.
@@ -235,16 +241,25 @@ class InvoiceNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
-  Future<String> _requireTenantId() async {
-    final user = await ref.read(authUserProvider.future);
-    if (user == null || !user.active) {
+  Future<({UserModel user, String tenantId})> _requireInvoiceAccess({
+    required AppCapability capability,
+    required String actorId,
+  }) async {
+    final activeUser = await ref.read(authUserProvider.future);
+    if (activeUser == null || !activeUser.active) {
       throw StateError('An active user profile is required');
     }
-    final tenantId = TenantScope.normalize(user.tenantId);
+    final tenantId = TenantScope.normalize(activeUser.tenantId);
     if (tenantId == null) {
       throw StateError('A workspace is required for invoice operations');
     }
-    return tenantId;
+    if (actorId.trim() != activeUser.id) {
+      throw StateError('Invoice actor must match the authenticated user');
+    }
+    if (!PermissionPolicy.can(activeUser, capability, tenantId: tenantId)) {
+      throw StateError('User is not authorized for this invoice operation');
+    }
+    return (user: activeUser, tenantId: tenantId);
   }
 
   Map<String, dynamic> _invoiceHeaderSnapshot(Map<String, dynamic>? settings) {
@@ -381,7 +396,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     }
 
     final db = FirebaseFirestore.instance;
-    final tenantId = await _requireTenantId();
+    final invoiceAccess = await _requireInvoiceAccess(
+      capability: AppCapability.createInvoice,
+      actorId: normalizedCreatedBy,
+    );
+    final tenantId = invoiceAccess.tenantId;
     final normalizedKey = idempotencyKey?.trim();
     final resolvedKey = normalizedKey == null || normalizedKey.isEmpty
         ? const Uuid().v4()
@@ -481,10 +500,14 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       final invoiceHeaderSnapshot = _invoiceHeaderSnapshot(settingsData);
       final now = Timestamp.now();
 
-      transaction.update(settingsRef, {'last_invoice_number': sequence});
+      transaction.update(settingsRef, {
+        'last_invoice_number': sequence,
+        'last_invoice_id': invRef.id,
+      });
       transaction.set(invRef, {
         'tenant_id': tenantId,
         'invoice_number': invoiceNumber,
+        'invoice_sequence': sequence,
         'sale_transaction_id': txRef.id,
         'idempotency_key': resolvedKey,
         'type': InvoiceModel.typeSale,
@@ -594,8 +617,12 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           },
         );
       }
-    } catch (_) {
-      /* best-effort only — non-critical */
+    } catch (error, stackTrace) {
+      _logger.w(
+        'Best-effort invoice notification write failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
     return invRef.id;
   }
@@ -632,7 +659,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (normalizedSellerId.isEmpty) {
       throw ArgumentError('sellerId must not be empty');
     }
-    final tenantId = await _requireTenantId();
+    final invoiceAccess = await _requireInvoiceAccess(
+      capability: AppCapability.createCashReceipt,
+      actorId: normalizedCreatedBy,
+    );
+    final tenantId = invoiceAccess.tenantId;
     final normalizedKey = idempotencyKey?.trim();
     final resolvedKey = normalizedKey == null || normalizedKey.isEmpty
         ? const Uuid().v4()
@@ -820,8 +851,13 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       throw ArgumentError('linkedInvoiceId must not be empty');
     }
 
+    final invoiceAccess = await _requireInvoiceAccess(
+      capability: AppCapability.creditNote,
+      actorId: normalizedCreatedBy,
+    );
+    final tenantId = invoiceAccess.tenantId;
+
     final db = FirebaseFirestore.instance;
-    final tenantId = await _requireTenantId();
     final normalizedKey = idempotencyKey?.trim();
     final resolvedKey = (normalizedKey != null && normalizedKey.isNotEmpty)
         ? normalizedKey
@@ -950,14 +986,19 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       final invoiceNumber =
           'INV-${DateTime.now().year}-${sequence.toString().padLeft(4, '0')}';
       final now = Timestamp.now();
-      transaction.update(settingsRef, {'last_invoice_number': sequence});
+      transaction.update(settingsRef, {
+        'last_invoice_number': sequence,
+        'last_invoice_id': invoiceRef.id,
+      });
       transaction.update(originalRef, {
         'credit_note_total': creditedTotal + total,
+        'latest_credit_note_invoice_id': invoiceRef.id,
         'updated_at': now,
       });
       transaction.set(invoiceRef, {
         'tenant_id': tenantId,
         'invoice_number': invoiceNumber,
+        'invoice_sequence': sequence,
         'idempotency_key': resolvedKey,
         'type': InvoiceModel.typeCreditNote,
         'invoice_header_snapshot': _invoiceHeaderSnapshot(settingsData),
@@ -1096,8 +1137,12 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           },
         );
       }
-    } catch (_) {
-      /* best-effort only — non-critical */
+    } catch (error, stackTrace) {
+      _logger.w(
+        'Best-effort return notification write failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
     return invoiceRef.id;
   }
@@ -1120,14 +1165,12 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (createdBy.trim().isEmpty) {
       throw ArgumentError('createdBy must not be empty');
     } // Defense-in-depth: enforce admin-only at app level (rules enforce at DB level)
-    final currentUser = await ref.read(authUserProvider.future);
-    if (currentUser == null || !currentUser.active || !currentUser.isAdmin) {
-      throw StateError('voidInvoice requires admin privileges');
-    }
-    if (createdBy.trim() != currentUser.id) {
-      throw StateError('createdBy must match the authenticated administrator');
-    }
-    final tenantId = await _requireTenantId();
+    final invoiceAccess = await _requireInvoiceAccess(
+      capability: AppCapability.voidInvoice,
+      actorId: createdBy,
+    );
+    final currentUser = invoiceAccess.user;
+    final tenantId = invoiceAccess.tenantId;
     final db = FirebaseFirestore.instance;
     final invoiceRef = db.collection(Collections.invoices).doc(invoiceId);
     final now = Timestamp.now();
@@ -1339,6 +1382,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       if (originalInvoiceRef != null && updatedCreditNoteTotal != null) {
         transaction.update(originalInvoiceRef, {
           'credit_note_total': updatedCreditNoteTotal,
+          'voided_credit_note_id': invoiceId,
           'updated_at': now,
         });
       }
@@ -1383,6 +1427,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'void_by': currentUser.id,
         'void_at': now,
         'void_reason': 'admin_void',
+        if (reversalTransactionRef != null)
+          'void_reversal_transaction_id': reversalTransactionRef.id,
         'updated_at': now,
       });
 
@@ -1516,11 +1562,12 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       throw ArgumentError('createdBy must not be empty');
     }
     final db = FirebaseFirestore.instance;
-    final currentUser = await ref.read(authUserProvider.future);
-    if (currentUser == null || !currentUser.isAdmin) {
-      throw StateError('markAsPaid requires admin privileges');
-    }
-    final tenantId = await _requireTenantId();
+    final invoiceAccess = await _requireInvoiceAccess(
+      capability: AppCapability.settleInvoice,
+      actorId: createdBy,
+    );
+    final currentUser = invoiceAccess.user;
+    final tenantId = invoiceAccess.tenantId;
     final invRef = db.collection(Collections.invoices).doc(invoiceId);
 
     await db.runTransaction((txn) async {
@@ -1593,6 +1640,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'outstanding_amount': 0,
         if (payRef != null)
           'payment_transaction_ids': FieldValue.arrayUnion([payRef.id]),
+        if (payRef != null) 'latest_payment_transaction_id': payRef.id,
         'updated_at': now,
       });
 

@@ -214,13 +214,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _showChangePasswordDialog() {
-    final currentPassC = TextEditingController();
-    final newPassC = TextEditingController();
-    final confirmPassC = TextEditingController();
-    final newPassFn = FocusNode();
-    final confirmPassFn = FocusNode();
-
-    showDialog(
+    var currentPassword = '';
+    var newPassword = '';
+    var confirmation = '';
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(tr('change_password', ref)),
@@ -228,36 +225,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: currentPassC,
+              TextFormField(
+                initialValue: currentPassword,
                 decoration: InputDecoration(
                   labelText: tr('current_password', ref),
                 ),
                 obscureText: true,
                 keyboardType: TextInputType.visiblePassword,
                 textInputAction: TextInputAction.next,
-                onSubmitted: (_) => newPassFn.requestFocus(),
+                onChanged: (value) => currentPassword = value,
+                onFieldSubmitted: (_) => FocusScope.of(ctx).nextFocus(),
               ),
               const SizedBox(height: 8),
-              TextField(
-                controller: newPassC,
-                focusNode: newPassFn,
+              TextFormField(
+                initialValue: newPassword,
                 decoration: InputDecoration(labelText: tr('new_password', ref)),
                 obscureText: true,
                 keyboardType: TextInputType.visiblePassword,
                 textInputAction: TextInputAction.next,
-                onSubmitted: (_) => confirmPassFn.requestFocus(),
+                onChanged: (value) => newPassword = value,
+                onFieldSubmitted: (_) => FocusScope.of(ctx).nextFocus(),
               ),
               const SizedBox(height: 8),
-              TextField(
-                controller: confirmPassC,
-                focusNode: confirmPassFn,
+              TextFormField(
+                initialValue: confirmation,
                 decoration: InputDecoration(
                   labelText: tr('confirm_password', ref),
                 ),
                 obscureText: true,
                 keyboardType: TextInputType.visiblePassword,
                 textInputAction: TextInputAction.done,
+                onChanged: (value) => confirmation = value,
               ),
             ],
           ),
@@ -269,14 +267,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final newPass = newPassC.text.trim();
-              if (newPass.length < 8) {
+              if (newPassword.length < 8) {
                 ScaffoldMessenger.of(
                   ctx,
                 ).showSnackBar(warningSnackBar(tr('err_weak_password', ref)));
                 return;
               }
-              if (newPass != confirmPassC.text.trim()) {
+              if (newPassword != confirmation) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
                   warningSnackBar(tr('passwords_dont_match', ref)),
                 );
@@ -287,8 +284,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 await ref
                     .read(userManagementNotifierProvider.notifier)
                     .changeOwnPassword(
-                      currentPassword: currentPassC.text,
-                      newPassword: newPass,
+                      currentPassword: currentPassword,
+                      newPassword: newPassword,
                     );
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (mounted) {
@@ -309,13 +306,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ],
       ),
-    ).whenComplete(() {
-      currentPassC.dispose();
-      newPassC.dispose();
-      confirmPassC.dispose();
-      newPassFn.dispose();
-      confirmPassFn.dispose();
-    });
+    );
   }
 
   @override

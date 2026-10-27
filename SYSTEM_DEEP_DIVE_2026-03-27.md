@@ -1,6 +1,6 @@
 # ShoesERP System Deep Dive
 
-Last updated: 2026-10-25
+Last updated: 2026-10-26
 
 ## Backup and Restore
 
@@ -40,9 +40,10 @@ client.
 Firebase Authentication is the app's only sign-in mechanism. After Firebase Auth succeeds, the app loads the matching user profile and validates that it is active, has a supported role, and belongs to a concrete tenant unless it is a platform super-admin. The router and role-scoped providers wait for profile state and preserve mapped errors; no device registration, pairing approval, custom access slot, renewal timer, or app-managed session gate participates in sign-in.
 
 The tenant-scoped `supervisor` role grants operational access to routes,
-shops, products, inventory, invoices, and reports. It does not grant user,
-notification, settings, or backup access, or financial correction/approval,
-invoice-void, route-seller assignment, or shop-route reassignment rights.
+shops, products, inventory, invoices, reports, and tenant notifications. It
+does not grant user, settings, or backup access, or financial
+correction/approval, invoice-void, route-seller assignment, or shop-route
+reassignment rights.
 Tenant admins may create or assign only supervisor and seller roles to eligible
 non-owner accounts; admin, tenant-admin, and platform roles remain restricted.
 
@@ -57,18 +58,71 @@ changes member profile activity.
 
 ## Notification Feed Stability
 
-The notification center and unread badge use the same admin-equivalent,
-tenant-scoped notification stream. Shop visibility is resolved from only the
-shop IDs referenced by that bounded feed. The child shop listener depends on
-a sorted, deduplicated shop-ID key rather than notification objects, so
-read-state-only snapshots do not cancel and recreate the shop subscriptions.
-Supervisor and seller roles do not receive the admin notification feed.
+The notification center and unread badge use one active-tenant-scoped stream.
+Legacy admin, tenant-admin, selected-context super-admin, and supervisor
+profiles can read and mark notifications for their own workspace; sellers
+remain excluded. Shop visibility is resolved from only the shop IDs referenced
+by that bounded feed. The child shop listener depends on a sorted,
+deduplicated shop-ID key rather than notification objects, so read-state-only
+snapshots do not cancel and recreate shop subscriptions.
+
+During either a feed refresh or referenced-shop visibility refresh, the UI
+retains the last successful visible notification set rather than replacing it
+with shimmer. The first load remains loading, and true stream errors remain
+errors. Notification feed subscriptions and read-state writes require an
+active profile, active tenant, authorized role, and selected/unexpired
+super-admin support context where applicable. Firestore Rules remain
+authoritative. Mark-as-read failures are mapped and presented; non-critical
+notification creation failures are logged without masking the committed
+financial operation.
+
+Both feed and referenced-shop streams are keyed by the normalized concrete
+tenant ID. This prevents Riverpod's retained provider state from displaying
+the previous workspace's notifications after a workspace switch. A missing or
+`__global__` context starts no notification query; the existing cache behavior
+is retained only within the same tenant.
+
+Platform settings-hub visibility is separate from permission to manage
+workspace settings: a root platform super-admin may open the metadata-only hub,
+while business-setting routes require an active, reasoned, unexpired selected
+workspace context.
+
+## RTL Statement and Financial Table Layout
+
+`pdf` 3.12.0 may resolve child order using the page's RTL direction. Statement
+table headers, data, summary, and final-balance rows explicitly pin physical
+English-left/amount-right order with LTR directionality, while Arabic/Urdu
+text and numeric amounts retain explicit per-cell directions. Every
+logo-enabled financial PDF uses the shared workspace header with English
+details left, a consistently sized company logo centered, and selected
+Arabic/Urdu details right. This applies to statements, invoices, receipts,
+seller/multi-shop reports, and flat exports; current logo bytes take priority,
+and invoice snapshots provide the supported invoice/receipt fallback subject
+to `visibleFields`. Arabic and Urdu generated statement and receipt headers
+were visually inspected in Chrome. Urdu PDF shaping remains Naskh-style; full
+Nastaliq rendering is not supported.
+
+The supplied cash-receipt reference is now available. The local v3.10.7+1118
+receipt body follows its compact bilingual structure, retains the existing
+shared workspace header, uses saved balance fields, and remains a single A5
+page. Workspace invoice-header settings support two optional receipt-footer
+contact numbers. Arabic and Urdu receipt samples were visually inspected in
+the browser. Full Flutter suite: `01:29 +639: All tests passed!`; focused
+PDF/settings suite: `00:15 +24: All tests passed!`; both analyzers are clean;
+Rules Emulator: `154 passing (30s)`. Split APKs/AAB were built and the ARM64
+APK was installed; the hosted release remained undeployed.
 
 ## Invoice Modes and Workspace Headers
 
 Invoice entry separates stock-backed sales, non-stock catalog sales, and cash receipt invoices. Non-stock sales retain product and variant detail while leaving seller inventory unchanged; Firestore rules enforce the workspace enablement setting and reject a stock sale without deduction metadata. Shop detail opens the shared invoice form with the current shop selected.
 
 Cash receipt creation increments the tenant's receipt sequence in the same Firestore transaction that creates the receipt invoice and `cash_in` ledger entry and reduces `shop.balance`. Rules bind the invoice, transaction, amount, and resulting balance so none of those writes can succeed alone. Ledger-only `cash_in` remains a separate operation when no receipt document is required.
+
+Sale-invoice and cash-receipt creation is granted to active admins, tenant
+admins, supervisors, and sellers through the app capability policy and
+independently enforced by Firestore Rules. Seller creation is constrained to
+the assigned route and authenticated seller identity. This create permission
+does not grant settlement, correction, credit-note, or invoice-void rights.
 
 Sale invoices link to their `cash_out` ledger row and, when money is received, to the matching `cash_in` row. The shop-balance delta must be written atomically with those records. These links are enforced for admins and sellers; seller rules additionally verify the exact outstanding-balance delta. Non-stock invoicing defaults to disabled when a workspace setting is absent and must be explicitly enabled. Transaction descriptions use a multiline field for notes.
 
@@ -385,10 +439,11 @@ Hosting and Rules/indexes reported `Deploy complete!`; split APKs were
 ## v3.10.5+1116 Supervisor and Android Bundle Verification
 
 The tenant-scoped `supervisor` role is operationally limited to routes, shops,
-products, inventory, invoices, and reports. User administration, notifications,
-settings, backup, financial corrections/approval, invoice voids, route seller
-assignment, and shop route reassignment remain outside this role. Tenant admins
-may assign supervisor or seller roles only to eligible non-owner profiles.
+products, inventory, invoices, reports, and tenant notifications. User
+administration, settings, backup, financial corrections/approval, invoice
+voids, route seller assignment, and shop route reassignment remain outside
+this role. Tenant admins may assign supervisor or seller roles only to
+eligible non-owner profiles.
 Legacy workspace admins can load the tenant user list and restore workspace
 archives in merge-only mode. Notification shop subscriptions now use a stable,
 sorted set of feed shop IDs, avoiding restarts caused solely by read-state
@@ -439,3 +494,25 @@ and 2 field overrides absent locally were preserved without `--force`. Split APK
 30.7 MB, ARM64 32.2 MB, x86_64 33.7 MB; signed AAB: 54.8 MB. APK v2 and
 AAB JAR verification passed. ARM64 metadata is versionName `3.10.6`,
 versionCode `310063117`; installation on `R5GL22RGT9V` returned `Success`.
+
+## 2026-10-27 Tenant Permission and User-List Recovery
+
+The app-side role/capability map is centralized in `RoleCapabilities` and
+`PermissionPolicy`; router access now treats the dashboard as a business
+capability and schedules a refresh when selected super-admin context expires.
+This is not a replacement for the independent tenant/role/support-context
+checks in Firestore Rules. Write-side tenant scoping rejects missing and
+global-sentinel tenant IDs while retaining explicitly scoped legacy reads.
+
+The Users screen's `authUserProvider.value` access hid Firestore profile-stream
+errors: while Firebase Auth still had a signed-in user, a null profile value
+was rendered as shimmer indefinitely. A missing profile followed the same
+loading-shaped UI. The screen now renders loading only while its auth/profile
+streams are actually loading, maps stream errors to retry UI, and surfaces
+missing-profile access denial. The widget regression reproduced a timeout
+before the change and passed afterward (`00:04 +4: All tests passed!`).
+
+Local-only status: complete Rules parity review, all finding-by-finding audit
+dispositions, analyzer/full-suite verification, fresh APK/AAB builds, and
+device delivery remain pending. No production deployment, Play publication,
+commit, or push is implied.

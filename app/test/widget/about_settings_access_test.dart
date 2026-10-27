@@ -17,6 +17,10 @@ void main() {
     final scopedSuperAdmin = _user(
       UserRole.superAdmin,
       activeWorkspaceId: 'workspace-1',
+      supportReason: 'Investigating workspace issue',
+      selectedAt: Timestamp.fromDate(
+        DateTime.now().toUtc().subtract(const Duration(minutes: 5)),
+      ),
     );
     final tenantAdmin = _user(UserRole.tenantAdmin, tenantId: 'workspace-1');
     final admin = _user(UserRole.admin, tenantId: 'workspace-1');
@@ -90,18 +94,25 @@ void main() {
   }
 }
 
-UserModel _user(UserRole role, {String? tenantId, String? activeWorkspaceId}) =>
-    UserModel(
-      id: role.name,
-      email: '${role.name}@example.com',
-      displayName: role.name,
-      role: role,
-      tenantId: tenantId,
-      activeWorkspaceId: activeWorkspaceId,
-      active: true,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    );
+UserModel _user(
+  UserRole role, {
+  String? tenantId,
+  String? activeWorkspaceId,
+  String? supportReason,
+  Timestamp? selectedAt,
+}) => UserModel(
+  id: role.name,
+  email: '${role.name}@example.com',
+  displayName: role.name,
+  role: role,
+  tenantId: tenantId,
+  activeWorkspaceId: activeWorkspaceId,
+  activeWorkspaceReason: supportReason,
+  activeWorkspaceSelectedAt: selectedAt,
+  active: true,
+  createdAt: Timestamp.now(),
+  updatedAt: Timestamp.now(),
+);
 
 class _FixedAppLocaleNotifier extends AppLocaleNotifier {
   _FixedAppLocaleNotifier(this.locale);

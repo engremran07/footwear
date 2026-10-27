@@ -17,8 +17,6 @@ Prevent regressions caused by architecture drift between code, rules, and agent 
 
 - Verify Firestore role helpers in firestore.rules
 
-- Verify Storage role helpers in storage.rules
-
 - Verify create/update user flows normalize role values before writing
 
 1. Collection alignment
@@ -102,28 +100,31 @@ Prevent regressions caused by architecture drift between code, rules, and agent 
 - All monetary displays (Total In/Out, route outstanding, dashboard AR) derive
   from this single field or from the live `shopTransactionsProvider` stream.
 
-- **Dev flush scenario:** If transactions/invoices are deleted from Firestore
-  outside the app (console, CLI, script), `shop.balance` will become stale.
-  Always follow any manual flush with `node dev_reset.js` from the repo root.
-  This resets: every shop `balance → 0.0` and `settings/global.last_invoice_number → 0`.
+- **Maintenance boundary:** Never delete transaction/invoice rows or rewrite
+  shop balances with client flush/reset tools or direct scripts. Those paths
+  fail closed because multi-batch cleanup cannot preserve ledger links
+  atomically. Use only a reviewed, tenant-scoped transactional maintenance
+  procedure; archive/restore is the supported workspace lifecycle.
 
 - **Inline audit trigger:** Any time you touch `transaction_provider.dart`,
   `invoice_provider.dart`, or `shop_provider.dart`, verify every write to
   `transactions` or `invoices` also updates `shop.balance` atomically. If any
   path skips the balance update, that is a critical data-integrity bug.
 
-## Admin Auth Pipeline Failure Playbook
+## Firebase Auth Recovery
 
-### INVALID_ID_TOKEN (custom-token 3-step flow)
+Firebase Auth owns credential and token refresh. Do not invent a
+`signInWithCustomToken` recovery path or reuse the account-creation
+secondary-app flow to mint credentials; client code has no trusted custom-token
+issuer.
 
-When Firebase Auth rejects the admin's ID token mid-session:
-
-1. Call `auth.currentUser?.getIdToken(forceRefresh: true)`.
-
-2. If step 1 fails, call `auth.signInWithCustomToken(customToken)` where `customToken` is issued by the secondary FirebaseApp flow.
-
-3. If step 2 fails, force logout via `authNotifier.signOut()` and redirect to `/login`.
-**Never silently swallow INVALID_ID_TOKEN — always force refresh or sign out.**
+- Preserve the signed-in state for transient network, timeout, and token-refresh
+  failures. Surface a retryable state without clearing Firebase Auth persistence.
+- For a confirmed disabled/deleted account or an explicitly invalid credential,
+  follow the current auth provider's mapped recovery path and scope any
+  sign-out to the UID that was checked.
+- Before changing auth recovery, trace the actual Firebase exception and
+  `auth_provider.dart`; do not convert every refresh failure into sign-out.
 
 ### insufficient_request_scope
 
@@ -138,6 +139,29 @@ When Firebase Auth rejects the admin's ID token mid-session:
 - Fix: Add `FIREBASE_SERVICE_ACCOUNT` secret to GitHub Actions; load via `google-github-actions/auth@v2`.
 
 ## Standard Failure Playbooks
+
+### Notification feed refresh and permission feedback
+
+- Trace the notification stream, unread badge, shop-visibility stream, screen
+  rendering, and read-state writes together; do not diagnose flicker from the
+  visible shimmer alone.
+- Keep the shop-visibility subscription keyed by a sorted, deduplicated set of
+  referenced shop IDs. Read-state-only notification snapshots must not restart
+  those shop subscriptions.
+- In Riverpod 3, `AsyncValue.whenData()` does not preserve stale data when the
+  source enters loading during a refresh. If the UI must remain stable, retain
+  the last successful visibility result explicitly; keep initial load and real
+  errors distinguishable.
+- Do not subscribe admin-only notification feeds until the profile, active
+  tenant, role, and any required super-admin support context are confirmed.
+  Firestore Rules remain authoritative; the client guard only avoids known
+  unauthorized subscriptions.
+- Never discard mark-as-read failures with `.ignore()`. Map and show failures,
+  then add a regression for the exact screen action and role/context.
+- Test stable shop-ID keys, cached visibility during refresh, first-load
+  loading, real stream errors, and successful/denied read-state writes. Run the
+  focused Rules Emulator cases whenever notification authorization tests
+  change.
 
 ### permission-denied on writes
 
@@ -166,6 +190,25 @@ When Firebase Auth rejects the admin's ID token mid-session:
 - Validate collection names against constants
 
 - Validate provider query matches deployed indexes
+
+### Multi-workspace permission parity
+
+- Treat `RoleCapabilities` and `PermissionPolicy` as the app-side source of
+  capability decisions, but keep Firestore Rules as the independent security
+  boundary. Reconcile each business operation across role model, router,
+  screen affordance, provider guard, and Rules.
+- Separate invoice creation from settlement, credit-note, correction, and
+  void permissions. Admins, tenant admins, supervisors, and sellers may create
+  sale invoices and cash receipts in their permitted scope; seller writes
+  remain assigned-route scoped. Never infer correction rights from create
+  access.
+- Require a concrete active tenant and active profile on every business path.
+  For super-admins, require the selected workspace, valid support reason,
+  append-only access event, and unexpired support context.
+- Add positive and negative emulator coverage for each role and cross-tenant
+  access. Include a multi-workspace fixture with at least 15 distinct tenant
+  IDs to detect hard-coded workspace assumptions; do not treat that test alone
+  as proof of production quota or latency capacity.
 
 ## MCP/Copilot Modernization Deploy Startup Checks
 
@@ -204,3 +247,46 @@ When runtime behavior changes, update in same change set:
 1. Provider identity guard
 
 - In notifier create/update methods, trim and validate created_by/route_id/shop_id; throw ArgumentError if empty.
+
+## Multi-Tenant Permission Review
+
+Use `RoleCapabilities` and `PermissionPolicy` for app-side role capabilities,
+tenant matching, target-role eligibility, and super-admin support-context
+checks. Do not duplicate role-to-route maps in screens, router guards, and
+navigation. Firestore Rules remain authoritative and must independently
+enforce the same business scope; the Dart matrix is not a Rules generator.
+
+Verify the actual contract for each operation rather than relying on a generic
+`isAdmin` check:
+
+- Legacy `admin`/`manager` manages eligible seller profiles only.
+- `tenant_admin` manages eligible seller and supervisor profiles in its own
+  tenant, subject to owner, peer-admin, seat, and role safeguards.
+- `supervisor` has tenant operational routes, shops, products, inventory,
+  invoices, reports, and notifications, but not settings, backups, user
+  administration, reassignment, financial corrections, credit notes, or
+  invoice voids.
+- `seller` stays route-scoped and does not receive administrative notification
+  or report access.
+- `super_admin` may access business data only with a selected tenant, a reason
+  of at least 10 characters, a recorded support event, and unexpired context.
+  The client must leave business routes when that context expires; Rules enforce
+  the TTL regardless of client state.
+
+New business writes must pass through `TenantScope.requireTenant()` and reject
+both missing tenants and the legacy `__global__` sentinel. Preserve legacy
+read handling only where a specific query or migration requires it. Never
+broaden a Rules clause to make a client query succeed without proving its
+tenant and role constraints.
+
+When a workspace becomes inactive, keep ordinary business reads and writes
+denied. Verify the narrowly scoped platform restoration path separately; do
+not reactivate member profiles or allow a generic admin branch to bypass the
+workspace lifecycle state.
+
+Classify changes before editing Rules: UI presentation, internal state
+refactor, query/index, schema migration, identity/membership, authorization
+policy, or trusted writer. UI-only and refactor changes do not justify a Rules
+rewrite. A `permission-denied` result requires tracing identity, profile
+activity, tenant lifecycle, exact query/write set, and Rules conditions before
+any policy change.

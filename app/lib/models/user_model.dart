@@ -83,7 +83,12 @@ class UserModel {
       role == UserRole.superAdmin;
   bool get isSeller => role == UserRole.seller;
   bool get isSupervisor => role == UserRole.supervisor;
-  bool get canManageOperationalData => isAdmin || isSupervisor;
+  bool get canAccessNotifications => RoleCapabilities.allows(
+    _roleToString(role),
+    AppCapability.viewNotifications,
+  );
+  bool get canManageOperationalData =>
+      RoleCapabilities.allows(_roleToString(role), AppCapability.viewRoutes);
   bool get isTenantAdmin => role == UserRole.tenantAdmin;
   bool get isSuperAdmin => role == UserRole.superAdmin;
   bool get isRoleRecognized => role != UserRole.unknown;
@@ -91,9 +96,11 @@ class UserModel {
       canCreateWorkspaceBackup || (isSeller && assignedRouteIds.isNotEmpty);
   bool get canRestoreBackup =>
       canRestoreWorkspaceBackup || (isSeller && assignedRouteIds.isNotEmpty);
-  bool get canCreateWorkspaceBackup => isAdmin;
+  bool get canCreateWorkspaceBackup =>
+      RoleCapabilities.allows(_roleToString(role), AppCapability.manageBackup);
   bool get canRunAutomaticWorkspaceBackup => isTenantAdmin;
-  bool get canRestoreWorkspaceBackup => isAdmin;
+  bool get canRestoreWorkspaceBackup =>
+      RoleCapabilities.allows(_roleToString(role), AppCapability.manageBackup);
   bool get canPruneWorkspaceBackup => isSuperAdmin;
   String? get tenantId => isSuperAdmin ? activeWorkspaceId : _tenantId;
 

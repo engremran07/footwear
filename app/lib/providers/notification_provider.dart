@@ -8,7 +8,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/notification_model.dart';
+import '../models/user_model.dart';
 import 'auth_provider.dart';
+
+String? notificationTenantIdFor(UserModel? user, {DateTime? now}) {
+  if (user == null || !user.active || !user.canAccessNotifications) return null;
+  final tenantId = TenantScope.normalize(user.tenantId);
+  if (tenantId == null || tenantId == TenantScope.globalTenantId) return null;
+  if (user.isSuperAdmin &&
+      !user.hasActiveWorkspaceSupportContextFor(tenantId, now: now)) {
+    return null;
+  }
+  return tenantId;
+}
+
+final notificationTenantScopeProvider = Provider.autoDispose<String?>(
+  (ref) => ref.watch(
+    authUserProvider.select((state) => notificationTenantIdFor(state.value)),
+  ),
+);
 
 @visibleForTesting
 List<NotificationModel> filterVisibleNotifications(
@@ -26,6 +44,42 @@ bool isNotificationShopVisible(Map<String, dynamic> shopData) =>
     shopData['active'] != false && shopData['deleted'] != true;
 
 @visibleForTesting
+AsyncValue<List<NotificationModel>> notificationsWithShopVisibility(
+  List<NotificationModel> notifications,
+  AsyncValue<Set<String>> activeShopIds,
+) {
+  if (activeShopIds.isLoading && activeShopIds.hasValue) {
+    final cachedShopIds = activeShopIds.value;
+    if (cachedShopIds != null) {
+      return AsyncData(
+        filterVisibleNotifications(notifications, cachedShopIds),
+      );
+    }
+  }
+  return activeShopIds.whenData(
+    (ids) => filterVisibleNotifications(notifications, ids),
+  );
+}
+
+@visibleForTesting
+AsyncValue<List<NotificationModel>> visibleNotificationState(
+  AsyncValue<List<NotificationModel>> notifications,
+  AsyncValue<Set<String>> activeShopIds,
+) {
+  if (notifications.hasError) {
+    return AsyncError<List<NotificationModel>>(
+      notifications.error!,
+      notifications.stackTrace!,
+    );
+  }
+  final currentNotifications = notifications.value;
+  if (currentNotifications == null) {
+    return const AsyncLoading<List<NotificationModel>>();
+  }
+  return notificationsWithShopVisibility(currentNotifications, activeShopIds);
+}
+
+@visibleForTesting
 String notificationShopIdsKey(AsyncValue<List<NotificationModel>> state) {
   final shopIds =
       state.value
@@ -37,22 +91,20 @@ String notificationShopIdsKey(AsyncValue<List<NotificationModel>> state) {
   return jsonEncode(shopIds ?? const <String>[]);
 }
 
-/// Admin-only stream of the 50 most-recent notifications ordered newest-first,
-/// scoped to the current user's tenant.
+/// Admin- and supervisor-only stream of the 50 most-recent notifications
+/// ordered newest-first, scoped to the current user's tenant.
 ///
 /// Returns [Stream.empty] for non-admin users so the provider never fires a
 /// Firestore query that would fail with permission-denied.
 ///
 /// P1-10 FIX: Added TenantScope.applyToQuery() to prevent admins from one
 /// workspace seeing notifications from other workspaces.
-final notificationsProvider =
-    StreamProvider.autoDispose<List<NotificationModel>>((ref) {
-      final (isAdmin, tenantId) = ref.watch(
-        authUserProvider.select(
-          (state) => (state.value?.isAdmin ?? false, state.value?.tenantId),
-        ),
-      );
-      if (!isAdmin) return const Stream.empty();
+final notificationsProvider = StreamProvider.autoDispose
+    .family<List<NotificationModel>, String?>((ref, tenantId) {
+      if (tenantId == null ||
+          ref.watch(notificationTenantScopeProvider) != tenantId) {
+        return Stream.value(const <NotificationModel>[]);
+      }
 
       var query =
           FirebaseFirestore.instance.collection(Collections.notifications)
@@ -76,17 +128,15 @@ final notificationsProvider =
 /// Watches only the shops referenced by the bounded notification feed. Missing,
 /// inactive, and soft-deleted shops are excluded without treating a capped
 /// all-shops query as an existence check.
-final activeNotificationShopIdsProvider =
-    StreamProvider.autoDispose<Set<String>>((ref) {
-      final (isAdmin, tenantId) = ref.watch(
-        authUserProvider.select(
-          (state) => (state.value?.isAdmin ?? false, state.value?.tenantId),
-        ),
-      );
-      if (!isAdmin) return Stream.value(const <String>{});
+final activeNotificationShopIdsProvider = StreamProvider.autoDispose
+    .family<Set<String>, String?>((ref, tenantId) {
+      if (tenantId == null ||
+          ref.watch(notificationTenantScopeProvider) != tenantId) {
+        return Stream.value(const <String>{});
+      }
 
       final encodedShopIds = ref.watch(
-        notificationsProvider.select(notificationShopIdsKey),
+        notificationsProvider(tenantId).select(notificationShopIdsKey),
       );
       final shopIds = (jsonDecode(encodedShopIds) as List<dynamic>)
           .cast<String>();
@@ -143,21 +193,24 @@ final activeNotificationShopIdsProvider =
 /// role- and tenant-scoped visible notification set.
 final visibleNotificationsProvider =
     Provider.autoDispose<AsyncValue<List<NotificationModel>>>((ref) {
-      final notifications = ref.watch(notificationsProvider);
-      return notifications.when(
-        data: (items) {
-          final activeShopIds = ref.watch(activeNotificationShopIdsProvider);
-          return activeShopIds.whenData(
-            (ids) => filterVisibleNotifications(items, ids),
-          );
-        },
-        loading: () => const AsyncLoading<List<NotificationModel>>(),
-        error: (error, stackTrace) =>
-            AsyncError<List<NotificationModel>>(error, stackTrace),
+      final tenantId = ref.watch(notificationTenantScopeProvider);
+      final notifications = ref.watch(notificationsProvider(tenantId));
+      if (notifications.hasError) {
+        return visibleNotificationState(
+          notifications,
+          const AsyncLoading<Set<String>>(),
+        );
+      }
+      if (notifications.value == null) {
+        return const AsyncLoading<List<NotificationModel>>();
+      }
+      final activeShopIds = ref.watch(
+        activeNotificationShopIdsProvider(tenantId),
       );
+      return visibleNotificationState(notifications, activeShopIds);
     });
 
-/// Derived count of unread notifications (admin only).
+/// Derived count of unread notifications for authorized operational roles.
 final unreadNotificationCountProvider = Provider.autoDispose<int>((ref) {
   return ref
           .watch(visibleNotificationsProvider)
@@ -173,6 +226,14 @@ class NotificationNotifier extends AsyncNotifier<void> {
 
   Future<void> markAsRead(String notifId) async {
     if (notifId.trim().isEmpty) return;
+    final user = await ref.read(authUserProvider.future);
+    if (notificationTenantIdFor(user) == null) {
+      throw StateError(
+        user?.isSuperAdmin == true
+            ? 'active platform super-admin access is required'
+            : 'An active workspace is required for this operation',
+      );
+    }
     await FirebaseFirestore.instance
         .collection(Collections.notifications)
         .doc(notifId)
@@ -187,6 +248,14 @@ class NotificationNotifier extends AsyncNotifier<void> {
     if (unreadIds.isEmpty) return;
     if (unreadIds.length > 50) {
       throw ArgumentError('At most 50 notifications can be marked at once.');
+    }
+    final user = await ref.read(authUserProvider.future);
+    if (notificationTenantIdFor(user) == null) {
+      throw StateError(
+        user?.isSuperAdmin == true
+            ? 'active platform super-admin access is required'
+            : 'An active workspace is required for this operation',
+      );
     }
 
     final db = FirebaseFirestore.instance;

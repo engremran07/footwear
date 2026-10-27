@@ -28,6 +28,68 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.10.9',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Eligible supervisors and route-assigned sellers can now create sale invoices and cash receipts within their workspace permissions.',
+          AppLocale.ar:
+              'يمكن للمشرفين المؤهلين والبائعين المعيّنين للمسارات الآن إنشاء فواتير البيع وسندات القبض ضمن صلاحيات مساحة العمل.',
+          AppLocale.ur:
+              'مجاز سپروائزر اور روٹ سے منسلک سیلرز اب اپنی ورک اسپیس کی اجازت کے مطابق سیل انوائس اور کیش رسید بنا سکتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.10.8',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🖼️',
+        text: {
+          AppLocale.en:
+              'Company logos now appear centered between English and Arabic or Urdu details across financial PDFs, with one consistent, slightly larger size.',
+          AppLocale.ar:
+              'تظهر شعارات الشركة الآن في الوسط بين التفاصيل الإنجليزية والعربية أو الأردية في جميع ملفات PDF المالية، بحجم موحد أكبر قليلًا.',
+          AppLocale.ur:
+              'کمپنی کے لوگو اب تمام مالی PDF دستاویزات میں انگریزی اور عربی یا اردو تفصیلات کے درمیان مرکز میں، یکساں اور قدرے بڑے سائز میں دکھائے جاتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔔',
+        text: {
+          AppLocale.en:
+              'Notifications now stay within the active workspace when you switch accounts or workspaces, while refreshes in the same workspace remain smooth.',
+          AppLocale.ar:
+              'تبقى الإشعارات الآن ضمن مساحة العمل النشطة عند تبديل الحساب أو مساحة العمل، مع استمرار التحديث بسلاسة داخل المساحة نفسها.',
+          AppLocale.ur:
+              'اکاؤنٹ یا ورک اسپیس تبدیل کرنے پر نوٹیفکیشن اب فعال ورک اسپیس تک محدود رہتے ہیں، جبکہ اسی ورک اسپیس میں ریفریش ہموار رہتا ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.10.7',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en:
+              'Cash receipts now use a compact bilingual layout based on the supplied reference, keep the workspace header, and can show two extra contact numbers.',
+          AppLocale.ar:
+              'تستخدم سندات القبض الآن تخطيطًا ثنائي اللغة أكثر اختصارًا مستوحى من النموذج المرفق، مع الحفاظ على ترويسة مساحة العمل وإمكانية عرض رقمي اتصال إضافيين.',
+          AppLocale.ur:
+              'نقد رسیدیں اب فراہم کردہ نمونے سے متاثر ایک مختصر دو لسانی ترتیب میں ہیں، ورک اسپیس ہیڈر برقرار رہتا ہے اور دو اضافی رابطہ نمبر دکھائے جا سکتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.10.6',
     date: 'October 2026',
     items: [

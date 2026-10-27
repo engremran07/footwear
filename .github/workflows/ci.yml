@@ -18,7 +18,7 @@ jobs:
 
   analyse:
     name: Flutter Analyze + Format
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +48,7 @@ jobs:
   test:
     name: Flutter Test
     needs: analyse
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -74,14 +74,14 @@ jobs:
   hygiene:
     name: Code Hygiene Gates
     needs: analyse
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - name: Gate 1 — No raw Firestore collection literals
         run: |
-          FOUND=$(grep -rn "\.collection('" app/lib/ | grep -v Collections\. | grep -v '//' | grep -v '\.rules' || true)
+          FOUND=$(grep -rnE "\.collection\(['\"]" app/lib/ | grep -v Collections\. | grep -v '//' | grep -v '\.rules' || true)
           if [ -n "$FOUND" ]; then
             echo "❌ Raw Firestore collection literal detected (use Collections.* constants):"
             echo "$FOUND"
@@ -91,7 +91,8 @@ jobs:
 
       - name: Gate 2 — allTransactionsProvider invalidated on sign-out
         run: |
-          if ! grep -q "allTransactionsProvider" app/lib/providers/auth_provider.dart; then
+          INVALIDATION_METHOD=$(sed -n '/void _invalidateRoleScopedProviders()/,/^  }/p' app/lib/providers/auth_provider.dart)
+          if ! printf '%s\n' "$INVALIDATION_METHOD" | grep -q "allTransactionsProvider"; then
             echo "❌ allTransactionsProvider not found in auth_provider.dart _invalidateRoleScopedProviders"
             exit 1
           fi
@@ -109,7 +110,7 @@ jobs:
 
       - name: Gate 4 — No direct Firestore writes from screens/widgets
         run: |
-          FOUND=$(grep -rn "FirebaseFirestore.instance" app/lib/screens/ app/lib/widgets/ 2>/dev/null | grep -v "//" || true)
+          FOUND=$(grep -rnE "FirebaseFirestore|\.collection\(" app/lib/screens/ app/lib/widgets/ 2>/dev/null | grep -v "//" || true)
           if [ -n "$FOUND" ]; then
             echo "❌ Direct Firestore write detected in screens/widgets:"
             echo "$FOUND"
@@ -125,33 +126,33 @@ jobs:
           with open('app/lib/core/l10n/app_locale.dart', 'r', encoding='utf-8') as f:
               content = f.read()
 
-            def locale_block(locale, next_locale=None):
+          def locale_block(locale, next_locale=None):
               start = f"AppLocale.{locale}: {{"
               start_index = content.find(start)
               if start_index < 0:
-                return None
+                  return None
               body_start = start_index + len(start)
               if next_locale is not None:
-                end_index = content.find(f"AppLocale.{next_locale}: {{", body_start)
+                  end_index = content.find(f"AppLocale.{next_locale}: {{", body_start)
               else:
-                end_index = content.find("\n};", body_start)
+                  end_index = content.find("\n};", body_start)
               if end_index < 0:
-                return None
+                  return None
               return content[body_start:end_index]
 
-            en_block = locale_block('en', 'ar')
-            ar_block = locale_block('ar', 'ur')
-            ur_block = locale_block('ur')
-            if en_block is None or ar_block is None or ur_block is None:
+          en_block = locale_block('en', 'ar')
+          ar_block = locale_block('ar', 'ur')
+          ur_block = locale_block('ur')
+          if en_block is None or ar_block is None or ur_block is None:
               print('❌ Could not parse 3 language blocks')
               sys.exit(1)
 
           def extract_keys(block):
               return set(re.findall(r"^\s*'([a-z][a-z0-9_]+)'\s*:", block, re.MULTILINE))
 
-            en_keys = extract_keys(en_block)
-            ar_keys = extract_keys(ar_block)
-            ur_keys = extract_keys(ur_block)
+          en_keys = extract_keys(en_block)
+          ar_keys = extract_keys(ar_block)
+          ur_keys = extract_keys(ur_block)
 
           missing_ar = en_keys - ar_keys
           missing_ur = en_keys - ur_keys

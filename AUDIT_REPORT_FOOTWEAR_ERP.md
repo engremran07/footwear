@@ -10,6 +10,250 @@
 
 ---
 
+## Scope-Specific Addendum — 2026-10-27 Tenant Cache Isolation and Policy Recheck
+
+This recheck fixes reproducible app/provider defects and records local Rules
+evidence. It does not claim production deployment or full closure of the
+attached 33-finding checklist.
+
+### Confirmed Fixes
+
+- The notification regression had two independent causes. The feed did not
+  preserve its previous value during same-tenant refresh, and its singleton
+  provider cache could retain tenant A's rows after switching to tenant B.
+  Feed and referenced-shop providers now use tenant-keyed families, keep
+  same-tenant refresh behavior, and return no business stream for missing or
+  `__global__` scope. A tenant-switch regression proves the new scope begins
+  without tenant A's cached rows.
+- Root platform super-admins can open the platform settings hub without
+  business context. Workspace settings descendants remain gated by a valid
+  selected support context. `viewSettingsHub` and `manageSettings` encode
+  these different scopes.
+- The user-route retry test now supplies the authenticated Firebase user that
+  the screen's auth-loading guard requires. The workspace navigation test now
+  uses a concrete tenant for tenant-admin access and valid reason/TTL fields
+  for selected super-admin access; the production guard was not weakened.
+- The Firestore Rules changes received local emulator validation. This is not
+  evidence that production Rules or indexes are deployed.
+
+### Verification
+
+- Full Flutter suite: `01:20 +654: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 5.6s)`.
+- `dart analyze test/`: `No issues found!`; updated changelog regression:
+  `00:00 +10: All tests passed!`.
+- Rules Emulator: `172 passing (42s)`.
+- Focused notification, route, settings, and permission-policy regressions
+  passed. Full suite includes those regressions; changelog was separately
+  tested after its final edit.
+- Markdown lint and `git diff --check` exited 0 after the final documentation
+  edits.
+- Version `3.10.8+1119` is synchronized. Split APKs built at 30.7 MB (ARMv7),
+  32.2 MB (ARM64), and 33.7 MB (x86_64); signed AAB built at 54.8 MB. APK v2
+  signature verification succeeded and `jarsigner` reported `jar verified.`
+  for the AAB.
+
+### Open Findings and Limits
+
+- The exact 129-line attachment text is not present in the current workspace
+  or retained session files. A complete row-by-row mapping of its 33 findings
+  cannot be honestly asserted from the available summary; reattach the source
+  checklist to finish that trace without inventing omitted points.
+- Known Rules/provider follow-ups remain: an invoice counter can be advanced
+  without a corresponding invoice; the write-rate throttle still depends on
+  client-controlled `updated_at`; and the auth provider still attempts a
+  client `email_verified` update that current Rules deny and the provider logs
+  as skipped.
+- Migration/decision-sized audit items remain open: money-in-minor-units,
+  financial disaster-recovery restore, shared-device inactivity policy,
+  invoice-logo reference redesign, paid-plan architecture, CSP hardening,
+  web multi-tab persistence, Rules-read billing metrics, and legacy sentinel
+  inventory/cleanup. They were not changed without migration evidence and
+  explicit policy decisions.
+- The device reconnected after the initial check. ARM64 APK copy reported
+  `1 file pushed`; streamed install reported `Success`. Device package reports
+  versionName `3.10.8`, versionCode `310083119`. No production Rules/indexes
+  or Hosting deployment, Play Console upload, commit, or push has been
+  performed.
+
+---
+
+## Scope-Specific Addendum — 2026-10-27 Tenant Permissions and User-List Recovery
+
+This addendum records verified local changes against the attached multi-tenant
+audit. It does not claim that every audit finding is closed or that production
+is ready.
+
+### Confirmed User-List Root Cause
+
+- `UsersListScreen` read `authUserProvider.value` but treated a null value as
+  loading whenever Firebase Auth still had a signed-in user. A Firestore
+  profile-stream error therefore remained an indefinite shimmer; a missing
+  profile was also presented as loading rather than an actionable access state.
+- The screen now distinguishes auth/profile loading, mapped auth/profile
+  errors with retry, and a missing profile's access-denied state. The focused
+  test reproduced the pre-fix failure as `pumpAndSettle timed out`; after the
+  fix the file reported `00:04 +4: All tests passed!`.
+
+### Permission Policy and Tenant Boundaries
+
+- `RoleCapabilities` and `PermissionPolicy` now include dashboard capability
+  and are the canonical app-side role/capability policy. The router rechecks
+  dashboard/business-route access when super-admin workspace support context
+  expires. This does not make client policy a security boundary.
+- `TenantScope.requireTenant()` and `TenantScope.applyToData()` reject missing
+  and `__global__` write scopes. Legacy sentinel reads are not globally
+  removed; any data cleanup requires an inventory and migration plan.
+- Runtime role policy remains: legacy admin/manager account management is
+  limited to sellers; tenant admins can manage eligible sellers/supervisors;
+  supervisors have operational and tenant-notification access, not user,
+  settings, backup, financial-correction, or invoice-void access.
+- Active admins, tenant admins, supervisors, and sellers may create sale
+  invoices and cash receipts in their permitted tenant scope. Seller writes
+  require their own authenticated identity and assigned route. Settlement,
+  credit-note creation, correction, and void remain separate capabilities.
+- Invoice Rules now accept only `sale`, `cash_receipt`, and `credit_note`
+  create types. The unsupported-type regression reproduced a supervisor
+  creating a `write_off` invoice before the fix; afterward, the targeted test
+  reported `1 passing`. The full Rules Emulator suite reports `180 passing`.
+- Multi-workspace regression seeds 15 distinct workspace IDs and verifies
+  each tenant admin can read its own shop/invoice documents but not the next
+  tenant's documents. This proves only those tested authorization paths; it
+  does not measure production quota or load capacity.
+- Invoice lifecycle Rules tests cover denied unlinked settlement, void, and
+  credit-total changes, plus linked credit-note creation. The invoice sequence
+  regression denies counter-only updates and requires same-batch invoice
+  linkage.
+- A read-only security review examined tenant scoping, role checks, invoice
+  and receipt Rules, counter linkage, provider authorization, notification and
+  tenant-user scoping, and the 15-workspace regression. It reported no
+  vulnerabilities in that reviewed scope. This is local-source review only;
+  it does not close the other pending checklist findings or verify deployed
+  production Rules.
+
+### Scope and Remaining Release Gates
+
+- Verified locally: Rules Emulator `180 passing`; focused invoice and
+  permission suite `00:08 +50: All tests passed!`; full Flutter suite
+  `01:21 +655: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 16.1s)`; `dart analyze test/`: `No issues found!`.
+- Finding dispositions currently supported by this pass: #4, #5, and #26 are
+  verified fixed in local source; #6 is partially addressed. The other 29
+  findings remain `pending_review` because their individual evidence has not
+  been revalidated here. This is not a complete 33-item audit closure.
+- Hosting and Firestore Rules/indexes deployed to
+  `shoeserp-clean-20260327` and each reported `Deploy complete!`; 23 remote
+  indexes and 2 field overrides absent locally were preserved. Web build:
+  `EXIT: 0`; live `version.json` reports `3.10.9`, build `1120`; shell and
+  main bundle returned HTTP 200 with `no-cache, no-store, must-revalidate`.
+  ARM64 installation on `R5GL22RGT9V` reported `Success`, versionName `3.10.9`,
+  versionCode `310093120`. Version `3.10.9+1120` split APKs
+  (30.7/32.2/33.7 MB) and a signed 54.8 MB AAB were built and verified.
+  Production data changes, Play Console upload, commit, and push were not
+  performed. The wider audit remains open; passing local tests and current
+  deployment do not disposition the 29 pending findings.
+
+---
+
+## Scope-Specific Addendum — Local v3.10.8+1119 Shared PDF Logo
+
+This focused regression addresses the user's request for one centered logo
+placement across financial PDFs; it is not a full re-audit.
+
+### Root Cause and Change
+
+- `_workspaceBrandHeader()` previously placed the logo at the left and had a
+  larger-logo special case only for statements. The flat-table builder had a
+  separate standalone image path, so placement and size varied by document.
+- The shared brand header now places English content on the left, a
+  consistently sized 64-by-46-point logo in the center, and selected
+  Arabic/Urdu content on the right. The flat-table fallback now uses the same
+  header. Saved invoice logo fallback and the explicit `visibleFields` logo
+  setting remain enforced.
+- Arabic statement and A5 cash-receipt samples were inspected in Chrome.
+  Logo-resource tests cover statement, invoice, receipt, seller/multi-shop,
+  and flat-table output; a regression also verifies that hidden logos remain
+  hidden.
+
+### Verification and Scope
+
+- Focused PDF suite: `00:01 +12: All tests passed!`; temporary visual probe:
+  `00:00 +1: All tests passed!`.
+- Full-suite validation, fresh Android/web builds, production Rules/indexes
+  and Hosting deployment, device upgrade, and Git publication are pending.
+  The `3.10.7` ARM64 APK is already installed; production has not yet received
+  the `3.10.8+1119` source.
+
+---
+
+## Scope-Specific Addendum — Local v3.10.7+1118 Cash Receipt Follow-up
+
+This is a focused implementation and regression record, not a full re-audit
+or production release. The actual cash-receipt reference is now available.
+
+### Changes and Evidence
+
+- The receipt body now follows the reference's compact bilingual structure
+  while retaining the existing shared workspace header and saved invoice
+  balance values. The A5 one-page constraint is covered by Arabic/Urdu PDF
+  regressions.
+- Workspace invoice-header settings now accept optional second and third
+  receipt-footer contact numbers. Model serialization, live form hydration,
+  dirty-edit preservation, and matching seller invoice-header Rules are
+  covered.
+- Arabic and Urdu PDFs were inspected in the browser; both show connected
+  script text and preserved English-left/RTL-right placement. Urdu remains
+  Naskh-style under the current renderer.
+- Full Flutter suite: `01:29 +639: All tests passed!`; focused PDF/settings
+  suite: `00:15 +24: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 13.3s)`; `dart analyze test/`:
+  `No issues found!`; Rules Emulator: `154 passing (30s)`.
+- Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.7 MB; signed AAB:
+  54.8 MB. All APK signatures verified and the AAB reported `jar verified.`.
+  ARM64 was copied to `/sdcard/Download/` and installed on `R5GL22RGT9V`
+  (`Success`); installed versionName `3.10.7`, versionCode `310073118`.
+- Firestore Rules/indexes and Hosting were not deployed; no production data,
+  commit, or push occurred.
+
+---
+
+## Scope-Specific Addendum — Unreleased Notification and RTL PDF Follow-up
+
+This is a focused local regression record, not a full re-audit or a production
+release. It does not change the historical v13 scores.
+
+### Confirmed Root Causes
+
+- The shop-visibility transform used `AsyncValue.whenData()`. On Riverpod 3
+  refresh loading states, this returned loading instead of preserving the
+  last successful transformed value, causing the notification list to be
+  replaced by shimmer. The regression now covers cached refresh state,
+  first-load loading, and real errors.
+- Mark-as-read failures were discarded with `.ignore()`, hiding the cause of
+  permission-denied feedback. The screen now shows mapped write failures; the
+  provider validates the available role/tenant/support context before
+  attempting the write.
+- Generated RTL statement output showed the table's physical columns
+  reversed. The table, summary, and final-balance row now use explicit LTR
+  physical ordering with per-cell language directions. Arabic and Urdu
+  statement samples were visually inspected in Chrome.
+
+### Scope and Remaining Evidence
+
+- Full Flutter suite: `01:14 +638: All tests passed!`; focused notification
+  provider/widget suite: `00:03 +9: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 10.9s)`;
+  `dart analyze test/`: `No issues found!`; Rules Emulator:
+  `154 passing (54s)`. Markdown lint and `git diff --check` exited 0.
+- At this earlier stage, the receipt image was unavailable. The later receipt
+  implementation and current validation are recorded in the v3.10.7+1118
+  addendum above.
+- This earlier source snapshot had no version bump or APK/AAB rebuild.
+  Production Rules/Hosting deployment, install, commit, and push were not
+  performed for that snapshot.
+
+---
+
 ## Scope-Specific Addendum — v3.10.6+1117 (2026-10-25)
 
 This addendum records the account-statement layout and combined release. It is

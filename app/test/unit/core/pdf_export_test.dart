@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -110,7 +111,7 @@ void main() {
   });
 
   test(
-    'cash receipt PDF is a single page and omits balance movement',
+    'cash receipt reference layout stays A5 and one page in Arabic and Urdu',
     () async {
       final now = Timestamp.fromMillisecondsSinceEpoch(0);
       final invoice = InvoiceModel(
@@ -119,7 +120,7 @@ void main() {
         type: InvoiceModel.typeCashReceipt,
         fulfillmentMode: 'none',
         shopId: 'shop-1',
-        shopName: 'Sample Shop',
+        shopName: 'Sample Shop · محل مثال',
         subtotal: 0,
         total: 125,
         amountReceived: 125,
@@ -132,6 +133,7 @@ void main() {
         cashReceiptSequence: 1,
         linkedInvoiceId: 'INV-2026-0001',
         sellerName: 'Workspace Seller',
+        notes: 'Old account collection · یہ اردو ٹیسٹ ہے؛ ٹ ڈ ڑ ں ھ ے',
         createdBy: 'seller-1',
         createdAt: now,
         updatedAt: now,
@@ -145,37 +147,62 @@ void main() {
           'accent_color': '#315C4C',
           'visible_fields': ['phone'],
           'phone': '+966500000000',
+          'receipt_phone_2': '+966511111111',
+          'receipt_phone_3': '+966522222222',
         },
       );
 
+      const currentHeader = InvoiceHeaderConfig(
+        nameEn:
+            'Current Settings Name for a Long Distribution Workspace Header',
+        nameAr: 'اسم مساحة العمل',
+        phone: '+966500000000',
+        receiptPhone2: '+966511111111',
+        receiptPhone3: '+966522222222',
+      );
       final bytes = await generateInvoicePdf(
         invoice: invoice,
         companyName: 'Changed Workspace Name',
         currency: 'SAR',
-        locale: AppLocale.en,
-        header: const InvoiceHeaderConfig(nameEn: 'Current Settings Name'),
+        locale: AppLocale.ar,
+        header: currentHeader,
       );
 
       expect(invoice.isCashReceipt, isTrue);
-      final pageCount = RegExp(
-        r'/Count\s+(\d+)',
-      ).firstMatch(latin1.decode(bytes, allowInvalid: true));
-      expect(pageCount, isNotNull);
-      expect(int.parse(pageCount!.group(1)!), 1);
-      final pdf = latin1.decode(bytes, allowInvalid: true);
-      final mediaBox = RegExp(
-        r'/MediaBox\[0 0 ([\d.]+) ([\d.]+)\]',
-      ).firstMatch(pdf);
-      expect(mediaBox, isNotNull);
-      expect(
-        double.parse(mediaBox!.group(1)!),
-        closeTo(PdfPageFormat.a5.width, 0.1),
+      void expectSinglePageA5WithResources(Uint8List generatedBytes) {
+        final pdf = latin1.decode(generatedBytes, allowInvalid: true);
+        final pageCount = RegExp(r'/Count\s+(\d+)').firstMatch(pdf);
+        expect(pageCount, isNotNull);
+        expect(int.parse(pageCount!.group(1)!), 1);
+        final mediaBox = RegExp(
+          r'/MediaBox\[0 0 ([\d.]+) ([\d.]+)\]',
+        ).firstMatch(pdf);
+        expect(mediaBox, isNotNull);
+        expect(
+          double.parse(mediaBox!.group(1)!),
+          closeTo(PdfPageFormat.a5.width, 0.1),
+        );
+        expect(
+          double.parse(mediaBox.group(2)!),
+          closeTo(PdfPageFormat.a5.height, 0.1),
+        );
+        expect(pdf, contains('/Subtype/Image'));
+        expect(pdf, contains('NotoSansArabic'));
+        expect(pdf, contains('/FontFile2'));
+      }
+
+      expectSinglePageA5WithResources(bytes);
+      final urduBytes = await generateInvoicePdf(
+        invoice: invoice,
+        companyName: 'Changed Workspace Name',
+        currency: 'SAR',
+        locale: AppLocale.ur,
+        header: currentHeader.copyWith(
+          documentLanguagePair: FinancialDocumentLanguagePair.englishUrdu,
+          nameUr: 'ورک اسپیس کمپنی',
+        ),
       );
-      expect(
-        double.parse(mediaBox.group(2)!),
-        closeTo(PdfPageFormat.a5.height, 0.1),
-      );
-      expect(pdf, contains('/Subtype/Image'));
+      expectSinglePageA5WithResources(urduBytes);
     },
   );
 
@@ -305,6 +332,40 @@ void main() {
     }
   });
 
+  test('standalone table logo uses the shared centered brand header', () async {
+    final bytes = await buildPdfTable(
+      title: 'Sales report',
+      headers: const ['Shop'],
+      rows: const [
+        ['Sample Shop'],
+      ],
+      companyName: 'Workspace Name',
+      locale: AppLocale.en,
+      logoBytes: _testLogoBytes,
+    );
+    final pdf = latin1.decode(bytes, allowInvalid: true);
+    expect(pdf, contains('/Subtype/Image'));
+
+    final hiddenLogoBytes = await buildPdfTable(
+      title: 'Sales report',
+      headers: const ['Shop'],
+      rows: const [
+        ['Sample Shop'],
+      ],
+      companyName: 'Workspace Name',
+      locale: AppLocale.en,
+      logoBytes: _testLogoBytes,
+      header: const InvoiceHeaderConfig(
+        nameEn: 'Workspace Name',
+        visibleFields: {},
+      ),
+    );
+    expect(
+      latin1.decode(hiddenLogoBytes, allowInvalid: true),
+      isNot(contains('/Subtype/Image')),
+    );
+  });
+
   test('Arabic and Urdu text builds across shared PDF report paths', () async {
     final date = Timestamp.fromDate(DateTime(2026, 10, 22));
     const arabic = 'تقرير الحساب';
@@ -427,8 +488,17 @@ void main() {
       labels: labelsFor(AppLocale.ar, sellerReportKeys),
       locale: AppLocale.ar,
       companyName: arabic,
+      logoBytes: _testLogoBytes,
+      header: const InvoiceHeaderConfig(
+        nameEn: 'Footwear',
+        nameAr: 'شركة الأحذية',
+      ),
     );
     expectPdf(sellerPdf);
+    expect(
+      latin1.decode(sellerPdf, allowInvalid: true),
+      contains('/Subtype/Image'),
+    );
 
     final invoicePdf = await generateInvoicePdf(
       invoice: InvoiceModel(
@@ -500,8 +570,18 @@ void main() {
       ],
       labels: labelsFor(AppLocale.ur, multiShopKeys),
       locale: AppLocale.ur,
+      logoBytes: _testLogoBytes,
+      header: const InvoiceHeaderConfig(
+        nameEn: 'Footwear',
+        nameUr: 'جوتوں کی کمپنی',
+        documentLanguagePair: FinancialDocumentLanguagePair.englishUrdu,
+      ),
     );
     expectPdf(multiShopPdf);
+    expect(
+      latin1.decode(multiShopPdf, allowInvalid: true),
+      contains('/Subtype/Image'),
+    );
   });
 
   test(

@@ -1,131 +1,101 @@
 ---
 name: user-management
-description: "Use when: creating, editing, or deleting users; role assignment; password reset; auth/Firestore user profile alignment."
+description: "Use when: managing Firebase Auth-linked profiles, tenant roles, workspace membership, route assignment, password recovery, or user-access regressions."
 ---
 
 # Skill: User Management
 
-## Domain
+## Scope and Sources of Truth
 
-Firebase Auth + Firestore user profiles for admin/seller roles in ShoesERP.
+User administration changes both Firebase Auth and tenant-scoped Firestore
+profiles. Inspect the current implementation before editing:
 
-## Key Files
+- `app/lib/models/user_model.dart`
+- `app/lib/core/utils/role_names.dart`
+- `app/lib/core/utils/permission_policy.dart`
+- `app/lib/providers/user_provider.dart`
+- `app/lib/providers/auth_provider.dart`
+- `app/lib/screens/users_list_screen.dart`
+- `firestore.rules` and `tests/firestore-rules/rules.test.js`
 
-- `app/lib/models/user_model.dart` — UserModel with isAdmin/isSeller/isManager
+`RoleCapabilities` and `PermissionPolicy` centralize app-side capabilities and
+context checks. They do not replace Firestore Rules: Rules remain the
+authorization boundary. Keep both layers aligned through positive and negative
+emulator tests.
 
-- `app/lib/providers/user_provider.dart` — allUsersProvider, UserNotifier
+For cross-feature workspace isolation, invoice-operation parity, and
+15-workspace regression guidance, use
+`.claude/skills/multi-tenant-saas/SKILL.md` alongside this user-lifecycle
+workflow.
 
-- `app/lib/providers/auth_provider.dart` — authUserProvider (StreamProvider)
+## Canonical Roles and Tenant Scope
 
-- `app/lib/screens/settings_screen.dart` — user list + edit dialog
+Read aliases through `canonicalRoleName()`; new profile writes use canonical
+values only: `admin`, `tenant_admin`, `super_admin`, `supervisor`, and `seller`.
+Legacy `manager` parses as `admin`.
 
-## Role Normalization Rules
+| Role | User-management scope |
+| --- | --- |
+| `admin` / legacy `manager` | May manage eligible seller profiles in the same workspace only |
+| `tenant_admin` | May manage eligible seller and supervisor profiles in the same workspace; cannot promote peers to admin/platform roles, change the permanent owner role, or deactivate peer administrators |
+| `super_admin` | May manage workspace-scoped roles only while the selected workspace support context is valid, audited, and unexpired |
+| `supervisor` | Operational access only; no user administration |
+| `seller` | Own profile only, except no arbitrary-user account administration |
 
-1. Always read roles trimmed+lowercased: `role.trim().toLowerCase()`
+Every ordinary business profile must be active and have a concrete `tenant_id`.
+Do not treat `__global__` or a missing tenant as a write fallback. Super-admin
+business administration requires an explicit selected workspace and valid
+support reason; metadata-only platform access remains separate.
 
-2. `isAdmin` = role == 'admin' OR role == 'manager' (legacy)
+## User CRUD and Membership Integrity
 
-3. `isSeller` = role == 'seller'
+- Create profiles through `UserManagementNotifier.createUser()`. It uses a
+  disposable secondary Firebase app for Auth account creation, then writes the
+  profile, tenant seat counter, and route assignments transactionally. If the
+  Firestore transaction fails, remove the newly created Auth account; report a
+  cleanup failure explicitly.
+- Validate the current actor from a fresh server profile, the concrete
+  workspace, the target role, and every route ID before writing.
+- Keep tenant seat changes atomic with profile activation/deactivation.
+- `updateUser()` accepts only the provider's editable-field allowlist. Do not
+  let UI visibility substitute for provider and Rules guards.
+- Deactivation is a soft status change. Route assignment changes and route
+  membership arrays must remain consistent in the same authorized flow.
+- Do not create or promote platform super-admins from client code. Arbitrary
+  Auth administration belongs in a trusted backend, which is not part of this
+  Spark-tier client architecture.
 
-4. Never write non-canonical role values — write only 'admin' or 'seller'
+## Credentials and Recovery
 
-## User CRUD Pattern
+- Profile email is read-only in administrator editing. An account owner may
+  request an email change through Firebase Auth's owner-controlled
+  reauthentication and verification flow.
+- Administrators request a reset by target user ID. Resolve the target profile
+  server-side, validate same-workspace management scope and the allowed target
+  role, then send to the stored email. Never accept an arbitrary email address
+  from an administrator as the reset target.
+- The account owner changes their own password after reauthentication.
+  Preserve password input exactly; do not trim it before validation,
+  reauthentication, creation, or update. Enforce the minimum length against the
+  exact entered value.
+- Firebase Auth owns credential and token lifecycle. Do not add custom tokens,
+  client-managed session slots, device registration, pairing, or sign-in policy
+  fields as an authorization boundary.
+- Never store password material, service-account credentials, or Auth secrets
+  in Firestore, backups, logs, source, or build defines.
 
-- Create: Secondary `FirebaseApp` approach — admin signs in to a throwaway secondary app instance to call `createUserWithEmailAndPassword`, writes Firestore user doc, then deletes the secondary app. No Cloud Functions needed.
+## Verification
 
-- Update: `UserManagementNotifier.updateUser()` → batch write to Firestore only
+For any user-access change:
 
-- Delete: `UserManagementNotifier.deleteUser()` → soft-delete: set `active = false`, clear route assignments. Auth account is orphaned but rules deny all access when `active != true`.
-
-- Password reset: `UserManagementNotifier.sendPasswordResetForSeller(email:)` → sends Firebase Auth password reset email. Admin cannot directly set passwords.
-
-## Email Field Rules
-
-- Email is immutable after creation → `enabled: false` in edit dialog
-
-- Edit user dialog: name, role, route assignment, and "Send Password Reset Email" button
-
-- Only sellers have assignedRouteId; admins do not
-
-## Firestore Security
-
-- Admin: full CRUD on `users` collection
-
-- Seller: read-only own document + limited self-update (display_name, updated_at, last_active)
-
-- Bootstrap admin allowed on empty collection
-
-## Common Pitfalls
-
-- Do NOT use Cloud Functions for user management — zero-cost Firebase tier (Firestore + Auth only)
-
-- Secondary FirebaseApp must be deleted after user creation to avoid resource leaks
-
-- Role mismatch between Firestore 'admin' and old 'manager' → rules and model both accept both
-
-- `active != true` users get permission-denied on all protected reads
-
-## 3-Step VERIFY_EMAIL / Custom-Token Flow
-
-When a user's ID token is rejected mid-session (INVALID_ID_TOKEN):
-
-```text
-Step 1:(forceRefresh: true)
-         ↓ success → continue
-         ↓ fail
-Step 2: signInWithCustomToken(token from secondary FirebaseApp)
-         ↓ success → continue
-         ↓ fail
-Step 3: authNotifier.signOut() → redirect to /login
-
-```
-
-**Secondary FirebaseApp pattern for user creation:**
-
-```dart
-
-final secondaryApp = await Firebase.initializeApp(
-  name: 'AdminUserCreate_${DateTime.now().millisecondsSinceEpoch}',
-  options: Firebase.app().options,
-);
-final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
-await secondaryAuth.createUserWithEmailAndPassword(
-  email: email, password: password);
-// write Firestore doc
-await secondaryApp.delete(); // MUST delete to avoid resource leak
-
-```
-
-## Password Reset Direct Path
-
-```dart
-
-// In UserManagementNotifier:
-Future<void> sendPasswordResetForSeller(String email) async {
-  await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-}
-
-```
-
-- Admin cannot read or set passwords directly — Firebase handles hashing.
-
-- UI: "Send Password Reset Email" button in edit user dialog.
-
-- Email field in edit dialog: always `enabled: false` (immutable after creation).
-
-## Service Account Credentials Cache Pattern
-
-When CI/CD needs Firestore Admin SDK access:
-
-```yaml
-
-- uses: google-github-actions/auth@v2
-  with:
-    credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-
-- uses: google-github-actions/setup-gcloud@v2
-
-```
-
-Never commit service account JSON files. Cache the token via the GitHub Actions
-`auth` action — credentials survive the full job without additional fetches.
+1. Test the screen's initial auth/profile loading state and the intended
+   actionable error state.
+2. Test the allowed actor/target-role/workspace combination and denied
+   cross-workspace, peer-admin, owner, inactive-profile, and expired
+   super-admin context cases as applicable.
+3. Replay the complete client transaction or batch in the Firestore Emulator;
+   include a denied attack and a valid operation.
+4. Run focused Flutter tests, `flutter analyze lib --no-pub`, and
+   `dart analyze test/` when tests change.
+5. Keep exact command output and distinguish local emulator evidence from
+   production Rules deployment.

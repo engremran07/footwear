@@ -42,6 +42,19 @@ Authentication limits and pricing pages for the exact operation in scope.
 
 ## Project Architecture Checks
 
+- A shared Firebase project means workspaces share one project's Firestore
+  quotas and billing account. `tenant_id` is an authorization/data-partition
+  key, not a per-tenant quota or noisy-neighbor limit. Do not promise each
+  workspace an independent free allocation.
+- For multi-workspace load, estimate reads/writes and storage from measured
+  per-workspace activity, include Rules lookups and live-list refreshes, and
+  compare aggregate usage with current project quotas. Use Console metrics
+  before claiming production headroom; source-code limits such as the member
+  seat cap are product policy, not Firebase quota protection.
+- Backup, restore, point-in-time recovery, TTL, and other operational features
+  may require Blaze billing even when ordinary Firestore usage fits the free
+  quota. Verify the current product/operation pricing before designing a SaaS
+  plan or promising no-cost recovery.
 - Do not add `firebase_storage` or Storage APIs; the current app contract excludes
   Firebase Storage.
 - Do not add Cloud Functions or other paid-plan dependencies without explicit

@@ -19,8 +19,10 @@ class TenantScope {
 
   static String requireTenant(String? tenantId) {
     final normalized = normalize(tenantId);
-    if (normalized == null) {
-      throw StateError('An active workspace is required for this operation');
+    if (normalized == null || normalized == globalTenantId) {
+      throw StateError(
+        'A concrete active workspace is required for this operation',
+      );
     }
     return normalized;
   }
@@ -29,8 +31,7 @@ class TenantScope {
     Map<String, dynamic> data, {
     String? tenantId,
   }) {
-    final normalized = normalize(tenantId);
-    if (normalized == null) return data;
+    final normalized = requireTenant(tenantId);
     final next = Map<String, dynamic>.from(data);
     next['tenant_id'] = normalized;
     return next;

@@ -549,15 +549,17 @@ class AuthNotifier extends AsyncNotifier<void> {
       email: firebaseUser.email!,
       password: currentPassword,
     );
-    final trimmedNew = newPassword.trim();
-    if (trimmedNew.length < 8) {
+    if (currentPassword.isEmpty || newPassword.isEmpty) {
+      throw ArgumentError('Passwords must not be empty');
+    }
+    if (newPassword.length < 8) {
       throw FirebaseAuthException(
         code: 'weak-password',
         message: 'Password is too weak. Use at least 8 characters.',
       );
     }
     await firebaseUser.reauthenticateWithCredential(credential);
-    await firebaseUser.updatePassword(trimmedNew);
+    await firebaseUser.updatePassword(newPassword);
   }
 
   Future<bool> reauthenticateCurrentUser(String password) async {

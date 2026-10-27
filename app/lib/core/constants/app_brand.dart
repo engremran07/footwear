@@ -13,10 +13,10 @@ class AppBrand {
   static const String logoAsset = 'assets/images/app_icon.png';
 
   // ─── Version ─────────────────────────────────────────────────────────────
-  static const String appVersion = '3.10.6';
-  static const String buildNumber = '1117';
+  static const String appVersion = '3.10.9';
+  static const String buildNumber = '1120';
   static const String versionDisplay = 'v$appVersion+$buildNumber';
-  static const String releaseDateIso = '2026-10-25';
+  static const String releaseDateIso = '2026-10-27';
 
   // ─── Contact / About ─────────────────────────────────────────────────────
   static const String contactEmail = 'engremran89@gmail.com';
@@ -70,6 +70,7 @@ class AppBrand {
   // ─── Semantic helpers ────────────────────────────────────────────────────
   static const Color onPrimary = Colors.white;
   static const Color onPrimaryMuted = Colors.white70;
+  static const Color exportCanvas = Color(0xFFFFFFFF);
 
   // ─── Snack bar container colours (Arctic-tinted) ─────────────────────────
   static const Color errorBg = Color(0xFFFCEEEB); // ice rose

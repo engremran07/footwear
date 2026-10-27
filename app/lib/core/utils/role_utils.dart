@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 import '../../models/user_model.dart';
 import 'role_names.dart';
+import 'permission_policy.dart';
 
 String normalizeRoleName(String role) {
   final canonical = canonicalRoleName(role);
@@ -11,39 +12,34 @@ String normalizeRoleName(String role) {
 }
 
 bool canManageUserAccountsRole(String role) {
-  final normalized = normalizeRoleName(role);
-  // P1-6 FIX: tenant_admin should be able to manage users within their tenant
-  return normalized == 'admin' ||
-      normalized == 'tenant_admin' ||
-      normalized == 'super_admin';
+  return RoleCapabilities.allows(role, AppCapability.manageUsers);
 }
 
 bool canManageOperationalDataRole(String role) {
-  final normalized = normalizeRoleName(role);
-  return normalized == 'admin' ||
-      normalized == 'supervisor' ||
-      normalized == 'tenant_admin' ||
-      normalized == 'super_admin';
+  return RoleCapabilities.allows(role, AppCapability.viewRoutes);
 }
 
 bool isOperationalRoleName(String role) => canManageOperationalDataRole(role);
 
 bool canManageWorkspaceRole(String role) {
-  final normalized = normalizeRoleName(role);
-  return normalized == 'super_admin';
+  return RoleCapabilities.allows(role, AppCapability.manageWorkspaces);
 }
 
 bool canManageTenantSecurity(UserModel user, String tenantId) {
-  if (!user.active || tenantId.trim().isEmpty) return false;
-  if (user.isSuperAdmin) return user.activeWorkspaceId == tenantId;
-  return user.isTenantAdmin && user.tenantId == tenantId;
+  if ((!user.isTenantAdmin && !user.isSuperAdmin) ||
+      !user.active ||
+      tenantId.trim().isEmpty) {
+    return false;
+  }
+  return PermissionPolicy.can(
+    user,
+    AppCapability.manageUsers,
+    tenantId: tenantId,
+  );
 }
 
 bool isPrivilegedRoleName(String role) {
-  final normalized = normalizeRoleName(role);
-  return normalized == 'admin' ||
-      normalized == 'tenant_admin' ||
-      normalized == 'super_admin';
+  return RoleCapabilities.allows(role, AppCapability.manageUsers);
 }
 
 String roleValueFromUserRole(UserRole role) {

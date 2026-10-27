@@ -5,6 +5,8 @@ import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/permission_policy.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/utils/tenant_scope.dart';
@@ -21,16 +23,10 @@ import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
 
-/// Dedicated admin-only user management screen (/users).
+/// User management for authorized admin-equivalent and workspace-admin roles.
 ///
-/// **Workspace-First UX (Enterprise v3.10+)**
-/// - Super admin selects workspace → sees all admin + seller users in that workspace
-/// - Tenant admin sees only their own workspace users
-/// - No role tags; context is implicit from workspace selection
-/// - Search + active/inactive tabs only
-///
-/// This eliminates the need for tenant_admin/tenant_seller role tags since
-/// the workspace boundary is explicit.
+/// User queries and writes remain constrained by the active workspace and
+/// role policy.
 class UsersListScreen extends ConsumerStatefulWidget {
   const UsersListScreen({super.key});
 
@@ -45,11 +41,47 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = ref.watch(authUserProvider).value;
+    final authState = ref.watch(authStateProvider);
+    if (authState.hasError) {
+      return Scaffold(
+        body: mappedErrorState(
+          error: authState.error!,
+          ref: ref,
+          onRetry: () => ref.invalidate(authStateProvider),
+        ),
+      );
+    }
+    if (authState.isLoading) {
+      return const Scaffold(body: ShimmerLoading());
+    }
 
-    final canViewUserAccounts =
-        currentUser != null &&
-        canManageUserAccountsRole(roleValueFromUserRole(currentUser.role));
+    final currentUserState = ref.watch(authUserProvider);
+    if (currentUserState.hasError) {
+      return Scaffold(
+        body: mappedErrorState(
+          error: currentUserState.error!,
+          ref: ref,
+          onRetry: () => ref.invalidate(authUserProvider),
+        ),
+      );
+    }
+    if (currentUserState.isLoading) {
+      return const Scaffold(body: ShimmerLoading());
+    }
+
+    final currentUser = currentUserState.value;
+    if (currentUser == null) {
+      return Scaffold(
+        body: Center(
+          child: Text(tr('permission_denied', ref)),
+        ),
+      );
+    }
+
+    final canViewUserAccounts = PermissionPolicy.hasRoleCapability(
+      currentUser,
+      AppCapability.manageUsers,
+    );
 
     // Account management must be isolated from workspace management.
     if (!canViewUserAccounts) {
@@ -78,10 +110,17 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateUserDialog(
+          currentUser,
           tenantId,
-          canCreateAdmin: currentUser.isSuperAdmin,
-          canCreateSupervisor:
-              currentUser.isSuperAdmin || currentUser.isTenantAdmin,
+          canCreateAdmin: PermissionPolicy.can(
+            currentUser,
+            AppCapability.manageUsers,
+            targetRole: 'admin',
+          ),
+          canCreateSupervisor: PermissionPolicy.can(
+            currentUser,
+            AppCapability.createSupervisor,
+          ),
         ),
         icon: const Icon(Icons.person_add),
         label: Text(tr('new_user', ref)),
@@ -175,14 +214,22 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         ? _InactiveUserTile(
                             user: filtered[i],
                             onReactivate:
-                                currentUser.isSuperAdmin ||
-                                    (!filtered[i].isAdmin &&
-                                        !filtered[i].isSupervisor)
+                                PermissionPolicy.can(
+                                  currentUser,
+                                  AppCapability.manageUsers,
+                                  targetRole: roleValueFromUserRole(
+                                    filtered[i].role,
+                                  ),
+                                )
                                 ? () => _confirmReactivateUser(filtered[i])
                                 : null,
                             onSendReset: () =>
                                 _sendResetEmailForUser(filtered[i]),
-                            onHardDelete: currentUser.isSuperAdmin
+                            onHardDelete:
+                                PermissionPolicy.can(
+                                  currentUser,
+                                  AppCapability.manageDataMaintenance,
+                                )
                                 ? () => _confirmHardDeleteUser(filtered[i])
                                 : null,
                           ).listEntry(i)
@@ -190,21 +237,28 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                             user: filtered[i],
                             currentUser: currentUser,
                             onEdit:
-                                currentUser.isSuperAdmin ||
-                                    (currentUser.isTenantAdmin &&
-                                        (filtered[i].isSupervisor ||
-                                            filtered[i].isSeller)) ||
-                                    (currentUser.isAdmin &&
-                                        filtered[i].isSeller)
+                                filtered[i].id != currentUser.id &&
+                                    PermissionPolicy.can(
+                                      currentUser,
+                                      AppCapability.manageUsers,
+                                      targetRole: roleValueFromUserRole(
+                                        filtered[i].role,
+                                      ),
+                                    )
                                 ? () =>
                                       _showEditUserDialog(filtered[i], tenantId)
                                 : null,
                             onDelete:
-                                !currentUser.isSuperAdmin &&
-                                    (filtered[i].isAdmin ||
-                                        filtered[i].isSupervisor)
-                                ? null
-                                : () => _confirmDeleteUser(filtered[i]),
+                                filtered[i].id != currentUser.id &&
+                                    PermissionPolicy.can(
+                                      currentUser,
+                                      AppCapability.manageUsers,
+                                      targetRole: roleValueFromUserRole(
+                                        filtered[i].role,
+                                      ),
+                                    )
+                                ? () => _confirmDeleteUser(filtered[i])
+                                : null,
                             onToggle: (v) => _toggleUserActive(filtered[i], v),
                           ).listEntry(i),
                   ),
@@ -222,9 +276,11 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
       final me = await ref.read(authUserProvider.future);
       if (!mounted) return;
       if (me == null ||
-          !me.active ||
-          !me.isAdmin ||
-          (!me.isSuperAdmin && (user.isAdmin || user.isSupervisor))) {
+          !PermissionPolicy.can(
+            me,
+            AppCapability.manageUsers,
+            targetRole: roleValueFromUserRole(user.role),
+          )) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
@@ -255,6 +311,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   // ── Create user dialog ───────────────────────────────────────────────────
 
   void _showCreateUserDialog(
+    UserModel currentUser,
     String tenantId, {
     required bool canCreateAdmin,
     required bool canCreateSupervisor,
@@ -322,8 +379,12 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         value: 'seller',
                         child: Text(tr('lbl_seller', ref)),
                       ),
-                      if (ref.read(authUserProvider).value?.isSuperAdmin ==
-                          true)
+                      if (PermissionPolicy.can(
+                        currentUser,
+                        AppCapability.manageUsers,
+                        targetRole: 'tenant_admin',
+                        tenantId: tenantId,
+                      ))
                         DropdownMenuItem(
                           value: 'tenant_admin',
                           child: Text(tr('role_tenant_admin', ref)),
@@ -371,10 +432,10 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                 onPressed: () async {
                   if (nameC.text.trim().isEmpty ||
                       emailC.text.trim().isEmpty ||
-                      passC.text.trim().isEmpty) {
+                      passC.text.isEmpty) {
                     return;
                   }
-                  if (passC.text.trim().length < 8) {
+                  if (passC.text.length < 8) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         warningSnackBar(tr('err_weak_password', ref)),
@@ -395,7 +456,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                         .read(userManagementNotifierProvider.notifier)
                         .createUser(
                           email: emailC.text.trim(),
-                          password: passC.text.trim(),
+                          password: passC.text,
                           displayName: nameC.text.trim(),
                           role: role,
                           phone: phoneC.text.trim(),
@@ -444,9 +505,12 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     final isSelf = currentUser.id == user.id;
     final canChangeRole =
         !isSelf &&
-        (currentUser.isSuperAdmin ||
-            (currentUser.isTenantAdmin &&
-                (user.isSupervisor || user.isSeller)));
+        PermissionPolicy.can(
+          currentUser,
+          AppCapability.manageUsers,
+          targetRole: roleValueFromUserRole(user.role),
+          tenantId: tenantId,
+        );
     final selectedRouteIds = List<String>.from(user.assignedRouteIds);
     final selectedRouteNames = List<String>.from(user.assignedRouteNames);
     final oldRouteIds = List<String>.from(user.assignedRouteIds);
@@ -603,7 +667,12 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                 onPressed: () async {
                   final me = await ref.read(authUserProvider.future);
                   if (!mounted || !ctx.mounted) return;
-                  if (me?.isAdmin != true) {
+                  if (!PermissionPolicy.can(
+                    me,
+                    AppCapability.manageUsers,
+                    targetRole: role,
+                    tenantId: tenantId,
+                  )) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         errorSnackBar(tr('err_permission_denied', ref)),
@@ -862,7 +931,11 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   Future<void> _confirmHardDeleteUser(UserModel user) async {
     final me = await ref.read(authUserProvider.future);
     if (!mounted) return;
-    if (me?.isSuperAdmin != true ||
+    if (!PermissionPolicy.can(
+          me,
+          AppCapability.manageDataMaintenance,
+          tenantId: me?.tenantId,
+        ) ||
         TenantScope.normalize(user.tenantId) !=
             TenantScope.normalize(me?.tenantId)) {
       return;
@@ -903,7 +976,13 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   Future<void> _confirmDeleteUser(UserModel user) async {
     final me = await ref.read(authUserProvider.future);
     if (!mounted) return;
-    if (me?.isAdmin != true) return;
+    if (!PermissionPolicy.can(
+      me,
+      AppCapability.manageUsers,
+      targetRole: roleValueFromUserRole(user.role),
+    )) {
+      return;
+    }
     // Cannot delete self or other admins
     if (user.id == me?.id || user.isAdmin) return;
 
@@ -940,7 +1019,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     try {
       await ref
           .read(userManagementNotifierProvider.notifier)
-          .sendPasswordResetForSeller(email: user.email);
+          .sendPasswordResetForSeller(userId: user.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           successSnackBar(
@@ -1028,11 +1107,11 @@ class _UserTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isSelf = user.id == currentUser?.id;
-    final canManageTarget =
-        currentUser?.isSuperAdmin == true ||
-        (currentUser?.isTenantAdmin == true &&
-            (user.isSupervisor || user.isSeller)) ||
-        (currentUser?.isAdmin == true && user.isSeller);
+    final canManageTarget = PermissionPolicy.can(
+      currentUser,
+      AppCapability.manageUsers,
+      targetRole: roleValueFromUserRole(user.role),
+    );
     final roleColor = user.isAdmin || user.isSupervisor
         ? AppBrand.adminRoleColor
         : AppBrand.sellerRoleColor;
@@ -1194,7 +1273,7 @@ class _UserTile extends ConsumerWidget {
 class _InactiveUserTile extends ConsumerWidget {
   final UserModel user;
   final VoidCallback? onReactivate;
-  final VoidCallback onSendReset;
+  final VoidCallback? onSendReset;
   final VoidCallback? onHardDelete;
 
   const _InactiveUserTile({
@@ -1298,18 +1377,19 @@ class _InactiveUserTile extends ConsumerWidget {
                 ),
               ),
             // Hard delete
-            Tooltip(
-              message: tr('send_password_reset', ref),
-              child: IconButton(
-                icon: const Icon(
-                  Icons.lock_reset,
-                  size: 20,
-                  color: AppBrand.primaryColor,
+            if (user.isSeller && onSendReset != null)
+              Tooltip(
+                message: tr('send_password_reset', ref),
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.lock_reset,
+                    size: 20,
+                    color: AppBrand.primaryColor,
+                  ),
+                  onPressed: onSendReset,
+                  visualDensity: VisualDensity.compact,
                 ),
-                onPressed: onSendReset,
-                visualDensity: VisualDensity.compact,
               ),
-            ),
             if (onHardDelete != null)
               Tooltip(
                 message: tr('hard_delete_user', ref),

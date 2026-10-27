@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,6 +40,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            authStateProvider.overrideWith(
+              (ref) => Stream.value(_TestFirebaseUser(admin.id)),
+            ),
             authUserProvider.overrideWith((ref) => Stream.value(admin)),
             tenantUsersProvider(
               'tenant-1',
@@ -72,4 +76,14 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+class _TestFirebaseUser implements User {
+  @override
+  final String uid;
+
+  _TestFirebaseUser(this.uid);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

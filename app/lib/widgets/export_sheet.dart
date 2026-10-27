@@ -39,7 +39,7 @@ Future<Uint8List> _whiteBackgroundPng(Uint8List pngBytes) async {
       recorder,
       Rect.fromLTWH(0, 0, src.width.toDouble(), src.height.toDouble()),
     );
-    canvas.drawColor(Colors.white, ui.BlendMode.src);
+    canvas.drawColor(AppBrand.exportCanvas, ui.BlendMode.src);
     canvas.drawImage(src, Offset.zero, Paint());
     final picture = recorder.endRecording();
     final result = await picture.toImage(src.width, src.height);

@@ -11,6 +11,8 @@ import '../core/utils/app_sanitizer.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/input_formatters.dart';
+import '../core/utils/permission_policy.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/invoice_model.dart';
 import '../models/product_model.dart';
@@ -444,11 +446,15 @@ class _CreateSaleInvoiceScreenState
                         icon: const Icon(Icons.shopping_bag_outlined),
                         label: Text(tr('invoice_non_stock_mode', ref)),
                       ),
-                    ButtonSegment(
-                      value: InvoiceEntryMode.cashReceipt,
-                      icon: const Icon(Icons.payments_outlined),
-                      label: Text(tr('cash_receipt', ref)),
-                    ),
+                    if (PermissionPolicy.can(
+                      user,
+                      AppCapability.createCashReceipt,
+                    ))
+                      ButtonSegment(
+                        value: InvoiceEntryMode.cashReceipt,
+                        icon: const Icon(Icons.payments_outlined),
+                        label: Text(tr('cash_receipt', ref)),
+                      ),
                   ],
                   selected: {_entryMode},
                   showSelectedIcon: false,

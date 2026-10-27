@@ -14,6 +14,8 @@ class InvoiceHeaderConfig {
   final String addressAr;
   final String addressUr;
   final String phone;
+  final String receiptPhone2;
+  final String receiptPhone3;
   final String email;
   final String taxNumber;
   final String commercialRegistrationNumber;
@@ -34,6 +36,8 @@ class InvoiceHeaderConfig {
     this.addressAr = '',
     this.addressUr = '',
     this.phone = '',
+    this.receiptPhone2 = '',
+    this.receiptPhone3 = '',
     this.email = '',
     this.taxNumber = '',
     this.commercialRegistrationNumber = '',
@@ -64,6 +68,8 @@ class InvoiceHeaderConfig {
       addressAr: json['address_ar'] as String? ?? '',
       addressUr: json['address_ur'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
+      receiptPhone2: json['receipt_phone_2'] as String? ?? '',
+      receiptPhone3: json['receipt_phone_3'] as String? ?? '',
       email: json['email'] as String? ?? '',
       taxNumber: json['tax_number'] as String? ?? '',
       commercialRegistrationNumber:
@@ -101,6 +107,8 @@ class InvoiceHeaderConfig {
     'address_ar': addressAr,
     'address_ur': addressUr,
     'phone': phone,
+    'receipt_phone_2': receiptPhone2,
+    'receipt_phone_3': receiptPhone3,
     'email': email,
     'tax_number': taxNumber,
     'commercial_registration_number': commercialRegistrationNumber,
@@ -122,6 +130,8 @@ class InvoiceHeaderConfig {
     String? addressAr,
     String? addressUr,
     String? phone,
+    String? receiptPhone2,
+    String? receiptPhone3,
     String? email,
     String? taxNumber,
     String? commercialRegistrationNumber,
@@ -141,6 +151,8 @@ class InvoiceHeaderConfig {
     addressAr: addressAr ?? this.addressAr,
     addressUr: addressUr ?? this.addressUr,
     phone: phone ?? this.phone,
+    receiptPhone2: receiptPhone2 ?? this.receiptPhone2,
+    receiptPhone3: receiptPhone3 ?? this.receiptPhone3,
     email: email ?? this.email,
     taxNumber: taxNumber ?? this.taxNumber,
     commercialRegistrationNumber:

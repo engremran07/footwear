@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:logger/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/backup_scope_policy.dart';
@@ -35,6 +36,8 @@ import 'auth_provider.dart';
 
 const _shopTransactionsLiveLimit = 150;
 const _shopsAnalyticsTransactionsLimit = 500;
+
+final _logger = Logger();
 
 bool _isCustomerLedgerEntry(Map<String, dynamic> data) =>
     data['deleted'] != true && data['voided'] != true;
@@ -596,8 +599,12 @@ class TransactionNotifier extends AsyncNotifier<void> {
             },
           );
         }
-      } catch (_) {
-        /* best-effort only — non-critical */
+      } catch (error, stackTrace) {
+        _logger.w(
+          'Best-effort transaction notification write failed',
+          error: error,
+          stackTrace: stackTrace,
+        );
       }
     });
   }

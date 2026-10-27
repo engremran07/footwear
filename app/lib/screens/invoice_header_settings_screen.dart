@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 
+import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/l10n/financial_document_localization.dart';
 import '../core/utils/error_mapper.dart';
@@ -37,6 +38,8 @@ class _InvoiceHeaderSettingsScreenState
     'address_ar': 'invoice_address_ar',
     'address_ur': 'invoice_address_ur',
     'phone': 'phone',
+    'receipt_phone_2': 'receipt_phone_2',
+    'receipt_phone_3': 'receipt_phone_3',
     'email': 'email',
     'tax_number': 'tax_registration_number',
     'commercial_registration_number': 'commercial_registration_number',
@@ -93,6 +96,8 @@ class _InvoiceHeaderSettingsScreenState
       'address_ar': header.addressAr,
       'address_ur': header.addressUr,
       'phone': header.phone,
+      'receipt_phone_2': header.receiptPhone2,
+      'receipt_phone_3': header.receiptPhone3,
       'email': header.email,
       'tax_number': header.taxNumber,
       'commercial_registration_number': header.commercialRegistrationNumber,
@@ -128,6 +133,8 @@ class _InvoiceHeaderSettingsScreenState
     addressAr: _controllers['address_ar']!.text.trim(),
     addressUr: _controllers['address_ur']!.text.trim(),
     phone: _controllers['phone']!.text.trim(),
+    receiptPhone2: _controllers['receipt_phone_2']!.text.trim(),
+    receiptPhone3: _controllers['receipt_phone_3']!.text.trim(),
     email: _controllers['email']!.text.trim(),
     taxNumber: _controllers['tax_number']!.text.trim(),
     commercialRegistrationNumber:
@@ -248,10 +255,11 @@ class _InvoiceHeaderSettingsScreenState
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: TextField(
+        key: ValueKey('invoice_header_field_$field'),
         controller: _controllers[field],
         textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
         maxLines: maxLines,
-        maxLength: 180,
+        maxLength: field.startsWith('receipt_phone_') ? 40 : 180,
         decoration: InputDecoration(
           labelText: tr(_fieldKeys[field]!, ref),
           counterText: '',
@@ -359,6 +367,15 @@ class _InvoiceHeaderSettingsScreenState
                 _textField('address_ur', rtl: true, maxLines: 2),
                 _sectionTitle('invoice_header_contact'),
                 _textField('phone'),
+                _textField('receipt_phone_2'),
+                _textField('receipt_phone_3'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    tr('receipt_contact_numbers_hint', ref),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
                 _textField('email'),
                 _textField('tax_number'),
                 _textField('commercial_registration_number'),
@@ -434,7 +451,7 @@ class _InvoiceHeaderSettingsScreenState
                                   ? const Icon(
                                       Icons.check,
                                       size: 16,
-                                      color: Colors.white,
+                                      color: AppBrand.onPrimary,
                                     )
                                   : null,
                             ),

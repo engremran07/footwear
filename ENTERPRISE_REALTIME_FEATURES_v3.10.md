@@ -1,7 +1,7 @@
 `    ext
 
 **Last Updated:** 2026-08-17  
-**Workspace:** JBM Impex (Multi-Tenant SaaS)
+**Workspace:** Example Workspace (Multi-Tenant SaaS)
 
 ---
 
@@ -152,7 +152,7 @@ Every screen now shows which workspace you're in:
 
 ```text
 ┌──────────────────────────────────────────────────────┐
-│  🏢 JBM Impex  |  👤 Admin  |  🔔 5  |  ⚙️  👤  ☰   │
+│  🏢 Example Workspace  |  👤 Admin  |  🔔 5  |  ⚙️  👤  ☰   │
 └──────────────────────────────────────────────────────┘
      ↑ Workspace     Current Role  Alerts    Menu
      (clickable)
@@ -160,8 +160,8 @@ Every screen now shows which workspace you're in:
 
 **Clicking workspace badge** → Shows mini-panel:
 
-- Current workspace: JBM Impex
-- Available workspaces: [Global Workspace] [JBM Impex] [Upcoming...]
+- Current workspace: Example Workspace
+- Available workspaces: [Unassigned legacy data] [Example Workspace] [Upcoming...]
 - Workspace settings (admin only): Edit name, logo, primary color
 - Invite link (tenant_admin only)
 
@@ -298,7 +298,7 @@ Instead of blasting all events, admins get batched summaries:
 **Daily 9 AM Digest:**
 
 ```text
-📊 JBM Impex Summary (Aug 17)
+📊 Example Workspace Summary (Aug 17)
 
 👥 Users: 1 seller added (john@example.com)
 🚚 Routes: 2 inactive (R3, R5)
@@ -384,38 +384,13 @@ final cachedWorkspaceProvider = StreamProvider.family<TenantModel, String>(
 
 ## 8. Data Migration Status
 
-### JBM Impex Workspace Setup (COMPLETED)
+### Historical Workspace Setup
 
-**Tenant Document Created:**
-
-```json
-{
-  "id": "jbm-impex",
-  "name": "JBM Impex",
-  "slug": "jbm-impex",
-  "plan": "professional",
-  "active": true,
-  "isTrial": false,
-  "createdAt": "2026-08-17T00:00:00Z",
-  "ownerUserId": "mgulamabas@gmail.com",
-  "primaryColor": "#1976d2"
-}
-```text
-
-**User Migration Script:** `migrate_to_jbm_workspace.js`
-
-- ✓ Migrates all users from **global** to JBM Impex
-- ✓ Updates <mgulamabas@gmail.com> role from tenant_admin → admin
-- ✓ Reassigns all sellers to JBM Impex
-- ✓ Migrates all shops, routes, transactions, invoices
-
-**Execution:**
-
-```bash
-cd D:\Footwear
-export MIGRATION_CONFIRM=MIGRATE
-node migrate_to_jbm_workspace.js
-```text
+Historical workspace IDs, owner identities, and customer-specific migration
+details have been removed from this example document. The legacy migration
+scripts are disabled because their broad, multi-batch writes bypass current
+tenant, ledger, and inventory integrity safeguards. No migration should be
+started from this document or by invoking those scripts.
 
 ---
 
@@ -424,9 +399,9 @@ node migrate_to_jbm_workspace.js
 - [x] Workspace-first UX implemented (users_list_screen.dart)
 - [x] Tenant-scoped providers updated (tenant_provider.dart)
 - [x] User creation with tenantId support (user_provider.dart)
-- [x] Data migration script created (migrate_to_jbm_workspace.js)
-- [ ] Run migration: `MIGRATION_CONFIRM=MIGRATE node migrate_to_jbm_workspace.js`
-- [ ] Verify data appears in app (login as <mgulamabas@gmail.com>)
+- [x] Workspace-scoped UX and providers implemented
+- [ ] Any required legacy-data migration must have an approved, audited,
+  tenant-specific plan and a validated recovery path
 - [ ] Test super_admin workspace switcher
 - [ ] Test tenant_admin sees only their workspace
 - [ ] (Optional) Implement activity logging feature
@@ -440,9 +415,9 @@ node migrate_to_jbm_workspace.js
 **After Migration + UX Update:**
 
 1. ✅ Super admin logs in → sees workspace selector dropdown
-2. ✅ Super admin selects "JBM Impex" → sees only JBM users (no role tags)
-3. ✅ Tenant admin (<mgulamabas@gmail.com>) logs in → no workspace selector; sees only JBM users
-4. ✅ All sellers see their shops/routes/transactions from JBM workspace
+2. ✅ Super admin selects a workspace → sees only that workspace's users
+3. ✅ Tenant admin logs in → sees only their assigned workspace's users
+4. ✅ Sellers see only shops, routes, and transactions in their assigned scope
 5. ✅ No data leakage across workspaces (Firestore rules enforce tenant_id boundary)
 6. ✅ New users created in workspace selector → assigned to correct workspace
 
@@ -450,13 +425,14 @@ node migrate_to_jbm_workspace.js
 
 ## 11. Future Enhancements (v3.11+)
 
-- **Workspace Invitations:** Tenant admin generates invite link; invitees auto-join
-- **Audit Trail Export:** 90-day activity log as CSV/PDF compliance report
-- **Multi-Workspace Dashboard:** Super admin views metrics across all workspaces
-- **Workspace Permissions Matrix:** Fine-grained role permissions per workspace
-- **IP Geolocation Audit:** Log login locations for security investigations
-- **Device Pairing:** Users can only access workspace from whitelisted devices
-- **Session Replay:** Record user actions for 24 hours for support debugging
+- **Workspace Invitations:** Use a trusted provisioning flow that assigns the
+  invited profile to one explicit tenant and does not create platform roles.
+- **Audit Trail Export:** Provide an authorized, cursor-paged export of
+  tenant-scoped audit records without exposing another workspace's data.
+- **Workspace Support Metrics:** Keep business-data support access explicitly
+  selected, reasoned, time-limited, and recorded in the platform access log.
+- **Permission Regression Matrix:** Exercise the app capability policy and
+  Firestore Rules independently against the same documented role scenarios.
 
 ---
 

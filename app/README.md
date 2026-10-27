@@ -1,6 +1,70 @@
-# FootWear ERP — Flutter App (v3.10.6+1117)
+# FootWear ERP — Flutter App (v3.10.9+1120)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
+
+## Local v3.10.9 Multi-Workspace Invoice Permissions
+
+Active admins, tenant admins, supervisors, and route-scoped sellers can create
+sale invoices and cash receipts within their permitted scope. Settlement,
+credit-note creation, correction, and void remain separately restricted.
+Firestore Rules reject unsupported invoice types, require same-batch invoice
+counter linkage, and enforce seller identity. The Rules Emulator includes a
+15-workspace own/adjacent-tenant isolation regression.
+
+Rules Emulator: `180 passing`; full Flutter suite:
+`01:21 +655: All tests passed!`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 16.1s)`; `dart analyze test/`:
+`No issues found!`. Version `3.10.9+1120` produced split APKs
+(30.7/32.2/33.7 MB) and a signed 54.8 MB AAB. APK v2 and AAB JAR signatures
+verified. Web build: `EXIT: 0`; Hosting and Rules/indexes each reported
+`Deploy complete!`. Live `version.json` reports version `3.10.9`, build
+`1120`; the shell and main bundle return `no-cache, no-store,
+must-revalidate`. ARM64 was copied and installed on `R5GL22RGT9V`
+(`Success`), versionCode `310093120`. Play Console upload, commit, and push
+were not performed. The broader 33-finding audit remains open.
+
+## Local v3.10.8 Shared Financial PDF Logo
+
+All logo-enabled financial PDF headers now place the company logo centered
+between English business details on the left and selected Arabic or Urdu
+details on the right. The same slightly larger 64-by-46-point logo size is
+used for statements, invoices, receipts, seller/multi-shop reports, and flat
+exports. The generic flat-table fallback now uses the same shared header. Long company
+names scale to one line to avoid increasing A5 receipt header height.
+Statement and A5 receipt samples were rendered in the browser; focused PDF
+regressions passed. The notification feed and referenced-shop visibility
+streams are also tenant-keyed, preventing stale rows from crossing workspace
+switches; missing and global-sentinel contexts do not query. Root platform
+settings are distinct from context-bound workspace settings.
+
+Rules Emulator: `172 passing (42s)`; full Flutter suite:
+`01:20 +654: All tests passed!`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 5.6s)`; `dart analyze test/`:
+`No issues found!`; changelog test: `00:00 +10: All tests passed!`.
+Version `3.10.8+1119` produced split APKs (30.7/32.2/33.7 MB) and a signed
+54.8 MB Play Console AAB. APK v2 and AAB JAR signatures verified. ARM64 was
+copied to and installed on `R5GL22RGT9V` (`Success`), versionName `3.10.8`,
+versionCode `310083119`. Production deployments remain unperformed.
+
+## Local v3.10.7 Cash Receipt Follow-up
+
+The cash-receipt body follows the supplied reference with a compact bilingual
+balance summary, receipt number/date, payer and amount lines, payment method
+and reference, account note, signatures, and optional extra footer contacts.
+The existing shared workspace header is passed through unchanged. Receipt
+balances still come from the saved invoice snapshot fields, and the document
+remains A5 and one page.
+
+Arabic and Urdu samples were visually inspected in the browser. PDF/settings
+tests: `00:15 +24: All tests passed!`; full Flutter suite:
+`01:29 +639: All tests passed!`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 13.3s)`; `dart analyze test/`:
+`No issues found!`; Rules Emulator: `154 passing (30s)`. Split APKs: ARMv7
+30.7 MB, ARM64 32.2 MB, x86_64 33.7 MB; signed AAB: 54.8 MB. All APK
+signatures verified and the AAB reported `jar verified.`. ARM64 was copied
+to `/sdcard/Download/` and installed on `R5GL22RGT9V` (`Success`),
+versionName `3.10.7`, versionCode `310073118`. No Hosting or Rules/indexes
+deployment, commit, or push was performed.
 
 ## v3.10.6 Bilingual Account Statement Layout
 
@@ -17,6 +81,22 @@ samples were inspected in Chrome. Full Flutter suite: `01:14 +633: All tests
 passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 6.3s)`;
 `dart analyze test/`: `No issues found!`; Rules Emulator: `152 passing (30s)`.
 
+## Unreleased Local Notification and PDF Follow-up
+
+Supervisors can read and mark notifications within their active workspace;
+sellers remain excluded. Notification screens retain cached rows while either
+the feed or shop-visibility stream refreshes, but preserve initial loading and
+real error states. Read-state failures are mapped and shown, and best-effort
+notification creation failures are logged. Tenant/role/support-context
+guards remain in place. Provider, widget, router, and Rules regressions cover
+these paths.
+
+Statement table, summary, and final-balance rows pin physical column order in
+Arabic and Urdu. Statement-specific spacing preserves the shared workspace
+header and does not change ledger math. Generated Arabic and Urdu statements
+were inspected in Chrome. Earlier test and emulator results predate the latest
+supervisor notification and PDF header changes; final validation is pending.
+
 Web `EXIT: 0`; Hosting and Rules/indexes deployments reported
 `Deploy complete!`. Live shell endpoints returned HTTP 200 with
 `no-store, must-revalidate, no-cache`; `version.json` reports `3.10.6+1117`.
@@ -28,9 +108,10 @@ covered by the source-control publication for this release.
 ## v3.10.5 Operational Supervisor and Access Recovery
 
 The tenant-scoped `supervisor` role can use routes, shops, products, inventory,
-invoices, and reports. It cannot administer users, notifications, settings, or
-backups, and cannot correct financial transactions, approve corrections, void
-invoices, change route seller assignments, or move shops between routes.
+invoices, reports, and workspace notifications. It cannot administer users,
+settings, or backups, and cannot correct financial transactions, approve
+corrections, void invoices, change route seller assignments, or move shops
+between routes.
 Tenant admins may assign only supervisor and seller roles to eligible
 non-owner profiles; admin and tenant-admin role changes remain restricted to
 the selected platform-super-admin flow.
@@ -226,7 +307,7 @@ Firebase Authentication is the only sign-in mechanism. Successful sign-in is fol
 
 Business-data Rules also require the tenant itself to be active; an active member profile cannot access business documents in an inactive workspace. Shop creation must start at a zero balance without seeded transaction-summary fields. Standalone ledger entries are validated against the same atomic shop/balance update, while invoice batches retain multi-row aggregate balance checks.
 
-Invoice creation supports stock sales, workspace-enabled non-stock catalog sales, and cash receipt invoices. Non-stock invoices preserve catalog item details without reducing inventory. Receipt numbering, receipt ledger entries, and shop balance changes are atomic and workspace-scoped. Workspace administrators configure bilingual invoice headers; generated PDFs use the header snapshot stored on each invoice. Shop detail provides a preselected invoice entry point while retaining ledger-only cash-in.
+Invoice creation supports stock sales, workspace-enabled non-stock catalog sales, and cash receipt invoices for active admins, tenant admins, supervisors, and sellers. Seller creation remains constrained to assigned routes. Creation does not grant settlement, correction, credit-note, or void rights. Non-stock invoices preserve catalog item details without reducing inventory. Receipt numbering, receipt ledger entries, and shop balance changes are atomic and workspace-scoped. Workspace administrators configure bilingual invoice headers; generated PDFs use the header snapshot stored on each invoice. Shop detail provides a preselected invoice entry point while retaining ledger-only cash-in.
 
 Non-stock invoicing is disabled for new and legacy workspaces unless an administrator explicitly enables it. Sale and credit-note creation commit the workspace invoice counter, invoice, ledger, shop balance, and stock movements in one Firestore transaction. Firestore Rules require invoice/ledger/shop links for sales, receipts, and credit notes; seller sales also validate the exact balance delta. Voiding a credit note reverses its stock movement and the original invoice's cumulative credit total. Transaction descriptions accept multiline notes.
 
@@ -400,8 +481,17 @@ Platform super-admin accounts are provisioned out of band. The client never embe
 | `manager` | Admin-equivalent (legacy) |
 | `tenant_admin` | Full CRUD within the tenant, subject to financial and role-management safeguards |
 | `super_admin` | Platform metadata globally; business data only in the explicitly selected, audited workspace |
-| `supervisor` | Tenant-scoped operational access to routes, shops, products, inventory, invoices, and reports; no user, notification, settings, or backup administration |
+| `supervisor` | Tenant-scoped operational access to routes, shops, products, inventory, invoices, reports, and notifications; no user, settings, or backup administration |
 | `seller` | Assigned route only — read + create transactions |
+
+`RoleCapabilities` and `PermissionPolicy` in
+`lib/core/utils/role_names.dart` and `lib/core/utils/permission_policy.dart`
+are the app-side capability source used by routes, screens, and providers.
+Legacy admins can manage seller accounts only; tenant admins can manage
+eligible seller/supervisor accounts; supervisors have operational plus tenant
+notification-feed access, not user/settings/backup or financial correction
+rights. Firestore Rules remain independently authoritative and require
+emulator regressions for both allowed and denied tenant operations.
 
 Dashboard and inventory suppress transient permission-denied states during auth/profile stream warm-up. Role-scoped providers stay in loading or cached fallback until access is confirmed.
 

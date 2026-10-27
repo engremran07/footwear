@@ -40,6 +40,29 @@ description: "Use when: authoring or changing ShoesERP Firestore Security Rules,
   rather than applying a one-row/one-delta assumption.
 - Preserve invoice immutability/correction paths, seller stock deduction
   matching, inventory audit writes, and deny-by-default behavior.
+- Compare each changed Rules path with
+  `app/lib/core/utils/role_names.dart` and
+  `app/lib/core/utils/permission_policy.dart`, then inspect its provider call
+  path. These centralize app decisions only; Firestore Rules independently
+  enforce identity, active profile, active tenant, role, and support context.
+- The permission matrix is operation-specific: legacy `admin`/`manager`
+  manages seller accounts only; `tenant_admin` may manage eligible seller and
+  supervisor accounts; `supervisor` has operational access but no user,
+  financial-correction, invoice-void, backup, or settings rights; sellers stay
+  route-scoped; platform `super_admin` business access requires a selected,
+  reasoned, audited workspace and an enforced eight-hour TTL.
+- Reject new business writes with missing, `global`, or `__global__` tenant
+  identity. Preserve a legacy read only when a specific documented migration
+  or query requires it; never use a broad `resource == null` or role-only
+  exception to silence permission errors.
+- Do not rewrite Rules for a UI-only or internal refactor. Identify the exact
+  authorization contract change or proven defect first, then test the full
+  valid and denied read/write sets.
+- Keep permission parity operation-specific: test sale-invoice creation,
+  cash-receipt creation, settlement, correction, credit-note, and void as
+  separate actions. Invoice/receipt creation may be available to operational
+  roles while settlement and corrections remain restricted; sellers must
+  match their authenticated identity and assigned route.
 
 ## Rules Complexity and Testing
 
@@ -50,6 +73,10 @@ description: "Use when: authoring or changing ShoesERP Firestore Security Rules,
   makes legitimate invoice or seller inventory writes fail.
 - Rules are not query filters. Test the actual query constraints and index
   requirements.
+- Exercise the same tenant-scoped operations across at least 15 distinct
+  workspace IDs when validating scale assumptions. This is an isolation
+  regression, not evidence that Spark quotas, read-cost ceilings, or latency
+  have been load-tested.
 - Run the complete local suite from the repository root:
 
   ```powershell

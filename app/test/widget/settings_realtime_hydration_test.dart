@@ -27,12 +27,18 @@ void main() {
 
   SettingsModel settings({
     String headerName = 'Workspace Header',
+    String receiptPhone2 = '',
+    String receiptPhone3 = '',
     int pairsPerCarton = 12,
   }) => SettingsModel(
     tenantId: admin.tenantId!,
     currency: 'SAR',
     pairsPerCarton: pairsPerCarton,
-    invoiceHeader: InvoiceHeaderConfig(nameEn: headerName),
+    invoiceHeader: InvoiceHeaderConfig(
+      nameEn: headerName,
+      receiptPhone2: receiptPhone2,
+      receiptPhone3: receiptPhone3,
+    ),
     updatedAt: now,
   );
 
@@ -79,6 +85,70 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('receipt contacts hydrate and keep local edits while dirty', (
+    tester,
+  ) async {
+    final settingsStream = StreamController<SettingsModel>();
+    addTearDown(settingsStream.close);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(admin)),
+          settingsProvider.overrideWith((ref) => settingsStream.stream),
+        ],
+        child: const MaterialApp(home: InvoiceHeaderSettingsScreen()),
+      ),
+    );
+    settingsStream.add(
+      settings(receiptPhone2: '+966511111111', receiptPhone3: '+966522222222'),
+    );
+    await tester.pumpAndSettle();
+
+    final secondPhone = find.byKey(
+      const ValueKey('invoice_header_field_receipt_phone_2'),
+    );
+    final thirdPhone = find.byKey(
+      const ValueKey('invoice_header_field_receipt_phone_3'),
+    );
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(secondPhone, 250, scrollable: scrollable);
+    expect(
+      tester.widget<TextField>(secondPhone).controller!.text,
+      '+966511111111',
+    );
+    await tester.scrollUntilVisible(thirdPhone, 250, scrollable: scrollable);
+    expect(
+      tester.widget<TextField>(thirdPhone).controller!.text,
+      '+966522222222',
+    );
+    expect(
+      find.textContaining('Extra numbers appear in the cash receipt footer'),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(secondPhone);
+    await tester.enterText(secondPhone, '+966533333333');
+    tester.testTextInput.hide();
+    await tester.pump();
+    settingsStream.add(
+      settings(receiptPhone2: '+966544444444', receiptPhone3: '+966555555555'),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      tester.widget<TextField>(secondPhone).controller!.text,
+      '+966533333333',
+    );
+    await tester.ensureVisible(thirdPhone);
+    expect(
+      tester.widget<TextField>(thirdPhone).controller!.text,
+      '+966522222222',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('invoice header settings follow remote language pair changes', (
     tester,
   ) async {
@@ -102,9 +172,11 @@ void main() {
     );
     expect(selector, findsOneWidget);
     expect(
-      tester.widget<DropdownButtonFormField<FinancialDocumentLanguagePair>>(
-        selector,
-      ).initialValue,
+      tester
+          .widget<DropdownButtonFormField<FinancialDocumentLanguagePair>>(
+            selector,
+          )
+          .initialValue,
       FinancialDocumentLanguagePair.englishArabic,
     );
 
@@ -119,9 +191,11 @@ void main() {
     await tester.pump();
 
     expect(
-      tester.widget<DropdownButtonFormField<FinancialDocumentLanguagePair>>(
-        selector,
-      ).initialValue,
+      tester
+          .widget<DropdownButtonFormField<FinancialDocumentLanguagePair>>(
+            selector,
+          )
+          .initialValue,
       FinancialDocumentLanguagePair.englishUrdu,
     );
     expect(tester.takeException(), isNull);

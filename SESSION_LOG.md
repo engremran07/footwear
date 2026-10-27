@@ -6,6 +6,285 @@
 
 ---
 
+## SESSION-030 — 2026-10-27 — Multi-Workspace Invoice Permissions and Release Artifacts
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the multi-tenant SaaS readiness audit, verify invoice
+permissions across workspace roles, and prepare the requested Android
+artifacts.
+
+### Root Cause and Changes
+
+- The invoice create Rules path accepted unsupported invoice types for
+  operational roles because the generic operational-role branch did not
+  constrain `type`. A pre-fix emulator regression reproduced supervisor
+  creation of `return`, `payment`, and `write_off` invoices.
+- Invoice creation now allowlists `sale`, `cash_receipt`, and `credit_note`.
+  Existing Rules still restrict credit-note creation to tenant admins and
+  require linked invoice, counter, ledger, shop-balance, and stock writes.
+- Invoice authorization now returns the validated, non-null actor profile
+  together with its tenant ID. This resolves the nullable actor dereferences
+  that had prevented focused invoice tests and analysis from compiling.
+- Added a 15-workspace isolation regression covering tenant-admin reads of
+  each workspace's own shop/invoice and denial of the adjacent workspace's
+  documents. App capabilities separately permit eligible tenant-scoped
+  admins, supervisors, and route-assigned sellers to create sale invoices and
+  cash receipts without granting settlement or correction permissions.
+- Added the multi-tenant SaaS readiness skill and updated runtime, Rules,
+  audit, user-management, and Android release guidance. Runtime docs describe
+  invoice create-versus-settle permissions. Findings 4, 5, and 26 are recorded
+  as locally verified; finding 6 is partial; 29 findings remain pending
+  evidence-based disposition.
+
+### Validation and Scope
+
+- Focused invoice/permission tests: `00:08 +50: All tests passed!`; full
+  Flutter suite: `01:21 +655: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 16.1s)`;
+  `dart analyze test/`: `No issues found!`.
+- Firestore Rules Emulator: `180 passing (38s)`. Before the Rules fix, the
+  invoice-type test reported `0 passing, 1 failing` because the unsupported
+  invoice write succeeded; afterward the focused test reported `1 passing`.
+  The local Rules suite includes the 15-workspace boundary regression.
+- Changelog regression: `00:00 +10: All tests passed!`; Markdown lint and
+  `git diff --check` exited 0.
+- Version `3.10.9+1120` is synchronized. Split APK build output:
+  ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.7 MB. Signed AAB:
+  `build\app\outputs\bundle\release\app-release.aab` (54.8 MB). APK v2
+  verification succeeded and the AAB reported `jar verified.`. APK metadata
+  reports versionName `3.10.9`; split codes are `310092120`, `310093120`, and
+  `310095120`.
+- ARM64 copy to `/sdcard/Download/app-arm64-v8a-release-v3.10.9-1120.apk`
+  reported `1 file pushed`. Installation is held because the matching local
+  Rules changes are not deployed to production; using the new invoice schema
+  against stale production Rules risks permission-denied failures.
+- A read-only security review of tenant scoping, invoice/receipt Rules and
+  provider guards, notification/user scope, and the 15-workspace regression
+  reported no vulnerabilities in the examined changes. It reviewed local
+  source only and does not close the remaining checklist findings or verify
+  deployed production Rules. AAB verification reported `jar verified.` with
+  local certificate trust/timestamp warnings; Play Console acceptance still
+  depends on the configured upload-certificate match.
+- No production Rules/indexes or Hosting deployment, Play Console upload,
+  production data changes, install, commit, or push occurred. The 33-item
+  audit remains open; 15-workspace authorization tests do not establish
+  production quota/load capacity or enterprise-wide readiness.
+
+---
+
+## SESSION-029 — 2026-10-27 — Notification Tenant Cache Isolation
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the multi-tenant permission and notification audit after
+a tenant-switch regression reproduced stale notification state.
+
+### Root Cause and Changes
+
+- A singleton notification feed provider retained its previous `AsyncValue`
+  when the auth profile switched workspace. Same-tenant stale-while-refresh
+  behavior is desirable, but sharing that cache across tenant changes can show
+  the previous workspace's rows and cause read-state writes to be denied.
+- The notification feed and referenced-shop visibility streams are now keyed
+  by concrete tenant ID. Missing and `__global__` scope start no query.
+  Same-tenant feed and shop refreshes still preserve cached visible rows.
+- App policy now differentiates the global platform settings hub from
+  workspace settings descendants. The hub is visible to an active root
+  super-admin; business settings still require selected, reasoned, unexpired
+  workspace context.
+- Two full-suite test failures were test-fixture mismatches: the user-screen
+  test omitted authenticated Firebase state, and the navigation/policy tests
+  omitted concrete tenant or audited support-context data. The tests now model
+  the actual auth and policy contracts; no authorization checks were relaxed.
+
+### Validation and Scope
+
+- Full Flutter suite: `01:20 +654: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 5.6s)`;
+  `dart analyze test/`: `No issues found!`; changelog test after its final
+  update: `00:00 +10: All tests passed!`.
+- Rules Emulator: `172 passing (42s)`.
+- Markdown lint and `git diff --check` exited 0 after documentation edits.
+- Version `3.10.8+1119` is synchronized. Split APKs built: ARMv7 30.7 MB,
+  ARM64 32.2 MB, x86_64 33.7 MB. Signed AAB built: 54.8 MB. APK v2 signature
+  verification succeeded; AAB verification reported `jar verified.`.
+- The exact 129-line, 33-finding attachment is not available in the current
+  workspace/session files, so the complete point-by-point disposition remains
+  open rather than being fabricated. Known migration-sized findings and Rules
+  follow-ups are listed in `AUDIT_REPORT_FOOTWEAR_ERP.md`.
+- The phone reconnected after the first ADB check. ARM64 APK copy reported
+  `1 file pushed`; `adb install --streaming -r` reported `Success`. Installed
+  versionName is `3.10.8`, versionCode `310083119`. Rules/indexes and Hosting
+  remain undeployed. No commit, push, or Play Console upload was performed.
+
+---
+
+## SESSION-028 — 2026-10-27 — Multi-Tenant Policy and User-List Recovery
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the workspace-permission audit, align app-side
+capabilities with the documented role contract, and address the Users screen
+that remained in loading after profile access failed.
+
+### Root Cause and Changes
+
+- `UsersListScreen` treated a missing `authUserProvider.value` as shimmer when
+  Firebase Auth still reported a signed-in account. A Firestore profile-stream
+  error therefore looked like an endless load, and a missing profile received
+  the same loading-shaped behavior.
+- The screen now separates auth/profile loading, mapped retryable stream
+  failures, and missing-profile access denial. The focused regression
+  reproduced `pumpAndSettle timed out` before the fix; it passed afterward.
+- The app capability matrix now includes dashboard access; selected
+  super-admin support context expiry refreshes routing; write tenant helpers
+  reject missing and global-sentinel identities. Owner password input is
+  preserved exactly and the dialog no longer disposes controllers it does not
+  own.
+- Updated the tenant-aware user-management, runtime-hardening, Rules-author,
+  and audit/verification skill guidance. Firestore Rules remain an independent
+  security boundary.
+
+### Validation and Scope
+
+- User-list widget suite: `00:04 +4: All tests passed!`.
+- The prior focused permission-policy/tenant-scope and profile-dialog checks
+  passed earlier in this session; the combined suite, full analyzers, full
+  Flutter suite, and Rules Emulator are pending.
+- Multi-tenant audit findings are not yet fully dispositioned; see the current
+  addendum in `AUDIT_REPORT_FOOTWEAR_ERP.md`. No production deployment, Play
+  publication, commit, or push occurred.
+
+---
+
+## SESSION-027 — 2026-10-26 — Unified Financial PDF Logo Placement
+
+**Agent:** GitHub Copilot
+
+**Trigger:** The user requested that the company logo be centered between
+English and Arabic/Urdu header content, enlarged slightly, and placed
+consistently wherever financial PDFs show the logo. The user also authorized
+production Rules/index and Hosting deployment, Git publication, and phone
+delivery if the APK was not already installed.
+
+### Root Cause and Changes
+
+- `_workspaceBrandHeader()` previously placed the logo before the English
+  content, and used a statement-only size variant. `buildPdfTable()` also had
+  a separate standalone image path when no workspace header was supplied.
+- The shared header now uses equal flexible English/RTL columns around a
+  centered 64-by-46-point logo, with explicit LTR physical ordering. This
+  applies to statement, invoice, receipt, seller/multi-shop report, and
+  logo-enabled flat-table PDF paths. The flat-table fallback now delegates to
+  the same shared header. The saved `visibleFields` logo setting and invoice
+  snapshot fallback remain intact.
+- Regression coverage checks the shared logo resource across PDF paths and
+  verifies the generic table respects a hidden logo. Arabic statement and A5
+  receipt PDFs were generated and inspected in the browser; the logo appears
+  between English-left and Arabic-right content at the same size.
+- Version/changelog synchronized to `3.10.8+1119`; trilingual changelog and
+  runtime/export guidance updated.
+
+### Validation and Release Status
+
+- Focused PDF suite: `00:01 +12: All tests passed!`; temporary visual probe:
+  `00:00 +1: All tests passed!`.
+- Full Flutter suite, release builds, production deployment, and Git
+  publication are in progress. The earlier `3.10.7` ARM64 APK is already
+  copied to `/sdcard/Download/` and installed on `R5GL22RGT9V`; it must be
+  upgraded to the new version after the rebuilt release APK is ready.
+
+---
+
+## SESSION-026 — 2026-10-25 — Cash Receipt Reference and Contact Settings
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the financial-PDF task after locating the actual
+cash-receipt reference. Preserve the shared workspace header, avoid changing
+ledger calculations, and keep release/deployment actions explicitly scoped.
+
+### Evidence and Changes
+
+- Replaced the cash-receipt body with a compact bilingual A5 layout based on
+  the supplied reference: a three-row balance summary, receipt number/date,
+  payer and amount fields, payment details, account note, signatures, and
+  footer contacts. The existing shared workspace header is passed through
+  unchanged.
+- Added optional second and third receipt contact values to the invoice-header
+  settings model and admin form. They are serialized into invoice-header
+  snapshots and displayed in the receipt footer without altering financial
+  calculations or Firestore write ownership.
+- Added model defaults/round-trip coverage, form hydration/dirty-edit coverage,
+  PDF A5/page/resource checks for Arabic and Urdu, and seller Rules regression
+  coverage for matching contact fields in invoice snapshots.
+- Browser inspection confirmed connected Arabic and Urdu text, English-left /
+  RTL-right placement, the one-page receipt layout, and the retained shared
+  header. Urdu output remains Naskh-style, not Nastaliq.
+
+### Validation and Status
+
+- Focused PDF/settings suite: `00:15 +24: All tests passed!`; full Flutter
+  suite: `01:29 +639: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 13.3s)`;
+  `dart analyze test/`: `No issues found!`; Rules Emulator:
+  `154 passing (30s)`.
+- Version is synchronized at `3.10.7+1118`, with a trilingual changelog entry.
+  Split APKs were built (ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.7 MB); the
+  signed AAB is 54.8 MB. All APK signatures verified and the AAB reported
+  `jar verified.`. ARM64 was copied to `/sdcard/Download/` and installed on
+  `R5GL22RGT9V` (`Success`); installed versionName is `3.10.7`, versionCode
+  `310073118`. Firestore Rules/indexes and Hosting deployment, commit, and
+  push were not performed.
+
+---
+
+## SESSION-025 — 2026-10-25 — Notification refresh and RTL PDF regressions
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the reported notification flicker/permission feedback
+and Arabic/Urdu statement rendering investigation after v3.10.6. Preserve the
+already-published v3.10.6 artifacts and distinguish unreleased local source
+from production state.
+
+### Evidence and Changes
+
+- Traced notification visibility loading through Riverpod 3. `AsyncValue.whenData`
+  reverts to loading when the source refreshes, replacing visible rows with
+  shimmer. The new transform retains the last successful visibility result
+  only during refresh; first load and actual errors remain visible states.
+- Removed silent `.ignore()` handling from mark-as-read actions; mapped
+  failures now reach the screen. Notification feed/write paths check active
+  profile, tenant, role, and selected support context before subscribing or
+  writing. Added provider/widget and Rules regression coverage.
+- Rendered Arabic and Urdu statements in Chrome. This reproduced a physical
+  RTL table-column reversal despite successful PDF generation. Table, summary,
+  and final-balance rows now pin LTR physical order, with each text widget's
+  language direction kept explicit. Statement-only logo sizing and compact
+  padding/footer changes leave the shared receipt header and financial math
+  unchanged.
+- Added notification and RTL report troubleshooting guidance to project-owned
+  skills and updated runtime/system documentation. The cash-receipt reference
+  and subsequent receipt implementation are documented in SESSION-026.
+
+### Validation and Status
+
+- Full Flutter suite: `01:14 +638: All tests passed!`; focused notification
+  provider/widget suite after lint cleanup: `00:03 +9: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 10.9s)`;
+  `dart analyze test/`: `No issues found!`; Rules Emulator:
+  `154 passing (54s)`. Markdown lint and `git diff --check` exited 0.
+- Arabic and Urdu statement probe PDFs were generated and visually inspected
+  in Chrome. Temporary probe files were removed after validation.
+- Fresh release build is pending; no production deployment or device action
+  occurred.
+- These changes remain local and unreleased. No Rules/Hosting deployment,
+  version bump, APK/AAB build, device install, commit, or push was performed.
+
+---
+
 ## SESSION-024 — 2026-10-25 — Supervisor, statements, and release v3.10.6
 
 **Agent:** GitHub Copilot

@@ -1,6 +1,6 @@
 ﻿# ShoesERP AGENTS Runtime Contract
 
-Last updated: 2026-10-25
+Last updated: 2026-10-27
 
 ## 1) Runtime Truth (Authoritative)
 
@@ -9,7 +9,7 @@ This repository is a route/seller distribution ERP.
 - Roles: admin, supervisor, seller
 - Legacy role value manager must be treated as admin-equivalent in app and rules
 - Tenant-aware roles tenant_admin and super_admin are now supported and must be treated as privileged, tenant-scoped roles in app and rules
-- Supervisor is a tenant-scoped operational role: routes, shops, products, inventory, invoices, and reports are available, but user administration, notifications, settings, backup, financial corrections, invoice voids, route-seller assignment, and shop route reassignment remain restricted.
+- Supervisor is a tenant-scoped operational role: routes, shops, products, inventory, invoices, reports, and the tenant notification feed are available, but user administration, settings, backup, financial corrections, invoice voids, route-seller assignment, and shop route reassignment remain restricted.
 - Super-admin is a platform operator, not a global business-data reader. By default it may access workspace metadata only; client business data requires an explicit `active_workspace_id`, a support reason of at least 10 characters, and an append-only `platform_access_logs` event. Access ends by clearing the active workspace context.
 - New tenant-scoped users carry a tenant_id and must not cross tenant boundaries in rules or providers. Firebase Authentication is the app's only sign-in/session mechanism; the app does not register devices, require pairing, or maintain custom access slots.
 - Business access requires both an active user profile and an active tenant
@@ -78,6 +78,7 @@ Admin-equivalent (admin/manager):
 Workspace admin (tenant_admin):
 
 - Full CRUD within the assigned tenant, subject to financial and user-role safeguards
+- May create sale invoices and cash receipts within the assigned tenant
 
 Platform super-admin:
 
@@ -88,16 +89,37 @@ Seller:
 - Read active business documents
 - Create/update shops only inside assigned route constraints
 - Create transactions for assigned route
+- Create sale invoices and cash receipts only for shops on assigned routes
 - Update own profile (name, theme, locale, password)
 - No writes to routes/products/product_variants/settings
 
 Supervisor:
 
 - Tenant-scoped access to operational routes, shops, products, inventory,
-  invoices, and reports
-- Cannot manage users, workspace/platform settings, notifications, or backups
+  invoices, reports, and the tenant notification feed
+- May create sale invoices and cash receipts within the active tenant
+- Cannot manage users, workspace/platform settings, or backups
 - Cannot change route seller assignments or move shops between routes
-- Cannot perform financial corrections, approve transaction edits, or void invoices
+- Cannot settle invoices, perform financial corrections, approve transaction
+  edits, issue credit notes, or void invoices
+
+Invoice creation is distinct from invoice settlement and correction. The
+app-side `RoleCapabilities`/`PermissionPolicy` policy permits sale-invoice and
+cash-receipt creation for active, tenant-scoped admins, tenant admins,
+supervisors, and sellers; seller writes remain constrained to assigned routes.
+Settlement, credit-note, correction, and void capabilities remain restricted
+to the roles explicitly granted those operations. Firestore Rules independently
+enforce these constraints and same-batch financial links.
+
+App-side capability decisions are centralized in
+`app/lib/core/utils/role_names.dart` and
+`app/lib/core/utils/permission_policy.dart`. Routes, screens, and providers
+must use that policy rather than invent role matrices; provider guards remain
+mandatory. This does not centralize or weaken Firestore authorization:
+`firestore.rules` independently enforces active profile, active tenant,
+operation-specific role, same-tenant ownership, and super-admin support
+context. Add positive and negative emulator tests whenever a Rules contract
+changes.
 
 ## 4) Non-Negotiable Engineering Rules
 
@@ -299,13 +321,14 @@ Supervisor:
   then validate its complete write set.
 
 1. Financial PDFs must reuse the shared workspace brand header: English
-  business information is on the left and the selected Arabic/Urdu information
-  is on the right, independent of app locale. Prefer current workspace logo
-  bytes; if current bytes are unavailable, invoice and receipt PDFs may use
-  the saved invoice logo while still honoring `visibleFields`. Cash receipts
-  use an A5 page and remain one page. Keep `use_arabic=true`, assert PDF font,
-  image, page-count, and page-size resources, and inspect rendered output when
-  available; font embedding alone is not visual proof.
+  business information is on the left, the company logo is centered, and the
+  selected Arabic/Urdu information is on the right, independent of app locale.
+  Use one shared logo size and placement for every PDF builder. Prefer current
+  workspace logo bytes; if current bytes are unavailable, invoice and receipt
+  PDFs may use the saved invoice logo while still honoring `visibleFields`.
+  Cash receipts use an A5 page and remain one page. Keep `use_arabic=true`,
+  assert PDF font, image, page-count, and page-size resources, and inspect
+  rendered output when available; font embedding alone is not visual proof.
 
 ## 5) Known Failure Signatures
 
@@ -580,6 +603,87 @@ locale. Cover these contracts, actual color pairs, and RTL direction in focused
 widget tests.
 
 ## 10) Current Audit Status
+
+2026-10-27 tenant notification cache isolation and policy verification — local,
+unreleased:
+
+- Notification feed and referenced-shop providers are keyed by concrete tenant
+  ID. Switching from tenant A to tenant B no longer reuses tenant A's cached
+  rows; missing and `__global__` contexts do not start a feed query. Same-tenant
+  refresh retains its intended stale-while-refresh behavior.
+- Root platform super-admins retain access to the platform settings hub, while
+  workspace settings descendants still require a valid selected workspace
+  context. The app-side distinction is represented by `viewSettingsHub` versus
+  `manageSettings`.
+- Firestore Rules Emulator: `172 passing (42s)`. Full Flutter suite:
+  `01:20 +654: All tests passed!`. `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 5.6s)`. `dart analyze test/`: `No issues found!`.
+  The updated trilingual changelog regression: `00:00 +10: All tests passed!`.
+- Version `3.10.8+1119` is synchronized. Split APK build succeeded:
+  ARMv7 `30.7 MB`, ARM64 `32.2 MB`, x86_64 `33.7 MB`. Signed Play Console
+  AAB build succeeded: `54.8 MB`. APK v2 signature verification succeeded;
+  AAB verification reported `jar verified.`.
+- The device reconnected after the first delivery check. ARM64 APK copy
+  reported `1 file pushed`; `adb install --streaming -r` reported `Success`.
+  Device package reports versionName `3.10.8`, versionCode `310083119`.
+  Rules/indexes and Hosting remain undeployed; no production data change, Play
+  upload, commit, or push was performed. Deployed behavior remains unverified.
+
+2026-10-27 tenant permission and user-list recovery — v3.10.9+1120:
+
+- The app-side capability matrix now includes dashboard access and checks
+  selected, reasoned super-admin workspace context and its eight-hour expiry
+  before business routes. The router schedules a refresh at context expiry.
+  New writes reject missing, `global`, and `__global__` tenant IDs.
+- The Users screen previously treated a signed-in profile-stream error or
+  missing profile as indefinite shimmer. It now distinguishes auth/profile
+  loading, mapped retryable auth/profile errors, and a missing profile's
+  access-denied state. A widget regression reproduced the shimmer via
+  `pumpAndSettle` timeout before the fix; afterward:
+  `00:04 +4: All tests passed!`.
+- Password values are no longer trimmed in owner password-change or account
+  creation validation. The owner dialog uses field-owned state so route
+  transitions cannot rebuild disposed controllers.
+- Active admins, tenant admins, supervisors, and sellers may create sale
+  invoices and cash receipts within their tenant scope; seller writes must
+  match the authenticated seller and assigned route. This does not grant
+  settlement, credit-note, correction, or void rights.
+- Invoice Rules now whitelist the supported create types and require linked
+  sequence/counter writes. A regression reproduced supervisor-created
+  unsupported invoice types before the fix. The 15-workspace isolation test
+  verifies own-tenant shop/invoice reads and denies adjacent-tenant reads.
+- Current local validation: Rules Emulator `180 passing`; focused invoice and
+  permission tests `00:08 +50: All tests passed!`; full Flutter suite
+  `01:21 +655: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 16.1s)`; `dart analyze test/`: `No issues found!`.
+- The 33-finding audit remains open: findings 4, 5, and 26 are verified fixed
+  in local source; finding 6 is partially addressed; the other 29 remain
+  pending evidence-based review. Hosting and Rules/indexes were deployed to
+  `shoeserp-clean-20260327`; live web version is `3.10.9+1120`, with
+  `no-cache, no-store, must-revalidate` headers on the shell and main bundle.
+  ARM64 installation on `R5GL22RGT9V` reported `Success`, versionCode
+  `310093120`. No production data change, Git publication, or Play Console
+  upload occurred. Version `3.10.9+1120` split APKs (30.7/32.2/33.7 MB) and
+  a signed 54.8 MB AAB were built and verified; 23 remote indexes and 2 field
+  overrides absent locally were preserved during deployment.
+
+2026-10-26 supervisor notifications and refresh stability — local, unreleased:
+
+- Supervisors now have tenant-scoped read and mark-read access to the admin
+  notification feed. Seller access, cross-tenant reads, user administration,
+  and route reassignment restrictions remain unchanged.
+- The notification view preserves cached rows while either its notification
+  stream or referenced-shop visibility stream refreshes; initial loading and
+  real stream errors remain distinct. Mark-read failures are mapped, and
+  best-effort notification creation failures are logged without changing the
+  already-committed financial operation.
+- The shared PDF business-name line now scales to one line rather than wrapping
+  and increasing A5 receipt header height. Financial calculations are
+  unchanged.
+- The notification, receipt-header, and shared-logo changes are included in
+  the later local `3.10.9+1120` verification: Rules Emulator `180 passing`,
+  full Flutter suite `01:21 +655: All tests passed!`, both analyzers clean,
+  split APKs and signed AAB built. No production deployment occurred.
 
 2026-10-24 operational data freshness and financial presentation — local,
 unreleased source:
@@ -1395,3 +1499,47 @@ Unreleased shared frontend accessibility foundation:
   package metadata is versionName `3.10.6`, versionCode `310063117`; install
   on `R5GL22RGT9V` reported `Success`.
 - Android SDK license acceptance was not changed; release builds succeeded.
+
+2026-10-25 notification refresh and RTL financial PDF follow-up — local,
+unreleased source:
+
+- The notification feed retained a stale-visibility guard for shop-listener
+  refreshes. The screen now distinguishes first load from refresh, surfaces
+  real visibility errors, avoids role/context-invalid subscriptions, and
+  displays mapped failures from mark-as-read actions instead of silently
+  ignoring them. Notification provider/widget regressions and tenant-admin
+  Rules coverage were added.
+- Statement table, summary, and final-balance rows now pin physical column
+  order under Arabic/Urdu page direction. Statement-only logo sizing and
+  compact table/footer spacing are visually checked in generated Arabic and
+  Urdu samples; invoice totals also pin their label/amount order. Financial
+  calculations, shared receipt header sizing, and receipt page constraints
+  remain unchanged.
+- Full Flutter suite: `01:14 +638: All tests passed!`; the focused
+  notification provider/widget suite after lint cleanup:
+  `00:03 +9: All tests passed!`. `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 10.9s)`; `dart analyze test/`:
+  `No issues found!`; Rules Emulator: `154 passing (54s)`. Markdown lint and
+  `git diff --check` exited 0. Arabic/Urdu statement samples were inspected
+  in Chrome.
+- The supplied cash-receipt reference is now available. The receipt body was
+  rebuilt around its balance summary, bilingual receipt fields, payment
+  reference, account note, signatures, and contact footer while retaining the
+  existing shared workspace header and A5 single-page constraint. Workspace
+  settings now accept two optional footer-only contact numbers. Arabic and
+  Urdu output was inspected in the browser; PDF/settings focus tests passed
+  (`00:15 +24: All tests passed!`), the full Flutter suite passed
+  (`01:29 +639: All tests passed!`), both analyzers are clean, and the local
+  Rules Emulator passed 154 tests. Version `3.10.7+1118` is synchronized;
+  split APKs were built (ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.7 MB) and
+  the signed AAB is 54.8 MB. All three APK signatures verified and the AAB
+  reported `jar verified.`. ARM64 was copied to `/sdcard/Download/` and
+  installed on `R5GL22RGT9V` (`Success`); installed versionName is `3.10.7`,
+  versionCode `310073118`. Firestore Rules/indexes and Hosting were not
+  deployed; no commit or push was performed.
+- Local v3.10.8+1119 unifies every financial PDF logo placement: the shared
+  header now centers a consistently sized logo between English-left and
+  Arabic/Urdu-right content. The generic flat-table logo fallback now uses
+  that same header. Focused PDF regressions passed and generated Arabic
+  statement and cash-receipt samples were visually inspected; full-suite,
+  release-build, and deployment verification are in progress.

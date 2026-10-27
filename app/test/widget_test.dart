@@ -19,9 +19,10 @@ import 'package:footwear_erp/widgets/app_shell.dart';
 
 void main() {
   group('App shell SaaS nav rules', () {
-    testWidgets('workspace CRUD is exposed as a first-class admin section', (
+    testWidgets('workspace user management requires selected tenant context', (
       tester,
     ) async {
+      final selectedAt = Timestamp.fromDate(DateTime.now().toUtc());
       final superAdmin = UserModel(
         id: 'sa',
         email: 'global@example.com',
@@ -31,11 +32,24 @@ void main() {
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       );
+      final selectedSuperAdmin = UserModel(
+        id: 'sa',
+        email: 'global@example.com',
+        displayName: 'Global Admin',
+        role: UserRole.superAdmin,
+        activeWorkspaceId: 'tenant-1',
+        activeWorkspaceReason: 'Reviewing workspace access',
+        activeWorkspaceSelectedAt: selectedAt,
+        active: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
       final tenantAdmin = UserModel(
         id: 'ta',
         email: 'tenant@example.com',
         displayName: 'Tenant Admin',
         role: UserRole.tenantAdmin,
+        tenantId: 'tenant-1',
         active: true,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
@@ -53,7 +67,8 @@ void main() {
       expect(AppShell.canManageWorkspaces(superAdmin), isTrue);
       expect(AppShell.canManageWorkspaces(tenantAdmin), isFalse);
       expect(AppShell.canManageWorkspaces(seller), isFalse);
-      expect(AppShell.canManageUsers(superAdmin), isTrue);
+      expect(AppShell.canManageUsers(superAdmin), isFalse);
+      expect(AppShell.canManageUsers(selectedSuperAdmin), isTrue);
       expect(AppShell.canManageUsers(tenantAdmin), isTrue);
       expect(AppShell.canManageUsers(seller), isFalse);
     });

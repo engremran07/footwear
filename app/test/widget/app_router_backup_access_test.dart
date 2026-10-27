@@ -12,10 +12,13 @@ import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/database_backup_provider.dart';
 import 'package:footwear_erp/providers/network_provider.dart';
+import 'package:footwear_erp/providers/notification_provider.dart';
 import 'package:footwear_erp/providers/tenant_provider.dart';
 import 'package:footwear_erp/screens/database_backup_screen.dart';
+import 'package:footwear_erp/screens/notification_center_screen.dart';
 import 'package:footwear_erp/screens/route_form_screen.dart';
 import 'package:footwear_erp/screens/shop_form_screen.dart';
+import 'package:footwear_erp/widgets/app_shell.dart';
 
 void main() {
   testWidgets('router page transitions are disabled for reduced motion', (
@@ -138,7 +141,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('supervisor can open route creation but not admin-only screens', (
+  testWidgets('supervisor can open operational and notification screens', (
     tester,
   ) async {
     final router = await _pumpBackupRoute(
@@ -158,10 +161,45 @@ void main() {
 
     router.go('/notifications');
     await tester.pumpAndSettle();
-    expect(router.routerDelegate.currentConfiguration.uri.path, '/');
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '/notifications',
+    );
+    expect(find.byType(NotificationCenterScreen), findsOneWidget);
+    expect(
+      AppShell.navigationRoutesFor(
+        UserModel(
+          id: 'supervisor',
+          email: '',
+          displayName: '',
+          role: UserRole.supervisor,
+          tenantId: 'tenant-1',
+          active: true,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        ),
+      ),
+      contains('/notifications'),
+    );
+
     router.go('/users');
     await tester.pumpAndSettle();
     expect(router.routerDelegate.currentConfiguration.uri.path, '/');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('seller remains unable to open notification center', (
+    tester,
+  ) async {
+    final router = await _pumpBackupRoute(
+      tester,
+      role: UserRole.seller,
+      routeIds: const ['route-1'],
+      location: '/notifications',
+    );
+
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/');
+    expect(find.byIcon(Icons.notifications_outlined), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
@@ -208,6 +246,12 @@ Future<GoRouter> _pumpBackupRoute(
         authUserProvider.overrideWith((ref) => Stream.value(user)),
         databaseBackupProvider.overrideWith(_TestBackupNotifier.new),
         isOnlineProvider.overrideWith((ref) => Stream.value(true)),
+        notificationsProvider.overrideWith(
+          (ref, tenantId) => Stream.value(const []),
+        ),
+        activeNotificationShopIdsProvider.overrideWith(
+          (ref, tenantId) => Stream.value(const <String>{}),
+        ),
         tenantProvider(tenant.id).overrideWith((ref) => Stream.value(tenant)),
       ],
       child: Consumer(

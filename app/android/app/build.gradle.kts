@@ -91,12 +91,36 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
+}
+
+tasks.configureEach {
+    val isReleasePackagingTask =
+        name.contains("Release", ignoreCase = true) &&
+            (name.startsWith("assemble", ignoreCase = true) ||
+                name.startsWith("bundle", ignoreCase = true) ||
+                name.startsWith("package", ignoreCase = true))
+    if (isReleasePackagingTask) {
+        doFirst {
+            if (!keystorePropertiesFile.isFile) {
                 throw GradleException(
                     "key.properties not found at ${keystorePropertiesFile.absolutePath}. " +
-                    "Release builds require a valid signing configuration."
+                        "Release builds require a valid signing configuration."
+                )
+            }
+            val requiredSigningProperties =
+                listOf("keyAlias", "keyPassword", "storeFile", "storePassword")
+            val missingSigningProperties = requiredSigningProperties.filter {
+                keystoreProperties.getProperty(it).isNullOrBlank()
+            }
+            if (missingSigningProperties.isNotEmpty()) {
+                throw GradleException(
+                    "Release signing configuration is incomplete; missing: " +
+                        missingSigningProperties.joinToString()
                 )
             }
         }
