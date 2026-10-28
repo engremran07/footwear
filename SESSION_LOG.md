@@ -33,8 +33,11 @@ contextual-action and workspace-logo work, and record exact delivery evidence.
   accessibility/browser/device acceptance remain open. The user-reported PDF
   connected-letter issue remains unconfirmed because its original document
   and viewer/runtime details are unavailable; no font policy was changed.
-- Git commit/push are the remaining authorized publication operations.
-  A push to `main` triggers the repository deployment workflow.
+- Release changes were committed as `1dc72b4`
+  (`feat: add contextual actions and preserve workspace logos`). Push output:
+  `cee6ecb..1dc72b4 main -> main`. This push triggers the repository's
+  Hosting and Firestore Rules/indexes deployment workflow; the status of that
+  push-triggered workflow was not checked here.
 
 ---
 
