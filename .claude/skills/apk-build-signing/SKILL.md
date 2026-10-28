@@ -101,6 +101,23 @@ artifacts. When Windows reports memory pressure, run one release build at a
 time and close unnecessary applications rather than deleting caches or
 terminating unrelated processes.
 
+### Windows verification notes
+
+- `gradlew.bat --version` reports Gradle's embedded Kotlin runtime; it is not
+  the Android Kotlin Gradle plugin version. Verify the plugin pin in
+  `app/android/settings.gradle.kts` before diagnosing version drift.
+- `apkanalyzer` expects APK/APK-set inputs and may fail on an AAB with
+  `NoSuchFileException: /AndroidManifest.xml`. Do not treat that as a bundle
+  build/signing failure. Use `bundletool` when available for AAB manifest
+  inspection; otherwise report that bundle metadata was not independently
+  extracted and verify the synchronized source version plus JAR signature.
+- A successful release build with unaccepted SDK licenses is evidence only
+  that the local build completed. Do not accept licenses automatically.
+- `jarsigner -verify` may report `jar verified.` while warning that a private
+  upload certificate chain is not trusted by the local JVM. Treat that as
+  signature-integrity evidence, not proof that Play Console recognizes the
+  upload key; confirm the certificate is registered before upload.
+
 ## Local Validation and Release Artifacts
 
 Release actions are separate: local builds do not deploy Hosting or Firestore,

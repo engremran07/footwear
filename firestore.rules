@@ -114,6 +114,52 @@ service cloud.firestore {
         selectedAt <= request.time;
     }
 
+    function supportAccessStartLogMatches(userId, workspaceId, reason, logId) {
+      let logPath = /databases/$(database)/documents/platform_access_logs/$(logId);
+      let log = getAfter(logPath).data;
+      return logId is string && logId.size() > 0 &&
+        log.actor_user_id == userId &&
+        log.workspace_id == workspaceId &&
+        log.event_type == 'workspace_access_started' &&
+        log.reason == reason &&
+        log.created_at == request.time;
+    }
+
+    function isLinkedSupportAccessStartLog(logId) {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      let userData = getAfter(userPath).data;
+      return logId is string && logId.size() > 0 &&
+        userData.get('active_workspace_access_log_id', '') == logId &&
+        userData.get('active_workspace_id', '') ==
+          request.resource.data.workspace_id &&
+        userData.get('active_workspace_reason', '') ==
+          request.resource.data.reason &&
+        userData.get('active_workspace_selected_at', null) ==
+          request.resource.data.created_at &&
+        request.resource.data.created_at == request.time;
+    }
+
+    function hasNewSupportAccessEndLog(logId) {
+      let logPath = /databases/$(database)/documents/platform_access_logs/$(logId);
+      return logId is string && logId.size() > 0 &&
+        !exists(logPath) &&
+        existsAfter(logPath);
+    }
+
+    function isLinkedSupportAccessEndLog(logId) {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      let previousUser = get(userPath).data;
+      let updatedUser = getAfter(userPath).data;
+      let startedLogId = previousUser.get('active_workspace_access_log_id', '');
+      return logId is string && logId.size() > 0 &&
+        previousUser.get('active_workspace_id', '') ==
+          request.resource.data.workspace_id &&
+        previousUser.get('active_workspace_reason', '') ==
+          request.resource.data.reason &&
+        request.resource.data.get('started_log_id', '') == startedLogId &&
+        updatedUser.get('last_workspace_access_end_log_id', '') == logId;
+    }
+
     function isSuperAdminRestoringTenant(tenantId) {
       let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
       return isSuperAdminForSelectedWorkspace(tenantId) &&
@@ -157,6 +203,11 @@ service cloud.firestore {
         isOperationalRole(role) &&
         hasTenantAccess &&
         isTenantActive(tenantId);
+    }
+
+    function isNotificationReaderForTenant(tenantId) {
+      return isOperationalForTenant(tenantId) &&
+        !isSuperAdminRole(getUserRole());
     }
 
     function currentUserTenantId() {
@@ -1691,7 +1742,14 @@ service cloud.firestore {
           isOwnDoc(userId) &&
           isSuperAdmin() &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['active_workspace_id', 'active_workspace_reason', 'active_workspace_selected_at', 'updated_at']) &&
+            .hasOnly([
+              'active_workspace_id',
+              'active_workspace_reason',
+              'active_workspace_selected_at',
+              'active_workspace_access_log_id',
+              'last_workspace_access_end_log_id',
+              'updated_at'
+            ]) &&
           request.resource.data.active_workspace_id is string &&
           exists(/databases/$(database)/documents/tenants/$(request.resource.data.active_workspace_id)) &&
           request.resource.data.active_workspace_reason is string &&
@@ -1699,16 +1757,47 @@ service cloud.firestore {
           request.resource.data.active_workspace_reason.size() <= 240 &&
           request.resource.data.active_workspace_selected_at is timestamp &&
           request.resource.data.active_workspace_selected_at == request.time &&
+          request.resource.data.active_workspace_access_log_id is string &&
+          supportAccessStartLogMatches(
+            userId,
+            request.resource.data.active_workspace_id,
+            request.resource.data.active_workspace_reason,
+            request.resource.data.active_workspace_access_log_id
+          ) &&
+          (
+            resource.data.get('active_workspace_id', '') == '' ?
+              request.resource.data.get('last_workspace_access_end_log_id', '') ==
+                resource.data.get('last_workspace_access_end_log_id', '') :
+              hasNewSupportAccessEndLog(
+                request.resource.data.get('last_workspace_access_end_log_id', '')
+              )
+          ) &&
           docSizeOk()
         ) ||
         (
           isOwnDoc(userId) &&
           isSuperAdmin() &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['active_workspace_id', 'active_workspace_reason', 'active_workspace_selected_at', 'updated_at']) &&
+            .hasOnly([
+              'active_workspace_id',
+              'active_workspace_reason',
+              'active_workspace_selected_at',
+              'active_workspace_access_log_id',
+              'last_workspace_access_end_log_id',
+              'updated_at'
+            ]) &&
           !('active_workspace_id' in request.resource.data) &&
           !('active_workspace_reason' in request.resource.data) &&
           !('active_workspace_selected_at' in request.resource.data) &&
+          !('active_workspace_access_log_id' in request.resource.data) &&
+          (
+            resource.data.get('active_workspace_id', '') == '' ?
+              request.resource.data.get('last_workspace_access_end_log_id', '') ==
+                resource.data.get('last_workspace_access_end_log_id', '') :
+              hasNewSupportAccessEndLog(
+                request.resource.data.get('last_workspace_access_end_log_id', '')
+              )
+          ) &&
           docSizeOk()
         ) ||
         (
@@ -2315,7 +2404,7 @@ service cloud.firestore {
     // user can create for the admin feed after the rate-limit checks.
     // Notifications remain tenant-owned and require active-tenant access.
     match /notifications/{notifId} {
-      allow read: if isOperationalForTenant(resource.data.tenant_id);
+      allow read: if isNotificationReaderForTenant(resource.data.tenant_id);
       allow create: if isActiveUser()
           && request.resource.data.created_by == request.auth.uid
           && isConcreteTenantId(request.resource.data.tenant_id)
@@ -2325,7 +2414,7 @@ service cloud.firestore {
           && request.resource.data.created_at == request.time
           && notificationRateAllowed()
           && docSizeOk();
-      allow update: if isOperationalForTenant(resource.data.tenant_id)
+      allow update: if isNotificationReaderForTenant(resource.data.tenant_id)
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['read', 'read_at']);
       allow delete: if false;
@@ -2346,8 +2435,13 @@ service cloud.firestore {
         request.resource.data.created_at is timestamp &&
         request.resource.data.created_at == request.time &&
         request.resource.data.keys().hasOnly([
-          'actor_user_id', 'workspace_id', 'event_type', 'reason', 'created_at'
-        ]) && docSizeOk();
+          'actor_user_id', 'workspace_id', 'event_type', 'reason',
+          'started_log_id', 'created_at'
+        ]) &&
+        (request.resource.data.event_type == 'workspace_access_started' ?
+        isLinkedSupportAccessStartLog(logId) :
+        isLinkedSupportAccessEndLog(logId)) &&
+        docSizeOk();
       allow update, delete: if false;
     }
 

@@ -86,7 +86,8 @@ class PermissionPolicy {
       return can(user, AppCapability.manageBackup);
     }
     if (path == '/settings/flush') {
-      return can(user, AppCapability.manageDataMaintenance);
+      return can(user, AppCapability.viewDataMaintenance) ||
+          can(user, AppCapability.manageDataMaintenance);
     }
     if (path == '/settings') {
       return can(user, AppCapability.viewSettingsHub);

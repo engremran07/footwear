@@ -71,11 +71,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 
     final currentUser = currentUserState.value;
     if (currentUser == null) {
-      return Scaffold(
-        body: Center(
-          child: Text(tr('permission_denied', ref)),
-        ),
-      );
+      return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
 
     final canViewUserAccounts = PermissionPolicy.hasRoleCapability(
@@ -321,6 +317,8 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     final nameC = TextEditingController();
     final phoneC = TextEditingController();
     String role = 'seller';
+    String? createError;
+    var isCreating = false;
     final selectedRouteIds = <String>[];
     final selectedRouteNames = <String>[];
 
@@ -334,16 +332,49 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (createError != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(ctx).colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          tr(createError!, ref),
+                          key: const Key('user_create_error'),
+                          style: TextStyle(
+                            color: Theme.of(ctx).colorScheme.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   TextField(
+                    key: const Key('user_create_name'),
                     controller: nameC,
                     decoration: InputDecoration(labelText: tr('name', ref)),
                     textCapitalization: TextCapitalization.words,
+                    onChanged: (_) {
+                      if (createError != null) {
+                        setS(() => createError = null);
+                      }
+                    },
                   ),
                   const SizedBox(height: 8),
                   TextField(
+                    key: const Key('user_create_email'),
                     controller: emailC,
                     decoration: InputDecoration(labelText: tr('email', ref)),
                     keyboardType: TextInputType.emailAddress,
+                    onChanged: (_) {
+                      if (createError != null) {
+                        setS(() => createError = null);
+                      }
+                    },
                   ),
                   const SizedBox(height: 8),
                   TextField(
@@ -355,10 +386,16 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
                   ),
                   const SizedBox(height: 8),
                   TextField(
+                    key: const Key('user_create_password'),
                     controller: passC,
                     decoration: InputDecoration(labelText: tr('password', ref)),
                     obscureText: true,
                     keyboardType: TextInputType.visiblePassword,
+                    onChanged: (_) {
+                      if (createError != null) {
+                        setS(() => createError = null);
+                      }
+                    },
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
@@ -425,61 +462,76 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: isCreating ? null : () => Navigator.pop(ctx),
                 child: Text(tr('cancel', ref)),
               ),
               ElevatedButton(
-                onPressed: () async {
-                  if (nameC.text.trim().isEmpty ||
-                      emailC.text.trim().isEmpty ||
-                      passC.text.isEmpty) {
-                    return;
-                  }
-                  if (passC.text.length < 8) {
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        warningSnackBar(tr('err_weak_password', ref)),
-                      );
-                    }
-                    return;
-                  }
-                  if (role == 'seller' &&
-                      !_validateSellerRoutes(
-                        ctx,
-                        selectedRouteIds,
-                        selectedRouteNames,
-                      )) {
-                    return;
-                  }
-                  try {
-                    await ref
-                        .read(userManagementNotifierProvider.notifier)
-                        .createUser(
-                          email: emailC.text.trim(),
-                          password: passC.text,
-                          displayName: nameC.text.trim(),
-                          role: role,
-                          phone: phoneC.text.trim(),
-                          assignedRouteIds: selectedRouteIds,
-                          assignedRouteNames: selectedRouteNames,
-                          tenantId: tenantId,
-                        );
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        successSnackBar(tr('saved_successfully', ref)),
-                      );
-                    }
-                  } catch (e) {
-                    if (ctx.mounted) {
-                      final key = AppErrorMapper.key(e);
-                      ScaffoldMessenger.of(
-                        ctx,
-                      ).showSnackBar(errorSnackBar(tr(key, ref)));
-                    }
-                  }
-                },
-                child: Text(tr('create', ref)),
+                onPressed: isCreating
+                    ? null
+                    : () async {
+                        if (nameC.text.trim().isEmpty ||
+                            emailC.text.trim().isEmpty ||
+                            passC.text.isEmpty) {
+                          return;
+                        }
+                        if (passC.text.length < 8) {
+                          setS(() => createError = 'err_weak_password');
+                          return;
+                        }
+                        if (role == 'seller' &&
+                            !_validateSellerRoutes(
+                              ctx,
+                              selectedRouteIds,
+                              selectedRouteNames,
+                              onError: (key) => setS(() => createError = key),
+                            )) {
+                          return;
+                        }
+                        setS(() {
+                          isCreating = true;
+                          createError = null;
+                        });
+                        try {
+                          await ref
+                              .read(userManagementNotifierProvider.notifier)
+                              .createUser(
+                                email: emailC.text.trim(),
+                                password: passC.text,
+                                displayName: nameC.text.trim(),
+                                role: role,
+                                phone: phoneC.text.trim(),
+                                assignedRouteIds: selectedRouteIds,
+                                assignedRouteNames: selectedRouteNames,
+                                tenantId: tenantId,
+                              );
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              successSnackBar(tr('saved_successfully', ref)),
+                            );
+                          }
+                        } catch (e) {
+                          if (ctx.mounted) {
+                            setS(() => createError = AppErrorMapper.key(e));
+                          }
+                        } finally {
+                          if (ctx.mounted) setS(() => isCreating = false);
+                        }
+                      },
+                child: isCreating
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(tr('loading', ref)),
+                        ],
+                      )
+                    : Text(tr('create', ref)),
               ),
             ],
           );
@@ -765,25 +817,39 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
   bool _validateSellerRoutes(
     BuildContext dialogContext,
     List<String> selectedRouteIds,
-    List<String> selectedRouteNames,
-  ) {
+    List<String> selectedRouteNames, {
+    void Function(String key)? onError,
+  }) {
     final routeState = ref.read(routesProvider);
     if (routeState.hasError) {
-      ScaffoldMessenger.of(dialogContext).showSnackBar(
-        errorSnackBar(tr(AppErrorMapper.key(routeState.error!), ref)),
-      );
+      final key = AppErrorMapper.key(routeState.error!);
+      if (onError != null) {
+        onError(key);
+      } else {
+        ScaffoldMessenger.of(
+          dialogContext,
+        ).showSnackBar(errorSnackBar(tr(key, ref)));
+      }
       return false;
     }
     if (routeState.isLoading || !routeState.hasValue) {
-      ScaffoldMessenger.of(
-        dialogContext,
-      ).showSnackBar(infoSnackBar(tr('loading', ref)));
+      if (onError != null) {
+        onError('loading');
+      } else {
+        ScaffoldMessenger.of(
+          dialogContext,
+        ).showSnackBar(infoSnackBar(tr('loading', ref)));
+      }
       return false;
     }
     if (selectedRouteIds.isEmpty) {
-      ScaffoldMessenger.of(
-        dialogContext,
-      ).showSnackBar(warningSnackBar(tr('msg_seller_needs_route', ref)));
+      if (onError != null) {
+        onError('msg_seller_needs_route');
+      } else {
+        ScaffoldMessenger.of(
+          dialogContext,
+        ).showSnackBar(warningSnackBar(tr('msg_seller_needs_route', ref)));
+      }
       return false;
     }
 
@@ -793,9 +859,13 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
     if (selectedRouteIds.any(
       (routeId) => !routeNamesById.containsKey(routeId),
     )) {
-      ScaffoldMessenger.of(
-        dialogContext,
-      ).showSnackBar(warningSnackBar(tr('route_unavailable', ref)));
+      if (onError != null) {
+        onError('route_unavailable');
+      } else {
+        ScaffoldMessenger.of(
+          dialogContext,
+        ).showSnackBar(warningSnackBar(tr('route_unavailable', ref)));
+      }
       return false;
     }
     selectedRouteNames

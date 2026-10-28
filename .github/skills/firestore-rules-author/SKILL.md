@@ -28,6 +28,12 @@ description: "Use when: authoring or changing ShoesERP Firestore Security Rules,
 - Preserve the selected-workspace and time-bounded support context for
   super-admin business access. Only the intended selected super-admin restore
   operation may reactivate an inactive tenant.
+- Require support-context start and end events to be append-only and linked to
+  the corresponding profile transition in the same batch. Starts bind the
+  profile's `active_workspace_access_log_id` to the event; exits bind
+  `last_workspace_access_end_log_id` to the end event and validate the prior
+  context plus its start-event ID when present. Workspace switches must end
+  the previous context and start the next in one batch.
 - Keep role aliases aligned: `manager` is admin-equivalent; `tenant_admin` is
   workspace-scoped; `super_admin` is platform-scoped, never a global business
   reader; sellers are route-scoped.

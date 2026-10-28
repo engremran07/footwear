@@ -66,6 +66,16 @@ void main() {
       );
     });
 
+    test('reads and preserves the workspace non-stock invoice setting', () {
+      final settings = SettingsModel.fromJson({
+        ...baseJson,
+        'allow_non_stock_invoices': true,
+      });
+
+      expect(settings.allowNonStockInvoices, isTrue);
+      expect(settings.toJson()['allow_non_stock_invoices'], isTrue);
+    });
+
     test('invoice header snapshot includes tenant branding and logo', () {
       final settings = SettingsModel.fromJson(baseJson);
       final snapshot = settings.invoiceHeaderSnapshot;

@@ -49,6 +49,7 @@ class UserModel {
   final String? activeWorkspaceId;
   final String? activeWorkspaceReason;
   final Timestamp? activeWorkspaceSelectedAt;
+  final String? activeWorkspaceAccessLogId;
 
   /// Multi-route assignment (many-to-many). Each seller can serve multiple routes.
   final List<String> assignedRouteIds;
@@ -69,6 +70,7 @@ class UserModel {
     this.activeWorkspaceId,
     this.activeWorkspaceReason,
     this.activeWorkspaceSelectedAt,
+    this.activeWorkspaceAccessLogId,
     this.assignedRouteIds = const [],
     this.assignedRouteNames = const [],
     required this.active,
@@ -149,6 +151,9 @@ class UserModel {
       activeWorkspaceSelectedAt: role == UserRole.superAdmin
           ? json['active_workspace_selected_at'] as Timestamp?
           : null,
+      activeWorkspaceAccessLogId: role == UserRole.superAdmin
+          ? json['active_workspace_access_log_id'] as String?
+          : null,
       assignedRouteIds: routeIds,
       assignedRouteNames: routeNames,
       active: json['active'] as bool? ?? true,
@@ -169,6 +174,8 @@ class UserModel {
       'active_workspace_reason': activeWorkspaceReason,
     if (activeWorkspaceSelectedAt != null)
       'active_workspace_selected_at': activeWorkspaceSelectedAt,
+    if (activeWorkspaceAccessLogId != null)
+      'active_workspace_access_log_id': activeWorkspaceAccessLogId,
     'assigned_route_ids': assignedRouteIds,
     'assigned_route_names': assignedRouteNames,
     'active': active,
@@ -187,6 +194,7 @@ class UserModel {
     String? activeWorkspaceId,
     String? activeWorkspaceReason,
     Timestamp? activeWorkspaceSelectedAt,
+    String? activeWorkspaceAccessLogId,
     List<String>? assignedRouteIds,
     List<String>? assignedRouteNames,
     bool? active,
@@ -206,6 +214,8 @@ class UserModel {
           activeWorkspaceReason ?? this.activeWorkspaceReason,
       activeWorkspaceSelectedAt:
           activeWorkspaceSelectedAt ?? this.activeWorkspaceSelectedAt,
+      activeWorkspaceAccessLogId:
+          activeWorkspaceAccessLogId ?? this.activeWorkspaceAccessLogId,
       assignedRouteIds: assignedRouteIds ?? this.assignedRouteIds,
       assignedRouteNames: assignedRouteNames ?? this.assignedRouteNames,
       active: active ?? this.active,

@@ -1,0 +1,113 @@
+FINAL CHANGE SUMMARY
+Audit date: 2026-10-28 (live console recheck addendum)
+Repository: engremran07/footwear
+Branch/HEAD: main / 6e5a4337f506d0713fe0463fb6f0ec0cef259b04
+Status: local, uncommitted; production deployment not performed.
+
+2026-10-28 CONSOLE RECHECK
+- Inspected the shared production web page read-only. The dashboard rendered
+  after reload; the direct console capture contained 9 Flutter/Firebase
+  `debug` messages and no errors or warnings.
+- The six MozBar toolbar entries in the supplied screenshot are external
+  browser-extension messages. Flutter bootstrap, TrustedTypes, and Firebase
+  initialization messages are expected SDK startup diagnostics.
+- Browser `[Violation]` timing entries were not reproduced in the capture
+  window and had no source-attributed production trace. A local 150-route
+  widget test did reproduce eager mounting of 150 analytics rows; the screen
+  now builds them through a lazy `SliverList`, preserving route content and
+  navigation. The regression passes with no more than 12 mounted tiles.
+- The local source correction is not proven to be the cause of the live
+  `[Violation]` callbacks: the diagnostic source map did not match the
+  deployed bundle, and no identical post-change browser trace was captured.
+  No browser console output or timing warning was suppressed.
+- The first `networkidle` reload timed out while browser navigation cancelled
+  Firestore Listen requests; the next DOM-ready reload completed. This is not
+  evidence of a Rules denial.
+- Current source is `3.10.12+1123`. The old `3.10.10` APK/AAB details below
+  are historical only. Current-version web/APK/AAB builds and phone install
+  are verified in the later 2026-10-28 release addendum. Hosting/Rules deploy
+  remains unperformed.
+
+IMPLEMENTED
+- Firestore Rules require same-batch support-access end events when the
+  selected workspace context is cleared or switched.
+- End events are linked to the prior profile context and optional start-event
+  ID; the updated profile stores `last_workspace_access_end_log_id`.
+- Provider exit, sign-out, and workspace-switch flows use the end-event
+  writer. Workspace switching also starts the new context in the same batch.
+- Added emulator regressions, including mismatched prior start-event denial.
+- Fixed an analyzer warning in the new map update using the repository's
+  null-aware map-entry convention.
+- Updated runtime docs, audit/session records, regression registry, Rules
+  instructions, tenant/testing/Rules skills, and corrected the inline-audit
+  reset guidance.
+- Added evidence-first TDD, boundary-appropriate unit/integration/Rules test
+  expectations, scoped authorized security-testing guidance, and an explicit
+  export integration CI step.
+- Verified the pinned Android Gradle toolchain and updated its skill with
+  Windows/AAB metadata diagnostics; no Gradle version upgrade was justified.
+- Added the eight requested clean-slate audit artifacts in this directory.
+
+VALIDATION
+- Rules Emulator: 181 passing (37s).
+- Full Flutter suite: 01:19 +659: All tests passed!
+- UserModel regression: 00:00 +26: All tests passed!
+- Flutter library analyzer: No issues found! (ran in 7.7s).
+- Dart test analyzer: No issues found!
+- Split APKs built: 30.7/32.2/33.7 MB. ARM64 APK v2 signature verified;
+  package versionName `3.10.10`, versionCode `310103121`. Copy to
+  `R5GL22RGT9V`: `1 file pushed`; install: `Success`.
+- Signed AAB built at
+  `app/build/app/outputs/bundle/release/app-release.aab` (54.8 MB);
+  `jarsigner` reported `jar verified.`. AAB manifest metadata was not
+  independently extracted.
+- Markdown lint exited 0 with no output after the final documentation edits;
+  `git diff --check` exited 0.
+- The focused retired-script source/configuration scan found no active
+  invocations. Global zero-trace acceptance remains open because the privileged
+  promotion tool and unexplained zero-byte worktree file remain unresolved.
+
+RETAINED / NOT REMOVED
+- Disabled migration, backup, restore, and reset scripts remain as explicit
+  fail-closed guards; no proof was available that their safety barriers or
+  recovery references can be removed.
+- `firestore-diagnostic.js` and the audit generator remain active tools.
+- `promote_super_admin.js` remains an owner-review blocker; it was not run.
+- Node manifests/locks remain because active diagnostics and emulator tests
+  depend on them.
+- An unexplained zero-byte untracked test-directory file remains preserved.
+  It was present before final audit cleanup and was not deleted.
+
+BLOCKERS AND RISKS
+- Local Firestore Rules and client changes are undeployed. Do not use the
+  updated client support-access flow against stale production Rules.
+- Runtime-configurable permissions and workspace feature-specific resets need
+  approved, Rules-enforced semantics; no schema was invented and no destructive
+  reset control was enabled.
+- Production data/schema reconciliation and external penetration testing were
+  not performed.
+- ADB initially showed no connected device; it later reconnected, and the
+  ARM64 APK was copied and installed successfully.
+- The complete repository audit and zero-trace acceptance remain partial;
+  see CLEAN_SLATE_AUDIT.txt and ZERO_TRACE_SEARCH_REPORT.txt.
+
+2026-10-28 LOCAL RELEASE ADDENDUM
+- Version `3.10.12+1123` was verified synchronized in `pubspec.yaml` and
+  `AppBrand`. Web build: `EXIT: 0`.
+- Split APKs: ARMv7 `30.7 MB`, ARM64 `32.3 MB`, x86_64 `33.7 MB`; each
+  verified with APK Signature Scheme v2. Signed AAB: `54.8 MB`;
+  `jarsigner -verify` reported `jar verified.` with a local certificate-chain
+  trust warning. Bundle metadata was not extracted because bundletool was
+  unavailable.
+- ARM64 was copied to `/sdcard/Download/` (`1 file pushed`) and installed on
+  `R5GL22RGT9V` (`Success`); installed versionName `3.10.12`, versionCode
+  `310123123`.
+- Hosting, Rules/indexes, Play Console upload, production data changes, commit,
+  and push were not performed. The artifacts remain local because the matching
+  Rules changes have not been deployed.
+
+ROLLBACK
+No commit exists to revert. The changes are uncommitted and must be reviewed
+as a coherent Rules/client batch. Do not selectively remove the Rules guard or
+client linkage: deploy only the matching tested schema/rules pair when
+explicitly authorized. Preserve unrelated worktree changes.

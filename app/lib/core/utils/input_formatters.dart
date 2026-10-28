@@ -14,9 +14,9 @@ class AppInputFormatters {
     RegExp(r'[\d+\-\s]'),
   );
 
-  /// Amounts: digits + single decimal point.
+  /// Amounts: Western, Arabic-Indic, and Eastern Arabic digits and separators.
   static final amountFormatter = FilteringTextInputFormatter.allow(
-    RegExp(r'[\d.]'),
+    RegExp(r'[0-9٠-٩۰-۹.,٫٬،]'),
   );
 
   /// Integer-only input.

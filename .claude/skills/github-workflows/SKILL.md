@@ -11,9 +11,9 @@ description: "Use when: creating or updating GitHub Actions workflows for Flutte
 
 |------|---------|---------|
 
-| `.github/workflows/ci.yml` | push / PR | Analyse + test + 17 hygiene gates |
+| `.github/workflows/ci.yml` | push / PR | Analyse + test + 18 hygiene gates |
 
-| `.github/workflows/build-apk.yml` | workflow_dispatch | Debug + release split-per-ABI APK set |
+| `.github/workflows/build-apk.yml` | workflow_dispatch | Debug/release split APKs or signed Play Console AAB |
 
 | `.github/workflows/release.yml` | push tag `v*` | Full validate + build + deploy + GitHub Release |
 
@@ -48,7 +48,7 @@ fi
 
 ```
 
-## 17 Hygiene Gate Grep Patterns
+## Hygiene Gate Grep Patterns
 
 ```bash
 
@@ -126,11 +126,21 @@ if [ -n "$FOUND" ]; then
   echo "FAIL: temp/debug artifact tracked: $FOUND"; exit 1
 fi
 
+# Gate 18: No tracked node_modules
+
+FOUND=$(git ls-files | grep -E '(^|/)node_modules/' || true)
+
+if [ -n "$FOUND" ]; then
+  echo "FAIL: node_modules must not be tracked: $FOUND"; exit 1
+fi
+
 ```
 
 ## Mandatory Local Pre-Signoff Sequence (non-bypassable)
 
-Before every commit, ALL of the following must succeed and evidence quoted:
+Before every commit, ALL of the following must succeed and evidence quoted.
+The current CI workflow has 18 hygiene gates; its checked-in step names and
+assertions are authoritative if this summary drifts:
 
 | Step | Command | Required evidence |
 
@@ -144,7 +154,7 @@ Before every commit, ALL of the following must succeed and evidence quoted:
 
 | 4 | `flutter test -r expanded --dart-define=use_arabic=true` | `All N tests passed!` |
 
-| 5 | Hygiene gates 5a-5e | all zero results |
+| 5 | All 18 CI hygiene gates plus runtime-specific grep gates | all pass |
 
 | 6 | `markdownlint "**/*.md" --ignore node_modules --ignore "app/build" --ignore "functions/node_modules"` | zero output (exit 0) |
 
@@ -161,6 +171,11 @@ Before every commit, ALL of the following must succeed and evidence quoted:
 | 12 | `git add -A && git commit && git push` | commit hash + push output |
 
 | 13 | `adb install --streaming -r <apk>` (if connected) | `Success` |
+
+The manual Android artifact workflow accepts `debug`, `release`, or `aab`.
+The AAB path writes the same release-signing inputs, builds
+`app-release.aab`, verifies it with `jarsigner`, and uploads it as a separate
+14-day artifact. APK modes retain their existing output paths.
 
 When `firebase_options.dart` is gitignored, CI must generate a stub:
 
@@ -217,3 +232,12 @@ Or use FlutterFire CLI with `FIREBASE_TOKEN` secret:
 - `FIREBASE_CLI_TOKEN` — `firebase login:ci` output
 
 - `FIREBASE_SERVICE_ACCOUNT` — service account JSON (for google-github-actions/auth)
+
+## Fail-Closed Maintenance Script Gate
+
+The Firestore Rules workflow runs
+`node --test tests/maintenance_scripts.test.js` before the emulator suite.
+Keep this check whenever reset, backup, restore, or tenant-migration scripts
+are required to remain disabled. The tests must spawn only disabled command
+stubs, assert a non-zero exit and explicit `Disabled:` message, and must not
+initialize Firebase or load production credentials.

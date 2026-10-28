@@ -6,6 +6,481 @@
 
 ---
 
+## SESSION-040 — 2026-10-28 — Local Web and Android Release Artifacts
+
+**Agent:** GitHub Copilot
+
+**Trigger:** The user requested web fixes, a Play Console AAB, and an APK
+copied to and installed on the phone.
+
+### Build and Delivery Evidence
+
+- Version synchronization was verified:
+  `app/pubspec.yaml` `3.10.12+1123`; `AppBrand` `3.10.12` / `1123`.
+- Web release build: `EXIT: 0`.
+- Split APK build succeeded:
+  - ARMv7: `30.7 MB` (`32,205,081` bytes).
+  - ARM64: `32.3 MB` (`33,837,437` bytes).
+  - x86_64: `33.7 MB` (`35,330,289` bytes).
+- All three APKs verified with APK Signature Scheme v2.
+- Signed AAB: `54.8 MB` (`57,481,385` bytes); `jarsigner -verify`:
+  `jar verified.` The local JVM warned that the upload certificate chain is
+  not trusted; this does not establish Play Console registration. AAB manifest
+  metadata was not independently extracted because bundletool was unavailable.
+- ARM64 APK copied to `/sdcard/Download/app-arm64-v8a-release.apk`
+  (`1 file pushed`) and installed on `R5GL22RGT9V` (`Success`). Post-install
+  package metadata: versionName `3.10.12`, versionCode `310123123`.
+
+### Production Boundaries
+
+- The web build is local; Firebase Hosting was not deployed.
+- Firestore Rules/indexes were not deployed. Local Rules/client schema changes
+  remain incompatible with an assumption of deployed production behavior; do
+  not treat these artifacts as production-ready until the matching Rules are
+  deployed with explicit authorization.
+- No Play Console upload, production data change, commit, or push was performed.
+
+---
+
+## SESSION-039 — 2026-10-28 — Dashboard Route Rendering Profile Follow-up
+
+**Agent:** GitHub Copilot
+
+**Trigger:** The user required timing diagnostics to be investigated and fixed
+without suppressing browser messages.
+
+### Confirmed Source Cost and Change
+
+- The authenticated dashboard's route analytics section expanded every route
+  into a `ListTile` inside a `Column`. A controlled widget regression with 150
+  routes reproduced 150 mounted tiles after scrolling to the section.
+- Replaced the dashboard's outer `ListView` with a `CustomScrollView` and the
+  route rows with a lazy `SliverList`. The same computed rows, order, visible
+  values, and route navigation are retained; only offscreen widget construction
+  is deferred.
+- An initial nested `ListView.builder(shrinkWrap: true)` attempt still mounted
+  all 150 rows and was rejected. The regression then passed after the sliver
+  change, confirming at most 12 route tiles are mounted while both end routes
+  remain reachable.
+
+### Verification and Remaining Attribution
+
+- Before-change regression: failed with `Actual: <150>` against the
+  `lessThanOrEqualTo(12)` assertion.
+- Dashboard test pair: `00:06 +3: All tests passed!`.
+- Full Flutter suite: `01:29 +685: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 47.4s)`.
+- `dart analyze test/`: `No issues found!`; focused `git diff --check` exited 0.
+- This confirms and fixes avoidable route-row widget construction in local
+  source. It does **not** prove that this was the source of the supplied live
+  `[Violation]` frames: the local source-map build differed from the deployed
+  bundle, and no equivalent post-change browser trace was captured. Console
+  output was not suppressed. A full Flutter suite, current-version web/APK/AAB
+  builds, production deployment, and device delivery were not performed here.
+
+---
+
+## SESSION-038 — 2026-10-28 — Live Web Inspector Recheck
+
+**Agent:** GitHub Copilot
+
+**Trigger:** The user reiterated that the supplied browser-inspector messages
+must be classified systematically, not hidden or ignored.
+
+### Observed Evidence and Classification
+
+- Read-only reload of the shared deployed web page rendered the dashboard.
+  A direct Playwright console capture returned nine `debug` entries for
+  Flutter bootstrap script injection, TrustedTypes policy availability, and
+  Firebase Core/Firestore/App Check/Auth initialization. It returned no
+  console `error` or `warning` entries in that capture window.
+- The supplied screenshot attributes six `toolbar.js` messages to MozBar.
+  Those originate from a browser extension and have no matching repository
+  source. They cannot be corrected by changing ShoesERP.
+- The screenshot's `[Violation]` handler-duration messages are browser
+  performance diagnostics, not exceptions. They did not recur during the
+  capture window, and no trace attributed them to a ShoesERP callback. No
+  suppression or speculative source change was made.
+- The first reload waiting for `networkidle` timed out while navigation
+  cancelled Firestore Listen requests with `net::ERR_ABORTED`. A subsequent
+  DOM-ready reload completed. This cancellation is not proof of permission
+  denial or a broken notification query.
+- The DevTools screenshot's message/source/severity counts are recorded as
+  displayed, not summed as mutually exclusive categories. A raw console export
+  and performance profile remain necessary to investigate any repeatable
+  long-task symptom.
+
+### Scope and Continuity
+
+- No application code, Firebase data, Rules, Hosting, build artifact, or Git
+  publication was changed in this recheck.
+- Current source remains `3.10.12+1123`; prior APK/AAB evidence for
+  `3.10.10` does not verify the current source. Current-version release and
+  authorized deployment tasks remain pending their own fresh validation.
+- This recheck does not close the separate notification feed timed-disappearance
+  task or prove production super-admin access under the local Rules changes.
+
+---
+
+## SESSION-037 — 2026-10-28 — Non-Stock Toggle Persistence and Access Regression
+
+**Agent:** GitHub Copilot
+
+**Trigger:** The invoice-header “Allow Non-stock Invoices” switch appeared on
+after selection but returned off after leaving and reopening the screen.
+
+### Confirmed Path and Changes
+
+- The switch only changed `_allowNonStockInvoices` and marked the complete
+  header form dirty. It did not call a notifier until the form Save button was
+  pressed; leaving the screen discarded the local setting.
+- The switch now immediately calls `SettingsNotifier.save()` with only
+  `allow_non_stock_invoices`. The screen disables repeated toggles while the
+  write is pending, restores the old value on failure, and displays the mapped
+  error. Existing unsaved header edits remain local.
+- A route-reentry widget regression failed before the fix because no save was
+  issued, then passed afterward. A second regression verifies permission-denied
+  rollback and visible feedback.
+- The same validation pass corrected the app-shell compile regression in the
+  active workspace banner and made the unread-count tenant argument null-safe.
+  An obsolete widget test expecting tenant admins to be denied maintenance was
+  updated to verify read-only access with disabled operations.
+
+### Validation and Release Boundaries
+
+- Focused affected suites: `00:00 +54: All tests passed!`; standalone
+  app-shell smoke tests: `00:01 +8: All tests passed!`; settings hydration:
+  `00:03 +6: All tests passed!`.
+- Full Flutter suite: `01:26 +684: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 9.1s)`;
+  `dart analyze test/`: `No issues found!`.
+- Local Rules Emulator evidence from this scope: `182 passing (41s)`.
+  Notification feeds remain restricted to admin/manager, tenant_admin, and
+  supervisor; sellers and platform super-admins are excluded.
+- No version bump, build, production deployment, phone copy/install, commit,
+  or push is claimed. The release environment check showed `2.85 GB` free RAM
+  (below the documented `3.2 GB` threshold) and ADB listed only
+  `List of devices attached`.
+
+---
+
+## SESSION-036 — 2026-10-27 — Mixed-Script UI Font Fallback
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the authenticated browser-console and font-fallback
+investigation after deployment of v3.10.11+1122.
+
+### Confirmed Path and Changes
+
+- The authenticated dashboard exposed mixed Arabic/Urdu Firestore text
+  under English UI styles. English `AppFonts` styles used Syne/DM Sans with no
+  fallback family; the shared resolver now keeps those primary families and
+  adds bundled Noto Sans Arabic followed by Noto Nastaliq Urdu. Arabic and Urdu
+  styles keep their locale font primary and fall back to the other script.
+- PDF code remains separate and unchanged. The PDF render path was not opened
+  in this browser session; UI fallback and embedded PDF font resources are not
+  visual proof of Arabic/Urdu PDF shaping.
+- The version and trilingual changelog are synchronized at `3.10.12+1123`.
+  Production Rules were not changed by this font correction.
+
+### Validation and Release Evidence
+
+- Focused font/changelog tests:
+  `00:01 +12: All tests passed!`.
+- Full Flutter suite: `01:31 +671: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 16.1s)`;
+  `dart analyze test/`: `No issues found!`.
+- Web release build reported `EXIT: 0`. Firebase Hosting reported
+  `Deploy complete!`; live `version.json` reports app version `3.10.12`,
+  build `1123`. The shell's cache header is
+  `no-store, must-revalidate, no-cache`.
+- After deployment, the existing browser page was reloaded and produced no
+  fresh console warnings/errors. It redirected to `/login`; its screenshot
+  showed the English, Arabic, and Urdu language labels, but authenticated
+  mixed-data dashboard rendering could not be visually rechecked. Network
+  listener cancellations elsewhere in retained history are not evidence of
+  a font or authorization failure.
+- APK/AAB builds were not started because the final free-RAM check was
+  `2.57 GB`, below the
+  documented `3.2 GB` release threshold. ADB output contained only
+  `List of devices attached`, so phone copy/install could not proceed. No
+  Play Console upload, production data change, commit, or push was performed.
+
+---
+
+## SESSION-035 — 2026-10-27 — Backup Recovery and Web Permission Audit
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the workspace backup, web-inspector, and local Android
+artifact verification from the prior session.
+
+### Confirmed Path and Changes
+
+- The backup screen hid its workspace readiness card from ordinary members
+  to avoid exposing workspace names. That also removed the only mapped error
+  and Retry path for the workspace metadata read. The generic scope card is
+  restored for members; successful readiness enables backup without showing
+  the workspace name. A focused regression checks retry, readiness, enabled
+  backup, and name privacy.
+- The full startup permission path was traced:
+  `AppShell.initState()` → post-frame first-run service → camera, photos,
+  storage, and OS-notification requests. The app has no matching camera or
+  OS-push workflow. The startup request service, unused dependency, and
+  unnecessary Android declarations were removed; image and backup file
+  operations continue through system pickers. This also addresses the
+  browser camera-policy and unsupported `Permission.photos` messages from
+  the prior trace at their source rather than suppressing them.
+- An initial web build used an old generated `web_plugin_registrant.dart`
+  containing `permission_handler_html` after that package had been removed.
+  Clearing Flutter-generated output and resolving dependencies regenerated
+  the plugin registrant; the subsequent standard web release build succeeded.
+- The latest synchronized version is `3.10.11+1122`; its trilingual
+  changelog includes the backup privacy/readiness and startup-permission
+  changes.
+
+### Validation and Release Evidence
+
+- Focused command:
+  `flutter test -r expanded --dart-define=use_arabic=true test\widget\database_backup_screen_test.dart test\widget\app_router_backup_access_test.dart test\unit\core\l10n_test.dart`
+  reported `00:24 +31: All tests passed!`.
+- Full Flutter suite reported `02:09 +669: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 36.3s)`.
+  `dart analyze test/`: `No issues found!`.
+- Local web build reported `EXIT: 0`. One unauthenticated browser reload at
+  `/#/login` produced nine Firebase initialization debug messages and no
+  console warnings/errors, page errors, or failed requests. This does not
+  prove that the full original inspector inventory is clear: the claimed
+  total of 18 conflicts with its listed category sum of 20, the Noto fallback
+  warning was not reproduced on the login page, and authenticated PDF
+  rendering remains unverified. Noto Sans Arabic and Noto Nastaliq Urdu files
+  are present in the generated web assets.
+- Split release APKs built: ARMv7 `30.7 MB`, ARM64 `32.2 MB`, and x86_64
+  `33.7 MB`. All three passed APK Signature Scheme v2 verification. The
+  signed Play Console AAB built at `54.8 MB`; `jarsigner` reported
+  `jar verified.` with a certificate-chain trust warning.
+- ARM64 was copied to `R5GL22RGT9V` (`1 file pushed`) and installed
+  (`Success`). The package reports versionName `3.10.11`,
+  versionCode `310113122`.
+- The prior unsigned local Rules changes remain undeployed. Hosting,
+  Firestore Rules/indexes, production data changes, Play Console upload,
+  commit, and push were not performed. The signed AAB still requires
+  confirmation that its upload certificate is registered in Play Console.
+- Authenticated-browser follow-up confirmed the live page still serves
+  version `3.10.9` build `1120`; the local source is `3.10.11+1122`. The
+  browser's retained history contained 47 mixed events from 20:21–20:35 UTC:
+  15 console entries (13 errors, 2 warnings) and 32 failed requests. Console
+  entries included two camera Permissions Policy violations, seven resource
+  timeouts, connection close/reset errors, two QUIC errors, and two Firestore
+  Listen transport warnings. Failed requests included 20 Firestore Listen
+  cancellations, seven Identity Toolkit timeouts, and one each for connection
+  close/reset, network change, QUIC idle timeout, and QUIC retransmission
+  timeout. A separate 60-second passive capture observed no new console or
+  page errors; the browser history did record one more Firestore Listen
+  cancellation. These results do not prove all reported DevTools messages are
+  resolved: the source fix is not deployed, the reported totals conflict, and
+  authenticated PDF/font rendering was not exercised. No Hosting or Rules
+  deployment was performed.
+
+---
+
+## SESSION-034 — 2026-10-27 — Super-Admin Hub and User-Creation Feedback
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the workspace access/user-creation recovery after the
+route and error-mapping changes were staged locally.
+
+### Confirmed Path and Changes
+
+- The root `/settings` route now uses the dedicated `viewSettingsHub`
+  capability; tenant settings descendants continue to require their
+  operation-specific capabilities. The root platform hub remains metadata
+  only until a valid workspace support context is selected.
+- The route regression initially failed because it searched for
+  `Platform settings`, while the localized UI correctly renders
+  `Platform Settings`. Correcting the case-sensitive expectation made the
+  test exercise the hub instead of a mismatched string.
+- User creation previously surfaced mapped Auth/provider errors through a
+  SnackBar behind the open dialog. The dialog now shows the localized mapped
+  error inline, disables its submit/cancel controls while creation is pending,
+  and displays a progress indicator. Seller-route validation feedback is
+  inline for this dialog; other dialog callers retain their existing
+  SnackBar feedback.
+- Firebase Auth email uniqueness remains project-wide. A duplicate email in a
+  different workspace remains correctly rejected; no role, provider, tenant,
+  seat-counter, Firestore Rules, or Auth policy was changed.
+- Missing workspace settings errors for invoice/receipt creation map to
+  localized setup guidance in EN/AR/UR. This clarifies a missing-settings
+  failure but does not create settings or prove that a particular live
+  workspace has that failure.
+
+### Validation and Limits
+
+- Focused command:
+  `flutter test -r expanded --dart-define=use_arabic=true test\widget\users_list_workspace_context_test.dart test\widget\app_router_backup_access_test.dart test\unit\core\error_mapper_test.dart`
+  reported `00:10 +60: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 9.5s)`.
+- `dart analyze test\`: `No issues found!`.
+- The widget test holds user creation pending, verifies the submit control is
+  disabled, then releases a simulated `email-already-in-use` failure and
+  verifies its message is rendered inside the dialog.
+- Live workspace data/error codes were not queried. Production Rules/indexes
+  and Hosting were not deployed; no production data, release artifact, device,
+  commit, or push operation was performed in this segment.
+
+---
+
+## SESSION-033 — 2026-10-27 — Super-Admin Support-Context End Audit
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the security regression audit after linking support
+context starts; verify that context exits and workspace switches also produce
+complete append-only evidence.
+
+### Confirmed Root Cause and Changes
+
+- The start-event fix did not cover context termination. A Rules regression
+  reproduced that a selected super-admin could clear `active_workspace_id`
+  without a matching `workspace_access_ended` event.
+- Explicit exit, sign-out, and workspace switching now create an end event in
+  the same batch as the profile transition. The event is linked by
+  `last_workspace_access_end_log_id` and validated against the prior actor,
+  workspace, reason, and prior start-event ID when present. A switch also
+  creates the next start event in that atomic batch.
+- Firestore Rules reject profile-only clearing and mismatched start-log IDs.
+  The existing append-only event restriction remains unchanged.
+- Inline-audit guidance recommending `node dev_reset.js` after a manual flush
+  contradicted the financial/data-integrity contract. It now directs engineers
+  to keep reset tooling fail-closed and use only a reviewed, tenant-scoped,
+  transactional maintenance path.
+
+### TDD and Validation
+
+- RED: the pre-fix exit regression passed only by demonstrating the
+  unauthorized context clear; the suite ended with `180 passing, 1 failing`.
+- GREEN: `firebase emulators:exec --only firestore "npm test"` completed with
+  `181 passing (37s)`.
+- `flutter test test/unit/models/user_model_test.dart --dart-define=use_arabic=true`:
+  `00:00 +26: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 7.7s)`.
+- `dart analyze test/`: `No issues found!`.
+- Full Flutter suite: `01:19 +659: All tests passed!`; focused export
+  integration test: `00:01 +1: All tests passed!`; maintenance script tests:
+  `ℹ tests 10`, `ℹ pass 10`, `ℹ fail 0`.
+- Split APK build: ARMv7 `30.7 MB`, ARM64 `32.2 MB`, x86_64 `33.7 MB`.
+  All three APK v2 signatures verified. The ARM64 APK reports versionName
+  `3.10.10`, versionCode `310103121`; copy to `R5GL22RGT9V` reported
+  `1 file pushed`, install reported `Success`.
+- Signed AAB: `app/build/app/outputs/bundle/release/app-release.aab`,
+  `54.8 MB`; `jarsigner` reported `jar verified.`. The package source version
+  is synchronized at `3.10.10+1121`; the Android analyzer could not read AAB
+  metadata directly without bundletool.
+- Android release skill now distinguishes Gradle's embedded Kotlin runtime
+  from the pinned Android Kotlin plugin and documents the AAB metadata-tool
+  limitation. The pinned wrapper/plugin baseline was verified; no Gradle
+  version upgrade was indicated by the successful builds.
+- Production Rules/indexes and Hosting were not deployed. No production data
+  changed. A complete repository audit, external penetration test, live
+  production data reconciliation, and final zero-trace review remain
+  outstanding.
+
+---
+
+## SESSION-032 — 2026-10-27 — Fail-Closed Maintenance Script Audit
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the requested full audit; verify that legacy reset and
+tenant-migration tools follow the repository's fail-closed and tenant
+integrity contract.
+
+### Confirmed Findings and Changes
+
+- The previous `flush_dev_data.js` implementation could delete tenant
+  transactions/invoices in separate batches and then directly reset shop
+  balances. Its development-project allowlist did not make the multi-batch
+  financial operation atomic. It is now a fail-closed stub.
+- `tool/backfill_missing_tenant_id.js` assigned unscoped records to a shared
+  default tenant and loaded a local service-account file. It is now a
+  fail-closed stub.
+- `tool/backfill_tenant_id.js` could assign all unscoped records in its
+  selected collections to one tenant, without a record-level ownership map.
+  It is now a fail-closed stub. No migration or reset was performed.
+- Added `tests/maintenance_scripts.test.js` and a CI step to keep all listed
+  legacy backup, reset, and migration commands disabled until a reviewed
+  replacement exists.
+
+### Validation and Scope
+
+- RED evidence: the initial test run reported `7` passing, `2` failing for
+  `flush_dev_data.js` and `tool/backfill_missing_tenant_id.js`. After those
+  stubs, `9` passed. Adding the tenant-backfill guard produced `9` passing,
+  `1` failing; after disabling that backfill, the final run reported
+  `ℹ tests 10`, `ℹ pass 10`, `ℹ fail 0`.
+- Exact command: `node --test tests/maintenance_scripts.test.js`. The test
+  executes only the disabled stubs, asserts non-zero exit and the explicit
+  `Disabled:` message, and does not initialize Firebase.
+- Dynamic role/feature configuration and feature-specific resets remain
+  blocked pending product decisions on allowed capabilities, data retention,
+  recovery, partial failures, and server-enforced authorization.
+- Existing `promote_super_admin.js` is a privileged out-of-band role mutation
+  utility and was not executed or changed; its bootstrap/audit contract needs
+  owner review before further use.
+- This is a bounded audit, not a full repository audit. No production data,
+  Rules/Hosting deployment, release artifact, device install, commit, or push
+  is claimed by this session entry.
+
+---
+
+## SESSION-031 — 2026-10-27 — Support Audit Linkage and Localized Amounts
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the full-repository audit, correct confirmed security
+and Arabic/Urdu input defects, and prepare evidence for the requested
+deliverables and Android artifacts.
+
+### Confirmed Root Causes and Changes
+
+- A super-admin could establish the selected-workspace profile context
+  without a same-batch `workspace_access_started` audit record. The Rules
+  Emulator regression reproduced the unlogged profile update as allowed.
+  The provider now writes the exact log ID into the profile in the same batch;
+  Rules verify the profile-to-log and log-to-profile linkage, actor, workspace,
+  reason, and request-time timestamp. End/sign-out clears the link.
+- `AppInputFormatters.amountFormatter` used an ASCII-oriented `\d` expression
+  and removed Arabic-Indic/Eastern-Arabic numerals before the already-capable
+  `AppFormatters.parseAmountText` received them. The allow-list now covers
+  those digit sets and their supported decimal/grouping separators.
+- A signing-password value formerly present in historical `AGENTS.md`
+  content is redacted in the working tree. Git history was not rewritten;
+  rotate the signing credential if it remains active.
+- The new nine audit deliverables are scoped to evidence actually inspected.
+  The separate 33-finding checklist referenced by earlier notes was not
+  included in the accessible 430-line execution prompt and remains a
+  row-by-row audit blocker. Feature-reset and runtime-configurable permission
+  changes remain blocked pending safe policy/design decisions.
+
+### Validation and Scope
+
+- Support-context Rules test was RED before the Rules fix: `64 passing,
+  1 failing` because the unlogged selection succeeded. Complete Rules suite
+  after the fix: `180 passing (39s)`.
+- Full Flutter suite before the formatter-to-parser assertion was added:
+  `01:32 +658: All tests passed!`; rerun the focused test and full suite after
+  the final test/document changes before release evidence is recorded.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 8.0s)`;
+  `dart analyze test/`: `No issues found!`.
+- Version/build/changelog synchronized to `3.10.10+1121` for the local
+  source. No current-source APK/AAB build, matching Rules deployment,
+  Hosting deployment, phone install, Play Console upload, commit, or push is
+  claimed in this entry.
+
+---
+
 ## SESSION-030 — 2026-10-27 — Multi-Workspace Invoice Permissions and Release Artifacts
 
 **Agent:** GitHub Copilot

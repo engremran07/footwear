@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/permission_policy.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/tenant_scope.dart';
 import '../providers/auth_provider.dart';
 import '../providers/tenant_provider.dart';
@@ -45,8 +47,14 @@ class DatabaseFlushScreen extends ConsumerWidget {
 
     final currentUser = authState.value;
     if (currentUser == null ||
-        !currentUser.active ||
-        !currentUser.isSuperAdmin) {
+        (!PermissionPolicy.can(
+              currentUser,
+              AppCapability.viewDataMaintenance,
+            ) &&
+            !PermissionPolicy.can(
+              currentUser,
+              AppCapability.manageDataMaintenance,
+            ))) {
       return Scaffold(
         appBar: AppBar(title: Text(tr('danger_zone', ref))),
         body: Center(child: Text(tr('permission_denied', ref))),
@@ -54,7 +62,18 @@ class DatabaseFlushScreen extends ConsumerWidget {
     }
 
     final tenantId = TenantScope.normalize(currentUser.tenantId);
-    if (tenantId == null) {
+    if (tenantId == null ||
+        tenantId == TenantScope.globalTenantId ||
+        (!PermissionPolicy.can(
+              currentUser,
+              AppCapability.viewDataMaintenance,
+              tenantId: tenantId,
+            ) &&
+            !PermissionPolicy.can(
+              currentUser,
+              AppCapability.manageDataMaintenance,
+              tenantId: tenantId,
+            ))) {
       return Scaffold(
         appBar: AppBar(title: Text(tr('danger_zone', ref))),
         body: Center(child: Text(tr('permission_denied', ref))),
@@ -113,6 +132,12 @@ class DatabaseFlushScreen extends ConsumerWidget {
                 _disabledOperation(context, ref, 'flush_routes'),
                 const Divider(height: 1),
                 _disabledOperation(context, ref, 'flush_products'),
+                const Divider(height: 1),
+                _disabledOperation(context, ref, 'flush_variants'),
+                const Divider(height: 1),
+                _disabledOperation(context, ref, 'flush_invoices'),
+                const Divider(height: 1),
+                _disabledOperation(context, ref, 'flush_notifications'),
                 const Divider(height: 1),
                 _disabledOperation(context, ref, 'flush_users'),
                 const Divider(height: 1),

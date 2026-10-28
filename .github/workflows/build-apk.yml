@@ -1,20 +1,22 @@
-name: Build APK (Manual)
+name: Build Android Artifact (Manual)
 
 on:
   workflow_dispatch:
     inputs:
       build_type:
-        description: 'Build type'
+        description: 'Artifact type'
         required: true
         default: 'release'
         type: choice
-        options: [debug, release]
+        options: [debug, release, aab]
 
 jobs:
   build:
-    name: Build ${{ github.event.inputs.build_type }} APK
+    name: Build ${{ github.event.inputs.build_type }} artifact
     runs-on: ubuntu-24.04
     timeout-minutes: 40
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,13 +46,13 @@ jobs:
         run: echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/android/app/google-services.json
 
       - name: Write keystore
-        if: github.event.inputs.build_type == 'release'
+        if: github.event.inputs.build_type != 'debug'
         env:
           KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
         run: echo "$KEYSTORE_FILE" | base64 -d > app/android/footwear-erp.jks
 
       - name: Write key.properties
-        if: github.event.inputs.build_type == 'release'
+        if: github.event.inputs.build_type != 'debug'
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -117,9 +119,31 @@ jobs:
           --dart-define=use_arabic=true \
           --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID"
 
+      - name: Build signed Play Console AAB
+        if: github.event.inputs.build_type == 'aab'
+        env:
+          GOOGLE_DRIVE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_SERVER_CLIENT_ID }}
+        run: cd app && flutter build appbundle --release \
+          --dart-define=USE_PLAY_INTEGRITY=true \
+          --dart-define=use_arabic=true \
+          --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID="$GOOGLE_DRIVE_SERVER_CLIENT_ID"
+
+      - name: Verify AAB signature
+        if: github.event.inputs.build_type == 'aab'
+        run: jarsigner -verify app/build/app/outputs/bundle/release/app-release.aab
+
       - name: Upload APK artifact
+        if: github.event.inputs.build_type != 'aab'
         uses: actions/upload-artifact@v4
         with:
           name: apk-${{ github.event.inputs.build_type }}-${{ github.sha }}
           path: app/build/app/outputs/flutter-apk/*.apk
+          retention-days: 14
+
+      - name: Upload AAB artifact
+        if: github.event.inputs.build_type == 'aab'
+        uses: actions/upload-artifact@v4
+        with:
+          name: aab-release-${{ github.sha }}
+          path: app/build/app/outputs/bundle/release/app-release.aab
           retention-days: 14

@@ -13,6 +13,18 @@ class AppFonts {
   static const String dmSansFamily = 'DMSans';
   static const String urduFamily = 'NotoNastaliqUrdu';
   static const String arabicFamily = 'NotoSansArabic';
+  static const List<String> _arabicFallback = <String>[arabicFamily];
+  static const List<String> _urduFallback = <String>[urduFamily];
+  static const List<String> _mixedScriptFallback = <String>[
+    arabicFamily,
+    urduFamily,
+  ];
+
+  static List<String> _fallbackFor(String locale) => switch (locale) {
+    'ur' => _arabicFallback,
+    'ar' => _urduFallback,
+    _ => _mixedScriptFallback,
+  };
 
   /// Heading font for the current locale.
   static TextStyle heading(
@@ -24,6 +36,7 @@ class AppFonts {
     return switch (locale) {
       'ur' => TextStyle(
         fontFamily: urduFamily,
+        fontFamilyFallback: _fallbackFor(locale),
         fontSize: fontSize,
         fontWeight: fontWeight,
         color: color,
@@ -31,6 +44,7 @@ class AppFonts {
       ),
       'ar' => TextStyle(
         fontFamily: arabicFamily,
+        fontFamilyFallback: _fallbackFor(locale),
         fontSize: fontSize,
         fontWeight: fontWeight,
         color: color,
@@ -38,6 +52,7 @@ class AppFonts {
       ),
       _ => TextStyle(
         fontFamily: syneFamily,
+        fontFamilyFallback: _fallbackFor(locale),
         fontSize: fontSize,
         fontWeight: fontWeight,
         color: color,
@@ -55,6 +70,7 @@ class AppFonts {
     return switch (locale) {
       'ur' => TextStyle(
         fontFamily: urduFamily,
+        fontFamilyFallback: _fallbackFor(locale),
         fontSize: fontSize,
         fontWeight: fontWeight,
         color: color,
@@ -62,6 +78,7 @@ class AppFonts {
       ),
       'ar' => TextStyle(
         fontFamily: arabicFamily,
+        fontFamilyFallback: _fallbackFor(locale),
         fontSize: fontSize,
         fontWeight: fontWeight,
         color: color,
@@ -69,6 +86,7 @@ class AppFonts {
       ),
       _ => TextStyle(
         fontFamily: dmSansFamily,
+        fontFamilyFallback: _fallbackFor(locale),
         fontSize: fontSize,
         fontWeight: fontWeight,
         color: color,

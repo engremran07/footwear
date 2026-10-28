@@ -30,7 +30,9 @@ List<UserModel> _sortUsersByDisplayName(Iterable<UserModel> users) {
 
 final tenantsProvider = StreamProvider.autoDispose<List<TenantModel>>((ref) {
   final currentUser = ref.watch(authUserProvider).value;
-  if (currentUser == null) return const Stream.empty();
+  if (currentUser == null || !currentUser.active) {
+    return const Stream.empty();
+  }
 
   if (currentUser.isSuperAdmin) {
     return FirebaseFirestore.instance
@@ -44,20 +46,7 @@ final tenantsProvider = StreamProvider.autoDispose<List<TenantModel>>((ref) {
         );
   }
 
-  if (!currentUser.isTenantAdmin) return const Stream.empty();
-  final tenantId = TenantScope.normalize(currentUser.tenantId);
-  if (tenantId == null) return const Stream.empty();
-
-  return FirebaseFirestore.instance
-      .collection(Collections.tenants)
-      .where('tenant_id', isEqualTo: tenantId)
-      .orderBy('name')
-      .snapshots()
-      .map(
-        (snap) => snap.docs
-            .map((doc) => TenantModel.fromJson(doc.data(), doc.id))
-            .toList(),
-      );
+  return const Stream.empty();
 });
 
 final tenantProvider = StreamProvider.autoDispose.family<TenantModel?, String>((

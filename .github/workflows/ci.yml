@@ -71,6 +71,9 @@ jobs:
       - name: flutter test
         run: cd app && flutter test -r expanded --coverage --dart-define=use_arabic=true
 
+      - name: Export integration regression
+        run: cd app && flutter test test/pdf_and_excel_export_integration_test.dart -r expanded --dart-define=use_arabic=true
+
   hygiene:
     name: Code Hygiene Gates
     needs: analyse

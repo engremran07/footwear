@@ -42,8 +42,21 @@ void main() {
       'uses the current tenant settings document instead of the global fallback',
       () {
         final tenantUser = seller.copyWith(tenantId: 'tenant-42');
+        final platformAdmin = UserModel(
+          id: 'platform-admin',
+          email: 'admin@example.com',
+          displayName: 'Platform Admin',
+          role: UserRole.superAdmin,
+          activeWorkspaceId: 'tenant-42',
+          activeWorkspaceReason: 'Workspace settings support',
+          activeWorkspaceSelectedAt: ts,
+          active: true,
+          createdAt: ts,
+          updatedAt: ts,
+        );
 
         expect(settingsDocumentIdForUser(tenantUser), 'tenant-42');
+        expect(settingsDocumentIdForUser(platformAdmin), 'tenant-42');
         expect(
           settingsDocumentIdForUser(null),
           TenantScope.noActiveWorkspaceId,

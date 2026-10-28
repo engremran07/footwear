@@ -15,18 +15,14 @@ String? notificationTenantIdFor(UserModel? user, {DateTime? now}) {
   if (user == null || !user.active || !user.canAccessNotifications) return null;
   final tenantId = TenantScope.normalize(user.tenantId);
   if (tenantId == null || tenantId == TenantScope.globalTenantId) return null;
-  if (user.isSuperAdmin &&
-      !user.hasActiveWorkspaceSupportContextFor(tenantId, now: now)) {
-    return null;
-  }
   return tenantId;
 }
 
-final notificationTenantScopeProvider = Provider.autoDispose<String?>(
-  (ref) => ref.watch(
-    authUserProvider.select((state) => notificationTenantIdFor(state.value)),
-  ),
-);
+final notificationTenantScopeProvider = Provider.autoDispose<String?>((ref) {
+  final profile = ref.watch(authUserProvider);
+  if (profile.isLoading || profile.hasError) return null;
+  return notificationTenantIdFor(profile.value);
+});
 
 @visibleForTesting
 List<NotificationModel> filterVisibleNotifications(
@@ -48,6 +44,12 @@ AsyncValue<List<NotificationModel>> notificationsWithShopVisibility(
   List<NotificationModel> notifications,
   AsyncValue<Set<String>> activeShopIds,
 ) {
+  if (activeShopIds.hasError) {
+    return AsyncError<List<NotificationModel>>(
+      activeShopIds.error!,
+      activeShopIds.stackTrace!,
+    );
+  }
   if (activeShopIds.isLoading && activeShopIds.hasValue) {
     final cachedShopIds = activeShopIds.value;
     if (cachedShopIds != null) {
@@ -91,14 +93,9 @@ String notificationShopIdsKey(AsyncValue<List<NotificationModel>> state) {
   return jsonEncode(shopIds ?? const <String>[]);
 }
 
-/// Admin- and supervisor-only stream of the 50 most-recent notifications
-/// ordered newest-first, scoped to the current user's tenant.
-///
-/// Returns [Stream.empty] for non-admin users so the provider never fires a
-/// Firestore query that would fail with permission-denied.
-///
-/// P1-10 FIX: Added TenantScope.applyToQuery() to prevent admins from one
-/// workspace seeing notifications from other workspaces.
+/// Streams the 50 newest notifications for an authorized operational role,
+/// scoped to the current concrete tenant. Unsupported or unresolved contexts
+/// receive an empty value without starting a Firestore query.
 final notificationsProvider = StreamProvider.autoDispose
     .family<List<NotificationModel>, String?>((ref, tenantId) {
       if (tenantId == null ||
@@ -211,14 +208,21 @@ final visibleNotificationsProvider =
     });
 
 /// Derived count of unread notifications for authorized operational roles.
-final unreadNotificationCountProvider = Provider.autoDispose<int>((ref) {
-  return ref
-          .watch(visibleNotificationsProvider)
-          .value
-          ?.where((notification) => !notification.read)
-          .length ??
-      0;
-});
+final unreadNotificationCountProvider = Provider.autoDispose
+    .family<int, String?>((ref, tenantId) {
+      if (tenantId == null ||
+          ref.watch(notificationTenantScopeProvider) != tenantId) {
+        return 0;
+      }
+      final notifications = ref.watch(notificationsProvider(tenantId));
+      if (notifications.value == null || notifications.hasError) return 0;
+      final shopIds = ref.watch(activeNotificationShopIdsProvider(tenantId));
+      return visibleNotificationState(
+            notifications,
+            shopIds,
+          ).value?.where((notification) => !notification.read).length ??
+          0;
+    });
 
 class NotificationNotifier extends AsyncNotifier<void> {
   @override

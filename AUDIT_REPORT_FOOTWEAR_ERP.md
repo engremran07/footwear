@@ -10,6 +10,228 @@
 
 ---
 
+## Scope-Specific Addendum — 2026-10-27 Mixed-Script UI Font Fallback
+
+This addendum covers the authenticated-dashboard Noto fallback warning. It
+does not close the complete browser-inspector inventory or establish PDF
+rendering correctness.
+
+### Confirmed Finding and Fix
+
+- **Medium — mixed-script glyphs lacked explicit UI fallback (fixed in source):**
+  English-locale `AppFonts` styles selected Syne/DM Sans but did not list the
+  bundled Arabic/Urdu font families as fallbacks. A dashboard containing
+  Arabic-script Firestore values or currency symbols could therefore fall
+  through to a platform font. The shared resolver now preserves the primary
+  locale font and supplies ordered bundled fallbacks. Arabic and Urdu retain
+  their own primary script fonts.
+- The PDF font loader and PDF builders were not changed. The `pdf` renderer's
+  script shaping limitations are a distinct concern; the UI fix does not
+  demonstrate Arabic/Urdu PDF correctness.
+- A regression test verifies the primary font and fallback order for the
+  English, Arabic, and Urdu `AppFonts` styles. Focused font/changelog tests:
+  `00:01 +12: All tests passed!`.
+
+### Validation and Remaining Limits
+
+- Full Flutter suite: `01:31 +671: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 16.1s)`;
+  `dart analyze test/`: `No issues found!`.
+- Version `3.10.12+1123` is synchronized with a trilingual changelog.
+  Web build: `EXIT: 0`; Hosting: `Deploy complete!`; live
+  `version.json` reports version `3.10.12`, build `1123`. The live shell
+  responds with `no-store, must-revalidate, no-cache`.
+- A post-deploy browser reload produced no fresh console warnings/errors but
+  redirected to login. Arabic/Urdu language labels were visible; the
+  authenticated Firestore dashboard could not be rechecked. The full
+  user-reported inspector inventory remains unresolved because its supplied
+  totals disagree and network/extension messages need independent
+  classification.
+- APK/AAB builds were not started because the final free-RAM check was
+  `2.57 GB`, below the
+  documented `3.2 GB` threshold; ADB showed no connected device. Android
+  artifacts, phone installation, and cross-surface release alignment remain
+  pending. No Play upload, production data change, commit, or push occurred.
+
+---
+
+## Scope-Specific Addendum — 2026-10-27 Backup Recovery and Web Permission Audit
+
+This addendum covers the workspace-member backup metadata state and the
+unnecessary first-launch device-permission requests. It does not claim that
+the complete user-reported browser-inspector inventory or authenticated PDF
+font rendering has been verified.
+
+### Confirmed Findings
+
+- **Medium — backup metadata error/retry path hidden (fixed locally):** hiding
+  the workspace scope card also hid its mapped metadata error and Retry
+  control, leaving workspace backup disabled without recovery feedback. The
+  generic scope card is restored for members; it shows loading, error/Retry,
+  and readiness states without exposing the workspace name.
+- **Low — unrelated permission requests on first launch (fixed locally):**
+  `AppShell.initState()` requested camera, photos, storage, and OS-notification
+  permissions despite no corresponding app workflow. The startup request path,
+  unused service/dependency, and unnecessary manifest permissions were
+  removed. Image/file pickers remain responsible for their scoped selection
+  flows; Firestore notifications do not require OS notification permission.
+- **Unresolved — original inspector inventory:** one unauthenticated local
+  browser reload produced nine Firebase initialization debug messages, with
+  no warnings/errors, page errors, or failed requests. The user's stated
+  total of 18 conflicts with the stated category sum of 20. The Noto fallback
+  warning was not reproduced on the login page, and the authenticated PDF
+  export path was not exercised in this browser session.
+- **Authenticated production follow-up:** the connected browser displayed the
+  authenticated dashboard, but live `version.json` still reports `3.10.9`
+  build `1120`; the local source is `3.10.11+1122`. Its retained browser event
+  history contains 47 mixed events from 20:21–20:35 UTC: 15 console entries
+  (13 errors, 2 warnings) and 32 failed requests. The console errors comprise
+  two camera Permissions Policy violations, seven `ERR_TIMED_OUT` resource
+  errors, one connection-closed error, one connection-reset error, and two
+  QUIC transport errors. The two warnings are Firestore Listen transport
+  warnings. Failed requests comprise 20 Firestore Listen `ERR_ABORTED`
+  requests, seven Identity Toolkit timeouts, and one each for connection
+  closed, connection reset, network changed, QUIC idle timeout, and QUIC too
+  many retransmission timeouts. These are browser-history events, not a
+  verified reproduction of the user's DevTools message inventory. A separate
+  60-second passive capture observed no new console or page errors, while
+  one additional Firestore Listen request cancellation appeared in the
+  browser event history. Network transport events alone do not establish an
+  application defect. The local startup-permission fix is not in the live
+  version; Hosting was not deployed. The reported counts (18, category sum
+  20, and later 30) and authenticated PDF/font behavior remain unresolved.
+
+### Verification and Release Boundaries
+
+- Focused backup/router/localization suite: `00:24 +31: All tests passed!`.
+- Full Flutter suite: `02:09 +669: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 36.3s)`;
+  `dart analyze test/`: `No issues found!`.
+- Local Flutter web build: `EXIT: 0`. The generated Noto Sans Arabic and
+  Noto Nastaliq Urdu assets are present in the web build; this confirms
+  packaging, not successful PDF font loading or visual shaping.
+- Split APKs built: ARMv7 `30.7 MB`, ARM64 `32.2 MB`, x86_64 `33.7 MB`.
+  All three APKs verified with APK Signature Scheme v2. The signed AAB built
+  at `54.8 MB`; `jarsigner` reported `jar verified.` and also warned that the
+  local certificate chain could not be validated. Play Console upload-key
+  registration must be confirmed before upload.
+- ARM64 copy reported `1 file pushed`; `adb install --streaming -r` reported
+  `Success` on `R5GL22RGT9V`. Installed metadata reports
+  versionName `3.10.11`, versionCode `310113122`.
+- Firestore Rules/indexes and Hosting were not deployed. No production data
+  change, Play Console upload, commit, or push was performed.
+
+---
+
+## Scope-Specific Addendum — 2026-10-27 Maintenance Script Audit
+
+The fail-closed maintenance-script regressions were tested before correction.
+This addendum does not claim that a safe feature-reset system or a complete
+record-mapped tenant migration has been implemented.
+
+### Confirmed Findings
+
+- **High — executable bulk flush conflicted with the financial source of
+  truth (fixed locally):** `flush_dev_data.js` deleted transactions and
+  invoices in separate batches, then rewrote shop balances outside the
+  `InvoiceNotifier`/`TransactionNotifier` pipeline. Its dev-project guard did
+  not prevent partial failures inside the allowed environment. It now exits
+  before Firebase initialization.
+- **High — unsafe tenant assignment scripts (fixed locally):**
+  `tool/backfill_missing_tenant_id.js` assigned missing records to a shared
+  `default` tenant; `tool/backfill_tenant_id.js` assigned all unscoped records
+  in selected collections to one supplied tenant without a record-level
+  ownership map. Both now fail closed. No Firebase project was contacted.
+- **High — undocumented privileged bootstrap path (review required):**
+  `promote_super_admin.js` directly patches a user role through the Firestore
+  REST API using a Firebase CLI access token and does not write the required
+  platform access audit event. It was not run or modified; the owner must
+  approve or replace its bootstrap contract before use.
+
+### TDD and Retest Evidence
+
+- `node --test tests/maintenance_scripts.test.js` was first red with two
+  failing scripts (`flush_dev_data.js` and
+  `tool/backfill_missing_tenant_id.js`). It passed `9/9` after those fixes.
+- Extending coverage to the single-tenant backfill reproduced a third
+  failure (`9/10`); the final run reported `ℹ tests 10`, `ℹ pass 10`,
+  `ℹ fail 0`.
+- The tests execute only explicit disabled stubs, assert exit code 1 and a
+  `Disabled:` message, and do not initialize Firebase. The same test is now
+  called in `.github/workflows/firestore-rules-tests.yml`.
+
+### Remaining Limits
+
+- Reset controls remain disabled. No feature-level reset was enabled because
+  dependency deletion order, preview accuracy, retention, recovery,
+  idempotency, audit, and partial-failure semantics still need owner approval
+  and a backend-enforced design.
+- `promote_super_admin.js` is an unverified privileged utility. No account
+  role was modified.
+- Production Rules/indexes and Hosting, current-source APK/AAB builds,
+  device installation, commit, and push remain separate operations; this
+  addendum does not claim they occurred.
+
+---
+
+## Scope-Specific Addendum — 2026-10-27 Support-Context and Amount Input Audit
+
+This addendum records two reproduced defects and local fixes. It does not
+close the full repository audit, prove production deployment, or complete the
+separate 33-finding checklist referenced by earlier notes.
+
+### Confirmed Findings
+
+- **High — unlogged platform support context (fixed locally; deployment
+  pending):** before the fix, a super-admin profile could select a workspace
+  without creating the required `workspace_access_started` event in the same
+  batch. The pre-fix Rules regression failed because that write succeeded.
+  `auth_provider.dart` now writes the exact event ID to
+  `active_workspace_access_log_id`; Rules check the post-batch profile and
+  event bidirectionally and validate actor, workspace, reason, and timestamp.
+  The separate exit-path regression reproduced that profile-only context
+  clearing/switching also succeeded without an end event. The provider now
+  creates `workspace_access_ended` in the same batch, stores its ID in
+  `last_workspace_access_end_log_id`, and links the event to the prior context
+  and start event. Rules Emulator: `181 passing (37s)`; no production deploy.
+- **High — signing credential exposed in Git history (unremediated history
+  risk):** a signing-password value existed in `HEAD:AGENTS.md:1235`. Its
+  value has been removed from the working tree without echoing it. History
+  was not rewritten. Rotate the key password if still active and verify the
+  upload-key configuration; production signing validity is not known.
+- **Medium — localized monetary input filtered before parsing (fixed
+  locally):** the shared amount formatter kept only ASCII `\d` and `.` while
+  the parser already normalized Arabic-Indic/Eastern-Arabic digits and
+  separators. The formatter now preserves the parser-supported scripts and
+  symbols. A formatter-to-parser regression is included.
+
+### Limits and Open Work
+
+- The accessible 430-line master prompt requests a full audit but does not
+  contain the separate 33-row checklist previously referenced by the audit
+  report. Individual disposition of those 33 items remains blocked until
+  that source is supplied.
+- Full source coverage is incomplete: only material paths, workflows, skills,
+  and test contracts listed in the companion audit deliverables were
+  inspected. Generated, binary, vendored, and dependency files were excluded
+  by design and enumerated as excluded, not treated as verified.
+- The database reset provider/UI remain fail-closed. No destructive
+  feature-reset implementation was introduced because module scope, retention,
+  recovery, partial-failure, and audit requirements require product-approved
+  design before deletion is enabled.
+- Super-admin-configurable role/feature permissions remain blocked until the
+  supported capability set and Rules-enforced configuration contract are
+  approved. Client-side toggles alone cannot safely grant authority.
+- Visual PDF inspection is partial. A browser screenshot of the Urdu
+  statement was available; Arabic statement and receipt capture pages were
+  blank/failed in the current viewer. No local PDF rasterizer was available,
+  so full font/glyph/layout acceptance is not claimed.
+- Local Rules tests and source validation do not prove the latest Rules are
+  deployed. Production deployment, fresh release artifacts, device install,
+  and Play Console acceptance remain separate gates.
+
+---
+
 ## Scope-Specific Addendum — 2026-10-27 Tenant Cache Isolation and Policy Recheck
 
 This recheck fixes reproducible app/provider defects and records local Rules
@@ -849,3 +1071,57 @@ Deep source review was performed for login, dashboard, inventory, reports, works
 - Firestore `Transaction.get` accepts a document reference, not a query. The new scoped reads occur before the transaction and existing returned documents are re-read inside it. Two simultaneous first-time logins can still race for the same slot/limit; enforcing an atomic tenant session ceiling under these rules requires a rule/data contract change, explicitly outside this frontend-only task.
 - Live logs showed additional `PERMISSION_DENIED` for profile/business listeners during the failed login attempt. Current own-profile rule permits an authenticated own-document read; the captured log sequence does not conclusively establish whether the profile denial preceded or followed sign-out. Re-check the updated APK with an authorized account before attributing that log to another defect.
 - The legacy one-shot production data purge remains blocked until owner-provided Google ADC/service-account credentials are configured; no credential was requested or read in this task.
+
+## Scope-Specific Addendum — 2026-10-27 Workspace Access and User-Creation Feedback
+
+This addendum records focused local regressions only. It does not resolve or
+close the broader multi-workspace audit.
+
+- Root super-admin `/settings` is guarded by `viewSettingsHub`; tenant settings
+  descendants retain their stricter capability guards. The regression verifies
+  the metadata hub is visible without an active workspace selection. Its first
+  rerun failed because the assertion used `Platform settings` instead of the
+  actual translated `Platform Settings`; the corrected assertion passes.
+- The create-user dialog previously showed mapped failures in a SnackBar behind
+  the modal. It now renders the error within the dialog, presents pending
+  progress, and disables repeated submission while the provider request is in
+  flight. Seller-route validation feedback is also shown in-dialog on this
+  flow. Tenant authorization and provider writes are unchanged.
+- Firebase Auth email uniqueness is project-wide and remains unchanged. A
+  registered email cannot create a second Auth identity merely by selecting a
+  different workspace; duplicate-email errors now remain readable in the
+  dialog.
+- Missing invoice/receipt settings errors map to localized EN/AR/UR setup
+  guidance. This message does not initialize settings or confirm that missing
+  settings caused any reported live workspace failure.
+- Focused validation:
+  `flutter test -r expanded --dart-define=use_arabic=true test\widget\users_list_workspace_context_test.dart test\widget\app_router_backup_access_test.dart test\unit\core\error_mapper_test.dart`:
+  `00:10 +60: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 9.5s)`; `dart analyze test\`:
+  `No issues found!`.
+- No live workspace data or sanitized Firebase error code was available to
+  establish the cause of the second workspace's invoice, receipt, or user
+  creation failures. Production Rules/indexes and Hosting were not deployed in
+  this segment; production behavior remains unverified.
+
+## Scope-Specific Addendum — 2026-10-28 Non-Stock Toggle Persistence
+
+The invoice-header toggle's write path was missing: it changed local widget
+state but wrote only when the form's Save button was pressed. The setting is
+now saved immediately through the tenant-scoped settings notifier, with
+failure rollback and mapped feedback. A route-reentry regression failed
+before the change and passed afterward; another test covers a denied write.
+The single-setting write does not commit unrelated unsaved invoice-header
+fields.
+
+The same validation pass fixed an app-shell compilation error and updated a
+stale test that expected tenant admins to be denied the read-only maintenance
+screen. Component reset controls remain disabled. Notification access remains
+limited to admin/manager, tenant_admin, and supervisor roles; seller and
+platform super-admin access is denied.
+
+Focused affected tests: `00:00 +54: All tests passed!`; full Flutter suite:
+`01:26 +684: All tests passed!`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 9.1s)`; `dart analyze test/`:
+`No issues found!`. Local Rules Emulator evidence is `182 passing (41s)`.
+Production behavior remains unverified; this work is local and unreleased.

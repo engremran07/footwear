@@ -15,7 +15,7 @@ The live codebase is a route/seller distribution ERP.
   invoices and cash receipts within their tenant scope; sellers remain
   assigned-route scoped. Creation does not grant invoice settlement,
   correction, credit-note, or void capabilities.
-- Super-admin is platform-only by default. Tenant business data requires explicit `active_workspace_id` plus a reasoned support context; selection start/end is written to append-only `platform_access_logs`.
+- Super-admin is platform-only by default. Tenant business data requires explicit `active_workspace_id` plus a reasoned support context; selection start/end is written to append-only `platform_access_logs`. Starting access links `active_workspace_access_log_id` to the exact start event in the same batch, enforced in both directions by Firestore Rules. Ending or switching access must atomically write an end event linked through `last_workspace_access_end_log_id` to the profile transition and, when available, the prior start event.
 - Firebase Auth is the app's only sign-in mechanism. The app has no custom device registration, pairing approval, session slots, or session renewal; Firestore Rules enforce active profile, role, tenant, and selected-workspace scope.
 - Business-data access additionally requires an active tenant document. An active user profile does not override an inactive workspace; the explicitly selected super-admin restoration path is the limited exception.
 - App-side role/capability checks use `RoleCapabilities` and
@@ -23,6 +23,9 @@ The live codebase is a route/seller distribution ERP.
   `app/lib/core/utils/permission_policy.dart`. Routes, screens, and providers
   must reuse them; Firestore Rules independently enforce authorization and
   remain the security boundary.
+- Tenant notification feeds are for admin/manager, tenant_admin, and
+  supervisor roles only. Sellers and platform super-admins are excluded in
+  both app policy and Rules.
 - Collections: users, products, product_variants, seller_inventory, inventory_transactions,
   routes, shops [Firestore name: 'customers' — legacy, use Collections.shops],
   transactions, invoices, settings
@@ -113,7 +116,7 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
   user-triggered retry, not background synchronization.
 23. Never store or ship service-account credentials. Arbitrary-user Auth administration belongs in a trusted backend; the client may not create/promote super-admins or mutate another user's Auth credentials.
 24. Platform super-admins may read workspace metadata globally, but every business-data operation must be scoped to the selected workspace and an auditable support reason. No selection means no business records.
-25. Super-admin business-context selection and exit events are append-only in `platform_access_logs`. Never create/promote platform super-admin accounts or mutate another user's Auth credentials from client code. Never store service-account credentials in Firestore, backups, APKs, or web builds.
+25. Super-admin business-context selection and exit events are append-only in `platform_access_logs` and must be linked to the matching profile transition in the same batch. Start events must match the new profile context. End events must match the prior context and the updated profile's `last_workspace_access_end_log_id`; switches must log the prior context's end and the new context's start atomically. Rules deny profile-only clearing or switching. Never create/promote platform super-admin accounts or mutate another user's Auth credentials from client code. Never store service-account credentials in Firestore, backups, APKs, or web builds.
 26. Super-admin business context expires after 8 hours in Firestore rules. Workspace admins may update only workspace-scoped business settings; workspace lifecycle and other platform configuration remain platform-controlled. Do not restore app-managed device registration, pairing, or session-slot enforcement.
 27. Require a concrete tenant for every new business write via `TenantScope.requireTenant`; never replace missing tenant identity with `__global__`. Unassigned users must not be silently self-healed into a shared tenant.
 28. Legacy local admins manage seller profiles only. Tenant admins may create
@@ -129,7 +132,7 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
     tenant. Reject legacy plaintext backup archives.
 33. Keep users signed in through transient token-refresh/network failures. Firebase initialization failure must render a retry state and must not mount the normal app shell.
 34. Copilot chat history and request IDs do not merge across GitHub identities through repository changes. Preserve durable decisions, pending tasks, audit IDs, and verification evidence in `SESSION_LOG.md` and the current audit report. On an account/profile switch, read those plus `git status`/`git diff`; never store credentials or full chat transcripts in the repository or claim separate accounts were synchronized.
-35. Workspace-root hard deletion is denied; use the selected-workspace archive/restore lifecycle. Database flush/reset actions and legacy plaintext whole-project export, whole-collection restore, and direct-balance reset scripts must remain fail-closed until a transactional, audited maintenance path preserves tenant, ledger, and inventory invariants.
+35. Workspace-root hard deletion is denied; use the selected-workspace archive/restore lifecycle. Database flush/reset actions and legacy plaintext whole-project export, whole-collection restore, and direct-balance reset scripts must remain fail-closed until a transactional, audited maintenance path preserves tenant, ledger, and inventory invariants. The unscoped/default-tenant backfill scripts `tool/backfill_tenant_id.js` and `tool/backfill_missing_tenant_id.js`, and the bulk reset script `flush_dev_data.js`, are disabled; any replacement must map each record to an evidenced tenant and pass an approved migration/recovery design.
 36. Missing-document Rules reads must be narrowly scoped to an active profile and concrete active tenant; super-admins additionally require selected-workspace support context. Only admin-equivalent users may probe missing seller inventory, and only super-admins may probe settings for a tenant that does not yet exist. Cover client reads and their complete transaction writes in emulator regressions; do not use a blanket `resource == null` allowance.
 37. Financial PDFs use the shared workspace header with English content left,
     the company logo centered, and selected Arabic/Urdu content right,
@@ -139,6 +142,14 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
     saved `visibleFields` setting. Cash receipts are A5 and single-page.
     Preserve the `use_arabic=true` shaping gate; verify font/image resources,
     page size, page count, and rendered layout separately.
+38. Behavior fixes use evidence-first TDD: reproduce the defect, add or confirm
+    a failing regression, implement the root-cause fix, and rerun the targeted
+    test. Add unit tests for changed models/policies and integration tests for
+    changed provider, screen, Firestore, or export boundaries. Rules changes
+    require positive and adversarial Emulator tests. Security/penetration
+    testing must remain within an explicitly authorized local/emulator scope;
+    do not probe production or third-party targets without separate written
+    authorization.
 
 ## Frontend UI Governance
 
@@ -438,6 +449,64 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- The local invoice-header non-stock toggle now persists immediately through
+  the tenant settings notifier without saving unrelated header drafts. Failed
+  writes restore the switch and show mapped feedback. Focused settings and
+  router/maintenance regressions pass. Full Flutter suite:
+  `01:26 +684: All tests passed!`; both analyzers are clean. This work remains
+  unreleased.
+- Workspace admins can view component-level maintenance options, but every
+  reset remains disabled and fail-closed. The app-shell support banner and
+  nullable notification badge compile and pass focused routing coverage.
+- Tenant notification access is restricted to admin/manager, tenant_admin,
+  and supervisor; sellers and platform super-admins are denied. Provider
+  streams and unread counts remain tenant-keyed.
+- The authenticated dashboard's mixed-script font gap is fixed in source
+  version `3.10.12+1123`: English keeps Syne/DM Sans and uses ordered bundled
+  Noto Arabic/Urdu fallbacks; Arabic and Urdu retain their preferred primary
+  families. Focused fallback/changelog tests: `00:01 +12: All tests passed!`;
+  full suite: `01:31 +671: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 16.1s)`; `dart analyze test/`:
+  `No issues found!`.
+  Web build: `EXIT: 0`; Hosting reported `Deploy complete!`, and live
+  `version.json` reports `3.10.12+1123`. A post-deploy page reload had no
+  fresh console warnings/errors but redirected to login, so authenticated
+  mixed-data rendering was not rechecked. PDF rendering remains separate.
+  APK/AAB builds and phone installation are pending: the final free-RAM check
+  was `2.57 GB`
+  (below the documented 3.2 GB threshold) and ADB listed no devices. No Play
+  upload, commit, or push was performed.
+- The backup screen again keeps a generic workspace-scope card visible to
+  members, preserving metadata loading, mapped errors, and Retry without
+  exposing workspace names. Startup no longer requests unrelated camera,
+  photos, storage, or OS-notification permissions; system pickers handle
+  image and backup files. Full Flutter suite: `02:09 +669: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 36.3s)`;
+  `dart analyze test/`: `No issues found!`. Local web build: `EXIT: 0`.
+  Split APKs (30.7/32.2/33.7 MB) and the signed 54.8 MB AAB were built and
+  verified; ARM64 install on `R5GL22RGT9V` reported `Success`, versionCode
+  `310113122`. Hosting and Firestore Rules/indexes were subsequently deployed;
+  the later live web version check confirmed `3.10.11+1122`.
+  The login-page browser capture did not reproduce the Noto warning; the
+  conflicting inspector-message counts and authenticated PDF rendering
+  remain open.
+- The support-context exit contract now requires a same-batch append-only
+  `workspace_access_ended` event when a selected workspace context is cleared
+  or switched. The event is linked by `last_workspace_access_end_log_id` and
+  checked against the prior profile context and optional start-event ID.
+  Workspace switches atomically end the prior context and start the next.
+  Local Rules Emulator: `181 passing (37s)`; the model regression:
+  `00:00 +26: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 7.7s)`; `dart analyze test/`:
+  `No issues found!`. Rules are not deployed.
+- The support-context audit contract now binds super-admin profile selection
+  to the exact same-batch append-only start event. Rules reject a profile-only
+  context update and validate the event ID, actor, workspace, reason, and
+  server timestamp. The matching client schema and Rules must be deployed
+  together before the new client is installed for production use.
+- Shared monetary input now preserves Western, Arabic-Indic, and
+  Eastern-Arabic digits and supported numeric separators before the canonical
+  amount parser runs. Unit coverage verifies formatter-to-parser behavior.
 - The 2026-10-27 notification regression was caused by singleton provider
   caches surviving a workspace switch. Feed and shop-visibility streams now
   use tenant-keyed families and reject missing/global notification scope;

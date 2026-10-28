@@ -981,12 +981,37 @@ class _TenantManagementScreenState
 
   @override
   Widget build(BuildContext context) {
+    final userState = ref.watch(authUserProvider);
+    if (userState.isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: Text(tr('workspaces', ref))),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (userState.hasError) {
+      return Scaffold(
+        appBar: AppBar(title: Text(tr('workspaces', ref))),
+        body: mappedErrorState(
+          error: userState.error!,
+          ref: ref,
+          onRetry: () => ref.invalidate(authUserProvider),
+        ),
+      );
+    }
+    final currentUser = userState.value;
+    if (currentUser?.active != true || currentUser?.isSuperAdmin != true) {
+      return Scaffold(
+        appBar: AppBar(title: Text(tr('workspaces', ref))),
+        body: Center(
+          child: Text(
+            tr('no_access_to_workspaces', ref),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+      );
+    }
+
     final tenantsAsync = ref.watch(tenantsProvider);
-    final currentUser = ref.watch(authUserProvider).value;
-    final canManageTenants =
-        currentUser != null &&
-        (currentUser.isSuperAdmin || currentUser.isTenantAdmin);
-    final canCreateTenants = currentUser?.isSuperAdmin == true;
     bool canEditTenant(TenantModel tenant) {
       return currentUser?.hasActiveWorkspaceSupportContextFor(tenant.id) ==
           true;
@@ -996,31 +1021,15 @@ class _TenantManagementScreenState
       appBar: AppBar(
         title: Text(tr('workspaces', ref)),
         actions: [
-          if (canCreateTenants)
-            IconButton(
-              onPressed: () => _openCreateSheet(),
-              icon: const Icon(Icons.add_business),
-            ),
+          IconButton(
+            onPressed: () => _openCreateSheet(),
+            icon: const Icon(Icons.add_business),
+          ),
         ],
       ),
       body: tenantsAsync.when(
         data: (tenants) {
           if (tenants.isEmpty) {
-            if (!canManageTenants) {
-              return Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.lock_outline, size: 56),
-                    const SizedBox(height: 12),
-                    Text(
-                      tr('no_access_to_workspaces', ref),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ],
-                ),
-              );
-            }
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,

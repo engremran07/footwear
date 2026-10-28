@@ -18,6 +18,19 @@ observable contract. Select the smallest test that proves the behavior, then
 expand when shared code, security, data integrity, or regressions warrant it.
 Verify APIs against the pinned Flutter/Dart version.
 
+For behavior fixes, use RED-GREEN-REFACTOR: reproduce the defect, add or
+confirm a regression that fails before the fix, implement the narrow
+root-cause correction, then rerun the focused test and relevant wider suites.
+Cover each changed boundary with the suitable unit, provider/widget, export,
+or emulator integration test; do not treat a unit test as proof of Rules or
+production integration behavior.
+
+Authorization/security changes require positive and adversarial Firestore
+Rules Emulator tests of the complete client-shaped read/write batch. Any
+penetration testing must have an explicit authorized scope and use local or
+isolated test targets unless the owner separately authorizes a production
+test window.
+
 ## Output
 
 Report the exact command, test target, observed pass/failure output, and any
@@ -276,6 +289,32 @@ Pop-Location
 
 ```
 
+### Same-Batch Platform Support Context
+
+When Rules authorize a selected super-admin workspace context, test the
+complete client batch, not a profile field in isolation:
+
+- The positive case updates the profile with a concrete workspace, support
+  reason, server timestamp, and exact `active_workspace_access_log_id` while
+  creating the matching append-only start event in the same batch.
+- Negative cases deny a profile-only selection, a log-only start, a mismatched
+  event ID/actor/workspace/reason/timestamp, and an attempt to alter or delete
+  an existing access event.
+- Exit tests must deny profile-only context clearing, a missing or mismatched
+  `last_workspace_access_end_log_id`, a forged/mismatched
+  `workspace_access_ended` event, and a wrong `started_log_id`. A workspace
+  switch must prove that the end event for the prior context, start event for
+  the next context, and profile update all commit atomically.
+- Run the complete Rules Emulator suite after changes to either side of this
+  contract. Emulator success is local evidence, not proof of deployment.
+
+### Localized Amount Input
+
+When an amount formatter changes, test each supported digit script and its
+decimal/group separators through both the actual `TextInputFormatter` and
+the canonical amount parser. Retain ASCII input and reject alphabetic/currency
+text at the formatter boundary; do not silently alter stored business text.
+
 ## Existing Soft-Delete Behavior
 
 Do not introduce soft-delete behavior just to make a test or CRUD path pass.
@@ -295,6 +334,23 @@ test('authorized correction records the delete actor and timestamp atomically', 
 For transaction correction, also cover the exact same-batch shop-balance
 reversal and deny hard delete unless the product owner and financial contract
 explicitly authorize a different design.
+
+## Legacy Maintenance Script Tests
+
+For repository scripts that reset, restore, export, promote roles, or migrate
+tenant-owned data, test the command boundary before any Firebase-backed
+execution. When policy requires a script to remain disabled, use an isolated
+process test that verifies a non-zero exit and an explicit disabled message
+without loading credentials or contacting Firebase:
+
+```bash
+node --test tests/maintenance_scripts.test.js
+```
+
+Do not treat a dry-run flag, project name, or client-supplied tenant ID as
+proof that a bulk operation preserves record ownership. A migration that
+assigns tenant IDs must use reviewed per-record ownership evidence and must
+be exercised only against isolated non-production fixtures.
 
 ## Provider Test Template
 

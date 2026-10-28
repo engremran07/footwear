@@ -1,0 +1,119 @@
+TEST AND BUILD REPORT
+Audit date: 2026-10-28 (console addendum; prior build evidence retained below)
+Repository baseline: 6e5a4337f506d0713fe0463fb6f0ec0cef259b04 on main.
+Environment: Windows 11; Flutter 3.41.6; Dart 3.11.4; Android SDK 36.1.0;
+JDK 21; Gradle wrapper 8.14; Android Gradle Plugin 8.11.1; Kotlin plugin
+2.2.20. Android SDK licenses are not fully accepted.
+
+LIVE WEB CONSOLE RECHECK — 2026-10-28
+- Read-only reload of the shared deployed web page completed at
+  `https://shoeserp-clean-20260327.web.app/`. The page rendered the dashboard.
+- Playwright console capture recorded 9 `debug` entries: Flutter bootstrap
+  script injection, FlutterFire TrustedTypes policy availability, and Firebase
+  Core/Firestore/App Check/Auth initialization. The capture contained no
+  `error` or `warning` messages.
+- The supplied DevTools screenshot separately attributes six messages to
+  `toolbar.js`/MozBar. These are browser-extension output, not repository code.
+- The screenshot's `[Violation]` handler-duration entries are performance
+  diagnostics, not exceptions. They did not recur in the captured console
+  window; no performance trace or reproducible user-facing slowdown was
+  obtained. Do not suppress these messages or claim a performance fix.
+- A first reload waiting for `networkidle` timed out while navigation aborted
+  Firestore Listen requests (`net::ERR_ABORTED`); a subsequent
+  `domcontentloaded` reload completed and produced the console capture above.
+  Navigation-cancelled listen requests alone do not prove a Firestore query or
+  authorization failure.
+
+DASHBOARD ROUTE ROW REGRESSION — 2026-10-28
+- A controlled widget test with 150 routes reproduced eager construction of
+  150 route `ListTile`s in the analytics section.
+- The dashboard now uses a lazy `SliverList` in its outer `CustomScrollView`.
+  The focused regression confirms at most 12 route tiles are mounted while
+  both the first and last sorted routes remain reachable.
+- Before-change test output failed with `Actual: <150>` against the maximum of
+  12. After-change dashboard test pair: `00:06 +3: All tests passed!`.
+- Full Flutter suite: `01:29 +685: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 47.4s)`;
+  `dart analyze test/`: `No issues found!`; focused `git diff --check`
+  exited 0.
+- This local source regression proves unnecessary route-row widget creation,
+  but it does not attribute the live screenshot's `[Violation]` callbacks to
+  this path. The source-map diagnostic bundle differed from deployed
+  `main.dart.js`; no equivalent post-change browser trace was captured.
+  Messages were not suppressed. The full suite and local release builds are
+  complete; Hosting and Rules/indexes deployments remain pending.
+
+CURRENT SOURCE / DELIVERY STATUS — 2026-10-28
+- Source version is `3.10.12+1123`; the earlier v3.10.10 APK/AAB evidence
+  below is historical and is not an artifact claim for the current source.
+- Full Flutter suite: `01:29 +685: All tests passed!`; `flutter analyze lib
+  --no-pub`: `No issues found! (ran in 47.4s)`; `dart analyze test/`:
+  `No issues found!`; Markdown lint exited 0 with no output.
+- Web release build: `EXIT: 0`. Split APKs built at 30.7 MB, 32.3 MB, and
+  33.7 MB; each verified with APK Signature Scheme v2. Signed AAB:
+  54.8 MB; `jarsigner -verify`: `jar verified.` The JVM warned that the
+  certificate chain is not locally trusted; Play Console registration is not
+  proven. AAB manifest metadata was not extracted because bundletool was not
+  available.
+- ARM64 APK copied to the connected phone (`1 file pushed`) and installed
+  (`Success`). Post-install metadata: `3.10.12`, versionCode `310123123`.
+- Hosting and Firestore Rules/indexes were not deployed. No Play Console
+  upload, production data change, commit, or push was performed. Because
+  local Rules/client changes remain undeployed, these are local artifacts, not
+  verified production-ready behavior.
+
+PASS
+- `firebase emulators:exec --only firestore "npm test"` from
+  `tests/firestore-rules/`: 181 passing (37s).
+- `flutter test test/unit/models/user_model_test.dart --dart-define=use_arabic=true`:
+  `00:00 +26: All tests passed!`.
+- `flutter test -r expanded --dart-define=use_arabic=true`:
+  `01:19 +659: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 7.7s)`.
+- `dart analyze test/`: `No issues found!`.
+- `node --test tests/maintenance_scripts.test.js`: `ℹ tests 10`,
+  `ℹ pass 10`, `ℹ fail 0`.
+
+PREVIOUS RED EVIDENCE
+- The support-context exit Rules test reproduced a profile-only clear before
+  the fix; the pre-fix suite ended with 180 passing and 1 failing.
+- Localized amount formatter regressions were red before the formatter change;
+  see the earlier audit/session evidence.
+
+BUILD AND DELIVERY STATUS
+- `flutter doctor -v`: Flutter and network checks passed; Android SDK licenses
+  are not fully accepted. Visual Studio is absent, which is not required for
+  Android.
+- `adb devices` initially showed only the header `List of devices attached`.
+  The device `R5GL22RGT9V` later reconnected and delivery completed.
+- `app/android/key.properties` exists; its contents were not displayed.
+- Split-per-ABI APK build succeeded:
+  ARMv7 `app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk`
+  (30.7 MB), ARM64 `app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
+  (32.2 MB), and x86_64
+  `app/build/app/outputs/flutter-apk/app-x86_64-release.apk` (33.7 MB).
+- ARM64 APK signature verification passed with APK Signature Scheme v2.
+  Exact size: 33,788,489 bytes. `aapt dump badging` reports application ID
+  `footwear.pk.com`, versionName `3.10.10`, versionCode `310103121`.
+- Device `R5GL22RGT9V` reconnected. `adb push` reported `1 file pushed`;
+  `adb install --streaming -r` reported `Success`.
+- All three split APK signatures were verified; installed package metadata
+  was checked after installation.
+- Signed AAB build succeeded at
+  `app/build/app/outputs/bundle/release/app-release.aab` (57,445,866 bytes;
+  54.8 MB). `jarsigner -verify` reported `jar verified.`.
+- `apkanalyzer` does not read an AAB as an APK (`NoSuchFileException:
+  /AndroidManifest.xml`); AAB package metadata was not independently
+  extracted. The synchronized source version is `3.10.10+1121`; the installed
+  split APK verifies package `footwear.pk.com`, versionName `3.10.10`, and
+  ABI-offset versionCode `310103121`.
+- Hosting and Firestore Rules/indexes: NOT deployed. Production deployment
+  remains unauthorized.
+- Commit, push, Play Console upload, and production data changes: NOT
+  performed.
+
+REMAINING VALIDATION
+- AAB manifest metadata was not independently extracted because bundletool
+  was unavailable; no extra tool was installed for this optional check.
+- Emulator and local builds are not evidence of production Rules deployment
+  or authenticated multi-role acceptance.

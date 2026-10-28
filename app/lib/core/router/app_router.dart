@@ -170,6 +170,9 @@ class RouterNotifier extends ChangeNotifier {
     if (!isLoggedIn) return null;
 
     final appUserState = _ref.read(authUserProvider);
+    if (state.matchedLocation == '/notifications' && appUserState.hasError) {
+      return null;
+    }
     if (appUserState.isLoading) return null;
 
     final appUser = appUserState.value;
@@ -388,7 +391,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Workspaces / tenants
           GoRoute(
             path: '/tenants',
-            pageBuilder: (_, s) => _fadePage(const TenantManagementScreen(), s),
+            pageBuilder: (_, s) => _fadePage(
+              const RoleGuard(
+                capability: AppCapability.manageWorkspaces,
+                child: TenantManagementScreen(),
+              ),
+              s,
+            ),
           ),
           // History (7-day feed — both admin and seller)
           GoRoute(
@@ -398,13 +407,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Notification center (operational-role access, scoped by provider and Rules).
           GoRoute(
             path: '/notifications',
-            pageBuilder: (_, s) => _fadePage(
-              const RoleGuard(
-                capability: AppCapability.viewNotifications,
-                child: NotificationCenterScreen(),
-              ),
-              s,
-            ),
+            pageBuilder: (_, s) =>
+                _fadePage(const NotificationCenterScreen(), s),
           ),
           // Profile
           GoRoute(
@@ -421,7 +425,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/settings',
             pageBuilder: (_, s) => _fadePage(
               const RoleGuard(
-                capability: AppCapability.manageSettings,
+                capability: AppCapability.viewSettingsHub,
                 child: SettingsScreen(),
               ),
               s,
@@ -441,7 +445,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: 'flush',
                 pageBuilder: (_, s) => _fadePage(
                   const RoleGuard(
-                    capability: AppCapability.manageDataMaintenance,
+                    capability: AppCapability.viewDataMaintenance,
                     child: DatabaseFlushScreen(),
                   ),
                   s,

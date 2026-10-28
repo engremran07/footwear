@@ -44,14 +44,37 @@ class NotificationCenterScreen extends ConsumerStatefulWidget {
 class _NotificationCenterScreenState
     extends ConsumerState<NotificationCenterScreen> {
   bool _markingAllRead = false;
+  String? _lastTenantId;
+  List<NotificationModel> _lastNotifications = const [];
 
   @override
   Widget build(BuildContext context) {
     final ref = this.ref;
-    final user = ref.watch(authUserProvider).value;
+    final userState = ref.watch(authUserProvider);
 
-    // Defense-in-depth: render nothing while role is resolving.
-    if (user == null) return const Scaffold(body: ShimmerLoading());
+    if (userState.hasError) {
+      return Scaffold(
+        body: mappedErrorState(
+          error: userState.error!,
+          ref: ref,
+          onRetry: () => ref.invalidate(authUserProvider),
+        ),
+      );
+    }
+    if (userState.isLoading) {
+      return const Scaffold(body: ShimmerLoading());
+    }
+    final user = userState.value;
+    if (user == null) {
+      return Scaffold(
+        body: ErrorState(
+          message: tr('err_account_not_assigned', ref),
+          errorType: ErrorType.permission,
+          onRetry: () => ref.invalidate(authUserProvider),
+          retryLabel: tr('retry', ref),
+        ),
+      );
+    }
 
     // Route guard should prevent sellers reaching here, but double-check.
     if (!user.canAccessNotifications) {
@@ -72,7 +95,17 @@ class _NotificationCenterScreenState
     }
 
     final notifAsync = ref.watch(visibleNotificationsProvider);
-    final unreadCount = ref.watch(unreadNotificationCountProvider);
+    final tenantId = notificationTenantIdFor(user);
+    if (_lastTenantId != tenantId) {
+      _lastTenantId = tenantId;
+      _lastNotifications = const [];
+    }
+    if (!notifAsync.hasError && notifAsync.hasValue) {
+      _lastNotifications = notifAsync.value ?? const [];
+    }
+    final unreadCount = _lastNotifications
+        .where((notification) => !notification.read)
+        .length;
 
     final theme = Theme.of(context);
     return Scaffold(
@@ -112,40 +145,84 @@ class _NotificationCenterScreenState
             ),
         ],
       ),
-      body: notifAsync.when(
-        loading: () => const ShimmerLoading(),
-        error: (e, _) => mappedErrorState(
-          error: e,
-          ref: ref,
-          onRetry: () => ref.invalidate(notificationsProvider),
-        ),
-        data: (notifications) {
-          if (notifications.isEmpty) {
-            return EmptyState(
-              icon: Icons.notifications_none_outlined,
-              message: tr('all_caught_up', ref),
-            );
-          }
-          final groups = _groupByDay(notifications);
-          return ListView.builder(
-            padding: const EdgeInsets.only(bottom: AppTokens.s32),
-            itemCount: _listItemCount(groups),
-            itemBuilder: (_, i) => _listItem(context, ref, groups, i),
-          );
-        },
-      ),
+      body: _notificationBody(notifAsync, tenantId, ref),
     );
+  }
+
+  Widget _notificationBody(
+    AsyncValue<List<NotificationModel>> state,
+    String? tenantId,
+    WidgetRef ref,
+  ) {
+    if (state.hasError) {
+      final error = state.error!;
+      if (_lastNotifications.isEmpty) {
+        return mappedErrorState(
+          error: error,
+          ref: ref,
+          onRetry: () => _retryFeed(tenantId),
+        );
+      }
+      return Column(
+        children: [
+          MaterialBanner(
+            key: const Key('notification_feed_error'),
+            content: Text(tr(AppErrorMapper.key(error), ref)),
+            leading: Icon(
+              Icons.error_outline,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => _retryFeed(tenantId),
+                child: Text(tr('retry', ref)),
+              ),
+            ],
+          ),
+          Expanded(child: _notificationList(_lastNotifications, ref)),
+        ],
+      );
+    }
+    if (state.isLoading && _lastNotifications.isEmpty) {
+      return const ShimmerLoading();
+    }
+    return _notificationList(_lastNotifications, ref);
+  }
+
+  Widget _notificationList(
+    List<NotificationModel> notifications,
+    WidgetRef ref,
+  ) {
+    if (notifications.isEmpty) {
+      return EmptyState(
+        icon: Icons.notifications_none_outlined,
+        message: tr('all_caught_up', ref),
+      );
+    }
+    final groups = _groupByDay(notifications);
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: AppTokens.s32),
+      itemCount: _listItemCount(groups),
+      itemBuilder: (_, i) => _listItem(context, ref, groups, i),
+    );
+  }
+
+  void _retryFeed(String? tenantId) {
+    if (tenantId == null) {
+      ref.invalidate(authUserProvider);
+      return;
+    }
+    ref.invalidate(notificationsProvider(tenantId));
+    ref.invalidate(activeNotificationShopIdsProvider(tenantId));
   }
 
   Future<void> _markAllRead() async {
     setState(() => _markingAllRead = true);
     try {
-      final visibleNotifications =
-          ref.read(visibleNotificationsProvider).value ?? const [];
       await ref
           .read(notificationNotifierProvider.notifier)
           .markAllAsRead(
-            visibleNotifications
+            _lastNotifications
                 .where((notification) => !notification.read)
                 .map((notification) => notification.id)
                 .toSet(),

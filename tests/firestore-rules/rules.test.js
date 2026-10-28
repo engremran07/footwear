@@ -4437,6 +4437,113 @@ describe('notifications collection', () => {
     );
   });
 
+  it('notification role and tenant boundaries hold across 15 workspaces', async () => {
+    const roles = [
+      'admin',
+      'manager',
+      'tenant_admin',
+      'supervisor',
+      'seller',
+    ];
+    const fixtures = [];
+
+    for (let index = 0; index < 15; index += 1) {
+      const tenantId = `notification-workspace-${index + 1}`;
+      const uid = `notification-user-${index + 1}`;
+      const role = roles[index % roles.length];
+      const notificationId = `notification-${index + 1}`;
+      fixtures.push({ tenantId, uid, role, notificationId });
+      await seedUser(uid, role, true, { tenant_id: tenantId });
+    }
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const fixture of fixtures) {
+        await db.collection('notifications').doc(fixture.notificationId).set({
+          target_role: 'admin',
+          tenant_id: fixture.tenantId,
+          read: false,
+          created_at: firebase.firestore.Timestamp.now(),
+        });
+      }
+    });
+
+    for (let index = 0; index < fixtures.length; index += 1) {
+      const fixture = fixtures[index];
+      const otherTenantId = fixtures[(index + 1) % fixtures.length].tenantId;
+      const db = testEnv.authenticatedContext(fixture.uid).firestore();
+      const scopedQuery = (tenantId) => db.collection('notifications')
+        .where('tenant_id', '==', tenantId)
+        .where('target_role', '==', 'admin')
+        .orderBy('created_at', 'desc')
+        .limit(50);
+
+      if (fixture.role === 'seller') {
+        await assertFails(scopedQuery(fixture.tenantId).get());
+        await assertFails(
+          db.collection('notifications').doc(fixture.notificationId).update({
+            read: true,
+            read_at: firebase.firestore.Timestamp.now(),
+          }),
+        );
+      } else {
+        const snapshot = await assertSucceeds(
+          scopedQuery(fixture.tenantId).get(),
+        );
+        assert.deepStrictEqual(
+          snapshot.docs.map((doc) => doc.id),
+          [fixture.notificationId],
+        );
+        await assertSucceeds(
+          db.collection('notifications').doc(fixture.notificationId).update({
+            read: true,
+            read_at: firebase.firestore.Timestamp.now(),
+          }),
+        );
+      }
+      await assertFails(scopedQuery(otherTenantId).get());
+    }
+
+    const selectedWorkspace = 'notification-platform-workspace';
+    await seedUser('platform-notification-uid', 'super_admin', true, {
+      active_workspace_id: selectedWorkspace,
+      active_workspace_reason: 'Investigate notification access',
+      active_workspace_selected_at: new Date(),
+      tenant_id: selectedWorkspace,
+    });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('notifications')
+        .doc('platform-notification')
+        .set({
+          target_role: 'admin',
+          tenant_id: selectedWorkspace,
+          read: false,
+          created_at: firebase.firestore.Timestamp.now(),
+        });
+    });
+    const platformDb = testEnv.authenticatedContext(
+      'platform-notification-uid',
+    ).firestore();
+    const platformFeed = (tenantId) => platformDb.collection('notifications')
+      .where('tenant_id', '==', tenantId)
+      .where('target_role', '==', 'admin')
+      .orderBy('created_at', 'desc')
+      .limit(50);
+
+    await assertFails(platformFeed(selectedWorkspace).get());
+    await assertFails(
+      platformFeed(fixtures[0].tenantId).get(),
+    );
+    await assertFails(
+      platformDb.collection('notifications')
+        .doc('platform-notification')
+        .update({
+          read: true,
+          read_at: firebase.firestore.Timestamp.now(),
+        }),
+    );
+  });
+
   it('seller: cannot create notifications without atomic rate state', async () => {
     await seedUser('seller-uid', 'seller');
     await assertFails(
@@ -4550,6 +4657,7 @@ describe('platform super-admin workspace isolation', () => {
       active_workspace_reason: 'Restore inactive workspace',
       active_workspace_selected_at:
         firebase.firestore.FieldValue.serverTimestamp(),
+      active_workspace_access_log_id: logRef.id,
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     selection.set(logRef, {
@@ -4578,10 +4686,23 @@ describe('platform super-admin workspace isolation', () => {
   it('workspace selection can atomically end the old context and start the new one', async () => {
     await seedWorkspace('tenant-a');
     await seedWorkspace('tenant-b');
+    const previousSelectedAt = new Date();
     await seedUser('platform-switch-workspace-uid', 'super_admin', true, {
       active_workspace_id: 'tenant-a',
       active_workspace_reason: 'Previous support review',
-      active_workspace_selected_at: new Date(),
+      active_workspace_selected_at: previousSelectedAt,
+      active_workspace_access_log_id: 'previous-start',
+    });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('platform_access_logs')
+        .doc('previous-start')
+        .set({
+          actor_user_id: 'platform-switch-workspace-uid',
+          workspace_id: 'tenant-a',
+          event_type: 'workspace_access_started',
+          reason: 'Previous support review',
+          created_at: previousSelectedAt,
+        });
     });
 
     const db = testEnv.authenticatedContext(
@@ -4596,6 +4717,8 @@ describe('platform super-admin workspace isolation', () => {
       active_workspace_reason: 'New support request',
       active_workspace_selected_at:
         firebase.firestore.FieldValue.serverTimestamp(),
+      active_workspace_access_log_id: startedLogRef.id,
+      last_workspace_access_end_log_id: endedLogRef.id,
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     batch.set(endedLogRef, {
@@ -4603,6 +4726,7 @@ describe('platform super-admin workspace isolation', () => {
       workspace_id: 'tenant-a',
       event_type: 'workspace_access_ended',
       reason: 'Previous support review',
+      started_log_id: 'previous-start',
       created_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     batch.set(startedLogRef, {
@@ -4805,7 +4929,7 @@ describe('platform super-admin workspace isolation', () => {
     await assertSucceeds(batch.commit());
   });
 
-  it('workspace selection rejects the client payload extra access-log id', async () => {
+  it('workspace selection atomically links its support access audit log', async () => {
     await seedWorkspace('tenant-a');
     await seedUser('platform-select-payload-uid', 'super_admin');
     const db = testEnv.authenticatedContext('platform-select-payload-uid').firestore();
@@ -4815,7 +4939,6 @@ describe('platform super-admin workspace isolation', () => {
       active_workspace_id: 'tenant-a',
       active_workspace_reason: 'Support ticket investigation',
       active_workspace_selected_at: firebase.firestore.FieldValue.serverTimestamp(),
-      active_workspace_access_log_id: logRef.id,
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     batch.set(logRef, {
@@ -4827,12 +4950,37 @@ describe('platform super-admin workspace isolation', () => {
     });
     await assertFails(batch.commit());
 
+    const mismatchedBatch = db.batch();
+    const mismatchedLogRef = db.collection('platform_access_logs')
+      .doc('end-log-mismatched');
+    mismatchedBatch.update(
+      db.collection('users').doc('platform-exit-payload-uid'),
+      {
+        active_workspace_id: firebase.firestore.FieldValue.delete(),
+        active_workspace_reason: firebase.firestore.FieldValue.delete(),
+        active_workspace_selected_at: firebase.firestore.FieldValue.delete(),
+        active_workspace_access_log_id: firebase.firestore.FieldValue.delete(),
+        last_workspace_access_end_log_id: mismatchedLogRef.id,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      },
+    );
+    mismatchedBatch.set(mismatchedLogRef, {
+      actor_user_id: 'platform-exit-payload-uid',
+      workspace_id: 'tenant-a',
+      event_type: 'workspace_access_ended',
+      reason: 'Support ticket investigation',
+      started_log_id: 'another-start-log',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertFails(mismatchedBatch.commit());
+
     const allowedBatch = db.batch();
     const allowedLogRef = db.collection('platform_access_logs').doc('start-log-allowed');
     allowedBatch.update(db.collection('users').doc('platform-select-payload-uid'), {
       active_workspace_id: 'tenant-a',
       active_workspace_reason: 'Support ticket investigation',
       active_workspace_selected_at: firebase.firestore.FieldValue.serverTimestamp(),
+      active_workspace_access_log_id: allowedLogRef.id,
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     allowedBatch.set(allowedLogRef, {
@@ -4847,11 +4995,23 @@ describe('platform super-admin workspace isolation', () => {
 
   it('workspace exit rejects the client payload extra access-log fields', async () => {
     await seedWorkspace('tenant-a');
+    const selectedAt = new Date();
     await seedUser('platform-exit-payload-uid', 'super_admin', true, {
       active_workspace_id: 'tenant-a',
       active_workspace_reason: 'Support ticket investigation',
-      active_workspace_selected_at: new Date(),
+      active_workspace_selected_at: selectedAt,
       active_workspace_access_log_id: 'start-log',
+    });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('platform_access_logs')
+        .doc('start-log')
+        .set({
+          actor_user_id: 'platform-exit-payload-uid',
+          workspace_id: 'tenant-a',
+          event_type: 'workspace_access_started',
+          reason: 'Support ticket investigation',
+          created_at: selectedAt,
+        });
     });
     const db = testEnv.authenticatedContext('platform-exit-payload-uid').firestore();
     const batch = db.batch();
@@ -4869,6 +5029,7 @@ describe('platform super-admin workspace isolation', () => {
       workspace_id: 'tenant-a',
       event_type: 'workspace_access_ended',
       reason: 'Support ticket investigation',
+      started_log_id: 'start-log',
       created_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     await assertFails(batch.commit());
@@ -4879,6 +5040,8 @@ describe('platform super-admin workspace isolation', () => {
       active_workspace_id: firebase.firestore.FieldValue.delete(),
       active_workspace_reason: firebase.firestore.FieldValue.delete(),
       active_workspace_selected_at: firebase.firestore.FieldValue.delete(),
+      active_workspace_access_log_id: firebase.firestore.FieldValue.delete(),
+      last_workspace_access_end_log_id: allowedLogRef.id,
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     allowedBatch.set(allowedLogRef, {
@@ -4886,9 +5049,68 @@ describe('platform super-admin workspace isolation', () => {
       workspace_id: 'tenant-a',
       event_type: 'workspace_access_ended',
       reason: 'Support ticket investigation',
+      started_log_id: 'start-log',
       created_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     await assertSucceeds(allowedBatch.commit());
+  });
+
+  it('requires an end audit event when a super-admin clears support context', async () => {
+    await seedWorkspace('tenant-a');
+    const selectedAt = new Date();
+    await seedUser('platform-unlogged-exit-uid', 'super_admin', true, {
+      active_workspace_id: 'tenant-a',
+      active_workspace_reason: 'Support ticket investigation',
+      active_workspace_selected_at: selectedAt,
+      active_workspace_access_log_id: 'start-log',
+    });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('platform_access_logs')
+        .doc('start-log')
+        .set({
+          actor_user_id: 'platform-unlogged-exit-uid',
+          workspace_id: 'tenant-a',
+          event_type: 'workspace_access_started',
+          reason: 'Support ticket investigation',
+          created_at: selectedAt,
+        });
+    });
+    const db = testEnv.authenticatedContext(
+      'platform-unlogged-exit-uid',
+    ).firestore();
+
+    await assertFails(
+      db.collection('users').doc('platform-unlogged-exit-uid').update({
+        active_workspace_id: firebase.firestore.FieldValue.delete(),
+        active_workspace_reason: firebase.firestore.FieldValue.delete(),
+        active_workspace_selected_at: firebase.firestore.FieldValue.delete(),
+        active_workspace_access_log_id: firebase.firestore.FieldValue.delete(),
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+
+    const endLogRef = db.collection('platform_access_logs').doc('end-log');
+    const endingBatch = db.batch();
+    endingBatch.update(
+      db.collection('users').doc('platform-unlogged-exit-uid'),
+      {
+        active_workspace_id: firebase.firestore.FieldValue.delete(),
+        active_workspace_reason: firebase.firestore.FieldValue.delete(),
+        active_workspace_selected_at: firebase.firestore.FieldValue.delete(),
+        active_workspace_access_log_id: firebase.firestore.FieldValue.delete(),
+        last_workspace_access_end_log_id: endLogRef.id,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      },
+    );
+    endingBatch.set(endLogRef, {
+      actor_user_id: 'platform-unlogged-exit-uid',
+      workspace_id: 'tenant-a',
+      event_type: 'workspace_access_ended',
+      reason: 'Support ticket investigation',
+      started_log_id: 'start-log',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertSucceeds(endingBatch.commit());
   });
 
   it('selected super-admin is limited to the selected tenant', async () => {
@@ -5067,8 +5289,27 @@ describe('platform super-admin workspace isolation', () => {
       tenant_id: 'tenant-a',
     });
     const platformDb = testEnv.authenticatedContext('platform-audit-uid').firestore();
-    await assertSucceeds(
-      platformDb.collection('platform_access_logs').doc('log-1').set({
+    const accessBatch = platformDb.batch();
+    const userRef = platformDb.collection('users').doc('platform-audit-uid');
+    const accessLogRef = platformDb.collection('platform_access_logs').doc('log-1');
+    accessBatch.update(userRef, {
+      active_workspace_id: 'tenant-a',
+      active_workspace_reason: 'Support ticket investigation',
+      active_workspace_selected_at:
+        firebase.firestore.FieldValue.serverTimestamp(),
+      active_workspace_access_log_id: accessLogRef.id,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    accessBatch.set(accessLogRef, {
+        actor_user_id: 'platform-audit-uid',
+        workspace_id: 'tenant-a',
+        event_type: 'workspace_access_started',
+        reason: 'Support ticket investigation',
+        created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertSucceeds(accessBatch.commit());
+    await assertFails(
+      platformDb.collection('platform_access_logs').doc('orphan-log').set({
         actor_user_id: 'platform-audit-uid',
         workspace_id: 'tenant-a',
         event_type: 'workspace_access_started',

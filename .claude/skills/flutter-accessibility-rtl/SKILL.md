@@ -33,6 +33,9 @@ and RTL changes, and during representative screen-family acceptance testing.
    without describing one mobile metric as universal WCAG conformance.
 4. Check Arabic and Urdu separately, including mixed Latin identifiers, dates,
    digits, currency, phone numbers, input cursor behavior, and text expansion.
+   Also test Arabic-script Firestore values while the app locale is English;
+   preserve the English primary font and verify ordered bundled Noto fallback
+   for each shared text style.
 5. Add automated Flutter accessibility guideline checks where supported by the
    pinned SDK; manually verify screen-reader and platform behavior when
    possible.
@@ -42,6 +45,8 @@ and RTL changes, and during representative screen-family acceptance testing.
    animation.
 7. Preserve localized validation and recovery messages. Never hardcode
    translated UI text or change export font policy based on UI typography.
+   UI fallback validation is not evidence that PDF, print, image, or
+   spreadsheet rendering is correct.
 
 ## Output
 

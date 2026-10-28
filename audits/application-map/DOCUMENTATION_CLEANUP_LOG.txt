@@ -1,0 +1,54 @@
+DOCUMENTATION CLEANUP LOG
+Audit date: 2026-10-27
+
+UPDATED IN THIS PASS
+- `AGENTS.md`: support-context exit and switch event linkage; current local
+  Rules/model/analyzer evidence; explicit non-deployment status.
+- `CLAUDE.md`: same-batch start/end support-audit contract and current
+  verification evidence.
+- `README.md` and `app/README.md`: local start/end audit-linkage description
+  and deployment caveat.
+- `SYSTEM_DEEP_DIVE_2026-03-27.md`: exact profile/event end-link model and
+  local emulator evidence.
+- `AUDIT_REPORT_FOOTWEAR_ERP.md`, `SESSION_LOG.md`, and
+  `REGRESSION_REGISTRY.md`: reproduced defect, root cause, fix, tests, and
+  remaining deployment gate.
+- `.claude/skills/multi-tenant-saas/SKILL.md`,
+  `.claude/skills/testing-strategy/SKILL.md`,
+  `.github/skills/firestore-rules-author/SKILL.md`, and
+  `.github/instructions/firestore-rules.instructions.md`: mandatory start,
+  end, and switch test contracts.
+- `AGENTS.md`, `CLAUDE.md`, `.claude/skills/testing-strategy/SKILL.md`, and
+  `.claude/skills/security-owasp-mobile/SKILL.md`: evidence-first TDD,
+  boundary-appropriate unit/integration/Rules tests, and scoped authorized
+  penetration testing.
+- `.github/workflows/ci.yml`: explicit export integration regression step;
+  the Rules workflow already runs maintenance guard tests plus emulator
+  authorization tests.
+- `.claude/skills/apk-build-signing/SKILL.md`: clarified the distinction
+  between Gradle embedded Kotlin and the Android plugin, and recorded the
+  AAB metadata-tool limitation without changing Gradle versions.
+- `.claude/skills/inline-audit/SKILL.md`: removed unsafe advice to run
+  `node dev_reset.js` after a manual flush; current guidance keeps reset
+  scripts fail-closed.
+
+HISTORICAL DOCUMENTS
+- Existing audit reports and SESSION_LOG entries are retained as historical
+  evidence. Their prior dates/results are not rewritten to imply that the
+  current fix existed then.
+- `MASTER_MULTI_SAAS_AUDIT_AND_PATCH_REPORT_2026_09_25.txt` contains an
+  outdated backfill execution command. It is identified in
+  ZERO_TRACE_SEARCH_REPORT.txt and must be annotated as superseded before the
+  documentation cleanup can be considered closed.
+- Earlier application-map reports are retained and cross-referenced by the
+  new clean-slate deliverables; they are not replaced.
+- `FULL_REPOSITORY_AUDIT.txt` now has a dated addendum for the support-context
+  exit regression without rewriting historical test results.
+- `MASTER_MULTI_SAAS_AUDIT_AND_PATCH_REPORT_2026_09_25.txt` keeps its
+  historical backfill discussion but now labels its old `--apply` guidance
+  superseded and blocks execution.
+
+NOT CLAIMED
+- This is not a full documentation-tree review. Every skill, README, archived
+  audit, generated report, and workflow instruction was not read.
+- No claims are made about production deployment or runtime behavior.

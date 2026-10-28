@@ -162,6 +162,21 @@ void main() {
       );
     });
 
+    test('missing workspace invoice settings map to setup guidance', () {
+      expect(
+        AppErrorMapper.key(
+          StateError('Workspace settings are required for invoicing'),
+        ),
+        equals('workspace_settings_initialization_required'),
+      );
+      expect(
+        AppErrorMapper.key(
+          StateError('Workspace settings are required for receipt numbering'),
+        ),
+        equals('workspace_settings_initialization_required'),
+      );
+    });
+
     test('workspace admin context failures map to permission denied', () {
       expect(
         AppErrorMapper.key(

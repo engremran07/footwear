@@ -15,7 +15,6 @@ import '../models/user_model.dart';
 import '../core/constants/app_brand.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
-import '../core/services/permissions_service.dart';
 import '../core/utils/permission_policy.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
@@ -105,7 +104,6 @@ class _AppShellState extends ConsumerState<AppShell>
       reverseCurve: Curves.easeIn,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      PermissionsService.requestOnFirstRun();
       // Defer changelog check to avoid blocking initial frame rendering.
       Future.delayed(const Duration(seconds: 1), _checkAndShowChangelog);
       Future.delayed(const Duration(seconds: 6), _checkAutoBackup);
@@ -287,8 +285,12 @@ class _AppShellState extends ConsumerState<AppShell>
   }
 
   Widget _workspaceContextBanner(UserModel user) {
-    final tenantId = user.tenantId;
-    if (tenantId == null) return const SizedBox.shrink();
+    final tenantId = user.activeWorkspaceId;
+    if (!user.isSuperAdmin ||
+        tenantId == null ||
+        !user.hasActiveWorkspaceSupportContextFor(tenantId)) {
+      return const SizedBox.shrink();
+    }
     final tenantName = ref
         .watch(tenantProvider(tenantId))
         .when(
@@ -297,51 +299,40 @@ class _AppShellState extends ConsumerState<AppShell>
           loading: () => tr('loading', ref),
           error: (_, _) => tr('workspace_name_unavailable', ref),
         );
-    final hasSupportAccess = user.isSuperAdmin;
     final reason = user.activeWorkspaceReason?.trim();
     return Material(
-      color: hasSupportAccess
-          ? AppBrand.warningColor.withAlpha(18)
-          : Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: AppBrand.warningColor.withAlpha(18),
       child: Padding(
         padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
         child: Row(
           children: [
-            Icon(
-              hasSupportAccess
-                  ? Icons.admin_panel_settings_outlined
-                  : Icons.domain_outlined,
-              size: 20,
-            ),
+            const Icon(Icons.admin_panel_settings_outlined, size: 20),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                hasSupportAccess
-                    ? '${tr('workspace_access_active', ref)}: $tenantName${reason?.isNotEmpty == true ? ' · $reason' : ''}'
-                    : '${tr('workspaces', ref)}: $tenantName',
+                '${tr('workspace_access_active', ref)}: $tenantName${reason?.isNotEmpty == true ? ' · $reason' : ''}',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
-            if (hasSupportAccess)
-              TextButton(
-                onPressed: () async {
-                  try {
-                    await ref
-                        .read(authNotifierProvider.notifier)
-                        .endWorkspaceAccess();
-                  } catch (error) {
-                    if (mounted) {
-                      final key = AppErrorMapper.key(error);
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(errorSnackBar(tr(key, ref)));
-                    }
+            TextButton(
+              onPressed: () async {
+                try {
+                  await ref
+                      .read(authNotifierProvider.notifier)
+                      .endWorkspaceAccess();
+                } catch (error) {
+                  if (mounted) {
+                    final key = AppErrorMapper.key(error);
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(errorSnackBar(tr(key, ref)));
                   }
-                },
-                child: Text(tr('end_workspace_access', ref)),
-              ),
+                }
+              },
+              child: Text(tr('end_workspace_access', ref)),
+            ),
           ],
         ),
       ),
@@ -356,8 +347,13 @@ class _AppShellState extends ConsumerState<AppShell>
     final isOnline = ref.watch(isOnlineProvider).value ?? true;
     final currentLocation = GoRouterState.of(context).uri.path;
     final unreadCount =
-        PermissionPolicy.can(user, AppCapability.viewNotifications)
-        ? ref.watch(unreadNotificationCountProvider)
+        user != null &&
+            PermissionPolicy.can(user, AppCapability.viewNotifications)
+        ? ref.watch(
+            unreadNotificationCountProvider(
+              user.isSuperAdmin ? null : user.tenantId,
+            ),
+          )
         : 0;
 
     final rawItems = AppShell._filteredItems(user);
@@ -428,7 +424,8 @@ class _AppShellState extends ConsumerState<AppShell>
                       width: double.infinity,
                       child: Column(
                         children: [
-                          if (user?.tenantId != null)
+                          if (user?.isSuperAdmin == true &&
+                              user?.tenantId != null)
                             _workspaceContextBanner(user!),
                           Expanded(child: widget.child),
                         ],
@@ -562,7 +559,8 @@ class _AppShellState extends ConsumerState<AppShell>
                           ),
                           body: Column(
                             children: [
-                              if (user?.tenantId != null)
+                              if (user?.isSuperAdmin == true &&
+                                  user?.tenantId != null)
                                 _workspaceContextBanner(user!),
                               Expanded(
                                 child: GestureDetector(

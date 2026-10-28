@@ -1,0 +1,151 @@
+FOOTWEAR — BOUNDED REPOSITORY AUDIT
+Audit date: 2026-10-27
+Repository: engremran07/footwear
+Branch: main
+Inspected baseline commit: 6e5a4337f506d0713fe0463fb6f0ec0cef259b04
+Upstream divergence at baseline: 0 ahead / 0 behind origin/main
+Worktree at inspection: already modified; audit changes were not committed
+
+STATUS
+This is a bounded, evidence-based audit, NOT a full file-by-file repository
+audit or production signoff. The accepted master execution prompt requests
+full coverage, but the inspected source set and workflow history do not prove
+every tracked source file was read. The separate 33-finding checklist
+mentioned in prior audit notes was not present in the accessible 430-line
+prompt; row-by-row disposition is BLOCKED pending that checklist.
+
+INITIAL INVENTORY (from current-session repository inventory)
+- 394 tracked files at baseline.
+- 129 Dart files under app/lib.
+- 88 tracked Flutter test files at baseline; 89 after the localized-input
+  regression test was added.
+- 5 GitHub workflows.
+- 28 .claude skills and 4 .github skills.
+- Firestore collection constants: 15 names, 14 unique collection paths
+  because shops/customers is an alias.
+- functions/ has no tracked backend source files.
+- The current worktree adds the Node maintenance-script regression test and
+  changes three previously executable maintenance scripts into fail-closed
+  stubs.
+
+COVERAGE ACCOUNTING
+PASS — Read the role/capability model, permission policy, collection
+constants, route declarations, Firestore Rules, Rules Emulator tests,
+tenant/auth-provider paths, amount formatter/parser path, PDF export font
+policy, data-flush provider, key reset/backup scripts, relevant route/screen
+register, selected Flutter regression tests, three edited skills, and the
+modified Android/Rules workflows.
+PARTIAL — Flutter UI/provider coverage: 129 app/lib files were inventoried,
+but not all were fully read. Existing screen-register and test inventories
+were reused as discovery evidence, not treated as execution evidence.
+PARTIAL — Skills/docs/workflows: three skills and relevant governance,
+audit, and workflow files were inspected/updated; all skill files and all
+five workflows were not exhaustively reviewed.
+NOT RUN — Authorized penetration testing, production data validation,
+authenticated role-based device acceptance, external multi-tenant load
+testing, exhaustive feature interaction testing, complete PDF visual
+inspection, and a production deployment comparison.
+EXCLUDED — Generated build output, package caches, node_modules, binary
+keystore/font/image assets, and logs were not treated as source files.
+The excluded files were not inferred to be safe from their filenames.
+
+CONFIRMED FINDINGS
+P1 FIXED LOCALLY — Super-admin selected-workspace profile updates previously
+could succeed without a same-batch platform_access_logs start event. The
+Rules test reproduced the allowed profile-only update. auth_provider.dart
+now links the exact event ID and Firestore Rules check both sides of the
+batch. Source anchors: auth_provider.dart:448-454;
+firestore.rules:117-132, 1723-1756, 2387-2396. Local Rules Emulator:
+180 passing. Production Rules remain undeployed.
+
+P1 OPEN — A signing-password value was present in committed history at
+HEAD:AGENTS.md:1235. The value is redacted from the current worktree; history
+was not rewritten. Owner rotation is required if the credential remains
+active.
+
+P2 FIXED LOCALLY — app/lib/core/utils/input_formatters.dart:18 filtered
+Arabic-Indic and Eastern-Arabic digits even though the canonical parser
+supports them. The formatter now retains supported digits/separators. The
+formatter-to-parser test was red before the fix and passes after it.
+
+P1 FIXED LOCALLY — flush_dev_data.js:4 replaces a script that deleted
+financial documents in separate batches and reset shop balances directly.
+Its allowlisted development project did not provide transaction/batch
+atomicity for the whole operation. It now fails closed.
+
+P1 FIXED LOCALLY — tool/backfill_missing_tenant_id.js:4 replaces a script that assigned unscoped
+records to a shared default tenant and referenced a service-account JSON
+file. It now fails closed.
+
+P1 FIXED LOCALLY — tool/backfill_tenant_id.js:4 replaces a script that could assign all unscoped
+records in selected collections to one tenant without a per-record ownership
+map. It now fails closed.
+
+P1 REVIEW REQUIRED — promote_super_admin.js:83,90 performs a privileged direct
+Firestore role patch without a matching platform support-access audit event.
+It was not executed or changed. Owner must approve a narrowly scoped
+bootstrap/audit process before use.
+
+P2 BLOCKED — The UI/provider data-reset surface remains fail-closed.
+Feature-specific reset scope, retention, recovery, preview accuracy,
+idempotency, audit, and partial-failure semantics have no approved design.
+
+P2 BLOCKED — Runtime-configurable permissions are not implemented. Supported
+capabilities, safe defaults, tenant/global boundaries, Rules representation,
+cache/revocation semantics, and migration behavior need owner approval.
+
+P2 OPEN — Urdu PDF output is Naskh-style with the current pdf 3.12.0 renderer;
+full Nastaliq shaping is not verified. Current-source visual inspection was
+partial, so no complete Arabic/Urdu PDF acceptance is claimed.
+
+TDD / RETEST
+- Support-context Rules regression: pre-fix suite 64 passing, 1 failing;
+  final Rules Emulator suite 180 passing (39s).
+- Localized amount: pre-fix formatter regressions failed; final focused suite
+  00:00 +4: All tests passed!.
+- Maintenance scripts: initial node:test run 7 pass / 2 fail; after fixes
+  9/9 passed. The added single-tenant backfill assertion then produced
+  9 pass / 1 fail; after disabling it, 10 pass / 0 fail.
+- Full Flutter suite after the prior Dart/source edits:
+  02:03 +659: All tests passed!. This was before the later Node-only script
+  guard test and did not verify production Rules or device behavior.
+- flutter analyze lib --no-pub: No issues found! (ran in 33.0s).
+- dart analyze test/: No issues found!.
+
+RELEASE / PRODUCTION STATUS
+Version is locally synchronized at 3.10.10+1121. Current-source APK/AAB
+builds were not attempted because the readiness probe showed 2.14 GiB free
+physical memory, below the previously used 3.2 GiB local build-safety
+threshold. `adb devices` showed only `List of devices attached`; no phone was
+connected for copy/install. Signatures, sizes, Hosting deployment, Rules/
+indexes deployment, commit, and push are not claimed.
+Do not use the updated support-context client for platform workspace access
+against stale production Rules.
+  app/lib/providers/auth_provider.dart:448-454, and
+  firestore.rules:117-132, 1723-1756, 2387-2396.
+
+ADDENDUM — 2026-10-27 SUPPORT-CONTEXT EXIT LINKAGE
+This addendum extends the bounded audit above; it does not change its
+historical test results or claim full repository coverage.
+
+P1 FIXED LOCALLY — A selected super-admin could clear or switch the active
+workspace context without creating a matching `workspace_access_ended` event.
+The Rules regression reproduced the profile-only clear. The provider now
+creates the end event in the same batch, stores its ID in
+`last_workspace_access_end_log_id`, and binds it to the prior actor, workspace,
+reason, and prior start-event ID when available. A switch also starts the new
+context in that same batch. Current anchors:
+`auth_provider.dart:137-160, 340-388, 453-481, 490-514`;
+`firestore.rules:142-160, 1720-1795, 2418-2438`;
+`rules.test.js:4570-5010`.
+
+TDD: the pre-fix suite allowed the unlogged exit (`180 passing, 1 failing`).
+Final local Rules Emulator: `181 passing (37s)`. The model test reports
+`00:00 +26: All tests passed!`; full Flutter suite reports
+`01:19 +659: All tests passed!`; both analyzers are clean. The final Rules
+suite is local only. Production Rules/indexes remain undeployed.
+
+No production data was queried or changed. External penetration testing and
+live tenant-data reconciliation were not performed. The updated support
+client must not be used for production support access until the matching
+Rules are deployed with explicit authorization.

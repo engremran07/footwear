@@ -126,6 +126,35 @@ class AuthNotifier extends AsyncNotifier<void> {
     }
   }
 
+  String _appendWorkspaceAccessEndLog(
+    FirebaseFirestore db,
+    WriteBatch batch, {
+    required String actorUserId,
+    required String workspaceId,
+    required String reason,
+    String? startedLogId,
+  }) {
+    final normalizedWorkspaceId = TenantScope.normalize(workspaceId);
+    final normalizedReason = reason.trim();
+    if (normalizedWorkspaceId == null ||
+        normalizedReason.length < 10 ||
+        normalizedReason.length > 240) {
+      throw StateError('The active workspace support context is invalid.');
+    }
+
+    final logRef = db.collection(Collections.platformAccessLogs).doc();
+    batch.set(logRef, {
+      'actor_user_id': actorUserId,
+      'workspace_id': normalizedWorkspaceId,
+      'event_type': 'workspace_access_ended',
+      'reason': normalizedReason,
+      if (startedLogId?.trim().isNotEmpty == true)
+        'started_log_id': startedLogId!.trim(),
+      'created_at': FieldValue.serverTimestamp(),
+    });
+    return logRef.id;
+  }
+
   Future<void> signIn(
     String emailAddress,
     String password, {
@@ -330,30 +359,32 @@ class AuthNotifier extends AsyncNotifier<void> {
           final profileData = profile.data();
           if ((profileData?['role'] as String? ?? '').trim().toLowerCase() ==
               'super_admin') {
-            final workspaceId = profileData?['active_workspace_id'] as String?;
-            final reason = profileData?['active_workspace_reason'] as String?;
-            final batch = FirebaseFirestore.instance.batch();
-            final accessLogRef = workspaceId != null && reason != null
-                ? FirebaseFirestore.instance
-                      .collection(Collections.platformAccessLogs)
-                      .doc()
-                : null;
-            batch.update(profile.reference, {
-              'active_workspace_id': FieldValue.delete(),
-              'active_workspace_reason': FieldValue.delete(),
-              'active_workspace_selected_at': FieldValue.delete(),
-              'updated_at': Timestamp.now(),
-            });
-            if (accessLogRef != null) {
-              batch.set(accessLogRef, {
-                'actor_user_id': authUser.uid,
-                'workspace_id': workspaceId,
-                'event_type': 'workspace_access_ended',
-                'reason': reason,
-                'created_at': FieldValue.serverTimestamp(),
+            final workspaceId = TenantScope.normalize(
+              profileData?['active_workspace_id'] as String?,
+            );
+            if (workspaceId != null) {
+              final reason =
+                  profileData?['active_workspace_reason'] as String? ?? '';
+              final batch = FirebaseFirestore.instance.batch();
+              final endLogId = _appendWorkspaceAccessEndLog(
+                FirebaseFirestore.instance,
+                batch,
+                actorUserId: authUser.uid,
+                workspaceId: workspaceId,
+                reason: reason,
+                startedLogId:
+                    profileData?['active_workspace_access_log_id'] as String?,
+              );
+              batch.update(profile.reference, {
+                'active_workspace_id': FieldValue.delete(),
+                'active_workspace_reason': FieldValue.delete(),
+                'active_workspace_selected_at': FieldValue.delete(),
+                'active_workspace_access_log_id': FieldValue.delete(),
+                'last_workspace_access_end_log_id': endLogId,
+                'updated_at': Timestamp.now(),
               });
+              await batch.commit();
             }
-            await batch.commit();
           }
         }
       } catch (e, stack) {
@@ -423,27 +454,23 @@ class AuthNotifier extends AsyncNotifier<void> {
     final batch = db.batch();
     final previousWorkspaceId = TenantScope.normalize(user.activeWorkspaceId);
     final previousReason = user.activeWorkspaceReason?.trim();
-    if (previousWorkspaceId != null &&
-        previousWorkspaceId != TenantScope.globalTenantId &&
-        previousReason != null &&
-        previousReason.length >= 10 &&
-        previousReason.length <= 240) {
-      final previousAccessLogRef = db
-          .collection(Collections.platformAccessLogs)
-          .doc();
-      batch.set(previousAccessLogRef, {
-        'actor_user_id': user.id,
-        'workspace_id': previousWorkspaceId,
-        'event_type': 'workspace_access_ended',
-        'reason': previousReason,
-        'created_at': FieldValue.serverTimestamp(),
-      });
-    }
+    final previousEndLogId = previousWorkspaceId == null
+        ? null
+        : _appendWorkspaceAccessEndLog(
+            db,
+            batch,
+            actorUserId: user.id,
+            workspaceId: previousWorkspaceId,
+            reason: previousReason ?? '',
+            startedLogId: user.activeWorkspaceAccessLogId,
+          );
     final accessLogRef = db.collection(Collections.platformAccessLogs).doc();
     batch.update(db.collection(Collections.users).doc(user.id), {
       'active_workspace_id': normalizedId,
       'active_workspace_reason': normalizedReason,
       'active_workspace_selected_at': FieldValue.serverTimestamp(),
+      'active_workspace_access_log_id': accessLogRef.id,
+      'last_workspace_access_end_log_id': ?previousEndLogId,
       'updated_at': FieldValue.serverTimestamp(),
     });
     batch.set(accessLogRef, {
@@ -462,31 +489,28 @@ class AuthNotifier extends AsyncNotifier<void> {
       throw StateError('Active super-admin access is required.');
     }
     final batch = FirebaseFirestore.instance.batch();
-    final workspaceId = user.activeWorkspaceId;
-    final reason = user.activeWorkspaceReason;
-    final accessLogRef = workspaceId != null && reason != null
-        ? FirebaseFirestore.instance
-              .collection(Collections.platformAccessLogs)
-              .doc()
-        : null;
+    final workspaceId = TenantScope.normalize(user.activeWorkspaceId);
+    if (workspaceId == null) return;
+    final reason = user.activeWorkspaceReason?.trim() ?? '';
+    final endLogId = _appendWorkspaceAccessEndLog(
+      FirebaseFirestore.instance,
+      batch,
+      actorUserId: user.id,
+      workspaceId: workspaceId,
+      reason: reason,
+      startedLogId: user.activeWorkspaceAccessLogId,
+    );
     batch.update(
       FirebaseFirestore.instance.collection(Collections.users).doc(user.id),
       {
         'active_workspace_id': FieldValue.delete(),
         'active_workspace_reason': FieldValue.delete(),
         'active_workspace_selected_at': FieldValue.delete(),
+        'active_workspace_access_log_id': FieldValue.delete(),
+        'last_workspace_access_end_log_id': endLogId,
         'updated_at': FieldValue.serverTimestamp(),
       },
     );
-    if (accessLogRef != null) {
-      batch.set(accessLogRef, {
-        'actor_user_id': user.id,
-        'workspace_id': workspaceId,
-        'event_type': 'workspace_access_ended',
-        'reason': reason,
-        'created_at': FieldValue.serverTimestamp(),
-      });
-    }
     await batch.commit();
   }
 

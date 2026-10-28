@@ -1,6 +1,6 @@
 # ShoesERP System Deep Dive
 
-Last updated: 2026-10-26
+Last updated: 2026-10-27
 
 ## Backup and Restore
 
@@ -13,6 +13,13 @@ Workspace settings are fetched by `settings/{tenantId}` document ID rather than 
 The restore preview shows one warning selected by the effective restore mode: merge keeps records absent from the archive, while replacement may prune within the selected support workspace. Restore re-authentication is owned by `AuthNotifier` and shared with destructive flush confirmation; backup restore uses backup-specific localized prompt text.
 
 App-private encrypted archives are listed through the shared restore picker and can be deleted after confirmation. Phone files use the system picker for save/import. Passphrases are required for encrypted backup creation and restore; creation asks for confirmation to catch entry mistakes. Archive checksum, workspace, creator, and current seller-route scope are validated before restore or Drive upload. Errors from preference, file-list, export, Drive, and restore operations are surfaced through the shared error mapper.
+
+Workspace members see a generic backup scope/readiness card while their
+workspace metadata is loading. The card retains mapped failure and Retry
+states, and successful metadata loading enables backup without revealing the
+workspace name. A prior privacy change hid the entire card and inadvertently
+removed the only metadata retry path; the generic card preserves both privacy
+and recovery feedback.
 
 ## Workspace Archival
 
@@ -46,6 +53,38 @@ correction/approval, invoice-void, route-seller assignment, or shop-route
 reassignment rights.
 Tenant admins may create or assign only supervisor and seller roles to eligible
 non-owner accounts; admin, tenant-admin, and platform roles remain restricted.
+
+## Platform Permission Requests
+
+App startup does not request camera, photo, storage, or OS-notification
+permissions. The product has no camera-capture or OS-push-notification
+workflow; image selection and backup file operations use system pickers.
+Firestore notification-feed authorization is separate from browser/Android
+notification permission. Permission requests must be added only for a
+specific workflow, at the point that workflow is invoked, and tested against
+the platform and browser permission policy instead of requested globally on
+first launch.
+
+The local release web build was loaded once in an unauthenticated browser at
+the login route: nine Firebase initialization debug messages were captured,
+with no console warnings/errors, uncaught page errors, or failed requests.
+This did not validate authenticated screens or PDF export. A later
+authenticated dashboard exposed missing UI fallback for Arabic-script
+Firestore values under the English theme. The shared `AppFonts` resolver now
+preserves English primary families and adds ordered bundled Noto fallbacks;
+Arabic and Urdu retain their locale-specific primary families. This UI fix
+does not alter the separate PDF font/shaping path. The reported inspector
+total and category counts still disagree.
+
+## Mixed-Script UI Font Fallback
+
+Firestore names, descriptions, and formatted currency may contain Arabic or
+Urdu script regardless of the selected app locale. Shared `AppFonts` styles
+therefore keep the locale's primary family and provide ordered bundled
+Arabic/Urdu fallback families. Tests check fallback configuration across
+heading, body, and text-theme styles. Browser inspection is needed to verify
+actual glyph output; UI font fallback does not prove PDF shaping, print,
+image, or spreadsheet rendering.
 
 Firestore Rules enforce active-profile status, active-tenant status, role permissions, and tenant ownership on business documents. A platform super-admin may see workspace metadata globally, but business data requires a selected workspace and a support reason; selection and exit are recorded in append-only `platform_access_logs`, and Rules enforce the eight-hour support-context limit. This audited workspace context is distinct from the removed app-managed access controls.
 
@@ -495,6 +534,30 @@ and 2 field overrides absent locally were preserved without `--force`. Split APK
 AAB JAR verification passed. ARM64 metadata is versionName `3.10.6`,
 versionCode `310063117`; installation on `R5GL22RGT9V` returned `Success`.
 
+## 2026-10-27 Support-Context Audit Linkage and Localized Amount Input
+
+Super-admin workspace starts now use a same-batch profile/log contract. The
+profile stores the exact `active_workspace_access_log_id`; Firestore Rules
+verify that the post-batch event has the authenticated actor, selected
+workspace, identical support reason, and request-time server timestamp. The
+start-event rule independently verifies the post-batch profile points back to
+that event. Clearing or switching a selected workspace now also requires a
+same-batch `workspace_access_ended` event. The end event is validated against
+the prior profile's actor, workspace, reason, and optional start-event ID; the
+updated profile retains its exact end-event ID in
+`last_workspace_access_end_log_id`. A workspace switch ends the previous
+context and starts the next context in the same batch. A pre-fix Rules
+regression allowed an unlogged exit; the final local Rules suite reports
+`181 passing (37s)`. This changes the client write schema; production Rules
+must be deployed before the updated client is used for workspace support
+access.
+
+The shared monetary input formatter now retains Western, Arabic-Indic, and
+Eastern-Arabic digits plus ASCII and Arabic decimal/grouping separators. The
+existing canonical amount parser normalizes these inputs; the formatter/parser
+regression exercises both stages. This does not imply Arabic/Urdu PDF font or
+visual-rendering defects are resolved.
+
 ## 2026-10-27 Tenant Permission and User-List Recovery
 
 The app-side role/capability map is centralized in `RoleCapabilities` and
@@ -516,3 +579,25 @@ Local-only status: complete Rules parity review, all finding-by-finding audit
 dispositions, analyzer/full-suite verification, fresh APK/AAB builds, and
 device delivery remain pending. No production deployment, Play publication,
 commit, or push is implied.
+
+## 2026-10-28 Non-Stock Setting and Workspace Access Follow-up
+
+The invoice-header setting previously changed only local widget state until
+the form's bottom Save action ran. The switch now persists its single
+`allow_non_stock_invoices` field immediately through the tenant-scoped
+`SettingsNotifier`, while leaving unrelated dirty header edits untouched.
+Write failures restore the prior value and surface mapped feedback. A widget
+regression covers enable → leave → reopen, plus failure rollback.
+
+The app shell safely handles a null profile for the tenant-keyed notification
+badge and renders the selected-workspace exit control only inside a verified
+super-admin support context. The workspace maintenance route is viewable by
+authorized workspace admins, but every client-side reset remains disabled.
+Notification feed roles are admin/manager, tenant_admin, and supervisor;
+seller and platform super-admin access is denied.
+
+Focused affected tests: `00:00 +54: All tests passed!`; full Flutter suite:
+`01:26 +684: All tests passed!`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 9.1s)`; `dart analyze test/`: `No issues found!`.
+This follow-up remains unreleased at `3.10.12+1123`; no new web/APK/AAB
+artifacts, production deployment, phone install, commit, or push are claimed.

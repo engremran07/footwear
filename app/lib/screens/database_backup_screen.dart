@@ -982,8 +982,10 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                               ],
                             ),
                             data: (selectedTenant) => Text(
-                              selectedTenant?.name ??
-                                  tr('workspace_name_unavailable', ref),
+                              user?.isSuperAdmin == true
+                                  ? selectedTenant?.name ??
+                                        tr('workspace_name_unavailable', ref)
+                                  : tr('backup_scope_ready', ref),
                             ),
                           ),
                         ),

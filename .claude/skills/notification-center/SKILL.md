@@ -10,7 +10,9 @@ description: "Use when: fixing notification feed flicker, unread badge refresh, 
 Use for notification streams, unread counts, visibility filtering, notification
 screen states, and mark-as-read writes. Keep notification reads scoped to the
 active tenant and authorized role. Admin-equivalent roles and supervisors may
-read and mark the tenant's admin notification feed. Sellers remain excluded.
+read and mark the tenant's admin notification feed. Sellers and platform
+super-admins remain excluded, including super-admins with selected workspace
+support context.
 
 ## Trace Before Changing
 
@@ -29,6 +31,11 @@ Auth/profile/tenant context
 Inspect the screen, providers, notification/shop models, error mapper, rules,
 and focused provider/widget/emulator tests. Separate actual authorization
 failures from startup/loading states and from refresh flicker.
+
+Read route redirects and `RoleGuard` behavior as part of this trace. A
+profile-stream failure must not be interpreted as a missing profile,
+redirected to bootstrap, or rendered as a permanent shimmer before the screen
+can show its mapped error and retry action.
 
 ## Stability and Authorization
 
@@ -54,6 +61,14 @@ failures from startup/loading states and from refresh flicker.
 - Do not suppress write failures with `.ignore()` or success-shaped fallbacks.
   Map Firebase exceptions and show visible feedback so stale deployed Rules,
   inactive tenants, and mismatched documents can be diagnosed.
+- Keep the auth/profile state machine explicit at the screen boundary:
+  profile loading may show loading UI; a profile-stream error must show mapped
+  retry feedback; a missing profile must show actionable access guidance; an
+  unsupported role or tenant context must not start feed or shop listeners.
+- The screen repeats capability and tenant checks even when the router also
+  gates the route. If a route guard hides the screen on provider errors, give
+  the route a safe error path; the screen must still avoid business queries
+  until authorization is confirmed.
 
 ## Required Regression Coverage
 
@@ -65,8 +80,13 @@ failures from startup/loading states and from refresh flicker.
   denied.
 - Seller or missing-context access is denied without starting an unauthorized
   feed query.
+- Profile-stream failures reach the screen as mapped errors with retry; they do
+  not become an endless shimmer or route to profile bootstrap.
 - Mark-as-read and mark-all failures display mapped feedback and retain
   retryable screen state.
+- Role-matrix coverage includes legacy admin/manager, tenant admin, and
+  supervisor access, plus seller and platform-super-admin denial across
+  multiple concrete tenants.
 - Run focused Flutter provider/widget tests and the Rules Emulator cases for
   changed authorization behavior. Quote exact test output and distinguish
   local emulator validation from production deployment.
@@ -96,3 +116,6 @@ states, and do not solve flicker by broadening Firestore permissions.
 - Never discard mark-read failures. Report the mapped error and retain normal
   navigation/retry behavior; an ignored write failure hides stale Rules and
   context mismatches.
+- An auth/profile stream error is not equivalent to a null profile. Do not
+  drive screen state from `AsyncValue.value` alone: inspect error and loading
+  state before interpreting a null data value.

@@ -108,6 +108,10 @@ class AppErrorMapper {
     if (msg.contains('workspace_seat_count_initialization_required')) {
       return 'workspace_seat_count_initialization_required';
     }
+    if (msg.contains('workspace settings are required for invoicing') ||
+        msg.contains('workspace settings are required for receipt numbering')) {
+      return 'workspace_settings_initialization_required';
+    }
     if (msg.contains('workspace_seat_count_changed_retry')) {
       return 'workspace_seat_count_changed_retry';
     }

@@ -166,157 +166,189 @@ class DashboardScreen extends ConsumerWidget {
             final hasOutstandingAlert = totalOutstanding > 0;
             final hasPendingEditRequests = pendingEdits.isNotEmpty;
 
-            return ListView(
-              padding: const EdgeInsets.all(AppTokens.s16),
-              children: [
-                // Welcome
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppTokens.s16),
-                  child: RichText(
-                    text: TextSpan(
-                      text: '${tr('welcome', ref)}, ',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: user.displayName.trim().isNotEmpty
-                              ? user.displayName
-                              : tr('profile', ref),
-                          style: _userNameStyle(context, ref),
-                        ),
-                      ],
-                    ),
+            return CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppTokens.s16,
+                    AppTokens.s16,
+                    AppTokens.s16,
+                    0,
                   ),
-                ).animate().fadeIn(duration: AppTokens.durNormal),
-
-                // Alerts banner
-                if (hasOutstandingAlert)
-                  _OutstandingAlertCard(
-                        currencyStats: s.currencyStats,
-                        // NOTE: no /customers route — shops are the customers
-                        onViewCurrency: (c) => context.go('/shops?currency=$c'),
-                      )
-                      .animate()
-                      .fadeIn(duration: AppTokens.durNormal)
-                      .slideY(begin: -0.1, end: 0, curve: AppTokens.curveStd),
-
-                if (hasOutstandingAlert) const SizedBox(height: AppTokens.s12),
-
-                if (hasPendingEditRequests)
-                  Card(
-                    color: AppBrand.primaryColor.withAlpha(18),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppTokens.brMD,
-                      side: BorderSide(
-                        color: AppBrand.primaryColor.withAlpha(64),
-                      ),
-                    ),
-                    child: ListTile(
-                      leading: const Icon(
-                        Icons.pending_actions,
-                        color: AppBrand.primaryColor,
-                      ),
-                      title: Text(
-                        tr(
-                          'pending_edit_requests_count',
-                          ref,
-                        ).replaceAll('%s', '${pendingEdits.length}'),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text(tr('pending_edit_requests_subtitle', ref)),
-                      trailing: TextButton(
-                        onPressed: () => _showPendingEditRequestsSheet(
-                          context,
-                          ref,
-                          pendingEdits,
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // Welcome
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppTokens.s16),
+                        child: RichText(
+                          text: TextSpan(
+                            text: '${tr('welcome', ref)}, ',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                ),
+                            children: [
+                              TextSpan(
+                                text: user.displayName.trim().isNotEmpty
+                                    ? user.displayName
+                                    : tr('profile', ref),
+                                style: _userNameStyle(context, ref),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: Text(tr('lbl_view', ref)),
-                      ),
-                      onTap: () => _showPendingEditRequestsSheet(
-                        context,
-                        ref,
-                        pendingEdits,
-                      ),
-                    ),
-                  ).screenEntry(),
+                      ).animate().fadeIn(duration: AppTokens.durNormal),
 
-                if (hasPendingEditRequests)
-                  const SizedBox(height: AppTokens.s12),
+                      // Alerts banner
+                      if (hasOutstandingAlert)
+                        _OutstandingAlertCard(
+                              currencyStats: s.currencyStats,
+                              // NOTE: no /customers route — shops are the customers
+                              onViewCurrency: (c) =>
+                                  context.go('/shops?currency=$c'),
+                            )
+                            .animate()
+                            .fadeIn(duration: AppTokens.durNormal)
+                            .slideY(
+                              begin: -0.1,
+                              end: 0,
+                              curve: AppTokens.curveStd,
+                            ),
 
-                // Stat cards grid
-                GridView.count(
-                  crossAxisCount: MediaQuery.of(context).size.width > 600
-                      ? 3
-                      : 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: AppTokens.s8,
-                  crossAxisSpacing: AppTokens.s8,
-                  childAspectRatio: 1.2,
-                  children: [
-                    StatCard(
-                      title: tr('total_routes', ref),
-                      value: s.totalRoutes.toString(),
-                      icon: Icons.route,
-                      color: AppBrand.primaryColor,
-                      staggerIndex: 0,
-                      onTap: () => context.go('/routes'),
-                    ),
-                    StatCard(
-                      title: tr('total_shops', ref),
-                      value: s.totalShops.toString(),
-                      icon: Icons.store,
-                      color: AppBrand.secondaryColor,
-                      staggerIndex: 1,
-                      onTap: () => context.go('/shops'),
-                    ),
-                    _OutstandingStatCard(
-                      title: tr('outstanding_balance', ref),
-                      currencyStats: s.currencyStats,
-                      totalOutstanding: totalOutstanding,
-                      staggerIndex: 2,
-                      onTap: () => context.go('/shops'),
-                    ),
-                    StatCard(
-                      title: tr('products', ref),
-                      value: s.totalProducts.toString(),
-                      icon: Icons.inventory_2,
-                      color: AppBrand.adminRoleColor,
-                      staggerIndex: 3,
-                      onTap: () => context.go('/products'),
-                    ),
-                    StatCard(
-                      title: tr('variants', ref),
-                      value: s.totalVariants.toString(),
-                      icon: Icons.style,
-                      color: AppBrand.warningColor,
-                      staggerIndex: 4,
-                      onTap: () => context.go('/inventory'),
-                    ),
-                    StatCard(
-                      title: tr('dashboard_stock_cartons', ref),
-                      value: AppFormatters.number(s.totalStockPairs ~/ ppc),
-                      subtitle: tr(
-                        'dashboard_pairs_remainder',
-                        ref,
-                      ).replaceAll('%s', '${s.totalStockPairs % ppc}'),
-                      icon: Icons.warehouse,
-                      color: AppBrand.stockColor,
-                      staggerIndex: 5,
-                      onTap: () => context.go('/inventory'),
-                    ),
-                  ],
+                      if (hasOutstandingAlert)
+                        const SizedBox(height: AppTokens.s12),
+
+                      if (hasPendingEditRequests)
+                        Card(
+                          color: AppBrand.primaryColor.withAlpha(18),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: AppTokens.brMD,
+                            side: BorderSide(
+                              color: AppBrand.primaryColor.withAlpha(64),
+                            ),
+                          ),
+                          child: ListTile(
+                            leading: const Icon(
+                              Icons.pending_actions,
+                              color: AppBrand.primaryColor,
+                            ),
+                            title: Text(
+                              tr(
+                                'pending_edit_requests_count',
+                                ref,
+                              ).replaceAll('%s', '${pendingEdits.length}'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              tr('pending_edit_requests_subtitle', ref),
+                            ),
+                            trailing: TextButton(
+                              onPressed: () => _showPendingEditRequestsSheet(
+                                context,
+                                ref,
+                                pendingEdits,
+                              ),
+                              child: Text(tr('lbl_view', ref)),
+                            ),
+                            onTap: () => _showPendingEditRequestsSheet(
+                              context,
+                              ref,
+                              pendingEdits,
+                            ),
+                          ),
+                        ).screenEntry(),
+
+                      if (hasPendingEditRequests)
+                        const SizedBox(height: AppTokens.s12),
+
+                      // Stat cards grid
+                      GridView.count(
+                        crossAxisCount: MediaQuery.of(context).size.width > 600
+                            ? 3
+                            : 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: AppTokens.s8,
+                        crossAxisSpacing: AppTokens.s8,
+                        childAspectRatio: 1.2,
+                        children: [
+                          StatCard(
+                            title: tr('total_routes', ref),
+                            value: s.totalRoutes.toString(),
+                            icon: Icons.route,
+                            color: AppBrand.primaryColor,
+                            staggerIndex: 0,
+                            onTap: () => context.go('/routes'),
+                          ),
+                          StatCard(
+                            title: tr('total_shops', ref),
+                            value: s.totalShops.toString(),
+                            icon: Icons.store,
+                            color: AppBrand.secondaryColor,
+                            staggerIndex: 1,
+                            onTap: () => context.go('/shops'),
+                          ),
+                          _OutstandingStatCard(
+                            title: tr('outstanding_balance', ref),
+                            currencyStats: s.currencyStats,
+                            totalOutstanding: totalOutstanding,
+                            staggerIndex: 2,
+                            onTap: () => context.go('/shops'),
+                          ),
+                          StatCard(
+                            title: tr('products', ref),
+                            value: s.totalProducts.toString(),
+                            icon: Icons.inventory_2,
+                            color: AppBrand.adminRoleColor,
+                            staggerIndex: 3,
+                            onTap: () => context.go('/products'),
+                          ),
+                          StatCard(
+                            title: tr('variants', ref),
+                            value: s.totalVariants.toString(),
+                            icon: Icons.style,
+                            color: AppBrand.warningColor,
+                            staggerIndex: 4,
+                            onTap: () => context.go('/inventory'),
+                          ),
+                          StatCard(
+                            title: tr('dashboard_stock_cartons', ref),
+                            value: AppFormatters.number(
+                              s.totalStockPairs ~/ ppc,
+                            ),
+                            subtitle: tr(
+                              'dashboard_pairs_remainder',
+                              ref,
+                            ).replaceAll('%s', '${s.totalStockPairs % ppc}'),
+                            icon: Icons.warehouse,
+                            color: AppBrand.stockColor,
+                            staggerIndex: 5,
+                            onTap: () => context.go('/inventory'),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: AppTokens.s16),
+                    ]),
+                  ),
                 ),
-
-                const SizedBox(height: AppTokens.s16),
-
-                // Route analytics section (extracted)
-                _RouteAnalyticsSection(
-                  routesAsync: routesAsync,
-                  shopsAsync: shopsAsync,
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppTokens.s16,
+                    0,
+                    AppTokens.s16,
+                    AppTokens.s16,
+                  ),
+                  sliver: _RouteAnalyticsSection(
+                    routesAsync: routesAsync,
+                    shopsAsync: shopsAsync,
+                  ),
                 ),
               ],
             ).screenEntry();
@@ -833,42 +865,73 @@ class _RouteAnalyticsSection extends ConsumerWidget {
     final shops = shopsAsync.value;
 
     if (routes == null || shops == null) {
-      return const SizedBox.shrink();
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
 
     final analytics = _compute(routes, shops);
-    if (analytics.isEmpty) return const SizedBox.shrink();
+    if (analytics.isEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: AppTokens.brMD),
-      child: Padding(
-        padding: const EdgeInsets.all(AppTokens.s12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AppSectionHeader(title: tr('routes', ref)),
-            ...analytics.map(
-              (row) => ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  radius: 14,
-                  child: Text('${row.route.routeNumber}'),
-                ),
-                title: Text(row.route.name),
-                subtitle: Text('${row.totalShops} ${tr('shops', ref)}'),
-                trailing: Text(
-                  AppFormatters.currency(row.outstanding, row.route.currency),
-                  style: TextStyle(
-                    color: row.outstanding > 0
-                        ? AppBrand.errorColor
-                        : AppBrand.successColor,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-                onTap: () => context.push('/routes/${row.route.id}'),
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTokens.s16,
+        vertical: 6,
+      ),
+      sliver: DecoratedSliver(
+        decoration: ShapeDecoration(
+          color:
+              Theme.of(context).cardTheme.color ??
+              Theme.of(context).colorScheme.surfaceContainerLow,
+          shape: RoundedRectangleBorder(borderRadius: AppTokens.brMD),
+        ),
+        sliver: SliverMainAxisGroup(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.all(AppTokens.s12),
+              sliver: SliverToBoxAdapter(
+                child: AppSectionHeader(title: tr('routes', ref)),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                AppTokens.s12,
+                0,
+                AppTokens.s12,
+                AppTokens.s12,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final row = analytics[index];
+                  return Material(
+                    type: MaterialType.transparency,
+                    child: ListTile(
+                      key: ValueKey(row.route.id),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        radius: 14,
+                        child: Text('${row.route.routeNumber}'),
+                      ),
+                      title: Text(row.route.name),
+                      subtitle: Text('${row.totalShops} ${tr('shops', ref)}'),
+                      trailing: Text(
+                        AppFormatters.currency(
+                          row.outstanding,
+                          row.route.currency,
+                        ),
+                        style: TextStyle(
+                          color: row.outstanding > 0
+                              ? AppBrand.errorColor
+                              : AppBrand.successColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      onTap: () => context.push('/routes/${row.route.id}'),
+                    ),
+                  );
+                }, childCount: analytics.length),
               ),
             ),
           ],

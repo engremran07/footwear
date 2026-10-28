@@ -110,6 +110,101 @@ void main() {
     },
   );
 
+  test(
+    'unread badge count is tenant-keyed during workspace switches',
+    () async {
+      final profiles = StreamController<UserModel?>();
+      final tenantAFeed = StreamController<List<NotificationModel>>();
+      final tenantBFeed = StreamController<List<NotificationModel>>();
+      final tenantAShops = StreamController<Set<String>>();
+      final tenantBShops = StreamController<Set<String>>();
+      final tenantBReady = Completer<void>();
+      final now = Timestamp.now();
+      UserModel user(String tenantId) => UserModel(
+        id: 'admin-$tenantId',
+        email: 'admin@example.com',
+        displayName: 'Admin',
+        role: UserRole.admin,
+        tenantId: tenantId,
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final notification = NotificationModel(
+        id: 'notification-a',
+        type: 'transaction',
+        shopId: 'shop-a',
+        shopName: 'Tenant A shop',
+        routeId: 'route-a',
+        sellerId: 'seller-a',
+        sellerName: 'Seller A',
+        amount: 10,
+        transactionType: 'cash_in',
+        refId: 'transaction-a',
+        targetRole: 'admin',
+        createdBy: 'seller-a',
+        createdAt: now,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          authUserProvider.overrideWith((ref) => profiles.stream),
+          notificationsProvider.overrideWith((ref, tenantId) {
+            return switch (tenantId) {
+              'tenant-a' => tenantAFeed.stream,
+              'tenant-b' => tenantBFeed.stream,
+              _ => Stream.value(const <NotificationModel>[]),
+            };
+          }),
+          activeNotificationShopIdsProvider.overrideWith((ref, tenantId) {
+            return switch (tenantId) {
+              'tenant-a' => tenantAShops.stream,
+              'tenant-b' => tenantBShops.stream,
+              _ => Stream.value(const <String>{}),
+            };
+          }),
+        ],
+      );
+      final scopeSubscription = container.listen(
+        notificationTenantScopeProvider,
+        (_, tenantId) {
+          if (tenantId == 'tenant-b' && !tenantBReady.isCompleted) {
+            tenantBReady.complete();
+          }
+        },
+      );
+      final tenantACountSubscription = container.listen(
+        unreadNotificationCountProvider('tenant-a'),
+        (_, _) {},
+      );
+      addTearDown(() {
+        scopeSubscription.close();
+        tenantACountSubscription.close();
+        container.dispose();
+        unawaited(profiles.close());
+        unawaited(tenantAFeed.close());
+        unawaited(tenantBFeed.close());
+        unawaited(tenantAShops.close());
+        unawaited(tenantBShops.close());
+      });
+
+      profiles.add(user('tenant-a'));
+      await container.read(authUserProvider.future);
+      tenantAFeed.add([notification]);
+      tenantAShops.add({'shop-a'});
+      await container.read(notificationsProvider('tenant-a').future);
+      await container.read(
+        activeNotificationShopIdsProvider('tenant-a').future,
+      );
+      expect(container.read(unreadNotificationCountProvider('tenant-a')), 1);
+
+      profiles.add(user('tenant-b'));
+      await tenantBReady.future.timeout(const Duration(seconds: 2));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(unreadNotificationCountProvider('tenant-b')), 0);
+    },
+  );
+
   test('shop listener key is stable when notification read state changes', () {
     NotificationModel notification(
       String id,
@@ -203,7 +298,7 @@ void main() {
         ),
         now: now,
       ),
-      'tenant-1',
+      isNull,
     );
     expect(
       notificationTenantIdFor(
@@ -219,6 +314,32 @@ void main() {
       isNull,
     );
   });
+
+  test(
+    'profile-stream errors do not authorize a notification tenant',
+    () async {
+      final profileError = StateError('profile stream failed');
+      final container = ProviderContainer(
+        overrides: [
+          authUserProvider.overrideWith(
+            (ref) => Stream<UserModel?>.error(profileError),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        notificationTenantScopeProvider,
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
+
+      await expectLater(
+        container.read(authUserProvider.future),
+        throwsA(same(profileError)),
+      );
+      expect(container.read(notificationTenantScopeProvider), isNull);
+    },
+  );
 
   test('filters missing and inactive shops from notification visibility', () {
     NotificationModel notification(String id, String shopId) =>
@@ -309,6 +430,73 @@ void main() {
     expect(visible.value?.map((item) => item.id), ['notification-1']);
     expect(visible.isLoading, isFalse);
     expect(visible.hasError, isFalse);
+  });
+
+  test('keeps cached visible rows while surfacing a feed stream error', () {
+    final notification = NotificationModel(
+      id: 'notification-1',
+      type: 'transaction',
+      shopId: 'shop-1',
+      shopName: 'Shop One',
+      routeId: 'route-1',
+      sellerId: 'seller-1',
+      sellerName: 'Seller',
+      amount: 10,
+      transactionType: 'cash_in',
+      refId: 'transaction-1',
+      targetRole: 'admin',
+      createdBy: 'seller-1',
+      createdAt: Timestamp.now(),
+    );
+    final permissionError = FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'permission-denied',
+    );
+    final failedFeed =
+        AsyncError<List<NotificationModel>>(permissionError, StackTrace.current)
+        // ignore: invalid_use_of_internal_member
+        .copyWithPrevious(AsyncData([notification]));
+
+    final visible = visibleNotificationState(
+      failedFeed,
+      const AsyncData({'shop-1'}),
+    );
+
+    expect(visible.hasError, isTrue);
+    expect(visible.error, same(permissionError));
+  });
+
+  test('keeps cached visible rows while shop visibility emits an error', () {
+    final notification = NotificationModel(
+      id: 'notification-1',
+      type: 'transaction',
+      shopId: 'shop-1',
+      shopName: 'Shop One',
+      routeId: 'route-1',
+      sellerId: 'seller-1',
+      sellerName: 'Seller',
+      amount: 10,
+      transactionType: 'cash_in',
+      refId: 'transaction-1',
+      targetRole: 'admin',
+      createdBy: 'seller-1',
+      createdAt: Timestamp.now(),
+    );
+    final permissionError = FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'permission-denied',
+    );
+    final failedVisibility =
+        AsyncError<Set<String>>(permissionError, StackTrace.current)
+        // ignore: invalid_use_of_internal_member
+        .copyWithPrevious(const AsyncData({'shop-1'}));
+
+    final visible = notificationsWithShopVisibility([
+      notification,
+    ], failedVisibility);
+
+    expect(visible.hasError, isTrue);
+    expect(visible.error, same(permissionError));
   });
 
   test(

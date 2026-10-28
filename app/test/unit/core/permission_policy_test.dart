@@ -47,6 +47,44 @@ void main() {
       );
     });
 
+    test('notifications are limited to workspace admins and supervisors', () {
+      for (final role in ['admin', 'tenant_admin']) {
+        expect(
+          RoleCapabilities.allows(role, AppCapability.viewNotifications),
+          isTrue,
+        );
+      }
+      expect(
+        RoleCapabilities.allows('supervisor', AppCapability.viewNotifications),
+        isTrue,
+      );
+      expect(
+        RoleCapabilities.allows('super_admin', AppCapability.viewNotifications),
+        isFalse,
+      );
+    });
+
+    test('workspace admins can view the disabled data maintenance screen', () {
+      for (final role in [UserRole.admin, UserRole.tenantAdmin]) {
+        final account = user(role: role);
+        expect(
+          PermissionPolicy.can(account, AppCapability.viewDataMaintenance),
+          isTrue,
+        );
+        expect(
+          PermissionPolicy.can(account, AppCapability.manageDataMaintenance),
+          isFalse,
+        );
+      }
+      expect(
+        PermissionPolicy.can(
+          user(role: UserRole.supervisor),
+          AppCapability.viewDataMaintenance,
+        ),
+        isFalse,
+      );
+    });
+
     test(
       'invoice creation capabilities are consistent across business roles',
       () {
@@ -245,7 +283,7 @@ void main() {
           AppCapability.viewNotifications,
           now: now,
         ),
-        isTrue,
+        isFalse,
       );
       expect(
         PermissionPolicy.can(selected, AppCapability.createInvoice, now: now),

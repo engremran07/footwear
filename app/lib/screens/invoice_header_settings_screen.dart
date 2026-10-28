@@ -60,6 +60,7 @@ class _InvoiceHeaderSettingsScreenState
   };
   bool _isDirty = false;
   bool _saving = false;
+  bool _savingNonStockInvoices = false;
   bool _allowNonStockInvoices = false;
   String _template = 'classic';
   String _titleScale = 'normal';
@@ -147,7 +148,7 @@ class _InvoiceHeaderSettingsScreenState
   );
 
   Future<void> _save() async {
-    if (_saving) return;
+    if (_saving || _savingNonStockInvoices) return;
     setState(() => _saving = true);
     try {
       final config = _config();
@@ -173,6 +174,34 @@ class _InvoiceHeaderSettingsScreenState
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _setAllowNonStockInvoices(bool value) async {
+    if (_saving || _savingNonStockInvoices || value == _allowNonStockInvoices) {
+      return;
+    }
+    final previousValue = _allowNonStockInvoices;
+    setState(() {
+      _allowNonStockInvoices = value;
+      _savingNonStockInvoices = true;
+    });
+    try {
+      await ref.read(settingsNotifierProvider.notifier).save({
+        'allow_non_stock_invoices': value,
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _allowNonStockInvoices = previousValue;
+          _savingNonStockInvoices = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+      }
+      return;
+    }
+    if (mounted) setState(() => _savingNonStockInvoices = false);
   }
 
   Future<void> _preview(SettingsModel settings) async {
@@ -315,10 +344,16 @@ class _InvoiceHeaderSettingsScreenState
                   value: _allowNonStockInvoices,
                   title: Text(tr('allow_non_stock_invoices', ref)),
                   subtitle: Text(tr('allow_non_stock_invoices_hint', ref)),
-                  onChanged: (value) => setState(() {
-                    _allowNonStockInvoices = value;
-                    _isDirty = true;
-                  }),
+                  secondary: _savingNonStockInvoices
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : null,
+                  onChanged: _saving || _savingNonStockInvoices
+                      ? null
+                      : _setAllowNonStockInvoices,
                 ),
                 DropdownButtonFormField<FinancialDocumentLanguagePair>(
                   key: const ValueKey('financial_document_language_pair'),
@@ -484,7 +519,7 @@ class _InvoiceHeaderSettingsScreenState
                 ),
                 const SizedBox(height: 8),
                 FilledButton.icon(
-                  onPressed: _saving ? null : _save,
+                  onPressed: _saving || _savingNonStockInvoices ? null : _save,
                   icon: _saving
                       ? const SizedBox(
                           width: 18,

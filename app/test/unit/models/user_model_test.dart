@@ -255,6 +255,7 @@ void main() {
         role: UserRole.superAdmin,
         activeWorkspaceId: 'tenant-1',
         activeWorkspaceReason: 'Incident investigation',
+        activeWorkspaceAccessLogId: 'support-start-1',
         active: true,
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -262,6 +263,7 @@ void main() {
       final restored = UserModel.fromJson(original.toJson(), original.id);
       expect(restored.tenantId, 'tenant-1');
       expect(restored.activeWorkspaceReason, 'Incident investigation');
+      expect(restored.activeWorkspaceAccessLogId, 'support-start-1');
     });
   });
 

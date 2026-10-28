@@ -1,6 +1,76 @@
-# FootWear ERP — Flutter App (v3.10.9+1120)
+# FootWear ERP — Flutter App (v3.10.12+1123; web deployed, Android pending)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
+
+## v3.10.11 Backup and Startup-Permission Follow-up
+
+Workspace members again see the backup scope/readiness card while workspace
+metadata loads. It preserves mapped error and Retry feedback, but uses generic
+scope text so it does not disclose the workspace name. Successful metadata
+loading enables the backup action.
+
+The app no longer requests camera, photos, storage, or OS notification
+permissions during startup. Image selection and backup file import/export use
+their system pickers; the in-app notification feed is Firestore-backed and is
+not an OS notification workflow. No Firestore Rules, tenant authorization, or
+business-data behavior changed in this follow-up.
+
+Full Flutter suite: `02:09 +669: All tests passed!`; `flutter analyze lib
+--no-pub`: `No issues found! (ran in 36.3s)`; `dart analyze test/`:
+`No issues found!`; web build: `EXIT: 0`. The split APKs were built at
+30.7/32.2/33.7 MB, and the signed AAB at 54.8 MB. All APK v2 signatures and
+the AAB JAR signature verified. The ARM64 APK was copied and installed on
+`R5GL22RGT9V` (`1 file pushed`; `Success`, versionCode `310113122`).
+Hosting and Firestore Rules/indexes were subsequently deployed; live
+`version.json` reports `3.10.11+1122`. Play Console upload, commit, and push
+were not performed.
+
+The local unauthenticated browser reload showed no console warning/error,
+page error, or failed request. The later authenticated dashboard exposed a
+mixed-script Noto fallback warning: English theme styles lacked bundled
+Arabic/Urdu fallback families. The local v3.10.12 fix adds ordered fallbacks;
+PDF font loading and shaping remain a separate validation path.
+
+## v3.10.12 Mixed-Script UI Font Follow-up
+
+Shared English styles retain Syne/DM Sans as primary fonts and fall back to
+bundled Noto Sans Arabic and Noto Nastaliq Urdu when Firestore-backed text
+contains those scripts. Arabic and Urdu locales retain their own primary font
+with the other script family as fallback. The PDF font/shaping policy is
+unchanged. Focused and full tests, analysis, the successful web build, the
+Hosting deployment, and the pending Android artifact/phone-delivery status
+are recorded in `SESSION_LOG.md`.
+
+## Local 2026-10-28 Workspace Follow-up (Unreleased)
+
+The invoice-header non-stock switch now writes only the current tenant's
+`allow_non_stock_invoices` setting immediately through `SettingsNotifier`.
+Unrelated header edits remain unsaved; a failed write restores the previous
+switch value and displays mapped feedback. Workspace admins may view
+component-level maintenance options, but reset controls remain disabled.
+Notification feeds are restricted to admin/manager, tenant_admin, and
+supervisor roles; sellers and platform super-admins are excluded.
+
+Focused affected tests: `00:00 +54: All tests passed!`; full Flutter suite:
+`01:26 +684: All tests passed!`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 9.1s)`; `dart analyze test/`: `No issues found!`.
+Version/build, release artifacts, production deployment, and device delivery
+remain unchanged and pending.
+
+## Local v3.10.10 Audit Follow-up
+
+Super-admin workspace selection now links the profile's active context to
+the exact same-batch append-only `workspace_access_started` event. Clearing
+or switching that context also requires a same-batch
+`workspace_access_ended` event linked to the previous context and the updated
+profile. Firestore Rules reject profile-only starts, exits, and switches.
+Shared amount fields accept Western, Arabic-Indic, and Eastern-Arabic numerals
+and the separators handled by the canonical parser. This source version is not
+yet deployed to Firebase. A local ARM64 APK for this source version was copied
+to and installed on `R5GL22RGT9V`. Do not use the updated support-access flow
+against stale production Rules; the Rules change and client schema must ship
+together. The signed AAB was built locally (54.8 MB); no Play Console upload
+or production deployment was performed.
 
 ## Local v3.10.9 Multi-Workspace Invoice Permissions
 

@@ -1,0 +1,101 @@
+ZERO-TRACE SEARCH REPORT
+Audit date: 2026-10-28
+
+SCOPE
+Searches cover tracked repository source, current Rules, workflows, and
+current operational documentation. Historical audit reports and test fixtures
+are classified separately; their evidence is not silently rewritten.
+
+WEB INSPECTOR MESSAGE CLASSIFICATION — 2026-10-28
+- The supplied screenshot reports 18 messages, 16 user messages, no console
+  errors, no warnings, 6 info, and 12 verbose. These displayed group counts
+  are not treated as a mutually exclusive arithmetic breakdown.
+- Six `toolbar.js` messages are identified as MozBar browser-extension output.
+  `rg` over `app`, `firebase.json`, `.github`, and `audits/application-map`
+  found no repository matches for `MozBar`, `toolbar.js`,
+  `requestAnimationFrame`, the displayed handler-duration text, or
+  `firebase-firestore-pipelines`.
+- A read-only live-page console capture recorded Flutter bootstrap injection,
+  TrustedTypes notices, and Firebase SDK initialization at `debug` level;
+  it recorded no application error or warning in that capture window.
+- `[Violation]` duration lines are timing diagnostics. They were not
+  reproduced in the capture window and no performance trace tied them to an
+  application frame. They remain unclassified as an application performance
+  defect until a repeatable profile exists; console suppression is not a fix.
+- An initial page reload cancelled Firestore Listen requests with
+  `net::ERR_ABORTED`; the following DOM-ready reload succeeded. The cancellation
+  during navigation is not evidence that Rules denied a feed request.
+
+SEARCH METHODS
+- `git ls-files` for tracked JS/TS, package manifests, and lockfiles.
+- `rg` for migration names, reset commands, promotion tools, package/runtime
+  references, support-context fields, and stale operational commands.
+- Focused retired-script scan over `app/lib`, `firestore.rules`,
+  `.github/workflows`, `app/android`, and `app/pubspec.yaml` returned no
+  matches.
+- `git status --short --untracked-files=all` for current local/untracked work.
+- Direct inspection of all 14 tracked JavaScript files discovered in the
+  inventory plus the new untracked maintenance test.
+- `firebase.json`, root package manifests, and Rules test package manifests
+  were read to identify active deployment/test dependency paths.
+
+RETIRED / DISABLED COMMANDS
+- Active Flutter source (`app/lib`): no runtime import/call of the disabled
+  migration/reset scripts was found in the focused search.
+- Firestore Rules source: no migration/reset script invocation found.
+- CI and test path: `tests/maintenance_scripts.test.js` intentionally names
+  ten fail-closed commands and executes them as subprocesses.
+- Current governance/audit text: mentions of disabled commands are intentional
+  safety notices and historical evidence, not active invocations.
+- Historical `MASTER_MULTI_SAAS_AUDIT_AND_PATCH_REPORT_2026_09_25.txt`
+  contains an old instruction to run `tool/backfill_tenant_id.js --apply`.
+  A dated notice now explicitly marks that command superseded and unsafe;
+  the historical evidence itself remains intact and must not be executed.
+
+RETAINED COMPONENTS
+- `firestore-diagnostic.js` is a read-only, explicit-project and
+  tenant-scoped diagnostic that depends on root `firebase-admin`.
+- `audits/application-map/generate.js` is the active audit-artifact generator.
+- `tests/firestore-rules/rules.test.js` and its npm manifest are active
+  Firestore Rules Emulator tests.
+- `promote_super_admin.js` remains an unresolved privileged tool; it is not
+  run and must not be used until its bootstrap/audit contract is approved.
+- The inline-audit skill contains an explicit `node dev_reset.js` prohibition;
+  this is a safety warning, not an invocation.
+- No tracked TypeScript source or Firebase Functions source was found.
+
+REMAINING UNRESOLVED TRACES
+- Old migration names remain in fail-closed guard filenames, maintenance test
+  cases, audit history, and historical documentation. These are classified as
+  guards/tests/history; removing them requires proof that operators, recovery,
+  or deployment workflows no longer depend on their explicit failure behavior.
+- `promote_super_admin.js` remains a privileged role mutation without the
+  current support-event linkage; this is a P1 review item, not an unexplained
+  zero-trace success.
+- A zero-byte, untracked file named `tests/firestore-rules/{console.error(e)`
+  was present in the worktree. Its provenance was not established and it was
+  preserved, not deleted.
+- The ignored local `functions/package-lock.json` has no tracked manifest or
+  Functions source. It was not removed.
+
+LOCAL DASHBOARD PERFORMANCE REPRODUCTION — 2026-10-28
+- A widget test seeded 150 route/shop pairs and observed all 150 route
+  `ListTile`s mounted after scrolling to the analytics section. The eager
+  `Column` expansion was replaced by a lazy `SliverList`; the same test now
+  verifies no more than 12 mounted tiles and reachability of the first and
+  last route.
+- The test reproduced a source-level rendering cost and verifies the local
+  correction. It does not map the production browser's handler-duration
+  messages to this widget: the generated source map did not match the deployed
+  JavaScript, and no identical post-change browser trace was captured.
+- No console message, timing warning, or diagnostic was hidden.
+
+RESULT
+Not a global zero-trace pass. No active runtime invocation of the disabled
+maintenance scripts was found in the focused source/configuration scan.
+Historical, review-required, test, local-only, and explicit-prohibition traces
+are classified above. The separate `promote_super_admin.js` review item and
+the unidentified zero-byte worktree file remain unresolved. Local dashboard
+route widget overbuilding is verified and corrected, but attribution of the
+live browser timing violations remains incomplete; do not claim that the
+repository or live application has no unexplained or risky traces.

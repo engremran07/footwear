@@ -1,0 +1,141 @@
+JAVASCRIPT / NODE / MIGRATION COMPONENT REGISTER
+Audit date: 2026-10-27
+Scope: tracked JavaScript, Node manifests/locks, and the local Functions
+directory discovered during this audit. No package or migration was removed
+in this pass unless an earlier local change had already replaced an unsafe
+script with a fail-closed guard.
+
+CLASSIFICATION KEY
+ACTIVE — currently used by application, tests, CI, or reporting.
+GUARD — retained fail-closed entry point that prevents an old destructive
+command from silently continuing.
+REVIEW — privileged or data-affecting utility not approved for use.
+LOCAL-ONLY — ignored/untracked local artifact; not a repository dependency.
+
+FILES
+
+audits/application-map/generate.js
+Classification: ACTIVE report generator.
+Evidence: the script writes the repository application-map inventory and
+comparison artifacts; its own output documents `node
+audits/application-map/generate.js`. Retain. Do not run with baseline reset
+options without review.
+
+firestore-diagnostic.js
+Classification: ACTIVE read-only workspace diagnostic.
+Evidence: requires the root `firebase-admin` dependency, explicit
+FIREBASE_PROJECT_ID and concrete WORKSPACE_ID, reads the tenant document and
+tenant-filtered sample counts for users/customers/transactions/invoices, and
+caps each sample at 1000. Retain; it was not run. Review raw collection names
+if this tool is changed.
+
+promote_super_admin.js
+Classification: REVIEW; privileged role-mutation tool.
+Evidence: accepts a target email and Firebase CLI token, queries a user, then
+patches the role to `super_admin`; it does not produce a matching append-only
+platform support-access event. It was not run. Do not use until the owner
+approves and documents a bootstrap/audit process. Obsolescence is unproven;
+retain pending that decision.
+
+dev_reset.js
+Classification: GUARD; fail-closed.
+Evidence: exits non-zero with a Disabled message before Firebase access.
+Covered by tests/maintenance_scripts.test.js. Retain as an explicit safety
+barrier; no direct balance reset is supported.
+
+dev_restore.js
+Classification: GUARD; fail-closed.
+Evidence: rejects plaintext whole-collection replacement. Covered by the
+maintenance-script test. Retain as a safety barrier.
+
+flush_dev_data.js
+Classification: GUARD; fail-closed.
+Evidence: rejects bulk deletion and shop-balance reset. Covered by the
+maintenance-script test. Retain as a safety barrier.
+
+migrate_jbm_workspace.js
+Classification: GUARD; fail-closed legacy migration entry point.
+Evidence: exits before data access; covered by the maintenance-script test.
+No completion proof for any historic migration was available, so do not
+remove its guard yet.
+
+migrate_to_jbm_workspace.js
+Classification: GUARD; fail-closed legacy migration entry point.
+Evidence: exits before data access; covered by the maintenance-script test.
+No deployed-data compatibility proof was available, so do not remove its
+guard yet.
+
+tool/migrate_to_jbm_workspace.js
+Classification: GUARD; fail-closed legacy migration entry point.
+Evidence: exits before data access; covered by the maintenance-script test.
+Retain pending proof that no operator or recovery process relies on the
+entry point.
+
+tool/migrate_to_arrays.js
+Classification: GUARD; fail-closed schema migration entry point.
+Evidence: rejects a global assignment migration; covered by the
+maintenance-script test. Existing data and rollback requirements were not
+inspected live; retain pending that evidence.
+
+tool/backfill_tenant_id.js
+Classification: GUARD; fail-closed.
+Evidence: rejects assigning all unscoped records to a single tenant without
+record-level ownership evidence. Covered by the maintenance-script test.
+Retain pending an approved record-mapped migration.
+
+tool/backfill_missing_tenant_id.js
+Classification: GUARD; fail-closed.
+Evidence: rejects default-tenant assignment and service-account access.
+Covered by the maintenance-script test. Retain pending an approved
+record-mapped migration.
+
+tool/backup_firestore.js
+Classification: GUARD; fail-closed.
+Evidence: rejects plaintext project-wide exports. Covered by the
+maintenance-script test. Current encrypted, workspace-scoped app backup is
+the supported flow.
+
+tests/firestore-rules/rules.test.js
+Classification: ACTIVE security/integration test suite.
+Evidence: invoked by the tests/firestore-rules npm test script and CI
+workflow; validates emulator authorization contracts. Retain.
+
+tests/maintenance_scripts.test.js
+Classification: ACTIVE Node regression tests; untracked in the current
+worktree.
+Evidence: spawns only fail-closed script stubs and asserts non-zero exit plus
+an explicit Disabled message. Keep as an expected local change; do not
+discard.
+
+ROOT NODE DEPENDENCIES
+package.json + package-lock.json:
+Classification: ACTIVE tool dependency set.
+Evidence: the manifest declares firebase-admin; firestore-diagnostic.js
+requires it. No npm scripts are declared. Retain both.
+
+tests/firestore-rules/package.json + package-lock.json:
+Classification: ACTIVE test dependency set.
+Evidence: Mocha and @firebase/rules-unit-testing provide the emulator test
+runner. CI and the local command invoke npm test here. Retain both.
+
+functions/
+Classification: no tracked backend source or Firebase Functions deployment.
+Evidence: firebase.json has no functions target and git ls-files functions/*
+returned no tracked source. An ignored, local-only functions/package-lock.json
+was found without a tracked package manifest; it was not modified or treated
+as a deployable service. Confirm with the repository owner before local cache
+cleanup.
+
+OTHER INVENTORY
+Tracked JavaScript: 14 files.
+Tracked TypeScript: 0 files.
+Tracked Node package manifests: 2.
+Tracked Node package locks: 2.
+No package was uninstalled and no lockfile was regenerated because no
+dependency-manifest change was made.
+
+REMOVAL DECISION
+No additional migration, compatibility, JS, package, or config component was
+removed in this audit. Existing fail-closed guards were retained because
+deployed-data and recovery dependencies are not proven absent. The
+super-admin promotion utility remains a high-risk review item.

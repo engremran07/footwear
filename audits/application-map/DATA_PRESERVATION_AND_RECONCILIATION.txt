@@ -1,0 +1,48 @@
+DATA PRESERVATION AND RECONCILIATION
+Audit date: 2026-10-27
+
+BASELINE AND METHOD
+- Repository baseline: branch main, HEAD
+  6e5a4337f506d0713fe0463fb6f0ec0cef259b04.
+- Initial worktree was already modified; no reset, clean, checkout, or
+  destructive Git operation was performed.
+- Production Firebase data was not queried, exported, transformed, or written.
+- Rules tests ran against the local Firestore Emulator and isolated fixtures.
+- Maintenance-script regressions spawn only fail-closed stubs; they do not
+  initialize Firebase or read production data.
+- No migration, backup restore, bulk flush, balance rewrite, or role promotion
+  was executed.
+
+INVARIANTS PRESERVED
+- Workspace/business documents retain concrete tenant ownership; no default
+  tenant reassignment was run.
+- Shop balance remains the financial source of truth and is changed only in
+  provider-controlled atomic invoice/transaction paths.
+- Invoice-linked ledger rows, stock deductions, invoice counters, and audit
+  records retain their same-batch relationships.
+- Warehouse mutations remain paired with tenant-scoped inventory audit rows.
+- Support-context start/end events are append-only and linked to profile
+  transitions in the same batch.
+- Disabled maintenance utilities do not perform data operations.
+
+RECONCILIATION RESULT
+PASS — No production-data operation was issued in this session segment.
+PASS — Local Rules Emulator tests passed with 181 cases.
+PASS — `node --test tests/maintenance_scripts.test.js` reported
+`ℹ tests 10`, `ℹ pass 10`, `ℹ fail 0`; each subprocess tests a fail-closed
+stub without Firebase access.
+BLOCKED — Live record counts, tenant ownership distribution, orphan
+references, financial balance reconciliation, inventory totals, and deployed
+schema conformity cannot be claimed without an authorized, read-only,
+sanitized production snapshot.
+BLOCKED — No before/after production dataset exists, because no production
+data was read or changed. Do not interpret absence of writes as proof that
+existing production records are internally consistent.
+
+SAFE FOLLOW-UP
+Any future data migration must use a non-production snapshot first and must be
+explicitly record-mapped, resumable, idempotent, audited, and reconciled for
+tenant ownership, financial ledger/balance totals, inventory quantities, and
+invoice/transaction links. Any feature-specific reset requires a separate
+approved dependency, preview, authorization, recovery, and partial-failure
+design. No data reset is authorized by this report.

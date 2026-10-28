@@ -3,6 +3,13 @@ Date: 2026-09-25
 Repository: D:\Footwear
 Status: Code-level fixes verified in the current workspace. Live Firestore/Hosting deployment is blocked in this environment because the Firebase CLI is not authenticated and requires re-login before any production deploy can run.
 
+SUPERSEDED OPERATIONAL GUIDANCE (2026-10-27):
+This is a historical report. The tenant backfill command listed below is
+disabled and must not be run. `tool/backfill_tenant_id.js` now exits with a
+Disabled message because it cannot safely assign tenant ownership without a
+reviewed per-record mapping. See `audits/application-map/OBSOLETE_COMPONENTS_REGISTER.txt`
+and `DATA_PRESERVATION_AND_RECONCILIATION.txt` for current policy.
+
 Environment blocker (verified):
 - Command: firebase projects:list
 - Evidence: "Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth"

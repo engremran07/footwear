@@ -51,6 +51,9 @@ apply generic micro-optimizations.
   list items without device- and workload-specific evidence.
 - Choose `ListView.builder` or slivers for lazy construction when list size or
   profiling warrants it. Do not add `RepaintBoundary` indiscriminately.
+- Attribute minified web frames only with a source map generated for the exact
+  JavaScript bundle under investigation. Verify bundle identity; a map from a
+  different build cannot establish production source attribution.
 - Apply `autoDispose` only after checking provider ownership, screen lifecycle,
   export awaits, and Riverpod 3 behavior.
 - Keep expensive sorting, PDF/XLSX generation, and image work off the UI thread

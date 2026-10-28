@@ -10,7 +10,8 @@ This repository is a route/seller distribution ERP.
 - Legacy role value manager must be treated as admin-equivalent in app and rules
 - Tenant-aware roles tenant_admin and super_admin are now supported and must be treated as privileged, tenant-scoped roles in app and rules
 - Supervisor is a tenant-scoped operational role: routes, shops, products, inventory, invoices, reports, and the tenant notification feed are available, but user administration, settings, backup, financial corrections, invoice voids, route-seller assignment, and shop route reassignment remain restricted.
-- Super-admin is a platform operator, not a global business-data reader. By default it may access workspace metadata only; client business data requires an explicit `active_workspace_id`, a support reason of at least 10 characters, and an append-only `platform_access_logs` event. Access ends by clearing the active workspace context.
+- Tenant notifications are available to admin/manager, tenant_admin, and supervisor roles only; sellers and platform super-admins are excluded.
+- Super-admin is a platform operator, not a global business-data reader. By default it may access workspace metadata only; client business data requires an explicit `active_workspace_id`, a support reason of at least 10 characters, and an append-only `platform_access_logs` event. Starting access must atomically link `active_workspace_access_log_id` to the exact start event; Rules validate the profile and event in both directions. Ending or switching access must create an append-only end event in the same batch as the profile transition, link it through `last_workspace_access_end_log_id`, and bind it to the prior start event when present. Rules validate the end event against the prior profile and the updated profile's end-event pointer.
 - New tenant-scoped users carry a tenant_id and must not cross tenant boundaries in rules or providers. Firebase Authentication is the app's only sign-in/session mechanism; the app does not register devices, require pairing, or maintain custom access slots.
 - Business access requires both an active user profile and an active tenant
   document. Inactive tenants block ordinary admin/seller business access; the
@@ -138,7 +139,7 @@ changes.
   multiple ledger rows and must preserve their validated invoice references
   and aggregate shop-balance delta.
 
-1. Super-admin business access is workspace-scoped. Never let a super-admin read tenant routes, shops, products, inventory, invoices, transactions, reports, users, or tenant settings without an explicit active workspace context. Platform workspace metadata may remain globally visible. Record support access starts/ends in the append-only `platform_access_logs` collection; never use UI visibility as the security boundary.
+1. Super-admin business access is workspace-scoped. Never let a super-admin read tenant routes, shops, products, inventory, invoices, transactions, reports, users, or tenant settings without an explicit active workspace context. Platform workspace metadata may remain globally visible. Record support access starts and ends in append-only `platform_access_logs` events linked in the same atomic batch to the profile transition. A cleared/switching profile context without a matching end event is denied by Rules; never use UI visibility as the security boundary.
 
 1. Super-admin business context expires after 8 hours. Firestore rules must enforce the TTL on every business-data path, and no generic admin-role branch may bypass it. Workspace admins may change only their workspace-scoped business settings; workspace lifecycle and platform configuration remain platform-controlled.
 
@@ -310,6 +311,15 @@ changes.
   Confidence Theater. Load `.claude/skills/vibe-debugging-discipline/SKILL.md`
   before any bug fix session.
 
+1. **Test behavior changes with evidence-first TDD.** For a reproducible
+  defect, add or confirm a regression that fails before the fix, implement
+  the narrow root-cause correction, and rerun it. Add unit tests for changed
+  model/policy logic and integration coverage for changed screen/provider/
+  Firestore boundaries. Authorization changes require positive and adversarial
+  Firestore Rules Emulator tests. Security or penetration testing must stay
+  within an explicitly authorized local/emulator scope; never probe production
+  or third-party targets without separate written authorization.
+
 1. **Missing-document Firestore reads must remain scoped.** Invoice and
   transaction idempotency reads require an active profile, a concrete active
   tenant, and a permitted role; super-admin access additionally requires the
@@ -319,6 +329,11 @@ changes.
   for workspace creation. Never use a blanket `resource == null` allowance.
   Rules tests must replay the relevant read inside the client transaction and
   then validate its complete write set.
+
+1. Monetary input formatters must preserve the Western, Arabic-Indic, and
+  Eastern-Arabic digits and the decimal/grouping separators accepted by
+  `AppFormatters.parseAmountText`. Test the formatter and parser together;
+  do not silently rewrite names or other business text.
 
 1. Financial PDFs must reuse the shared workspace brand header: English
   business information is on the left, the company logo is centered, and the
@@ -603,6 +618,127 @@ locale. Cover these contracts, actual color pairs, and RTL direction in focused
 widget tests.
 
 ## 10) Current Audit Status
+
+2026-10-28 local settings and workspace-access follow-up — unreleased:
+
+- The invoice-header non-stock setting now saves immediately through
+  `SettingsNotifier` to the current tenant's settings document. A failed write
+  restores the prior switch value and shows mapped feedback. The switch saves
+  only its own field, so unrelated dirty invoice-header edits are not committed.
+- The app shell's selected-workspace banner exposes the end-access action only
+  after validating an active super-admin support context. Its notification
+  badge handles a loading/null profile without dereferencing it. Workspace
+  admins may open the read-only maintenance page; every component reset remains
+  disabled and fail-closed.
+- Notification access is restricted to admin/manager, tenant_admin, and
+  supervisor accounts; sellers and platform super-admins are denied in app
+  policy and Firestore Rules. Tenant-keyed notification rows and unread counts
+  remain isolated across workspace switches.
+- Focused affected suites: `00:00 +54: All tests passed!`; standalone shell
+  smoke tests: `00:00 +8: All tests passed!`; settings hydration suite:
+  `00:00 +6: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 9.1s)`; `dart analyze test/`:
+  `No issues found!`; full Flutter suite:
+  `01:26 +684: All tests passed!`. The full suite initially caught an obsolete
+  expectation that tenant admins must be denied the read-only maintenance
+  screen; the corrected test verifies view access and disabled actions.
+- Changes are local and unreleased. Version remains `3.10.12+1123`;
+  production Rules/indexes, Hosting, APK/AAB builds, phone delivery, commit,
+  and push are not claimed for this follow-up.
+
+2026-10-27 mixed-script UI font fallback — v3.10.12+1123
+(Hosting deployed; Android pending):
+
+- The authenticated dashboard exposed an English-theme font gap: script-specific
+  Arabic/Urdu Firestore values had no explicit fallback families. `AppFonts`
+  now preserves Syne/DM Sans as the English primary fonts and lists bundled
+  Noto Sans Arabic then Noto Nastaliq Urdu as fallbacks. Arabic and Urdu retain
+  their locale primary family and fall back to the other script font. PDF
+  font selection and shaping are unchanged.
+- Focused fallback/changelog tests: `00:01 +12: All tests passed!`; full
+  Flutter suite: `01:31 +671: All tests passed!`; `flutter analyze lib
+  --no-pub`: `No issues found! (ran in 16.1s)`; `dart analyze test/`:
+  `No issues found!`.
+- Web build: `EXIT: 0`; Firebase Hosting: `Deploy complete!`; live
+  `version.json` reports `3.10.12+1123`, and `index.html` returns
+  `no-store, must-revalidate, no-cache`. A post-deploy reload returned no
+  fresh console warnings/errors, but the browser redirected to login, so the
+  authenticated mixed-data dashboard was not visually rechecked. PDF export
+  and Arabic/Urdu PDF rendering are separate, unverified paths.
+- APK/AAB builds were not started: the final free-RAM check was `2.57 GB`,
+  below the
+  documented `3.2 GB` release-build threshold. `adb devices` showed only
+  `List of devices attached`; no phone copy/install was possible. No Play
+  upload, commit, or push was performed. Hosting is updated; Android artifacts
+  remain pending, so both release surfaces are not yet aligned.
+
+2026-10-27 backup recovery and startup permission audit — v3.10.11+1122;
+subsequently deployed:
+
+- The backup readiness card is visible to workspace members without showing
+  the workspace name. It preserves metadata loading, mapped errors, Retry,
+  and the disabled-backup state until workspace readiness is confirmed.
+- First-launch camera, photos, storage, and OS-notification permission
+  requests were removed because the app has no corresponding capture or
+  device-notification workflow. Image selection and backup file operations
+  use system pickers; the in-app notification feed remains Firestore-backed.
+- Full Flutter suite: `02:09 +669: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 36.3s)`;
+  `dart analyze test/`: `No issues found!`. The local web release build
+  reported `EXIT: 0`.
+- One unauthenticated local browser reload produced nine Firebase-init debug
+  messages and no console warnings/errors, page errors, or failed requests.
+  The reported total (18) conflicts with the listed category sum (20); the
+  Noto fallback warning was not reproduced on the login page. Authenticated
+  PDF rendering and a complete inspector inventory remain open.
+- Split APKs: ARMv7 `30.7 MB`, ARM64 `32.2 MB`, x86_64 `33.7 MB`; signed
+  AAB: `54.8 MB`. All APK v2 signatures and the AAB JAR signature verified.
+  ARM64 copy reported `1 file pushed`; installation reported `Success` on
+  `R5GL22RGT9V`, versionName `3.10.11`, versionCode `310113122`.
+- Hosting and Firestore Rules/indexes were subsequently deployed; the later
+  live version check confirmed v3.10.11+1122 before the v3.10.12 Hosting
+  release. No production data change, Play Console upload, commit, or push
+  was performed.
+
+2026-10-27 super-admin support-context end-audit linkage — local, undeployed:
+
+- The Rules regression reproduced that a selected super-admin could clear
+  `active_workspace_id` or switch workspaces without a corresponding
+  `workspace_access_ended` event. The profile update now requires a newly
+  created end-event ID in the same batch; the event validates the previous
+  actor, workspace, reason, optional start-event ID, and the updated profile's
+  `last_workspace_access_end_log_id` pointer.
+- Workspace switching writes the previous-context end event and new-context
+  start event atomically with the profile update. Explicit exit and sign-out
+  also use the end-event writer. A mismatched prior start-event ID is denied.
+- RED: pre-fix Rules test allowed context clearing without an end event
+  (`180 passing, 1 failing`). GREEN: final Rules Emulator run reported
+  `181 passing (37s)`. The model regression reported
+  `00:00 +26: All tests passed!`; `flutter analyze lib --no-pub` reported
+  `No issues found! (ran in 7.7s)`; `dart analyze test/` reported
+  `No issues found!`.
+- Rules/client schema changes remain local and undeployed. Split APKs were
+  built (ARMv7 `30.7 MB`, ARM64 `32.2 MB`, x86_64 `33.7 MB`); ARM64 was copied
+  to and installed on `R5GL22RGT9V` (`Success`, versionName `3.10.10`,
+  versionCode `310103121`). The AAB build succeeded at `54.8 MB` and
+  `jarsigner` reported `jar verified.`. No production deployment/data change,
+  Play upload, commit, or push is claimed.
+
+2026-10-27 legacy maintenance script safety — local:
+
+- The Node regression test reproduced that `flush_dev_data.js` still contained
+  an executable bulk deletion and direct shop-balance reset, and that the
+  legacy tenant backfills assigned missing records to one chosen/default
+  tenant without per-record ownership proof.
+- `flush_dev_data.js`, `tool/backfill_tenant_id.js`, and
+  `tool/backfill_missing_tenant_id.js` now fail closed with an explicit
+  explanation. The other legacy backup, restore, and migration stubs are
+  covered by the same test. No Firebase credentials were loaded and no data
+  was read or changed.
+- `node --test tests/maintenance_scripts.test.js`: `ℹ tests 10`,
+  `ℹ pass 10`, `ℹ fail 0`. The test was red before each newly disabled
+  script was changed. A reviewed, record-mapped migration and any reset
+  implementation remain blocked on an approved data/recovery contract.
 
 2026-10-27 tenant notification cache isolation and policy verification — local,
 unreleased:
@@ -1232,7 +1368,7 @@ Unreleased shared frontend accessibility foundation:
 - Security: seller admin data leak guards (allInvoicesProvider, adminAllSellerInventoryProvider), voidInvoice admin-only check, isValidRole() in Firestore rules, invoice math validation in rules, transaction type+amount validation
 - Dashboard: _lastGoodDashboardStatsProvider cache; graceful per-metric zero-fallback; no AsyncError propagation
 - Android: ProGuard rules for 8+ plugins, isMinifyEnabled=true, isShrinkResources=true, signing fallback removed (throws GradleException)
-- Signing: new release keystore footwear-erp.jks at D:\Footwear\footwear-erp.jks; storePassword=ShoeERP2024!; key.properties path fixed + BOM removed
+- Release signing credentials are local-only; never record their values in repository documentation.
 - L10n: 3 new keys × 3 languages (err_url_open, err_whatsapp_unavailable, whatsapp_greeting)
 - About screen: hardcoded EN strings replaced with tr() calls
 - Dead code: search_provider.dart deleted (0 usages)

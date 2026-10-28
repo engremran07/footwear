@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -141,6 +143,59 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('workspace members do not see workspace names in backup UI', (
+    tester,
+  ) async {
+    final router = await _pumpBackupRoute(
+      tester,
+      role: UserRole.tenantAdmin,
+      routeIds: const [],
+    );
+
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '/settings/backup',
+    );
+    expect(find.byType(DatabaseBackupScreen), findsOneWidget);
+    expect(find.text('Workspace One'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('workspace names stay hidden in the wide app shell', (
+    tester,
+  ) async {
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tester.view
+      ..physicalSize = const Size(1400, 900)
+      ..devicePixelRatio = 1;
+
+    await _pumpBackupRoute(
+      tester,
+      role: UserRole.tenantAdmin,
+      routeIds: const [],
+    );
+
+    expect(find.text('Workspace One'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('root super-admin can open the platform settings hub', (
+    tester,
+  ) async {
+    final router = await _pumpBackupRoute(
+      tester,
+      role: UserRole.superAdmin,
+      routeIds: const [],
+      location: '/settings',
+    );
+
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/settings');
+    expect(find.text('Platform Settings'), findsOneWidget);
+    expect(find.text('Workspaces'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('supervisor can open operational and notification screens', (
     tester,
   ) async {
@@ -202,6 +257,67 @@ void main() {
     expect(find.byIcon(Icons.notifications_outlined), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'notification route shows profile permission errors with retry feedback',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'whats_new_seen_version': AppBrand.appVersion,
+      });
+      var notificationSubscriptions = 0;
+      final profileError = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      );
+      late GoRouter router;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authStateProvider.overrideWith(
+              (ref) => Stream.value(_TestFirebaseUser('test-user')),
+            ),
+            authUserProvider.overrideWith(
+              (ref) => Stream<UserModel?>.error(profileError),
+            ),
+            databaseBackupProvider.overrideWith(_NoopBackupNotifier.new),
+            isOnlineProvider.overrideWith((ref) => Stream.value(true)),
+            notificationsProvider.overrideWith((ref, tenantId) {
+              notificationSubscriptions++;
+              return const Stream.empty();
+            }),
+            activeNotificationShopIdsProvider.overrideWith(
+              (ref, tenantId) => Stream.value(const <String>{}),
+            ),
+          ],
+          child: Consumer(
+            builder: (context, ref, child) {
+              router = ref.watch(appRouterProvider);
+              return MaterialApp.router(routerConfig: router);
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      router.go('/notifications');
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 7));
+      await tester.pumpAndSettle();
+
+      expect(
+        router.routerDelegate.currentConfiguration.uri.path,
+        '/notifications',
+      );
+      expect(find.byType(NotificationCenterScreen), findsOneWidget);
+      expect(
+        find.text('You do not have permission to perform this action.'),
+        findsOneWidget,
+      );
+      expect(find.text('Retry'), findsOneWidget);
+      expect(notificationSubscriptions, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Future<GoRouter> _pumpBackupRoute(
@@ -317,4 +433,20 @@ class _TestBackupNotifier extends DatabaseBackupNotifier {
 
   @override
   Future<String?> getLastRestoreBy() async => null;
+}
+
+class _NoopBackupNotifier extends _TestBackupNotifier {
+  @override
+  Future<
+    ({
+      Uint8List bytes,
+      String localPath,
+      String fileName,
+      String tenantId,
+      String checksum,
+      String scope,
+      List<String> routeIds,
+    })?
+  >
+  checkAndAutoBackup() async => null;
 }

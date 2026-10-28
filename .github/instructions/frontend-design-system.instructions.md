@@ -83,6 +83,11 @@ into identical metric cards or add decorative data, gradients, or motion.
   PDF font selection, shaping flags, print/share, and spreadsheet limitations
   are governed by the analytics-reporting skill and must not be inferred from
   UI font behavior.
+- Firestore-backed text can contain Arabic or Urdu even when the app locale is
+  English. Preserve the locale's primary UI family and provide ordered bundled
+  Noto fallbacks through `AppFonts`; test Arabic-script names and currency
+  symbols in English, Arabic, and Urdu styles. This UI fallback does not change
+  the independent PDF font/shaping policy.
 
 ## Performance and state
 

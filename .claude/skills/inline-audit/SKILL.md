@@ -256,7 +256,7 @@ final names = NameResolver(
 
 | Split-per-ABI APK not installed, wrong ABI file | build used the wrong artifact or install path | Use `flutter build apk --release --split-per-abi --dart-define=USE_PLAY_INTEGRITY=true --dart-define=use_arabic=true` then `adb push` / `adb install --streaming -r` |
 
-| Stale balance after dev flush | transactions deleted via console/CLI without updating shop.balance | Run `node dev_reset.js` from repo root after any manual flush |
+| Stale balance after a reset/flush | bulk deletion or direct balance writes can break financial links and leave partial state | Keep client reset/flush scripts fail-closed. Do not run `node dev_reset.js` or manually delete ledger rows; use only a reviewed, tenant-scoped, transactional maintenance path that preserves invoice, inventory, and `shop.balance` invariants |
 
 | `avoid_double_and_int_checks` in `flutter build web` | Transitive dep (image 4.3.0) locked by another pkg (excel) to old archive | Upgrade or replace blocking package; see Chain 5 in CLAUDE.md |
 

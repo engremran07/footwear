@@ -28,6 +28,68 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.10.12',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔤',
+        text: {
+          AppLocale.en:
+              'Arabic and Urdu names, numbers, and currency symbols now use the right bundled fonts even when the app is set to English.',
+          AppLocale.ar:
+              'تُعرض الأسماء والأرقام ورموز العملات العربية والأردية الآن بالخطوط المناسبة حتى عند استخدام التطبيق باللغة الإنجليزية.',
+          AppLocale.ur:
+              'اب عربی اور اردو نام، اعداد اور کرنسی علامات درست فونٹس میں دکھائی دیتی ہیں، چاہے ایپ انگریزی میں ہو۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.10.11',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '👤',
+        text: {
+          AppLocale.en:
+              'Admin labels are clearer, organization names stay private in member screens, and account setup errors now include clearer guidance.',
+          AppLocale.ar:
+              'أصبحت تسميات المسؤول أوضح، وتظل أسماء المؤسسات مخفية في شاشات الأعضاء، كما أصبحت رسائل إعداد الحساب أكثر وضوحًا.',
+          AppLocale.ur:
+              'ایڈمن کے لیبل مزید واضح ہیں، ممبر اسکرینز میں ادارے کے نام پوشیدہ رہتے ہیں، اور اکاؤنٹ سیٹ اپ کی خرابیوں کے پیغامات بہتر رہنمائی دیتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en:
+              'Backup readiness stays visible without showing workspace names, and startup no longer asks for unrelated device permissions.',
+          AppLocale.ar:
+              'تظل جاهزية النسخ الاحتياطي واضحة دون عرض أسماء مساحات العمل، ولم يعد التطبيق يطلب أذونات جهاز غير مرتبطة عند بدء التشغيل.',
+          AppLocale.ur:
+              'ورک اسپیس کے نام دکھائے بغیر بیک اپ کی تیاری واضح رہتی ہے، اور آغاز پر غیر متعلقہ ڈیوائس اجازتیں طلب نہیں کی جاتیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.10.10',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔢',
+        text: {
+          AppLocale.en:
+              'Amount fields now accept Arabic and Eastern Arabic numerals, and platform workspace access is linked to its audit record.',
+          AppLocale.ar:
+              'تقبل حقول المبالغ الآن الأرقام العربية والأرقام العربية الشرقية، ويرتبط وصول مسؤول المنصة إلى مساحة العمل بسجل التدقيق الخاص به.',
+          AppLocale.ur:
+              'رقم کے خانے اب عربی اور مشرقی عربی ہندسے قبول کرتے ہیں، اور پلیٹ فارم کی ورک اسپیس تک رسائی اس کے آڈٹ ریکارڈ سے منسلک ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.10.9',
     date: 'October 2026',
     items: [

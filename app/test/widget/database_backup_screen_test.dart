@@ -334,6 +334,7 @@ void main() {
         find.text('Something went wrong. Please try again.'),
         findsOneWidget,
       );
+      expect(find.text('Workspace One'), findsNothing);
       await tester.drag(find.byType(ListView).first, const Offset(0, -700));
       await tester.pumpAndSettle();
       final backupButton = find.widgetWithText(
@@ -348,7 +349,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tenantAttempts, greaterThan(1));
-      expect(find.text('Workspace One'), findsOneWidget);
+      expect(find.text('Workspace One'), findsNothing);
+      expect(find.text('Workspace backup scope is ready.'), findsOneWidget);
       await tester.drag(find.byType(ListView).first, const Offset(0, -700));
       await tester.pumpAndSettle();
       expect(tester.widget<FilledButton>(backupButton).onPressed, isNotNull);

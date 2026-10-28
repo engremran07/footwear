@@ -12,6 +12,20 @@ the checked-out source, tests, and configuration. This checklist is an audit
 guide, not a certification or a claim that ShoesERP is OWASP compliant. Record
 evidence, severity, confidence, scope, and unresolved limitations.
 
+## Authorized Security Testing
+
+- Treat source review, static analysis, and isolated emulator adversarial
+  tests as separate evidence types; do not call them an external penetration
+  test.
+- Before dynamic testing, confirm the exact application/environment and written
+  scope. Do not probe production Firebase projects, customer workspaces,
+  accounts, or third-party infrastructure unless the owner separately
+  authorizes a bounded test window and test identities/data.
+- Prefer local Firebase Emulator fixtures for Rules attack cases. Keep tests
+  non-destructive and verify that no real production project is selected.
+- Report attempted and blocked tests distinctly; never infer production
+  exposure or safety from emulator-only evidence.
+
 ## Authentication and Authorization
 
 - Firebase Authentication is the app's sign-in mechanism. Firebase SDK token
@@ -85,6 +99,11 @@ indexes without explicit authorization.
 - Inspect Android permissions, exported components, deep links, release
   debuggability, signing configuration, and ProGuard/R8 behavior in the actual
   manifest and Gradle files.
+- Request runtime permission only when a specific user-invoked workflow needs
+  it. Do not blanket-request camera, photos, storage, or OS notifications at
+  first launch; prefer system photo/file pickers when they meet the workflow.
+  For web, check browser Permissions Policy and capture the exact console
+  message before attributing it to app behavior.
 - Verify secrets are not committed or passed through client build defines.
   Public Firebase client configuration is not equivalent to a service-account
   credential; access still depends on Rules and API restrictions.

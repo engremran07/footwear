@@ -30,6 +30,9 @@ jobs:
       - name: Install test dependencies
         run: npm ci --prefix tests/firestore-rules
 
+      - name: Verify legacy maintenance scripts fail closed
+        run: node --test tests/maintenance_scripts.test.js
+
       - name: Install Firebase CLI
         run: npm install --global firebase-tools@15.31.0
 

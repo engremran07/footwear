@@ -43,6 +43,7 @@ enum AppCapability {
   createCashReceipt,
   settleInvoice,
   viewHistory,
+  viewDataMaintenance,
   writeOff,
   voidInvoice,
   creditNote,
@@ -61,7 +62,6 @@ class RoleCapabilities {
     AppCapability.manageSettings,
     AppCapability.manageBackup,
     AppCapability.viewDashboard,
-    AppCapability.viewNotifications,
     AppCapability.viewReports,
     AppCapability.viewRoutes,
     AppCapability.manageRoutes,
@@ -76,6 +76,7 @@ class RoleCapabilities {
     AppCapability.createCashReceipt,
     AppCapability.settleInvoice,
     AppCapability.viewHistory,
+    AppCapability.viewDataMaintenance,
     AppCapability.writeOff,
     AppCapability.voidInvoice,
     AppCapability.creditNote,
@@ -115,8 +116,12 @@ class RoleCapabilities {
   };
 
   static const Map<String, Set<AppCapability>> matrix = {
-    'admin': _businessAdmin,
-    'tenant_admin': {..._businessAdmin, AppCapability.createSupervisor},
+    'admin': {..._businessAdmin, AppCapability.viewNotifications},
+    'tenant_admin': {
+      ..._businessAdmin,
+      AppCapability.viewNotifications,
+      AppCapability.createSupervisor,
+    },
     'super_admin': {
       AppCapability.manageWorkspaces,
       AppCapability.manageDataMaintenance,

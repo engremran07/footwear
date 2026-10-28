@@ -1,7 +1,69 @@
-# FootWear ERP — v3.10.9+1120
+# FootWear ERP — v3.10.12+1123 (web deployed; Android pending)
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
+> **v3.10.11+1122 deployment:** Backup scope feedback is visible
+> to workspace members without disclosing the workspace name, and app startup
+> no longer requests unrelated camera, storage, photo, or notification
+> permissions. Full Flutter suite: `02:09 +669: All tests passed!`;
+> `flutter analyze lib --no-pub`: `No issues found! (ran in 36.3s)`;
+> `dart analyze test/`: `No issues found!`; web build: `EXIT: 0`.
+> Split APKs: ARMv7 30.7 MB, ARM64 32.2 MB, x86_64 33.7 MB. The signed
+> Play Console AAB is 54.8 MB; APK v2 signatures and the AAB JAR signature
+> verified. ARM64 was copied and installed on `R5GL22RGT9V`
+> (`1 file pushed`; `Success`, versionName `3.10.11`, versionCode
+> `310113122`). Hosting and Firestore Rules/indexes were subsequently
+> deployed; the live `version.json` reports `3.10.11+1122`. There was no Play
+> upload, commit, or push.
+
+## v3.10.12+1123 Mixed-Script UI Font Follow-up
+
+Shared English text styles now fall back to bundled Arabic and Urdu fonts for
+script-specific Firestore values while preserving the English brand fonts.
+Arabic and Urdu locales retain their own primary font. PDF font policy is
+unchanged. Focused tests: `00:01 +12: All tests passed!`; full suite:
+`01:31 +671: All tests passed!`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 16.1s)`; `dart analyze test/`:
+`No issues found!`. Web build:
+`EXIT: 0`; Hosting: `Deploy complete!`; live `version.json` reports
+`3.10.12+1123`. APK/AAB builds and phone delivery remain blocked pending at
+least 3.2 GB free RAM and an attached ADB device. Details are in the latest
+session log.
+
+One unauthenticated local browser reload produced nine Firebase-initialization
+debug messages and no console warnings/errors, page errors, or failed
+requests. A later authenticated dashboard did expose the mixed-script Noto
+fallback issue fixed in v3.10.12; after deployment, the browser redirected to
+login, so authenticated rendering could not be rechecked. The reported
+inspector counts conflict (18 messages versus 20 across the stated
+categories), and authenticated PDF rendering and the complete original
+inspector inventory remain unverified.
+
+## Local 2026-10-28 Workspace Follow-up (Unreleased)
+
+The invoice-header non-stock switch now saves its tenant setting immediately.
+It writes only `allow_non_stock_invoices`; other unsaved header edits remain
+local. Failed writes restore the previous switch value and show mapped
+feedback. Workspace admins can view maintenance components, but all reset
+actions remain disabled and fail-closed. Notification access is limited to
+admin/manager, tenant_admin, and supervisor roles; sellers and platform
+super-admins are excluded.
+
+Focused affected tests: `00:00 +54: All tests passed!`; full Flutter suite:
+`01:26 +684: All tests passed!`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 9.1s)`; `dart analyze test/`: `No issues found!`.
+These local changes have not been versioned, built, deployed, or delivered to a
+phone; do not infer production behavior from local tests.
+
+> **Local audit follow-up, not yet deployed:** super-admin workspace selection
+> and exit/switch now require same-batch, linked append-only start/end records;
+> monetary amount fields preserve Arabic-Indic and Eastern-Arabic numerals.
+> The version and trilingual changelog are synchronized. Split APKs were built,
+> and the ARM64 APK was copied to and installed on `R5GL22RGT9V`. The signed
+> AAB was built at 54.8 MB and `jarsigner` reported `jar verified.`. Production
+> Rules/Hosting, Play Console upload, commit, and push remain separate release
+> gates.
+>
 > **Local v3.10.7+1118 follow-up (not deployed):** Cash-receipt PDFs now use
 > a compact bilingual body based on the supplied receipt reference, preserve
 > the existing shared workspace header, and support two optional receipt

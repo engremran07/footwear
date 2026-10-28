@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:footwear_erp/core/l10n/app_locale.dart';
 
 /// Extracts translation keys from a locale section in app_locale.dart.
 /// Reads the section between [startMarker] and [endMarker] (exclusive).
@@ -98,6 +99,15 @@ void main() {
       expect(enKeys, contains('admin_no_stock_guidance'));
       expect(arKeys, contains('admin_no_stock_guidance'));
       expect(urKeys, contains('admin_no_stock_guidance'));
+    });
+
+    test('tenant admin role is displayed as Admin in every locale', () {
+      expect(trRead('role_admin', AppLocale.en), 'Admin');
+      expect(trRead('role_tenant_admin', AppLocale.en), 'Admin');
+      expect(trRead('role_admin', AppLocale.ar), 'مدير');
+      expect(trRead('role_tenant_admin', AppLocale.ar), 'مدير');
+      expect(trRead('role_admin', AppLocale.ur), 'ایڈمن');
+      expect(trRead('role_tenant_admin', AppLocale.ur), 'ایڈمن');
     });
 
     test('No duplicate keys in EN locale', () {

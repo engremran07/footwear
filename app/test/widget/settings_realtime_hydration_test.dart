@@ -30,10 +30,12 @@ void main() {
     String receiptPhone2 = '',
     String receiptPhone3 = '',
     int pairsPerCarton = 12,
+    bool allowNonStockInvoices = false,
   }) => SettingsModel(
     tenantId: admin.tenantId!,
     currency: 'SAR',
     pairsPerCarton: pairsPerCarton,
+    allowNonStockInvoices: allowNonStockInvoices,
     invoiceHeader: InvoiceHeaderConfig(
       nameEn: headerName,
       receiptPhone2: receiptPhone2,
@@ -82,6 +84,119 @@ void main() {
       tester.widget<TextField>(headerNameField).controller!.text,
       'Unsaved phone edit',
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'non-stock toggle persists independently of unsaved header edits',
+    (tester) async {
+      final settingsStream = StreamController<SettingsModel>.broadcast();
+      addTearDown(settingsStream.close);
+      var currentSettings = settings();
+      final savedPayloads = <Map<String, dynamic>>[];
+      final settingsNotifier = _SavingSettingsNotifier((data) async {
+        savedPayloads.add(Map<String, dynamic>.from(data));
+        currentSettings = currentSettings.copyWith(
+          allowNonStockInvoices: data['allow_non_stock_invoices'] as bool,
+        );
+        settingsStream.add(currentSettings);
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(admin)),
+            settingsProvider.overrideWith((ref) => settingsStream.stream),
+            settingsNotifierProvider.overrideWith(() => settingsNotifier),
+          ],
+          child: const MaterialApp(home: _InvoiceHeaderEntry()),
+        ),
+      );
+
+      await tester.tap(find.text('Open invoice header'));
+      await tester.pump();
+      settingsStream.add(currentSettings);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('invoice_header_field_name_en')),
+        'Unsaved draft',
+      );
+      tester.testTextInput.hide();
+      await tester.pump();
+      await tester.tap(find.byType(SwitchListTile));
+      await tester.pumpAndSettle();
+
+      expect(savedPayloads, [
+        {'allow_non_stock_invoices': true},
+      ]);
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('invoice_header_field_name_en')),
+            )
+            .controller!
+            .text,
+        'Unsaved draft',
+      );
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open invoice header'));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('invoice_header_field_name_en')),
+            )
+            .controller!
+            .text,
+        'Workspace Header',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('non-stock toggle restores its previous value when save fails', (
+    tester,
+  ) async {
+    final settingsStream = StreamController<SettingsModel>.broadcast();
+    addTearDown(settingsStream.close);
+    final settingsNotifier = _SavingSettingsNotifier((_) async {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      );
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(admin)),
+          settingsProvider.overrideWith((ref) => settingsStream.stream),
+          settingsNotifierProvider.overrideWith(() => settingsNotifier),
+        ],
+        child: const MaterialApp(home: _InvoiceHeaderEntry()),
+      ),
+    );
+
+    await tester.tap(find.text('Open invoice header'));
+    await tester.pump();
+    settingsStream.add(settings());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+      isFalse,
+    );
+    expect(find.byType(SnackBar), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -226,4 +341,31 @@ void main() {
     expect(tester.widget<TextField>(cartonField).controller!.text, '24');
     expect(tester.takeException(), isNull);
   });
+}
+
+class _SavingSettingsNotifier extends SettingsNotifier {
+  _SavingSettingsNotifier(this.onSave);
+
+  final Future<void> Function(Map<String, dynamic>) onSave;
+
+  @override
+  Future<void> save(Map<String, dynamic> data) => onSave(data);
+}
+
+class _InvoiceHeaderEntry extends StatelessWidget {
+  const _InvoiceHeaderEntry();
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Center(
+      child: TextButton(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const InvoiceHeaderSettingsScreen(),
+          ),
+        ),
+        child: const Text('Open invoice header'),
+      ),
+    ),
+  );
 }

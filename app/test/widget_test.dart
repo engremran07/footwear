@@ -9,9 +9,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:footwear_erp/core/models/tenant_model.dart';
 import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/dashboard_provider.dart';
+import 'package:footwear_erp/providers/tenant_provider.dart';
 import 'package:footwear_erp/screens/bootstrap_profile_screen.dart';
 import 'package:footwear_erp/screens/dashboard_screen.dart';
 import 'package:footwear_erp/screens/database_flush_screen.dart';
@@ -184,9 +186,10 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('tenant admins are blocked from the flush screen', (
+    testWidgets('tenant admins can view fail-closed maintenance options', (
       tester,
     ) async {
+      final now = Timestamp.now();
       final tenantAdmin = UserModel(
         id: 'ta',
         email: 'tenant@example.com',
@@ -194,22 +197,39 @@ void main() {
         role: UserRole.tenantAdmin,
         active: true,
         tenantId: 'workspace-1',
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
+        createdAt: now,
+        updatedAt: now,
+      );
+      final tenant = TenantModel(
+        id: 'workspace-1',
+        name: 'Workspace One',
+        slug: 'workspace-one',
+        createdAt: now,
+        updatedAt: now,
       );
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             authUserProvider.overrideWith((ref) => Stream.value(tenantAdmin)),
+            tenantProvider(
+              tenant.id,
+            ).overrideWith((ref) => Stream.value(tenant)),
           ],
           child: const MaterialApp(home: DatabaseFlushScreen()),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Access Denied'), findsOneWidget);
+      expect(find.text('Access Denied'), findsNothing);
       expect(find.text('Danger Zone'), findsOneWidget);
+      expect(find.text('Workspace One'), findsOneWidget);
+      final financialTile = find.widgetWithText(
+        ListTile,
+        'Flush Financial Data',
+      );
+      expect(financialTile, findsOneWidget);
+      expect(tester.widget<ListTile>(financialTile).enabled, isFalse);
     });
 
     testWidgets('super admins see workspace metrics instead of route totals', (

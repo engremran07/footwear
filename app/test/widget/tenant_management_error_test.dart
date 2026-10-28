@@ -125,10 +125,10 @@ void main() {
       ),
     );
 
-    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text(tenant.name), findsOneWidget);
     await tester.tap(find.byIcon(Icons.edit));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pumpAndSettle();
     final ownerSelector = find.byKey(const Key('workspace_owner_selector'));
     await tester.ensureVisible(ownerSelector);
     await tester.tap(ownerSelector);
@@ -138,32 +138,37 @@ void main() {
     expect(find.text('Seller Account'), findsNothing);
   });
 
-  testWidgets(
-    'tenant admins see only workspace metadata, not platform actions',
-    (tester) async {
-      final tenant = TenantModel(
-        id: 'workspace-1',
-        name: 'Workspace One',
-        slug: 'workspace-one',
-        activeUserCount: 1,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      );
-      final tenantAdmin = UserModel(
-        id: 'tenant-admin',
-        email: 'tenant@example.com',
-        displayName: 'Workspace Admin',
-        role: UserRole.tenantAdmin,
+  testWidgets('workspace names are hidden from all non-platform roles', (
+    tester,
+  ) async {
+    final tenant = TenantModel(
+      id: 'workspace-1',
+      name: 'Workspace One',
+      slug: 'workspace-one',
+      activeUserCount: 1,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    for (final role in [
+      UserRole.tenantAdmin,
+      UserRole.admin,
+      UserRole.supervisor,
+      UserRole.seller,
+    ]) {
+      final user = UserModel(
+        id: 'user-${role.name}',
+        email: 'user@example.com',
+        displayName: role.name,
+        role: role,
         tenantId: tenant.id,
         active: true,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       );
-
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            authUserProvider.overrideWith((ref) => Stream.value(tenantAdmin)),
+            authUserProvider.overrideWith((ref) => Stream.value(user)),
             tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
           ],
           child: const MaterialApp(home: TenantManagementScreen()),
@@ -171,13 +176,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Workspace One'), findsOneWidget);
+      expect(find.text('Workspace One'), findsNothing, reason: role.name);
+      expect(
+        find.text('You do not have access to any workspace.'),
+        findsOneWidget,
+        reason: role.name,
+      );
       expect(find.byIcon(Icons.add_business), findsNothing);
       expect(find.byIcon(Icons.edit), findsNothing);
-      expect(find.byType(TextButton), findsNothing);
       expect(tester.takeException(), isNull);
-    },
-  );
+    }
+  });
 
   testWidgets('workspace create does not wait for global owner users', (
     tester,

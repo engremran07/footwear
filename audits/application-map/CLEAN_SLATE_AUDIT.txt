@@ -1,0 +1,130 @@
+FOOTWEAR CLEAN-SLATE AUDIT
+Audit date: 2026-10-27
+Repository: engremran07/footwear
+Branch: main
+Inspected HEAD: 6e5a4337f506d0713fe0463fb6f0ec0cef259b04
+Worktree: pre-existing and currently modified; no changes were committed.
+
+STATUS
+This is a bounded, evidence-based audit of high-risk tenant, support-access,
+financial-maintenance, and JavaScript/Node paths. It is not a full file-by-file
+repository audit, a production-data reconciliation, a penetration test against
+live infrastructure, or a production release signoff. The accepted master
+prompt is preserved at the user-provided attachment; its eight deliverables
+are being written alongside the existing application-map reports.
+
+BASELINE INVENTORY
+- 394 files tracked at HEAD.
+- 126 tracked Dart files under app/lib and 86 tracked Dart files under
+  app/test; the working tree also contains the new input-formatter test.
+- 14 tracked JavaScript files, 0 tracked TypeScript files, 2 tracked Node
+  package manifests, and 2 tracked Node package locks.
+- 5 GitHub workflows; 28 .claude skills and 4 .github skills (prior inventory
+  recorded in FULL_REPOSITORY_AUDIT.txt; skill counts were not recalculated
+  in this bounded pass).
+- 15 collection constant names map to 14 unique Firestore paths because
+  Collections.shops aliases the legacy `customers` path.
+- Local firestore.indexes.json contains 26 composite indexes and 0 field
+  overrides.
+- `firebase.json` configures Firestore and Hosting; it has no Functions
+  deployment target. No tracked Functions source is present.
+- `functions/package-lock.json` exists locally but is not tracked; the
+  directory has no tracked Functions source or manifest and was not modified.
+
+INSPECTION COVERAGE
+PASS — Repository identity, branch, HEAD, worktree status, tracked source
+counts, Node manifests/locks, Firebase config, and app version were inspected.
+PASS — Firestore support-context start/end provider writes, Rules validators,
+profile update guards, and positive/negative emulator tests were traced.
+PASS — The listed reset, restore, tenant-backfill, array/workspace migration,
+diagnostic, promotion, report-generator, and maintenance-test JavaScript files
+were inspected or classified; active-reference searches were run.
+PASS — Collection constants, Rules suite, full Flutter test suite, app
+analyzer, and test analyzer were run.
+PARTIAL — The repository-wide inventory does not imply every source file,
+screen/provider, skill, workflow, asset, or deployed schema was fully read.
+Prior screen-register and audit reports are discovery aids, not proof of
+exhaustive coverage.
+BLOCKED — Live tenant data, production Rules/index parity, Firebase Auth
+accounts, and production indexes were not inspected. No production credentials
+or data were used.
+NOT RUN — External penetration testing, authenticated device acceptance,
+multi-workspace load/quota testing, exhaustive UI/PDF visual review, and
+production migration/reconciliation.
+EXCLUDED FROM SOURCE REVIEW — generated output, ignored package caches,
+node_modules, build products, binary fonts/images, local signing material,
+and logs. No excluded file was deleted.
+
+CONFIRMED FINDINGS
+P1 FIXED LOCALLY — A selected super-admin could clear or switch the active
+workspace profile context without a same-batch end-audit event. The pre-fix
+Rules test reproduced the allowed clear. The client now writes the end event
+with the profile transition; Rules validate the prior profile and the updated
+profile's end-event pointer. Workspace switches end the old context and start
+the new one in the same batch. The final local Rules suite reported 181
+passing (37s). Production deployment remains pending.
+
+P1 FIXED LOCALLY — The earlier support-context start path allowed a profile
+selection without a matching append-only start event. The client and Rules
+now link the exact event ID in both directions. The combined contract is
+covered by the Rules suite.
+
+P2 FIXED LOCALLY — The shared amount formatter discarded Arabic-Indic and
+Eastern-Arabic digits supported by the canonical amount parser. A
+formatter-to-parser regression now covers these scripts.
+
+P1 FIXED LOCALLY — Bulk reset and tenant-backfill scripts that could break
+financial/inventory relationships or assign records without ownership proof
+were replaced by fail-closed stubs. The scripts were not executed against any
+Firebase project.
+
+P1 REVIEW REQUIRED — `promote_super_admin.js` can perform a direct privileged
+role patch without the current support-access event contract. It was not run,
+changed, or proven obsolete. Keep blocked pending an approved bootstrap
+procedure.
+
+P2 BLOCKED — Runtime-configurable permissions are not implemented:
+`RoleCapabilities.matrix` is a compile-time role map and Rules independently
+authorize each operation. A configurable policy requires a versioned,
+validated Rules-enforced contract, approved role/action bounds, cache
+invalidation, revocation behavior, and migration. No policy collection or
+config schema was invented.
+
+P2 BLOCKED — Feature-by-feature workspace data reset remains fail-closed.
+`DatabaseFlushScreen` currently renders its operation entries disabled and
+`DatabaseFlushNotifier` throws `UnsupportedError`; its current role and tenant
+guards do not constitute an implemented reset workflow. Deletion scope,
+dependency order, financial/inventory handling, dry-run preview, idempotency,
+recovery, authorization, and audit semantics require a reviewed design.
+The existing app flush/reset surfaces remain disabled.
+
+P2 OPEN — Current PDF renderer output and language-aware input behavior still
+need end-to-end Arabic/Urdu visual review. Unicode range alone cannot
+distinguish Arabic from Urdu; silent language rewriting is not implemented.
+
+DATA SAFETY
+No production data was queried, transformed, deleted, or written. Emulator
+tests use isolated test fixtures. No migration, flush, restore, role-promotion,
+or production deployment command was run. Because production data was not
+read, this audit does not claim that every deployed record conforms to the
+current canonical schema.
+
+VALIDATION
+- Firestore Rules Emulator: 181 passing (37s).
+- Full Flutter suite: 01:19 +659: All tests passed!
+- Focused UserModel support-context regression: 00:00 +26: All tests passed!
+- `flutter analyze lib --no-pub`: No issues found! (ran in 7.7s).
+- `dart analyze test/`: No issues found!
+- Split APKs built at 30.7/32.2/33.7 MB. ARM64 APK v2 signature passed;
+  package metadata reports versionName `3.10.10`, versionCode `310103121`.
+  Device `R5GL22RGT9V` copy reported `1 file pushed`; install reported
+  `Success`. Signed AAB built at 54.8 MB; `jarsigner` reported
+  `jar verified.`. AAB package metadata was not independently extracted.
+- Markdown lint exited 0 with no output. `git diff --check` exited 0.
+
+RELATED EVIDENCE
+- FULL_REPOSITORY_AUDIT.txt — earlier bounded repository audit and coverage.
+- OBSOLETE_COMPONENTS_REGISTER.txt — JavaScript/Node dependency classification.
+- DATA_PRESERVATION_AND_RECONCILIATION.txt — data safety limits and invariants.
+- TEST_AND_BUILD_REPORT.txt — executed checks and artifact status.
+- AUDIT_REPORT_FOOTWEAR_ERP.md and SESSION_LOG.md — findings and chronology.
