@@ -131,6 +131,22 @@ void main() {
   });
 
   group('AppErrorMapper.key — plain Dart errors', () {
+    test(
+      'Android notification failures have actionable localized messages',
+      () {
+        expect(
+          AppErrorMapper.key(StateError('android_notifications_unavailable')),
+          'android_notifications_unavailable',
+        );
+        expect(
+          AppErrorMapper.key(
+            StateError('android_notifications_initialization_failed'),
+          ),
+          'android_notifications_initialization_failed',
+        );
+      },
+    );
+
     test('disabled workspace data reset uses its actionable message', () {
       expect(
         AppErrorMapper.key(UnsupportedError('flush_data_reset_unavailable')),

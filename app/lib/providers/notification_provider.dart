@@ -13,6 +13,21 @@ import 'auth_provider.dart';
 
 enum NotificationStreamSource { notifications, shops }
 
+const int notificationShopIdQueryChunkSize = 5;
+
+@visibleForTesting
+List<List<String>> notificationShopIdChunks(List<String> shopIds) => [
+  for (
+    var start = 0;
+    start < shopIds.length;
+    start += notificationShopIdQueryChunkSize
+  )
+    shopIds.sublist(
+      start,
+      (start + notificationShopIdQueryChunkSize).clamp(0, shopIds.length),
+    ),
+];
+
 class NotificationStreamFailure implements Exception {
   final NotificationStreamSource source;
   final Object cause;
@@ -97,7 +112,6 @@ AsyncValue<List<NotificationModel>> notificationsWithShopVisibility(
   );
 }
 
-@visibleForTesting
 AsyncValue<List<NotificationModel>> visibleNotificationState(
   AsyncValue<List<NotificationModel>> notifications,
   AsyncValue<Set<String>> activeShopIds,
@@ -180,10 +194,10 @@ final activeNotificationShopIdsProvider = StreamProvider.autoDispose
         FirebaseFirestore.instance.collection(Collections.shops),
         tenantId: tenantId,
       );
-      final chunks = <List<String>>[
-        for (var start = 0; start < shopIds.length; start += 30)
-          shopIds.sublist(start, (start + 30).clamp(0, shopIds.length)),
-      ];
+      // The Rules check the user's profile and active tenant for each
+      // referenced shop; five documents keeps the query within the 10-call
+      // document-access budget without weakening tenant authorization.
+      final chunks = notificationShopIdChunks(shopIds);
 
       return Stream<Set<String>>.multi((controller) {
         final latest = List<Set<String>?>.filled(chunks.length, null);

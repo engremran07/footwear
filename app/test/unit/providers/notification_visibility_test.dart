@@ -2,15 +2,21 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/models/notification_model.dart';
 import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
+import 'package:footwear_erp/providers/android_notification_provider.dart';
+import 'package:footwear_erp/core/l10n/app_locale.dart';
 import 'package:footwear_erp/providers/notification_provider.dart';
 import 'package:footwear_erp/screens/notification_center_screen.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('future notification dates are grouped as today', () {
     expect(notificationDayLabel(-1), '__today__');
     expect(notificationDayLabel(0), '__today__');
@@ -23,6 +29,38 @@ void main() {
     expect(update['read'], isTrue);
     expect(update['read_at'], isA<FieldValue>());
   });
+
+  test(
+    'Android alert permission is requested only after explicit action',
+    () async {
+      final previousPlatform = debugDefaultTargetPlatformOverride;
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = previousPlatform);
+
+      final client = _FakeAndroidNotificationClient();
+      final container = ProviderContainer(
+        overrides: [
+          androidNotificationClientProvider.overrideWithValue(client),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(
+        await container.read(androidNotificationPermissionProvider.future),
+        false,
+      );
+      expect(client.permissionChecks, 1);
+      expect(client.permissionRequests, 0);
+
+      expect(
+        await container
+            .read(androidNotificationPermissionProvider.notifier)
+            .request(),
+        isTrue,
+      );
+      expect(client.permissionRequests, 1);
+    },
+  );
 
   test(
     'workspace change never reuses prior tenant notification rows',
@@ -283,6 +321,66 @@ void main() {
 
     expect(notificationShopIdsKey(unread), notificationShopIdsKey(read));
     expect(notificationShopIdsKey(unread), '["shop-1","shop-2"]');
+  });
+
+  test('referenced shop queries stay within the Firestore Rules budget', () {
+    final shopIds = List.generate(50, (index) => 'shop-$index');
+
+    final chunks = notificationShopIdChunks(shopIds);
+
+    expect(chunks, hasLength(10));
+    expect(
+      chunks.every((chunk) => chunk.length <= notificationShopIdQueryChunkSize),
+      isTrue,
+    );
+    expect(chunks.expand((chunk) => chunk), shopIds);
+  });
+
+  test('foreground alerts include only new, unread, undelivered entries', () {
+    final sessionStartedAt = DateTime.utc(2026, 10, 28, 12);
+    NotificationModel notification(
+      String id,
+      DateTime createdAt, {
+      bool read = false,
+    }) => NotificationModel(
+      id: id,
+      type: 'transaction',
+      shopId: 'shop-1',
+      shopName: 'Shop',
+      routeId: 'route-1',
+      sellerId: 'seller-1',
+      sellerName: 'Seller',
+      amount: 10,
+      transactionType: 'cash_in',
+      refId: id,
+      targetRole: 'admin',
+      read: read,
+      createdBy: 'seller-1',
+      createdAt: Timestamp.fromDate(createdAt),
+    );
+
+    final candidates = foregroundNotificationCandidates(
+      notifications: [
+        notification(
+          'old',
+          sessionStartedAt.subtract(const Duration(seconds: 1)),
+        ),
+        notification(
+          'already-delivered',
+          sessionStartedAt.add(const Duration(seconds: 1)),
+        ),
+        notification(
+          'already-read',
+          sessionStartedAt.add(const Duration(seconds: 2)),
+          read: true,
+        ),
+        notification('new', sessionStartedAt.add(const Duration(seconds: 3))),
+      ],
+      deliveredNotificationIds: const {'already-delivered'},
+      sessionStartedAt: sessionStartedAt,
+    );
+
+    expect(candidates.map((notification) => notification.id), ['new']);
   });
 
   test('hides inactive and soft-deleted shop documents', () {
@@ -577,4 +675,30 @@ class _AuthenticatedUser implements User {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeAndroidNotificationClient implements AndroidNotificationClient {
+  int permissionChecks = 0;
+  int permissionRequests = 0;
+
+  @override
+  Future<bool> notificationsEnabled(AppLocale locale) async {
+    permissionChecks++;
+    return false;
+  }
+
+  @override
+  Future<bool> requestNotificationsPermission(AppLocale locale) async {
+    permissionRequests++;
+    return true;
+  }
+
+  @override
+  Future<void> deliverNewEntries({
+    required String userId,
+    required String tenantId,
+    required Iterable<NotificationModel> notifications,
+    required DateTime sessionStartedAt,
+    required AppLocale locale,
+  }) async {}
 }

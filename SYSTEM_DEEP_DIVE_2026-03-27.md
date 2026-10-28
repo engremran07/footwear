@@ -176,9 +176,34 @@ Firestore Rules require the resolved value to equal `request.time`. Arbitrary
 client timestamps, partial updates, read resets, inactive profiles/tenants,
 unassigned/global tenant scope, and cross-tenant access are denied. Focused
 Rules Emulator coverage includes valid mark-one and mark-all batches and these
-negative cases. The latest full local emulator run reported `185 passing
-(46s)`; it also logged non-failing expression-limit diagnostics in other
-Rules paths. This Rules change remains undeployed.
+negative cases. The earlier full local emulator run reported `185 passing
+(46s)` and logged non-failing expression-limit diagnostics in other Rules
+paths. During the v3.10.14+1125 deployment, Firebase reported the checked-in
+Rules were already current; indexes deployed successfully without deleting
+remote-only indexes or field overrides.
+
+## Notification Visibility Query Budget and Android Alerts
+
+The notification feed resolves referenced shops in five-ID chunks. This
+preserves active-tenant, role, and shop-visibility checks while bounding Rules
+document-access calls for larger notification feeds. A 50-shop emulator
+regression exercises ten chunks for both workspace admins and supervisors;
+the complete local Rules Emulator suite reports `191 passing (56s)`.
+
+Android alerts are an explicit opt-in, foreground-only presentation of newly
+arriving unread notifications that are visible to the active user. The app
+reuses the existing tenant-scoped feed and shop-visibility providers; it adds
+no Firestore listener, FCM integration, or backend sender. Permission is
+requested only after the user enables the feature. Alerts are private, silent,
+and deduplicated per user/workspace. They do not arrive while the app is
+closed or suspended. Sellers and platform super-admins remain excluded.
+
+Version `3.10.14+1125` focused notification, localization, and error-mapping
+tests pass; the full Flutter suite reports `01:29 +708: All tests passed!`.
+The Rules Emulator reports `191 passing (56s)`. Production Rules/indexes and
+Hosting deployments completed, and live `version.json` reports
+`3.10.14+1125`. This does not substitute for an authenticated JBM Impex
+production check.
 
 ## Standalone Transaction Retry Integrity
 

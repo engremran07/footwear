@@ -10,6 +10,56 @@
 
 ---
 
+## Scope-Specific Addendum — 2026-10-28 v3.10.14+1125 Notifications
+
+### Verified Finding and Change
+
+- The notification screen's referenced-shop visibility stream previously
+  queried as many as 30 IDs at once. The Rules path combines tenant, active
+  profile, role, and shop-visibility checks; the large query exceeded the
+  Firestore Rules document-access-call budget in a larger workspace. This
+  explains why smaller workspaces could work while JBM Impex failed.
+- Shop visibility now resolves IDs in batches of five. App authorization and
+  Firestore Rules were not weakened. A 50-shop emulator regression covers
+  both workspace admins and supervisors across ten chunks.
+- Android alerts are opt-in and foreground-only. They reuse existing
+  tenant-scoped feed and visibility providers, add no Firestore listener or
+  FCM sender, and request OS notification permission only after user action.
+  Closed-app/background delivery is not supported.
+
+### Local Validation
+
+- Focused notification, error-mapping, and changelog suite:
+  `00:04 +81: All tests passed!`; localization parity:
+  `00:00 +13: All tests passed!`; full Flutter suite:
+  `01:29 +708: All tests passed!`.
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 16.2s)`;
+  `dart analyze test/`: `No issues found!`; full Rules Emulator:
+  `191 passing (56s)`.
+- Version `3.10.14+1125` is synchronized. The ARM64 APK signature verified
+  with APK v2; ADB copied the APK to `R5GL22RGT9V` (`1 file pushed`) and
+  installation returned `Success`, versionName `3.10.14`, versionCode
+  `310143125`.
+- Split APK sizes: ARMv7 `32,857,045` bytes, ARM64 `34,520,181` bytes, and
+  x86_64 `36,142,717` bytes. The signed AAB is `75,804,395` bytes;
+  `jarsigner -verify` reported `jar verified.` while warning that its
+  self-signed certificate is not trusted locally and it has no timestamp.
+  Play Console upload-key acceptance is not established.
+- Web build: `EXIT: 0`; Firestore reported the Rules already current and
+  deployed indexes successfully, preserving 23 remote-only indexes and 2
+  field overrides. Rules/indexes and Hosting deployments reported
+  `Deploy complete!`. Live `version.json` reports `3.10.14+1125`; the web
+  shell and main bundle use `no-store, must-revalidate, no-cache`.
+
+### Remaining Evidence
+
+- The live JBM Impex notification feed still needs an authenticated check
+  after deployment; local emulator coverage is not production evidence.
+- The broader modernization/audit work and the existing unresolved production
+  notification investigation remain open until that live check is completed.
+
+---
+
 ## Scope-Specific Addendum — 2026-10-28 v3.10.13+1124 Release Delivery
 
 ### Verification

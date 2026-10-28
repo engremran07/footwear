@@ -1,6 +1,30 @@
-# FootWear ERP — Flutter App (v3.10.13+1124; Hosting/Rules deployed, ARM64 installed)
+# FootWear ERP — Flutter App (v3.10.14+1125; Hosting/Rules deployed, ARM64 installed)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
+
+## v3.10.14+1125 Notification Visibility and Android Alerts
+
+The notification feed now resolves referenced shop visibility in batches of
+five IDs, limiting per-query Rules access calls for larger tenants without
+changing tenant or role authorization. The 50-shop Rules Emulator regression
+covers workspace admins and supervisors. Android notifications are opt-in,
+private, silent, and foreground-only. They reuse the existing tenant-scoped
+feed and visibility streams, add no Firestore listener or FCM sender, and
+request notification permission only after the user chooses to enable alerts.
+Sellers and platform super-admins remain excluded.
+
+Full Flutter suite: `01:29 +708: All tests passed!`; Rules Emulator:
+`191 passing (56s)`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 16.2s)`; `dart analyze test/`:
+`No issues found!`. The split APKs verify with APK v2; the ARM64 APK was
+installed on `R5GL22RGT9V` (`Success`, versionName `3.10.14`, versionCode
+`310143125`). The signed AAB built at 75,804,395 bytes and reports
+`jar verified.` with a local self-signed-certificate warning and no
+timestamp. Web build: `EXIT: 0`; Firestore Rules/indexes and Hosting each
+reported `Deploy complete!`; live `version.json` reports `3.10.14+1125`.
+No Play Console upload occurred. JBM Impex still requires an authenticated
+production check; emulator results alone do not confirm that workspace's
+live feed.
 
 ## Archived Workspace Access Gate (v3.10.13+1124)
 

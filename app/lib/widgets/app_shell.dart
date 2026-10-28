@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/auth_provider.dart';
+import '../providers/android_notification_provider.dart';
 import '../providers/network_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/route_provider.dart';
@@ -328,9 +329,8 @@ class _AppShellState extends ConsumerState<AppShell>
                 } catch (error) {
                   if (mounted) {
                     final key = AppErrorMapper.key(error);
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(errorSnackBar(tr(key, ref)));
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(errorSnackBar(tr(key, ref)));
                   }
                 }
               },
@@ -418,6 +418,7 @@ class _AppShellState extends ConsumerState<AppShell>
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isWide = screenWidth >= AppTokens.breakpointNavigationRail;
     final isOnline = ref.watch(isOnlineProvider).value ?? true;
+    ref.watch(androidNotificationObserverProvider);
     final currentLocation = GoRouterState.of(context).uri.path;
     final unreadCount =
         user != null &&
@@ -459,9 +460,8 @@ class _AppShellState extends ConsumerState<AppShell>
         return;
       }
       _lastBackPress = now;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(infoSnackBar(tr('press_back_again_to_exit', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(infoSnackBar(tr('press_back_again_to_exit', ref)));
     }
 
     // ── Tablet/Desktop: NavigationRail (unchanged) ────────────────────────

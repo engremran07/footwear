@@ -121,6 +121,12 @@ class AppErrorMapper {
     if (msg.contains('pdf_arabic_shaping_disabled')) {
       return 'err_pdf_shaping_unavailable';
     }
+    if (msg.contains('android_notifications_unavailable')) {
+      return 'android_notifications_unavailable';
+    }
+    if (msg.contains('android_notifications_initialization_failed')) {
+      return 'android_notifications_initialization_failed';
+    }
     if (msg.contains('pdf_export_failed') ||
         msg.contains('pdf export failed') ||
         msg.contains('pdf generation failed')) {

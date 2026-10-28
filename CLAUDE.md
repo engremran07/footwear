@@ -449,6 +449,21 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- v3.10.14+1125 bounds notification shop-visibility Rules work by querying
+  referenced shop IDs in five-ID batches; positive scale coverage includes
+  workspace admins and supervisors. Local Android alerts are opt-in,
+  foreground-only, silent, private, and reuse the existing tenant-scoped
+  Firestore providers without an additional listener or FCM sender. Notification
+  access remains unavailable to sellers and platform super-admins. Full
+  Flutter suite: `01:29 +708: All tests passed!`; Rules Emulator:
+  `191 passing (56s)`; both analyzers are clean. The split APKs verify with
+  APK v2; the ARM64 APK was installed on `R5GL22RGT9V` (`Success`,
+  versionCode `310143125`). The signed 75,804,395-byte AAB reports
+  `jar verified.` with a locally untrusted self-signed certificate and no
+  timestamp. Web build `EXIT: 0`; Rules/indexes and Hosting each reported
+  `Deploy complete!`; live `version.json` reports `3.10.14+1125`. No Play
+  Console upload occurred. Authenticated JBM Impex feed verification remains
+  pending.
 - v3.10.13+1124 was built and delivered locally after the Gradle toolchain and
   same-drive Pub cache fixes. Flutter suite: `01:43 +704: All tests passed!`;
   both Dart analyzers clean; Rules Emulator: `190 passing (56s)`. Split APKs

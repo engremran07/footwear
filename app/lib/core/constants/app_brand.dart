@@ -13,10 +13,10 @@ class AppBrand {
   static const String logoAsset = 'assets/images/app_icon.png';
 
   // ─── Version ─────────────────────────────────────────────────────────────
-  static const String appVersion = '3.10.13';
-  static const String buildNumber = '1124';
+  static const String appVersion = '3.10.14';
+  static const String buildNumber = '1125';
   static const String versionDisplay = 'v$appVersion+$buildNumber';
-  static const String releaseDateIso = '2026-10-27';
+  static const String releaseDateIso = '2026-10-28';
 
   // ─── Contact / About ─────────────────────────────────────────────────────
   static const String contactEmail = 'engremran89@gmail.com';

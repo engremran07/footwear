@@ -1431,6 +1431,40 @@ describe('customers collection', () => {
     );
   });
 
+  it('operational notification shop lookups stay within the Rules access budget', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedUser('supervisor-uid', 'supervisor');
+    const shopIds = Array.from({ length: 50 }, (_, index) => `notice-shop-${index}`);
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        const batch = db.batch();
+        for (const shopId of shopIds) {
+          batch.set(db.collection('customers').doc(shopId), {
+            name: shopId,
+            route_id: 'route-1',
+            tenant_id: 'tenant-1',
+            balance: 0,
+            active: true,
+          });
+        }
+        await batch.commit();
+    });
+
+    for (const context of [adminCtx(testEnv), supervisorCtx(testEnv)]) {
+        const db = context.firestore();
+        for (let start = 0; start < shopIds.length; start += 5) {
+          const chunk = shopIds.slice(start, start + 5);
+          const snapshot = await assertSucceeds(
+            db.collection('customers')
+              .where('tenant_id', '==', 'tenant-1')
+              .where(firebase.firestore.FieldPath.documentId(), 'in', chunk)
+              .get(),
+          );
+          assert.strictEqual(snapshot.size, chunk.length);
+        }
+    }
+  });
+
   it('seller: cannot create shop with empty name', async () => {
     await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
     await assertFails(

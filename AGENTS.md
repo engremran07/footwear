@@ -622,6 +622,39 @@ widget tests.
 
 ## 10) Current Audit Status
 
+2026-10-28 v3.10.14+1125 notification visibility and Android alerts:
+
+- The referenced-shop visibility stream now resolves feed shop IDs in batches
+  of five, keeping Rules access-call evaluation bounded for larger workspaces
+  without broadening authorization. The 50-shop regression covers workspace
+  admins and supervisors; the full local Rules Emulator reports
+  `191 passing (56s)`.
+- Android notification-center alerts are opt-in, private, silent, and
+  foreground-only. They reuse the existing tenant-scoped notification and
+  shop-visibility providers, add no Firestore listener or FCM sender, and ask
+  for notification permission only after a user action. Sellers and
+  platform super-admins remain excluded by the existing app policy and Rules.
+- Full Flutter suite: `01:29 +708: All tests passed!`; focused notification,
+  error-mapping, and changelog tests: `00:04 +81: All tests passed!`;
+  localization parity: `00:00 +13: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 16.2s)`;
+  `dart analyze test/`: `No issues found!`.
+- Version `3.10.14+1125` is synchronized. Split APKs built at 32,857,045 B
+  (ARMv7), 34,520,181 B (ARM64), and 36,142,717 B (x86_64); all verify with
+  APK v2. The ARM64 APK was copied to `R5GL22RGT9V` (`1 file pushed`) and
+  installed (`Success`, versionName `3.10.14`, versionCode `310143125`). The
+  signed AAB is 75,804,395 B; `jarsigner -verify` reported `jar verified.`
+  with a locally untrusted self-signed certificate and no timestamp. Web
+  build: `EXIT: 0`; Firestore reported Rules already current and deployed
+  indexes successfully, preserving 23 remote-only indexes and 2 field
+  overrides; Firebase reported `Deploy complete!`. Hosting reported
+  `Deploy complete!`; live `version.json` reports `3.10.14+1125`, and the
+  web shell/main bundle use `no-store, must-revalidate, no-cache`.
+- No Play Console upload occurred. Git publication follows final verification.
+- The JBM Impex production feed has not yet been checked in an authenticated
+  session. Emulator evidence identifies and covers the query-budget failure,
+  but is not proof of live-workspace resolution.
+
 2026-10-28 changelog validation contract correction:
 
 - The version-bump check now names the implemented `ChangelogEntry` model and

@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +13,7 @@ import '../core/utils/formatters.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/notification_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/android_notification_provider.dart';
 import '../providers/notification_provider.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
@@ -144,6 +147,13 @@ class _NotificationCenterScreenState
           ],
         ),
         actions: [
+          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+            IconButton(
+              key: const Key('enable_android_notifications'),
+              tooltip: tr('android_notifications_foreground_only', ref),
+              onPressed: _enableAndroidNotifications,
+              icon: const Icon(Icons.notifications_active_outlined),
+            ),
           if (unreadCount > 0)
             TextButton.icon(
               onPressed: _markingAllRead ? null : _markAllRead,
@@ -186,8 +196,7 @@ class _NotificationCenterScreenState
                 onRetry: () => _retryFeed(tenantId),
               ),
             ),
-            if (kDebugMode && failure != null)
-              _notificationStreamSource(failure),
+            if (failure != null) _notificationStreamSource(failure, ref),
           ],
         );
       }
@@ -199,8 +208,7 @@ class _NotificationCenterScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(tr(AppErrorMapper.key(cause), ref)),
-                if (kDebugMode && failure != null)
-                  _notificationStreamSource(failure),
+                if (failure != null) _notificationStreamSource(failure, ref),
               ],
             ),
             leading: Icon(
@@ -242,14 +250,26 @@ class _NotificationCenterScreenState
     );
   }
 
-  Widget _notificationStreamSource(NotificationStreamFailure failure) =>
-      Padding(
-        padding: const EdgeInsets.only(top: AppTokens.s4),
-        child: Text(
-          'Stream: ${failure.source.name}',
-          key: const Key('notification_stream_source'),
-        ),
-      );
+  Widget _notificationStreamSource(
+    NotificationStreamFailure failure,
+    WidgetRef ref,
+  ) {
+    final sourceKey = switch (failure.source) {
+      NotificationStreamSource.notifications => 'notification_feed_source',
+      NotificationStreamSource.shops => 'notification_shop_visibility_source',
+    };
+    final code = switch (failure.cause) {
+      FirebaseException(:final code) => code,
+      _ => null,
+    };
+    return Padding(
+      padding: const EdgeInsets.only(top: AppTokens.s4),
+      child: Text(
+        code == null ? tr(sourceKey, ref) : '${tr(sourceKey, ref)} ($code)',
+        key: const Key('notification_stream_source'),
+      ),
+    );
+  }
 
   void _retryFeed(String? tenantId) {
     if (tenantId == null) {
@@ -258,6 +278,25 @@ class _NotificationCenterScreenState
     }
     ref.invalidate(notificationsProvider(tenantId));
     ref.invalidate(activeNotificationShopIdsProvider(tenantId));
+  }
+
+  Future<void> _enableAndroidNotifications() async {
+    try {
+      final enabled = await ref
+          .read(androidNotificationPermissionProvider.notifier)
+          .request();
+      if (!mounted) return;
+      final message = enabled
+          ? tr('android_notifications_enabled', ref)
+          : tr('android_notifications_permission_denied', ref);
+      ScaffoldMessenger.of(context).showSnackBar(
+        enabled ? successSnackBar(message) : errorSnackBar(message),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+    }
   }
 
   Future<void> _markAllRead() async {

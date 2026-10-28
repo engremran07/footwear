@@ -28,18 +28,29 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.10.14',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔔',
+        text: {
+          AppLocale.en: 'Notifications now handle large workspaces reliably, and workspace admins and supervisors can opt in to quiet device alerts while the app is open.',
+          AppLocale.ar: 'أصبحت الإشعارات أكثر موثوقية في مساحات العمل الكبيرة، ويمكن لمسؤولي مساحة العمل والمشرفين تفعيل تنبيهات هادئة أثناء فتح التطبيق.',
+          AppLocale.ur: 'بڑے ورک اسپیسز میں اطلاعات اب زیادہ قابلِ اعتماد ہیں، اور ورک اسپیس ایڈمن اور سپروائزر ایپ کھلی ہونے پر خاموش ڈیوائس الرٹس فعال کر سکتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.10.13',
     date: 'October 2026',
     items: [
       ChangelogItem(
         emoji: '🔄',
         text: {
-          AppLocale.en:
-              'Workspace and notification screens now behave more consistently during refresh, and core app libraries have been updated for current compatibility.',
-          AppLocale.ar:
-              'أصبحت شاشات مساحة العمل والإشعارات أكثر اتساقًا أثناء التحديث، وتم تحديث مكتبات التطبيق الأساسية لتحسين التوافق.',
-          AppLocale.ur:
-              'ریفریش کے دوران ورک اسپیس اور نوٹیفکیشن اسکرینز اب زیادہ مستقل انداز میں کام کرتی ہیں، اور مطابقت بہتر بنانے کے لیے ایپ کی بنیادی لائبریریاں اپ ڈیٹ کی گئی ہیں۔',
+          AppLocale.en: 'Workspace and notification screens now behave more consistently during refresh, and core app libraries have been updated for current compatibility.',
+          AppLocale.ar: 'أصبحت شاشات مساحة العمل والإشعارات أكثر اتساقًا أثناء التحديث، وتم تحديث مكتبات التطبيق الأساسية لتحسين التوافق.',
+          AppLocale.ur: 'ریفریش کے دوران ورک اسپیس اور نوٹیفکیشن اسکرینز اب زیادہ مستقل انداز میں کام کرتی ہیں، اور مطابقت بہتر بنانے کے لیے ایپ کی بنیادی لائبریریاں اپ ڈیٹ کی گئی ہیں۔',
         },
       ),
     ],
@@ -51,12 +62,9 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔤',
         text: {
-          AppLocale.en:
-              'Arabic and Urdu names, numbers, and currency symbols now use the right bundled fonts even when the app is set to English.',
-          AppLocale.ar:
-              'تُعرض الأسماء والأرقام ورموز العملات العربية والأردية الآن بالخطوط المناسبة حتى عند استخدام التطبيق باللغة الإنجليزية.',
-          AppLocale.ur:
-              'اب عربی اور اردو نام، اعداد اور کرنسی علامات درست فونٹس میں دکھائی دیتی ہیں، چاہے ایپ انگریزی میں ہو۔',
+          AppLocale.en: 'Arabic and Urdu names, numbers, and currency symbols now use the right bundled fonts even when the app is set to English.',
+          AppLocale.ar: 'تُعرض الأسماء والأرقام ورموز العملات العربية والأردية الآن بالخطوط المناسبة حتى عند استخدام التطبيق باللغة الإنجليزية.',
+          AppLocale.ur: 'اب عربی اور اردو نام، اعداد اور کرنسی علامات درست فونٹس میں دکھائی دیتی ہیں، چاہے ایپ انگریزی میں ہو۔',
         },
       ),
     ],
@@ -68,23 +76,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '👤',
         text: {
-          AppLocale.en:
-              'Admin labels are clearer, organization names stay private in member screens, and account setup errors now include clearer guidance.',
-          AppLocale.ar:
-              'أصبحت تسميات المسؤول أوضح، وتظل أسماء المؤسسات مخفية في شاشات الأعضاء، كما أصبحت رسائل إعداد الحساب أكثر وضوحًا.',
-          AppLocale.ur:
-              'ایڈمن کے لیبل مزید واضح ہیں، ممبر اسکرینز میں ادارے کے نام پوشیدہ رہتے ہیں، اور اکاؤنٹ سیٹ اپ کی خرابیوں کے پیغامات بہتر رہنمائی دیتے ہیں۔',
+          AppLocale.en: 'Admin labels are clearer, organization names stay private in member screens, and account setup errors now include clearer guidance.',
+          AppLocale.ar: 'أصبحت تسميات المسؤول أوضح، وتظل أسماء المؤسسات مخفية في شاشات الأعضاء، كما أصبحت رسائل إعداد الحساب أكثر وضوحًا.',
+          AppLocale.ur: 'ایڈمن کے لیبل مزید واضح ہیں، ممبر اسکرینز میں ادارے کے نام پوشیدہ رہتے ہیں، اور اکاؤنٹ سیٹ اپ کی خرابیوں کے پیغامات بہتر رہنمائی دیتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Backup readiness stays visible without showing workspace names, and startup no longer asks for unrelated device permissions.',
-          AppLocale.ar:
-              'تظل جاهزية النسخ الاحتياطي واضحة دون عرض أسماء مساحات العمل، ولم يعد التطبيق يطلب أذونات جهاز غير مرتبطة عند بدء التشغيل.',
-          AppLocale.ur:
-              'ورک اسپیس کے نام دکھائے بغیر بیک اپ کی تیاری واضح رہتی ہے، اور آغاز پر غیر متعلقہ ڈیوائس اجازتیں طلب نہیں کی جاتیں۔',
+          AppLocale.en: 'Backup readiness stays visible without showing workspace names, and startup no longer asks for unrelated device permissions.',
+          AppLocale.ar: 'تظل جاهزية النسخ الاحتياطي واضحة دون عرض أسماء مساحات العمل، ولم يعد التطبيق يطلب أذونات جهاز غير مرتبطة عند بدء التشغيل.',
+          AppLocale.ur: 'ورک اسپیس کے نام دکھائے بغیر بیک اپ کی تیاری واضح رہتی ہے، اور آغاز پر غیر متعلقہ ڈیوائس اجازتیں طلب نہیں کی جاتیں۔',
         },
       ),
     ],
@@ -96,12 +98,9 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔢',
         text: {
-          AppLocale.en:
-              'Amount fields now accept Arabic and Eastern Arabic numerals, and platform workspace access is linked to its audit record.',
-          AppLocale.ar:
-              'تقبل حقول المبالغ الآن الأرقام العربية والأرقام العربية الشرقية، ويرتبط وصول مسؤول المنصة إلى مساحة العمل بسجل التدقيق الخاص به.',
-          AppLocale.ur:
-              'رقم کے خانے اب عربی اور مشرقی عربی ہندسے قبول کرتے ہیں، اور پلیٹ فارم کی ورک اسپیس تک رسائی اس کے آڈٹ ریکارڈ سے منسلک ہے۔',
+          AppLocale.en: 'Amount fields now accept Arabic and Eastern Arabic numerals, and platform workspace access is linked to its audit record.',
+          AppLocale.ar: 'تقبل حقول المبالغ الآن الأرقام العربية والأرقام العربية الشرقية، ويرتبط وصول مسؤول المنصة إلى مساحة العمل بسجل التدقيق الخاص به.',
+          AppLocale.ur: 'رقم کے خانے اب عربی اور مشرقی عربی ہندسے قبول کرتے ہیں، اور پلیٹ فارم کی ورک اسپیس تک رسائی اس کے آڈٹ ریکارڈ سے منسلک ہے۔',
         },
       ),
     ],
@@ -113,12 +112,9 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Eligible supervisors and route-assigned sellers can now create sale invoices and cash receipts within their workspace permissions.',
-          AppLocale.ar:
-              'يمكن للمشرفين المؤهلين والبائعين المعيّنين للمسارات الآن إنشاء فواتير البيع وسندات القبض ضمن صلاحيات مساحة العمل.',
-          AppLocale.ur:
-              'مجاز سپروائزر اور روٹ سے منسلک سیلرز اب اپنی ورک اسپیس کی اجازت کے مطابق سیل انوائس اور کیش رسید بنا سکتے ہیں۔',
+          AppLocale.en: 'Eligible supervisors and route-assigned sellers can now create sale invoices and cash receipts within their workspace permissions.',
+          AppLocale.ar: 'يمكن للمشرفين المؤهلين والبائعين المعيّنين للمسارات الآن إنشاء فواتير البيع وسندات القبض ضمن صلاحيات مساحة العمل.',
+          AppLocale.ur: 'مجاز سپروائزر اور روٹ سے منسلک سیلرز اب اپنی ورک اسپیس کی اجازت کے مطابق سیل انوائس اور کیش رسید بنا سکتے ہیں۔',
         },
       ),
     ],
@@ -130,23 +126,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🖼️',
         text: {
-          AppLocale.en:
-              'Company logos now appear centered between English and Arabic or Urdu details across financial PDFs, with one consistent, slightly larger size.',
-          AppLocale.ar:
-              'تظهر شعارات الشركة الآن في الوسط بين التفاصيل الإنجليزية والعربية أو الأردية في جميع ملفات PDF المالية، بحجم موحد أكبر قليلًا.',
-          AppLocale.ur:
-              'کمپنی کے لوگو اب تمام مالی PDF دستاویزات میں انگریزی اور عربی یا اردو تفصیلات کے درمیان مرکز میں، یکساں اور قدرے بڑے سائز میں دکھائے جاتے ہیں۔',
+          AppLocale.en: 'Company logos now appear centered between English and Arabic or Urdu details across financial PDFs, with one consistent, slightly larger size.',
+          AppLocale.ar: 'تظهر شعارات الشركة الآن في الوسط بين التفاصيل الإنجليزية والعربية أو الأردية في جميع ملفات PDF المالية، بحجم موحد أكبر قليلًا.',
+          AppLocale.ur: 'کمپنی کے لوگو اب تمام مالی PDF دستاویزات میں انگریزی اور عربی یا اردو تفصیلات کے درمیان مرکز میں، یکساں اور قدرے بڑے سائز میں دکھائے جاتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🔔',
         text: {
-          AppLocale.en:
-              'Notifications now stay within the active workspace when you switch accounts or workspaces, while refreshes in the same workspace remain smooth.',
-          AppLocale.ar:
-              'تبقى الإشعارات الآن ضمن مساحة العمل النشطة عند تبديل الحساب أو مساحة العمل، مع استمرار التحديث بسلاسة داخل المساحة نفسها.',
-          AppLocale.ur:
-              'اکاؤنٹ یا ورک اسپیس تبدیل کرنے پر نوٹیفکیشن اب فعال ورک اسپیس تک محدود رہتے ہیں، جبکہ اسی ورک اسپیس میں ریفریش ہموار رہتا ہے۔',
+          AppLocale.en: 'Notifications now stay within the active workspace when you switch accounts or workspaces, while refreshes in the same workspace remain smooth.',
+          AppLocale.ar: 'تبقى الإشعارات الآن ضمن مساحة العمل النشطة عند تبديل الحساب أو مساحة العمل، مع استمرار التحديث بسلاسة داخل المساحة نفسها.',
+          AppLocale.ur: 'اکاؤنٹ یا ورک اسپیس تبدیل کرنے پر نوٹیفکیشن اب فعال ورک اسپیس تک محدود رہتے ہیں، جبکہ اسی ورک اسپیس میں ریفریش ہموار رہتا ہے۔',
         },
       ),
     ],
@@ -158,12 +148,9 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Cash receipts now use a compact bilingual layout based on the supplied reference, keep the workspace header, and can show two extra contact numbers.',
-          AppLocale.ar:
-              'تستخدم سندات القبض الآن تخطيطًا ثنائي اللغة أكثر اختصارًا مستوحى من النموذج المرفق، مع الحفاظ على ترويسة مساحة العمل وإمكانية عرض رقمي اتصال إضافيين.',
-          AppLocale.ur:
-              'نقد رسیدیں اب فراہم کردہ نمونے سے متاثر ایک مختصر دو لسانی ترتیب میں ہیں، ورک اسپیس ہیڈر برقرار رہتا ہے اور دو اضافی رابطہ نمبر دکھائے جا سکتے ہیں۔',
+          AppLocale.en: 'Cash receipts now use a compact bilingual layout based on the supplied reference, keep the workspace header, and can show two extra contact numbers.',
+          AppLocale.ar: 'تستخدم سندات القبض الآن تخطيطًا ثنائي اللغة أكثر اختصارًا مستوحى من النموذج المرفق، مع الحفاظ على ترويسة مساحة العمل وإمكانية عرض رقمي اتصال إضافيين.',
+          AppLocale.ur: 'نقد رسیدیں اب فراہم کردہ نمونے سے متاثر ایک مختصر دو لسانی ترتیب میں ہیں، ورک اسپیس ہیڈر برقرار رہتا ہے اور دو اضافی رابطہ نمبر دکھائے جا سکتے ہیں۔',
         },
       ),
     ],
@@ -175,12 +162,9 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📄',
         text: {
-          AppLocale.en:
-              'Account statements now place the shop name and statement dates between the English and Arabic or Urdu details for a clearer, more compact page.',
-          AppLocale.ar:
-              'تعرض كشوف الحساب الآن اسم المتجر وفترة الكشف بين التفاصيل الإنجليزية والعربية أو الأردية بتنسيق أوضح وأكثر اختصارًا.',
-          AppLocale.ur:
-              'اکاؤنٹ اسٹیٹمنٹ میں دکان کا نام اور مدت اب انگریزی اور عربی یا اردو تفصیلات کے درمیان زیادہ واضح اور مختصر انداز میں دکھائی جاتی ہے۔',
+          AppLocale.en: 'Account statements now place the shop name and statement dates between the English and Arabic or Urdu details for a clearer, more compact page.',
+          AppLocale.ar: 'تعرض كشوف الحساب الآن اسم المتجر وفترة الكشف بين التفاصيل الإنجليزية والعربية أو الأردية بتنسيق أوضح وأكثر اختصارًا.',
+          AppLocale.ur: 'اکاؤنٹ اسٹیٹمنٹ میں دکان کا نام اور مدت اب انگریزی اور عربی یا اردو تفصیلات کے درمیان زیادہ واضح اور مختصر انداز میں دکھائی جاتی ہے۔',
         },
       ),
     ],
@@ -192,23 +176,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧑‍💼',
         text: {
-          AppLocale.en:
-              'Workspace supervisors can manage day-to-day routes, shops, products, inventory, invoices, and reports without account-administration or support-access controls.',
-          AppLocale.ar:
-              'يمكن لمشرفي مساحة العمل إدارة المسارات والمتاجر والمنتجات والمخزون والفواتير والتقارير اليومية دون صلاحيات إدارة الحسابات أو وصول الدعم.',
-          AppLocale.ur:
-              'ورک اسپیس سپروائزر اکاؤنٹ ایڈمنسٹریشن یا سپورٹ رسائی کے اختیارات کے بغیر روزمرہ روٹس، دکانیں، مصنوعات، انوینٹری، انوائسز اور رپورٹس سنبھال سکتے ہیں۔',
+          AppLocale.en: 'Workspace supervisors can manage day-to-day routes, shops, products, inventory, invoices, and reports without account-administration or support-access controls.',
+          AppLocale.ar: 'يمكن لمشرفي مساحة العمل إدارة المسارات والمتاجر والمنتجات والمخزون والفواتير والتقارير اليومية دون صلاحيات إدارة الحسابات أو وصول الدعم.',
+          AppLocale.ur: 'ورک اسپیس سپروائزر اکاؤنٹ ایڈمنسٹریشن یا سپورٹ رسائی کے اختیارات کے بغیر روزمرہ روٹس، دکانیں، مصنوعات، انوینٹری، انوائسز اور رپورٹس سنبھال سکتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🔄',
         text: {
-          AppLocale.en:
-              'Backup and workspace user lists now work for legacy administrators, and notification updates no longer restart the shop-visibility listener unnecessarily.',
-          AppLocale.ar:
-              'أصبحت النسخ الاحتياطية وقوائم مستخدمي مساحة العمل متاحة للمسؤولين القدامى، ولم تعد تحديثات الإشعارات تعيد تشغيل مستمع المتاجر دون حاجة.',
-          AppLocale.ur:
-              'پرانے ایڈمن اکاؤنٹس کے لیے بیک اپ اور ورک اسپیس صارفین کی فہرست درست کام کرتی ہے، اور نوٹیفکیشن اپ ڈیٹس اب دکانوں کا listener بلا ضرورت دوبارہ شروع نہیں کرتیں۔',
+          AppLocale.en: 'Backup and workspace user lists now work for legacy administrators, and notification updates no longer restart the shop-visibility listener unnecessarily.',
+          AppLocale.ar: 'أصبحت النسخ الاحتياطية وقوائم مستخدمي مساحة العمل متاحة للمسؤولين القدامى، ولم تعد تحديثات الإشعارات تعيد تشغيل مستمع المتاجر دون حاجة.',
+          AppLocale.ur: 'پرانے ایڈمن اکاؤنٹس کے لیے بیک اپ اور ورک اسپیس صارفین کی فہرست درست کام کرتی ہے، اور نوٹیفکیشن اپ ڈیٹس اب دکانوں کا listener بلا ضرورت دوبارہ شروع نہیں کرتیں۔',
         },
       ),
     ],
@@ -220,34 +198,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Financial documents now use a shared bilingual header with English on the left and Arabic or Urdu on the right.',
-          AppLocale.ar:
-              'تستخدم المستندات المالية الآن ترويسة موحدة بالإنجليزية على اليسار والعربية أو الأردية على اليمين.',
-          AppLocale.ur:
-              'مالی دستاویزات میں اب مشترک دو لسانی ہیڈر ہے جس میں انگریزی بائیں اور عربی یا اردو دائیں جانب ہے۔',
+          AppLocale.en: 'Financial documents now use a shared bilingual header with English on the left and Arabic or Urdu on the right.',
+          AppLocale.ar: 'تستخدم المستندات المالية الآن ترويسة موحدة بالإنجليزية على اليسار والعربية أو الأردية على اليمين.',
+          AppLocale.ur: 'مالی دستاویزات میں اب مشترک دو لسانی ہیڈر ہے جس میں انگریزی بائیں اور عربی یا اردو دائیں جانب ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Cash receipts now fit a single A5 page, and invoice logos remain available when current workspace image data is missing.',
-          AppLocale.ar:
-              'تظهر الإيصالات النقدية الآن في صفحة A5 واحدة، وتبقى شعارات الفواتير متاحة عند غياب صورة مساحة العمل الحالية.',
-          AppLocale.ur:
-              'نقد رسیدیں اب ایک A5 صفحے میں آتی ہیں، اور موجودہ ورک اسپیس کی تصویر دستیاب نہ ہو تو انوائس کا محفوظ لوگو استعمال ہوتا ہے۔',
+          AppLocale.en: 'Cash receipts now fit a single A5 page, and invoice logos remain available when current workspace image data is missing.',
+          AppLocale.ar: 'تظهر الإيصالات النقدية الآن في صفحة A5 واحدة، وتبقى شعارات الفواتير متاحة عند غياب صورة مساحة العمل الحالية.',
+          AppLocale.ur: 'نقد رسیدیں اب ایک A5 صفحے میں آتی ہیں، اور موجودہ ورک اسپیس کی تصویر دستیاب نہ ہو تو انوائس کا محفوظ لوگو استعمال ہوتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Workspace support access now gives clearer start, switch, and end feedback.',
-          AppLocale.ar:
-              'أصبحت رسائل بدء وصول الدعم إلى مساحة العمل وتبديله وإنهائه أوضح.',
-          AppLocale.ur:
-              'ورک اسپیس سپورٹ رسائی شروع کرنے، تبدیل کرنے اور ختم کرنے کے پیغامات اب زیادہ واضح ہیں۔',
+          AppLocale.en: 'Workspace support access now gives clearer start, switch, and end feedback.',
+          AppLocale.ar: 'أصبحت رسائل بدء وصول الدعم إلى مساحة العمل وتبديله وإنهائه أوضح.',
+          AppLocale.ur: 'ورک اسپیس سپورٹ رسائی شروع کرنے، تبدیل کرنے اور ختم کرنے کے پیغامات اب زیادہ واضح ہیں۔',
         },
       ),
     ],
@@ -259,12 +228,9 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '👥',
         text: {
-          AppLocale.en:
-              'Workspace member lists and seat reconciliation now include older active profiles even when a display name is missing.',
-          AppLocale.ar:
-              'تتضمن قوائم أعضاء مساحة العمل ومطابقة المقاعد الآن الملفات النشطة القديمة حتى عند غياب الاسم المعروض.',
-          AppLocale.ur:
-              'ورک اسپیس کے ممبران کی فہرست اور نشستوں کی مطابقت میں اب پرانے فعال پروفائل بھی شامل ہیں، چاہے دکھانے والا نام موجود نہ ہو۔',
+          AppLocale.en: 'Workspace member lists and seat reconciliation now include older active profiles even when a display name is missing.',
+          AppLocale.ar: 'تتضمن قوائم أعضاء مساحة العمل ومطابقة المقاعد الآن الملفات النشطة القديمة حتى عند غياب الاسم المعروض.',
+          AppLocale.ur: 'ورک اسپیس کے ممبران کی فہرست اور نشستوں کی مطابقت میں اب پرانے فعال پروفائل بھی شامل ہیں، چاہے دکھانے والا نام موجود نہ ہو۔',
         },
       ),
     ],
@@ -276,34 +242,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧑‍💼',
         text: {
-          AppLocale.en:
-              'Workspace admins can manage admin and seller roles in their own workspace, with seat totals checked against the live team.',
-          AppLocale.ar:
-              'يمكن لمسؤولي مساحة العمل إدارة أدوار المسؤولين والبائعين ضمن مساحتهم، مع مطابقة المقاعد لإجمالي الفريق المباشر.',
-          AppLocale.ur:
-              'ورک اسپیس منتظمین اپنی ورک اسپیس میں ایڈمن اور سیلر کے کردار سنبھال سکتے ہیں، جبکہ نشستوں کی تعداد ٹیم کے تازہ ریکارڈ سے ملائی جاتی ہے۔',
+          AppLocale.en: 'Workspace admins can manage admin and seller roles in their own workspace, with seat totals checked against the live team.',
+          AppLocale.ar: 'يمكن لمسؤولي مساحة العمل إدارة أدوار المسؤولين والبائعين ضمن مساحتهم، مع مطابقة المقاعد لإجمالي الفريق المباشر.',
+          AppLocale.ur: 'ورک اسپیس منتظمین اپنی ورک اسپیس میں ایڈمن اور سیلر کے کردار سنبھال سکتے ہیں، جبکہ نشستوں کی تعداد ٹیم کے تازہ ریکارڈ سے ملائی جاتی ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🖼️',
         text: {
-          AppLocale.en:
-              'Workspace logos are resized on your device to fit the upload limit while preserving transparency.',
-          AppLocale.ar:
-              'تُعاد تهيئة شعارات مساحة العمل على جهازك لتناسب حد الرفع مع الحفاظ على الشفافية.',
-          AppLocale.ur:
-              'ورک اسپیس کے لوگو شفافیت برقرار رکھتے ہوئے اپ لوڈ کی حد کے مطابق آپ کے آلے پر سائز کیے جاتے ہیں۔',
+          AppLocale.en: 'Workspace logos are resized on your device to fit the upload limit while preserving transparency.',
+          AppLocale.ar: 'تُعاد تهيئة شعارات مساحة العمل على جهازك لتناسب حد الرفع مع الحفاظ على الشفافية.',
+          AppLocale.ur: 'ورک اسپیس کے لوگو شفافیت برقرار رکھتے ہوئے اپ لوڈ کی حد کے مطابق آپ کے آلے پر سائز کیے جاتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Cash receipts now use a compact bilingual table and a single-page layout without the balance-movement block.',
-          AppLocale.ar:
-              'تستخدم الإيصالات النقدية الآن جدولًا ثنائي اللغة وتنسيقًا مدمجًا في صفحة واحدة دون قسم حركة الرصيد.',
-          AppLocale.ur:
-              'نقد رسیدیں اب مختصر دو لسانی جدول اور ایک صفحے کے لے آؤٹ میں ہیں، اور ان میں بیلنس کی نقل و حرکت کا حصہ شامل نہیں۔',
+          AppLocale.en: 'Cash receipts now use a compact bilingual table and a single-page layout without the balance-movement block.',
+          AppLocale.ar: 'تستخدم الإيصالات النقدية الآن جدولًا ثنائي اللغة وتنسيقًا مدمجًا في صفحة واحدة دون قسم حركة الرصيد.',
+          AppLocale.ur: 'نقد رسیدیں اب مختصر دو لسانی جدول اور ایک صفحے کے لے آؤٹ میں ہیں، اور ان میں بیلنس کی نقل و حرکت کا حصہ شامل نہیں۔',
         },
       ),
     ],
@@ -315,23 +272,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '👥',
         text: {
-          AppLocale.en:
-              'Workspace owners can review contact and verification details, live team roles, and the 10-member free-tier capacity.',
-          AppLocale.ar:
-              'يمكن لمالكي مساحة العمل مراجعة بيانات الاتصال والتحقق، وأدوار الفريق المباشرة، والسعة المجانية البالغة 10 أعضاء.',
-          AppLocale.ur:
-              'ورک اسپیس مالکان رابطے اور تصدیق کی تفصیلات، ٹیم کے تازہ کردار، اور مفت پلان کی 10 اراکین کی گنجائش دیکھ سکتے ہیں۔',
+          AppLocale.en: 'Workspace owners can review contact and verification details, live team roles, and the 10-member free-tier capacity.',
+          AppLocale.ar: 'يمكن لمالكي مساحة العمل مراجعة بيانات الاتصال والتحقق، وأدوار الفريق المباشرة، والسعة المجانية البالغة 10 أعضاء.',
+          AppLocale.ur: 'ورک اسپیس مالکان رابطے اور تصدیق کی تفصیلات، ٹیم کے تازہ کردار، اور مفت پلان کی 10 اراکین کی گنجائش دیکھ سکتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Cash receipt details and PDFs now include a clearer payment, balance, and recipient breakdown.',
-          AppLocale.ar:
-              'تتضمن تفاصيل الإيصال النقدي وملفات PDF الآن توضيحًا أفضل للدفع والرصيد والمستلم.',
-          AppLocale.ur:
-              'نقد رسید کی تفصیلات اور پی ڈی ایف میں اب ادائیگی، بقایا، اور وصول کنندہ کی معلومات زیادہ واضح ہیں۔',
+          AppLocale.en: 'Cash receipt details and PDFs now include a clearer payment, balance, and recipient breakdown.',
+          AppLocale.ar: 'تتضمن تفاصيل الإيصال النقدي وملفات PDF الآن توضيحًا أفضل للدفع والرصيد والمستلم.',
+          AppLocale.ur: 'نقد رسید کی تفصیلات اور پی ڈی ایف میں اب ادائیگی، بقایا، اور وصول کنندہ کی معلومات زیادہ واضح ہیں۔',
         },
       ),
     ],
@@ -343,34 +294,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔄',
         text: {
-          AppLocale.en:
-              'Workspace settings, including invoice headers, now update across screens and devices. Reprints use the current workspace header.',
-          AppLocale.ar:
-              'تتحدّث إعدادات مساحة العمل، بما فيها ترويسة الفاتورة، عبر الشاشات والأجهزة. تستخدم إعادة الطباعة ترويسة مساحة العمل الحالية.',
-          AppLocale.ur:
-              'ورک اسپیس سیٹنگز، بشمول انوائس ہیڈر، اب اسکرینز اور ڈیوائسز پر اپ ڈیٹ ہوتی ہیں۔ دوبارہ پرنٹ میں موجودہ ورک اسپیس ہیڈر استعمال ہوتا ہے۔',
+          AppLocale.en: 'Workspace settings, including invoice headers, now update across screens and devices. Reprints use the current workspace header.',
+          AppLocale.ar: 'تتحدّث إعدادات مساحة العمل، بما فيها ترويسة الفاتورة، عبر الشاشات والأجهزة. تستخدم إعادة الطباعة ترويسة مساحة العمل الحالية.',
+          AppLocale.ur: 'ورک اسپیس سیٹنگز، بشمول انوائس ہیڈر، اب اسکرینز اور ڈیوائسز پر اپ ڈیٹ ہوتی ہیں۔ دوبارہ پرنٹ میں موجودہ ورک اسپیس ہیڈر استعمال ہوتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🔔',
         text: {
-          AppLocale.en:
-              'Notifications now hide shops that are inactive or deleted, and history labels no longer cover shop names.',
-          AppLocale.ar:
-              'تخفي الإشعارات الآن المتاجر غير النشطة أو المحذوفة، ولم تعد تسميات السجل تغطي أسماء المتاجر.',
-          AppLocale.ur:
-              'نوٹیفکیشنز اب غیر فعال یا حذف شدہ دکانیں نہیں دکھاتیں، اور ہسٹری لیبل دکان کے نام پر نہیں آتے۔',
+          AppLocale.en: 'Notifications now hide shops that are inactive or deleted, and history labels no longer cover shop names.',
+          AppLocale.ar: 'تخفي الإشعارات الآن المتاجر غير النشطة أو المحذوفة، ولم تعد تسميات السجل تغطي أسماء المتاجر.',
+          AppLocale.ur: 'نوٹیفکیشنز اب غیر فعال یا حذف شدہ دکانیں نہیں دکھاتیں، اور ہسٹری لیبل دکان کے نام پر نہیں آتے۔',
         },
       ),
       ChangelogItem(
         emoji: '🖼️',
         text: {
-          AppLocale.en:
-              'Workspace logos are processed on your device, keep transparency, and show clear size guidance. The app publisher is Aeonis Labs.',
-          AppLocale.ar:
-              'تُعالج شعارات مساحة العمل على جهازك مع الحفاظ على الشفافية وإظهار إرشادات واضحة للحجم. ناشر التطبيق هو Aeonis Labs.',
-          AppLocale.ur:
-              'ورک اسپیس لوگو آپ کے آلے پر پروسیس ہوتا ہے، شفافیت برقرار رکھتا ہے اور سائز کی واضح رہنمائی دیتا ہے۔ ایپ پبلشر Aeonis Labs ہے۔',
+          AppLocale.en: 'Workspace logos are processed on your device, keep transparency, and show clear size guidance. The app publisher is Aeonis Labs.',
+          AppLocale.ar: 'تُعالج شعارات مساحة العمل على جهازك مع الحفاظ على الشفافية وإظهار إرشادات واضحة للحجم. ناشر التطبيق هو Aeonis Labs.',
+          AppLocale.ur: 'ورک اسپیس لوگو آپ کے آلے پر پروسیس ہوتا ہے، شفافیت برقرار رکھتا ہے اور سائز کی واضح رہنمائی دیتا ہے۔ ایپ پبلشر Aeonis Labs ہے۔',
         },
       ),
     ],
@@ -382,34 +324,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🌐',
         text: {
-          AppLocale.en:
-              'Financial PDFs now show English with Arabic by default, or Urdu when selected by a workspace administrator.',
-          AppLocale.ar:
-              'تعرض ملفات PDF المالية الإنجليزية مع العربية افتراضيًا، أو الأردية عند اختيارها من مسؤول مساحة العمل.',
-          AppLocale.ur:
-              'مالی پی ڈی ایف میں انگریزی کے ساتھ عربی بطور ڈیفالٹ دکھائی جاتی ہے، یا ورک اسپیس منتظم کے انتخاب پر اردو دکھائی جاتی ہے۔',
+          AppLocale.en: 'Financial PDFs now show English with Arabic by default, or Urdu when selected by a workspace administrator.',
+          AppLocale.ar: 'تعرض ملفات PDF المالية الإنجليزية مع العربية افتراضيًا، أو الأردية عند اختيارها من مسؤول مساحة العمل.',
+          AppLocale.ur: 'مالی پی ڈی ایف میں انگریزی کے ساتھ عربی بطور ڈیفالٹ دکھائی جاتی ہے، یا ورک اسپیس منتظم کے انتخاب پر اردو دکھائی جاتی ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Invoice and receipt exports use consistent bilingual labels and preserve the saved workspace header.',
-          AppLocale.ar:
-              'تستخدم صادرات الفواتير والإيصالات تسميات ثنائية اللغة متسقة وتحافظ على ترويسة مساحة العمل المحفوظة.',
-          AppLocale.ur:
-              'انوائس اور رسید ایکسپورٹس میں یکساں دو لسانی لیبل استعمال ہوتے ہیں اور محفوظ شدہ ورک اسپیس ہیڈر برقرار رہتا ہے۔',
+          AppLocale.en: 'Invoice and receipt exports use consistent bilingual labels and preserve the saved workspace header.',
+          AppLocale.ar: 'تستخدم صادرات الفواتير والإيصالات تسميات ثنائية اللغة متسقة وتحافظ على ترويسة مساحة العمل المحفوظة.',
+          AppLocale.ur: 'انوائس اور رسید ایکسپورٹس میں یکساں دو لسانی لیبل استعمال ہوتے ہیں اور محفوظ شدہ ورک اسپیس ہیڈر برقرار رہتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🔒',
         text: {
-          AppLocale.en:
-              'Seller invoice creation validates the same workspace header settings used to create the document.',
-          AppLocale.ar:
-              'يتحقق إنشاء الفواتير للبائع من إعدادات ترويسة مساحة العمل نفسها المستخدمة لإنشاء المستند.',
-          AppLocale.ur:
-              'سیلر انوائس بناتے وقت اسی ورک اسپیس ہیڈر کی ترتیبات کی تصدیق کی جاتی ہے جو دستاویز میں محفوظ ہوتی ہیں۔',
+          AppLocale.en: 'Seller invoice creation validates the same workspace header settings used to create the document.',
+          AppLocale.ar: 'يتحقق إنشاء الفواتير للبائع من إعدادات ترويسة مساحة العمل نفسها المستخدمة لإنشاء المستند.',
+          AppLocale.ur: 'سیلر انوائس بناتے وقت اسی ورک اسپیس ہیڈر کی ترتیبات کی تصدیق کی جاتی ہے جو دستاویز میں محفوظ ہوتی ہیں۔',
         },
       ),
     ],
@@ -421,34 +354,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '💾',
         text: {
-          AppLocale.en:
-              'Workspace backups now use role-scoped access, including workspace settings, and restore only records allowed for your account.',
-          AppLocale.ar:
-              'تستخدم النسخ الاحتياطية لمساحة العمل الآن صلاحيات محددة حسب الدور، بما في ذلك الإعدادات، ولا تستعيد إلا السجلات المسموح بها لحسابك.',
-          AppLocale.ur:
-              'ورک اسپیس بیک اپ اب کردار کے مطابق اجازتیں استعمال کرتا ہے، بشمول ورک اسپیس سیٹنگز، اور صرف آپ کے اکاؤنٹ کے مجاز ریکارڈ بحال کرتا ہے۔',
+          AppLocale.en: 'Workspace backups now use role-scoped access, including workspace settings, and restore only records allowed for your account.',
+          AppLocale.ar: 'تستخدم النسخ الاحتياطية لمساحة العمل الآن صلاحيات محددة حسب الدور، بما في ذلك الإعدادات، ولا تستعيد إلا السجلات المسموح بها لحسابك.',
+          AppLocale.ur: 'ورک اسپیس بیک اپ اب کردار کے مطابق اجازتیں استعمال کرتا ہے، بشمول ورک اسپیس سیٹنگز، اور صرف آپ کے اکاؤنٹ کے مجاز ریکارڈ بحال کرتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🔄',
         text: {
-          AppLocale.en:
-              'Invoice headers and workspace settings refresh consistently across screens and devices.',
-          AppLocale.ar:
-              'تتحدّث ترويسات الفواتير وإعدادات مساحة العمل باستمرار عبر الشاشات والأجهزة.',
-          AppLocale.ur:
-              'انوائس ہیڈرز اور ورک اسپیس سیٹنگز اب مختلف اسکرینوں اور ڈیوائسز پر یکساں طور پر تازہ ہوتی ہیں۔',
+          AppLocale.en: 'Invoice headers and workspace settings refresh consistently across screens and devices.',
+          AppLocale.ar: 'تتحدّث ترويسات الفواتير وإعدادات مساحة العمل باستمرار عبر الشاشات والأجهزة.',
+          AppLocale.ur: 'انوائس ہیڈرز اور ورک اسپیس سیٹنگز اب مختلف اسکرینوں اور ڈیوائسز پر یکساں طور پر تازہ ہوتی ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Shop balances stay separated by route currency, with clearer invoice filters and financial document exports.',
-          AppLocale.ar:
-              'تبقى أرصدة المتاجر منفصلة حسب عملة المسار، مع مرشحات فواتير أوضح وتصدير محسّن للمستندات المالية.',
-          AppLocale.ur:
-              'دکانوں کے بیلنس روٹ کی کرنسی کے مطابق الگ رہتے ہیں، اور انوائس فلٹرز و مالی دستاویزات کی ایکسپورٹ زیادہ واضح ہے۔',
+          AppLocale.en: 'Shop balances stay separated by route currency, with clearer invoice filters and financial document exports.',
+          AppLocale.ar: 'تبقى أرصدة المتاجر منفصلة حسب عملة المسار، مع مرشحات فواتير أوضح وتصدير محسّن للمستندات المالية.',
+          AppLocale.ur: 'دکانوں کے بیلنس روٹ کی کرنسی کے مطابق الگ رہتے ہیں، اور انوائس فلٹرز و مالی دستاویزات کی ایکسپورٹ زیادہ واضح ہے۔',
         },
       ),
     ],
@@ -460,45 +384,33 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '💱',
         text: {
-          AppLocale.en:
-              'Seller and account reports now keep each route currency separate in exported totals.',
-          AppLocale.ar:
-              'تحافظ تقارير البائعين والحسابات الآن على فصل عملة كل مسار في الإجماليات المصدّرة.',
-          AppLocale.ur:
-              'سیلر اور اکاؤنٹ رپورٹس اب ایکسپورٹ شدہ ٹوٹلز میں ہر روٹ کی کرنسی الگ رکھتی ہیں۔',
+          AppLocale.en: 'Seller and account reports now keep each route currency separate in exported totals.',
+          AppLocale.ar: 'تحافظ تقارير البائعين والحسابات الآن على فصل عملة كل مسار في الإجماليات المصدّرة.',
+          AppLocale.ur: 'سیلر اور اکاؤنٹ رپورٹس اب ایکسپورٹ شدہ ٹوٹلز میں ہر روٹ کی کرنسی الگ رکھتی ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '📄',
         text: {
-          AppLocale.en:
-              'Account statements and report exports use the correct shop and route currency.',
-          AppLocale.ar:
-              'تستخدم كشوف الحسابات والتقارير المصدّرة عملة المتجر والمسار الصحيحة.',
-          AppLocale.ur:
-              'اکاؤنٹ اسٹیٹمنٹس اور رپورٹ ایکسپورٹس میں دکان اور روٹ کی درست کرنسی استعمال ہوتی ہے۔',
+          AppLocale.en: 'Account statements and report exports use the correct shop and route currency.',
+          AppLocale.ar: 'تستخدم كشوف الحسابات والتقارير المصدّرة عملة المتجر والمسار الصحيحة.',
+          AppLocale.ur: 'اکاؤنٹ اسٹیٹمنٹس اور رپورٹ ایکسپورٹس میں دکان اور روٹ کی درست کرنسی استعمال ہوتی ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '💾',
         text: {
-          AppLocale.en:
-              'Save encrypted seller backups on your device and restore eligible transactions for your assigned routes. Google Drive upload is available after OAuth setup.',
-          AppLocale.ar:
-              'احفظ نسخًا احتياطية مشفّرة للبائع على جهازك واستعد المعاملات المؤهلة لمساراتك المعيّنة. يتوفر الرفع إلى Google Drive بعد إعداد OAuth.',
-          AppLocale.ur:
-              'اپنے آلے پر سیلر کا انکرپٹڈ بیک اپ محفوظ کریں اور اپنے مقررہ روٹس کی اہل ٹرانزیکشنز بحال کریں۔ OAuth سیٹ اپ کے بعد Google Drive پر اپ لوڈ دستیاب ہے۔',
+          AppLocale.en: 'Save encrypted seller backups on your device and restore eligible transactions for your assigned routes. Google Drive upload is available after OAuth setup.',
+          AppLocale.ar: 'احفظ نسخًا احتياطية مشفّرة للبائع على جهازك واستعد المعاملات المؤهلة لمساراتك المعيّنة. يتوفر الرفع إلى Google Drive بعد إعداد OAuth.',
+          AppLocale.ur: 'اپنے آلے پر سیلر کا انکرپٹڈ بیک اپ محفوظ کریں اور اپنے مقررہ روٹس کی اہل ٹرانزیکشنز بحال کریں۔ OAuth سیٹ اپ کے بعد Google Drive پر اپ لوڈ دستیاب ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '♿',
         text: {
-          AppLocale.en:
-              'Forms and navigation now respect reduced-motion settings and provide clearer loading and retry feedback.',
-          AppLocale.ar:
-              'تحترم النماذج والتنقل الآن إعدادات تقليل الحركة وتعرض حالات تحميل وإعادة محاولة أوضح.',
-          AppLocale.ur:
-              'فارمز اور نیویگیشن اب کم حرکت کی ترتیبات کا احترام کرتے ہیں اور لوڈنگ و دوبارہ کوشش کے واضح پیغامات دکھاتے ہیں۔',
+          AppLocale.en: 'Forms and navigation now respect reduced-motion settings and provide clearer loading and retry feedback.',
+          AppLocale.ar: 'تحترم النماذج والتنقل الآن إعدادات تقليل الحركة وتعرض حالات تحميل وإعادة محاولة أوضح.',
+          AppLocale.ur: 'فارمز اور نیویگیشن اب کم حرکت کی ترتیبات کا احترام کرتے ہیں اور لوڈنگ و دوبارہ کوشش کے واضح پیغامات دکھاتے ہیں۔',
         },
       ),
     ],
@@ -510,23 +422,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📒',
         text: {
-          AppLocale.en:
-              'Workspace administrators can manage supported invoices, receipts, credit notes, and audited transaction corrections with atomic shop-balance updates.',
-          AppLocale.ar:
-              'يمكن لمسؤولي مساحة العمل إدارة الفواتير والإيصالات والإشعارات الدائنة وتصحيحات المعاملات المسجلة للتدقيق، مع تحديث أرصدة المتاجر بشكل ذري.',
-          AppLocale.ur:
-              'ورک اسپیس ایڈمن معاون انوائسز، رسیدیں، کریڈٹ نوٹس اور آڈٹ شدہ ٹرانزیکشن اصلاحات کو دکان کے بیلنس کی ایٹمی اپ ڈیٹس کے ساتھ منظم کر سکتے ہیں۔',
+          AppLocale.en: 'Workspace administrators can manage supported invoices, receipts, credit notes, and audited transaction corrections with atomic shop-balance updates.',
+          AppLocale.ar: 'يمكن لمسؤولي مساحة العمل إدارة الفواتير والإيصالات والإشعارات الدائنة وتصحيحات المعاملات المسجلة للتدقيق، مع تحديث أرصدة المتاجر بشكل ذري.',
+          AppLocale.ur: 'ورک اسپیس ایڈمن معاون انوائسز، رسیدیں، کریڈٹ نوٹس اور آڈٹ شدہ ٹرانزیکشن اصلاحات کو دکان کے بیلنس کی ایٹمی اپ ڈیٹس کے ساتھ منظم کر سکتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🌐',
         text: {
-          AppLocale.en:
-              'Arabic and Urdu text shaping and right-to-left layout are enabled for invoice and report PDF exports.',
-          AppLocale.ar:
-              'تم تفعيل تشكيل النص العربي والأردي وتخطيط الكتابة من اليمين إلى اليسار في ملفات PDF للفواتير والتقارير.',
-          AppLocale.ur:
-              'انوائس اور رپورٹ PDF ایکسپورٹس میں عربی اور اردو متن کی درست تشکیل اور دائیں سے بائیں ترتیب فعال ہے۔',
+          AppLocale.en: 'Arabic and Urdu text shaping and right-to-left layout are enabled for invoice and report PDF exports.',
+          AppLocale.ar: 'تم تفعيل تشكيل النص العربي والأردي وتخطيط الكتابة من اليمين إلى اليسار في ملفات PDF للفواتير والتقارير.',
+          AppLocale.ur: 'انوائس اور رپورٹ PDF ایکسپورٹس میں عربی اور اردو متن کی درست تشکیل اور دائیں سے بائیں ترتیب فعال ہے۔',
         },
       ),
     ],
@@ -538,34 +444,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Sign-in now uses Firebase Authentication without device pairing or custom session approvals.',
-          AppLocale.ar:
-              'يعتمد تسجيل الدخول الآن على مصادقة Firebase دون إقران الأجهزة أو الموافقة على جلسات مخصصة.',
-          AppLocale.ur:
-              'اب سائن اِن Firebase Authentication کے ذریعے ہوتا ہے، ڈیوائس پیئرنگ یا کسٹم سیشن منظوری کے بغیر۔',
+          AppLocale.en: 'Sign-in now uses Firebase Authentication without device pairing or custom session approvals.',
+          AppLocale.ar: 'يعتمد تسجيل الدخول الآن على مصادقة Firebase دون إقران الأجهزة أو الموافقة على جلسات مخصصة.',
+          AppLocale.ur: 'اب سائن اِن Firebase Authentication کے ذریعے ہوتا ہے، ڈیوائس پیئرنگ یا کسٹم سیشن منظوری کے بغیر۔',
         },
       ),
       ChangelogItem(
         emoji: '🏢',
         text: {
-          AppLocale.en:
-              'Workspace administrators can manage routes, shops, and transactions within their workspace.',
-          AppLocale.ar:
-              'يمكن لمسؤولي مساحة العمل إدارة المسارات والمتاجر والمعاملات داخل مساحة عملهم.',
-          AppLocale.ur:
-              'ورک اسپیس ایڈمن اپنی ورک اسپیس میں روٹس، دکانوں اور ٹرانزیکشنز کا انتظام کر سکتے ہیں۔',
+          AppLocale.en: 'Workspace administrators can manage routes, shops, and transactions within their workspace.',
+          AppLocale.ar: 'يمكن لمسؤولي مساحة العمل إدارة المسارات والمتاجر والمعاملات داخل مساحة عملهم.',
+          AppLocale.ur: 'ورک اسپیس ایڈمن اپنی ورک اسپیس میں روٹس، دکانوں اور ٹرانزیکشنز کا انتظام کر سکتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🛡️',
         text: {
-          AppLocale.en:
-              'Shop balances and transaction records receive stronger checks when saved together.',
-          AppLocale.ar:
-              'تخضع أرصدة المتاجر وسجلات المعاملات لفحوصات أقوى عند حفظها معًا.',
-          AppLocale.ur:
-              'دکان کے بیلنس اور ٹرانزیکشن ریکارڈ ایک ساتھ محفوظ ہوتے وقت مزید مضبوط جانچ سے گزرتے ہیں۔',
+          AppLocale.en: 'Shop balances and transaction records receive stronger checks when saved together.',
+          AppLocale.ar: 'تخضع أرصدة المتاجر وسجلات المعاملات لفحوصات أقوى عند حفظها معًا.',
+          AppLocale.ur: 'دکان کے بیلنس اور ٹرانزیکشن ریکارڈ ایک ساتھ محفوظ ہوتے وقت مزید مضبوط جانچ سے گزرتے ہیں۔',
         },
       ),
     ],
@@ -577,34 +474,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📱',
         text: {
-          AppLocale.en:
-              'Workspace admins can pair unlimited devices while their concurrent sessions remain capped by the platform policy.',
-          AppLocale.ar:
-              'يمكن لمسؤولي مساحة العمل ربط عدد غير محدود من الأجهزة مع بقاء الجلسات المتزامنة خاضعة لحد سياسة المنصة.',
-          AppLocale.ur:
-              'ورک اسپیس ایڈمن لامحدود ڈیوائسز جوڑ سکتے ہیں، جبکہ بیک وقت سیشنز پلیٹ فارم پالیسی کی حد میں رہیں گے۔',
+          AppLocale.en: 'Workspace admins can pair unlimited devices while their concurrent sessions remain capped by the platform policy.',
+          AppLocale.ar: 'يمكن لمسؤولي مساحة العمل ربط عدد غير محدود من الأجهزة مع بقاء الجلسات المتزامنة خاضعة لحد سياسة المنصة.',
+          AppLocale.ur: 'ورک اسپیس ایڈمن لامحدود ڈیوائسز جوڑ سکتے ہیں، جبکہ بیک وقت سیشنز پلیٹ فارم پالیسی کی حد میں رہیں گے۔',
         },
       ),
       ChangelogItem(
         emoji: '🔎',
         text: {
-          AppLocale.en:
-              'A paired-device list shows the account email, device model, app version, and Android version.',
-          AppLocale.ar:
-              'تعرض قائمة الأجهزة المقترنة بريد الحساب وطراز الجهاز وإصدار التطبيق وإصدار أندرويد.',
-          AppLocale.ur:
-              'جوڑی گئی ڈیوائسز کی فہرست اکاؤنٹ ای میل، ڈیوائس ماڈل، ایپ ورژن اور اینڈرائیڈ ورژن دکھاتی ہے۔',
+          AppLocale.en: 'A paired-device list shows the account email, device model, app version, and Android version.',
+          AppLocale.ar: 'تعرض قائمة الأجهزة المقترنة بريد الحساب وطراز الجهاز وإصدار التطبيق وإصدار أندرويد.',
+          AppLocale.ur: 'جوڑی گئی ڈیوائسز کی فہرست اکاؤنٹ ای میل، ڈیوائس ماڈل، ایپ ورژن اور اینڈرائیڈ ورژن دکھاتی ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '📒',
         text: {
-          AppLocale.en:
-              'Workspace admins can correct standalone cash transactions with an audited balance reversal; invoice-linked entries stay protected.',
-          AppLocale.ar:
-              'يمكن لمسؤولي مساحة العمل تصحيح معاملات النقد المستقلة مع عكس الرصيد وتسجيله، وتبقى القيود المرتبطة بالفواتير محمية.',
-          AppLocale.ur:
-              'ورک اسپیس ایڈمن آڈٹ شدہ بیلنس ریورسل کے ساتھ الگ نقد ٹرانزیکشن درست کر سکتے ہیں؛ انوائس سے منسلک اندراجات محفوظ رہتے ہیں۔',
+          AppLocale.en: 'Workspace admins can correct standalone cash transactions with an audited balance reversal; invoice-linked entries stay protected.',
+          AppLocale.ar: 'يمكن لمسؤولي مساحة العمل تصحيح معاملات النقد المستقلة مع عكس الرصيد وتسجيله، وتبقى القيود المرتبطة بالفواتير محمية.',
+          AppLocale.ur: 'ورک اسپیس ایڈمن آڈٹ شدہ بیلنس ریورسل کے ساتھ الگ نقد ٹرانزیکشن درست کر سکتے ہیں؛ انوائس سے منسلک اندراجات محفوظ رہتے ہیں۔',
         },
       ),
     ],
@@ -616,34 +504,26 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🏢',
         text: {
-          AppLocale.en:
-              'New workspaces can be created with an owner account, and owner selection is limited to administrators in that workspace.',
-          AppLocale.ar:
-              'يمكن إنشاء مساحات العمل الجديدة مع حساب مالك، ويقتصر اختيار المالك على مسؤولي مساحة العمل نفسها.',
-          AppLocale.ur:
-              'نئے ورک اسپیس کے ساتھ مالک کا اکاؤنٹ بنایا جا سکتا ہے، اور مالک کے انتخاب میں صرف اسی ورک اسپیس کے ایڈمن شامل ہوتے ہیں۔',
+          AppLocale.en: 'New workspaces can be created with an owner account, and owner selection is limited to administrators in that workspace.',
+          AppLocale.ar: 'يمكن إنشاء مساحات العمل الجديدة مع حساب مالك، ويقتصر اختيار المالك على مسؤولي مساحة العمل نفسها.',
+          AppLocale.ur: 'نئے ورک اسپیس کے ساتھ مالک کا اکاؤنٹ بنایا جا سکتا ہے، اور مالک کے انتخاب میں صرف اسی ورک اسپیس کے ایڈمن شامل ہوتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🔒',
         text: {
-          AppLocale.en:
-              'Workspace administrators can deactivate seller accounts and review, revoke, or block their registered devices and sessions.',
-          AppLocale.ar:
-              'يمكن لمسؤولي مساحة العمل تعطيل حسابات البائعين ومراجعة أجهزتهم وجلساتهم المسجلة وإلغائها أو حظرها.',
-          AppLocale.ur:
-              'ورک اسپیس ایڈمن سیلر اکاؤنٹس غیر فعال کر سکتے ہیں اور ان کے رجسٹرڈ ڈیوائسز اور سیشنز کا جائزہ لے کر انہیں منسوخ یا بلاک کر سکتے ہیں۔',
+          AppLocale.en: 'Workspace administrators can deactivate seller accounts and review, revoke, or block their registered devices and sessions.',
+          AppLocale.ar: 'يمكن لمسؤولي مساحة العمل تعطيل حسابات البائعين ومراجعة أجهزتهم وجلساتهم المسجلة وإلغائها أو حظرها.',
+          AppLocale.ur: 'ورک اسپیس ایڈمن سیلر اکاؤنٹس غیر فعال کر سکتے ہیں اور ان کے رجسٹرڈ ڈیوائسز اور سیشنز کا جائزہ لے کر انہیں منسوخ یا بلاک کر سکتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🎨',
         text: {
-          AppLocale.en:
-              'Updated app artwork now refreshes correctly in the installed web app.',
+          AppLocale.en: 'Updated app artwork now refreshes correctly in the installed web app.',
           AppLocale.ar:
               'يتم الآن تحديث أيقونة التطبيق في نسخة الويب المثبتة بشكل صحيح.',
-          AppLocale.ur:
-              'انسٹال شدہ ویب ایپ میں ایپ کا نیا آئیکن اب درست طور پر اپ ڈیٹ ہوتا ہے۔',
+          AppLocale.ur: 'انسٹال شدہ ویب ایپ میں ایپ کا نیا آئیکن اب درست طور پر اپ ڈیٹ ہوتا ہے۔',
         },
       ),
     ],
@@ -655,23 +535,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🏢',
         text: {
-          AppLocale.en:
-              'Workspace owner selection and editing now follow the selected workspace, with clear feedback when saving is not allowed.',
-          AppLocale.ar:
-              'أصبح اختيار مالك مساحة العمل وتحريرها مرتبطاً بمساحة العمل المحددة، مع رسائل واضحة عند عدم السماح بالحفظ.',
-          AppLocale.ur:
-              'ورک اسپیس کے مالک کا انتخاب اور ترمیم اب منتخب ورک اسپیس کے مطابق ہے، اور محفوظ کرنے کی اجازت نہ ہونے پر واضح پیغام ملتا ہے۔',
+          AppLocale.en: 'Workspace owner selection and editing now follow the selected workspace, with clear feedback when saving is not allowed.',
+          AppLocale.ar: 'أصبح اختيار مالك مساحة العمل وتحريرها مرتبطاً بمساحة العمل المحددة، مع رسائل واضحة عند عدم السماح بالحفظ.',
+          AppLocale.ur: 'ورک اسپیس کے مالک کا انتخاب اور ترمیم اب منتخب ورک اسپیس کے مطابق ہے، اور محفوظ کرنے کی اجازت نہ ہونے پر واضح پیغام ملتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🎨',
         text: {
-          AppLocale.en:
-              'The app icon now has a consistent size on Android and web, and shop actions have clearer spacing.',
-          AppLocale.ar:
-              'أصبح حجم أيقونة التطبيق متناسقاً على أندرويد والويب، مع مسافات أوضح بين إجراءات المتجر.',
-          AppLocale.ur:
-              'اینڈرائیڈ اور ویب پر ایپ آئیکن کا سائز یکساں ہے، اور دکان کے بٹنوں کے درمیان فاصلہ بہتر ہے۔',
+          AppLocale.en: 'The app icon now has a consistent size on Android and web, and shop actions have clearer spacing.',
+          AppLocale.ar: 'أصبح حجم أيقونة التطبيق متناسقاً على أندرويد والويب، مع مسافات أوضح بين إجراءات المتجر.',
+          AppLocale.ur: 'اینڈرائیڈ اور ویب پر ایپ آئیکن کا سائز یکساں ہے، اور دکان کے بٹنوں کے درمیان فاصلہ بہتر ہے۔',
         },
       ),
     ],
@@ -683,33 +557,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Non-stock invoices are off by default and can only be enabled for a workspace by its administrator.',
-          AppLocale.ar:
-              'الفواتير غير المرتبطة بالمخزون معطّلة افتراضياً، ولا يمكن تفعيلها إلا لمساحة العمل بواسطة مسؤولها.',
-          AppLocale.ur:
-              'نان اسٹاک انوائسز بطورِ ڈیفالٹ بند ہیں اور صرف ورک اسپیس کا ایڈمن انہیں فعال کر سکتا ہے۔',
+          AppLocale.en: 'Non-stock invoices are off by default and can only be enabled for a workspace by its administrator.',
+          AppLocale.ar: 'الفواتير غير المرتبطة بالمخزون معطّلة افتراضياً، ولا يمكن تفعيلها إلا لمساحة العمل بواسطة مسؤولها.',
+          AppLocale.ur: 'نان اسٹاک انوائسز بطورِ ڈیفالٹ بند ہیں اور صرف ورک اسپیس کا ایڈمن انہیں فعال کر سکتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🔒',
         text: {
-          AppLocale.en:
-              'Sales, receipts, and returns now save their linked ledger, balance, stock, and invoice-number updates together.',
-          AppLocale.ar:
-              'تحفظ المبيعات والإيصالات والمرتجعات الآن قيودها وتحديثات الأرصدة والمخزون وأرقام الفواتير المرتبطة معاً.',
-          AppLocale.ur:
-              'سیلز، رسیدیں اور ریٹرنز اب متعلقہ لیجر، بیلنس، اسٹاک اور انوائس نمبر کی اپ ڈیٹس ایک ساتھ محفوظ کرتے ہیں۔',
+          AppLocale.en: 'Sales, receipts, and returns now save their linked ledger, balance, stock, and invoice-number updates together.',
+          AppLocale.ar: 'تحفظ المبيعات والإيصالات والمرتجعات الآن قيودها وتحديثات الأرصدة والمخزون وأرقام الفواتير المرتبطة معاً.',
+          AppLocale.ur: 'سیلز، رسیدیں اور ریٹرنز اب متعلقہ لیجر، بیلنس، اسٹاک اور انوائس نمبر کی اپ ڈیٹس ایک ساتھ محفوظ کرتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '📝',
         text: {
-          AppLocale.en:
-              'Transaction descriptions support multiple lines for clearer notes.',
+          AppLocale.en: 'Transaction descriptions support multiple lines for clearer notes.',
           AppLocale.ar: 'تدعم أوصاف المعاملات عدة أسطر لإضافة ملاحظات أوضح.',
-          AppLocale.ur:
-              'واضح نوٹس کے لیے ٹرانزیکشن کی تفصیل میں متعدد سطریں لکھی جا سکتی ہیں۔',
+          AppLocale.ur: 'واضح نوٹس کے لیے ٹرانزیکشن کی تفصیل میں متعدد سطریں لکھی جا سکتی ہیں۔',
         },
       ),
     ],
@@ -721,23 +587,18 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Workspace admins can sign in without seller device approval, and access registration handles older device and session records more reliably.',
-          AppLocale.ar:
-              'يمكن لمسؤولي مساحة العمل تسجيل الدخول دون موافقة أجهزة البائعين، وأصبح تسجيل الوصول يتعامل مع سجلات الأجهزة والجلسات القديمة بموثوقية أكبر.',
-          AppLocale.ur:
-              'ورک اسپیس ایڈمن سیلر ڈیوائس کی منظوری کے بغیر سائن اِن کر سکتے ہیں، اور رسائی کی رجسٹریشن پرانے ڈیوائس اور سیشن ریکارڈز کو زیادہ قابلِ اعتماد طریقے سے سنبھالتی ہے۔',
+          AppLocale.en: 'Workspace admins can sign in without seller device approval, and access registration handles older device and session records more reliably.',
+          AppLocale.ar: 'يمكن لمسؤولي مساحة العمل تسجيل الدخول دون موافقة أجهزة البائعين، وأصبح تسجيل الوصول يتعامل مع سجلات الأجهزة والجلسات القديمة بموثوقية أكبر.',
+          AppLocale.ur: 'ورک اسپیس ایڈمن سیلر ڈیوائس کی منظوری کے بغیر سائن اِن کر سکتے ہیں، اور رسائی کی رجسٹریشن پرانے ڈیوائس اور سیشن ریکارڈز کو زیادہ قابلِ اعتماد طریقے سے سنبھالتی ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '📱',
         text: {
-          AppLocale.en:
-              'Device pairing and session renewal now give clearer, more reliable access decisions.',
+          AppLocale.en: 'Device pairing and session renewal now give clearer, more reliable access decisions.',
           AppLocale.ar:
               'أصبحت قرارات ربط الأجهزة وتجديد الجلسات أوضح وأكثر موثوقية.',
-          AppLocale.ur:
-              'ڈیوائس پیئرنگ اور سیشن کی تجدید کے رسائی فیصلے اب زیادہ واضح اور قابلِ اعتماد ہیں۔',
+          AppLocale.ur: 'ڈیوائس پیئرنگ اور سیشن کی تجدید کے رسائی فیصلے اب زیادہ واضح اور قابلِ اعتماد ہیں۔',
         },
       ),
     ],
@@ -749,23 +610,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Sign-in now verifies the correct device slot and session before enforcing access, with separate limits for platform operators, workspace admins, and sellers.',
-          AppLocale.ar:
-              'يتحقق تسجيل الدخول من الجهاز والجلسة الصحيحين قبل فرض قيود الوصول، مع حدود منفصلة لمشرفي المنصة ومسؤولي مساحات العمل والبائعين.',
-          AppLocale.ur:
-              'سائن اِن اب رسائی کی پابندی سے پہلے درست ڈیوائس اور سیشن کی تصدیق کرتا ہے، جبکہ پلیٹ فارم، ورک اسپیس ایڈمن اور سیلر کے لیے الگ حدیں ہیں۔',
+          AppLocale.en: 'Sign-in now verifies the correct device slot and session before enforcing access, with separate limits for platform operators, workspace admins, and sellers.',
+          AppLocale.ar: 'يتحقق تسجيل الدخول من الجهاز والجلسة الصحيحين قبل فرض قيود الوصول، مع حدود منفصلة لمشرفي المنصة ومسؤولي مساحات العمل والبائعين.',
+          AppLocale.ur: 'سائن اِن اب رسائی کی پابندی سے پہلے درست ڈیوائس اور سیشن کی تصدیق کرتا ہے، جبکہ پلیٹ فارم، ورک اسپیس ایڈمن اور سیلر کے لیے الگ حدیں ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Invoice PDFs now show non-stock catalog lines clearly, preserve workspace branding, localize receipt details, and paginate longer invoices.',
-          AppLocale.ar:
-              'تعرض ملفات الفواتير أصناف الكتالوج دون مخزون بوضوح، وتحفظ هوية مساحة العمل، وتترجم تفاصيل الإيصال، وتدعم الفواتير متعددة الصفحات.',
-          AppLocale.ur:
-              'انوائس پی ڈی ایف اب بغیر اسٹاک کیٹلاگ آئٹمز واضح دکھاتی ہے، ورک اسپیس برانڈنگ محفوظ رکھتی ہے، رسید کی تفصیلات ترجمہ کرتی ہے اور طویل انوائس کے صفحات بناتی ہے۔',
+          AppLocale.en: 'Invoice PDFs now show non-stock catalog lines clearly, preserve workspace branding, localize receipt details, and paginate longer invoices.',
+          AppLocale.ar: 'تعرض ملفات الفواتير أصناف الكتالوج دون مخزون بوضوح، وتحفظ هوية مساحة العمل، وتترجم تفاصيل الإيصال، وتدعم الفواتير متعددة الصفحات.',
+          AppLocale.ur: 'انوائس پی ڈی ایف اب بغیر اسٹاک کیٹلاگ آئٹمز واضح دکھاتی ہے، ورک اسپیس برانڈنگ محفوظ رکھتی ہے، رسید کی تفصیلات ترجمہ کرتی ہے اور طویل انوائس کے صفحات بناتی ہے۔',
         },
       ),
     ],
@@ -777,23 +632,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Create stock sales, non-stock catalog invoices, and cash receipt invoices. Non-stock invoices leave inventory unchanged.',
-          AppLocale.ar:
-              'أنشئ فواتير بيع من المخزون أو من الكتالوج دون خصم المخزون، وسندات قبض مرتبطة بحساب المتجر.',
-          AppLocale.ur:
-              'اسٹاک فروخت، کیٹلاگ سے بغیر اسٹاک انوائس، اور دکان کے کھاتے سے منسلک نقد وصولی کی رسید بنائیں۔',
+          AppLocale.en: 'Create stock sales, non-stock catalog invoices, and cash receipt invoices. Non-stock invoices leave inventory unchanged.',
+          AppLocale.ar: 'أنشئ فواتير بيع من المخزون أو من الكتالوج دون خصم المخزون، وسندات قبض مرتبطة بحساب المتجر.',
+          AppLocale.ur: 'اسٹاک فروخت، کیٹلاگ سے بغیر اسٹاک انوائس، اور دکان کے کھاتے سے منسلک نقد وصولی کی رسید بنائیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🏷️',
         text: {
-          AppLocale.en:
-              'Workspace administrators can configure bilingual invoice headers, layout, contact details, and visible fields.',
-          AppLocale.ar:
-              'يمكن لمسؤولي مساحة العمل تخصيص ترويسة الفاتورة باللغتين والتنسيق وبيانات التواصل والتفاصيل الظاهرة.',
-          AppLocale.ur:
-              'ورک اسپیس ایڈمن دو لسانی انوائس ہیڈر، لے آؤٹ، رابطے کی تفصیلات اور نمایاں فیلڈز ترتیب دے سکتے ہیں۔',
+          AppLocale.en: 'Workspace administrators can configure bilingual invoice headers, layout, contact details, and visible fields.',
+          AppLocale.ar: 'يمكن لمسؤولي مساحة العمل تخصيص ترويسة الفاتورة باللغتين والتنسيق وبيانات التواصل والتفاصيل الظاهرة.',
+          AppLocale.ur: 'ورک اسپیس ایڈمن دو لسانی انوائس ہیڈر، لے آؤٹ، رابطے کی تفصیلات اور نمایاں فیلڈز ترتیب دے سکتے ہیں۔',
         },
       ),
     ],
@@ -805,23 +654,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Sign-in now waits for device registration and keeps clear guidance on screen when access cannot be registered.',
-          AppLocale.ar:
-              'ينتظر تسجيل الدخول اكتمال تسجيل الجهاز، ويعرض إرشادات واضحة عند تعذر تسجيل الوصول.',
-          AppLocale.ur:
-              'سائن اِن اب ڈیوائس رجسٹریشن مکمل ہونے کا انتظار کرتا ہے اور رسائی رجسٹر نہ ہونے پر واضح رہنمائی دکھاتا ہے۔',
+          AppLocale.en: 'Sign-in now waits for device registration and keeps clear guidance on screen when access cannot be registered.',
+          AppLocale.ar: 'ينتظر تسجيل الدخول اكتمال تسجيل الجهاز، ويعرض إرشادات واضحة عند تعذر تسجيل الوصول.',
+          AppLocale.ur: 'سائن اِن اب ڈیوائس رجسٹریشن مکمل ہونے کا انتظار کرتا ہے اور رسائی رجسٹر نہ ہونے پر واضح رہنمائی دکھاتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '📱',
         text: {
-          AppLocale.en:
-              'Workspace device approvals and session controls are clearer, with recovery for old devices and separate platform-operator sessions.',
-          AppLocale.ar:
-              'أصبحت الموافقة على أجهزة مساحة العمل وإدارة الجلسات أوضح، مع استعادة الأجهزة القديمة وفصل جلسات مشرف المنصة.',
-          AppLocale.ur:
-              'ورک اسپیس ڈیوائس منظوری اور سیشن کنٹرول واضح ہیں، پرانی ڈیوائسز کی بحالی اور پلیٹ فارم آپریٹر کے الگ سیشنز کے ساتھ۔',
+          AppLocale.en: 'Workspace device approvals and session controls are clearer, with recovery for old devices and separate platform-operator sessions.',
+          AppLocale.ar: 'أصبحت الموافقة على أجهزة مساحة العمل وإدارة الجلسات أوضح، مع استعادة الأجهزة القديمة وفصل جلسات مشرف المنصة.',
+          AppLocale.ur: 'ورک اسپیس ڈیوائس منظوری اور سیشن کنٹرول واضح ہیں، پرانی ڈیوائسز کی بحالی اور پلیٹ فارم آپریٹر کے الگ سیشنز کے ساتھ۔',
         },
       ),
     ],
@@ -833,23 +676,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Workspace administrators and sellers can sign in without stale device records ending the session.',
-          AppLocale.ar:
-              'يمكن لمسؤولي مساحات العمل والبائعين تسجيل الدخول دون أن تنهي سجلات الأجهزة القديمة الجلسة.',
-          AppLocale.ur:
-              'ورک اسپیس ایڈمن اور سیلر پرانے ڈیوائس ریکارڈز کی وجہ سے سیشن ختم ہوئے بغیر سائن اِن کر سکتے ہیں۔',
+          AppLocale.en: 'Workspace administrators and sellers can sign in without stale device records ending the session.',
+          AppLocale.ar: 'يمكن لمسؤولي مساحات العمل والبائعين تسجيل الدخول دون أن تنهي سجلات الأجهزة القديمة الجلسة.',
+          AppLocale.ur: 'ورک اسپیس ایڈمن اور سیلر پرانے ڈیوائس ریکارڈز کی وجہ سے سیشن ختم ہوئے بغیر سائن اِن کر سکتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🧭',
         text: {
-          AppLocale.en:
-              'Workspace setup now keeps localized errors visible, and the sign-in screen uses readable system-bar icons.',
-          AppLocale.ar:
-              'تعرض إعدادات مساحة العمل الأخطاء بلغتك، وتستخدم شاشة الدخول أيقونات واضحة لشريط النظام.',
-          AppLocale.ur:
-              'ورک اسپیس سیٹ اپ اب مقامی زبان میں خرابی دکھاتا ہے، اور سائن اِن اسکرین پر سسٹم بار کے آئیکنز واضح ہیں۔',
+          AppLocale.en: 'Workspace setup now keeps localized errors visible, and the sign-in screen uses readable system-bar icons.',
+          AppLocale.ar: 'تعرض إعدادات مساحة العمل الأخطاء بلغتك، وتستخدم شاشة الدخول أيقونات واضحة لشريط النظام.',
+          AppLocale.ur: 'ورک اسپیس سیٹ اپ اب مقامی زبان میں خرابی دکھاتا ہے، اور سائن اِن اسکرین پر سسٹم بار کے آئیکنز واضح ہیں۔',
         },
       ),
     ],
@@ -861,12 +698,9 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Encrypted backups now separate file export from Google Drive, and workspace restore and archive actions follow your access scope.',
-          AppLocale.ar:
-              'تفصل النسخ الاحتياطية المشفرة بين تصدير الملف وGoogle Drive، وتلتزم إجراءات الاستعادة والأرشفة بصلاحيات مساحة العمل.',
-          AppLocale.ur:
-              'انکرپٹڈ بیک اپ فائل ایکسپورٹ اور Google Drive کو الگ کرتے ہیں، جبکہ بحالی اور آرکائیو آپ کی ورک اسپیس کی اجازت کے مطابق ہوتے ہیں۔',
+          AppLocale.en: 'Encrypted backups now separate file export from Google Drive, and workspace restore and archive actions follow your access scope.',
+          AppLocale.ar: 'تفصل النسخ الاحتياطية المشفرة بين تصدير الملف وGoogle Drive، وتلتزم إجراءات الاستعادة والأرشفة بصلاحيات مساحة العمل.',
+          AppLocale.ur: 'انکرپٹڈ بیک اپ فائل ایکسپورٹ اور Google Drive کو الگ کرتے ہیں، جبکہ بحالی اور آرکائیو آپ کی ورک اسپیس کی اجازت کے مطابق ہوتے ہیں۔',
         },
       ),
     ],
@@ -878,45 +712,33 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '♿',
         text: {
-          AppLocale.en:
-              'Status labels now follow your language, and high-contrast colors are easier to read.',
-          AppLocale.ar:
-              'تظهر تسميات الحالات بلغتك، وأصبحت ألوان التباين العالي أسهل للقراءة.',
-          AppLocale.ur:
-              'اسٹیٹس لیبل اب آپ کی زبان میں دکھتے ہیں، اور ہائی کنٹراسٹ رنگ پڑھنے میں آسان ہیں۔',
+          AppLocale.en: 'Status labels now follow your language, and high-contrast colors are easier to read.',
+          AppLocale.ar: 'تظهر تسميات الحالات بلغتك، وأصبحت ألوان التباين العالي أسهل للقراءة.',
+          AppLocale.ur: 'اسٹیٹس لیبل اب آپ کی زبان میں دکھتے ہیں، اور ہائی کنٹراسٹ رنگ پڑھنے میں آسان ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🧭',
         text: {
-          AppLocale.en:
-              'Workspace identity, status labels, search controls, About details, and loading announcements now respect your language. Your language choice is remembered.',
-          AppLocale.ar:
-              'تعرض هوية مساحة العمل والحالات والبحث ومعلومات التطبيق وإعلانات التحميل بلغتك. يُحفظ اختيار اللغة.',
-          AppLocale.ur:
-              'ورک اسپیس، اسٹیٹس، تلاش، ایپ کی معلومات اور لوڈنگ پیغامات اب آپ کی زبان میں ہیں۔ زبان کا انتخاب محفوظ رہتا ہے۔',
+          AppLocale.en: 'Workspace identity, status labels, search controls, About details, and loading announcements now respect your language. Your language choice is remembered.',
+          AppLocale.ar: 'تعرض هوية مساحة العمل والحالات والبحث ومعلومات التطبيق وإعلانات التحميل بلغتك. يُحفظ اختيار اللغة.',
+          AppLocale.ur: 'ورک اسپیس، اسٹیٹس، تلاش، ایپ کی معلومات اور لوڈنگ پیغامات اب آپ کی زبان میں ہیں۔ زبان کا انتخاب محفوظ رہتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🔄',
         text: {
-          AppLocale.en:
-              'List refresh and report export now wait for current data, and history or notification errors provide a retry action.',
-          AppLocale.ar:
-              'ينتظر تحديث القوائم وتصدير التقارير البيانات الحالية، وتوفر أخطاء السجل والإشعارات خيار إعادة المحاولة.',
-          AppLocale.ur:
-              'فہرست ریفریش اور رپورٹ ایکسپورٹ اب تازہ ڈیٹا کا انتظار کرتے ہیں، اور ہسٹری یا نوٹیفکیشن کی خرابی میں دوبارہ کوشش دستیاب ہے۔',
+          AppLocale.en: 'List refresh and report export now wait for current data, and history or notification errors provide a retry action.',
+          AppLocale.ar: 'ينتظر تحديث القوائم وتصدير التقارير البيانات الحالية، وتوفر أخطاء السجل والإشعارات خيار إعادة المحاولة.',
+          AppLocale.ur: 'فہرست ریفریش اور رپورٹ ایکسپورٹ اب تازہ ڈیٹا کا انتظار کرتے ہیں، اور ہسٹری یا نوٹیفکیشن کی خرابی میں دوبارہ کوشش دستیاب ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '☁️',
         text: {
-          AppLocale.en:
-              'Drive backup files keep distinct timestamps, and the backup picker shows dates in your locale.',
-          AppLocale.ar:
-              'تحمل ملفات نسخ Drive توقيتات مميزة، ويعرض منتقي النسخ التواريخ وفق لغتك.',
-          AppLocale.ur:
-              'Drive بیک اپ فائلوں کے اوقات الگ رہتے ہیں، اور بیک اپ فہرست تاریخیں آپ کی زبان میں دکھاتی ہے۔',
+          AppLocale.en: 'Drive backup files keep distinct timestamps, and the backup picker shows dates in your locale.',
+          AppLocale.ar: 'تحمل ملفات نسخ Drive توقيتات مميزة، ويعرض منتقي النسخ التواريخ وفق لغتك.',
+          AppLocale.ur: 'Drive بیک اپ فائلوں کے اوقات الگ رہتے ہیں، اور بیک اپ فہرست تاریخیں آپ کی زبان میں دکھاتی ہے۔',
         },
       ),
     ],
@@ -928,56 +750,41 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Workspace admins can restore encrypted business backups into their own workspace. Records absent from the backup remain; selected platform admins can prune only in that workspace.',
-          AppLocale.ar:
-              'يمكن لمسؤولي مساحة العمل استعادة نسخ بيانات العمل المشفرة إلى مساحة عملهم. تبقى السجلات غير الموجودة في النسخة، ويمكن لمسؤول المنصة حذف الزائد في المساحة المحددة فقط.',
-          AppLocale.ur:
-              'ورک اسپیس ایڈمن اپنے ورک اسپیس میں انکرپٹڈ کاروباری بیک اپ بحال کر سکتے ہیں۔ بیک اپ میں نہ ہونے والے ریکارڈ برقرار رہتے ہیں؛ پلیٹ فارم ایڈمن صرف منتخب ورک اسپیس میں اضافی ریکارڈ حذف کر سکتا ہے۔',
+          AppLocale.en: 'Workspace admins can restore encrypted business backups into their own workspace. Records absent from the backup remain; selected platform admins can prune only in that workspace.',
+          AppLocale.ar: 'يمكن لمسؤولي مساحة العمل استعادة نسخ بيانات العمل المشفرة إلى مساحة عملهم. تبقى السجلات غير الموجودة في النسخة، ويمكن لمسؤول المنصة حذف الزائد في المساحة المحددة فقط.',
+          AppLocale.ur: 'ورک اسپیس ایڈمن اپنے ورک اسپیس میں انکرپٹڈ کاروباری بیک اپ بحال کر سکتے ہیں۔ بیک اپ میں نہ ہونے والے ریکارڈ برقرار رہتے ہیں؛ پلیٹ فارم ایڈمن صرف منتخب ورک اسپیس میں اضافی ریکارڈ حذف کر سکتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🛡️',
         text: {
-          AppLocale.en:
-              'Platform backups include only the selected workspace profile and its users. Workspace backups exclude user and seller account profiles.',
-          AppLocale.ar:
-              'تتضمن نسخ المنصة مساحة العمل المحددة ومستخدميها فقط، بينما تستبعد نسخ مساحة العمل ملفات حسابات المستخدمين والبائعين.',
-          AppLocale.ur:
-              'پلیٹ فارم بیک اپ میں صرف منتخب ورک اسپیس اور اس کے صارفین شامل ہیں؛ ورک اسپیس بیک اپ میں صارف اور سیلر اکاؤنٹ پروفائل شامل نہیں ہوتے۔',
+          AppLocale.en: 'Platform backups include only the selected workspace profile and its users. Workspace backups exclude user and seller account profiles.',
+          AppLocale.ar: 'تتضمن نسخ المنصة مساحة العمل المحددة ومستخدميها فقط، بينما تستبعد نسخ مساحة العمل ملفات حسابات المستخدمين والبائعين.',
+          AppLocale.ur: 'پلیٹ فارم بیک اپ میں صرف منتخب ورک اسپیس اور اس کے صارفین شامل ہیں؛ ورک اسپیس بیک اپ میں صارف اور سیلر اکاؤنٹ پروفائل شامل نہیں ہوتے۔',
         },
       ),
       ChangelogItem(
         emoji: '⏱️',
         text: {
-          AppLocale.en:
-              'Tenant-admin Drive backups run at your chosen interval when the Android app is opened or resumed. Seller accounts cannot start backups.',
-          AppLocale.ar:
-              'تعمل نسخ Drive لمسؤول مساحة العمل حسب الفاصل الزمني المختار عند فتح تطبيق Android أو استئنافه. لا يمكن لحسابات البائعين بدء النسخ.',
-          AppLocale.ur:
-              'ٹیننٹ ایڈمن کے Drive بیک اپ منتخب وقفے کے مطابق Android ایپ کھولنے یا دوبارہ فعال ہونے پر چلتے ہیں۔ سیلر بیک اپ شروع نہیں کر سکتے۔',
+          AppLocale.en: 'Tenant-admin Drive backups run at your chosen interval when the Android app is opened or resumed. Seller accounts cannot start backups.',
+          AppLocale.ar: 'تعمل نسخ Drive لمسؤول مساحة العمل حسب الفاصل الزمني المختار عند فتح تطبيق Android أو استئنافه. لا يمكن لحسابات البائعين بدء النسخ.',
+          AppLocale.ur: 'ٹیننٹ ایڈمن کے Drive بیک اپ منتخب وقفے کے مطابق Android ایپ کھولنے یا دوبارہ فعال ہونے پر چلتے ہیں۔ سیلر بیک اپ شروع نہیں کر سکتے۔',
         },
       ),
       ChangelogItem(
         emoji: '📦',
         text: {
-          AppLocale.en:
-              'Stock transfers, adjustments, and returns now keep workspace inventory and movement history together. Unknown roles are blocked with recovery guidance.',
-          AppLocale.ar:
-              'تحافظ تحويلات المخزون وتسوياته ومرتجعاته على ارتباط المخزون بسجل الحركة. تُحظر الأدوار غير المعروفة مع إرشادات للاستعادة.',
-          AppLocale.ur:
-              'اسٹاک کی منتقلی، ایڈجسٹمنٹ اور واپسی اب انوینٹری اور حرکت کی تاریخ کو ورک اسپیس میں اکٹھا رکھتی ہیں۔ نامعلوم کردار بلاک ہوتے ہیں اور رہنمائی دکھائی جاتی ہے۔',
+          AppLocale.en: 'Stock transfers, adjustments, and returns now keep workspace inventory and movement history together. Unknown roles are blocked with recovery guidance.',
+          AppLocale.ar: 'تحافظ تحويلات المخزون وتسوياته ومرتجعاته على ارتباط المخزون بسجل الحركة. تُحظر الأدوار غير المعروفة مع إرشادات للاستعادة.',
+          AppLocale.ur: 'اسٹاک کی منتقلی، ایڈجسٹمنٹ اور واپسی اب انوینٹری اور حرکت کی تاریخ کو ورک اسپیس میں اکٹھا رکھتی ہیں۔ نامعلوم کردار بلاک ہوتے ہیں اور رہنمائی دکھائی جاتی ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '📶',
         text: {
-          AppLocale.en:
-              'Temporary network problems no longer sign you out, and startup offers a retry if Firebase cannot initialize.',
-          AppLocale.ar:
-              'لا تؤدي مشكلات الشبكة المؤقتة إلى تسجيل خروجك، ويعرض بدء التشغيل خيار إعادة المحاولة عند تعذر تهيئة Firebase.',
-          AppLocale.ur:
-              'عارضی نیٹ ورک مسائل اب سائن آؤٹ نہیں کرتے، اور Firebase شروع نہ ہو تو دوبارہ کوشش کا اختیار ملتا ہے۔',
+          AppLocale.en: 'Temporary network problems no longer sign you out, and startup offers a retry if Firebase cannot initialize.',
+          AppLocale.ar: 'لا تؤدي مشكلات الشبكة المؤقتة إلى تسجيل خروجك، ويعرض بدء التشغيل خيار إعادة المحاولة عند تعذر تهيئة Firebase.',
+          AppLocale.ur: 'عارضی نیٹ ورک مسائل اب سائن آؤٹ نہیں کرتے، اور Firebase شروع نہ ہو تو دوبارہ کوشش کا اختیار ملتا ہے۔',
         },
       ),
     ],
@@ -989,23 +796,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🛡️',
         text: {
-          AppLocale.en:
-              'Platform admins now see workspace business data only after selecting a workspace and recording a support reason.',
-          AppLocale.ar:
-              'لا يرى مسؤولو المنصة بيانات العمل إلا بعد اختيار مساحة عمل وتسجيل سبب الدعم.',
-          AppLocale.ur:
-              'پلیٹ فارم ایڈمن اب ورک اسپیس منتخب کرنے اور سپورٹ وجہ درج کرنے کے بعد ہی کاروباری ڈیٹا دیکھتے ہیں۔',
+          AppLocale.en: 'Platform admins now see workspace business data only after selecting a workspace and recording a support reason.',
+          AppLocale.ar: 'لا يرى مسؤولو المنصة بيانات العمل إلا بعد اختيار مساحة عمل وتسجيل سبب الدعم.',
+          AppLocale.ur: 'پلیٹ فارم ایڈمن اب ورک اسپیس منتخب کرنے اور سپورٹ وجہ درج کرنے کے بعد ہی کاروباری ڈیٹا دیکھتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Account owners control their own email and password changes; administrators can send password-reset emails.',
-          AppLocale.ar:
-              'يتحكم أصحاب الحسابات في تغيير البريد وكلمة المرور، ويمكن للمسؤولين إرسال رسائل إعادة تعيين كلمة المرور.',
-          AppLocale.ur:
-              'اکاؤنٹ مالکان ای میل اور پاس ورڈ کی تبدیلی خود کرتے ہیں؛ ایڈمن پاس ورڈ ری سیٹ ای میل بھیج سکتے ہیں۔',
+          AppLocale.en: 'Account owners control their own email and password changes; administrators can send password-reset emails.',
+          AppLocale.ar: 'يتحكم أصحاب الحسابات في تغيير البريد وكلمة المرور، ويمكن للمسؤولين إرسال رسائل إعادة تعيين كلمة المرور.',
+          AppLocale.ur: 'اکاؤنٹ مالکان ای میل اور پاس ورڈ کی تبدیلی خود کرتے ہیں؛ ایڈمن پاس ورڈ ری سیٹ ای میل بھیج سکتے ہیں۔',
         },
       ),
     ],
@@ -1017,11 +818,9 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📱',
         text: {
-          AppLocale.en:
-              'Android 17-era compatibility and release build reliability have been improved.',
+          AppLocale.en: 'Android 17-era compatibility and release build reliability have been improved.',
           AppLocale.ar: 'تم تحسين توافق Android 17 وموثوقية إنشاء الإصدار.',
-          AppLocale.ur:
-              'Android 17 دور کی مطابقت اور ریلیز بلڈ کی قابل اعتماد کارکردگی بہتر کی گئی ہے۔',
+          AppLocale.ur: 'Android 17 دور کی مطابقت اور ریلیز بلڈ کی قابل اعتماد کارکردگی بہتر کی گئی ہے۔',
         },
       ),
     ],
@@ -1033,23 +832,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🛡️',
         text: {
-          AppLocale.en:
-              'Workspace permissions now protect every route, shop, ledger, invoice, inventory, and user operation. Legacy admin accounts work only inside their own workspace.',
-          AppLocale.ar:
-              'تحمي صلاحيات مساحة العمل الآن كل عمليات المسارات والمتاجر والدفاتر والفواتير والمخزون والمستخدمين. تعمل حسابات المسؤول القديمة داخل مساحة عملها فقط.',
-          AppLocale.ur:
-              'ورک اسپیس اجازتیں اب روٹ، شاپ، لیجر، انوائس، انوینٹری اور صارف کی ہر کارروائی کو محفوظ کرتی ہیں۔ پرانے ایڈمن اکاؤنٹس صرف اپنی ورک اسپیس میں کام کرتے ہیں۔',
+          AppLocale.en: 'Workspace permissions now protect every route, shop, ledger, invoice, inventory, and user operation. Legacy admin accounts work only inside their own workspace.',
+          AppLocale.ar: 'تحمي صلاحيات مساحة العمل الآن كل عمليات المسارات والمتاجر والدفاتر والفواتير والمخزون والمستخدمين. تعمل حسابات المسؤول القديمة داخل مساحة عملها فقط.',
+          AppLocale.ur: 'ورک اسپیس اجازتیں اب روٹ، شاپ، لیجر، انوائس، انوینٹری اور صارف کی ہر کارروائی کو محفوظ کرتی ہیں۔ پرانے ایڈمن اکاؤنٹس صرف اپنی ورک اسپیس میں کام کرتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '☁️',
         text: {
-          AppLocale.en:
-              'Drive backup now reports OAuth configuration problems clearly. Web and Android builds use the same configured Google Drive client settings.',
-          AppLocale.ar:
-              'تعرض النسخة الاحتياطية في Drive مشاكل إعداد OAuth بوضوح. تستخدم إصدارات الويب وAndroid إعدادات عميل Google Drive نفسها.',
-          AppLocale.ur:
-              'Drive بیک اپ اب OAuth کنفیگریشن کے مسائل واضح طور پر بتاتا ہے۔ ویب اور Android بلڈز ایک ہی Google Drive کلائنٹ سیٹنگز استعمال کرتے ہیں۔',
+          AppLocale.en: 'Drive backup now reports OAuth configuration problems clearly. Web and Android builds use the same configured Google Drive client settings.',
+          AppLocale.ar: 'تعرض النسخة الاحتياطية في Drive مشاكل إعداد OAuth بوضوح. تستخدم إصدارات الويب وAndroid إعدادات عميل Google Drive نفسها.',
+          AppLocale.ur: 'Drive بیک اپ اب OAuth کنفیگریشن کے مسائل واضح طور پر بتاتا ہے۔ ویب اور Android بلڈز ایک ہی Google Drive کلائنٹ سیٹنگز استعمال کرتے ہیں۔',
         },
       ),
     ],
@@ -1061,23 +854,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Google Drive backup now uses your Google account, workspace scope, and route permissions. Sellers can restore only their own permitted route transactions.',
-          AppLocale.ar:
-              'تستخدم النسخة الاحتياطية في Google Drive الآن حسابك ونطاق مساحة العمل وصلاحيات المسارات. يمكن للبائع استعادة معاملات مساراته المسموح بها فقط.',
-          AppLocale.ur:
-              'Google Drive بیک اپ اب آپ کے Google اکاؤنٹ، ورک اسپیس اور روٹ اجازتوں کے مطابق ہے۔ سیلر صرف اپنے مجاز روٹ کی ٹرانزیکشنز بحال کر سکتا ہے۔',
+          AppLocale.en: 'Google Drive backup now uses your Google account, workspace scope, and route permissions. Sellers can restore only their own permitted route transactions.',
+          AppLocale.ar: 'تستخدم النسخة الاحتياطية في Google Drive الآن حسابك ونطاق مساحة العمل وصلاحيات المسارات. يمكن للبائع استعادة معاملات مساراته المسموح بها فقط.',
+          AppLocale.ur: 'Google Drive بیک اپ اب آپ کے Google اکاؤنٹ، ورک اسپیس اور روٹ اجازتوں کے مطابق ہے۔ سیلر صرف اپنے مجاز روٹ کی ٹرانزیکشنز بحال کر سکتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '☁️',
         text: {
-          AppLocale.en:
-              'Super admins select a workspace before backup or restore, preventing cross-workspace data replacement.',
-          AppLocale.ar:
-              'يختار المسؤول الأعلى مساحة عمل قبل النسخ أو الاستعادة، مما يمنع استبدال بيانات مساحات العمل الأخرى.',
-          AppLocale.ur:
-              'سپر ایڈمن بیک اپ یا ریسٹور سے پہلے ورک اسپیس منتخب کرتا ہے، جس سے دوسری ورک اسپیس کا ڈیٹا تبدیل نہیں ہوتا۔',
+          AppLocale.en: 'Super admins select a workspace before backup or restore, preventing cross-workspace data replacement.',
+          AppLocale.ar: 'يختار المسؤول الأعلى مساحة عمل قبل النسخ أو الاستعادة، مما يمنع استبدال بيانات مساحات العمل الأخرى.',
+          AppLocale.ur: 'سپر ایڈمن بیک اپ یا ریسٹور سے پہلے ورک اسپیس منتخب کرتا ہے، جس سے دوسری ورک اسپیس کا ڈیٹا تبدیل نہیں ہوتا۔',
         },
       ),
     ],
@@ -1089,23 +876,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '☁️',
         text: {
-          AppLocale.en:
-              'Backups can now be uploaded to your own Google Drive, with workspace-scoped data and verified restore protection for administrators.',
-          AppLocale.ar:
-              'يمكن الآن رفع النسخ الاحتياطية إلى Google Drive الخاص بك، مع بيانات مخصصة لمساحة العمل وحماية استعادة موثوقة للمسؤولين.',
-          AppLocale.ur:
-              'اب بیک اپ آپ کے اپنے Google Drive پر اپ لوڈ ہو سکتے ہیں، ورک اسپیس کے مطابق ڈیٹا اور ایڈمن کے لیے تصدیق شدہ ریسٹور تحفظ کے ساتھ۔',
+          AppLocale.en: 'Backups can now be uploaded to your own Google Drive, with workspace-scoped data and verified restore protection for administrators.',
+          AppLocale.ar: 'يمكن الآن رفع النسخ الاحتياطية إلى Google Drive الخاص بك، مع بيانات مخصصة لمساحة العمل وحماية استعادة موثوقة للمسؤولين.',
+          AppLocale.ur: 'اب بیک اپ آپ کے اپنے Google Drive پر اپ لوڈ ہو سکتے ہیں، ورک اسپیس کے مطابق ڈیٹا اور ایڈمن کے لیے تصدیق شدہ ریسٹور تحفظ کے ساتھ۔',
         },
       ),
       ChangelogItem(
         emoji: '🛡️',
         text: {
-          AppLocale.en:
-              'Seller cash transactions and approved edit settings now respect workspace permissions, and super-admin flush tools can target one workspace safely.',
-          AppLocale.ar:
-              'تحترم معاملات النقدية وتعديلات البائعين الآن صلاحيات مساحة العمل، ويمكن لأدوات المسح للمسؤول الأعلى استهداف مساحة عمل واحدة بأمان.',
-          AppLocale.ur:
-              'سیلر کیش ٹرانزیکشنز اور ایڈٹ سیٹنگز اب ورک اسپیس اجازتوں کی پابندی کرتی ہیں، اور سپر ایڈمن فلش ٹولز ایک ورک اسپیس کو محفوظ طریقے سے منتخب کر سکتے ہیں۔',
+          AppLocale.en: 'Seller cash transactions and approved edit settings now respect workspace permissions, and super-admin flush tools can target one workspace safely.',
+          AppLocale.ar: 'تحترم معاملات النقدية وتعديلات البائعين الآن صلاحيات مساحة العمل، ويمكن لأدوات المسح للمسؤول الأعلى استهداف مساحة عمل واحدة بأمان.',
+          AppLocale.ur: 'سیلر کیش ٹرانزیکشنز اور ایڈٹ سیٹنگز اب ورک اسپیس اجازتوں کی پابندی کرتی ہیں، اور سپر ایڈمن فلش ٹولز ایک ورک اسپیس کو محفوظ طریقے سے منتخب کر سکتے ہیں۔',
         },
       ),
     ],
@@ -1117,56 +898,41 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '�',
         text: {
-          AppLocale.en:
-              'Workspace and Tenant accounts are now fully isolated by default. Each seller is assigned to specific routes within their workspace, and can only see shops and inventory within those routes.',
-          AppLocale.ar:
-              'أصبحت حسابات مساحة العمل والمستأجرين معزولة بالكامل الآن بشكل افتراضي. يتم تخصيص كل بائع لمسارات معينة داخل مساحة عمله، ولا يمكنه سوى رؤية المتاجر والمخزون داخل تلك المسارات.',
-          AppLocale.ur:
-              'ورکسپیس اور ٹینٹ اکاؤنٹس اب ڈیفالٹ طور پر مکمل طور پر الگ تھلگ ہیں۔ ہر بروکر کو ان کے ورکسپیس میں مخصوص روٹس کے لیے تفویض کیا جاتا ہے، اور وہ صرف ان روٹس میں شاپس اور انوینٹری دیکھ سکتے ہیں۔',
+          AppLocale.en: 'Workspace and Tenant accounts are now fully isolated by default. Each seller is assigned to specific routes within their workspace, and can only see shops and inventory within those routes.',
+          AppLocale.ar: 'أصبحت حسابات مساحة العمل والمستأجرين معزولة بالكامل الآن بشكل افتراضي. يتم تخصيص كل بائع لمسارات معينة داخل مساحة عمله، ولا يمكنه سوى رؤية المتاجر والمخزون داخل تلك المسارات.',
+          AppLocale.ur: 'ورکسپیس اور ٹینٹ اکاؤنٹس اب ڈیفالٹ طور پر مکمل طور پر الگ تھلگ ہیں۔ ہر بروکر کو ان کے ورکسپیس میں مخصوص روٹس کے لیے تفویض کیا جاتا ہے، اور وہ صرف ان روٹس میں شاپس اور انوینٹری دیکھ سکتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Admin accounts can now manage entire workspaces. When you sign in as admin, you see all routes, shops, and seller performance across the workspace. Sellers only see their assigned routes.',
-          AppLocale.ar:
-              'يمكن لحسابات المسؤول الآن إدارة مساحات العمل بالكامل. عند تسجيل الدخول كمسؤول، ترى جميع المسارات والمتاجر وأداء البائعين في جميع أنحاء مساحة العمل. لا يرى البائعون سوى مساراتهم المعينة.',
-          AppLocale.ur:
-              'ایڈمن اکاؤنٹس اب پورے ورکسپیس کو منیج کر سکتے ہیں۔ جب آپ ایڈمن کے طور پر سائن ان کرتے ہیں، تو آپ پورے ورکسپیس میں تمام روٹس، شاپس، اور فروخت کی کارکردگی دیکھتے ہیں۔ بروکر صرف اپنے تفویض شدہ روٹس دیکھتے ہیں۔',
+          AppLocale.en: 'Admin accounts can now manage entire workspaces. When you sign in as admin, you see all routes, shops, and seller performance across the workspace. Sellers only see their assigned routes.',
+          AppLocale.ar: 'يمكن لحسابات المسؤول الآن إدارة مساحات العمل بالكامل. عند تسجيل الدخول كمسؤول، ترى جميع المسارات والمتاجر وأداء البائعين في جميع أنحاء مساحة العمل. لا يرى البائعون سوى مساراتهم المعينة.',
+          AppLocale.ur: 'ایڈمن اکاؤنٹس اب پورے ورکسپیس کو منیج کر سکتے ہیں۔ جب آپ ایڈمن کے طور پر سائن ان کرتے ہیں، تو آپ پورے ورکسپیس میں تمام روٹس، شاپس، اور فروخت کی کارکردگی دیکھتے ہیں۔ بروکر صرف اپنے تفویض شدہ روٹس دیکھتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '📦',
         text: {
-          AppLocale.en:
-              'Previous workspace data has been automatically transferred to the new workspace model. All shops, routes, and transactions remain intact and are now scoped to the default global workspace.',
-          AppLocale.ar:
-              'تم نقل بيانات مساحة العمل السابقة تلقائيًا إلى نموذج مساحة العمل الجديد. تبقى جميع المتاجر والمسارات والمعاملات سليمة وتقتصر الآن على مساحة العمل العالمية الافتراضية.',
-          AppLocale.ur:
-              'پچھلے ورکسپیس ڈیٹا کو خودکار طور پر نئے ورکسپیس ماڈل میں منتقل کیا گیا ہے۔ تمام شاپس، روٹس، اور ٹرانزیکشنز برقرار ہیں اور اب ڈیفالٹ گلوبل ورکسپیس کے لیے محدود ہیں۔',
+          AppLocale.en: 'Previous workspace data has been automatically transferred to the new workspace model. All shops, routes, and transactions remain intact and are now scoped to the default global workspace.',
+          AppLocale.ar: 'تم نقل بيانات مساحة العمل السابقة تلقائيًا إلى نموذج مساحة العمل الجديد. تبقى جميع المتاجر والمسارات والمعاملات سليمة وتقتصر الآن على مساحة العمل العالمية الافتراضية.',
+          AppLocale.ur: 'پچھلے ورکسپیس ڈیٹا کو خودکار طور پر نئے ورکسپیس ماڈل میں منتقل کیا گیا ہے۔ تمام شاپس، روٹس، اور ٹرانزیکشنز برقرار ہیں اور اب ڈیفالٹ گلوبل ورکسپیس کے لیے محدود ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '�📲',
         text: {
-          AppLocale.en:
-              'The release APK is now copied to phone storage before installation so the app package is preserved on-device for recovery and handoff.',
-          AppLocale.ar:
-              'يتم الآن نسخ حزمة الإصدار إلى تخزين الهاتف قبل التثبيت، بحيث يتم الاحتفاظ بحزمة التطبيق على الجهاز لأغراض الاسترداد والتسليم.',
-          AppLocale.ur:
-              'ریلیز APK اب انسٹال سے پہلے فون کے اسٹوریج میں کاپی ہو جاتا ہے تاکہ اپلیکیشن پیکیج ڈیوائس پر محفوظ رہے اور ریسیوری/ہینڈآف کے لیے دستیاب رہے۔',
+          AppLocale.en: 'The release APK is now copied to phone storage before installation so the app package is preserved on-device for recovery and handoff.',
+          AppLocale.ar: 'يتم الآن نسخ حزمة الإصدار إلى تخزين الهاتف قبل التثبيت، بحيث يتم الاحتفاظ بحزمة التطبيق على الجهاز لأغراض الاسترداد والتسليم.',
+          AppLocale.ur: 'ریلیز APK اب انسٹال سے پہلے فون کے اسٹوریج میں کاپی ہو جاتا ہے تاکہ اپلیکیشن پیکیج ڈیوائس پر محفوظ رہے اور ریسیوری/ہینڈآف کے لیے دستیاب رہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🧩',
         text: {
-          AppLocale.en:
-              'The app now follows the streamed install flow in the governance pack to keep release installs consistent with the required device-delivery workflow.',
-          AppLocale.ar:
-              'يتبع التطبيق الآن تدفق التثبيت المتدفق في حزمة الحوكمة للحفاظ على اتساق عمليات تثبيت الإصدار مع سير عمل تسليم الجهاز المطلوب.',
-          AppLocale.ur:
-              'ایپ اب گورننس پیک میں streamed install flow کی پیروی کرتی ہے تاکہ ریلیز انسٹال required device-delivery workflow کے ساتھ مستقل رہے۔',
+          AppLocale.en: 'The app now follows the streamed install flow in the governance pack to keep release installs consistent with the required device-delivery workflow.',
+          AppLocale.ar: 'يتبع التطبيق الآن تدفق التثبيت المتدفق في حزمة الحوكمة للحفاظ على اتساق عمليات تثبيت الإصدار مع سير عمل تسليم الجهاز المطلوب.',
+          AppLocale.ur: 'ایپ اب گورننس پیک میں streamed install flow کی پیروی کرتی ہے تاکہ ریلیز انسٹال required device-delivery workflow کے ساتھ مستقل رہے۔',
         },
       ),
     ],
@@ -1178,23 +944,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧩',
         text: {
-          AppLocale.en:
-              'Shop category tags now show directly in the shops list and detail cards, making customer grouping easier to scan at a glance.',
-          AppLocale.ar:
-              'تظهر الآن وسوم فئة المتجر مباشرةً في قائمة المتاجر وبطاقات التفاصيل، مما يجعل تجميع العملاء أسهل في الفحص السريع.',
-          AppLocale.ur:
-              'شاپ کاٹیگری ٹیگز اب شاپس لسٹ اور ڈیٹیل کارڈز میں براہِ راست دکھائی دیتے ہیں، جس سے کسٹمر گروپنگ ایک نظر میں آسان ہو جاتی ہے۔',
+          AppLocale.en: 'Shop category tags now show directly in the shops list and detail cards, making customer grouping easier to scan at a glance.',
+          AppLocale.ar: 'تظهر الآن وسوم فئة المتجر مباشرةً في قائمة المتاجر وبطاقات التفاصيل، مما يجعل تجميع العملاء أسهل في الفحص السريع.',
+          AppLocale.ur: 'شاپ کاٹیگری ٹیگز اب شاپس لسٹ اور ڈیٹیل کارڈز میں براہِ راست دکھائی دیتے ہیں، جس سے کسٹمر گروپنگ ایک نظر میں آسان ہو جاتی ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Manual amount entry now accepts the same common text formats used in the field, including commas and currency text, so payment collection is more forgiving.',
-          AppLocale.ar:
-              'تقبل إدخالات المبالغ اليدوية الآن نفس التنسيقات النصية الشائعة المستخدمة في الحقل، بما في ذلك الفواصل ونص العملة، مما يجعل جمع المدفوعات أكثر مرونة.',
-          AppLocale.ur:
-              'دستی رقم داخل کرنا اب اسی عام فارمیٹس کو قبول کرتا ہے جو فیلڈ میں استعمال ہوتے ہیں، بشمول commas اور currency text، اس لیے ادائیگی جمع کرنا زیادہ آسان ہو جاتا ہے۔',
+          AppLocale.en: 'Manual amount entry now accepts the same common text formats used in the field, including commas and currency text, so payment collection is more forgiving.',
+          AppLocale.ar: 'تقبل إدخالات المبالغ اليدوية الآن نفس التنسيقات النصية الشائعة المستخدمة في الحقل، بما في ذلك الفواصل ونص العملة، مما يجعل جمع المدفوعات أكثر مرونة.',
+          AppLocale.ur: 'دستی رقم داخل کرنا اب اسی عام فارمیٹس کو قبول کرتا ہے جو فیلڈ میں استعمال ہوتے ہیں، بشمول commas اور currency text، اس لیے ادائیگی جمع کرنا زیادہ آسان ہو جاتا ہے۔',
         },
       ),
     ],
@@ -1206,23 +966,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🛡️',
         text: {
-          AppLocale.en:
-              'Repeated write actions are now guarded so a single invoice or transaction submit is processed only once, preventing duplicate taps and accidental double-posts.',
-          AppLocale.ar:
-              'تمت حماية الإجراءات المتكررة الآن بحيث يتم تنفيذ إرسال فاتورة أو معاملة واحدة فقط مرة واحدة، مما يمنع النقرات المكررة والمنشورات المزدوجة عن طريق الخطأ.',
-          AppLocale.ur:
-              'بار بار دہرائے جانے والے write actions اب محفوظ ہو گئے ہیں تاکہ ایک ہی انوائس یا ٹرانزیکشن صرف ایک بار پروسیس ہو، دو بار ٹیپ اور accidental double-posts سے بچا جا سکے۔',
+          AppLocale.en: 'Repeated write actions are now guarded so a single invoice or transaction submit is processed only once, preventing duplicate taps and accidental double-posts.',
+          AppLocale.ar: 'تمت حماية الإجراءات المتكررة الآن بحيث يتم تنفيذ إرسال فاتورة أو معاملة واحدة فقط مرة واحدة، مما يمنع النقرات المكررة والمنشورات المزدوجة عن طريق الخطأ.',
+          AppLocale.ur: 'بار بار دہرائے جانے والے write actions اب محفوظ ہو گئے ہیں تاکہ ایک ہی انوائس یا ٹرانزیکشن صرف ایک بار پروسیس ہو، دو بار ٹیپ اور accidental double-posts سے بچا جا سکے۔',
         },
       ),
       ChangelogItem(
         emoji: '📦',
         text: {
-          AppLocale.en:
-              'Release packaging and Android build metadata are aligned again so the APK version code safely exceeds the currently installed device build during handoff.',
-          AppLocale.ar:
-              'تمت محاذاة بيانات إصدار الحزمة وبناء Android مرة أخرى حتى يتجاوز رمز إصدار APK بشكل آمن الإصدار المثبت حاليًا على الجهاز أثناء التسليم.',
-          AppLocale.ur:
-              'ریلیز پیکیجنگ اور Android build metadata دوبارہ متوازن ہو گئے ہیں تاکہ APK version code ہینڈآف کے دوران موجودہ ڈیوائس build سے محفوظ طریقے سے زیادہ ہو۔',
+          AppLocale.en: 'Release packaging and Android build metadata are aligned again so the APK version code safely exceeds the currently installed device build during handoff.',
+          AppLocale.ar: 'تمت محاذاة بيانات إصدار الحزمة وبناء Android مرة أخرى حتى يتجاوز رمز إصدار APK بشكل آمن الإصدار المثبت حاليًا على الجهاز أثناء التسليم.',
+          AppLocale.ur: 'ریلیز پیکیجنگ اور Android build metadata دوبارہ متوازن ہو گئے ہیں تاکہ APK version code ہینڈآف کے دوران موجودہ ڈیوائس build سے محفوظ طریقے سے زیادہ ہو۔',
         },
       ),
     ],
@@ -1234,23 +988,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'PDF exports now paginate consistently for large ledgers and account statements, so long reports are no longer truncated or cut off mid-page.',
-          AppLocale.ar:
-              'تُقسم صادرات PDF الآن بشكل متسق للقيود الكبيرة والبيانات المالية، لذلك لا يتم قطع التقارير الطويلة أو قطعها في منتصف الصفحة بعد الآن.',
-          AppLocale.ur:
-              'PDF ایکسپورٹس اب بڑے لیجرز اور اکاؤنٹ سٹیٹمنٹ کے لیے مستقل طور پر پیج بندی کرتے ہیں، اس لیے طویل رپورٹس اب نصف صفحے میں نہیں کٹے رہتے۔',
+          AppLocale.en: 'PDF exports now paginate consistently for large ledgers and account statements, so long reports are no longer truncated or cut off mid-page.',
+          AppLocale.ar: 'تُقسم صادرات PDF الآن بشكل متسق للقيود الكبيرة والبيانات المالية، لذلك لا يتم قطع التقارير الطويلة أو قطعها في منتصف الصفحة بعد الآن.',
+          AppLocale.ur: 'PDF ایکسپورٹس اب بڑے لیجرز اور اکاؤنٹ سٹیٹمنٹ کے لیے مستقل طور پر پیج بندی کرتے ہیں، اس لیے طویل رپورٹس اب نصف صفحے میں نہیں کٹے رہتے۔',
         },
       ),
       ChangelogItem(
         emoji: '🔐',
         text: {
-          AppLocale.en:
-              'Admin identity actions are now disabled by default in client builds unless a secure compile-time credential is provided, reducing the risk of accidental credential exposure.',
-          AppLocale.ar:
-              'تم تعطيل إجراءات الهوية الإدارية افتراضيًا في نسخ العميل ما لم يتم توفير بيانات اعتماد آمنة أثناء الترجمة، مما يقلل من خطر تسريب الاعتمادات عن طريق الخطأ.',
-          AppLocale.ur:
-              'ایڈمن آئیڈینٹی ایکشنز اب کلائنٹ builds میں ڈیفالٹ طور پر غیر فعال ہیں جب تک کہ کمپائل ٹائم پر محفوظ کریڈینشل فراہم نہ کیا جائے، جس سے accidental credential exposure کا خطرہ کم ہوتا ہے۔',
+          AppLocale.en: 'Admin identity actions are now disabled by default in client builds unless a secure compile-time credential is provided, reducing the risk of accidental credential exposure.',
+          AppLocale.ar: 'تم تعطيل إجراءات الهوية الإدارية افتراضيًا في نسخ العميل ما لم يتم توفير بيانات اعتماد آمنة أثناء الترجمة، مما يقلل من خطر تسريب الاعتمادات عن طريق الخطأ.',
+          AppLocale.ur: 'ایڈمن آئیڈینٹی ایکشنز اب کلائنٹ builds میں ڈیفالٹ طور پر غیر فعال ہیں جب تک کہ کمپائل ٹائم پر محفوظ کریڈینشل فراہم نہ کیا جائے، جس سے accidental credential exposure کا خطرہ کم ہوتا ہے۔',
         },
       ),
     ],
@@ -1262,34 +1010,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔍',
         text: {
-          AppLocale.en:
-              'Last transaction (In/Out + amount) now appears for all shops in both the Shops list and Route detail, even for older shops that did not previously show any activity.',
-          AppLocale.ar:
-              'تظهر الآن آخر معاملة (داخل/خارج + المبلغ) لجميع المتاجر في قائمة المتاجر وتفاصيل المسار، حتى للمتاجر القديمة التي لم تُظهر أي نشاط من قبل.',
-          AppLocale.ur:
-              'اب تمام شاپس کی آخری ٹرانزیکشن (اِن/آؤٹ + رقم) شاپس لسٹ اور روٹ ڈیٹیل دونوں میں نظر آتی ہے، پرانے شاپس کے لیے بھی جو پہلے کوئی ایکٹیویٹی نہیں دکھا رہے تھے۔',
+          AppLocale.en: 'Last transaction (In/Out + amount) now appears for all shops in both the Shops list and Route detail, even for older shops that did not previously show any activity.',
+          AppLocale.ar: 'تظهر الآن آخر معاملة (داخل/خارج + المبلغ) لجميع المتاجر في قائمة المتاجر وتفاصيل المسار، حتى للمتاجر القديمة التي لم تُظهر أي نشاط من قبل.',
+          AppLocale.ur: 'اب تمام شاپس کی آخری ٹرانزیکشن (اِن/آؤٹ + رقم) شاپس لسٹ اور روٹ ڈیٹیل دونوں میں نظر آتی ہے، پرانے شاپس کے لیے بھی جو پہلے کوئی ایکٹیویٹی نہیں دکھا رہے تھے۔',
         },
       ),
       ChangelogItem(
         emoji: '🗂️',
         text: {
-          AppLocale.en:
-              'Shops list tile no longer shows the route number in the subtitle — it now shows the last transaction details instead.',
-          AppLocale.ar:
-              'لا تُظهر بطاقة قائمة المتاجر رقم المسار في العنوان الفرعي بعد الآن — بل تُظهر تفاصيل آخر معاملة بدلاً من ذلك.',
-          AppLocale.ur:
-              'شاپس لسٹ ٹائل میں اب سب ٹائٹل میں روٹ نمبر نہیں دکھایا جاتا — اس کی جگہ آخری ٹرانزیکشن کی تفصیلات دکھائی جاتی ہیں۔',
+          AppLocale.en: 'Shops list tile no longer shows the route number in the subtitle — it now shows the last transaction details instead.',
+          AppLocale.ar: 'لا تُظهر بطاقة قائمة المتاجر رقم المسار في العنوان الفرعي بعد الآن — بل تُظهر تفاصيل آخر معاملة بدلاً من ذلك.',
+          AppLocale.ur: 'شاپس لسٹ ٹائل میں اب سب ٹائٹل میں روٹ نمبر نہیں دکھایا جاتا — اس کی جگہ آخری ٹرانزیکشن کی تفصیلات دکھائی جاتی ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '📅',
         text: {
-          AppLocale.en:
-              'Shops sort by most-recent activity now works correctly for all shops, including those created before the activity-tracking feature was introduced.',
-          AppLocale.ar:
-              'يعمل الآن ترتيب المتاجر حسب أحدث نشاط بشكل صحيح لجميع المتاجر، بما في ذلك تلك التي أُنشئت قبل تقديم ميزة تتبع النشاط.',
-          AppLocale.ur:
-              'شاپس کی ترتیب تازہ ترین ایکٹیویٹی کے مطابق اب تمام شاپس کے لیے درست طریقے سے کام کرتی ہے، بشمول وہ شاپس جو ایکٹیویٹی ٹریکنگ فیچر متعارف ہونے سے پہلے بنائی گئی تھیں۔',
+          AppLocale.en: 'Shops sort by most-recent activity now works correctly for all shops, including those created before the activity-tracking feature was introduced.',
+          AppLocale.ar: 'يعمل الآن ترتيب المتاجر حسب أحدث نشاط بشكل صحيح لجميع المتاجر، بما في ذلك تلك التي أُنشئت قبل تقديم ميزة تتبع النشاط.',
+          AppLocale.ur: 'شاپس کی ترتیب تازہ ترین ایکٹیویٹی کے مطابق اب تمام شاپس کے لیے درست طریقے سے کام کرتی ہے، بشمول وہ شاپس جو ایکٹیویٹی ٹریکنگ فیچر متعارف ہونے سے پہلے بنائی گئی تھیں۔',
         },
       ),
     ],
@@ -1301,23 +1040,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📊',
         text: {
-          AppLocale.en:
-              'Shop tiles now show only the last In/Out transaction without repeating the balance already visible in the tile.',
-          AppLocale.ar:
-              'تعرض بطاقات المتاجر الآن آخر معاملة (داخل/خارج) فقط دون تكرار الرصيد الظاهر بالفعل في البطاقة.',
-          AppLocale.ur:
-              'شاپ ٹائلز اب صرف آخری اِن/آؤٹ ٹرانزیکشن دکھاتی ہیں، بیلنس دوبارہ نہیں دکھایا جاتا کیونکہ وہ پہلے سے ٹائل میں نظر آتا ہے۔',
+          AppLocale.en: 'Shop tiles now show only the last In/Out transaction without repeating the balance already visible in the tile.',
+          AppLocale.ar: 'تعرض بطاقات المتاجر الآن آخر معاملة (داخل/خارج) فقط دون تكرار الرصيد الظاهر بالفعل في البطاقة.',
+          AppLocale.ur: 'شاپ ٹائلز اب صرف آخری اِن/آؤٹ ٹرانزیکشن دکھاتی ہیں، بیلنس دوبارہ نہیں دکھایا جاتا کیونکہ وہ پہلے سے ٹائل میں نظر آتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🔄',
         text: {
-          AppLocale.en:
-              'Shops are sorted by most recent transaction activity at the top of the route and shops lists.',
-          AppLocale.ar:
-              'يتم الآن ترتيب المتاجر حسب آخر نشاط بالمعاملات في أعلى قوائم المسارات والمتاجر.',
-          AppLocale.ur:
-              'شاپس کو روٹ اور شاپس لسٹ میں سب سے حالیہ ٹرانزیکشن سرگرمی کے مطابق اوپر سے ترتیب دیا گیا ہے۔',
+          AppLocale.en: 'Shops are sorted by most recent transaction activity at the top of the route and shops lists.',
+          AppLocale.ar: 'يتم الآن ترتيب المتاجر حسب آخر نشاط بالمعاملات في أعلى قوائم المسارات والمتاجر.',
+          AppLocale.ur: 'شاپس کو روٹ اور شاپس لسٹ میں سب سے حالیہ ٹرانزیکشن سرگرمی کے مطابق اوپر سے ترتیب دیا گیا ہے۔',
         },
       ),
     ],
@@ -1329,34 +1062,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Shop tiles on the Route and Shops screens now show the last transaction direction and amount at a glance.',
-          AppLocale.ar:
-              'تعرض بطاقات المتاجر في شاشتي المسار والمتاجر الآن اتجاه آخر معاملة ومبلغها بنظرة سريعة.',
-          AppLocale.ur:
-              'روٹ اور دکانوں کی اسکرین پر دکان کارڈز اب آخری ٹرانزیکشن کی سمت اور رقم ایک نظر میں دکھاتے ہیں۔',
+          AppLocale.en: 'Shop tiles on the Route and Shops screens now show the last transaction direction and amount at a glance.',
+          AppLocale.ar: 'تعرض بطاقات المتاجر في شاشتي المسار والمتاجر الآن اتجاه آخر معاملة ومبلغها بنظرة سريعة.',
+          AppLocale.ur: 'روٹ اور دکانوں کی اسکرین پر دکان کارڈز اب آخری ٹرانزیکشن کی سمت اور رقم ایک نظر میں دکھاتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🔧',
         text: {
-          AppLocale.en:
-              'Fixed missing translation keys for "In", "Payment", and "Access Denied" labels shown in various screens.',
-          AppLocale.ar:
-              'تم إصلاح مفاتيح الترجمة المفقودة لتسميات "استلام" و"دفعة" و"لا صلاحية" التي تظهر في شاشات مختلفة.',
-          AppLocale.ur:
-              'مختلف اسکرینوں میں دکھائے جانے والے "موصول"، "ادائیگی" اور "رسائی نہیں" لیبلز کے گم ترجمہ کلیدیں ٹھیک کی گئیں۔',
+          AppLocale.en: 'Fixed missing translation keys for "In", "Payment", and "Access Denied" labels shown in various screens.',
+          AppLocale.ar: 'تم إصلاح مفاتيح الترجمة المفقودة لتسميات "استلام" و"دفعة" و"لا صلاحية" التي تظهر في شاشات مختلفة.',
+          AppLocale.ur: 'مختلف اسکرینوں میں دکھائے جانے والے "موصول"، "ادائیگی" اور "رسائی نہیں" لیبلز کے گم ترجمہ کلیدیں ٹھیک کی گئیں۔',
         },
       ),
       ChangelogItem(
         emoji: '💡',
         text: {
-          AppLocale.en:
-              'Internal model improvements: InvoiceModel, TransactionModel, and NotificationModel now support copy-with-changes for more reliable state updates.',
-          AppLocale.ar:
-              'تحسينات داخلية في النماذج: تدعم InvoiceModel وTransactionModel وNotificationModel الآن النسخ مع التغييرات لتحديثات حالة أكثر موثوقية.',
-          AppLocale.ur:
-              'داخلی ماڈل بہتری: InvoiceModel، TransactionModel، اور NotificationModel اب کاپی ود چینجز کو سپورٹ کرتے ہیں تاکہ اسٹیٹ اپڈیٹس زیادہ قابل اعتماد ہوں۔',
+          AppLocale.en: 'Internal model improvements: InvoiceModel, TransactionModel, and NotificationModel now support copy-with-changes for more reliable state updates.',
+          AppLocale.ar: 'تحسينات داخلية في النماذج: تدعم InvoiceModel وTransactionModel وNotificationModel الآن النسخ مع التغييرات لتحديثات حالة أكثر موثوقية.',
+          AppLocale.ur: 'داخلی ماڈل بہتری: InvoiceModel، TransactionModel، اور NotificationModel اب کاپی ود چینجز کو سپورٹ کرتے ہیں تاکہ اسٹیٹ اپڈیٹس زیادہ قابل اعتماد ہوں۔',
         },
       ),
     ],
@@ -1368,34 +1092,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧭',
         text: {
-          AppLocale.en:
-              'Route details now show the route name cleanly in the top breadcrumb with the normal back gesture flow.',
-          AppLocale.ar:
-              'تعرض تفاصيل المسار الآن اسم المسار فقط بشكل واضح في شريط التنقل العلوي مع سلوك الرجوع المعتاد.',
-          AppLocale.ur:
-              'روٹ کی تفصیلات میں اب اوپر کے بریڈ کرمب میں صرف روٹ کا نام صاف طور پر دکھتا ہے اور بیک جیسچر معمول کے مطابق کام کرتا ہے۔',
+          AppLocale.en: 'Route details now show the route name cleanly in the top breadcrumb with the normal back gesture flow.',
+          AppLocale.ar: 'تعرض تفاصيل المسار الآن اسم المسار فقط بشكل واضح في شريط التنقل العلوي مع سلوك الرجوع المعتاد.',
+          AppLocale.ur: 'روٹ کی تفصیلات میں اب اوپر کے بریڈ کرمب میں صرف روٹ کا نام صاف طور پر دکھتا ہے اور بیک جیسچر معمول کے مطابق کام کرتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '⚡',
         text: {
-          AppLocale.en:
-              'Shops inside each route now auto-sort by latest live activity so the most recently updated shops appear first.',
-          AppLocale.ar:
-              'تُرتَّب المتاجر داخل كل مسار الآن تلقائيًا حسب أحدث نشاط مباشر بحيث تظهر المتاجر الأحدث تحديثًا أولاً.',
-          AppLocale.ur:
-              'ہر روٹ کے اندر دکانیں اب تازہ ترین لائیو سرگرمی کے مطابق خودکار طور پر ترتیب پاتی ہیں تاکہ سب سے حالیہ اپڈیٹ والی دکانیں پہلے آئیں۔',
+          AppLocale.en: 'Shops inside each route now auto-sort by latest live activity so the most recently updated shops appear first.',
+          AppLocale.ar: 'تُرتَّب المتاجر داخل كل مسار الآن تلقائيًا حسب أحدث نشاط مباشر بحيث تظهر المتاجر الأحدث تحديثًا أولاً.',
+          AppLocale.ur: 'ہر روٹ کے اندر دکانیں اب تازہ ترین لائیو سرگرمی کے مطابق خودکار طور پر ترتیب پاتی ہیں تاکہ سب سے حالیہ اپڈیٹ والی دکانیں پہلے آئیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🧹',
         text: {
-          AppLocale.en:
-              'The temporary shops "Active Today" filter and its related UI were removed for a cleaner shops screen.',
-          AppLocale.ar:
-              'تمت إزالة فلتر المتاجر المؤقت "نشط اليوم" وكل الواجهة المرتبطة به لجعل شاشة المتاجر أبسط.',
-          AppLocale.ur:
-              'عارضی دکانوں کا "آج کی سرگرمی" فلٹر اور اس سے متعلقہ UI ہٹا دیا گیا ہے تاکہ دکانوں کی اسکرین زیادہ صاف رہے۔',
+          AppLocale.en: 'The temporary shops "Active Today" filter and its related UI were removed for a cleaner shops screen.',
+          AppLocale.ar: 'تمت إزالة فلتر المتاجر المؤقت "نشط اليوم" وكل الواجهة المرتبطة به لجعل شاشة المتاجر أبسط.',
+          AppLocale.ur: 'عارضی دکانوں کا "آج کی سرگرمی" فلٹر اور اس سے متعلقہ UI ہٹا دیا گیا ہے تاکہ دکانوں کی اسکرین زیادہ صاف رہے۔',
         },
       ),
     ],
@@ -1407,34 +1122,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📋',
         text: {
-          AppLocale.en:
-              'New History tab: view the last 7 days of transactions grouped by day, with tap-to-navigate to shop details.',
-          AppLocale.ar:
-              'تبويب السجل الجديد: عرض آخر 7 أيام من المعاملات مجمّعة حسب اليوم، مع النقر للانتقال إلى تفاصيل المتجر.',
-          AppLocale.ur:
-              'نیا تاریخ ٹیب: گزشتہ 7 دنوں کی ٹرانزیکشنز دن کے مطابق دیکھیں، دکان کی تفصیلات تک جانے کے لیے ٹیپ کریں۔',
+          AppLocale.en: 'New History tab: view the last 7 days of transactions grouped by day, with tap-to-navigate to shop details.',
+          AppLocale.ar: 'تبويب السجل الجديد: عرض آخر 7 أيام من المعاملات مجمّعة حسب اليوم، مع النقر للانتقال إلى تفاصيل المتجر.',
+          AppLocale.ur: 'نیا تاریخ ٹیب: گزشتہ 7 دنوں کی ٹرانزیکشنز دن کے مطابق دیکھیں، دکان کی تفصیلات تک جانے کے لیے ٹیپ کریں۔',
         },
       ),
       ChangelogItem(
         emoji: '🔔',
         text: {
-          AppLocale.en:
-              'Admin notification bell: live badge in the top bar shows unread seller activity. Tap to open the Notification Center.',
-          AppLocale.ar:
-              'جرس إشعارات المسؤول: شارة حية في الشريط العلوي تعرض نشاط البائع غير المقروء. انقر لفتح مركز الإشعارات.',
-          AppLocale.ur:
-              'ایڈمن نوٹیفیکیشن بیل: اوپری بار میں لائیو بیج سیلر کی غیر پڑھی سرگرمی دکھاتا ہے۔ نوٹیفیکیشن سنٹر کھولنے کے لیے ٹیپ کریں۔',
+          AppLocale.en: 'Admin notification bell: live badge in the top bar shows unread seller activity. Tap to open the Notification Center.',
+          AppLocale.ar: 'جرس إشعارات المسؤول: شارة حية في الشريط العلوي تعرض نشاط البائع غير المقروء. انقر لفتح مركز الإشعارات.',
+          AppLocale.ur: 'ایڈمن نوٹیفیکیشن بیل: اوپری بار میں لائیو بیج سیلر کی غیر پڑھی سرگرمی دکھاتا ہے۔ نوٹیفیکیشن سنٹر کھولنے کے لیے ٹیپ کریں۔',
         },
       ),
       ChangelogItem(
         emoji: '🏪',
         text: {
-          AppLocale.en:
-              'Shops list: "Active Today" filter highlights shops with same-day activity. Shops automatically sort by most recent transaction.',
-          AppLocale.ar:
-              'قائمة المتاجر: فلتر "نشط اليوم" يُبرز المتاجر النشطة اليوم. تُرتَّب المتاجر تلقائيًا حسب أحدث معاملة.',
-          AppLocale.ur:
-              'دکانوں کی فہرست: "آج کی سرگرمی" فلٹر آج کی سرگرمی والی دکانیں نمایاں کرتا ہے۔ دکانیں خودکار طور پر تازہ ترین ٹرانزیکشن کے مطابق ترتیب پاتی ہیں۔',
+          AppLocale.en: 'Shops list: "Active Today" filter highlights shops with same-day activity. Shops automatically sort by most recent transaction.',
+          AppLocale.ar: 'قائمة المتاجر: فلتر "نشط اليوم" يُبرز المتاجر النشطة اليوم. تُرتَّب المتاجر تلقائيًا حسب أحدث معاملة.',
+          AppLocale.ur: 'دکانوں کی فہرست: "آج کی سرگرمی" فلٹر آج کی سرگرمی والی دکانیں نمایاں کرتا ہے۔ دکانیں خودکار طور پر تازہ ترین ٹرانزیکشن کے مطابق ترتیب پاتی ہیں۔',
         },
       ),
     ],
@@ -1446,23 +1152,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🌐',
         text: {
-          AppLocale.en:
-              'Product details screen — labels (In Stock, Out, Quantity) now display correctly in Arabic and Urdu.',
-          AppLocale.ar:
-              'شاشة تفاصيل المنتج — التسميات (في المخزون، نافد، الكمية) تظهر الآن بشكل صحيح بالعربية والأردية.',
-          AppLocale.ur:
-              'پروڈکٹ تفصیلات اسکرین — لیبلز (اسٹاک میں، خالی، مقدار) اب عربی اور اردو میں درست ظاہر ہوتے ہیں۔',
+          AppLocale.en: 'Product details screen — labels (In Stock, Out, Quantity) now display correctly in Arabic and Urdu.',
+          AppLocale.ar: 'شاشة تفاصيل المنتج — التسميات (في المخزون، نافد، الكمية) تظهر الآن بشكل صحيح بالعربية والأردية.',
+          AppLocale.ur: 'پروڈکٹ تفصیلات اسکرین — لیبلز (اسٹاک میں، خالی، مقدار) اب عربی اور اردو میں درست ظاہر ہوتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🔒',
         text: {
-          AppLocale.en:
-              'Security improvements: product image links are now validated, and transaction edit requests are checked for valid amounts.',
-          AppLocale.ar:
-              'تحسينات الأمان: روابط صور المنتج تُتحقق منها الآن، وطلبات تعديل المعاملات تُفحص للتأكد من صحة المبالغ.',
-          AppLocale.ur:
-              'سیکیورٹی بہتریاں: پروڈکٹ امیج لنکس کی اب توثیق کی جاتی ہے، اور ٹرانزیکشن ترمیم کی درخواستوں میں رقم کی جانچ ہوتی ہے۔',
+          AppLocale.en: 'Security improvements: product image links are now validated, and transaction edit requests are checked for valid amounts.',
+          AppLocale.ar: 'تحسينات الأمان: روابط صور المنتج تُتحقق منها الآن، وطلبات تعديل المعاملات تُفحص للتأكد من صحة المبالغ.',
+          AppLocale.ur: 'سیکیورٹی بہتریاں: پروڈکٹ امیج لنکس کی اب توثیق کی جاتی ہے، اور ٹرانزیکشن ترمیم کی درخواستوں میں رقم کی جانچ ہوتی ہے۔',
         },
       ),
     ],
@@ -1474,12 +1174,9 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '⚡',
         text: {
-          AppLocale.en:
-              'Seller dashboard now loads instantly without flickering — route cards and shop data appear together in one smooth render.',
-          AppLocale.ar:
-              'لوحة تحكم البائع تُحمّل الآن فورًا بدون وميض — بطاقات المسارات وبيانات المحلات تظهر معًا في عرض سلس.',
-          AppLocale.ur:
-              'سیلر ڈیش بورڈ اب فوری لوڈ ہوتا ہے بغیر جھلملاہٹ کے — روٹ کارڈز اور دکانوں کا ڈیٹا ایک ساتھ ظاہر ہوتا ہے۔',
+          AppLocale.en: 'Seller dashboard now loads instantly without flickering — route cards and shop data appear together in one smooth render.',
+          AppLocale.ar: 'لوحة تحكم البائع تُحمّل الآن فورًا بدون وميض — بطاقات المسارات وبيانات المحلات تظهر معًا في عرض سلس.',
+          AppLocale.ur: 'سیلر ڈیش بورڈ اب فوری لوڈ ہوتا ہے بغیر جھلملاہٹ کے — روٹ کارڈز اور دکانوں کا ڈیٹا ایک ساتھ ظاہر ہوتا ہے۔',
         },
       ),
     ],
@@ -1491,34 +1188,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🧾',
         text: {
-          AppLocale.en:
-              'Reports now support a centralized bilingual column naming mode for English exports (Date, Description, Entry By, Credit, Debit, Balance).',
-          AppLocale.ar:
-              'التقارير تدعم الآن وضعًا مركزيًا لأسماء الأعمدة الثنائية في التصدير الإنجليزي (التاريخ، التفاصيل، بواسطة، فاتورة، واصل، الباقي).',
-          AppLocale.ur:
-              'رپورٹس میں اب انگریزی ایکسپورٹس کے لیے مرکزی بائی لنگول کالم نام موڈ شامل ہے (Date, Description, Entry By, Credit, Debit, Balance).',
+          AppLocale.en: 'Reports now support a centralized bilingual column naming mode for English exports (Date, Description, Entry By, Credit, Debit, Balance).',
+          AppLocale.ar: 'التقارير تدعم الآن وضعًا مركزيًا لأسماء الأعمدة الثنائية في التصدير الإنجليزي (التاريخ، التفاصيل، بواسطة، فاتورة، واصل، الباقي).',
+          AppLocale.ur: 'رپورٹس میں اب انگریزی ایکسپورٹس کے لیے مرکزی بائی لنگول کالم نام موڈ شامل ہے (Date, Description, Entry By, Credit, Debit, Balance).',
         },
       ),
       ChangelogItem(
         emoji: '⚙️',
         text: {
-          AppLocale.en:
-              'Admin Settings now includes a toggle to enable or disable Arabic column names in English PDF, Excel, and image report outputs.',
-          AppLocale.ar:
-              'تتضمن إعدادات المشرف الآن مفتاحًا لتفعيل أو تعطيل أسماء الأعمدة العربية داخل تقارير PDF وExcel والصور باللغة الإنجليزية.',
-          AppLocale.ur:
-              'ایڈمن سیٹنگز میں اب ایک ٹوگل شامل ہے جس سے انگریزی PDF، Excel اور امیج رپورٹس میں عربی کالم نام آن یا آف کیے جا سکتے ہیں۔',
+          AppLocale.en: 'Admin Settings now includes a toggle to enable or disable Arabic column names in English PDF, Excel, and image report outputs.',
+          AppLocale.ar: 'تتضمن إعدادات المشرف الآن مفتاحًا لتفعيل أو تعطيل أسماء الأعمدة العربية داخل تقارير PDF وExcel والصور باللغة الإنجليزية.',
+          AppLocale.ur: 'ایڈمن سیٹنگز میں اب ایک ٹوگل شامل ہے جس سے انگریزی PDF، Excel اور امیج رپورٹس میں عربی کالم نام آن یا آف کیے جا سکتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🔗',
         text: {
-          AppLocale.en:
-              'Export naming behavior is now unified through one shared report-column utility, ensuring consistent output across all report screens.',
-          AppLocale.ar:
-              'سلوك تسمية الأعمدة في التصدير أصبح موحّدًا عبر أداة مشتركة واحدة لضمان الاتساق عبر جميع شاشات التقارير.',
-          AppLocale.ur:
-              'ایکسپورٹ کالم نامنگ اب ایک مشترکہ یوٹیلٹی کے ذریعے یکساں ہو گئی ہے، جس سے تمام رپورٹ اسکرینز میں آؤٹ پٹ مستقل رہتا ہے۔',
+          AppLocale.en: 'Export naming behavior is now unified through one shared report-column utility, ensuring consistent output across all report screens.',
+          AppLocale.ar: 'سلوك تسمية الأعمدة في التصدير أصبح موحّدًا عبر أداة مشتركة واحدة لضمان الاتساق عبر جميع شاشات التقارير.',
+          AppLocale.ur: 'ایکسپورٹ کالم نامنگ اب ایک مشترکہ یوٹیلٹی کے ذریعے یکساں ہو گئی ہے، جس سے تمام رپورٹ اسکرینز میں آؤٹ پٹ مستقل رہتا ہے۔',
         },
       ),
     ],
@@ -1530,34 +1218,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🛡️',
         text: {
-          AppLocale.en:
-              'New fool-proof backup and restore flow with admin-only restore protection and recorded backup/restore timestamps.',
-          AppLocale.ar:
-              'تدفق نسخ احتياطي واستعادة جديد وآمن مع حماية الاستعادة للمشرف فقط وتسجيل وقت آخر نسخة احتياطية وآخر استعادة.',
-          AppLocale.ur:
-              'نیا محفوظ بیک اپ اور ریسٹور فلو: ریسٹور صرف ایڈمن کے لیے، اور آخری بیک اپ اور آخری ریسٹور کے وقت باقاعدہ ریکارڈ ہوتے ہیں۔',
+          AppLocale.en: 'New fool-proof backup and restore flow with admin-only restore protection and recorded backup/restore timestamps.',
+          AppLocale.ar: 'تدفق نسخ احتياطي واستعادة جديد وآمن مع حماية الاستعادة للمشرف فقط وتسجيل وقت آخر نسخة احتياطية وآخر استعادة.',
+          AppLocale.ur: 'نیا محفوظ بیک اپ اور ریسٹور فلو: ریسٹور صرف ایڈمن کے لیے، اور آخری بیک اپ اور آخری ریسٹور کے وقت باقاعدہ ریکارڈ ہوتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '📱',
         text: {
-          AppLocale.en:
-              'Settings now opens dedicated Backup and Danger Zone screens for clearer, safer admin operations.',
-          AppLocale.ar:
-              'الإعدادات تفتح الآن شاشات مخصصة للنسخ الاحتياطي ومنطقة الخطر لتكون عمليات المشرف أوضح وأكثر أمانًا.',
-          AppLocale.ur:
-              'سیٹنگز میں اب بیک اپ اور ڈینجر زون کی الگ اسکرینز ہیں تاکہ ایڈمن آپریشنز زیادہ واضح اور محفوظ رہیں۔',
+          AppLocale.en: 'Settings now opens dedicated Backup and Danger Zone screens for clearer, safer admin operations.',
+          AppLocale.ar: 'الإعدادات تفتح الآن شاشات مخصصة للنسخ الاحتياطي ومنطقة الخطر لتكون عمليات المشرف أوضح وأكثر أمانًا.',
+          AppLocale.ur: 'سیٹنگز میں اب بیک اپ اور ڈینجر زون کی الگ اسکرینز ہیں تاکہ ایڈمن آپریشنز زیادہ واضح اور محفوظ رہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🔧',
         text: {
-          AppLocale.en:
-              'Dependency cleanup: direct packages are up-to-date and deprecated API usage has been removed from app code.',
-          AppLocale.ar:
-              'تنظيف الاعتماديات: الحزم المباشرة أصبحت محدثة وتمت إزالة استخدامات الـ API المتقادمة من كود التطبيق.',
-          AppLocale.ur:
-              'ڈپینڈنسی کلین اپ: ڈائریکٹ پیکجز اپ ٹو ڈیٹ ہیں اور ایپ کوڈ سے deprecated API استعمالات ختم کر دی گئی ہیں۔',
+          AppLocale.en: 'Dependency cleanup: direct packages are up-to-date and deprecated API usage has been removed from app code.',
+          AppLocale.ar: 'تنظيف الاعتماديات: الحزم المباشرة أصبحت محدثة وتمت إزالة استخدامات الـ API المتقادمة من كود التطبيق.',
+          AppLocale.ur: 'ڈپینڈنسی کلین اپ: ڈائریکٹ پیکجز اپ ٹو ڈیٹ ہیں اور ایپ کوڈ سے deprecated API استعمالات ختم کر دی گئی ہیں۔',
         },
       ),
     ],
@@ -1569,23 +1248,17 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📋',
         text: {
-          AppLocale.en:
-              'Shops list: WhatsApp button now appears on every shop tile for quick contact.',
-          AppLocale.ar:
-              'قائمة المتاجر: زر واتساب يظهر الآن على كل بطاقة متجر للتواصل السريع.',
-          AppLocale.ur:
-              'شاپس لسٹ: اب ہر شاپ ٹائل پر واٹس ایپ بٹن دکھائی دیتا ہے — فوری رابطے کے لیے۔',
+          AppLocale.en: 'Shops list: WhatsApp button now appears on every shop tile for quick contact.',
+          AppLocale.ar: 'قائمة المتاجر: زر واتساب يظهر الآن على كل بطاقة متجر للتواصل السريع.',
+          AppLocale.ur: 'شاپس لسٹ: اب ہر شاپ ٹائل پر واٹس ایپ بٹن دکھائی دیتا ہے — فوری رابطے کے لیے۔',
         },
       ),
       ChangelogItem(
         emoji: '📊',
         text: {
-          AppLocale.en:
-              'Reports: replaced the pie chart with a ranked top-10 debtors list — easier to see who owes the most.',
-          AppLocale.ar:
-              'التقارير: تم استبدال الرسم البياني الدائري بقائمة أفضل 10 مدينين — أسهل لمعرفة من يدين بالأكثر.',
-          AppLocale.ur:
-              'رپورٹس: پائی چارٹ کو ٹاپ 10 مقروضین کی رینکڈ لسٹ سے بدل دیا — دیکھیں کون سب سے زیادہ باقی ہے۔',
+          AppLocale.en: 'Reports: replaced the pie chart with a ranked top-10 debtors list — easier to see who owes the most.',
+          AppLocale.ar: 'التقارير: تم استبدال الرسم البياني الدائري بقائمة أفضل 10 مدينين — أسهل لمعرفة من يدين بالأكثر.',
+          AppLocale.ur: 'رپورٹس: پائی چارٹ کو ٹاپ 10 مقروضین کی رینکڈ لسٹ سے بدل دیا — دیکھیں کون سب سے زیادہ باقی ہے۔',
         },
       ),
       ChangelogItem(
@@ -1606,34 +1279,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '💱',
         text: {
-          AppLocale.en:
-              'Multi-currency support: amounts now display in the correct currency (SAR or PKR) based on each route — no more mixed symbols.',
-          AppLocale.ar:
-              'دعم العملات المتعددة: تعرض المبالغ الآن العملة الصحيحة (ريال أو روبية) بناءً على كل مسار — لا مزيد من رموز مختلطة.',
-          AppLocale.ur:
-              'ملٹی کرنسی سپورٹ: رقومات اب ہر روٹ کے مطابق درست کرنسی (SAR یا PKR) میں دکھائی جاتی ہیں۔',
+          AppLocale.en: 'Multi-currency support: amounts now display in the correct currency (SAR or PKR) based on each route — no more mixed symbols.',
+          AppLocale.ar: 'دعم العملات المتعددة: تعرض المبالغ الآن العملة الصحيحة (ريال أو روبية) بناءً على كل مسار — لا مزيد من رموز مختلطة.',
+          AppLocale.ur: 'ملٹی کرنسی سپورٹ: رقومات اب ہر روٹ کے مطابق درست کرنسی (SAR یا PKR) میں دکھائی جاتی ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '💬',
         text: {
-          AppLocale.en:
-              'WhatsApp quick-connect: tap the WhatsApp button on any shop to open a chat instantly.',
-          AppLocale.ar:
-              'اتصال سريع عبر واتساب: اضغط على زر واتساب في أي متجر لفتح محادثة فوراً.',
-          AppLocale.ur:
-              'واٹس ایپ کوئیک کنیکٹ: کسی بھی شاپ پر واٹس ایپ بٹن دبائیں اور فوری چیٹ کھولیں۔',
+          AppLocale.en: 'WhatsApp quick-connect: tap the WhatsApp button on any shop to open a chat instantly.',
+          AppLocale.ar: 'اتصال سريع عبر واتساب: اضغط على زر واتساب في أي متجر لفتح محادثة فوراً.',
+          AppLocale.ur: 'واٹس ایپ کوئیک کنیکٹ: کسی بھی شاپ پر واٹس ایپ بٹن دبائیں اور فوری چیٹ کھولیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🧹',
         text: {
-          AppLocale.en:
-              'Cleaner charts: removed unused cash-flow and balance trend graphs to speed up screen loading.',
-          AppLocale.ar:
-              'رسوم بيانية أنظف: تمت إزالة الرسوم البيانية غير المستخدمة لتحسين سرعة تحميل الشاشات.',
-          AppLocale.ur:
-              'صاف چارٹس: غیر ضروری کیش فلو اور بیلنس ٹرینڈ گرافس ہٹا دیے — اسکرین لوڈنگ تیز ہو گئی۔',
+          AppLocale.en: 'Cleaner charts: removed unused cash-flow and balance trend graphs to speed up screen loading.',
+          AppLocale.ar: 'رسوم بيانية أنظف: تمت إزالة الرسوم البيانية غير المستخدمة لتحسين سرعة تحميل الشاشات.',
+          AppLocale.ur: 'صاف چارٹس: غیر ضروری کیش فلو اور بیلنس ٹرینڈ گرافس ہٹا دیے — اسکرین لوڈنگ تیز ہو گئی۔',
         },
       ),
     ],
@@ -1645,34 +1309,26 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔀',
         text: {
-          AppLocale.en:
-              'Multi-route seller assignment: sellers can now be assigned to multiple routes simultaneously.',
-          AppLocale.ar:
-              'تعيين البائعين لعدة مسارات: يمكن الآن تعيين البائعين لعدة مسارات في نفس الوقت.',
-          AppLocale.ur:
-              'ملٹی روٹ سیلر اسائنمنٹ: سیلرز کو اب ایک ساتھ کئی روٹس پر تعینات کیا جا سکتا ہے۔',
+          AppLocale.en: 'Multi-route seller assignment: sellers can now be assigned to multiple routes simultaneously.',
+          AppLocale.ar: 'تعيين البائعين لعدة مسارات: يمكن الآن تعيين البائعين لعدة مسارات في نفس الوقت.',
+          AppLocale.ur: 'ملٹی روٹ سیلر اسائنمنٹ: سیلرز کو اب ایک ساتھ کئی روٹس پر تعینات کیا جا سکتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🧹',
         text: {
-          AppLocale.en:
-              'Legacy single-route code removed — the app now uses arrays everywhere for route and seller assignments, improving reliability.',
-          AppLocale.ar:
-              'تم إزالة رمز المسار الواحد القديم — يستخدم التطبيق الآن المصفوفات في كل مكان لتعيينات المسارات والبائعين.',
-          AppLocale.ur:
-              'پرانا سنگل روٹ کوڈ ہٹا دیا گیا — ایپ اب ہر جگہ arrays استعمال کرتی ہے، جو مزید قابل اعتماد ہے۔',
+          AppLocale.en: 'Legacy single-route code removed — the app now uses arrays everywhere for route and seller assignments, improving reliability.',
+          AppLocale.ar: 'تم إزالة رمز المسار الواحد القديم — يستخدم التطبيق الآن المصفوفات في كل مكان لتعيينات المسارات والبائعين.',
+          AppLocale.ur: 'پرانا سنگل روٹ کوڈ ہٹا دیا گیا — ایپ اب ہر جگہ arrays استعمال کرتی ہے، جو مزید قابل اعتماد ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🔒',
         text: {
-          AppLocale.en:
-              'Firestore security rules updated for multi-route access control.',
+          AppLocale.en: 'Firestore security rules updated for multi-route access control.',
           AppLocale.ar:
               'تم تحديث قواعد أمان Firestore للتحكم في الوصول متعدد المسارات.',
-          AppLocale.ur:
-              'ملٹی روٹ رسائی کنٹرول کے لیے Firestore سیکیورٹی رولز اپ ڈیٹ کیے گئے۔',
+          AppLocale.ur: 'ملٹی روٹ رسائی کنٹرول کے لیے Firestore سیکیورٹی رولز اپ ڈیٹ کیے گئے۔',
         },
       ),
     ],
@@ -1684,34 +1340,25 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📁',
         text: {
-          AppLocale.en:
-              'Export file names are now clean and consistent — every PDF, Excel, and image export uses a clear name like "ledger_shop-name_2026-04-18" instead of random codes.',
-          AppLocale.ar:
-              'أسماء ملفات التصدير أصبحت واضحة ومتسقة — كل PDF وExcel وصورة تستخدم اسمًا واضحًا مثل "ledger_shop-name_2026-04-18" بدلاً من رموز عشوائية.',
-          AppLocale.ur:
-              'ایکسپورٹ فائل نام اب صاف اور یکساں ہیں — ہر PDF، Excel، اور تصویر "ledger_shop-name_2026-04-18" جیسا واضح نام استعمال کرتی ہے، نہ کہ بے ترتیب کوڈ۔',
+          AppLocale.en: 'Export file names are now clean and consistent — every PDF, Excel, and image export uses a clear name like "ledger_shop-name_2026-04-18" instead of random codes.',
+          AppLocale.ar: 'أسماء ملفات التصدير أصبحت واضحة ومتسقة — كل PDF وExcel وصورة تستخدم اسمًا واضحًا مثل "ledger_shop-name_2026-04-18" بدلاً من رموز عشوائية.',
+          AppLocale.ur: 'ایکسپورٹ فائل نام اب صاف اور یکساں ہیں — ہر PDF، Excel، اور تصویر "ledger_shop-name_2026-04-18" جیسا واضح نام استعمال کرتی ہے، نہ کہ بے ترتیب کوڈ۔',
         },
       ),
       ChangelogItem(
         emoji: '🗂️',
         text: {
-          AppLocale.en:
-              'Multi-shop ledger PDF: route names now appear as section headers on the cover page, making it easy to jump to the right route at a glance.',
-          AppLocale.ar:
-              'PDF كشف حساب متعدد المتاجر: تظهر الآن أسماء المسارات كعناوين أقسام في صفحة الغلاف، مما يسهّل الوصول إلى المسار الصحيح بنظرة واحدة.',
-          AppLocale.ur:
-              'ملٹی شاپ لیجر PDF: روٹ کے نام اب کور پیج پر سیکشن ہیڈرز کے طور پر ظاہر ہوتے ہیں، جس سے صحیح روٹ تک ایک نظر میں پہنچنا آسان ہوتا ہے۔',
+          AppLocale.en: 'Multi-shop ledger PDF: route names now appear as section headers on the cover page, making it easy to jump to the right route at a glance.',
+          AppLocale.ar: 'PDF كشف حساب متعدد المتاجر: تظهر الآن أسماء المسارات كعناوين أقسام في صفحة الغلاف، مما يسهّل الوصول إلى المسار الصحيح بنظرة واحدة.',
+          AppLocale.ur: 'ملٹی شاپ لیجر PDF: روٹ کے نام اب کور پیج پر سیکشن ہیڈرز کے طور پر ظاہر ہوتے ہیں، جس سے صحیح روٹ تک ایک نظر میں پہنچنا آسان ہوتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '📐',
         text: {
-          AppLocale.en:
-              'PDF layout improvements: stock summary cards and table cells are now properly centered for a cleaner, more professional look.',
-          AppLocale.ar:
-              'تحسينات تخطيط PDF: بطاقات ملخص المخزون وخلايا الجداول مركزة الآن بشكل صحيح لمظهر أنظف وأكثر احترافية.',
-          AppLocale.ur:
-              'PDF لے آؤٹ بہتری: اسٹاک سمری کارڈز اور ٹیبل سیلز اب صحیح طریقے سے سینٹر کیے گئے ہیں تاکہ ایک صاف اور زیادہ پیشہ ورانہ شکل ملے۔',
+          AppLocale.en: 'PDF layout improvements: stock summary cards and table cells are now properly centered for a cleaner, more professional look.',
+          AppLocale.ar: 'تحسينات تخطيط PDF: بطاقات ملخص المخزون وخلايا الجداول مركزة الآن بشكل صحيح لمظهر أنظف وأكثر احترافية.',
+          AppLocale.ur: 'PDF لے آؤٹ بہتری: اسٹاک سمری کارڈز اور ٹیبل سیلز اب صحیح طریقے سے سینٹر کیے گئے ہیں تاکہ ایک صاف اور زیادہ پیشہ ورانہ شکل ملے۔',
         },
       ),
     ],
@@ -1723,45 +1370,33 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📄',
         text: {
-          AppLocale.en:
-              'PDF sharing fixed: multi-shop ledger and invoice PDF exports now use a more reliable sharing method that works on all Android versions.',
-          AppLocale.ar:
-              'إصلاح مشاركة PDF: تصدير كشف حساب المتاجر والفواتير يستخدم الآن طريقة مشاركة أكثر موثوقية تعمل على جميع إصدارات أندرويد.',
-          AppLocale.ur:
-              'PDF شیئرنگ ٹھیک: ملٹی شاپ لیجر اور انوائس PDF ایکسپورٹ اب ایک زیادہ قابل اعتماد شیئرنگ طریقہ استعمال کرتے ہیں جو تمام اینڈرائیڈ ورژنز پر کام کرتا ہے۔',
+          AppLocale.en: 'PDF sharing fixed: multi-shop ledger and invoice PDF exports now use a more reliable sharing method that works on all Android versions.',
+          AppLocale.ar: 'إصلاح مشاركة PDF: تصدير كشف حساب المتاجر والفواتير يستخدم الآن طريقة مشاركة أكثر موثوقية تعمل على جميع إصدارات أندرويد.',
+          AppLocale.ur: 'PDF شیئرنگ ٹھیک: ملٹی شاپ لیجر اور انوائس PDF ایکسپورٹ اب ایک زیادہ قابل اعتماد شیئرنگ طریقہ استعمال کرتے ہیں جو تمام اینڈرائیڈ ورژنز پر کام کرتا ہے۔',
         },
       ),
       ChangelogItem(
         emoji: '🔍',
         text: {
-          AppLocale.en:
-              'Better error diagnostics: PDF export errors are now logged to Crashlytics for faster troubleshooting.',
-          AppLocale.ar:
-              'تشخيص أفضل للأخطاء: أخطاء تصدير PDF تُسجَّل الآن في Crashlytics لتسريع استكشاف الأخطاء.',
-          AppLocale.ur:
-              'بہتر ایرر تشخیص: PDF ایکسپورٹ ایررز اب Crashlytics میں لاگ ہوتے ہیں تاکہ مسائل تیزی سے حل ہوں۔',
+          AppLocale.en: 'Better error diagnostics: PDF export errors are now logged to Crashlytics for faster troubleshooting.',
+          AppLocale.ar: 'تشخيص أفضل للأخطاء: أخطاء تصدير PDF تُسجَّل الآن في Crashlytics لتسريع استكشاف الأخطاء.',
+          AppLocale.ur: 'بہتر ایرر تشخیص: PDF ایکسپورٹ ایررز اب Crashlytics میں لاگ ہوتے ہیں تاکہ مسائل تیزی سے حل ہوں۔',
         },
       ),
       ChangelogItem(
         emoji: '🖨️',
         text: {
-          AppLocale.en:
-              'Unified export pipeline: invoices and multi-shop ledgers now offer Excel, PDF, PNG, and Print options from a single export sheet.',
-          AppLocale.ar:
-              'خط تصدير موحّد: الفواتير وكشوف حسابات المتاجر تقدم الآن خيارات Excel وPDF وPNG والطباعة من ورقة تصدير واحدة.',
-          AppLocale.ur:
-              'متحد ایکسپورٹ پائپ لائن: انوائسز اور ملٹی شاپ لیجرز اب ایک ایکسپورٹ شیٹ سے Excel، PDF، PNG، اور پرنٹ کے آپشنز پیش کرتے ہیں۔',
+          AppLocale.en: 'Unified export pipeline: invoices and multi-shop ledgers now offer Excel, PDF, PNG, and Print options from a single export sheet.',
+          AppLocale.ar: 'خط تصدير موحّد: الفواتير وكشوف حسابات المتاجر تقدم الآن خيارات Excel وPDF وPNG والطباعة من ورقة تصدير واحدة.',
+          AppLocale.ur: 'متحد ایکسپورٹ پائپ لائن: انوائسز اور ملٹی شاپ لیجرز اب ایک ایکسپورٹ شیٹ سے Excel، PDF، PNG، اور پرنٹ کے آپشنز پیش کرتے ہیں۔',
         },
       ),
       ChangelogItem(
         emoji: '🌍',
         text: {
-          AppLocale.en:
-              'Invoice PDF fully localized: all labels now display in your chosen language (Arabic, Urdu, or English).',
-          AppLocale.ar:
-              'فاتورة PDF مترجمة بالكامل: جميع التسميات تظهر الآن بلغتك المختارة (العربية، الأردية، أو الإنجليزية).',
-          AppLocale.ur:
-              'انوائس PDF مکمل طور پر مقامی: تمام لیبلز اب آپ کی منتخب زبان (عربی، اردو، یا انگریزی) میں ظاہر ہوتے ہیں۔',
+          AppLocale.en: 'Invoice PDF fully localized: all labels now display in your chosen language (Arabic, Urdu, or English).',
+          AppLocale.ar: 'فاتورة PDF مترجمة بالكامل: جميع التسميات تظهر الآن بلغتك المختارة (العربية، الأردية، أو الإنجليزية).',
+          AppLocale.ur: 'انوائس PDF مکمل طور پر مقامی: تمام لیبلز اب آپ کی منتخب زبان (عربی، اردو، یا انگریزی) میں ظاہر ہوتے ہیں۔',
         },
       ),
     ],
@@ -1773,12 +1408,9 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🛡️',
         text: {
-          AppLocale.en:
-              'Export & save reliability: all screens now wait for your user data to fully load before exporting or saving — no more blank reports or silent failures.',
-          AppLocale.ar:
-              'موثوقية التصدير والحفظ: جميع الشاشات تنتظر الآن تحميل بيانات المستخدم بالكامل قبل التصدير أو الحفظ — لا مزيد من التقارير الفارغة أو الأخطاء الصامتة.',
-          AppLocale.ur:
-              'ایکسپورٹ اور محفوظ کرنے کی قابل اعتمادی: تمام اسکرینز اب ایکسپورٹ یا محفوظ کرنے سے پہلے آپ کے صارف ڈیٹا کے مکمل لوڈ ہونے کا انتظار کرتی ہیں — مزید خالی رپورٹس یا خاموش ناکامیاں نہیں۔',
+          AppLocale.en: 'Export & save reliability: all screens now wait for your user data to fully load before exporting or saving — no more blank reports or silent failures.',
+          AppLocale.ar: 'موثوقية التصدير والحفظ: جميع الشاشات تنتظر الآن تحميل بيانات المستخدم بالكامل قبل التصدير أو الحفظ — لا مزيد من التقارير الفارغة أو الأخطاء الصامتة.',
+          AppLocale.ur: 'ایکسپورٹ اور محفوظ کرنے کی قابل اعتمادی: تمام اسکرینز اب ایکسپورٹ یا محفوظ کرنے سے پہلے آپ کے صارف ڈیٹا کے مکمل لوڈ ہونے کا انتظار کرتی ہیں — مزید خالی رپورٹس یا خاموش ناکامیاں نہیں۔',
         },
       ),
       ChangelogItem(
@@ -1799,23 +1431,18 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📊',
         text: {
-          AppLocale.en:
-              'Seller report PDF now loads fresh data reliably — no more "PDF generation failed" on first tap.',
-          AppLocale.ar:
-              'تقرير البائع PDF يحمّل البيانات الحديثة بموثوقية — لا مزيد من رسالة "فشل إنشاء PDF" عند أول ضغطة.',
-          AppLocale.ur:
-              'سیلر رپورٹ PDF اب قابل اعتماد طریقے سے تازہ ڈیٹا لوڈ کرتی ہے — پہلی ٹیپ پر "PDF ناکام" کی خطا نہیں آئے گی۔',
+          AppLocale.en: 'Seller report PDF now loads fresh data reliably — no more "PDF generation failed" on first tap.',
+          AppLocale.ar: 'تقرير البائع PDF يحمّل البيانات الحديثة بموثوقية — لا مزيد من رسالة "فشل إنشاء PDF" عند أول ضغطة.',
+          AppLocale.ur: 'سیلر رپورٹ PDF اب قابل اعتماد طریقے سے تازہ ڈیٹا لوڈ کرتی ہے — پہلی ٹیپ پر "PDF ناکام" کی خطا نہیں آئے گی۔',
         },
       ),
       ChangelogItem(
         emoji: '📄',
         text: {
-          AppLocale.en:
-              'Shop account-statement PDF now always reads latest company settings before generating.',
+          AppLocale.en: 'Shop account-statement PDF now always reads latest company settings before generating.',
           AppLocale.ar:
               'تقرير حساب المتجر يقرأ الآن أحدث إعدادات الشركة قبل الإنشاء.',
-          AppLocale.ur:
-              'دکان اکاؤنٹ سٹیٹمنٹ PDF بنانے سے پہلے کمپنی کی تازہ ترین ترتیبات پڑھتا ہے۔',
+          AppLocale.ur: 'دکان اکاؤنٹ سٹیٹمنٹ PDF بنانے سے پہلے کمپنی کی تازہ ترین ترتیبات پڑھتا ہے۔',
         },
       ),
     ],
@@ -1827,12 +1454,9 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📄',
         text: {
-          AppLocale.en:
-              'Fixed PDF export crash — export providers no longer self-destruct during Firestore queries.',
-          AppLocale.ar:
-              'تم إصلاح تعطل تصدير PDF — مزودات التصدير لم تعد تتلف أثناء استعلامات Firestore.',
-          AppLocale.ur:
-              'PDF ایکسپورٹ کریش درست کی گئی — ایکسپورٹ پرووائیڈرز Firestore کوئریز کے دوران ختم نہیں ہوتے۔',
+          AppLocale.en: 'Fixed PDF export crash — export providers no longer self-destruct during Firestore queries.',
+          AppLocale.ar: 'تم إصلاح تعطل تصدير PDF — مزودات التصدير لم تعد تتلف أثناء استعلامات Firestore.',
+          AppLocale.ur: 'PDF ایکسپورٹ کریش درست کی گئی — ایکسپورٹ پرووائیڈرز Firestore کوئریز کے دوران ختم نہیں ہوتے۔',
         },
       ),
     ],
@@ -1844,12 +1468,9 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '📄',
         text: {
-          AppLocale.en:
-              'Fixed PDF ledger export (all-shops / per-route) — was crashing during Firebase token refresh mid-export.',
-          AppLocale.ar:
-              'تم إصلاح تصدير PDF للدفتر (جميع المتاجر / لكل خط) — كان يتعطل أثناء تجديد دخول Firebase.',
-          AppLocale.ur:
-              'PDF لیجر ایکسپورٹ درست کی گئی — Firebase ٹوکن ریفریش کے دوران کریش ہوتا تھا۔',
+          AppLocale.en: 'Fixed PDF ledger export (all-shops / per-route) — was crashing during Firebase token refresh mid-export.',
+          AppLocale.ar: 'تم إصلاح تصدير PDF للدفتر (جميع المتاجر / لكل خط) — كان يتعطل أثناء تجديد دخول Firebase.',
+          AppLocale.ur: 'PDF لیجر ایکسپورٹ درست کی گئی — Firebase ٹوکن ریفریش کے دوران کریش ہوتا تھا۔',
         },
       ),
     ],
@@ -1861,10 +1482,8 @@ const List<ChangelogEntry> kChangelog = [
       ChangelogItem(
         emoji: '🔒',
         text: {
-          AppLocale.en:
-              'Session lock overlay no longer appears on the login screen when left unattended.',
-          AppLocale.ar:
-              'لم تعد شاشة قفل الجلسة تظهر على شاشة تسجيل الدخول عند عدم النشاط.',
+          AppLocale.en: 'Session lock overlay no longer appears on the login screen when left unattended.',
+          AppLocale.ar: 'لم تعد شاشة قفل الجلسة تظهر على شاشة تسجيل الدخول عند عدم النشاط.',
           AppLocale.ur:
               'لاگن سکرین پر بیکار وقت سیشن لاک والی اسکرین اب ظاھر نہیں ہوگی۔',
         },

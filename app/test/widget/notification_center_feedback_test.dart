@@ -198,7 +198,7 @@ void main() {
       find.text('You do not have permission to perform this action.'),
       findsOneWidget,
     );
-    expect(find.text('Stream: notifications'), findsOneWidget);
+    expect(find.text('Notification feed (permission-denied)'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
     expect(shopVisibilitySubscriptions, 0);
     expect(tester.takeException(), isNull);
@@ -217,8 +217,8 @@ void main() {
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     );
-    final feed = StreamController<List<NotificationModel>>();
-    final shops = StreamController<Set<String>>();
+    final feed = StreamController<List<NotificationModel>>.broadcast();
+    final shops = StreamController<Set<String>>.broadcast();
     addTearDown(() async {
       await feed.close();
       await shops.close();
@@ -255,9 +255,11 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     feed.add([notification]);
+    await tester.pump(const Duration(milliseconds: 100));
     shops.add({'shop-1'});
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Shop One'), findsOneWidget);
     final providerContainer = ProviderScope.containerOf(
       tester.element(find.byType(NotificationCenterScreen)),
@@ -266,11 +268,20 @@ void main() {
     feed.addError(
       FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied'),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.text('Shop One'), findsOneWidget);
+    expect(find.byType(ShimmerLoading), findsNothing);
     expect(find.byKey(const Key('notification_feed_error')), findsOneWidget);
-    expect(find.text('Stream: notifications'), findsOneWidget);
+    final diagnostic = tester.widget<Text>(
+      find.byKey(const Key('notification_stream_source')),
+    );
+    final failure =
+        providerContainer.read(visibleNotificationsProvider).error!
+            as NotificationStreamFailure;
+    expect(failure.source, NotificationStreamSource.notifications);
+    expect(failure.cause, isA<FirebaseException>());
+    expect(diagnostic.data, 'Notification feed (permission-denied)');
     expect(find.text('Retry'), findsOneWidget);
     expect(
       providerContainer.read(visibleNotificationsProvider).hasError,
@@ -292,8 +303,8 @@ void main() {
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     );
-    final feed = StreamController<List<NotificationModel>>();
-    final shops = StreamController<Set<String>>();
+    final feed = StreamController<List<NotificationModel>>.broadcast();
+    final shops = StreamController<Set<String>>.broadcast();
     addTearDown(() async {
       await feed.close();
       await shops.close();
@@ -330,9 +341,11 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     feed.add([notification]);
+    await tester.pump(const Duration(milliseconds: 100));
     shops.add({'shop-1'});
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Shop One'), findsOneWidget);
     final providerContainer = ProviderScope.containerOf(
       tester.element(find.byType(NotificationCenterScreen)),
@@ -359,7 +372,10 @@ void main() {
       reason: 'feed=$feedState, visible=$visibleState',
     );
     expect(find.byKey(const Key('notification_feed_error')), findsOneWidget);
-    expect(find.text('Stream: shops'), findsOneWidget);
+    expect(
+      find.text('Shop visibility lookup (permission-denied)'),
+      findsOneWidget,
+    );
     expect(find.text('Retry'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

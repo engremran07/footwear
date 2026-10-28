@@ -6,6 +6,51 @@
 
 ---
 
+## SESSION-063 — 2026-10-28 — Notification Query Budget and Android Alerts
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Trace the persistent workspace-specific notification failure,
+bound the Firestore Rules query cost, and add an optional Android notification
+center experience without a new Firestore listener or paid backend.
+
+- Root-cause regression: querying up to 30 referenced shop IDs in one
+  visibility lookup exceeded Rules access-call limits for larger feeds. The
+  provider now chunks IDs in groups of five; a 50-shop regression covers
+  workspace admins and supervisors. App and Rules authorization were not
+  broadened.
+- Added opt-in, private, silent, foreground-only Android alerts. The observer
+  reuses tenant-scoped notification and shop-visibility providers, deduplicates
+  per user/workspace, and prompts for notification permission only after an
+  explicit user action. No FCM sender, extra Firestore listener, or background
+  delivery was added.
+- Focused notification/error/changelog tests:
+  `00:04 +81: All tests passed!`; localization parity:
+  `00:00 +13: All tests passed!`; full Flutter suite:
+  `01:29 +708: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 16.2s)`; `dart analyze test/`:
+  `No issues found!`; Rules Emulator: `191 passing (56s)`.
+- Version `3.10.14+1125` is synchronized. The ARM64 APK verified with APK v2,
+  was copied to `R5GL22RGT9V` (`1 file pushed`), and installed successfully
+  (`Success`, versionName `3.10.14`, versionCode `310143125`).
+- Split APKs built at 32,857,045 B (ARMv7), 34,520,181 B (ARM64), and
+  36,142,717 B (x86_64). The signed AAB built at 75,804,395 B and
+  `jarsigner -verify` reported `jar verified.` with a locally untrusted
+  self-signed certificate and no timestamp; Play Console acceptance is not
+  established.
+- Web build reported `EXIT: 0`. Firestore reported the checked-in Rules were
+  already current and deployed indexes successfully, preserving 23
+  remote-only indexes and 2 field overrides; deployment reported
+  `Deploy complete!`. Hosting also reported `Deploy complete!`; live
+  `version.json` reports `3.10.14+1125`, and the main bundle's cache header is
+  `no-store, must-revalidate, no-cache`.
+- The JBM Impex production feed still requires an authenticated post-deployment
+  check. No production outcome is inferred from emulator tests. Git
+  publication is recorded in the task completion summary; no Play Console
+  upload occurred.
+
+---
+
 ## SESSION-062 — 2026-10-28 — Completing the Authorized v3.10.13 Delivery Sequence
 
 **Agent:** GitHub Copilot

@@ -96,8 +96,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'build_number': 'Build Number',
     'release_date': 'Release Date',
     'platform': 'Platform',
-    'about_description':
-        'A workspace-based ERP for footwear distribution, route sales, inventory and reporting.',
+    'about_description': 'A workspace-based ERP for footwear distribution, route sales, inventory and reporting.',
     'platform_value': 'Firebase Spark — Firestore and Auth',
     'copyright_notice': '© %s. All rights reserved.',
     'legal': 'Legal',
@@ -149,17 +148,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'Enter a reason of 10 to 240 characters.',
     'workspace_access_unavailable':
         'The selected workspace is unavailable. Refresh and try again.',
-    'workspace_settings_initialization_required':
-        'Workspace invoice settings are missing. Ask a workspace admin to open Invoice Header settings and save them before creating invoices or receipts.',
+    'workspace_settings_initialization_required': 'Workspace invoice settings are missing. Ask a workspace admin to open Invoice Header settings and save them before creating invoices or receipts.',
     'workspace_access_started': 'Workspace support access started.',
     'workspace_access_ended': 'Workspace support access ended.',
     'workspace_access_end_title': 'End support access?',
-    'workspace_access_end_message':
-        'This clears the selected workspace and ends access to its business data.',
-    'workspace_support_context_required':
-        'Select a workspace and provide a support reason before accessing its business data.',
-    'workspace_support_context_other_workspace':
-        'Another workspace is currently selected. Selecting this one will switch the audited support context.',
+    'workspace_access_end_message': 'This clears the selected workspace and ends access to its business data.',
+    'workspace_support_context_required': 'Select a workspace and provide a support reason before accessing its business data.',
+    'workspace_support_context_other_workspace': 'Another workspace is currently selected. Selecting this one will switch the audited support context.',
     'credentials_owner_managed':
         'The account owner manages email and password changes.',
     'send_password_reset': 'Send password reset email',
@@ -193,15 +188,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Error Messages (mapped by AppErrorMapper) ──
     'err_invalid_credentials': 'Incorrect email or password. Please try again.',
     'err_user_not_found': 'No account found with these details.',
-    'err_account_not_assigned':
-        'Your account is not assigned to a workspace. Contact your administrator.',
-    'err_account_role_invalid':
-        'Your account role is unsupported. Contact your workspace administrator.',
+    'err_account_not_assigned': 'Your account is not assigned to a workspace. Contact your administrator.',
+    'err_account_role_invalid': 'Your account role is unsupported. Contact your workspace administrator.',
     'err_user_disabled': 'This account has been disabled. Contact admin.',
-    'workspace_policy_unavailable':
-        'Workspace access policy is unavailable. Try again or contact your administrator.',
-    'workspace_disabled':
-        'This workspace has been archived. Contact your platform administrator.',
+    'workspace_policy_unavailable': 'Workspace access policy is unavailable. Try again or contact your administrator.',
+    'workspace_disabled': 'This workspace has been archived. Contact your platform administrator.',
     'err_too_many_requests':
         'Too many attempts. Please wait a moment and try again.',
     'err_email_in_use': 'This email is already registered.',
@@ -221,8 +212,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_service_unavailable':
         'Service temporarily unavailable. Try again shortly.',
     'err_firebase_init_title': 'Service could not start',
-    'err_firebase_init_body':
-        'The app could not connect to its services. Check your connection and retry.',
+    'err_firebase_init_body': 'The app could not connect to its services. Check your connection and retry.',
     'err_cancelled': 'Operation was cancelled.',
     'err_timeout': 'Request timed out. Please try again.',
     'err_unauthenticated': 'You are not signed in. Please sign in first.',
@@ -235,8 +225,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_export_no_data':
         'No data to export. Apply different filters or add records first.',
     'err_pdf_failed': 'PDF generation failed.',
-    'err_pdf_shaping_unavailable':
-        'This build cannot safely export Arabic or Urdu PDFs. Update the app or contact your administrator.',
+    'err_pdf_shaping_unavailable': 'This build cannot safely export Arabic or Urdu PDFs. Update the app or contact your administrator.',
     'err_unknown': 'Something went wrong. Please try again.',
     'err_function_not_deployed':
         'Feature requires server setup — contact admin.',
@@ -255,8 +244,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'pending_admin_approval': 'Pending admin approval',
     'require_approval_title':
         'Require admin approval for seller transaction edits',
-    'require_approval_subtitle':
-        'ON: seller edits are pending until approved. OFF: seller edits are auto-approved.',
+    'require_approval_subtitle': 'ON: seller edits are pending until approved. OFF: seller edits are auto-approved.',
     // ── Seller Sell-Stock ──
     'sell_stock': 'Sell Stock',
     'no_stock_available': 'No stock available',
@@ -340,16 +328,14 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'partial': 'Partial',
     'void': 'Void',
     'mark_paid': 'Mark as Paid',
-    'confirm_void_invoice':
-        'Are you sure you want to void this invoice? This will reverse the balance.',
+    'confirm_void_invoice': 'Are you sure you want to void this invoice? This will reverse the balance.',
     'void_refund_cash': 'Cash Refund',
     'void_refund_credit': 'Credit Balance',
     'linked_invoice': 'Linked Invoice',
     'bad_debt': 'Bad Debt',
     'mark_bad_debt': 'Mark as Bad Debt',
     'recover_bad_debt': 'Recover Bad Debt',
-    'confirm_bad_debt':
-        'Mark this customer as bad debt? Their outstanding balance will be written off.',
+    'confirm_bad_debt': 'Mark this customer as bad debt? Their outstanding balance will be written off.',
     'confirm_recover_bad_debt':
         'Recover this bad debt? The written-off balance will be restored.',
     'bad_debt_amount': 'Bad Debt Amount',
@@ -357,8 +343,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'transfer_history': 'Transfer History',
     'settings': 'Settings',
     'platform_settings': 'Platform Settings',
-    'platform_settings_scope':
-        'Global access is limited to workspace management, profile preferences, About, and What’s New. Business settings require an active support workspace.',
+    'platform_settings_scope': 'Global access is limited to workspace management, profile preferences, About, and What’s New. Business settings require an active support workspace.',
 
     // ── Dashboard ──
     'todays_snapshot': "Today's Snapshot",
@@ -659,6 +644,19 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'notification_new_transaction': 'New transaction',
     'notification_new_invoice': 'New invoice',
     'notification_center': 'Notification Center',
+    'notification_feed_source': 'Notification feed',
+    'notification_shop_visibility_source': 'Shop visibility lookup',
+    'android_notification_channel_name': 'Workspace activity',
+    'android_notification_channel_description':
+        'New transaction and invoice alerts while FootWear is open',
+    'android_notifications_foreground_only': 'Enable local alerts while FootWear is open. They do not arrive after the app closes.',
+    'android_notifications_enabled':
+        'On-device alerts are enabled while the app is open.',
+    'android_notifications_permission_denied': 'Notification permission was not granted. Check Android app notification settings.',
+    'android_notifications_unavailable':
+        'Android notifications are unavailable on this device.',
+    'android_notifications_initialization_failed':
+        'Android notifications could not be initialized.',
     'mark_as_read': 'Mark as read',
     'sort_by_name': 'Sort by name',
 
@@ -725,11 +723,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'archive_workspace': 'Archive workspace',
     'restore_workspace': 'Restore workspace',
     'archive_workspace_confirmation_title': 'Archive this workspace?',
-    'archive_workspace_confirmation_message':
-        'This blocks business access for all members but preserves their profiles and records. You can restore it later.',
+    'archive_workspace_confirmation_message': 'This blocks business access for all members but preserves their profiles and records. You can restore it later.',
     'restore_workspace_confirmation_title': 'Restore this workspace?',
-    'restore_workspace_confirmation_message':
-        'This reactivates business access for active members in this workspace.',
+    'restore_workspace_confirmation_message': 'This reactivates business access for active members in this workspace.',
     'workspace_archived': 'Workspace archived',
     'workspace_restored': 'Workspace restored',
     'workspace_status_active': 'Active',
@@ -753,8 +749,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'This workspace has reached its 10 active-user limit.',
     'workspace_seat_count_initialization_required':
         'Seat tracking must be initialized before managing workspace users.',
-    'workspace_seat_count_changed_retry':
-        'Workspace membership changed during reconciliation. Refresh and try again.',
+    'workspace_seat_count_changed_retry': 'Workspace membership changed during reconciliation. Refresh and try again.',
     'workspace_member_summary': 'Workspace members',
     'workspace_active_users': 'Active users',
     'workspace_inactive_users': 'Inactive users',
@@ -885,12 +880,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'expected_delivery': 'Expected Delivery',
     'not_set': 'Not set',
     'delivered_order': 'Delivered Order',
-    'cash_refund_note':
-        'Cash refund will be logged manually via the Cash screen after physical refund is confirmed.',
+    'cash_refund_note': 'Cash refund will be logged manually via the Cash screen after physical refund is confirmed.',
     'enter_refund_amount': 'Enter refund amount',
     'invalid_amount': 'Invalid amount',
-    'gps_hint':
-        'Enter GPS coordinates so other sellers can find this shop. You can get coordinates from Google Maps.',
+    'gps_hint': 'Enter GPS coordinates so other sellers can find this shop. You can get coordinates from Google Maps.',
     'invalid_number': 'Invalid number',
     'category_required': 'Category is required',
     'country': 'Country',
@@ -911,24 +904,20 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'created_date': 'Created',
     'received_date': 'Received',
     'mark_as_completed': 'Mark as Completed',
-    'mark_completed_info':
-        'Confirm that the physical refund has been given to the customer. This will lock the return.',
+    'mark_completed_info': 'Confirm that the physical refund has been given to the customer. This will lock the return.',
     'reason_optional': 'Reason (optional)',
     'replacement_order': 'Replacement Order',
     'return_completed_log':
         'Return completed. Log the cash refund via Cash screen.',
     'return_locked': 'This return is completed and locked.',
     'return_rejected_msg': 'This return has been rejected.',
-    'reminder_cash_refund':
-        'Reminder: After marking complete, log the cash refund via the Cash screen.',
+    'reminder_cash_refund': 'Reminder: After marking complete, log the cash refund via the Cash screen.',
     'write_off_amount_bad_debt': 'Write Off as Bad Debt',
-    'bad_debt_confirm_msg':
-        'outstanding balance will be written off as bad debt expense. Balance will be set to zero and an expense record submitted for approval.',
+    'bad_debt_confirm_msg': 'outstanding balance will be written off as bad debt expense. Balance will be set to zero and an expense record submitted for approval.',
     'order_id_label': 'Order ID',
     'total_pairs': 'Total Pairs',
     'inventory_batch_label': 'Inventory Batch',
-    'mark_received_info':
-        'This will trigger creation of inventory items and a batch. This cannot be undone.',
+    'mark_received_info': 'This will trigger creation of inventory items and a batch. This cannot be undone.',
     'cancel_po': 'Cancel Order',
 
     // ── Management screen strings ──
@@ -1062,8 +1051,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'send_payment_reminder': 'Send Payment Reminder',
     'whatsapp_open_chat': 'Open Chat',
     'whatsapp_view_statement': 'View Account Statement',
-    'payment_reminder_msg':
-        'Hello %name%, your outstanding balance is %amount%. Please arrange payment at your earliest convenience.',
+    'payment_reminder_msg': 'Hello %name%, your outstanding balance is %amount%. Please arrange payment at your earliest convenience.',
     'top_outstanding': 'Top Outstanding Accounts',
     'outstanding': 'Outstanding',
     'days_overdue': 'days overdue',
@@ -1149,8 +1137,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'create_cash_receipt': 'Create Cash Receipt',
     'invoice_created': 'Invoice created successfully',
     'no_inventory_items': 'No inventory items available',
-    'admin_no_stock_guidance':
-        'No stock is allocated to you. Transfer warehouse stock to your account, or choose a non-stock invoice if this workspace allows it.',
+    'admin_no_stock_guidance': 'No stock is allocated to you. Transfer warehouse stock to your account, or choose a non-stock invoice if this workspace allows it.',
     'select_shop': 'Select Shop',
     'select_at_least_one_item': 'Select at least one item',
     'sale_amount': 'Sale Amount',
@@ -1167,10 +1154,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'new_balance': 'New Balance',
     'sale_amount_required': 'Enter sale amount',
     'payment_summary': 'Payment Summary',
-    'route_has_seller':
-        'Cannot delete: route has an assigned seller. Remove the seller assignment first.',
-    'route_has_shops':
-        'Cannot delete: route has active shops. Move or deactivate shops first.',
+    'route_has_seller': 'Cannot delete: route has an assigned seller. Remove the seller assignment first.',
+    'route_has_shops': 'Cannot delete: route has active shops. Move or deactivate shops first.',
     'invoice_ref': 'Invoice',
     'invoice_title': 'INVOICE',
     'invoice_mode': 'Invoice Type',
@@ -1201,8 +1186,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'invoice_header_settings': 'Invoice Header',
     'invoice_header_settings_hint': 'Configure this workspace invoice header',
     'financial_document_language_pair': 'Financial document languages',
-    'financial_document_language_pair_hint':
-        'Use English with the selected Arabic or Urdu language in financial PDFs',
+    'financial_document_language_pair_hint': 'Use English with the selected Arabic or Urdu language in financial PDFs',
     'financial_document_language_english_arabic': 'English + Arabic',
     'financial_document_language_english_urdu': 'English + Urdu',
     'allow_non_stock_invoices': 'Allow Non-stock Invoices',
@@ -1214,8 +1198,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'invoice_header_contact': 'Contact and Registration',
     'receipt_phone_2': 'Additional receipt contact number 2 (optional)',
     'receipt_phone_3': 'Additional receipt contact number 3 (optional)',
-    'receipt_contact_numbers_hint':
-        'Extra numbers appear in the cash receipt footer only. The shared header stays unchanged.',
+    'receipt_contact_numbers_hint': 'Extra numbers appear in the cash receipt footer only. The shared header stays unchanged.',
     'invoice_name_en': 'Business Name (English)',
     'invoice_name_ar': 'Business Name (Arabic)',
     'invoice_name_ur': 'Business Name (Urdu)',
@@ -1331,16 +1314,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'reactivate': 'Reactivate',
     'confirm_reactivate_user': 'Reactivate %s and restore their access?',
     'disable_user': 'Disable account',
-    'confirm_deactivate_user':
-        'Disable %s? They will lose access, and their route assignments will be cleared.',
+    'confirm_deactivate_user': 'Disable %s? They will lose access, and their route assignments will be cleared.',
     'settings_company_logo': 'Company Logo',
-    'settings_logo_specs':
-        'Lossless PNG · auto-oriented · resized proportionally up to 800×400 px · max 50 KB Base64. No upscaling or JPEG compression.',
+    'settings_logo_specs': 'Lossless PNG · auto-oriented · resized proportionally up to 800×400 px · max 50 KB Base64. No upscaling or JPEG compression.',
     'settings_logo_processing': 'Processing locally…',
     'settings_logo_preview_details':
         'PNG · %1×%2 px · %3 Base64 · source %4×%5 px',
-    'settings_logo_invalid_image':
-        'This file could not be decoded as an image. Choose a valid image file.',
+    'settings_logo_invalid_image': 'This file could not be decoded as an image. Choose a valid image file.',
     'settings_logo_source_too_large':
         'Source image is %s. Choose an image under 20 MB.',
     'settings_logo_processing_failed':
@@ -1349,8 +1329,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'Pairs per carton must be a positive whole number.',
     'settings_logo_image_too_large':
         'Image is %s. Use a simpler image or reduce dimensions to 256×256 px.',
-    'settings_logo_encoded_too_large':
-        'Lossless PNG is %s at %1×%2 px, above the 50 KB limit. Use a simpler logo with fewer fine details.',
+    'settings_logo_encoded_too_large': 'Lossless PNG is %s at %1×%2 px, above the 50 KB limit. Use a simpler logo with fewer fine details.',
     'lbl_preview': 'Preview · %s',
     'settings_uploading_pct': 'Uploading… %s%%',
     'settings_uploading': 'Uploading…',
@@ -1369,8 +1348,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'dashboard_pending_dues': 'Shops have pending dues',
     'pending_edit_requests_count':
         '%s seller edit requests pending your approval',
-    'pending_edit_requests_subtitle':
-        'Open the request list and jump to the related shop to approve or reject.',
+    'pending_edit_requests_subtitle': 'Open the request list and jump to the related shop to approve or reject.',
     'lbl_view': 'View',
     'dashboard_stock_cartons': 'Stock Cartons',
     'dashboard_pairs_remainder': '%s pairs remainder',
@@ -1407,10 +1385,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'This sign-in does not have an assigned workspace profile.',
     'bootstrap_invalid_role_title': 'This account role is not supported.',
     'bootstrap_signed_in_as': 'Signed in as: %s',
-    'bootstrap_instructions':
-        'Your sign-in is valid, but a workspace profile has not been provisioned for this account. Contact your workspace administrator to request access.',
-    'bootstrap_invalid_role_instructions':
-        'A workspace administrator must correct this account role before it can access business data. Sign out and contact support.',
+    'bootstrap_instructions': 'Your sign-in is valid, but a workspace profile has not been provisioned for this account. Contact your workspace administrator to request access.',
+    'bootstrap_invalid_role_instructions': 'A workspace administrator must correct this account role before it can access business data. Sign out and contact support.',
 
     // ── Shop Detail Screen ──
     'tooltip_edit_customer': 'Edit shop',
@@ -1471,8 +1447,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Danger Zone / Database Flush ──
     'danger_zone': 'Danger Zone',
     'danger_zone_subtitle': 'Irreversible database operations',
-    'flush_data_reset_unavailable':
-        'Workspace data cleanup is disabled because client-side deletes can leave invoices, balances, inventory, routes, and user profiles inconsistent. Use an encrypted backup and an approved, audited maintenance process.',
+    'flush_data_reset_unavailable': 'Workspace data cleanup is disabled because client-side deletes can leave invoices, balances, inventory, routes, and user profiles inconsistent. Use an encrypted backup and an approved, audited maintenance process.',
     'flush_financial': 'Flush Financial Data',
     'flush_financial_desc':
         'Delete all invoices, transactions, and reset shop balances to zero',
@@ -1521,15 +1496,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Backup ──
     'backup_title': 'Backup Data',
     'backup_subtitle': 'Choose records allowed by your workspace role.',
-    'backup_platform_metadata_subtitle':
-        'Only the selected workspace profile and its user profiles are included. Business records are excluded.',
+    'backup_platform_metadata_subtitle': 'Only the selected workspace profile and its user profiles are included. Business records are excluded.',
     'backup_scope_ready': 'Workspace backup scope is ready.',
-    'backup_workspace_backup_subtitle':
-        'Includes workspace business data. User and seller account profiles are excluded.',
-    'backup_seller_route_backup_subtitle':
-        'Includes assigned routes, shops, your inventory, transactions, and invoices. Restore imports only your unlinked cash transactions.',
-    'backup_seller_restore_warning':
-        'Only your own unlinked cash transactions for routes currently assigned to you can be restored. Invoice-linked entries and other sellers’ transactions are not restored.',
+    'backup_workspace_backup_subtitle': 'Includes workspace business data. User and seller account profiles are excluded.',
+    'backup_seller_route_backup_subtitle': 'Includes assigned routes, shops, your inventory, transactions, and invoices. Restore imports only your unlinked cash transactions.',
+    'backup_seller_restore_warning': 'Only your own unlinked cash transactions for routes currently assigned to you can be restored. Invoice-linked entries and other sellers’ transactions are not restored.',
     'backup_workspaces': 'Selected workspace profile',
     'backup_users': 'Workspace user profiles',
     'backup_routes': 'Routes',
@@ -1557,10 +1528,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'restore_from_google_drive': 'Restore from Google Drive',
     'backup_drive_success': 'Backup uploaded to your Google Drive',
     'backup_drive_none': 'No ShoesERP backups found in your Google Drive',
-    'backup_drive_error':
-        'Google Drive is not configured or authorization was not granted. Contact the administrator.',
-    'backup_drive_not_configured':
-        'Automatic Google Drive backup is unavailable until this build is configured.',
+    'backup_drive_error': 'Google Drive is not configured or authorization was not granted. Contact the administrator.',
+    'backup_drive_not_configured': 'Automatic Google Drive backup is unavailable until this build is configured.',
     'backup_delete_title': 'Delete backup',
     'backup_delete_prompt':
         'Permanently delete %s from Google Drive? This cannot be undone.',
@@ -1590,10 +1559,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_restore': 'Restore from Backup',
     'backup_restore_subtitle':
         'Select a saved backup to restore its data into this workspace',
-    'backup_seller_restore_subtitle':
-        'Restore only your own unlinked cash transactions for currently assigned routes.',
-    'backup_restore_warning':
-        'This will replace data covered by the backup. This action cannot be undone.',
+    'backup_seller_restore_subtitle': 'Restore only your own unlinked cash transactions for currently assigned routes.',
+    'backup_restore_warning': 'This will replace data covered by the backup. This action cannot be undone.',
     'backup_restore_merge_warning':
         'Records missing from this backup will remain in the workspace.',
     'backup_restore_reauth_title': 'Confirm password to restore backup',
@@ -1642,8 +1609,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'build_number': 'رقم البناء',
     'release_date': 'تاريخ الإصدار',
     'platform': 'المنصة',
-    'about_description':
-        'نظام مؤسسي لمساحات العمل لتوزيع الأحذية ومبيعات المسارات والمخزون والتقارير.',
+    'about_description': 'نظام مؤسسي لمساحات العمل لتوزيع الأحذية ومبيعات المسارات والمخزون والتقارير.',
     'platform_value': 'Firebase Spark — Firestore وAuth',
     'copyright_notice': '© %s. جميع الحقوق محفوظة.',
     'legal': 'قانوني',
@@ -1690,8 +1656,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'workspace_access_reason_invalid': 'أدخل سببًا يتراوح بين 10 و240 حرفًا.',
     'workspace_access_unavailable':
         'مساحة العمل المحددة غير متاحة. حدّث القائمة وحاول مرة أخرى.',
-    'workspace_settings_initialization_required':
-        'إعدادات الفواتير لمساحة العمل غير مهيأة. اطلب من مسؤول مساحة العمل فتح إعدادات ترويسة الفاتورة وحفظها قبل إنشاء الفواتير أو الإيصالات.',
+    'workspace_settings_initialization_required': 'إعدادات الفواتير لمساحة العمل غير مهيأة. اطلب من مسؤول مساحة العمل فتح إعدادات ترويسة الفاتورة وحفظها قبل إنشاء الفواتير أو الإيصالات.',
     'workspace_access_started': 'بدأ الوصول إلى مساحة العمل للدعم.',
     'workspace_access_ended': 'انتهى الوصول إلى مساحة العمل للدعم.',
     'workspace_access_end_title': 'هل تريد إنهاء وصول الدعم؟',
@@ -1699,8 +1664,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'سيؤدي ذلك إلى مسح مساحة العمل المحددة وإنهاء الوصول إلى بياناتها.',
     'workspace_support_context_required':
         'اختر مساحة عمل وأدخل سبب الدعم قبل الوصول إلى بياناتها.',
-    'workspace_support_context_other_workspace':
-        'تم تحديد مساحة عمل أخرى حاليًا. سيؤدي اختيار هذه المساحة إلى تبديل سياق الدعم المسجل.',
+    'workspace_support_context_other_workspace': 'تم تحديد مساحة عمل أخرى حاليًا. سيؤدي اختيار هذه المساحة إلى تبديل سياق الدعم المسجل.',
     'credentials_owner_managed':
         'يدير مالك الحساب تغييرات البريد وكلمة المرور.',
     'send_password_reset': 'إرسال بريد إعادة تعيين كلمة المرور',
@@ -1772,8 +1736,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_export_no_data':
         'لا توجد بيانات للتصدير. جرّب فلاتر مختلفة أو أضف سجلات أولاً.',
     'err_pdf_failed': 'فشل إنشاء PDF.',
-    'err_pdf_shaping_unavailable':
-        'لا يمكن لهذا الإصدار إنشاء ملفات PDF عربية أو أردية بشكل صحيح. حدّث التطبيق أو تواصل مع المسؤول.',
+    'err_pdf_shaping_unavailable': 'لا يمكن لهذا الإصدار إنشاء ملفات PDF عربية أو أردية بشكل صحيح. حدّث التطبيق أو تواصل مع المسؤول.',
     'err_unknown': 'حدث خطأ ما. حاول مرة أخرى.',
     'err_function_not_deployed':
         'هذه الميزة تتطلب إعداد الخادم — تواصل مع المسؤول.',
@@ -1790,8 +1753,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'edit_request_rejected': 'تم رفض طلب التعديل.',
     'pending_admin_approval': 'بانتظار موافقة المسؤول',
     'require_approval_title': 'طلب موافقة المسؤول على تعديلات البائع للمعاملات',
-    'require_approval_subtitle':
-        'تشغيل: تعديلات البائع تبقى معلقة حتى الموافقة. إيقاف: تُعتمد تلقائياً.',
+    'require_approval_subtitle': 'تشغيل: تعديلات البائع تبقى معلقة حتى الموافقة. إيقاف: تُعتمد تلقائياً.',
     // ── بيع المخزون ──
     'sell_stock': 'بيع المخزون',
     'no_stock_available': 'لا يوجد مخزون متاح',
@@ -1891,8 +1853,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'transfer_history': 'سجل التحويلات',
     'settings': 'الإعدادات',
     'platform_settings': 'إعدادات المنصة',
-    'platform_settings_scope':
-        'يقتصر الوصول العام على إدارة مساحات العمل وتفضيلات الملف الشخصي والنبذة والجديد. تتطلب إعدادات الأعمال مساحة عمل دعم نشطة.',
+    'platform_settings_scope': 'يقتصر الوصول العام على إدارة مساحات العمل وتفضيلات الملف الشخصي والنبذة والجديد. تتطلب إعدادات الأعمال مساحة عمل دعم نشطة.',
 
     // ── Dashboard ──
     'todays_snapshot': 'لمحة اليوم',
@@ -2196,6 +2157,20 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'notification_new_transaction': 'معاملة جديدة',
     'notification_new_invoice': 'فاتورة جديدة',
     'notification_center': 'مركز الإشعارات',
+    'notification_feed_source': 'تدفق الإشعارات',
+    'notification_shop_visibility_source': 'التحقق من ظهور المتجر',
+    'android_notification_channel_name': 'نشاط مساحة العمل',
+    'android_notification_channel_description':
+        'تنبيهات المعاملات والفواتير الجديدة أثناء فتح التطبيق',
+    'android_notifications_foreground_only':
+        'فعّل التنبيهات المحلية أثناء فتح التطبيق. لن تصلك بعد إغلاق التطبيق.',
+    'android_notifications_enabled': 'تم تفعيل التنبيهات أثناء فتح التطبيق.',
+    'android_notifications_permission_denied':
+        'لم يتم منح إذن الإشعارات. تحقق من إعدادات إشعارات التطبيق في Android.',
+    'android_notifications_unavailable':
+        'إشعارات Android غير متاحة على هذا الجهاز.',
+    'android_notifications_initialization_failed':
+        'تعذر تهيئة إشعارات Android.',
     'mark_as_read': 'تعليم كمقروء',
     'sort_by_name': 'ترتيب حسب الاسم',
 
@@ -2261,8 +2236,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'archive_workspace': 'أرشفة مساحة العمل',
     'restore_workspace': 'استعادة مساحة العمل',
     'archive_workspace_confirmation_title': 'هل تريد أرشفة مساحة العمل؟',
-    'archive_workspace_confirmation_message':
-        'سيؤدي ذلك إلى إيقاف وصول الأعضاء إلى بيانات العمل مع الاحتفاظ بملفاتهم وسجلاتهم. يمكنك استعادتها لاحقاً.',
+    'archive_workspace_confirmation_message': 'سيؤدي ذلك إلى إيقاف وصول الأعضاء إلى بيانات العمل مع الاحتفاظ بملفاتهم وسجلاتهم. يمكنك استعادتها لاحقاً.',
     'restore_workspace_confirmation_title': 'هل تريد استعادة مساحة العمل؟',
     'restore_workspace_confirmation_message':
         'سيؤدي ذلك إلى إعادة وصول الأعضاء النشطين إلى بيانات مساحة العمل.',
@@ -2288,8 +2262,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'وصلت مساحة العمل إلى الحد الأقصى البالغ 10 مستخدمين نشطين.',
     'workspace_seat_count_initialization_required':
         'يجب تهيئة تتبع المقاعد قبل إدارة مستخدمي مساحة العمل.',
-    'workspace_seat_count_changed_retry':
-        'تغيرت عضوية مساحة العمل أثناء مطابقة العدد. حدّث القائمة وحاول مجددًا.',
+    'workspace_seat_count_changed_retry': 'تغيرت عضوية مساحة العمل أثناء مطابقة العدد. حدّث القائمة وحاول مجددًا.',
     'workspace_member_summary': 'أعضاء مساحة العمل',
     'workspace_active_users': 'المستخدمون النشطون',
     'workspace_inactive_users': 'المستخدمون غير النشطين',
@@ -2420,12 +2393,10 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'expected_delivery': 'التسليم المتوقع',
     'not_set': 'غير محدد',
     'delivered_order': 'طلب مسلّم',
-    'cash_refund_note':
-        'سيتم تسجيل الاسترداد النقدي يدويًا عبر شاشة النقد بعد تأكيد الاسترداد الفعلي.',
+    'cash_refund_note': 'سيتم تسجيل الاسترداد النقدي يدويًا عبر شاشة النقد بعد تأكيد الاسترداد الفعلي.',
     'enter_refund_amount': 'أدخل مبلغ الاسترداد',
     'invalid_amount': 'مبلغ غير صالح',
-    'gps_hint':
-        'أدخل إحداثيات GPS ليتمكن البائعون الآخرون من العثور على هذا المحل. يمكنك الحصول على الإحداثيات من خرائط جوجل.',
+    'gps_hint': 'أدخل إحداثيات GPS ليتمكن البائعون الآخرون من العثور على هذا المحل. يمكنك الحصول على الإحداثيات من خرائط جوجل.',
     'invalid_number': 'رقم غير صالح',
     'category_required': 'الفئة مطلوبة',
     'country': 'الدولة',
@@ -2462,8 +2433,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'reminder_cash_refund':
         'تذكير: بعد التحديد كمكتمل، سجّل المبلغ المسترد عبر شاشة النقد.',
     'write_off_amount_bad_debt': 'شطب كديون معدومة',
-    'bad_debt_confirm_msg':
-        'سيتم شطب الرصيد المعلق كمصروف ديون معدومة. سيتم تصفير الرصيد وتقديم سجل مصروفات للموافقة.',
+    'bad_debt_confirm_msg': 'سيتم شطب الرصيد المعلق كمصروف ديون معدومة. سيتم تصفير الرصيد وتقديم سجل مصروفات للموافقة.',
     'order_id_label': 'رقم الطلب',
     'total_pairs': 'إجمالي الأزواج',
     'inventory_batch_label': 'دفعة المخزون',
@@ -2595,8 +2565,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'send_payment_reminder': 'إرسال تذكير بالدفع',
     'whatsapp_open_chat': 'فتح المحادثة',
     'whatsapp_view_statement': 'عرض كشف الحساب',
-    'payment_reminder_msg':
-        'مرحباً %name%، رصيدك المستحق هو %amount%. يرجى ترتيب الدفع في أقرب وقت ممكن.',
+    'payment_reminder_msg': 'مرحباً %name%، رصيدك المستحق هو %amount%. يرجى ترتيب الدفع في أقرب وقت ممكن.',
     'top_outstanding': 'أعلى الحسابات المستحقة',
     'outstanding': 'مستحق',
     'days_overdue': 'أيام متأخرة',
@@ -2680,8 +2649,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'create_cash_receipt': 'إنشاء سند قبض',
     'invoice_created': 'تم إنشاء الفاتورة بنجاح',
     'no_inventory_items': 'لا توجد عناصر مخزون متاحة',
-    'admin_no_stock_guidance':
-        'لا يوجد مخزون مخصص لك. انقل المخزون من المستودع إلى حسابك، أو اختر فاتورة بدون مخزون إذا كانت مساحة العمل تسمح بذلك.',
+    'admin_no_stock_guidance': 'لا يوجد مخزون مخصص لك. انقل المخزون من المستودع إلى حسابك، أو اختر فاتورة بدون مخزون إذا كانت مساحة العمل تسمح بذلك.',
     'select_shop': 'اختر المتجر',
     'select_at_least_one_item': 'اختر عنصرًا واحدًا على الأقل',
     'sale_amount': 'مبلغ البيع',
@@ -2700,8 +2668,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'payment_summary': 'ملخص الدفع',
     'route_has_seller':
         'لا يمكن الحذف: المنطقة لديها بائع معين. قم بإزالة تعيين البائع أولاً.',
-    'route_has_shops':
-        'لا يمكن الحذف: المنطقة تحتوي على محلات نشطة. انقل أو عطّل المحلات أولاً.',
+    'route_has_shops': 'لا يمكن الحذف: المنطقة تحتوي على محلات نشطة. انقل أو عطّل المحلات أولاً.',
     'invoice_ref': 'فاتورة',
     'invoice_title': 'فاتورة',
     'invoice_mode': 'نوع الفاتورة',
@@ -2745,8 +2712,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'invoice_header_contact': 'بيانات التواصل والتسجيل',
     'receipt_phone_2': 'رقم اتصال إضافي للإيصال 2 (اختياري)',
     'receipt_phone_3': 'رقم اتصال إضافي للإيصال 3 (اختياري)',
-    'receipt_contact_numbers_hint':
-        'تظهر الأرقام الإضافية في تذييل سند القبض فقط، دون تغيير الترويسة المشتركة.',
+    'receipt_contact_numbers_hint': 'تظهر الأرقام الإضافية في تذييل سند القبض فقط، دون تغيير الترويسة المشتركة.',
     'invoice_name_en': 'اسم المنشأة (بالإنجليزية)',
     'invoice_name_ar': 'اسم المنشأة (بالعربية)',
     'invoice_name_ur': 'اسم المنشأة (بالأردية)',
@@ -2866,8 +2832,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'confirm_deactivate_user':
         'هل تريد تعطيل %s؟ سيفقد الوصول وستتم إزالة تعيينات المسارات.',
     'settings_company_logo': 'شعار الشركة',
-    'settings_logo_specs':
-        'PNG دون فقدان الجودة · تصحيح الاتجاه تلقائيًا · تغيير متناسب حتى 800×400 بكسل · حد 50 كيلوبايت Base64. دون تكبير أو ضغط JPEG.',
+    'settings_logo_specs': 'PNG دون فقدان الجودة · تصحيح الاتجاه تلقائيًا · تغيير متناسب حتى 800×400 بكسل · حد 50 كيلوبايت Base64. دون تكبير أو ضغط JPEG.',
     'settings_logo_processing': 'جارٍ المعالجة محليًا…',
     'settings_logo_preview_details':
         'PNG · %1×%2 بكسل · %3 Base64 · الأصل %4×%5 بكسل',
@@ -2880,8 +2845,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'يجب أن يكون عدد الأزواج في الكرتون رقمًا صحيحًا موجبًا.',
     'settings_logo_image_too_large':
         'حجم الصورة %s. استخدم صورة أبسط أو قلّل الأبعاد إلى 256×256 بكسل.',
-    'settings_logo_encoded_too_large':
-        'حجم PNG دون فقدان الجودة %s بأبعاد %1×%2 بكسل، ويتجاوز حد 50 كيلوبايت. استخدم شعارًا أبسط بتفاصيل دقيقة أقل.',
+    'settings_logo_encoded_too_large': 'حجم PNG دون فقدان الجودة %s بأبعاد %1×%2 بكسل، ويتجاوز حد 50 كيلوبايت. استخدم شعارًا أبسط بتفاصيل دقيقة أقل.',
     'lbl_preview': 'معاينة · %s',
     'settings_uploading_pct': 'جارٍ الرفع… %s%%',
     'settings_uploading': 'جارٍ الرفع…',
@@ -2937,10 +2901,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'bootstrap_missing_profile': 'لا توجد مساحة عمل مخصصة لهذا الحساب.',
     'bootstrap_invalid_role_title': 'دور هذا الحساب غير مدعوم.',
     'bootstrap_signed_in_as': 'مسجّل الدخول كـ: %s',
-    'bootstrap_instructions':
-        'تم تسجيل الدخول، لكن لم يتم إعداد ملف مساحة عمل لهذا الحساب. تواصل مع مسؤول مساحة العمل لطلب الوصول.',
-    'bootstrap_invalid_role_instructions':
-        'يجب على مسؤول مساحة العمل تصحيح دور الحساب قبل الوصول إلى بيانات العمل. سجّل الخروج وتواصل مع الدعم.',
+    'bootstrap_instructions': 'تم تسجيل الدخول، لكن لم يتم إعداد ملف مساحة عمل لهذا الحساب. تواصل مع مسؤول مساحة العمل لطلب الوصول.',
+    'bootstrap_invalid_role_instructions': 'يجب على مسؤول مساحة العمل تصحيح دور الحساب قبل الوصول إلى بيانات العمل. سجّل الخروج وتواصل مع الدعم.',
 
     // ── Shop Detail Screen ──
     'tooltip_edit_customer': 'تعديل المحل',
@@ -3001,8 +2963,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Danger Zone / Database Flush ──
     'danger_zone': 'منطقة الخطر',
     'danger_zone_subtitle': 'عمليات قاعدة بيانات لا رجعة فيها',
-    'flush_data_reset_unavailable':
-        'تم تعطيل تنظيف بيانات مساحة العمل لأن عمليات الحذف من التطبيق قد تؤدي إلى عدم اتساق الفواتير والأرصدة والمخزون والمسارات وملفات المستخدمين. استخدم نسخة احتياطية مشفرة وإجراء صيانة معتمداً ومسجلاً للتدقيق.',
+    'flush_data_reset_unavailable': 'تم تعطيل تنظيف بيانات مساحة العمل لأن عمليات الحذف من التطبيق قد تؤدي إلى عدم اتساق الفواتير والأرصدة والمخزون والمسارات وملفات المستخدمين. استخدم نسخة احتياطية مشفرة وإجراء صيانة معتمداً ومسجلاً للتدقيق.',
     'flush_financial': 'مسح البيانات المالية',
     'flush_financial_desc':
         'حذف جميع الفواتير والمعاملات وإعادة أرصدة المحلات إلى صفر',
@@ -3048,15 +3009,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Backup ──
     'backup_title': 'نسخ احتياطي للبيانات',
     'backup_subtitle': 'اختر السجلات المسموح بها حسب دورك في مساحة العمل.',
-    'backup_platform_metadata_subtitle':
-        'تتضمن النسخة مساحة العمل المحددة وملفات مستخدميها فقط، ولا تتضمن سجلات العمل.',
+    'backup_platform_metadata_subtitle': 'تتضمن النسخة مساحة العمل المحددة وملفات مستخدميها فقط، ولا تتضمن سجلات العمل.',
     'backup_scope_ready': 'نطاق النسخ الاحتياطي لمساحة العمل جاهز.',
-    'backup_workspace_backup_subtitle':
-        'تتضمن بيانات العمل لمساحة العمل، ولا تتضمن ملفات حسابات المستخدمين أو البائعين.',
-    'backup_seller_route_backup_subtitle':
-        'تتضمن المسارات والمحلات والمخزون والمعاملات والفواتير المخصصة لك. تستعيد العملية معاملاتك النقدية غير المرتبطة بفاتورة فقط.',
-    'backup_seller_restore_warning':
-        'تستعيد العملية معاملاتك النقدية غير المرتبطة بفاتورة للمسارات المخصصة لك حالياً فقط. لن تُستعاد المعاملات المرتبطة بالفواتير أو معاملات البائعين الآخرين.',
+    'backup_workspace_backup_subtitle': 'تتضمن بيانات العمل لمساحة العمل، ولا تتضمن ملفات حسابات المستخدمين أو البائعين.',
+    'backup_seller_route_backup_subtitle': 'تتضمن المسارات والمحلات والمخزون والمعاملات والفواتير المخصصة لك. تستعيد العملية معاملاتك النقدية غير المرتبطة بفاتورة فقط.',
+    'backup_seller_restore_warning': 'تستعيد العملية معاملاتك النقدية غير المرتبطة بفاتورة للمسارات المخصصة لك حالياً فقط. لن تُستعاد المعاملات المرتبطة بالفواتير أو معاملات البائعين الآخرين.',
     'backup_workspaces': 'ملف مساحة العمل المحددة',
     'backup_users': 'ملفات مستخدمي مساحة العمل',
     'backup_routes': 'المسارات',
@@ -3084,8 +3041,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'تم رفع النسخة الاحتياطية إلى Google Drive الخاص بك',
     'backup_drive_none':
         'لا توجد نسخ ShoesERP احتياطية في Google Drive الخاص بك',
-    'backup_drive_error':
-        'Google Drive غير مهيأ أو لم تتم الموافقة على التفويض. تواصل مع المسؤول.',
+    'backup_drive_error': 'Google Drive غير مهيأ أو لم تتم الموافقة على التفويض. تواصل مع المسؤول.',
     'backup_drive_not_configured':
         'النسخ التلقائي إلى Google Drive غير متاح حتى يتم إعداد هذا الإصدار.',
     'backup_delete_title': 'حذف النسخة الاحتياطية',
@@ -3117,10 +3073,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_restore': 'استعادة من نسخة احتياطية',
     'backup_restore_subtitle':
         'اختر نسخة محفوظة لاستعادة بياناتها إلى مساحة العمل هذه',
-    'backup_seller_restore_subtitle':
-        'استعد معاملاتك النقدية غير المرتبطة بفاتورة للمسارات المخصصة لك حالياً فقط.',
-    'backup_restore_warning':
-        'ستستبدل هذه العملية البيانات الموجودة في النسخة الاحتياطية. لا يمكن التراجع عن هذا الإجراء.',
+    'backup_seller_restore_subtitle': 'استعد معاملاتك النقدية غير المرتبطة بفاتورة للمسارات المخصصة لك حالياً فقط.',
+    'backup_restore_warning': 'ستستبدل هذه العملية البيانات الموجودة في النسخة الاحتياطية. لا يمكن التراجع عن هذا الإجراء.',
     'backup_restore_merge_warning':
         'ستبقى السجلات غير الموجودة في هذه النسخة داخل مساحة العمل.',
     'backup_restore_reauth_title': 'تأكيد كلمة المرور لاستعادة النسخة',
@@ -3168,8 +3122,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'build_number': 'بلڈ نمبر',
     'release_date': 'ریلیز کی تاریخ',
     'platform': 'پلیٹ فارم',
-    'about_description':
-        'جوتوں کی تقسیم، روٹ سیلز، انوینٹری اور رپورٹس کے لیے ورک اسپیس پر مبنی ERP۔',
+    'about_description': 'جوتوں کی تقسیم، روٹ سیلز، انوینٹری اور رپورٹس کے لیے ورک اسپیس پر مبنی ERP۔',
     'platform_value': 'Firebase Spark — Firestore اور Auth',
     'copyright_notice': '© %s. جملہ حقوق محفوظ ہیں۔',
     'legal': 'قانونی',
@@ -3216,17 +3169,13 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'workspace_access_reason_invalid': '10 سے 240 حروف پر مشتمل وجہ درج کریں۔',
     'workspace_access_unavailable':
         'منتخب کردہ ورک اسپیس دستیاب نہیں۔ تازہ کاری کرکے دوبارہ کوشش کریں۔',
-    'workspace_settings_initialization_required':
-        'ورک اسپیس کی انوائس سیٹنگز تیار نہیں ہیں۔ انوائس یا رسید بنانے سے پہلے ورک اسپیس ایڈمن سے کہیں کہ انوائس ہیڈر کی ترتیبات کھول کر محفوظ کریں۔',
+    'workspace_settings_initialization_required': 'ورک اسپیس کی انوائس سیٹنگز تیار نہیں ہیں۔ انوائس یا رسید بنانے سے پہلے ورک اسپیس ایڈمن سے کہیں کہ انوائس ہیڈر کی ترتیبات کھول کر محفوظ کریں۔',
     'workspace_access_started': 'ورک اسپیس سپورٹ رسائی شروع ہو گئی۔',
     'workspace_access_ended': 'ورک اسپیس سپورٹ رسائی ختم ہو گئی۔',
     'workspace_access_end_title': 'سپورٹ رسائی ختم کریں؟',
-    'workspace_access_end_message':
-        'اس سے منتخب ورک اسپیس صاف ہو جائے گی اور اس کے کاروباری ڈیٹا تک رسائی ختم ہو جائے گی۔',
-    'workspace_support_context_required':
-        'کاروباری ڈیٹا تک رسائی سے پہلے ورک اسپیس منتخب کرکے سپورٹ کی وجہ درج کریں۔',
-    'workspace_support_context_other_workspace':
-        'اس وقت ایک دوسری ورک اسپیس منتخب ہے۔ اسے منتخب کرنے سے آڈٹ شدہ سپورٹ سیاق تبدیل ہو جائے گا۔',
+    'workspace_access_end_message': 'اس سے منتخب ورک اسپیس صاف ہو جائے گی اور اس کے کاروباری ڈیٹا تک رسائی ختم ہو جائے گی۔',
+    'workspace_support_context_required': 'کاروباری ڈیٹا تک رسائی سے پہلے ورک اسپیس منتخب کرکے سپورٹ کی وجہ درج کریں۔',
+    'workspace_support_context_other_workspace': 'اس وقت ایک دوسری ورک اسپیس منتخب ہے۔ اسے منتخب کرنے سے آڈٹ شدہ سپورٹ سیاق تبدیل ہو جائے گا۔',
     'credentials_owner_managed':
         'اکاؤنٹ کا مالک ای میل اور پاس ورڈ کی تبدیلی خود کرتا ہے۔',
     'send_password_reset': 'پاس ورڈ ری سیٹ ای میل بھیجیں',
@@ -3261,11 +3210,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_user_not_found': 'ان تفصیلات سے کوئی اکاؤنٹ نہیں ملا۔',
     'err_account_not_assigned':
         'آپ کا اکاؤنٹ کسی ورک اسپیس سے منسلک نہیں۔ منتظم سے رابطہ کریں۔',
-    'err_account_role_invalid':
-        'آپ کے اکاؤنٹ کا کردار معاونت یافتہ نہیں۔ ورک اسپیس منتظم سے رابطہ کریں۔',
+    'err_account_role_invalid': 'آپ کے اکاؤنٹ کا کردار معاونت یافتہ نہیں۔ ورک اسپیس منتظم سے رابطہ کریں۔',
     'err_user_disabled': 'یہ اکاؤنٹ غیر فعال ہے۔ ایڈمن سے رابطہ کریں۔',
-    'workspace_policy_unavailable':
-        'ورک اسپیس رسائی پالیسی دستیاب نہیں۔ دوبارہ کوشش کریں یا منتظم سے رابطہ کریں۔',
+    'workspace_policy_unavailable': 'ورک اسپیس رسائی پالیسی دستیاب نہیں۔ دوبارہ کوشش کریں یا منتظم سے رابطہ کریں۔',
     'workspace_disabled':
         'یہ ورک اسپیس آرکائیو کر دی گئی ہے۔ پلیٹ فارم ایڈمن سے رابطہ کریں۔',
     'err_too_many_requests':
@@ -3297,11 +3244,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'err_whatsapp_unavailable': 'واٹس ایپ نہیں کھلا',
     'whatsapp_greeting': 'السلام علیکم',
     'err_invalid_data': 'ڈیٹا فارمیٹ غلط ہے۔ اپنی ان پٹ چیک کریں۔',
-    'err_export_no_data':
-        'ایکسپورٹ کے لیے کوئی ڈیٹا نہیں۔ مختلف فلٹرز آزمائیں یا پہلے ریکارڈز شامل کریں۔',
+    'err_export_no_data': 'ایکسپورٹ کے لیے کوئی ڈیٹا نہیں۔ مختلف فلٹرز آزمائیں یا پہلے ریکارڈز شامل کریں۔',
     'err_pdf_failed': 'PDF بنانے میں ناکامی۔',
-    'err_pdf_shaping_unavailable':
-        'یہ ورژن عربی یا اردو PDF درست طور پر نہیں بنا سکتا۔ ایپ اپ ڈیٹ کریں یا منتظم سے رابطہ کریں۔',
+    'err_pdf_shaping_unavailable': 'یہ ورژن عربی یا اردو PDF درست طور پر نہیں بنا سکتا۔ ایپ اپ ڈیٹ کریں یا منتظم سے رابطہ کریں۔',
     'err_unknown': 'کچھ غلط ہو گیا۔ دوبارہ کوشش کریں۔',
     'err_function_not_deployed':
         'اس فیچر کے لیے سرور سیٹ اپ درکار ہے — ایڈمن سے رابطہ کریں۔',
@@ -3424,8 +3369,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'transfer_history': 'منتقلی تاریخ',
     'settings': 'ترتیبات',
     'platform_settings': 'پلیٹ فارم سیٹنگز',
-    'platform_settings_scope':
-        'عمومی رسائی ورک اسپیس مینجمنٹ، پروفائل ترجیحات، تعارف اور نئی تبدیلیوں تک محدود ہے۔ کاروباری سیٹنگز کے لیے فعال سپورٹ ورک اسپیس ضروری ہے۔',
+    'platform_settings_scope': 'عمومی رسائی ورک اسپیس مینجمنٹ، پروفائل ترجیحات، تعارف اور نئی تبدیلیوں تک محدود ہے۔ کاروباری سیٹنگز کے لیے فعال سپورٹ ورک اسپیس ضروری ہے۔',
 
     // ── Dashboard ──
     'todays_snapshot': 'آج کا خلاصہ',
@@ -3677,8 +3621,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'return_detail': 'واپسی کی تفصیل',
     'return_not_found': 'واپسی نہیں ملی',
     'approve_return': 'واپسی کی منظوری',
-    'approve_return_info':
-        'اس واپسی کی منظوری دیں؟ اچھی حالت والی اشیاء کا اسٹاک بحال ہو جائے گا۔',
+    'approve_return_info': 'اس واپسی کی منظوری دیں؟ اچھی حالت والی اشیاء کا اسٹاک بحال ہو جائے گا۔',
     'reject_return': 'واپسی مسترد کریں',
     'reject_return_info': 'اس واپسی کی درخواست مسترد کریں؟',
     'return_approved': 'واپسی منظور ہو گئی',
@@ -3729,6 +3672,18 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'notification_new_transaction': 'نئی ٹرانزیکشن',
     'notification_new_invoice': 'نئی انوائس',
     'notification_center': 'نوٹیفیکیشن سنٹر',
+    'notification_feed_source': 'اطلاعات کی فہرست',
+    'notification_shop_visibility_source': 'دکان کی نمائش کی جانچ',
+    'android_notification_channel_name': 'ورک اسپیس کی سرگرمی',
+    'android_notification_channel_description':
+        'FootWear کھلا ہونے پر نئی ٹرانزیکشنز اور انوائسز کے الرٹس',
+    'android_notifications_foreground_only': 'ایپ کھلی ہونے پر مقامی الرٹس فعال کریں۔ ایپ بند ہونے کے بعد الرٹس نہیں آئیں گے۔',
+    'android_notifications_enabled': 'ایپ کھلی ہونے پر ڈیوائس الرٹس فعال ہیں۔',
+    'android_notifications_permission_denied': 'اطلاعات کی اجازت نہیں ملی۔ Android میں ایپ کی اطلاع کی ترتیبات دیکھیں۔',
+    'android_notifications_unavailable':
+        'اس ڈیوائس پر Android اطلاعات دستیاب نہیں ہیں۔',
+    'android_notifications_initialization_failed':
+        'Android اطلاعات شروع نہیں ہو سکیں۔',
     'mark_as_read': 'پڑھا ہوا نشان لگائیں',
     'sort_by_name': 'نام کے مطابق ترتیب',
 
@@ -3797,11 +3752,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'archive_workspace': 'ورک اسپیس آرکائیو کریں',
     'restore_workspace': 'ورک اسپیس بحال کریں',
     'archive_workspace_confirmation_title': 'کیا اس ورک اسپیس کو آرکائیو کریں؟',
-    'archive_workspace_confirmation_message':
-        'اس سے تمام ممبران کی کاروباری ڈیٹا تک رسائی بند ہو جائے گی، مگر ان کے پروفائل اور ریکارڈ محفوظ رہیں گے۔ آپ بعد میں اسے بحال کر سکتے ہیں۔',
+    'archive_workspace_confirmation_message': 'اس سے تمام ممبران کی کاروباری ڈیٹا تک رسائی بند ہو جائے گی، مگر ان کے پروفائل اور ریکارڈ محفوظ رہیں گے۔ آپ بعد میں اسے بحال کر سکتے ہیں۔',
     'restore_workspace_confirmation_title': 'کیا اس ورک اسپیس کو بحال کریں؟',
-    'restore_workspace_confirmation_message':
-        'اس سے اس ورک اسپیس کے فعال ممبران کی کاروباری رسائی دوبارہ شروع ہو جائے گی۔',
+    'restore_workspace_confirmation_message': 'اس سے اس ورک اسپیس کے فعال ممبران کی کاروباری رسائی دوبارہ شروع ہو جائے گی۔',
     'workspace_archived': 'ورک اسپیس آرکائیو ہو گئی',
     'workspace_restored': 'ورک اسپیس بحال ہو گئی',
     'workspace_status_active': 'فعال',
@@ -3825,8 +3778,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'اس ورک اسپیس میں فعال صارفین کی زیادہ سے زیادہ حد 10 ہے۔',
     'workspace_seat_count_initialization_required':
         'ورک اسپیس صارفین کے انتظام سے پہلے نشستوں کی گنتی شروع کریں۔',
-    'workspace_seat_count_changed_retry':
-        'گنتی کے دوران ورک اسپیس کی رکنیت تبدیل ہوئی۔ تازہ کاری کرکے دوبارہ کوشش کریں۔',
+    'workspace_seat_count_changed_retry': 'گنتی کے دوران ورک اسپیس کی رکنیت تبدیل ہوئی۔ تازہ کاری کرکے دوبارہ کوشش کریں۔',
     'workspace_member_summary': 'ورک اسپیس کے اراکین',
     'workspace_active_users': 'فعال صارفین',
     'workspace_inactive_users': 'غیر فعال صارفین',
@@ -3987,8 +3939,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'created_date': 'بنایا گیا',
     'received_date': 'موصول ہوا',
     'mark_as_completed': 'مکمل نشان لگائیں',
-    'mark_completed_info':
-        'تصدیق کریں کہ فزیکل ریفنڈ گاہک کو دے دیا گیا ہے۔ یہ واپسی لاک ہو جائے گی۔',
+    'mark_completed_info': 'تصدیق کریں کہ فزیکل ریفنڈ گاہک کو دے دیا گیا ہے۔ یہ واپسی لاک ہو جائے گی۔',
     'reason_optional': 'وجہ (اختیاری)',
     'replacement_order': 'متبادل آرڈر',
     'return_completed_log': 'واپسی مکمل۔ نقد ریفنڈ کیش اسکرین سے درج کریں۔',
@@ -3997,8 +3948,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'reminder_cash_refund':
         'یاد دہانی: مکمل کرنے کے بعد، نقد ریفنڈ کیش اسکرین سے درج کریں۔',
     'write_off_amount_bad_debt': 'ناقابل وصول قرض شطب کریں',
-    'bad_debt_confirm_msg':
-        'واجب الادا بقایا ناقابل وصول قرض کے طور پر شطب ہو گا۔ بیلنس صفر ہو جائے گا اور منظوری کے لیے اخراجات کا ریکارڈ جمع ہو گا۔',
+    'bad_debt_confirm_msg': 'واجب الادا بقایا ناقابل وصول قرض کے طور پر شطب ہو گا۔ بیلنس صفر ہو جائے گا اور منظوری کے لیے اخراجات کا ریکارڈ جمع ہو گا۔',
     'order_id_label': 'آرڈر نمبر',
     'total_pairs': 'کل جوڑے',
     'inventory_batch_label': 'انوینٹری بیچ',
@@ -4133,8 +4083,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'send_payment_reminder': 'ادائیگی کی یاددہانی بھیجیں',
     'whatsapp_open_chat': 'چیٹ کھولیں',
     'whatsapp_view_statement': 'اکاؤنٹ اسٹیٹمنٹ دیکھیں',
-    'payment_reminder_msg':
-        'السلام علیکم %name%، آپ کا واجب الادا بیلنس %amount% ہے۔ براہ کرم جلد از جلد ادائیگی کا بندوبست فرمائیں۔',
+    'payment_reminder_msg': 'السلام علیکم %name%، آپ کا واجب الادا بیلنس %amount% ہے۔ براہ کرم جلد از جلد ادائیگی کا بندوبست فرمائیں۔',
     'top_outstanding': 'سب سے زیادہ واجب الادا',
     'outstanding': 'واجب الادا',
     'days_overdue': 'دن بقایا',
@@ -4218,8 +4167,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'create_cash_receipt': 'نقد وصولی کی رسید بنائیں',
     'invoice_created': 'رسید کامیابی سے بنائی گئی',
     'no_inventory_items': 'کوئی انوینٹری آئٹم دستیاب نہیں',
-    'admin_no_stock_guidance':
-        'آپ کے لیے کوئی اسٹاک مختص نہیں ہے۔ گودام سے اپنے اکاؤنٹ میں اسٹاک منتقل کریں، یا اگر یہ ورک اسپیس اجازت دے تو بغیر اسٹاک کی انوائس منتخب کریں۔',
+    'admin_no_stock_guidance': 'آپ کے لیے کوئی اسٹاک مختص نہیں ہے۔ گودام سے اپنے اکاؤنٹ میں اسٹاک منتقل کریں، یا اگر یہ ورک اسپیس اجازت دے تو بغیر اسٹاک کی انوائس منتخب کریں۔',
     'select_shop': 'دکان منتخب کریں',
     'select_at_least_one_item': 'کم از کم ایک آئٹم منتخب کریں',
     'sale_amount': 'فروخت کی رقم',
@@ -4238,8 +4186,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'payment_summary': 'ادائیگی کا خلاصہ',
     'route_has_seller':
         'حذف نہیں ہو سکتا: علاقے پر بائع مقرر ہے۔ پہلے بائع کی تفویض ہٹائیں۔',
-    'route_has_shops':
-        'حذف نہیں ہو سکتا: علاقے پر فعال دکانیں ہیں۔ پہلے دکانیں منتقل یا غیر فعال کریں۔',
+    'route_has_shops': 'حذف نہیں ہو سکتا: علاقے پر فعال دکانیں ہیں۔ پہلے دکانیں منتقل یا غیر فعال کریں۔',
     'invoice_ref': 'رسید',
     'invoice_title': 'رسید',
     'invoice_mode': 'رسید کی قسم',
@@ -4283,8 +4230,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'invoice_header_contact': 'رابطہ اور رجسٹریشن',
     'receipt_phone_2': 'رسید کے لیے اضافی رابطہ نمبر 2 (اختیاری)',
     'receipt_phone_3': 'رسید کے لیے اضافی رابطہ نمبر 3 (اختیاری)',
-    'receipt_contact_numbers_hint':
-        'اضافی نمبر صرف نقد وصولی کی رسید کے فوٹر میں دکھیں گے؛ مشترکہ ہیڈر تبدیل نہیں ہوگا۔',
+    'receipt_contact_numbers_hint': 'اضافی نمبر صرف نقد وصولی کی رسید کے فوٹر میں دکھیں گے؛ مشترکہ ہیڈر تبدیل نہیں ہوگا۔',
     'invoice_name_en': 'کاروبار کا نام (انگریزی)',
     'invoice_name_ar': 'کاروبار کا نام (عربی)',
     'invoice_name_ur': 'کاروبار کا نام (اردو)',
@@ -4401,11 +4347,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'confirm_reactivate_user':
         '%s کو دوبارہ فعال کریں اور ان کی رسائی بحال کریں؟',
     'disable_user': 'اکاؤنٹ غیر فعال کریں',
-    'confirm_deactivate_user':
-        'کیا %s کا اکاؤنٹ غیر فعال کریں؟ رسائی ختم ہوگی اور راستوں کی تفویض ہٹا دی جائے گی۔',
+    'confirm_deactivate_user': 'کیا %s کا اکاؤنٹ غیر فعال کریں؟ رسائی ختم ہوگی اور راستوں کی تفویض ہٹا دی جائے گی۔',
     'settings_company_logo': 'کمپنی لوگو',
-    'settings_logo_specs':
-        'بغیر کوالٹی نقصان PNG · سمت خود درست · 800×400 px تک متناسب سائز · زیادہ سے زیادہ 50 KB Base64۔ بڑا نہیں کیا جائے گا اور JPEG کمپریشن نہیں ہوگی۔',
+    'settings_logo_specs': 'بغیر کوالٹی نقصان PNG · سمت خود درست · 800×400 px تک متناسب سائز · زیادہ سے زیادہ 50 KB Base64۔ بڑا نہیں کیا جائے گا اور JPEG کمپریشن نہیں ہوگی۔',
     'settings_logo_processing': 'مقامی طور پر پروسیس ہو رہا ہے…',
     'settings_logo_preview_details':
         'PNG · %1×%2 px · %3 Base64 · اصل %4×%5 px',
@@ -4417,10 +4361,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'تصویر پروسیس نہیں ہو سکی۔ کوئی دوسری تصویر آزمائیں۔',
     'settings_invalid_pairs_per_carton':
         'فی کارٹن جوڑوں کی تعداد مثبت مکمل عدد ہونی چاہیے۔',
-    'settings_logo_image_too_large':
-        'تصویر کا سائز %s ہے۔ آسان تصویر استعمال کریں یا سائز 256×256 px تک کم کریں۔',
-    'settings_logo_encoded_too_large':
-        'بغیر نقصان PNG کا سائز %s ہے (%1×%2 px)، جو 50 KB حد سے زیادہ ہے۔ کم باریک تفصیلات والا سادہ لوگو استعمال کریں۔',
+    'settings_logo_image_too_large': 'تصویر کا سائز %s ہے۔ آسان تصویر استعمال کریں یا سائز 256×256 px تک کم کریں۔',
+    'settings_logo_encoded_too_large': 'بغیر نقصان PNG کا سائز %s ہے (%1×%2 px)، جو 50 KB حد سے زیادہ ہے۔ کم باریک تفصیلات والا سادہ لوگو استعمال کریں۔',
     'lbl_preview': 'پیش نظارہ · %s',
     'settings_uploading_pct': 'اپلوڈ ہو رہا ہے… %s%%',
     'settings_uploading': 'اپلوڈ ہو رہا ہے…',
@@ -4440,8 +4382,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'dashboard_pending_dues': 'صارفین کے واجبات باقی ہیں',
     'pending_edit_requests_count':
         '%s سیلر ترمیمی درخواستیں آپ کی منظوری کی منتظر ہیں',
-    'pending_edit_requests_subtitle':
-        'درخواستوں کی فہرست کھولیں اور منظوری یا رد کے لیے متعلقہ دکان پر جائیں۔',
+    'pending_edit_requests_subtitle': 'درخواستوں کی فہرست کھولیں اور منظوری یا رد کے لیے متعلقہ دکان پر جائیں۔',
     'lbl_view': 'دیکھیں',
     'dashboard_stock_cartons': 'اسٹاک کارٹن',
     'dashboard_pairs_remainder': '%s جوڑے باقی',
@@ -4478,10 +4419,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'اس اکاؤنٹ کے لیے کوئی ورک اسپیس مقرر نہیں ہے۔',
     'bootstrap_invalid_role_title': 'اس اکاؤنٹ کا کردار معاونت یافتہ نہیں۔',
     'bootstrap_signed_in_as': 'بطور سائن ان: %s',
-    'bootstrap_instructions':
-        'آپ سائن اِن ہیں، لیکن اس اکاؤنٹ کے لیے ورک اسپیس پروفائل نہیں بنایا گیا۔ رسائی کے لیے اپنے ورک اسپیس منتظم سے رابطہ کریں۔',
-    'bootstrap_invalid_role_instructions':
-        'کاروباری ڈیٹا تک رسائی سے پہلے ورک اسپیس منتظم کو اکاؤنٹ کا کردار درست کرنا ہوگا۔ سائن آؤٹ کر کے سپورٹ سے رابطہ کریں۔',
+    'bootstrap_instructions': 'آپ سائن اِن ہیں، لیکن اس اکاؤنٹ کے لیے ورک اسپیس پروفائل نہیں بنایا گیا۔ رسائی کے لیے اپنے ورک اسپیس منتظم سے رابطہ کریں۔',
+    'bootstrap_invalid_role_instructions': 'کاروباری ڈیٹا تک رسائی سے پہلے ورک اسپیس منتظم کو اکاؤنٹ کا کردار درست کرنا ہوگا۔ سائن آؤٹ کر کے سپورٹ سے رابطہ کریں۔',
 
     // ── Shop Detail Screen ──
     'tooltip_edit_customer': 'دکان میں ترمیم',
@@ -4542,8 +4481,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     // ── Danger Zone / Database Flush ──
     'danger_zone': 'خطرناک زون',
     'danger_zone_subtitle': 'ناقابل واپسی ڈیٹا بیس آپریشنز',
-    'flush_data_reset_unavailable':
-        'ورک اسپیس ڈیٹا کی صفائی بند ہے کیونکہ ایپ سے حذف کرنے پر انوائسز، بیلنس، انوینٹری، روٹس اور صارف پروفائلز میں عدم مطابقت ہو سکتی ہے۔ تصدیق شدہ انکرپٹڈ بیک اپ اور منظور شدہ آڈٹ شدہ مینٹیننس طریقہ استعمال کریں۔',
+    'flush_data_reset_unavailable': 'ورک اسپیس ڈیٹا کی صفائی بند ہے کیونکہ ایپ سے حذف کرنے پر انوائسز، بیلنس، انوینٹری، روٹس اور صارف پروفائلز میں عدم مطابقت ہو سکتی ہے۔ تصدیق شدہ انکرپٹڈ بیک اپ اور منظور شدہ آڈٹ شدہ مینٹیننس طریقہ استعمال کریں۔',
     'flush_financial': 'مالیاتی ڈیٹا صاف کریں',
     'flush_financial_desc':
         'تمام انوائسز، ٹرانزیکشنز حذف کریں اور دکان بیلنس صفر کریں',
@@ -4592,15 +4530,11 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_title': 'ڈیٹا بیک اپ',
     'backup_subtitle':
         'اپنے ورک اسپیس کردار کے مطابق اجازت یافتہ ریکارڈ منتخب کریں۔',
-    'backup_platform_metadata_subtitle':
-        'صرف منتخب ورک اسپیس اور اس کے صارف پروفائل شامل ہوں گے۔ کاروباری ریکارڈ شامل نہیں ہوں گے۔',
+    'backup_platform_metadata_subtitle': 'صرف منتخب ورک اسپیس اور اس کے صارف پروفائل شامل ہوں گے۔ کاروباری ریکارڈ شامل نہیں ہوں گے۔',
     'backup_scope_ready': 'ورک اسپیس بیک اپ کا دائرہ تیار ہے۔',
-    'backup_workspace_backup_subtitle':
-        'ورک اسپیس کا کاروباری ڈیٹا شامل ہوگا؛ صارف اور سیلر اکاؤنٹ پروفائل شامل نہیں ہوں گے۔',
-    'backup_seller_route_backup_subtitle':
-        'آپ کے روٹس، دکانیں، انوینٹری، ٹرانزیکشنز اور انوائسز شامل ہیں۔ ریسٹور صرف آپ کی غیر منسلک نقد ٹرانزیکشنز درآمد کرتا ہے۔',
-    'backup_seller_restore_warning':
-        'صرف آپ کی موجودہ تفویض کردہ روٹس کی اپنی غیر منسلک نقد ٹرانزیکشنز بحال ہوں گی۔ انوائس سے منسلک اور دوسرے سیلرز کی ٹرانزیکشنز بحال نہیں ہوں گی۔',
+    'backup_workspace_backup_subtitle': 'ورک اسپیس کا کاروباری ڈیٹا شامل ہوگا؛ صارف اور سیلر اکاؤنٹ پروفائل شامل نہیں ہوں گے۔',
+    'backup_seller_route_backup_subtitle': 'آپ کے روٹس، دکانیں، انوینٹری، ٹرانزیکشنز اور انوائسز شامل ہیں۔ ریسٹور صرف آپ کی غیر منسلک نقد ٹرانزیکشنز درآمد کرتا ہے۔',
+    'backup_seller_restore_warning': 'صرف آپ کی موجودہ تفویض کردہ روٹس کی اپنی غیر منسلک نقد ٹرانزیکشنز بحال ہوں گی۔ انوائس سے منسلک اور دوسرے سیلرز کی ٹرانزیکشنز بحال نہیں ہوں گی۔',
     'backup_workspaces': 'منتخب ورک اسپیس پروفائل',
     'backup_users': 'ورک اسپیس صارف پروفائلز',
     'backup_routes': 'روٹس',
@@ -4628,8 +4562,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'restore_from_google_drive': 'Google Drive سے ریسٹور کریں',
     'backup_drive_success': 'بیک اپ آپ کے Google Drive پر اپ لوڈ ہو گیا',
     'backup_drive_none': 'آپ کے Google Drive میں ShoesERP بیک اپ نہیں ملا',
-    'backup_drive_error':
-        'Google Drive کنفیگر نہیں ہے یا اجازت نہیں دی گئی۔ ایڈمن سے رابطہ کریں۔',
+    'backup_drive_error': 'Google Drive کنفیگر نہیں ہے یا اجازت نہیں دی گئی۔ ایڈمن سے رابطہ کریں۔',
     'backup_drive_not_configured':
         'اس بلڈ کی کنفیگریشن تک Google Drive خودکار بیک اپ دستیاب نہیں ہے۔',
     'backup_delete_title': 'بیک اپ حذف کریں',
@@ -4661,8 +4594,7 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'backup_restore': 'بیک اپ سے ریسٹور',
     'backup_restore_subtitle':
         'اس ورک اسپیس میں ڈیٹا بحال کرنے کے لیے بیک اپ منتخب کریں',
-    'backup_seller_restore_subtitle':
-        'صرف اپنی موجودہ تفویض کردہ روٹس کی غیر منسلک نقد ٹرانزیکشنز بحال کریں۔',
+    'backup_seller_restore_subtitle': 'صرف اپنی موجودہ تفویض کردہ روٹس کی غیر منسلک نقد ٹرانزیکشنز بحال کریں۔',
     'backup_restore_warning':
         'بیک اپ میں شامل ڈیٹا تبدیل ہو جائے گا۔ یہ عمل واپس نہیں ہو سکتا۔',
     'backup_restore_merge_warning':
