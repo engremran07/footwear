@@ -243,6 +243,12 @@ An AAB is for Play Console upload and cannot be installed directly. Install a
 matching APK on devices. Verify the release artifacts and report their exact
 paths and sizes:
 
+For Play Console track selection, upload-key validation, and compliant launch
+marketing, follow the
+[Google Play release and marketing skill](../google-play-release-marketing/SKILL.md).
+Do not upload an AAB until its signing-certificate fingerprint is confirmed
+against the Play Console upload certificate.
+
 The module's ABI split setting is enabled for APK builds and disabled when a
 `bundle` Gradle task is requested. Android Gradle Plugin rejects app bundles
 when multiple shrunk-resource APK outputs are configured in the same task.
