@@ -396,6 +396,13 @@ parameter. Urdu PDFs use Naskh-style shaping; a standalone Nastaliq proof is
 not production support until branding, selectable text, pagination, and
 Web/Android report parity are verified.
 
+Mixed-script PDF cells now use the first cased script letter for paragraph
+direction instead of switching the entire value to RTL when any Arabic/Urdu
+character appears. Numeric-only date cells use LTR direction. This correction
+was released in v3.10.16+1127; it does not change font shaping, date formatting,
+timestamp values, or financial calculations. The reported production date
+discrepancy remains unverified without its source PDF.
+
 Workspace-logo processing is local and lossless: transparent pixels remain
 transparent, and opaque colored backgrounds are retained without background
 removal or substitution. The same saved logo bytes flow through workspace

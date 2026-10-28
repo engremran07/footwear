@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
+
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+
 import '../l10n/app_locale.dart';
 import '../l10n/financial_document_localization.dart';
 import '../../models/transaction_model.dart';
@@ -233,15 +235,42 @@ pw.Widget _bilingualHeaderText(String text, {required pw.TextStyle style}) {
   );
 }
 
-/// Returns true when [text] contains Arabic/Urdu script characters.
-/// Used to auto-apply RTL direction to individual cells regardless of locale.
-bool _containsRtlChars(String text) => RegExp(
-  r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]',
-).hasMatch(text);
+bool _isArabicScriptLetter(int rune) =>
+    (rune >= 0x0621 && rune <= 0x064A) ||
+    (rune >= 0x066E && rune <= 0x06D3) ||
+    rune == 0x06D5 ||
+    (rune >= 0x06E5 && rune <= 0x06E6) ||
+    (rune >= 0x06EE && rune <= 0x06EF) ||
+    (rune >= 0x06FA && rune <= 0x06FC) ||
+    rune == 0x06FF ||
+    (rune >= 0x0750 && rune <= 0x077F) ||
+    (rune >= 0x08A0 && rune <= 0x08C9) ||
+    (rune >= 0xFB50 && rune <= 0xFDFF) ||
+    (rune >= 0xFE70 && rune <= 0xFEFC);
 
-/// Returns RTL direction when [text] contains RTL chars, otherwise [fallback].
+bool _isPdfDigit(int rune) =>
+    (rune >= 0x0030 && rune <= 0x0039) ||
+    (rune >= 0x0660 && rune <= 0x0669) ||
+    (rune >= 0x06F0 && rune <= 0x06F9);
+
+bool _isCasedLetter(int rune) {
+  final character = String.fromCharCode(rune);
+  return character.toLowerCase() != character.toUpperCase();
+}
+
+@visibleForTesting
+pw.TextDirection pdfTextDirectionFor(String text, pw.TextDirection fallback) {
+  var containsDigit = false;
+  for (final rune in text.runes) {
+    if (_isArabicScriptLetter(rune)) return pw.TextDirection.rtl;
+    if (_isCasedLetter(rune)) return pw.TextDirection.ltr;
+    if (_isPdfDigit(rune)) containsDigit = true;
+  }
+  return containsDigit ? pw.TextDirection.ltr : fallback;
+}
+
 pw.TextDirection _cellDir(String text, pw.TextDirection fallback) =>
-    _containsRtlChars(text) ? pw.TextDirection.rtl : fallback;
+    pdfTextDirectionFor(text, fallback);
 
 const pw.TextDirection _amountDir = pw.TextDirection.ltr;
 

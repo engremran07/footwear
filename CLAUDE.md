@@ -473,6 +473,19 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- v3.10.16+1127 releases the shared mixed-script PDF direction correction:
+  English-first mixed values retain source order in Arabic/Urdu invoices and
+  statements, and numeric-only date cells use LTR direction. Font shaping,
+  timestamp values, and date formatting are unchanged; the reported
+  production date discrepancy remains unverified without its source document.
+  Full Flutter suite: `01:53 +718: All tests passed!`; `flutter analyze lib
+  --no-pub`: `No issues found! (ran in 80.1s)`; `dart analyze test/`:
+  `No issues found!`; changelog test: `00:00 +10: All tests passed!`. Web
+  build `EXIT: 0`; Hosting deployed and live `version.json` reports
+  `3.10.16+1127`. Split APKs are 31.4/32.9/34.5 MB and verify with APK v2;
+  ARM64 installation on `R5GL22RGT9V` reported `Success`, versionCode
+  `310163127`. Firestore Rules/indexes were unchanged. Git commit and push
+  remain pending.
 - v3.10.15+1126 adds shared contextual record actions across route, shop,
   product, inventory, invoice, history, notification, dashboard, report, and
   ledger surfaces without changing provider or Firestore authorization.
@@ -495,9 +508,21 @@ must not be described as a release or production signoff.
   `R5GL22RGT9V` (`Success`, versionCode `310153126`). The signed 72.3 MB AAB
   reports `jar verified.` with a locally untrusted self-signed certificate
   and no timestamp; Play Console upload-key acceptance is not established.
-- Authenticated visual and manual assistive-technology acceptance remain
-  unverified. The original user-reported PDF and runtime details are still
-  needed to confirm its rendering defect; no font-policy change was made.
+- Synthetic Arabic and Urdu invoice plus two-page statement renders reproduced
+  an English-first mixed-script ordering defect: `_cellDir()` selected RTL when
+  any Arabic/Urdu character appeared. The shared policy now follows the first
+  cased script letter, and numeric-only date values use LTR direction. Full-page
+  rasterized samples show English-first values in source order and chronological
+  `dd/MM/yyyy` dates. The original production PDF is still unavailable, so its
+  reported date discrepancy and timezone interpretation remain unverified;
+  timestamp values, date formatting, font policy, and financial calculations
+  were not changed.
+- Focused PDF suite: `00:02 +15: All tests passed!`; full Flutter suite:
+  `01:47 +718: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 174.8s)`; `dart analyze test/`:
+  `No issues found!`. The hot-restart attempt found no active Flutter app in
+  the Dart Tooling Daemon. The follow-up v3.10.16+1127 release is recorded
+  above; the original production date discrepancy remains unverified.
 - v3.10.14+1125 bounds notification shop-visibility Rules work by querying
   referenced shop IDs in five-ID batches; positive scale coverage includes
   workspace admins and supervisors. Local Android alerts are opt-in,

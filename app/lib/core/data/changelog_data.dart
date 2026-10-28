@@ -28,6 +28,20 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.10.16',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en: 'Mixed Arabic, Urdu, and English text now keeps its intended reading order in invoices and account statements.',
+          AppLocale.ar: 'يُعرض النص المختلط بالعربية والأردية والإنجليزية الآن بترتيب القراءة الصحيح في الفواتير وكشوف الحساب.',
+          AppLocale.ur: 'انوائس اور اکاؤنٹ اسٹیٹمنٹس میں عربی، اردو اور انگریزی کا ملا جلا متن اب درست ترتیب سے دکھائی دیتا ہے۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.10.15',
     date: 'October 2026',
     items: [

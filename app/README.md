@@ -600,6 +600,13 @@ The current Urdu renderer remains Naskh-style; a Nastaliq prototype has not
 passed logo, text-extraction, pagination, and cross-platform report parity
 gates.
 
+Mixed-script PDF cells use the first cased script letter to choose paragraph
+direction, so an English-first value remains ordered before its Arabic/Urdu
+portion. Numeric-only date cells use LTR direction. This correction was
+released in v3.10.16+1127; it does not change date formatting, timestamp
+values, financial calculations, or the Noto Sans Arabic font policy. The
+reported production date discrepancy remains unverified without its source PDF.
+
 Place `google-services.json` in `android/app/` before running (obtain from Firebase Console — gitignored).
 
 Google Drive backup requires a Google OAuth web client and Android client for package `footwear.pk.com`. Configure the release SHA-1 in Google Cloud/Firebase, then provide `GOOGLE_DRIVE_CLIENT_ID` and `GOOGLE_DRIVE_SERVER_CLIENT_ID` as `--dart-define` values for web and Android builds. The app requests only the `drive.file` scope.

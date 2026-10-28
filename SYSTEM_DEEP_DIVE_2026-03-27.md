@@ -239,6 +239,18 @@ to `visibleFields`. Arabic and Urdu generated statement and receipt headers
 were visually inspected in Chrome. Urdu PDF shaping remains Naskh-style; full
 Nastaliq rendering is not supported.
 
+The local 2026-10-28 rendering follow-up found that mixed English-first
+Arabic/Urdu values were assigned RTL paragraph direction whenever any RTL
+character occurred, reversing the visible text order in invoice and statement
+cells. Shared cell direction now follows the first cased script letter, while
+numeric-only date values use LTR direction. Rasterized Arabic and Urdu invoice
+and two-page statement samples were inspected after the correction. The
+original production PDF was not available; its reported date discrepancy and
+timezone interpretation remain unverified. No timestamp or date-format change
+was made. The rendering correction was released in v3.10.16+1127; Hosting
+reports the deployed version, and the matching ARM64 APK was installed on the
+connected test phone. Firestore Rules and indexes were unchanged.
+
 The supplied cash-receipt reference is now available. The local v3.10.7+1118
 receipt body follows its compact bilingual structure, retains the existing
 shared workspace header, uses saved balance fields, and remains a single A5

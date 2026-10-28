@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:footwear_erp/core/l10n/app_locale.dart';
 import 'package:footwear_erp/core/l10n/financial_document_localization.dart';
 import 'package:footwear_erp/core/utils/pdf_export.dart';
@@ -32,6 +33,46 @@ void main() {
     expect(pdfCurrencyLabel(AppLocale.ar, 'PKR'), 'روبية');
     expect(pdfCurrencyLabel(AppLocale.ur, 'SAR'), 'ریال');
     expect(pdfCurrencyLabel(AppLocale.ur, 'PKR'), 'روپے');
+  });
+
+  test('PDF text direction follows the first script in mixed values', () {
+    expect(
+      pdfTextDirectionFor(
+        'Classic Shoe حذاء كلاسيكي جوتا',
+        pw.TextDirection.rtl,
+      ),
+      pw.TextDirection.ltr,
+    );
+    expect(
+      pdfTextDirectionFor(
+        'Invoice INV-2026-1 موديل حذاء فروخت',
+        pw.TextDirection.rtl,
+      ),
+      pw.TextDirection.ltr,
+    );
+    expect(
+      pdfTextDirectionFor('حذاء كلاسيكي Classic Shoe', pw.TextDirection.ltr),
+      pw.TextDirection.rtl,
+    );
+    expect(
+      pdfTextDirectionFor('أسود Black کالا', pw.TextDirection.ltr),
+      pw.TextDirection.rtl,
+    );
+  });
+
+  test('numeric-only date strings use LTR direction in RTL documents', () {
+    expect(
+      pdfTextDirectionFor('23/08/2026', pw.TextDirection.rtl),
+      pw.TextDirection.ltr,
+    );
+    expect(
+      pdfTextDirectionFor('٢٣/٠٨/٢٠٢٦', pw.TextDirection.rtl),
+      pw.TextDirection.ltr,
+    );
+    expect(
+      pdfTextDirectionFor('— •', pw.TextDirection.rtl),
+      pw.TextDirection.rtl,
+    );
   });
 
   test('calculateLedgerSummary follows authoritative balance impacts', () {
@@ -471,7 +512,7 @@ void main() {
       amount: 25,
       createdBy: 'seller-rtl',
       createdAt: date,
-      description: '$arabic — $urdu',
+      description: 'Invoice INV-RTL-1 $arabic — $urdu',
     );
     const ledgerKeys = [
       'account_statement',
@@ -582,9 +623,9 @@ void main() {
           const TransactionItem(
             variantId: 'rtl-variant',
             sku: 'RTL-1',
-            productName: '$arabic — $urdu',
+            productName: 'Classic Shoe — $arabic — $urdu',
             size: '42',
-            color: 'أسود',
+            color: 'Black — أسود — کالا',
             qty: 1,
             unitPrice: 25,
             subtotal: 25,

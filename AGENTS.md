@@ -648,6 +648,24 @@ and never replace provider or Firestore authorization.
 
 ## 10) Current Audit Status
 
+2026-10-28 v3.10.16+1127 PDF direction correction:
+
+- The verified mixed-script direction fix is released. English-first values
+  retain source reading order in Arabic/Urdu invoice and statement PDFs, and
+  numeric-only date cells use LTR direction. No timestamp or date-format
+  behavior changed; the reported production date discrepancy remains
+  unverified because its source document was unavailable.
+- Full Flutter suite: `01:53 +718: All tests passed!`; `flutter analyze lib
+  --no-pub`: `No issues found! (ran in 80.1s)`; `dart analyze test/`:
+  `No issues found!`; changelog test: `00:00 +10: All tests passed!`.
+- Version `3.10.16+1127` is synchronized. Web build: `EXIT: 0`; Firebase
+  Hosting reported `Deploy complete!`, and live `version.json` reports
+  `3.10.16` / build `1127`. Split APKs built at 31.4/32.9/34.5 MB and all
+  verify with APK v2. ARM64 copied to `/sdcard/Download/` (`1 file pushed`)
+  and installed on `R5GL22RGT9V` (`Success`, versionCode `310163127`).
+- No Rules/index files changed, so no Rules/index deployment was needed. Git
+  commit and push to `main` are pending.
+
 2026-10-28 v3.10.15+1126 release — contextual actions and logo governance:
 
 - The governance pack now requires applicable skills/instructions, current
@@ -681,10 +699,21 @@ and never replace provider or Firestore authorization.
   its locally untrusted self-signed certificate and missing timestamp do not
   establish Play Console upload-key acceptance. No Play Console upload was
   performed.
-- Hot restart was unavailable because the Dart Tooling Daemon had no active
-  Flutter app. Authenticated browser/device, manual assistive-technology, and
-  pixel-level export acceptance remain unverified. The user-reported PDF
-  rendering issue remains open pending its original PDF and runtime details.
+- Synthetic Arabic and Urdu invoice plus two-page statement renders reproduced
+  an English-first mixed-script ordering defect: `_cellDir()` selected RTL when
+  any Arabic/Urdu character appeared. The shared policy now follows the first
+  cased script letter, and numeric-only date values use LTR direction. Full-page
+  rasterized samples show English-first values in source order and chronological
+  `dd/MM/yyyy` dates. The original production PDF is still unavailable, so its
+  reported date discrepancy and timezone interpretation remain unverified;
+  timestamp values, date formatting, font policy, and financial calculations
+  were not changed.
+- Focused PDF suite: `00:02 +15: All tests passed!`; full Flutter suite:
+  `01:47 +718: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 174.8s)`; `dart analyze test/`:
+  `No issues found!`. The hot-restart attempt found no active Flutter app in
+  the Dart Tooling Daemon. The follow-up v3.10.16+1127 release is recorded
+  above; the original production date discrepancy remains unverified.
 
 2026-10-28 v3.10.14+1125 notification visibility and Android alerts:
 
