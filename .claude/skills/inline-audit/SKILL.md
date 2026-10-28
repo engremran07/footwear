@@ -244,7 +244,7 @@ final names = NameResolver(
 
 | "PDF generation failed" on export | `ExportSheet.show()` missing `pdfBytesBuilder` for ledger data | Pass `pdfBytesBuilder: () => buildPdfLedger(...)` with full params |
 
-| Stale "What's New" after update | `changelog_data.dart` not updated on version bump | Add trilingual `ChangelogVersion` entry for every version |
+| Stale "What's New" after update | `changelog_data.dart` not updated on version bump | Add a trilingual `ChangelogEntry` and run `changelog_data_test.dart` for every version |
 
 | Raw UID instead of name in PDF | Ad-hoc uid→name map or missing NameResolver | Use `NameResolver` from `name_resolver.dart`; never fall back to raw UID |
 

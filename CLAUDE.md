@@ -346,7 +346,7 @@ Never keep ambiguity-driven workaround code without explicit justification.
 | `ExportSheet.show(` without `pdfBytesBuilder` on ledger data | PDF export fails or produces flat table instead of ledger | Always pass `pdfBytesBuilder: () => buildPdfLedger(...)` for ledger exports |
 | PDF generation without `--dart-define=use_arabic=true` | The PDF package can bidi-reorder Arabic/Urdu without shaping | Keep the flag on every PDF-capable action; the shared font loader rejects unshaped output |
 | `labels['key'] ?? 'English Fallback'` in PDF builders | Hardcoded English bypasses i18n | Use `trRead()` with locale; `??` fallback must be `'—'` or localized key |
-| Missing `ChangelogVersion` entry after version bump | Users see stale "What's New" content | Add trilingual entry to `changelog_data.dart` on every version bump |
+| Missing `ChangelogEntry` after version bump | Users see stale "What's New" content | Add the trilingual entry and run `changelog_data_test.dart` on every version bump |
 | `ref.read(authUserProvider).value` in async/export context | Null during stream loading → empty data or crash | `await ref.read(authUserProvider.future)` in all async/provider contexts |
 
 ## Vibe Debugging Anti-Patterns (Mandatory Awareness)

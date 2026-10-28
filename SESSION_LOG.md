@@ -6,6 +6,45 @@
 
 ---
 
+## SESSION-062 — 2026-10-28 — Completing the Authorized v3.10.13 Delivery Sequence
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the requested order: phone APK delivery, Firestore
+Rules/indexes, Hosting, then Git publication; correct the changelog validation
+documentation while preserving the open audit work.
+
+- Copied the existing v3.10.13+1124 ARM64 APK to `R5GL22RGT9V`
+  (`1 file pushed`) and installed it (`Success`). The device reports
+  versionName `3.10.13` and versionCode `310133124`.
+- Firestore Rules compiled and deployed; Firebase reported the Rules already
+  current and `Deploy complete!`. Indexes deployed successfully; the 23
+  remote-only indexes and 2 field overrides were preserved.
+- Rebuilt the web app from v3.10.13+1124 source (`WEB_BUILD_EXIT: 0`) and
+  deployed Hosting (`Deploy complete!`). The live `version.json` returned
+  HTTP 200 with version `3.10.13`, build `1124`; its cache policy is
+  `no-store, must-revalidate, no-cache`.
+- The existing signed AAB remains at
+  `app/build/app/outputs/bundle/release/app-release.aab` (75,560,663 bytes);
+  it was not rebuilt in this continuation. No Play Console upload occurred.
+- Corrected stale changelog governance references to use the implemented
+  `ChangelogEntry` model and the focused trilingual/current-release test.
+  Markdown lint and `git diff --check` exited 0; the focused test reported
+  `00:00 +10: All tests passed!`.
+- Final local checks: `flutter analyze lib --no-pub` reported
+  `No issues found! (ran in 159.9s)`; `dart analyze test/` reported
+  `No issues found!`; the full Flutter suite reported
+  `01:29 +704: All tests passed!`; PDF/Excel integration reported
+  `00:00 +1: All tests passed!`. The formatter check is not clean: it reports
+  90 existing Dart files would change. It ran with `--output=none`, so it
+  changed no source files; unrelated mass formatting was not applied.
+- Production notification permission/flicker evidence remains insufficient
+  to identify the denied operation. No authenticated business-flow check or
+  production data change was performed. The documentation changes are
+  included in the explicitly requested commit and push.
+
+---
+
 ## SESSION-061 — 2026-10-28 — Gradle Recovery and v3.10.13 Delivery
 
 **Agent:** GitHub Copilot
@@ -38,7 +77,8 @@ sequence after fixing the reported Gradle failure.
   the browser snapshot recorded a 400 resource response and canceled Firestore
   Listen request, but neither identified a denied notification/shop query.
   No business data was inspected or changed. No authenticated smoke test, Play
-  Console upload, commit, or push was performed. Broader audit and
+  Console upload was performed. Commit `13513ae` was pushed to `main`;
+  post-push GitHub Actions status was not verified. Broader audit and
   modernization todos remain open.
 
 ---

@@ -290,8 +290,11 @@ changes.
   to `app/lib/core/data/changelog_data.dart` with trilingual
   (EN/AR/UR) descriptions. The `whats_new_sheet.dart` auto-displays the
   latest changelog on first launch after update. Skipping this means users
-  see stale "What's New" content. Verify:
-  `grep -c "ChangelogVersion" app/lib/core/data/changelog_data.dart`
+  see stale "What's New" content. Verify the current-release/trilingual
+  contract with
+  `flutter test test/unit/core/changelog_data_test.dart --dart-define=use_arabic=true`
+  and confirm entries with
+  `grep -c "ChangelogEntry(" app/lib/core/data/changelog_data.dart`.
 
 1. **Task continuity is mandatory.** When a user adds new work mid-session,
   the agent MUST merge new tasks into the existing todo list — never discard,
@@ -619,6 +622,12 @@ widget tests.
 
 ## 10) Current Audit Status
 
+2026-10-28 changelog validation contract correction:
+
+- The version-bump check now names the implemented `ChangelogEntry` model and
+  points to the focused test that verifies the first entry matches the app
+  version and every item has EN/AR/UR text.
+
 2026-10-28 v3.10.13+1124 delivery status:
 
 - Full Flutter suite: `01:43 +704: All tests passed!`; `flutter analyze lib
@@ -633,8 +642,10 @@ widget tests.
   remote indexes and two field overrides absent locally were preserved.
 - The production notification permission/flicker report remains open: the
   reported denied Firestore operation and code were not identified. No
-  authenticated business-flow check, Play Console upload, commit, or push was
-  performed. The broader audit and modernization todos remain in progress.
+  authenticated business-flow check or Play Console upload was performed.
+  Commit `13513ae` was pushed to `main`; the resulting GitHub Actions status
+  remains unverified. The broader audit and modernization todos remain in
+  progress.
 
 2026-10-28 role-write and notification minor-finding verification:
 
