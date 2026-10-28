@@ -10,6 +10,543 @@
 
 ---
 
+## Scope-Specific Addendum — 2026-10-28 v3.10.13+1124 Release Delivery
+
+### Verification
+
+- Full Flutter suite: `01:43 +704: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 20.9s)`;
+  `dart analyze test/`: `No issues found!`; Firestore Rules Emulator:
+  `190 passing (56s)`.
+- Gradle's cross-volume plugin-source task was fixed by resolving packages
+  with the existing same-drive `PUB_CACHE`. The exact
+  `:flutter_plugin_android_lifecycle:compileDebugUnitTestSources` task reported
+  `BUILD SUCCESSFUL in 55s`. Split APKs built at 31.2/32.8/34.3 MB; the AAB
+  built at 72.1 MB and `jarsigner` reported `jar verified.` with an
+  untrusted-local-certificate warning and no timestamp.
+- The ARM64 APK was copied and installed on `R5GL22RGT9V` (`1 file pushed`,
+  `Success`; versionName `3.10.13`, versionCode `310133124`). Web build:
+  `EXIT: 0`. Firestore Rules/indexes and Hosting each reported
+  `Deploy complete!`; live `version.json` reports `3.10.13+1124`. Twenty-three
+  remote indexes and two field overrides absent locally were preserved.
+
+### Remaining Work
+
+- The user-reported notification permission/flicker issue is still open. The
+  browser snapshot recorded a 400 resource response and canceled Firestore
+  Listen request; neither identified a denied notification or shop-visibility
+  query. No authenticated business data was inspected. Request the concrete
+  failed operation and Firebase error code if the issue persists after
+  deployment; do not broaden Rules or mask errors.
+- Play Console upload, commit, and push were not performed. The broader
+  multi-pass audit and modernization todos remain open.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Mark-All Notification Batch (P2-01)
+
+### Verification and Disposition
+
+- **P2-01 — mark-all's 50-write batch lacked Rules Emulator coverage (not
+  present in current worktree):** `NotificationNotifier.markAllAsRead()` caps
+  its input at 50 and applies the same server-timestamped unread-to-read patch
+  to each document in one batch. Current Rules authorize each update only for
+  the tenant notification-reader roles and require the one-way state
+  transition.
+- The current Rules test suite already contains a 50-notification atomic
+  mark-all case. The full Firestore Rules Emulator suite reported
+  `190 passing (46s)`, including that case. No 20-call access-limit failure
+  was reproduced at the configured 50-item feed cap.
+- **Disposition:** the stated untested-batch finding is stale for the current
+  worktree and is closed for the 50-item contract. No chunking or Rules
+  change was added.
+
+### Validation Boundary
+
+- Local Rules Emulator only. This does not confirm production Rules are
+  deployed or measure production write latency. No production operation
+  occurred.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Notification Visibility Error (P2-02)
+
+### Verification and Disposition
+
+- **P2-02 — one shop-visibility chunk error propagates to the derived feed:**
+  confirmed as current behavior. A failed shop query marks the combined
+  visibility stream as an error, and the derived feed enters an error state.
+  The screen nevertheless retains and displays its last successful rows with
+  a retry banner; on first load, it remains fail-closed and shows the mapped
+  error rather than displaying shops whose active/deleted status was not
+  verified.
+- The error is tagged as `shops` or `notifications` internally. The screen
+  displays that source only in debug mode, not in release. Focused notification
+  unit/widget tests report `00:04 +23: All tests passed!`, including source
+  attribution, cached-row retention, mapped errors, and retry UI.
+- **Disposition:** the former claim that the feed always disappears is stale
+  for cached sessions. The genuine residual is a first-load/partial-chunk
+  failure that blocks the complete verified feed, plus limited release
+  diagnostics. This is intentionally fail-closed; exposing notifications
+  without proving shop visibility would weaken the existing filtering
+  contract.
+
+### Remaining Evidence Needed
+
+- No authorized production/browser session or captured Firebase exception
+  identified whether the reported permission denial originates in the
+  notification query or one of the shop visibility chunks. The source label
+  and underlying exception are available to local tests, but no production
+  query path, Rules deployment state, or real failure was reproduced here.
+- **Status:** leave the permission-denied runtime issue open pending the
+  concrete source and Firebase error code. Do not mask it as success or
+  broaden notification/shop reads. No Rules or client behavior change was
+  made for this finding.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Seller Notification Cooldown (P2-03)
+
+### Verification and Disposition
+
+- **P2-03 — a per-seller notification cooldown can discard valid events after
+  their financial writes commit:** reproduced against the prior Rules contract.
+  Seller notifications are best-effort writes after the invoice or standalone
+  transaction commits, so a denied notification did not roll back the ledger
+  operation.
+- The per-user cooldown update was removed. Each seller notification now uses
+  a deterministic source-scoped ID, and Rules require its payload to match a
+  persisted same-tenant invoice or standalone transaction. Detached or
+  altered source data remains denied; financial writes do not depend on
+  notification success.
+- A follow-up emulator failure identified an incomplete invoice test fixture:
+  the seeded invoice omitted `shop_name` while the notification correctly
+  supplied it. The fixture now matches a real persisted invoice. The full
+  Rules Emulator suite reports `190 passing (48s)`. Focused writer/provider/
+  notification-screen tests report `00:03 +20: All tests passed!`.
+- **Disposition:** P2-03 is fixed in local source and has positive and
+  adversarial emulator coverage. The separate reported notification-feed
+  permission/flicker issue remains open; this fix does not identify or prove
+  which production read or mark-read request was denied.
+
+### Validation Boundary
+
+- Local Rules Emulator and Flutter tests only. Rules/indexes remain
+  undeployed; no production notification path was tested. No fresh APK/AAB,
+  phone delivery, Hosting deployment, commit, or push was performed.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Dashboard Cache Tenant Isolation (P2-04)
+
+### Verification and Disposition
+
+- **P2-04 — last-good dashboard metrics were globally cached:** reproduced.
+  A test seeded metrics for workspace A, resolved the authenticated profile
+  for workspace B, and held B's metric streams in loading. The dashboard
+  rendered A's `metrics:11/22` values under B before the fix.
+- The cache now stores one scope-tagged entry, keyed by user ID, role, active
+  state, concrete tenant/workspace context, support-session identity, and
+  sorted assigned route IDs. A fallback is used only for the matching profile
+  scope. During profile loading, it also requires the cached profile UID to
+  match the current Firebase Auth UID; missing profiles and permission/auth
+  errors do not display cached business metrics.
+- The regression now verifies that workspace B stays loading instead of
+  showing A's values, and that same-workspace refresh still retains its own
+  cached metrics. Focused dashboard suite: `00:09 +5: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 8.1s)`;
+  `dart analyze test/`: `No issues found!`.
+- **Disposition:** P2-04 is fixed in local source. No Firestore Rules or query
+  shape changed. This does not substitute for multi-tenant emulator coverage
+  of other business collections.
+
+### Validation Boundary
+
+- Local Flutter tests and analysis only. A hot restart was unavailable because
+  the connected Dart Tooling Daemon had no running Flutter app. No release
+  build, phone delivery, deployment, commit, or push occurred.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Router Route-Policy Duplication (P2-11)
+
+### Verification and Disposition
+
+- **P2-11 — the router maintained a second tenant-business route list:**
+  confirmed as a structural drift risk. `RouterNotifier` classified business
+  paths separately from `PermissionPolicy.canAccessRoute()`, so future route
+  additions could receive inconsistent workspace-selection redirects.
+- Route matching now returns one `RouteAccessDecision` from
+  `PermissionPolicy`: allowed, denied, or workspace selection required. The
+  router consumes that decision instead of keeping a second path list.
+  Existing role, tenant, super-admin support-context, and unknown-route
+  behavior is preserved; no permission was broadened.
+- Policy and router regressions reported
+  `00:14 +28: All tests passed!`; `flutter analyze lib --no-pub` reported
+  `No issues found! (ran in 5.6s)`; `dart analyze test/` reported
+  `No issues found!`.
+- **Disposition:** P2-11 is fixed locally. Firestore Rules, indexes, and route
+  declarations were not changed.
+
+### Validation Boundary
+
+- Local Flutter tests and analysis only. The Dart Tooling Daemon had no
+  running app, so hot restart was unavailable. No release build, phone
+  delivery, deployment, commit, or push occurred.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Notification Profile Refresh (P3-04)
+
+### Verification and Disposition
+
+- **P3-04 — a profile refresh could clear the notification tenant scope and
+  briefly replace the feed with an empty state:** the original failure mode
+  is already fixed in the current worktree. `notificationProfileForState()`
+  retains a cached profile only when its ID matches the settled Firebase Auth
+  UID; Auth loading/errors and UID mismatches clear the scope. The screen also
+  distinguishes profile errors from initial loading.
+- The widget regression confirms that during a same-user profile refresh the
+  tenant scope remains `tenant-1`, the cached notification remains visible,
+  and shimmer does not replace the feed. Missing profiles, profile errors,
+  feed errors, and shop-visibility errors have separate failure/retry
+  coverage.
+- Focused notification widget/provider tests reported
+  `00:03 +23: All tests passed!`.
+- **Disposition:** P3-04 is fixed in the current local source; no new code
+  change was needed for this recheck. This does not resolve the separate
+  permission-denied incident in P2-02: the denied production operation and
+  deployed Rules version remain unverified. No Rules or index changes were
+  made.
+
+### Validation Boundary
+
+- Local Flutter tests only. No production/browser reproduction or Rules
+  deployment was performed. No release build, phone delivery, Hosting
+  deployment, commit, or push occurred.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Action-Specific Operational Guards (P3-05)
+
+### Verification and Disposition
+
+- **P3-05 — `isOperationalRoleName()` was an alias for checking
+  `viewRoutes`, while callers used it to authorize route-counter, product,
+  and inventory writes:** confirmed semantic drift. The current capability
+  matrix already defines the corresponding write capabilities.
+- The route-counter guard now checks `manageRoutes`, product administration
+  checks `manageProducts`, and seller-stock return checks `manageInventory`.
+  The misleading `isOperationalRoleName()` and
+  `canManageOperationalDataRole()` wrappers were removed. Role sets remain
+  unchanged for the current matrix; supervisor operational access remains
+  allowed and seller operational writes remain denied.
+- Added action-capability coverage for supervisors and sellers. Focused
+  permission-policy tests reported `00:00 +12: All tests passed!`;
+  `flutter analyze lib --no-pub` reported
+  `No issues found! (ran in 10.0s)`; `dart analyze test/` reported
+  `No issues found!`.
+- **Disposition:** the misleading action guards are corrected locally.
+  Firestore Rules and collection queries were not changed. The wider P1-04
+  inventory of raw role checks remains open; this narrow correction does not
+  claim full capability-policy migration.
+
+### Validation Boundary
+
+- Local Flutter tests and analysis only. No Rules changes, production
+  deployment, release build, phone delivery, commit, or push occurred.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Canonical Workspace Role Writes (P3-08)
+
+### Verification and Disposition
+
+- **P3-08 — `isWorkspaceAssignableRole()` uses exact lowercase role values
+  while role-read helpers accept legacy aliases/casing:** verified as
+  intentional write validation, not a bug. Existing Rules tests assert that
+  workspace role writes must be canonical, and provider writers normalize
+  roles before saving. Relaxing the predicate would accept noncanonical
+  values on new writes without improving legacy-read compatibility.
+- The focused Rules Emulator case reported `1 passing (9s)` and verified that
+  the workspace role write using a padded uppercase value is denied.
+- **Disposition:** no Rules change. Keep read compatibility separate from the
+  canonical format required for new role writes.
+
+### Validation Boundary
+
+- Focused local Rules Emulator test only. Production Rules deployment status
+  was not tested. No source or Rules modification was made for this finding.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Notification Minor Findings (P4-01, P4-04)
+
+### Verification and Disposition
+
+- **P4-01 — unused `now` parameter on `notificationTenantIdFor()`:** not
+  present in current source; the function has no `now` parameter.
+- **P4-04 — stale "operational-admin" comment:** not present in the current
+  notification screen. Its file header correctly describes the feed as
+  available to admins and supervisors.
+- **Disposition:** both findings are already resolved in the current
+  worktree; no code change was needed.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Runtime-Configurable Role Policy (P1-03)
+
+### Verification and Disposition
+
+- **P1-03 — per-workspace configurable role capabilities are absent
+  (confirmed as an absent feature, not a current authorization defect):**
+  `SettingsModel` exposes workspace invoice/edit-policy toggles but no
+  `role_policy` or capability overrides. App permissions come from the
+  canonical `RoleCapabilities`/`PermissionPolicy` implementation, while
+  Firestore Rules independently enforce the role and tenant contract.
+- The runtime contract specifies fixed, operation-specific role capabilities
+  and says screens/providers must reuse that policy; it does not require
+  administrators to redefine the role matrix at runtime. Adding deny-only
+  overrides would require a schema, supported capability list, authorized
+  editor policy, Rules enforcement, migration defaults, and positive/negative
+  emulator coverage.
+- **Disposition:** do not add a dynamic role-policy subsystem as an audit
+  hotfix. Treat it as a product/security feature requiring an explicit
+  capability list and governance decision. No current policy bypass was
+  established by this finding alone.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Client/Rules Release Skew (P1-02)
+
+### Verification and Fix
+
+- **P1-02 — a release could be published even when Rules/Hosting deployment
+  failed (verified and gated locally):** In the release workflow, the
+  GitHub Release job previously depended on validation, artifact building,
+  and Rules tests, but not on the deployment job. It could therefore publish
+  APK artifacts after a failed Rules or Hosting deployment.
+- The release job now also requires successful completion of `deploy`.
+  The current `deploy-web.yml` and `release.yml` source orders Firestore
+  Rules/index deployment before Hosting, and both workflows gate deployment
+  on the Firestore Rules test workflow. A local structural check confirmed the
+  job dependency and step order.
+
+### Remaining Version-Skew Boundary
+
+- **Partial, not a production synchronization claim:** No workflow was run
+  against GitHub or Firebase in this verification. The app has no startup
+  Rules-version handshake, and the separate manual APK/AAB artifact workflow
+  can still produce an artifact without deploying Rules. Production Rules
+  timestamp, secret availability, and client/server compatibility remain
+  unverified until the authorized release sequence succeeds.
+- This work does not change application behavior or Firestore data. No
+  production deploy, release build, device delivery, commit, or push occurred.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Email Verification Sync (P1-01)
+
+### Verification and Disposition
+
+- **P1-01 — Auth-to-profile email verification update denied by Rules (not
+  reproducible in current working tree):** The user self-update allowlist
+  includes `email` and `email_verified`. Rules permit `email_verified` only
+  when it equals the authenticated token claim, and permit an email mirror
+  only when it equals the token email and that claim is verified.
+- Both client paths (`signIn()` and `syncEmailVerification()`) reload Firebase
+  Auth state and force-refresh the ID token before writing. The resume path
+  also rechecks the current UID and verified state after refresh. Sync failures
+  remain non-blocking and are logged.
+- Rules Emulator regressions cover denial when an unverified claim attempts
+  to set `email_verified`, success when a verified token synchronizes its
+  email/profile state, and denial of a forged email. Focused run:
+  `2 passing (8s)`.
+- **Disposition:** the reported client/Rules mismatch is already corrected in
+  the current working tree. No further code change is justified by the
+  reproduced evidence. The test run does not exercise Firebase Auth's real
+  network token refresh.
+
+### Validation Boundary
+
+- The emulator validated the Rules contract; source inspection validated the
+  client ordering. No production Auth account/data access or deployment
+  occurred. Production Rules version alignment remains a separate release
+  gate.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Large Invoice Rules Budget (P2-10)
+
+### Verification and Disposition
+
+- **P2-10 — large invoice batches may exceed Rules access-call limits
+  (30-line scenario not reproduced):** Added a seller regression that creates
+  an invoice with 30 lines and 30 distinct seller-inventory deductions in the
+  same atomic write as the invoice counter, sale transaction, and shop balance.
+  The full local Firestore Rules Emulator suite reported `190 passing (46s)`,
+  including the new case. No Rules access-call-limit rejection occurred.
+- The provider does read each deducted seller-inventory document before
+  committing, so a 30-deduction invoice necessarily incurs those Firestore
+  document reads. The emulator test does not measure production latency,
+  Spark quota consumption, or overall workload cost.
+- **Disposition:** the stated 30-line Rules ceiling concern is not reproduced
+  and no Rules change is warranted. Keep read-cost/workload profiling as a
+  separate open measurement; the emulator result is not a quota or performance
+  certification.
+
+### Validation Boundary
+
+- Local emulator only. No production data was accessed and no Rules or index
+  deployment, build, phone delivery, commit, or push occurred.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Super-Admin Notification Access (P2-09)
+
+### Verification and Disposition
+
+- **P2-09 — platform super-admins cannot read tenant notifications during
+  support access (intentional and documented):** `RoleCapabilities.matrix`
+  does not grant `viewNotifications` to `super_admin`, and the independent
+  Firestore Rules helper excludes super-admins from notification readers even
+  when the selected support context is valid. Existing Rules Emulator
+  coverage explicitly denies the selected-workspace feed, a different
+  workspace feed, and mark-read writes.
+- The runtime contract and project documentation already state that tenant
+  notifications are available to admin/manager, tenant_admin, and supervisor
+  roles, while sellers and platform super-admins are excluded. The focused
+  role/policy suite reported `00:00 +11: All tests passed!`.
+- **Disposition:** no capability or Rules change is warranted. Adding a
+  support-only read permission would broaden platform access and conflict with
+  the current privacy policy; treat that as a separate product/security
+  decision, not an audit bug.
+
+### Validation Boundary
+
+- Current app policy, Rules source, Rules regression assertions, and the
+  published runtime documentation were inspected. The emulator test itself
+  was not rerun in this verification. No production access or deployment
+  occurred.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Profile-Read Error Routing (P2-08)
+
+### Verification and Disposition
+
+- **P2-08 — profile-stream errors routed to bootstrap as if the profile were
+  missing (not reproducible in current source):** The router may send an
+  authenticated user with a failed profile stream to `/bootstrap-profile`,
+  but `BootstrapProfileScreen` renders the mapped error state with Retry for
+  `authUserProvider` errors; it does not render the missing-profile message.
+  The notification route separately retains its mapped profile-permission
+  error and retry feedback.
+- The screen regression asserts that a profile-read error shows `ErrorState`
+  and Retry, not missing-profile copy. The router regression covers profile
+  permission-denied feedback on `/notifications`. The combined focused run
+  reported `00:11 +17: All tests passed!`.
+- **Disposition:** the reported user-visible failure is not present in the
+  current code path, so no router or screen workaround was added. This
+  finding is closed for the current source revision; it does not establish
+  that any earlier deployed build contains the same behavior.
+
+### Validation Boundary
+
+- Source and focused widget/router regressions were checked locally. No
+  production account or Firestore data was accessed, and no deployment,
+  release build, device delivery, commit, or push was performed.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Super-Admin Listener Expiry (P2-05)
+
+### Verification and Fix
+
+- **P2-05 — persistent selected-workspace settings listener outlived context
+  expiry (verified and fixed locally):** The router's expiry timer only
+  refreshed route authorization. `settingsProvider` is non-`autoDispose` and
+  remained subscribed to `settings/{tenantId}`; its document selection used
+  the super-admin's `tenantId` without validating support-context age. The
+  pre-fix regression returned `tenant-42` for a context older than eight
+  hours.
+- The provider now requires an active profile and a reasoned, unexpired,
+  concrete super-admin workspace context before selecting its settings document. For a
+  valid context it schedules self-invalidation at expiry and cancels the timer
+  on disposal. The rebuild emits the no-active-workspace settings state and
+  closes the old stream instead of reconnecting. The client TTL is centralized
+  in `UserModel` and shared with router and tenant-scoped provider timers;
+  Firestore Rules remain authoritative.
+- Focused settings/model/permission/router suite:
+  `00:11 +60: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 5.5s)`; `dart analyze test/`:
+  `No issues found!`.
+
+### Boundaries
+
+- No Rules or indexes changed. No Firestore read against production data was
+  performed; the regression confirms the expired path returns the fallback
+  before obtaining a Firestore instance.
+- This is local and unreleased. The full Flutter suite, fresh release
+  artifacts, device delivery, production deployment, commit, and push remain
+  pending.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Legacy `__global__` Compatibility (P2-06)
+
+### Verification and Disposition
+
+- **P2-06 — legacy global-tenant compatibility remains in read Rules
+  (confirmed; removal blocked):** `firestore.rules` treats the sentinel as
+  active for compatibility, has a legacy settings lookup fallback, and has a
+  settings read branch for an unassigned profile. The Rules Emulator fixtures
+  explicitly verify that an unassigned legacy admin can read a seeded global
+  product, while new product, variant, route, shop, and inventory-log creates
+  using `__global__` are denied. Notification reads for a null-tenant profile
+  are separately denied.
+- The two tenant-backfill scripts are fail-closed because assigning unscoped
+  records to one tenant could disclose data across workspaces. No production
+  data inventory, per-record ownership map, or approved recovery plan is
+  available in this audit scope. Removing the legacy read branches now could
+  strand existing business records or guess their ownership.
+- **Disposition:** do not remove the compatibility branches until a reviewed,
+  per-record migration map and recovery procedure establish that the legacy
+  documents have been safely assigned or retired. New business writes must
+  continue to require a concrete tenant. This finding remains open and is not
+  claimed fixed.
+
+---
+
+## Scope-Specific Addendum — 2026-10-28 Archived Workspace Access UX
+
+### Confirmed Finding and Fix
+
+- **Medium — archived workspace had no member-facing recovery state (fixed
+  locally):** Rules already denied ordinary business access when the tenant
+  document was inactive, but the app shell mounted the business route without
+  first resolving tenant lifecycle state. The new app-shell gate waits for
+  the tenant snapshot and shows localized retry/sign-out feedback for missing,
+  archived, or failed tenant reads. Platform super-admins bypass the member
+  gate so the selected, audited restoration path is preserved.
+- The new routing regression reproduced the issue before the fix: the backup
+  screen remained mounted for an inactive tenant. The focused router suite
+  then reported `00:10 +16: All tests passed!`. `flutter analyze lib --no-pub`
+  reported `No issues found! (ran in 4.8s)` and `dart analyze test/` reported
+  `No issues found!`.
+
+### Validation and Remaining Limits
+
+- Firestore Rules and indexes were not changed. The tenant gate is app UX;
+  Firestore Rules continue to be the independent authorization boundary.
+- The change is local and unreleased. The full Flutter suite, release
+  artifacts, device delivery, production deployment, authenticated
+  production verification, commit, and push remain pending.
+- Repository Markdown lint exited 0 with no output after the documentation
+  updates.
+
+---
+
 ## Scope-Specific Addendum — 2026-10-27 Mixed-Script UI Font Fallback
 
 This addendum covers the authenticated-dashboard Noto fallback warning. It

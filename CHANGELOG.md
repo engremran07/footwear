@@ -7,6 +7,26 @@ Most recent first.
 
 ---
 
+## [3.10.13+1124] — 2026-10-28 — Dependency and Android build compatibility
+
+### Changed
+
+- Updated the Flutter baseline to 3.47.8 / Dart 3.13.7 and upgraded direct Flutter and Node dependencies to the latest resolver-compatible versions. Five newer transitive Dart packages remain constrained by their parents or SDK and were not forced.
+- Aligned Android tooling with the Flutter 3.47.8 template: Gradle 9.3.1, AGP 9.1.0, and Kotlin Gradle Plugin 2.4.0; upgraded Google Services to 4.5.0.
+- Migrated Android build configuration to AGP's public `ApplicationExtension` and Kotlin's typed `compilerOptions`.
+
+### Fixed
+
+- Resolved the release build failure caused by Firebase Auth Kotlin metadata 2.4.0 being incompatible with the configured Kotlin Gradle Plugin 2.2.20.
+
+### Verification
+
+- Full Flutter suite: `01:43 +704: All tests passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 20.9s)`; `dart analyze test/`: `No issues found!`; Firestore Rules Emulator: `190 passing (56s)`.
+- Web release build: `EXIT: 0`; Firebase Hosting and Firestore Rules/indexes each reported `Deploy complete!`. Live `version.json` reports `3.10.13+1124`; 23 remote indexes and two field overrides absent locally were preserved.
+- Split release APKs built: ARMv7 31.2 MB, ARM64 32.8 MB, and x86_64 34.3 MB. All three signatures verified with APK Signature Scheme v2. ARM64 package metadata reports versionName `3.10.13`, versionCode `310133124`; it was copied to `R5GL22RGT9V` (`1 file pushed`) and installed (`Success`).
+- Signed Play Console AAB built at 72.1 MB; `jarsigner -verify` reported `jar verified.` with a self-signed, locally untrusted certificate-chain warning and no timestamp. This is signature-integrity evidence, not proof that Play Console accepts the upload key. No Play Console upload, commit, or push was performed.
+- Flutter's Kotlin Gradle Plugin migration warning for the app and Firebase plugins remains visible; it was not suppressed.
+
 ## [3.10.3+1114] — 2026-10-25 — Workspace roster completeness
 
 ### Fixed

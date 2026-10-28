@@ -186,6 +186,25 @@ void main() {
       );
     });
 
+    test('operational write permissions use action-specific capabilities', () {
+      for (final capability in [
+        AppCapability.manageRoutes,
+        AppCapability.manageProducts,
+        AppCapability.manageInventory,
+      ]) {
+        expect(
+          RoleCapabilities.allows('supervisor', capability),
+          isTrue,
+          reason: 'supervisors must be allowed to $capability',
+        );
+        expect(
+          RoleCapabilities.allows('seller', capability),
+          isFalse,
+          reason: 'sellers must not be allowed to $capability',
+        );
+      }
+    });
+
     test('role assignment is limited to the permitted target roles', () {
       final legacyAdmin = user(role: UserRole.admin);
       final tenantAdmin = user(role: UserRole.tenantAdmin);
@@ -325,6 +344,18 @@ void main() {
 
       expect(PermissionPolicy.canAccessRoute(unselected, '/'), isFalse);
       expect(PermissionPolicy.canAccessRoute(unselected, '/tenants'), isTrue);
+      expect(
+        PermissionPolicy.routeAccessDecision(unselected, '/routes'),
+        RouteAccessDecision.workspaceSelectionRequired,
+      );
+      expect(
+        PermissionPolicy.routeAccessDecision(unselected, '/unknown'),
+        RouteAccessDecision.denied,
+      );
+      expect(
+        PermissionPolicy.routeAccessDecision(unselected, '/tenants'),
+        RouteAccessDecision.allowed,
+      );
       expect(PermissionPolicy.canAccessRoute(selected, '/'), isTrue);
       final expired = user(
         role: UserRole.superAdmin,
@@ -337,6 +368,10 @@ void main() {
       );
       expect(PermissionPolicy.canAccessRoute(expired, '/'), isFalse);
       expect(PermissionPolicy.canAccessRoute(expired, '/tenants'), isTrue);
+      expect(
+        PermissionPolicy.routeAccessDecision(expired, '/routes'),
+        RouteAccessDecision.workspaceSelectionRequired,
+      );
     });
 
     test('settings descendants are restricted to workspace administrators', () {

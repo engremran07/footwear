@@ -1,4 +1,5 @@
 import java.util.Properties
+import com.android.build.api.dsl.ApplicationExtension
 
 plugins {
     id("com.android.application")
@@ -39,7 +40,7 @@ val buildingAppBundle = gradle.startParameter.taskNames.any {
     it.contains("bundle", ignoreCase = true)
 }
 
-android {
+extensions.configure<ApplicationExtension> {
     namespace = "footwear.pk.com"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
@@ -48,10 +49,6 @@ android {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -95,6 +92,12 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget("17")
     }
 }
 

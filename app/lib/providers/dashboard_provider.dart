@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/utils/error_mapper.dart';
+import '../core/utils/tenant_scope.dart';
 import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
 import '../models/route_model.dart';
@@ -63,39 +66,89 @@ class DashboardStats {
 /// Exposed (not private) so auth_provider can invalidate it on sign-out
 /// to prevent stale stats from flashing when a new user signs in (SM-01).
 final lastGoodDashboardStatsProvider =
-    NotifierProvider<LastGoodDashboardStatsNotifier, DashboardStats?>(
+    NotifierProvider<LastGoodDashboardStatsNotifier, DashboardStatsCacheEntry?>(
       LastGoodDashboardStatsNotifier.new,
     );
 
-class LastGoodDashboardStatsNotifier extends Notifier<DashboardStats?> {
-  @override
-  DashboardStats? build() => null;
+class DashboardStatsCacheEntry {
+  final String scopeKey;
+  final DashboardStats stats;
 
-  void set(DashboardStats stats) => state = stats;
+  const DashboardStatsCacheEntry({
+    required this.scopeKey,
+    required this.stats,
+  });
+}
+
+class LastGoodDashboardStatsNotifier
+    extends Notifier<DashboardStatsCacheEntry?> {
+  @override
+  DashboardStatsCacheEntry? build() => null;
+
+  DashboardStats? forUser(UserModel user) {
+    final cached = state;
+    return cached?.scopeKey == _dashboardStatsScopeKey(user)
+        ? cached?.stats
+        : null;
+  }
+
+  void setForUser(UserModel user, DashboardStats stats) {
+    state = DashboardStatsCacheEntry(
+      scopeKey: _dashboardStatsScopeKey(user),
+      stats: stats,
+    );
+  }
 }
 
 final _lastGoodDashboardStatsProvider = lastGoodDashboardStatsProvider;
+
+String _dashboardStatsScopeKey(UserModel user) {
+  final routeIds = user.assignedRouteIds.map((id) => id.trim()).toList()
+    ..sort();
+  return jsonEncode([
+    user.id,
+    user.role.name,
+    user.active,
+    TenantScope.normalize(user.tenantId),
+    TenantScope.normalize(user.activeWorkspaceId),
+    user.activeWorkspaceSelectedAt?.millisecondsSinceEpoch,
+    user.activeWorkspaceAccessLogId,
+    routeIds,
+  ]);
+}
 
 /// Derives dashboard stats reactively from live stream providers.
 /// Role-aware: admin sees all data, seller sees only their route's data.
 final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
   final userAsync = ref.watch(authUserProvider);
+  DashboardStats? cachedForUser(UserModel? user) {
+    if (user == null) return null;
+    return ref.read(_lastGoodDashboardStatsProvider.notifier).forUser(user);
+  }
+
   if (userAsync.isLoading) {
-    final cached = ref.read(_lastGoodDashboardStatsProvider);
+    final cachedUser = userAsync.value;
+    final authUid = ref.watch(authStateProvider).value?.uid;
+    final cacheMatchesAuth =
+        cachedUser != null && cachedUser.id == authUid;
+    final cached = cacheMatchesAuth ? cachedForUser(cachedUser) : null;
     return cached != null ? AsyncData(cached) : const AsyncLoading();
   }
   if (userAsync.hasError && userAsync.error != null) {
     if (AppErrorMapper.isPermissionOrAuthError(userAsync.error!)) {
       return const AsyncLoading();
     }
-    final cached = ref.read(_lastGoodDashboardStatsProvider);
+    final cachedUser = userAsync.value;
+    final authUid = ref.watch(authStateProvider).value?.uid;
+    final cacheMatchesAuth =
+        cachedUser != null && cachedUser.id == authUid;
+    final cached = cacheMatchesAuth ? cachedForUser(cachedUser) : null;
     return cached != null ? AsyncData(cached) : const AsyncLoading();
   }
 
   final user = userAsync.value;
   if (user == null) {
-    final cached = ref.read(_lastGoodDashboardStatsProvider);
-    return cached != null ? AsyncData(cached) : const AsyncLoading();
+    return const AsyncLoading();
   }
 
   final AsyncValue<List<RouteModel>> routes;
@@ -104,7 +157,7 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
     final workspaces = ref.watch(tenantsProvider);
     final users = user.tenantId == null ? null : ref.watch(allUsersProvider);
     if (workspaces.isLoading || (users?.isLoading ?? false)) {
-      final cached = ref.read(_lastGoodDashboardStatsProvider);
+      final cached = cachedForUser(user);
       return cached != null ? AsyncData(cached) : const AsyncLoading();
     }
 
@@ -120,7 +173,9 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
       usersInActiveWorkspaces: userList.where((u) => u.active).length,
     );
     Future.microtask(
-      () => ref.read(_lastGoodDashboardStatsProvider.notifier).set(stats),
+      () => ref
+          .read(_lastGoodDashboardStatsProvider.notifier)
+          .setForUser(user, stats),
     );
     return AsyncData(stats);
   }
@@ -159,7 +214,7 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
       shops is AsyncLoading ||
       products is AsyncLoading ||
       variants is AsyncLoading) {
-    final cached = ref.read(_lastGoodDashboardStatsProvider);
+    final cached = cachedForUser(user);
     return cached != null ? AsyncData(cached) : const AsyncLoading();
   }
 
@@ -213,7 +268,9 @@ final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
 
   // Persist the latest successful computation for use as a fallback.
   Future.microtask(
-    () => ref.read(_lastGoodDashboardStatsProvider.notifier).set(stats),
+    () => ref
+        .read(_lastGoodDashboardStatsProvider.notifier)
+        .setForUser(user, stats),
   );
 
   return AsyncData(stats);

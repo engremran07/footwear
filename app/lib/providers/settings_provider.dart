@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../core/constants/collections.dart';
 import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
@@ -10,24 +13,52 @@ import '../models/settings_model.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
 
-String settingsDocumentIdForUser(UserModel? currentUser) {
+String settingsDocumentIdForUser(UserModel? currentUser, {DateTime? now}) {
+  if (currentUser?.isSuperAdmin == true) {
+    final workspaceId = TenantScope.normalize(currentUser!.activeWorkspaceId);
+    if (workspaceId == null ||
+        workspaceId == TenantScope.globalTenantId ||
+        !currentUser.hasActiveWorkspaceSupportContextFor(
+          workspaceId,
+          now: now,
+        )) {
+      return TenantScope.noActiveWorkspaceId;
+    }
+    return workspaceId;
+  }
+
   final tenantId = TenantScope.normalize(currentUser?.tenantId);
   return tenantId ?? TenantScope.noActiveWorkspaceId;
 }
 
+SettingsModel _defaultSettings(String settingsDocId) => SettingsModel(
+  tenantId: settingsDocId,
+  currency: 'SAR',
+  pairsPerCarton: 12,
+  requireAdminApprovalForSellerTransactionEdits: false,
+  updatedAt: Timestamp.now(),
+);
+
 final settingsProvider = StreamProvider<SettingsModel>((ref) {
   final currentUser = ref.watch(authUserProvider).value;
   final settingsDocId = settingsDocumentIdForUser(currentUser);
+
+  if (settingsDocId != TenantScope.noActiveWorkspaceId &&
+      currentUser?.isSuperAdmin == true) {
+    final selectedAt = currentUser!.activeWorkspaceSelectedAt?.toDate();
+    if (selectedAt != null) {
+      final expiresAt = selectedAt.add(UserModel.workspaceSupportContextTtl);
+      final remaining = expiresAt.difference(DateTime.now());
+      final expiryTimer = Timer(
+        remaining.isNegative ? Duration.zero : remaining,
+        ref.invalidateSelf,
+      );
+      ref.onDispose(expiryTimer.cancel);
+    }
+  }
+
   if (settingsDocId == TenantScope.noActiveWorkspaceId) {
-    return Stream.value(
-      SettingsModel(
-        tenantId: settingsDocId,
-        currency: 'SAR',
-        pairsPerCarton: 12,
-        requireAdminApprovalForSellerTransactionEdits: false,
-        updatedAt: Timestamp.now(),
-      ),
-    );
+    return Stream.value(_defaultSettings(settingsDocId));
   }
 
   return FirebaseFirestore.instance
@@ -37,13 +68,7 @@ final settingsProvider = StreamProvider<SettingsModel>((ref) {
       .map((doc) {
         final data = doc.data();
         if (data == null) {
-          return SettingsModel(
-            tenantId: settingsDocId,
-            currency: 'SAR',
-            pairsPerCarton: 12,
-            requireAdminApprovalForSellerTransactionEdits: false,
-            updatedAt: Timestamp.now(),
-          );
+          return _defaultSettings(settingsDocId);
         }
 
         final model = SettingsModel.fromJson(data);

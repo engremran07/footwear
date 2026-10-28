@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../core/constants/app_brand.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/auth_refresh_policy.dart';
@@ -207,8 +208,7 @@ class AuthNotifier extends AsyncNotifier<void> {
           await _signOutIfCurrentUid(uid);
           throw FirebaseAuthException(
             code: 'permission-denied',
-            message:
-                'User profile is not provisioned. Contact your workspace administrator.',
+            message: 'User profile is not provisioned. Contact your workspace administrator.',
           );
         }
 
@@ -221,8 +221,7 @@ class AuthNotifier extends AsyncNotifier<void> {
           await _signOutIfCurrentUid(uid);
           throw FirebaseAuthException(
             code: 'invalid-user-role',
-            message:
-                'This account has an unsupported role. Contact your administrator.',
+            message: 'This account has an unsupported role. Contact your administrator.',
           );
         }
 
@@ -236,8 +235,7 @@ class AuthNotifier extends AsyncNotifier<void> {
             await _signOutIfCurrentUid(uid);
             throw FirebaseAuthException(
               code: 'account-not-assigned-to-workspace',
-              message:
-                  'Your account is not assigned to a workspace. Contact your administrator.',
+              message: 'Your account is not assigned to a workspace. Contact your administrator.',
             );
           }
         }
@@ -255,21 +253,28 @@ class AuthNotifier extends AsyncNotifier<void> {
         // Riverpod stream reflects the real state without requiring re-login.
         try {
           await FirebaseAuth.instance.currentUser?.reload();
-          final isVerified =
-              FirebaseAuth.instance.currentUser?.emailVerified ?? false;
-          if (isVerified) {
-            final authEmail = FirebaseAuth.instance.currentUser?.email
-                ?.trim()
-                .toLowerCase();
+          final freshAuthUser = FirebaseAuth.instance.currentUser;
+          if (freshAuthUser != null &&
+              freshAuthUser.uid == uid &&
+              freshAuthUser.emailVerified) {
+            final authEmail = freshAuthUser.email?.trim().toLowerCase();
             final profileEmail = (userData?['email'] as String?)
                 ?.trim()
                 .toLowerCase();
-            await usersRef.doc(uid).update({
+            final patch = <String, dynamic>{
               if (authEmail != null && authEmail != profileEmail)
                 'email': authEmail,
               if (userData?['email_verified'] != true) 'email_verified': true,
-              'updated_at': Timestamp.now(),
-            });
+            };
+            if (patch.isNotEmpty) {
+              await freshAuthUser.getIdToken(true);
+              if (FirebaseAuth.instance.currentUser?.uid == uid) {
+                await usersRef.doc(uid).update({
+                  ...patch,
+                  'updated_at': Timestamp.now(),
+                });
+              }
+            }
           }
         } catch (e) {
           _logger.w('Email verification sync skipped: $e');
@@ -480,6 +485,7 @@ class AuthNotifier extends AsyncNotifier<void> {
       'reason': normalizedReason,
       'created_at': FieldValue.serverTimestamp(),
     });
+    ref.invalidate(lastGoodDashboardStatsProvider);
     await batch.commit();
   }
 
@@ -511,6 +517,7 @@ class AuthNotifier extends AsyncNotifier<void> {
         'updated_at': FieldValue.serverTimestamp(),
       },
     );
+    ref.invalidate(lastGoodDashboardStatsProvider);
     await batch.commit();
   }
 
@@ -547,11 +554,15 @@ class AuthNotifier extends AsyncNotifier<void> {
         patch['email_verified'] = true;
       }
       if (patch.isNotEmpty) {
-        patch['updated_at'] = Timestamp.now();
+        await fresh.getIdToken(true);
+        if (FirebaseAuth.instance.currentUser?.uid != fresh.uid ||
+            FirebaseAuth.instance.currentUser?.emailVerified != true) {
+          return;
+        }
         await FirebaseFirestore.instance
             .collection(Collections.users)
             .doc(fresh.uid)
-            .update(patch);
+            .update({...patch, 'updated_at': Timestamp.now()});
       }
     } catch (e) {
       _logger.w('Email verification resync skipped: $e');

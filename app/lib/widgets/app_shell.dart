@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../providers/auth_provider.dart';
 import '../providers/network_provider.dart';
 import '../providers/notification_provider.dart';
@@ -20,9 +21,11 @@ import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/role_names.dart';
 import '../core/utils/snack_helper.dart';
+import '../core/utils/tenant_scope.dart';
 import '../providers/changelog_provider.dart';
 import '../providers/database_backup_provider.dart';
 import '../providers/tenant_provider.dart';
+import 'error_state.dart';
 import 'whats_new_sheet.dart';
 
 // ─── App Shell ───────────────────────────────────────────────────────────────
@@ -339,9 +342,79 @@ class _AppShellState extends ConsumerState<AppShell>
     );
   }
 
+  Widget _workspaceAccessScreen(Widget content) => Scaffold(
+    body: SafeArea(
+      child: Column(
+        children: [
+          Expanded(child: content),
+          Padding(
+            padding: const EdgeInsets.all(AppTokens.s16),
+            child: FilledButton.icon(
+              onPressed: () =>
+                  ref.read(authNotifierProvider.notifier).signOut(),
+              icon: const Icon(Icons.logout),
+              label: Text(tr('sign_out', ref)),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authUserProvider).value;
+    if (user != null && !user.isSuperAdmin) {
+      final tenantId = TenantScope.normalize(user.tenantId);
+      if (tenantId == null || tenantId == TenantScope.globalTenantId) {
+        return _workspaceAccessScreen(
+          ErrorState(
+            message: tr('workspace_access_unavailable', ref),
+            errorType: ErrorType.permission,
+          ),
+        );
+      }
+
+      final workspaceState = ref.watch(tenantProvider(tenantId));
+      if (workspaceState.isLoading && !workspaceState.hasValue) {
+        return Scaffold(
+          body: Center(
+            child: Semantics(
+              label: tr('loading', ref),
+              liveRegion: true,
+              child: const CircularProgressIndicator(),
+            ),
+          ),
+        );
+      }
+      if (workspaceState.hasError) {
+        final error = workspaceState.error!;
+        return _workspaceAccessScreen(
+          mappedErrorState(
+            error: error,
+            ref: ref,
+            onRetry: () => ref.invalidate(tenantProvider(tenantId)),
+          ),
+        );
+      }
+
+      final tenant = workspaceState.value;
+      if (tenant == null || !tenant.active) {
+        return _workspaceAccessScreen(
+          ErrorState(
+            message: tr(
+              tenant == null
+                  ? 'workspace_access_unavailable'
+                  : 'workspace_disabled',
+              ref,
+            ),
+            errorType: ErrorType.permission,
+            onRetry: () => ref.invalidate(tenantProvider(tenantId)),
+          ),
+        );
+      }
+    }
+
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isWide = screenWidth >= AppTokens.breakpointNavigationRail;
     final isOnline = ref.watch(isOnlineProvider).value ?? true;

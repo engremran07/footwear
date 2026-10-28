@@ -9,13 +9,13 @@ description: "Use when: diagnosing Android Gradle builds, building or signing Sh
 
 | Component | Current configuration |
 | --- | --- |
-| Flutter | 3.41.6 |
+| Flutter | 3.47.8 |
 | Java / Kotlin JVM target | 17 |
 | Gradle build JDK | 17 or 21; the current workstation runs 21 |
-| Gradle wrapper | 8.14 |
-| Android Gradle Plugin | 8.11.1 |
-| Kotlin Android plugin | 2.2.20 |
-| Google Services plugin | 4.4.2 |
+| Gradle wrapper | 9.3.1 |
+| Android Gradle Plugin | 9.1.0 |
+| Kotlin Android plugin | 2.4.0 |
+| Google Services plugin | 4.5.0 |
 | Compile / target SDK | 36 |
 | Minimum SDK | 29 |
 | Application ID | `footwear.pk.com` |
@@ -24,6 +24,18 @@ Use the checked-in Gradle wrapper. Do not install a separate Gradle version or
 upgrade the Android and Kotlin plugins independently of the wrapper. The app
 module applies the Android and Kotlin plugins before the Flutter Gradle plugin.
 Release builds require signing configuration and fail closed when it is absent.
+
+These are the compatibility-verified versions for Flutter 3.47.8, not a claim
+that each is the newest version published independently. Flutter 3.47.8's
+Android templates use Gradle 9.3.1, AGP 9.1.0, and Kotlin Gradle Plugin 2.4.0.
+Firebase's Android Google Services setup currently documents plugin 4.5.0.
+Do not move beyond the Flutter-tested Gradle/AGP/Kotlin range without checking
+the Flutter tool's compatibility data and building both APK and AAB tasks.
+
+The version alignment is material: the resolved Firebase Auth Android
+artifact can publish Kotlin 2.4.0 metadata, which Kotlin Gradle Plugin 2.2.20
+cannot read. Raise the Kotlin plugin to at least the metadata version and keep
+Gradle and AGP within the Flutter-compatible matrix.
 
 ## Version and Android Version-Code Rules
 
@@ -84,6 +96,37 @@ DNS is not evidence that the dependency version is incompatible. Avoid
 `flutter clean` unless stale generated output is part of the demonstrated
 failure; it does not repair a version or network mismatch.
 
+If Flutter reports that a Windows engine artifact is in use while preparing
+the SDK, classify this as an SDK/cache file lock, not a Gradle compatibility
+failure. Inspect active Flutter test/debug processes and release the lock by
+stopping the owning run through its IDE or test runner. Do not terminate an
+unrelated process or delete/replace the shared SDK artifact. Retry
+`flutter doctor -v` and the original Flutter command after the owning run has
+closed; until then, Dart-only package inspection is not evidence that Flutter
+tests or Android builds work.
+
+For the Windows `icudtl.dat` “user-mapped section open” error, do not mistake
+the accompanying download/extract wording for proof of a network failure.
+Flutter may need to validate or replace engine artifacts before `pub get`.
+Run only one Flutter SDK/artifact operation at a time; stop overlapping
+Flutter tests, debug runs, desktop runs, or another SDK update gracefully
+through the IDE or test runner, then wait for the SDK file to be released.
+Use Resource Monitor's Associated Handles search or Windows Restart Manager
+to identify a current owner when needed; Dart language-server processes alone
+are not proof that they own the locked artifact. Do not kill processes by
+name, disable antivirus, or delete the Flutter cache. Retry the original
+command once the file is no longer locked. If the owner cannot be identified
+or the error persists without a lock, investigate endpoint protection and
+network access separately.
+
+`flutter pub get --no-example` completed successfully on 2026-10-28 after
+four logged `icudtl.dat` lock failures; a later verification also completed
+with `Got dependencies!` and exit code 0. No Flutter test/debug process was
+found owning the artifact during that verification, and Restart Manager
+reported no current owner. The five packages reported as newer but
+incompatible are resolver constraints, not a failed `pub get`; do not force
+overrides to silence that notice.
+
 If `flutter doctor` reports unaccepted Android SDK licenses, ask the device
 owner to review and accept them with `flutter doctor --android-licenses`.
 Release builds that already succeed do not justify silently accepting legal
@@ -117,6 +160,34 @@ terminating unrelated processes.
   upload certificate chain is not trusted by the local JVM. Treat that as
   signature-integrity evidence, not proof that Play Console recognizes the
   upload key; confirm the certificate is registered before upload.
+- When the VS Code Gradle extension reports a Gradle, AGP, or Kotlin version
+  different from `gradle-wrapper.properties` and `settings.gradle.kts`, do not
+  upgrade the project again based on that extension log. Confirm the checked-in
+  wrapper directly, refresh the Gradle project in VS Code, and reload the
+  window so task discovery uses the current project model. Recheck the version
+  banner before treating an extension task failure as a release-build failure.
+- A `this and base files have different roots` error while the Gradle extension
+  creates a Flutter plugin source task is distinct from APK/AAB compilation.
+  First compare the extension's reported Gradle/plugin versions with the
+  checked-in wrapper and settings, then reproduce through `gradlew.bat` using
+  the exact task. If the current wrapper reproduces a cross-volume path error,
+  keep the existing Pub cache intact and configure a new `PUB_CACHE` on the
+  same volume as the workspace. From the Flutter app directory:
+
+  ```powershell
+  $repoDrive = (Get-Location).Drive.Root
+  $cachePath = Join-Path $repoDrive 'FlutterPubCache'
+  [Environment]::SetEnvironmentVariable('PUB_CACHE', $cachePath, 'User')
+  $env:PUB_CACHE = $cachePath
+  flutter pub get --no-example
+  Set-Location android
+  .\gradlew.bat :flutter_plugin_android_lifecycle:compileDebugUnitTestSources --stacktrace
+  ```
+
+  Restart VS Code and its Gradle server after changing the user environment so
+  the extension inherits `PUB_CACHE`. Re-run the exact failed task before
+  retrying APK/AAB builds. Do not copy or delete the old cache, relocate build
+  outputs, or change project versions to work around this filesystem error.
 
 ## Local Validation and Release Artifacts
 
@@ -223,3 +294,63 @@ requirements whenever permissions change. Keep only permissions needed by
 current workflows. Do not add camera, location, storage, boot, or notification
 permissions based on this skill alone; test the relevant Android API levels
 and document any user-visible permission prompt.
+
+## Gradle Failure Evidence
+
+Do not report that “all Gradle issues are fixed” from a configuration review or
+a successful unrelated task. The current version inventory is a compatibility
+baseline, not proof that every APK/AAB task succeeds on every workstation.
+When a build fails:
+
+1. Capture the exact Flutter command, task, exit code, first Gradle exception,
+   and underlying `Caused by` chain. Include `flutter doctor -v`, `java
+   -version`, and `gradlew.bat --version` when toolchain mismatch is plausible.
+2. Classify the failure before editing: dependency/DNS resolution, SDK/license,
+   signing, memory/resources, filesystem/cache, plugin configuration, source
+   compilation, or task-specific APK/AAB packaging.
+3. Re-run the narrow failing task after a root-cause change, then run both APK
+   and AAB release tasks when the change affects shared Android configuration.
+   Do not upgrade or clear caches merely to turn a single failed build green.
+4. Report exactly which tasks ran and their output. A clean APK is not evidence
+   that the AAB task works, and an AAB signature check is not proof that Play
+   Console accepts the upload certificate.
+
+Verified 2026-10-28: Firebase Auth metadata 2.4.0 failed with Kotlin Gradle
+Plugin 2.2.20. The verified Flutter 3.47.8 toolchain is Gradle 9.3.1, AGP
+9.1.0, and Kotlin Gradle Plugin 2.4.0; Google Services is 4.5.0. AGP 9 also
+requires the public `ApplicationExtension` DSL and Kotlin's typed
+`compilerOptions` instead of the deprecated `BaseAppModuleExtension` and
+`android.kotlinOptions` APIs in this app. The split APK task completed after
+that migration. Flutter still warns that the app and current Firebase
+plugins apply Kotlin Gradle Plugin; retain and report this upstream warning
+instead of suppressing it. The split APKs and 72.1 MB AAB then built. The AAB
+reported `jar verified.` but also a self-signed/untrusted local certificate
+chain and no timestamp; this is not evidence that Play Console accepts the
+upload key. The subsequent v3.10.13+1124 delivery copied and installed the
+ARM64 APK successfully, then deployed Rules/indexes and Hosting.
+
+The cross-volume Gradle source-root failure was independently reproduced
+through the checked-in wrapper. A same-drive user-level `PUB_CACHE` made the
+exact `:flutter_plugin_android_lifecycle:compileDebugUnitTestSources` task
+succeed again (`BUILD SUCCESSFUL in 55s`). The split APK, AAB, and web release
+tasks then all completed. This resolves the reported workstation failure; it
+does not guarantee builds on different cache, SDK, or network configurations.
+
+For large workspaces, build release artifacts sequentially and inspect free
+memory before starting. Never stop unrelated processes or delete shared caches
+to address resource pressure. If no reproducible failure is available, record
+the toolchain baseline and leave the issue unverified rather than inventing a
+Gradle fix.
+
+Verified 2026-10-28: the VS Code Gradle server initially reported Gradle 8.14,
+AGP 8.11.1, and Kotlin 2.2.20, then failed while creating
+`:flutter_plugin_android_lifecycle:compileDebugUnitTestSources` because the
+app build output was on `D:\` and the plugin source was in the Pub cache on
+`C:\`. The checked-in wrapper/settings specify Gradle 9.3.1, AGP 9.1.0, and
+Kotlin 2.4.0. The exact task also failed through the current wrapper with that
+cross-volume cache layout. Resolving packages with `PUB_CACHE` on the workspace
+volume made the exact task pass: `BUILD SUCCESSFUL in 2m` (29 actionable
+tasks). The existing C-drive cache was left untouched. The user-level
+`PUB_CACHE` was set to the same-drive cache; restart VS Code before verifying
+the Gradle extension. APK/AAB release builds remain separate verification
+gates.

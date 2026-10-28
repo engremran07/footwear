@@ -292,3 +292,218 @@ needed; tenant and selected-workspace boundaries remain unchanged.
 - No web build or Hosting deployment was performed. Git publication is
   pending because a push to `main` automatically triggers Hosting; no
   authenticated cross-device business-data verification was performed.
+
+## 2026-10-28 Full-Frontend Modernization Baseline
+
+The complete 832-line modernization prompt and its companion skill snapshot
+were reviewed. This is a staged modernization of the existing product, not a
+greenfield rewrite. The requested scope covers repository and feature
+inventory, focused external research, distinct desktop-web and Android
+experiences, design-system consistency, Riverpod ownership, skills/tooling,
+dependency and Gradle compatibility, footwear workflows, performance,
+accessibility, Firebase consistency, regression testing, and evidence-based
+reporting.
+
+### Verified baseline
+
+- Repository baseline: `main` at
+  `2f2c09b2b522249142e428093b2ee86e24714cd7`. The only observed worktree
+  entry is an unexplained, zero-byte untracked file under
+  `tests/firestore-rules/`; it was preserved and not included in the work.
+- Local environment: Flutter `3.41.6`, Dart `3.11.4`; app constraint is
+  Dart `>=3.11.0 <4.0.0`, version `3.10.12+1123`.
+- Baseline analysis: `flutter analyze lib --no-pub` reported
+  `No issues found! (ran in 94.0s)`; `dart analyze test/` reported
+  `No issues found!`.
+- Baseline tests: `flutter test -r expanded
+  --dart-define=use_arabic=true` reported
+  `01:24 +685: All tests passed!`.
+- Baseline web build: `flutter build web --release
+  --dart-define=use_arabic=true` completed with `EXIT: 0`. The WebAssembly
+  dry-run succeeded; tree-shaking and dry-run notices were informational.
+- Android configuration inspected: Gradle `8.14`, AGP `8.11.1`, Kotlin
+  `2.2.20`, Java `17`, compile/target SDK `36`, minimum SDK `29`. The
+  dependency/Gradle review found no evidenced compatibility failure that
+  warrants a blind upgrade. Existing release artifact evidence is recorded
+  in SESSION-040; the Android build was not rerun for this audit.
+
+### Initial architecture and risk observations
+
+- The router has 32 registered route patterns. The app uses a single
+  `MaterialApp.router`; the authenticated shell changes composition by
+  available width, using compact navigation below 720 logical pixels, a rail
+  from 720, and an extended rail from 1024. The inspected shell does not select
+  a separate composition using `kIsWeb`. This is a confirmed architecture
+  fact; screen-by-screen review is required before classifying it as a product
+  defect.
+- The project already owns centralized brand, theme, token, font, motion,
+  localization, and shared-widget implementations. This baseline does not
+  justify introducing a parallel design system or UI package.
+- Current test evidence includes selected narrow-phone and wide-shell cases,
+  but the bounded frontend review found no direct shell tests at the 720/1024
+  breakpoints or a platform-specific web composition test. It did not find a
+  demonstrated responsive defect.
+- A bounded Riverpod review flagged transaction-write concurrency and
+  idempotency, settings mutation-state visibility, notification mutation
+  scope, and listener-cancellation test coverage for targeted verification.
+  These are audit candidates, not confirmed authorization defects; the Rules
+  contract and exact user-facing behavior must be checked before remediation.
+- Research retrieved [Flutter accessibility guidance](https://docs.flutter.dev/ui/accessibility),
+  which recommends functional controls, screen-reader testing, contrast
+  checks, touch targets, actionable errors, and large text-scale checks.
+  Apply only relevant guidance and verify APIs with the pinned Flutter 3.41.6
+  SDK; the retrieved documentation currently describes a newer Flutter line.
+- [WCAG 2.2](https://www.w3.org/TR/WCAG22/) provides device-independent,
+  testable web accessibility criteria. It is an evaluation reference, not a
+  claim of conformance.
+- [Shopify Polaris references](https://shopify.dev/docs/api/polaris) describe
+  a unified UI framework spanning Shopify app surfaces. This is a consistency
+  pattern only: its web-component implementation is not a Flutter dependency,
+  and no code or assets were adopted.
+- [Odoo Inventory documentation](https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/inventory.html)
+  and its [stock report](https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/inventory/warehouses_storage/reporting/stock.html)
+  show role-gated stock reporting with grouping, searchable filters, on-hand
+  and movement context. These patterns may inform desktop table research but
+  do not justify adding purchasing or valuation features without validating
+  the ShoesERP business model.
+- Flutter's adaptive-responsive page could not be retrieved in this run
+  because of a transport-level failure. No third-party code, assets, SDK, or
+  package was adopted; license compatibility was therefore not used to justify
+  an implementation. This remains preliminary research, not a completed
+  commercial/open-source comparison.
+
+### Phased execution and status
+
+| Phase | Scope | Status |
+|---|---|---|
+| A | Repository, toolchain, test, and build baseline | Baseline completed; full screen inventory remains part of Phase D |
+| B | Focused design, accessibility, and ERP research | Preliminary sources collected; research comparison remains open |
+| C | Distinct desktop-web and Android experiences | Width-responsive shell confirmed; detailed screen assessment and implementation remain open |
+| D | Evidence-based feature-gap comparison and ranked backlog | In progress; route inventory started, feature-domain verification remains open |
+| E | Existing design-system and component unification | Existing owners confirmed; cross-screen consistency audit remains open |
+| F | Riverpod state ownership and duplication | Bounded candidate findings recorded; direct reproduction and cross-feature audit remain open |
+| G | Skills, agents, and MCP review | Existing project skills are present; targeted skill/tool decisions remain open |
+| H | Dependency and Gradle modernization | Configuration reviewed; no upgrade selected without a demonstrated need |
+| I | Footwear workflow enrichment | Not yet audited end-to-end |
+| J | Performance, accessibility, and interaction quality | Prior dashboard lazy-list work is recorded separately; whole-app profiling and accessibility review remain open |
+| K | Firebase and cross-platform consistency | Not yet verified end-to-end across representative roles and tenants |
+| L | Regression, integration, and platform validation | Current baseline is green; modernization-specific scenario coverage remains open |
+| M | Bounded implementation and change control | In progress; preserve existing behavior and use evidence-first tests |
+| N | Audit, research, migration, test, and backlog deliverables | This baseline addendum is partial; remaining evidence must be added as phases execute |
+
+### Continuity and boundaries
+
+The session todo list retains all earlier unresolved multi-tenant, permission,
+notification, invoice, user-management, super-admin, browser-diagnostic,
+workspace-visibility, reset-safety, and seller-history tasks. Thirteen
+modernization phase todos were added rather than replacing those items. Phase
+A is complete; feature inventory is active. No runtime source, Rules, indexes,
+release version, production data, deployment, commit, or push was changed by
+this baseline audit. The unexplained untracked file remains untouched.
+
+### 2026-10-28 Provider and notification Rules regressions
+
+#### Notification feed disappears during profile refresh
+
+The commit trace identified a loading-state regression: when the profile
+provider emitted `AsyncLoading` with a retained value, the notification screen
+showed full-screen loading and the tenant-scope provider discarded the cached
+profile. The correction retains the feed only when the retained profile ID
+matches the settled Firebase Auth UID. Auth loading/errors and UID mismatch
+still clear tenant scope, preserving account-switch isolation.
+
+The added widget regression failed before the fix because the notification row
+disappeared during a same-user profile refresh. Focused notification-center
+widget tests: `00:03 +9: All tests passed!`; visibility/provider tests:
+`00:00 +13: All tests passed!`; full Flutter suite:
+`01:36 +689: All tests passed!`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 116.5s)`; `dart analyze test/`:
+`No issues found!`. This local result does not verify a production session or
+close the broader modernization audit.
+
+The follow-up traced notification tile taps and the mark-all action through
+`NotificationCenterScreen`, `NotificationNotifier`, and the notification
+Rules. The provider previously supplied client-clock timestamps, while Rules
+did not enforce a one-way transition. The client now uses server-timestamp
+sentinels; Rules require both fields to change, `read` to transition from
+false to true, and `read_at` to resolve to `request.time`. Concrete active
+tenant and authorized operational-role gates remain in place. Rules emulator
+tests deny resets, partial changes, client timestamps, unassigned/global
+scope, inactive users/tenants, and cross-tenant access, while allowing
+mark-one and mark-all for eligible readers.
+
+The transaction audit traced the shop cash-entry dialog through
+`TransactionNotifier.create()`. The concurrency guard previously allowed a
+second call to complete without writing or signaling rejection. It now throws
+an error that the screen maps to feedback. Optional keyed creates use a stable
+tenant-scoped document ID and a Firestore transaction to atomically create the
+ledger row and update `shop.balance`. The unkeyed batch path remains intact.
+The regression verifies the duplicate call is not silently accepted and the
+document ID is tenant-specific. It does not yet verify a concurrent persisted
+race against an emulator.
+
+Validation: focused notification and transaction tests
+`00:00 +21: All tests passed!`; full Flutter suite
+`01:34 +688: All tests passed!`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 15.4s)`; `dart analyze test/`:
+`No issues found!`; Rules Emulator: `185 passing (46s)`. The emulator log
+contained non-failing expression-limit diagnostics in other Rules paths.
+Rules and provider changes remain local and undeployed. Android/web release,
+device install, deployment, Git publication, authenticated visual acceptance,
+and the full modernization phases remain open.
+
+## 2026-10-28 Mobile ERP Design Benchmark and Feature-Gap Candidates
+
+The comparison below uses published product features and repository evidence
+available on 2026-10-28. It is a pattern benchmark, not a universal ranking:
+the projects serve different business sizes and device contexts. ShoesERP
+remains the source of truth for brand, role policy, tenant scope, and footwear
+distribution workflows. Do not copy proprietary layouts or assets.
+
+| Reference | Category and documented patterns | ShoesERP comparison | Reuse decision |
+|---|---|---|---|
+| [Flutter Material 3](https://docs.flutter.dev/ui/design/material) | Open design-system foundation for controls, forms, surfaces, themes, and accessibility | ShoesERP already uses Flutter/Material with owned theme and token files; Material does not supply distributor workflows or tenant authorization | Keep as the foundation; improve the existing system instead of replacing it |
+| [Flutter Responsive Admin Panel](https://github.com/abuanwar072/Flutter-Responsive-Admin-Panel-or-Dashboard) | Open Flutter dashboard starter; its README describes charts, tables, information cards, and web/tablet/phone layouts; repository license is MIT | ShoesERP has width-responsive shell navigation and operational screens, but no verified evidence yet that every business list adapts to a dense desktop/table layout | Borrow responsive information hierarchy only; do not import the starter wholesale or its unrelated dependencies |
+| [GetWidget](https://pub.dev/packages/getwidget) | Open-source Flutter component catalog for common forms, lists, cards, and controls | ShoesERP already has shared widgets and semantic tokens; adding another kit risks duplicate visual systems and bundle weight | Use only as a pattern reference; add no package without a concrete missing component and measured benefit |
+| [FlexColorScheme](https://pub.dev/packages/flex_color_scheme) | Open-source Flutter theming toolkit for coordinated Material themes | ShoesERP already owns `AppTheme`, `AppFonts`, and `AppTokens`; the current latest line may require a newer Flutter SDK | No adoption selected; compare behavior after SDK upgrade, not as a reason to create a parallel theme |
+| [Odoo Inventory](https://www.odoo.com/app/inventory) | Commercial ERP reference: replenishment, GS1 workflows, offline operation, multi-warehouse lookup, counting, and batch/cluster/wave picking | The route map has no dedicated purchase, pick/pack, replenishment, or warehouse-location routes; there is no evidence that these concepts belong in ShoesERP's current seller-distribution model | Treat as discovery candidates, not committed scope; require business-owner validation and tenant/data model before implementation |
+| [Zoho Inventory](https://www.zoho.com/sa/inventory/features/) | Commercial inventory reference: multi-warehouse transfers, picklists, barcode/serial/batch tracking, invoicing, returns, and analytics | ShoesERP has inventory transfers, invoices, returns, and reports; barcode, serial/batch, and picklist workflows were not found in the inspected route/source search | Prioritize only footwear-specific SKU scanning and transfer/pick workflows after feasibility and permissions review; pricing/availability are regional |
+| [Sortly](https://www.sortly.com/features/) | Commercial mobile inventory reference: barcode/QR capture, custom fields/tags, picklists, low-stock alerts, offline edits, and automatic sync | ShoesERP has tenant-scoped products and stock; no scanner screen or explicit offline write queue/conflict workflow was found in the inspected routes and source search | Study capture ergonomics and low-stock presentation; offline writes need a separately designed conflict and ledger policy |
+
+### Candidate gap register
+
+The following are ranked by potential value and safety, not all confirmed
+defects. "Not found" means absent from the inspected route map/source search;
+it does not prove that no hidden or external workflow exists.
+
+| Priority | Candidate | Current evidence | Recommended next step |
+|---|---|---|---|
+| P0 | Clear async and permission feedback across role-scoped screens | Existing audit has concrete notification refresh, Users loading, backup, invoice-mode, and workspace-context regressions; tests cover several, while authenticated cross-workspace visual acceptance remains open | Close known regressions with role/tenant fixtures and retain visible retry/error states before visual redesign |
+| P1 | Task-oriented responsive shell and dashboards | Shell uses compact navigation below 720 logical pixels, a rail from 720, and an extended rail from 1024; different web-specific composition and all-screen responsive behavior are not verified | Audit the same route at phone, tablet, and desktop constraints, then introduce role-specific quick actions only where task traces show friction |
+| P1 | Dense desktop list/table mode with stable filters and bulk-safe selection | Product lists, shops, invoices, and users exist; the screen register does not establish a common desktop data-grid interaction contract | Prototype responsive list-to-table presentation, preserve keyboard/focus/RTL behavior, and avoid bulk destructive actions |
+| P1 | Cross-screen search and recent operational context | No global command/search route or command-palette source match was found in the inspected app library | Validate user tasks and Firestore query cost, then scope search to authorized tenant and role before implementation |
+| P2 | Footwear SKU/barcode capture with manual fallback | No barcode/QR route or scanner flow was found; product and variant workflows exist | Validate labels/SKU uniqueness, camera permission necessity, device availability, and a manual-input fallback; no camera permission is added in this audit |
+| P2 | Low-stock/replenishment work queue | Inventory exists; no dedicated purchase/replenishment route was found | Decide whether ShoesERP owns purchasing/replenishment or only seller allocation; do not add purchase orders by analogy alone |
+| P3 | Offline mutation queue and conflict resolution | Network status is exposed, but a durable queued-write/conflict-resolution contract was not found in the inspected route/source search | Keep financial and stock writes online-only unless an idempotent, tenant-bound reconciliation design is approved and emulator-tested |
+| P3 | Richer warehouse location, picklist, serial/batch tracking | Not found in the inspected route map; the current model uses variant-level stock and seller allocations | Validate actual warehouse operations and data requirements before introducing schema or provider changes |
+
+### Design direction
+
+Use the existing design tokens and components to create a calm, high-density
+operational interface: role-aware primary tasks, compact status and quantity
+scanning, expandable detail, clear save/refresh progress, and responsive
+phone-to-desktop list composition. Preserve current brand and business
+semantics; do not add decorative analytics, generic KPI cards, camera
+permissions, offline financial writes, or paid UI dependencies without
+measured evidence. The comparison does not visually certify current screens:
+authenticated admin/supervisor/seller screenshots across EN/AR/UR, light/dark
+themes, text scale, and viewport sizes remain pending.
+
+Research references: [Flutter accessibility](https://docs.flutter.dev/ui/accessibility),
+[GetWidget](https://pub.dev/packages/getwidget),
+[FlexColorScheme](https://pub.dev/packages/flex_color_scheme),
+[Odoo Inventory](https://www.odoo.com/app/inventory),
+[Zoho Inventory](https://www.zoho.com/sa/inventory/features/),
+and [Sortly](https://www.sortly.com/features/). Commercial feature pages are
+vendor claims; pricing, region, licensing, availability, and offline behavior
+must be rechecked before a product or architecture decision.

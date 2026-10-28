@@ -11,17 +11,48 @@ import '../models/notification_model.dart';
 import '../models/user_model.dart';
 import 'auth_provider.dart';
 
-String? notificationTenantIdFor(UserModel? user, {DateTime? now}) {
+enum NotificationStreamSource { notifications, shops }
+
+class NotificationStreamFailure implements Exception {
+  final NotificationStreamSource source;
+  final Object cause;
+
+  const NotificationStreamFailure({required this.source, required this.cause});
+}
+
+String? notificationTenantIdFor(UserModel? user) {
   if (user == null || !user.active || !user.canAccessNotifications) return null;
   final tenantId = TenantScope.normalize(user.tenantId);
   if (tenantId == null || tenantId == TenantScope.globalTenantId) return null;
   return tenantId;
 }
 
+@visibleForTesting
+UserModel? notificationProfileForState(
+  AsyncValue<UserModel?> profile, {
+  required String? authenticatedUid,
+}) {
+  if (profile.hasError || authenticatedUid == null) return null;
+  final user = profile.value;
+  return user?.id == authenticatedUid ? user : null;
+}
+
+@visibleForTesting
+Map<String, dynamic> notificationReadUpdate() => {
+  'read': true,
+  'read_at': FieldValue.serverTimestamp(),
+};
+
 final notificationTenantScopeProvider = Provider.autoDispose<String?>((ref) {
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading || authState.hasError) return null;
   final profile = ref.watch(authUserProvider);
-  if (profile.isLoading || profile.hasError) return null;
-  return notificationTenantIdFor(profile.value);
+  return notificationTenantIdFor(
+    notificationProfileForState(
+      profile,
+      authenticatedUid: authState.value?.uid,
+    ),
+  );
 });
 
 @visibleForTesting
@@ -46,7 +77,10 @@ AsyncValue<List<NotificationModel>> notificationsWithShopVisibility(
 ) {
   if (activeShopIds.hasError) {
     return AsyncError<List<NotificationModel>>(
-      activeShopIds.error!,
+      NotificationStreamFailure(
+        source: NotificationStreamSource.shops,
+        cause: activeShopIds.error!,
+      ),
       activeShopIds.stackTrace!,
     );
   }
@@ -70,7 +104,10 @@ AsyncValue<List<NotificationModel>> visibleNotificationState(
 ) {
   if (notifications.hasError) {
     return AsyncError<List<NotificationModel>>(
-      notifications.error!,
+      NotificationStreamFailure(
+        source: NotificationStreamSource.notifications,
+        cause: notifications.error!,
+      ),
       notifications.stackTrace!,
     );
   }
@@ -103,9 +140,9 @@ final notificationsProvider = StreamProvider.autoDispose
         return Stream.value(const <NotificationModel>[]);
       }
 
-      var query =
-          FirebaseFirestore.instance.collection(Collections.notifications)
-              as Query<Map<String, dynamic>>;
+      var query = FirebaseFirestore.instance.collection(
+        Collections.notifications,
+      ) as Query<Map<String, dynamic>>;
 
       // P1-10 FIX: Apply tenant scoping to prevent cross-tenant leakage
       query = TenantScope.applyToQuery(query, tenantId: tenantId);
@@ -241,7 +278,7 @@ class NotificationNotifier extends AsyncNotifier<void> {
     await FirebaseFirestore.instance
         .collection(Collections.notifications)
         .doc(notifId)
-        .update({'read': true, 'read_at': Timestamp.now()});
+        .update(notificationReadUpdate());
   }
 
   Future<void> markAllAsRead(Set<String> visibleNotificationIds) async {
@@ -266,8 +303,7 @@ class NotificationNotifier extends AsyncNotifier<void> {
     final batch = db.batch();
     for (final id in unreadIds) {
       batch.update(db.collection(Collections.notifications).doc(id), {
-        'read': true,
-        'read_at': Timestamp.now(),
+        ...notificationReadUpdate(),
       });
     }
     await batch.commit();

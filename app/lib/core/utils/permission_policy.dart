@@ -2,6 +2,8 @@ import '../../models/user_model.dart';
 import 'role_names.dart';
 import 'tenant_scope.dart';
 
+enum RouteAccessDecision { allowed, denied, workspaceSelectionRequired }
+
 class PermissionPolicy {
   PermissionPolicy._();
 
@@ -65,38 +67,62 @@ class PermissionPolicy {
   }
 
   static bool canAccessRoute(UserModel? user, String rawPath) {
+    return routeAccessDecision(user, rawPath) == RouteAccessDecision.allowed;
+  }
+
+  static RouteAccessDecision routeAccessDecision(
+    UserModel? user,
+    String rawPath,
+  ) {
     var path = Uri.tryParse(rawPath)?.path ?? rawPath;
     path = path.replaceAll(RegExp(r'/+'), '/');
     if (path.length > 1 && path.endsWith('/')) {
       path = path.substring(0, path.length - 1);
     }
-    if (path == '/') return can(user, AppCapability.viewDashboard);
+    if (path == '/') return _routeDecision(user, AppCapability.viewDashboard);
     if (path == '/about' || path == '/profile') {
-      return user != null && user.active;
+      return user != null && user.active
+          ? RouteAccessDecision.allowed
+          : RouteAccessDecision.denied;
     }
     if (path == '/tenants') {
-      return can(user, AppCapability.manageWorkspaces);
+      return _routeDecision(
+        user,
+        AppCapability.manageWorkspaces,
+        workspaceScoped: false,
+      );
     }
-    if (path == '/users') return can(user, AppCapability.manageUsers);
+    if (path == '/users') {
+      return _routeDecision(user, AppCapability.manageUsers);
+    }
     if (path == '/notifications') {
-      return can(user, AppCapability.viewNotifications);
+      return _routeDecision(user, AppCapability.viewNotifications);
     }
-    if (path == '/reports') return can(user, AppCapability.viewReports);
+    if (path == '/reports') {
+      return _routeDecision(user, AppCapability.viewReports);
+    }
     if (path == '/settings/backup') {
-      return can(user, AppCapability.manageBackup);
+      return _routeDecision(user, AppCapability.manageBackup);
     }
     if (path == '/settings/flush') {
-      return can(user, AppCapability.viewDataMaintenance) ||
-          can(user, AppCapability.manageDataMaintenance);
+      if (can(user, AppCapability.viewDataMaintenance) ||
+          can(user, AppCapability.manageDataMaintenance)) {
+        return RouteAccessDecision.allowed;
+      }
+      return _routeDecision(user, AppCapability.viewDataMaintenance);
     }
     if (path == '/settings') {
-      return can(user, AppCapability.viewSettingsHub);
+      return _routeDecision(
+        user,
+        AppCapability.viewSettingsHub,
+        workspaceScoped: false,
+      );
     }
     if (path.startsWith('/settings/')) {
-      return can(user, AppCapability.manageSettings);
+      return _routeDecision(user, AppCapability.manageSettings);
     }
     if (path == '/routes' || path.startsWith('/routes/')) {
-      return can(
+      return _routeDecision(
         user,
         _isRouteMutation(path)
             ? AppCapability.manageRoutes
@@ -104,7 +130,7 @@ class PermissionPolicy {
       );
     }
     if (path == '/shops' || path.startsWith('/shops/')) {
-      return can(
+      return _routeDecision(
         user,
         _isShopMutation(path)
             ? AppCapability.manageShops
@@ -112,7 +138,7 @@ class PermissionPolicy {
       );
     }
     if (path == '/products' || path.startsWith('/products/')) {
-      return can(
+      return _routeDecision(
         user,
         _isProductMutation(path)
             ? AppCapability.manageProducts
@@ -120,18 +146,34 @@ class PermissionPolicy {
       );
     }
     if (path == '/inventory') {
-      return can(user, AppCapability.viewInventory);
+      return _routeDecision(user, AppCapability.viewInventory);
     }
     if (path == '/invoices' || path.startsWith('/invoices/')) {
-      return can(
+      return _routeDecision(
         user,
         path == '/invoices/new'
             ? AppCapability.createInvoice
             : AppCapability.viewInvoices,
       );
     }
-    if (path == '/history') return can(user, AppCapability.viewHistory);
-    return false;
+    if (path == '/history') {
+      return _routeDecision(user, AppCapability.viewHistory);
+    }
+    return RouteAccessDecision.denied;
+  }
+
+  static RouteAccessDecision _routeDecision(
+    UserModel? user,
+    AppCapability capability, {
+    bool workspaceScoped = true,
+  }) {
+    if (can(user, capability)) return RouteAccessDecision.allowed;
+    if (workspaceScoped &&
+        user?.isSuperAdmin == true &&
+        !can(user, AppCapability.viewDashboard)) {
+      return RouteAccessDecision.workspaceSelectionRequired;
+    }
+    return RouteAccessDecision.denied;
   }
 
   static bool _isRouteMutation(String path) =>

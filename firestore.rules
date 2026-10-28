@@ -206,8 +206,20 @@ service cloud.firestore {
     }
 
     function isNotificationReaderForTenant(tenantId) {
-      return isOperationalForTenant(tenantId) &&
+      return isConcreteTenantId(tenantId) &&
+        isOperationalForTenant(tenantId) &&
         !isSuperAdminRole(getUserRole());
+    }
+
+    function isNotificationMarkRead() {
+      let changedFields = request.resource.data.diff(resource.data)
+        .affectedKeys();
+      return resource.data.get('read', false) == false &&
+        request.resource.data.get('read', false) == true &&
+        request.resource.data.get('read_at', null) is timestamp &&
+        request.resource.data.read_at == request.time &&
+        changedFields.hasOnly(['read', 'read_at']) &&
+        changedFields.hasAll(['read', 'read_at']);
     }
 
     function currentUserTenantId() {
@@ -245,10 +257,13 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function selfUpdateDoesNotChangeEmailVerified(userId) {
+    function selfEmailVerificationMatchesAuthToken(userId) {
+      let changedFields =
+        request.resource.data.diff(resource.data).affectedKeys();
       return !isOwnDoc(userId) ||
-        !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['email_verified']);
+        !changedFields.hasAny(['email_verified']) ||
+        request.resource.data.email_verified ==
+          request.auth.token.email_verified;
     }
 
     // S-07: cap document field count (request.resource.data.size() returns
@@ -492,13 +507,43 @@ service cloud.firestore {
         || request.time > resource.data.updated_at + duration.value(1, 's');
     }
 
-    function notificationRateAllowed() {
-      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      let userBefore = get(userPath).data;
-      let userAfter = getAfter(userPath).data;
-      return userAfter.last_notification_at == request.time &&
-        (!('last_notification_at' in userBefore) ||
-          request.time > userBefore.last_notification_at + duration.value(5, 's'));
+    function notificationIsLinkedToInvoice(notifId) {
+      let refId = request.resource.data.ref_id;
+      let invoicePath = /databases/$(database)/documents/invoices/$(refId);
+      let invoice = get(invoicePath).data;
+      return refId is string &&
+        refId.size() > 0 &&
+        notifId == 'invoice_' + refId &&
+        exists(invoicePath) &&
+        invoice.get('type', '') == 'sale' &&
+        invoice.get('created_by', '') == request.auth.uid &&
+        invoice.get('seller_id', '') == request.auth.uid &&
+        invoice.get('tenant_id', '') == request.resource.data.tenant_id &&
+        invoice.get('shop_id', '') == request.resource.data.shop_id &&
+        invoice.get('shop_name', '') == request.resource.data.shop_name &&
+        invoice.get('route_id', '') == request.resource.data.route_id &&
+        invoice.get('invoice_number', '') ==
+          request.resource.data.invoice_number &&
+        invoice.get('total', 0) == request.resource.data.amount;
+    }
+
+    function notificationIsLinkedToTransaction(notifId) {
+      let refId = request.resource.data.ref_id;
+      let transactionPath =
+        /databases/$(database)/documents/transactions/$(refId);
+      let source = get(transactionPath).data;
+      return refId is string &&
+        refId.size() > 0 &&
+        notifId == 'transaction_' + refId &&
+        exists(transactionPath) &&
+        !('invoice_id' in source) &&
+        source.get('created_by', '') == request.auth.uid &&
+        source.get('tenant_id', '') == request.resource.data.tenant_id &&
+        source.get('shop_id', '') == request.resource.data.shop_id &&
+        source.get('shop_name', '') == request.resource.data.shop_name &&
+        source.get('route_id', '') == request.resource.data.route_id &&
+        source.get('type', '') == request.resource.data.transaction_type &&
+        source.get('amount', 0) == request.resource.data.amount;
     }
 
     function isSellerForRoute(routeId) {
@@ -1695,7 +1740,7 @@ service cloud.firestore {
         canTenantAdminUpdateSupervisorActive(
           userId, resource.data, request.resource.data
         )
-      ) : selfUpdateDoesNotChangeEmailVerified(userId) ? ((
+      ) : selfEmailVerificationMatchesAuthToken(userId) ? ((
           isAuthenticated() &&
           canWorkspaceAdminUpdateSeller(
             userId, resource.data, request.resource.data
@@ -1731,7 +1776,14 @@ service cloud.firestore {
         (
           isOwnDoc(userId) &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['display_name', 'phone', 'updated_at', 'last_active', 'email']) &&
+            .hasOnly([
+              'display_name',
+              'phone',
+              'updated_at',
+              'last_active',
+              'email',
+              'email_verified'
+            ]) &&
           (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email']) ||
             (request.resource.data.email == request.auth.token.email &&
               request.auth.token.email_verified == true)) &&
@@ -1798,15 +1850,6 @@ service cloud.firestore {
                 request.resource.data.get('last_workspace_access_end_log_id', '')
               )
           ) &&
-          docSizeOk()
-        ) ||
-        (
-          isOwnDoc(userId) &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['last_notification_at']) &&
-          request.resource.data.last_notification_at == request.time &&
-          (!('last_notification_at' in resource.data) ||
-            request.time > resource.data.last_notification_at + duration.value(5, 's')) &&
           docSizeOk()
         )
       )) : false;
@@ -2400,23 +2443,45 @@ service cloud.firestore {
     }
 
     // --- notifications (Firestore-listener notification feed) ----------------
-    // Admins and supervisors read/mark-read within their tenant. Any active
-    // user can create for the admin feed after the rate-limit checks.
-    // Notifications remain tenant-owned and require active-tenant access.
+    // Admins and supervisors read/mark-read within their tenant. Sellers may
+    // create one source-linked notification after its business write commits.
     match /notifications/{notifId} {
       allow read: if isNotificationReaderForTenant(resource.data.tenant_id);
       allow create: if isActiveUser()
+          && isSeller()
+          && isSellerForRoute(request.resource.data.route_id)
           && request.resource.data.created_by == request.auth.uid
+          && request.resource.data.seller_id == request.auth.uid
           && isConcreteTenantId(request.resource.data.tenant_id)
           && isTenantActive(request.resource.data.tenant_id)
           && request.resource.data.tenant_id == currentUserTenantId()
           && request.resource.data.created_at is timestamp
           && request.resource.data.created_at == request.time
-          && notificationRateAllowed()
+          && request.resource.data.shop_id is string
+          && request.resource.data.shop_id.size() > 0
+          && request.resource.data.route_id is string
+          && request.resource.data.route_id.size() > 0
+          && request.resource.data.amount is number
+          && request.resource.data.amount > 0
+          && request.resource.data.target_role == 'admin'
+          && request.resource.data.read == false
+          && (
+            (
+              request.resource.data.type == 'invoice' &&
+              request.resource.data.transaction_type == 'cash_out' &&
+              notificationIsLinkedToInvoice(notifId)
+            ) ||
+            (
+              request.resource.data.type == 'transaction' &&
+              isValidSellerTransactionType(
+                request.resource.data.transaction_type
+              ) &&
+              notificationIsLinkedToTransaction(notifId)
+            )
+          )
           && docSizeOk();
       allow update: if isNotificationReaderForTenant(resource.data.tenant_id)
-          && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['read', 'read_at']);
+          && isNotificationMarkRead();
       allow delete: if false;
     }
 

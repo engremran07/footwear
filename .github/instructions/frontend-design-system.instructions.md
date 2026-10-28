@@ -46,7 +46,7 @@ into identical metric cards or add decorative data, gradients, or motion.
 
 - Base layout decisions on available constraints, not device-name checks.
   Prefer `LayoutBuilder` for local content constraints and `MediaQuery.sizeOf`
-  for window-level decisions; verify APIs against Flutter 3.41.6.
+  for window-level decisions; verify APIs against Flutter 3.47.8.
 - Preserve current routes and role-aware entry points. Read the actual router
   and `AppShell` before changing navigation; do not add a drawer package or
   fixed destination counts by convention.

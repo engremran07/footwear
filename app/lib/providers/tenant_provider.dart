@@ -88,7 +88,7 @@ final tenantUsersProvider = StreamProvider.autoDispose
       if (currentUser!.isSuperAdmin) {
         final selectedAt = currentUser.activeWorkspaceSelectedAt!.toDate();
         final remaining = selectedAt
-            .add(const Duration(hours: 8))
+            .add(UserModel.workspaceSupportContextTtl)
             .difference(DateTime.now());
         final expiryTimer = Timer(remaining, ref.invalidateSelf);
         ref.onDispose(expiryTimer.cancel);
@@ -123,7 +123,7 @@ final tenantWorkspaceUsersProvider = StreamProvider.autoDispose
         }
         final selectedAt = currentUser.activeWorkspaceSelectedAt!.toDate();
         final remaining = selectedAt
-            .add(const Duration(hours: 8))
+            .add(UserModel.workspaceSupportContextTtl)
             .difference(DateTime.now());
         if (remaining <= Duration.zero) {
           return Stream.value(const <UserModel>[]);
@@ -164,7 +164,7 @@ final allInactiveUsersForTenantProvider =
       if (currentUser!.isSuperAdmin) {
         final selectedAt = currentUser.activeWorkspaceSelectedAt!.toDate();
         final remaining = selectedAt
-            .add(const Duration(hours: 8))
+            .add(UserModel.workspaceSupportContextTtl)
             .difference(DateTime.now());
         final expiryTimer = Timer(remaining, ref.invalidateSelf);
         ref.onDispose(expiryTimer.cancel);

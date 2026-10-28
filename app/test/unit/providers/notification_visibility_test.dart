@@ -1,23 +1,40 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/models/notification_model.dart';
 import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/notification_provider.dart';
+import 'package:footwear_erp/screens/notification_center_screen.dart';
 
 void main() {
+  test('future notification dates are grouped as today', () {
+    expect(notificationDayLabel(-1), '__today__');
+    expect(notificationDayLabel(0), '__today__');
+  });
+
+  test('mark-read payload uses the Firestore server timestamp sentinel', () {
+    final update = notificationReadUpdate();
+    expect(update.keys, containsAll(['read', 'read_at']));
+    expect(update, hasLength(2));
+    expect(update['read'], isTrue);
+    expect(update['read_at'], isA<FieldValue>());
+  });
+
   test(
     'workspace change never reuses prior tenant notification rows',
     () async {
       final profiles = StreamController<UserModel?>();
+      final authUsers = StreamController<User?>.broadcast();
       final tenantAFeed = StreamController<List<NotificationModel>>();
       final tenantBFeed = StreamController<List<NotificationModel>>();
       final tenantAShops = StreamController<Set<String>>();
       final tenantBShops = StreamController<Set<String>>();
       final tenantBReady = Completer<void>();
+      final tenantBAuthReady = Completer<void>();
       final now = Timestamp.now();
       UserModel user(String tenantId) => UserModel(
         id: 'admin-$tenantId',
@@ -46,6 +63,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          authStateProvider.overrideWith((ref) => authUsers.stream),
           authUserProvider.overrideWith((ref) => profiles.stream),
           notificationsProvider.overrideWith((ref, tenantId) {
             return switch (tenantId) {
@@ -75,17 +93,27 @@ void main() {
           }
         },
       );
+      final authSubscription = container.listen(authStateProvider, (_, state) {
+        if (state.value?.uid == 'admin-tenant-b' &&
+            !tenantBAuthReady.isCompleted) {
+          tenantBAuthReady.complete();
+        }
+      });
       addTearDown(() {
         subscription.close();
         scopeSubscription.close();
+        authSubscription.close();
         container.dispose();
         unawaited(profiles.close());
+        unawaited(authUsers.close());
         unawaited(tenantAFeed.close());
         unawaited(tenantBFeed.close());
         unawaited(tenantAShops.close());
         unawaited(tenantBShops.close());
       });
 
+      authUsers.add(_AuthenticatedUser('admin-tenant-a'));
+      await container.read(authStateProvider.future);
       profiles.add(user('tenant-a'));
       await container.read(authUserProvider.future);
       expect(container.read(notificationTenantScopeProvider), 'tenant-a');
@@ -100,6 +128,8 @@ void main() {
         'Tenant A shop',
       );
 
+      authUsers.add(_AuthenticatedUser('admin-tenant-b'));
+      await tenantBAuthReady.future.timeout(const Duration(seconds: 2));
       profiles.add(user('tenant-b'));
       await tenantBReady.future.timeout(const Duration(seconds: 2));
       await Future<void>.delayed(Duration.zero);
@@ -114,11 +144,13 @@ void main() {
     'unread badge count is tenant-keyed during workspace switches',
     () async {
       final profiles = StreamController<UserModel?>();
+      final authUsers = StreamController<User?>.broadcast();
       final tenantAFeed = StreamController<List<NotificationModel>>();
       final tenantBFeed = StreamController<List<NotificationModel>>();
       final tenantAShops = StreamController<Set<String>>();
       final tenantBShops = StreamController<Set<String>>();
       final tenantBReady = Completer<void>();
+      final tenantBAuthReady = Completer<void>();
       final now = Timestamp.now();
       UserModel user(String tenantId) => UserModel(
         id: 'admin-$tenantId',
@@ -147,6 +179,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          authStateProvider.overrideWith((ref) => authUsers.stream),
           authUserProvider.overrideWith((ref) => profiles.stream),
           notificationsProvider.overrideWith((ref, tenantId) {
             return switch (tenantId) {
@@ -172,21 +205,31 @@ void main() {
           }
         },
       );
+      final authSubscription = container.listen(authStateProvider, (_, state) {
+        if (state.value?.uid == 'admin-tenant-b' &&
+            !tenantBAuthReady.isCompleted) {
+          tenantBAuthReady.complete();
+        }
+      });
       final tenantACountSubscription = container.listen(
         unreadNotificationCountProvider('tenant-a'),
         (_, _) {},
       );
       addTearDown(() {
         scopeSubscription.close();
+        authSubscription.close();
         tenantACountSubscription.close();
         container.dispose();
         unawaited(profiles.close());
+        unawaited(authUsers.close());
         unawaited(tenantAFeed.close());
         unawaited(tenantBFeed.close());
         unawaited(tenantAShops.close());
         unawaited(tenantBShops.close());
       });
 
+      authUsers.add(_AuthenticatedUser('admin-tenant-a'));
+      await container.read(authStateProvider.future);
       profiles.add(user('tenant-a'));
       await container.read(authUserProvider.future);
       tenantAFeed.add([notification]);
@@ -197,6 +240,8 @@ void main() {
       );
       expect(container.read(unreadNotificationCountProvider('tenant-a')), 1);
 
+      authUsers.add(_AuthenticatedUser('admin-tenant-b'));
+      await tenantBAuthReady.future.timeout(const Duration(seconds: 2));
       profiles.add(user('tenant-b'));
       await tenantBReady.future.timeout(const Duration(seconds: 2));
       await Future<void>.delayed(Duration.zero);
@@ -272,21 +317,15 @@ void main() {
       updatedAt: Timestamp.now(),
     );
 
-    expect(notificationTenantIdFor(user(), now: now), 'tenant-1');
+    expect(notificationTenantIdFor(user()), 'tenant-1');
+    expect(notificationTenantIdFor(user(tenantId: '__global__')), isNull);
     expect(
-      notificationTenantIdFor(user(tenantId: '__global__'), now: now),
-      isNull,
-    );
-    expect(
-      notificationTenantIdFor(user(role: UserRole.supervisor), now: now),
+      notificationTenantIdFor(user(role: UserRole.supervisor)),
       'tenant-1',
     );
-    expect(notificationTenantIdFor(user(tenantId: null), now: now), isNull);
-    expect(notificationTenantIdFor(user(active: false), now: now), isNull);
-    expect(
-      notificationTenantIdFor(user(role: UserRole.seller), now: now),
-      isNull,
-    );
+    expect(notificationTenantIdFor(user(tenantId: null)), isNull);
+    expect(notificationTenantIdFor(user(active: false)), isNull);
+    expect(notificationTenantIdFor(user(role: UserRole.seller)), isNull);
     expect(
       notificationTenantIdFor(
         user(
@@ -296,7 +335,6 @@ void main() {
           supportReason: 'Investigating access',
           selectedAt: now.subtract(const Duration(hours: 1)),
         ),
-        now: now,
       ),
       isNull,
     );
@@ -309,7 +347,6 @@ void main() {
           supportReason: 'short',
           selectedAt: now,
         ),
-        now: now,
       ),
       isNull,
     );
@@ -321,6 +358,9 @@ void main() {
       final profileError = StateError('profile stream failed');
       final container = ProviderContainer(
         overrides: [
+          authStateProvider.overrideWith(
+            (ref) => Stream.value(_AuthenticatedUser('user-1')),
+          ),
           authUserProvider.overrideWith(
             (ref) => Stream<UserModel?>.error(profileError),
           ),
@@ -463,7 +503,9 @@ void main() {
     );
 
     expect(visible.hasError, isTrue);
-    expect(visible.error, same(permissionError));
+    final failure = visible.error! as NotificationStreamFailure;
+    expect(failure.source, NotificationStreamSource.notifications);
+    expect(failure.cause, same(permissionError));
   });
 
   test('keeps cached visible rows while shop visibility emits an error', () {
@@ -496,7 +538,9 @@ void main() {
     ], failedVisibility);
 
     expect(visible.hasError, isTrue);
-    expect(visible.error, same(permissionError));
+    final failure = visible.error! as NotificationStreamFailure;
+    expect(failure.source, NotificationStreamSource.shops);
+    expect(failure.cause, same(permissionError));
   });
 
   test(
@@ -518,7 +562,19 @@ void main() {
       );
       final visibleError = notificationsWithShopVisibility(const [], failed);
       expect(visibleError.hasError, isTrue);
-      expect(visibleError.error, same(permissionError));
+      final failure = visibleError.error! as NotificationStreamFailure;
+      expect(failure.source, NotificationStreamSource.shops);
+      expect(failure.cause, same(permissionError));
     },
   );
+}
+
+class _AuthenticatedUser implements User {
+  @override
+  final String uid;
+
+  _AuthenticatedUser(this.uid);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

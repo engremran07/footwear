@@ -3,11 +3,17 @@
   "version": "1.0.0",
   "description": "Firestore Security Rules emulator tests for ShoesERP",
   "scripts": {
-    "test": "mocha --timeout 30000 rules.test.js",
+    "test": "mocha --timeout 120000 rules.test.js",
     "test:emulator": "firebase emulators:exec --only firestore 'npm test'"
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "^2.0.7",
-    "mocha": "^10.0.0"
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.1.0",
+    "mocha": "^12.0.3"
+  },
+  "overrides": {
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "1.14.6"
+    }
   }
 }

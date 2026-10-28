@@ -60,11 +60,25 @@ consistency but is never a substitute for Firestore Rules.
   switch cannot reuse the previous tenant's cache. Profile errors must remain
   errors with retry feedback, not be normalized to a missing user or a
   success-shaped empty feed. Keep initial loading distinct from cached refresh.
+- Key every last-good business-data cache by the full effective scope, not
+  only by tenant: authenticated user, role, active state, tenant/workspace
+  support context, and route assignments where they filter visibility. During
+  profile loading, reuse cached data only when the retained profile UID matches
+  the settled Firebase Auth UID. Unknown, changed, or permission-denied profile
+  states must not expose another account's cached business data.
 - Workspace feature settings such as `allow_non_stock_invoices` live in the
   concrete tenant's `settings/{tenantId}` document. UI controls must use the
   settings notifier, preserve partial-update semantics, and have a regression
   for saving, leaving/reopening, and handling permission-denied writes. A
   setting toggle cannot commit unrelated dirty form fields.
+- Audit selected-workspace listener lifetime separately from route redirects.
+  Every long-lived provider that reads tenant business data must re-check the
+  support context when it builds. Non-`autoDispose` streams must schedule an
+  invalidation for the context TTL, cancel that timer on disposal, and switch
+  to a no-workspace state at expiry instead of reconnecting to the same tenant
+  document. This is client lifecycle hygiene; Firestore Rules remain the
+  authoritative expiry boundary. Test expired context without permitting a
+  Firestore read.
 - A UI capability toggle is not authorization. Any dynamically configurable
   policy must have a versioned, validated fail-closed data contract that the
   Rules enforce for the same tenant and operation. Do not add a client-only
@@ -141,3 +155,34 @@ default or selected tenant are not safe for multi-workspace data and must fail
 closed. A replacement migration needs a per-record ownership map, dry-run
 report, explicit environment allowlist, reviewed recovery plan, and isolated
 emulator/staging verification before production authorization.
+
+## Cross-Workspace Feature-Parity Regression
+
+Do not treat a successful workflow in one workspace as evidence that the same
+feature works in another. For workspace-specific settings and operations:
+
+- Seed multiple independent active tenants with different settings, including
+  `allow_non_stock_invoices`, and verify each form reads and writes only
+  `settings/{tenantId}`. Reopen the form and verify the saved value remains
+  enabled or disabled as set; never fall back to a singleton/global setting.
+- Exercise sale invoices, cash receipts, stock-backed invoices, and
+  non-stock invoices separately in every applicable tenant. A disabled
+  non-stock setting must deny that mode without disabling the other valid
+  invoice flows.
+- Verify account creation, duplicate-email feedback, role assignment, and
+  workspace metadata visibility for each role. Firebase Auth email uniqueness
+  is project-wide; an `email-already-in-use` result is expected unless an
+  explicitly supported membership-linking flow exists. Do not bypass Auth
+  uniqueness or create duplicate credentials to work around it.
+- Test that workspace admins, supervisors, and sellers see only the workspace
+  metadata and destinations their role is entitled to see; platform workspace
+  listings must not leak through a shared shell or cached provider.
+- Key every mutable provider/cache by concrete tenant identity. Switch between
+  tenants and back, then verify data, settings, loading state, and errors do
+  not bleed across workspace boundaries.
+
+Record a per-workspace pass/fail matrix and distinguish Rules denial, missing
+or stale indexes, app policy mismatch, stale cached state, and tenant-specific
+configuration. Never fix a parity failure by copying one tenant's settings or
+permissions into a global default. Keep reset/flush operations fail-closed
+unless a separate approved, audited, tenant-bound maintenance design exists.

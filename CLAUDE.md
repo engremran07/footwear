@@ -1,6 +1,6 @@
 ﻿# ShoesERP AI Coding Rules (CLAUDE.md)
 
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
 ## Runtime Override (Always First)
 
@@ -449,15 +449,105 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- v3.10.13+1124 was built and delivered locally after the Gradle toolchain and
+  same-drive Pub cache fixes. Flutter suite: `01:43 +704: All tests passed!`;
+  both Dart analyzers clean; Rules Emulator: `190 passing (56s)`. Split APKs
+  are 31.2/32.8/34.3 MB; the signed AAB is 72.1 MB. ARM64 was installed on
+  `R5GL22RGT9V` (`Success`, versionCode `310133124`). Rules/indexes and Hosting
+  were deployed; live web version is `3.10.13+1124`. The notification-feed
+  permission report, broader audit, Play Console upload, commit, and push
+  remain open.
+
+- The 2026-10-28 support-context expiry audit found that route refresh did not
+  stop the persistent `settingsProvider` listener. The provider now validates
+  super-admin workspace context, invalidates itself at the eight-hour TTL,
+  cancels its expiry timer on disposal, and switches to a no-workspace state
+  instead of reconnecting to an expired settings document. The shared client
+  TTL is used by the user model, router, and tenant-scoped provider timers;
+  Firestore Rules remain authoritative. The pre-fix regression observed
+  `tenant-42` instead of `__no_active_workspace__`; focused suite:
+  `00:11 +60: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 5.5s)`; `dart analyze test/`:
+  `No issues found!`. This is local source only; production Rules were not
+  changed or deployed.
+- The app shell now checks the authenticated workspace tenant before mounting
+  ordinary members' business routes. Initial tenant loading stays in a
+  loading state; missing/inactive tenants and tenant-read failures display
+  mapped retry feedback and sign-out. Platform super-admins bypass this
+  member gate so the explicit audited workspace-restoration flow remains
+  available. Rules remain the authorization boundary. The pre-fix archived
+  workspace widget regression failed; the focused suite reported
+  `00:10 +16: All tests passed!`. `flutter analyze lib --no-pub` reported
+  `No issues found! (ran in 4.8s)` and `dart analyze test/` reported
+  `No issues found!`. This change is local and unreleased.
+- The 2026-10-28 Android build failure was traced to Firebase Auth Kotlin
+  metadata 2.4.0 being consumed by Kotlin Gradle Plugin 2.2.20. The Android
+  toolchain now matches Flutter 3.47.8's template (Gradle 9.3.1, AGP 9.1.0,
+  Kotlin Gradle Plugin 2.4.0) with Google Services 4.5.0; the wrapper is
+  checksum-pinned. The app build script now uses AGP's public
+  `ApplicationExtension` and typed Kotlin `compilerOptions`. Split APKs built
+  and verified at 31.2/32.8/34.3 MB with versionName `3.10.13` and APK v2
+  signatures. The signed AAB built at 72.1 MB and `jarsigner -verify`
+  reported `jar verified.` with a self-signed/untrusted local certificate
+  chain and no timestamp; Play Console acceptance is not established. ADB
+  had no connected device, so phone delivery, Rules/indexes and Hosting
+  deployment, commit, and push remain pending. The Firebase plugins' Kotlin
+  Gradle Plugin migration warning is reported rather than suppressed.
+- The 2026-10-28 notification refresh regression was traced through commit
+  `2f2c09b`: a retained same-user profile was treated as absent during
+  `AsyncLoading`, clearing the tenant scope and hiding the feed. The screen
+  now retains its last authorized feed only when the cached profile UID
+  matches the settled Firebase Auth UID; auth loading/errors and UID changes
+  still clear notification scope. The pre-fix widget regression reproduced
+  the disappearance. Focused widget suite: `00:03 +9: All tests passed!`;
+  visibility/provider suite: `00:00 +13: All tests passed!`; full suite:
+  `01:36 +689: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 116.5s)`; `dart analyze test/`:
+  `No issues found!`. This follow-up did not change Rules. Existing local
+  Rules edits remain undeployed, and authenticated production verification,
+  release build, device delivery, deployment, commit, and push remain pending.
+- The local notification Rules contract now permits only a server-timestamped,
+  one-way unread-to-read transition; mark-one and mark-all provider writes use
+  `FieldValue.serverTimestamp()`. Concrete active tenant, active profile, and
+  authorized reader checks remain mandatory. The standalone transaction
+  provider no longer silently drops an overlapping write, and keyed creates
+  atomically commit a deterministic tenant-scoped ledger document with the
+  shop-balance delta. Focused tests: `00:00 +21: All tests passed!`;
+  full Flutter suite: `01:34 +688: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 15.4s)`;
+  `dart analyze test/`: `No issues found!`; Rules Emulator:
+  `185 passing (46s)`. The full emulator output contained non-failing Rules
+  expression-limit diagnostics. These changes remain local, unreleased, and
+  undeployed; release validation remains pending.
+- P2-03's seller notification cooldown regression is fixed locally. Seller
+  notifications remain best-effort after the financial commit, use
+  deterministic source IDs, and are authorized only when their payload matches
+  a persisted tenant-scoped invoice or standalone transaction. The old
+  cooldown-field update is denied. Full Rules Emulator: `190 passing (48s)`;
+  focused notification Flutter tests: `00:03 +20: All tests passed!`. A
+  corrected invoice fixture now includes the source `shop_name`. This local
+  Rules change is undeployed and does not resolve the separate production
+  notification-feed permission report.
+- P2-04's dashboard cache leak is fixed locally. The last-good cache now
+  matches the authenticated user, role, active state, tenant/workspace support
+  session, and sorted seller route assignments before it can serve fallback
+  metrics. While the profile reloads, the retained profile must match the
+  settled Auth UID. The regression reproduced workspace A metrics rendering
+  under workspace B before the fix; dashboard suite: `00:09 +5: All tests
+  passed!`; both analyzers are clean. No Rules changed or release operation
+  occurred.
 - The local invoice-header non-stock toggle now persists immediately through
   the tenant settings notifier without saving unrelated header drafts. Failed
   writes restore the switch and show mapped feedback. Focused settings and
   router/maintenance regressions pass. Full Flutter suite:
   `01:26 +684: All tests passed!`; both analyzers are clean. This work remains
   unreleased.
-- Workspace admins can view component-level maintenance options, but every
-  reset remains disabled and fail-closed. The app-shell support banner and
-  nullable notification badge compile and pass focused routing coverage.
+- Workspace admins can view component-level maintenance options through a
+  Settings entry gated by the same `PermissionPolicy` route decision as
+  `/settings/flush`; sellers, supervisors, and unscoped platform
+  super-admins do not see the entry. Every reset remains disabled and
+  fail-closed. The app-shell support banner and nullable notification badge
+  compile and pass focused routing coverage.
 - Tenant notification access is restricted to admin/manager, tenant_admin,
   and supervisor; sellers and platform super-admins are denied. Provider
   streams and unread counts remain tenant-keyed.

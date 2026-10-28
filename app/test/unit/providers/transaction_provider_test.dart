@@ -154,4 +154,52 @@ void main() {
       },
     );
   });
+
+  test('create does not silently skip a concurrent invocation', () async {
+    final container = containerWithUser(seller);
+    addTearDown(container.dispose);
+    final authSub = keepAuthAlive(container);
+    addTearDown(authSub.close);
+    final notifier = container.read(transactionNotifierProvider.notifier);
+
+    final first = notifier.create(
+      shopId: '',
+      shopName: 'Shop',
+      routeId: 'route-1',
+      type: 'cash_in',
+      amount: 10,
+      createdBy: seller.id,
+      idempotencyKey: 'same-request',
+    );
+    final second = notifier.create(
+      shopId: '',
+      shopName: 'Shop',
+      routeId: 'route-1',
+      type: 'cash_in',
+      amount: 10,
+      createdBy: seller.id,
+      idempotencyKey: 'same-request',
+    );
+
+    await expectLater(first, throwsArgumentError);
+    await expectLater(second, throwsStateError);
+  });
+
+  test('idempotency document ID is stable and tenant-scoped', () {
+    final firstAttempt = transactionIdempotencyDocumentId(
+      tenantId: 'tenant-1',
+      idempotencyKey: 'request-1',
+    );
+    final retry = transactionIdempotencyDocumentId(
+      tenantId: 'tenant-1',
+      idempotencyKey: 'request-1',
+    );
+    final otherTenant = transactionIdempotencyDocumentId(
+      tenantId: 'tenant-2',
+      idempotencyKey: 'request-1',
+    );
+
+    expect(firstAttempt, retry);
+    expect(firstAttempt, isNot(otherTenant));
+  });
 }

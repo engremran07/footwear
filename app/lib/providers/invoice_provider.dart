@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+
 import '../core/constants/collections.dart';
 import '../core/utils/firestore_pagination.dart';
 import '../core/utils/notification_writer.dart';
@@ -299,8 +300,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     String currency = 'SAR',
     Map<String, int> sellerInventoryDeductions = const {},
     String fulfillmentMode = InvoiceModel.fulfillmentStock,
-    String?
-    idempotencyKey, // optional: pass a stable UUID to prevent duplicates on retry
+    String? idempotencyKey, // optional: pass a stable UUID to prevent duplicates on retry
   }) async {
     final normalizedCreatedBy = createdBy.trim();
     if (normalizedCreatedBy.isEmpty) {
@@ -590,31 +590,25 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       return (invoiceNumber: invoiceNumber, created: true);
     });
     if (!result.created) return invRef.id;
-    final invoiceNumber = result.invoiceNumber;
 
-    // Best-effort notification for admin feed (non-critical, fire-and-forget).
-    // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
     try {
       final appUser = await ref.read(authUserProvider.future);
       if (appUser != null && appUser.isSeller) {
-        await writeRateLimitedNotification(
+        await writeSellerNotification(
           db: db,
-          actorUid: appUser.id,
-          data: {
-            'type': 'invoice',
-            'shop_id': shopId,
-            'shop_name': shopName,
-            'route_id': routeId,
-            'seller_id': normalizedCreatedBy,
-            'seller_name': appUser.displayName,
-            'amount': total,
-            'transaction_type': 'cash_out',
-            'invoice_number': invoiceNumber,
-            'ref_id': invRef.id,
-            'target_role': 'admin',
-            'read': false,
-            'tenant_id': appUser.tenantId,
-          },
+          data: buildSellerNotification(
+            sourceType: 'invoice',
+            sourceId: invRef.id,
+            sellerId: appUser.id,
+            sellerName: appUser.displayName,
+            tenantId: tenantId,
+            shopId: shopId,
+            shopName: shopName,
+            routeId: routeId,
+            amount: total,
+            transactionType: 'cash_out',
+            invoiceNumber: result.invoiceNumber,
+          ),
         );
       }
     } catch (error, stackTrace) {
@@ -900,202 +894,177 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             id: db.collection(Collections.productVariants).doc(id),
         };
 
-    final result = await db.runTransaction<({String invoiceNumber, bool created})>((
-      transaction,
-    ) async {
-      final originalSnapshot = await transaction.get(originalRef);
-      final settingsSnapshot = await transaction.get(settingsRef);
-      final invoiceSnapshot = await transaction.get(invoiceRef);
-      if (invoiceSnapshot.exists) {
-        final existing = invoiceSnapshot.data()!;
-        if (existing['tenant_id'] == tenantId &&
-            existing['idempotency_key'] == resolvedKey &&
-            existing['linked_invoice_id'] == normalizedLinkedInvoiceId &&
-            (existing['total'] as num?)?.toDouble() == total) {
-          return (
-            invoiceNumber: existing['invoice_number'] as String? ?? '',
-            created: false,
-          );
-        }
-        throw StateError('Credit note idempotency key was reused');
-      }
-      if (!originalSnapshot.exists) {
-        throw ArgumentError('Original invoice does not exist');
-      }
-      if (!settingsSnapshot.exists) {
-        throw StateError('Workspace settings are required for invoicing');
-      }
-      final original = originalSnapshot.data()!;
-      if (original['tenant_id'] != tenantId ||
-          original['shop_id'] != shopId ||
-          original['route_id'] != routeId ||
-          original['type'] != InvoiceModel.typeSale) {
-        throw ArgumentError(
-          'Original invoice does not match this shop and workspace',
-        );
-      }
-      if (original['status'] == InvoiceModel.statusVoid) {
-        throw ArgumentError(
-          'Cannot create a credit note against a voided invoice',
-        );
-      }
-      final originalCreatedAt = original['created_at'] as Timestamp?;
-      if (originalCreatedAt == null) {
-        throw ArgumentError('Original invoice has no creation timestamp');
-      }
-      if (DateTime.now().difference(originalCreatedAt.toDate()).inDays > 30) {
-        throw ArgumentError(
-          'Credit notes must be created within 30 days of the original invoice',
-        );
-      }
-      final creditedTotal =
-          (original['credit_note_total'] as num?)?.toDouble() ?? 0;
-      final originalTotal = (original['total'] as num?)?.toDouble() ?? 0;
-      if (creditedTotal + total > originalTotal + 0.01) {
-        throw ArgumentError(
-          'Credit notes cannot exceed the original invoice total',
-        );
-      }
+    final result = await db
+        .runTransaction<({String invoiceNumber, bool created})>((
+          transaction,
+        ) async {
+          final originalSnapshot = await transaction.get(originalRef);
+          final settingsSnapshot = await transaction.get(settingsRef);
+          final invoiceSnapshot = await transaction.get(invoiceRef);
+          if (invoiceSnapshot.exists) {
+            final existing = invoiceSnapshot.data()!;
+            if (existing['tenant_id'] == tenantId &&
+                existing['idempotency_key'] == resolvedKey &&
+                existing['linked_invoice_id'] == normalizedLinkedInvoiceId &&
+                (existing['total'] as num?)?.toDouble() == total) {
+              return (
+                invoiceNumber: existing['invoice_number'] as String? ?? '',
+                created: false,
+              );
+            }
+            throw StateError('Credit note idempotency key was reused');
+          }
+          if (!originalSnapshot.exists) {
+            throw ArgumentError('Original invoice does not exist');
+          }
+          if (!settingsSnapshot.exists) {
+            throw StateError('Workspace settings are required for invoicing');
+          }
+          final original = originalSnapshot.data()!;
+          if (original['tenant_id'] != tenantId ||
+              original['shop_id'] != shopId ||
+              original['route_id'] != routeId ||
+              original['type'] != InvoiceModel.typeSale) {
+            throw ArgumentError(
+              'Original invoice does not match this shop and workspace',
+            );
+          }
+          if (original['status'] == InvoiceModel.statusVoid) {
+            throw ArgumentError(
+              'Cannot create a credit note against a voided invoice',
+            );
+          }
+          final originalCreatedAt = original['created_at'] as Timestamp?;
+          if (originalCreatedAt == null) {
+            throw ArgumentError('Original invoice has no creation timestamp');
+          }
+          if (DateTime.now().difference(originalCreatedAt.toDate()).inDays >
+              30) {
+            throw ArgumentError(
+              'Credit notes must be created within 30 days of the original invoice',
+            );
+          }
+          final creditedTotal =
+              (original['credit_note_total'] as num?)?.toDouble() ?? 0;
+          final originalTotal = (original['total'] as num?)?.toDouble() ?? 0;
+          if (creditedTotal + total > originalTotal + 0.01) {
+            throw ArgumentError(
+              'Credit notes cannot exceed the original invoice total',
+            );
+          }
 
-      final shopSnapshot = await transaction.get(shopRef);
-      if (!shopSnapshot.exists ||
-          shopSnapshot.data()?['tenant_id'] != tenantId ||
-          shopSnapshot.data()?['route_id'] != routeId) {
-        throw ArgumentError('Shop does not belong to this workspace and route');
-      }
-      final sellerInventoryData = <String, Map<String, dynamic>>{};
-      for (final entry in sellerInventoryRefs.entries) {
-        final snapshot = await transaction.get(entry.value);
-        if (!snapshot.exists || snapshot.data()?['tenant_id'] != tenantId) {
-          throw StateError('Invoice seller inventory is unavailable');
-        }
-        sellerInventoryData[entry.key] = snapshot.data()!;
-      }
-      final warehouseVariantData = <String, Map<String, dynamic>>{};
-      for (final entry in warehouseVariantRefs.entries) {
-        final snapshot = await transaction.get(entry.value);
-        if (!snapshot.exists || snapshot.data()?['tenant_id'] != tenantId) {
-          throw StateError('Invoice warehouse stock is unavailable');
-        }
-        warehouseVariantData[entry.key] = snapshot.data()!;
-      }
+          final shopSnapshot = await transaction.get(shopRef);
+          if (!shopSnapshot.exists ||
+              shopSnapshot.data()?['tenant_id'] != tenantId ||
+              shopSnapshot.data()?['route_id'] != routeId) {
+            throw ArgumentError(
+              'Shop does not belong to this workspace and route',
+            );
+          }
+          final sellerInventoryData = <String, Map<String, dynamic>>{};
+          for (final entry in sellerInventoryRefs.entries) {
+            final snapshot = await transaction.get(entry.value);
+            if (!snapshot.exists || snapshot.data()?['tenant_id'] != tenantId) {
+              throw StateError('Invoice seller inventory is unavailable');
+            }
+            sellerInventoryData[entry.key] = snapshot.data()!;
+          }
+          final warehouseVariantData = <String, Map<String, dynamic>>{};
+          for (final entry in warehouseVariantRefs.entries) {
+            final snapshot = await transaction.get(entry.value);
+            if (!snapshot.exists || snapshot.data()?['tenant_id'] != tenantId) {
+              throw StateError('Invoice warehouse stock is unavailable');
+            }
+            warehouseVariantData[entry.key] = snapshot.data()!;
+          }
 
-      final settingsData = settingsSnapshot.data();
-      final sequence =
-          ((settingsData?['last_invoice_number'] as num?)?.toInt() ?? 0) + 1;
-      final invoiceNumber =
-          'INV-${DateTime.now().year}-${sequence.toString().padLeft(4, '0')}';
-      final now = Timestamp.now();
-      transaction.update(settingsRef, {
-        'last_invoice_number': sequence,
-        'last_invoice_id': invoiceRef.id,
-      });
-      transaction.update(originalRef, {
-        'credit_note_total': creditedTotal + total,
-        'latest_credit_note_invoice_id': invoiceRef.id,
-        'updated_at': now,
-      });
-      transaction.set(invoiceRef, {
-        'tenant_id': tenantId,
-        'invoice_number': invoiceNumber,
-        'invoice_sequence': sequence,
-        'idempotency_key': resolvedKey,
-        'type': InvoiceModel.typeCreditNote,
-        'invoice_header_snapshot': _invoiceHeaderSnapshot(settingsData),
-        'shop_id': shopId,
-        'shop_name': shopName,
-        'route_id': routeId,
-        'seller_id': sellerId,
-        'seller_name': sellerName,
-        'items': items,
-        'subtotal': subtotal,
-        'discount': 0,
-        'total': total,
-        'amount_received': 0,
-        'outstanding_amount': 0,
-        'sale_type': 'return',
-        'status': InvoiceModel.statusIssued,
-        'notes': notes,
-        'linked_invoice_id': normalizedLinkedInvoiceId,
-        'return_transaction_id': transactionRef.id,
-        'seller_inventory_restores': sellerInventoryRestores,
-        'created_by': normalizedCreatedBy,
-        'created_at': now,
-        'updated_at': now,
-      });
-      transaction.set(transactionRef, {
-        'tenant_id': tenantId,
-        'shop_id': shopId,
-        'shop_name': shopName,
-        'route_id': routeId,
-        'type': 'return',
-        'sale_type': 'return',
-        'amount': total,
-        'description': 'Credit note $invoiceNumber',
-        'items': items,
-        'invoice_id': invoiceId,
-        'invoice_number': invoiceNumber,
-        'created_by': normalizedCreatedBy,
-        'created_at': now,
-        'deleted': false,
-      });
-      transaction.update(shopRef, {
-        'balance': FieldValue.increment(-total),
-        'updated_at': now,
-        'last_transaction_at': now,
-        'last_transaction_type': 'return',
-        'last_transaction_amount': total,
-        'last_transaction_id': transactionRef.id,
-      });
-      for (final entry in sellerInventoryRefs.entries) {
-        final inventoryData = sellerInventoryData[entry.key]!;
-        final before =
-            (inventoryData['quantity_available'] as num?)?.toInt() ?? 0;
-        final quantity = sellerInventoryRestores[entry.key]!;
-        transaction.update(entry.value, {
-          'quantity_available': FieldValue.increment(quantity),
-          'updated_at': now,
-        });
-        transaction
-            .set(db.collection(Collections.inventoryTransactions).doc(), {
-              'type': 'return_from_shop',
-              'seller_id': inventoryData['seller_id'] as String? ?? sellerId,
-              'seller_name':
-                  inventoryData['seller_name'] as String? ?? sellerName,
-              'product_id': inventoryData['product_id'] as String? ?? '',
-              'variant_id': inventoryData['variant_id'] as String? ?? '',
-              'variant_name': inventoryData['variant_name'] as String? ?? '',
-              'quantity': quantity,
-              'direction': 'in',
-              'previous_quantity': before,
-              'new_quantity': before + quantity,
-              'notes': 'credit_note:$invoiceNumber',
-              'created_by': normalizedCreatedBy,
-              'created_at': now,
-              'tenant_id': tenantId,
-            });
-      }
-      for (final entry in warehouseVariantRefs.entries) {
-        final item = items.firstWhere(
-          (value) => value['variant_id'] == entry.key,
-        );
-        final quantity = (item['qty'] as num?)?.toInt() ?? 0;
-        if (quantity > 0) {
-          final variantData = warehouseVariantData[entry.key]!;
-          final before =
-              (variantData['quantity_available'] as num?)?.toInt() ?? 0;
-          transaction.update(entry.value, {
-            'quantity_available': FieldValue.increment(quantity),
+          final settingsData = settingsSnapshot.data();
+          final sequence =
+              ((settingsData?['last_invoice_number'] as num?)?.toInt() ?? 0) +
+              1;
+          final invoiceNumber =
+              'INV-${DateTime.now().year}-${sequence.toString().padLeft(4, '0')}';
+          final now = Timestamp.now();
+          transaction.update(settingsRef, {
+            'last_invoice_number': sequence,
+            'last_invoice_id': invoiceRef.id,
+          });
+          transaction.update(originalRef, {
+            'credit_note_total': creditedTotal + total,
+            'latest_credit_note_invoice_id': invoiceRef.id,
             'updated_at': now,
           });
-          transaction
-              .set(db.collection(Collections.inventoryTransactions).doc(), {
+          transaction.set(invoiceRef, {
+            'tenant_id': tenantId,
+            'invoice_number': invoiceNumber,
+            'invoice_sequence': sequence,
+            'idempotency_key': resolvedKey,
+            'type': InvoiceModel.typeCreditNote,
+            'invoice_header_snapshot': _invoiceHeaderSnapshot(settingsData),
+            'shop_id': shopId,
+            'shop_name': shopName,
+            'route_id': routeId,
+            'seller_id': sellerId,
+            'seller_name': sellerName,
+            'items': items,
+            'subtotal': subtotal,
+            'discount': 0,
+            'total': total,
+            'amount_received': 0,
+            'outstanding_amount': 0,
+            'sale_type': 'return',
+            'status': InvoiceModel.statusIssued,
+            'notes': notes,
+            'linked_invoice_id': normalizedLinkedInvoiceId,
+            'return_transaction_id': transactionRef.id,
+            'seller_inventory_restores': sellerInventoryRestores,
+            'created_by': normalizedCreatedBy,
+            'created_at': now,
+            'updated_at': now,
+          });
+          transaction.set(transactionRef, {
+            'tenant_id': tenantId,
+            'shop_id': shopId,
+            'shop_name': shopName,
+            'route_id': routeId,
+            'type': 'return',
+            'sale_type': 'return',
+            'amount': total,
+            'description': 'Credit note $invoiceNumber',
+            'items': items,
+            'invoice_id': invoiceId,
+            'invoice_number': invoiceNumber,
+            'created_by': normalizedCreatedBy,
+            'created_at': now,
+            'deleted': false,
+          });
+          transaction.update(shopRef, {
+            'balance': FieldValue.increment(-total),
+            'updated_at': now,
+            'last_transaction_at': now,
+            'last_transaction_type': 'return',
+            'last_transaction_amount': total,
+            'last_transaction_id': transactionRef.id,
+          });
+          for (final entry in sellerInventoryRefs.entries) {
+            final inventoryData = sellerInventoryData[entry.key]!;
+            final before =
+                (inventoryData['quantity_available'] as num?)?.toInt() ?? 0;
+            final quantity = sellerInventoryRestores[entry.key]!;
+            transaction.update(entry.value, {
+              'quantity_available': FieldValue.increment(quantity),
+              'updated_at': now,
+            });
+            transaction.set(
+              db.collection(Collections.inventoryTransactions).doc(),
+              {
                 'type': 'return_from_shop',
-                'seller_id': '',
-                'seller_name': 'warehouse',
-                'product_id': variantData['product_id'] as String? ?? '',
-                'variant_id': entry.key,
-                'variant_name': variantData['variant_name'] as String? ?? '',
+                'seller_id': inventoryData['seller_id'] as String? ?? sellerId,
+                'seller_name':
+                    inventoryData['seller_name'] as String? ?? sellerName,
+                'product_id': inventoryData['product_id'] as String? ?? '',
+                'variant_id': inventoryData['variant_id'] as String? ?? '',
+                'variant_name': inventoryData['variant_name'] as String? ?? '',
                 'quantity': quantity,
                 'direction': 'in',
                 'previous_quantity': before,
@@ -1104,42 +1073,70 @@ class InvoiceNotifier extends AsyncNotifier<void> {
                 'created_by': normalizedCreatedBy,
                 'created_at': now,
                 'tenant_id': tenantId,
+              },
+            );
+          }
+          for (final entry in warehouseVariantRefs.entries) {
+            final item = items.firstWhere(
+              (value) => value['variant_id'] == entry.key,
+            );
+            final quantity = (item['qty'] as num?)?.toInt() ?? 0;
+            if (quantity > 0) {
+              final variantData = warehouseVariantData[entry.key]!;
+              final before =
+                  (variantData['quantity_available'] as num?)?.toInt() ?? 0;
+              transaction.update(entry.value, {
+                'quantity_available': FieldValue.increment(quantity),
+                'updated_at': now,
               });
-        }
-      }
-      return (invoiceNumber: invoiceNumber, created: true);
-    });
+              transaction.set(
+                db.collection(Collections.inventoryTransactions).doc(),
+                {
+                  'type': 'return_from_shop',
+                  'seller_id': '',
+                  'seller_name': 'warehouse',
+                  'product_id': variantData['product_id'] as String? ?? '',
+                  'variant_id': entry.key,
+                  'variant_name': variantData['variant_name'] as String? ?? '',
+                  'quantity': quantity,
+                  'direction': 'in',
+                  'previous_quantity': before,
+                  'new_quantity': before + quantity,
+                  'notes': 'credit_note:$invoiceNumber',
+                  'created_by': normalizedCreatedBy,
+                  'created_at': now,
+                  'tenant_id': tenantId,
+                },
+              );
+            }
+          }
+          return (invoiceNumber: invoiceNumber, created: true);
+        });
     if (!result.created) return invoiceRef.id;
-    final invoiceNumber = result.invoiceNumber;
 
-    // Best-effort notification for admin feed (non-critical, fire-and-forget).
-    // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
     try {
       final appUser = await ref.read(authUserProvider.future);
       if (appUser != null && appUser.isSeller) {
-        await writeRateLimitedNotification(
+        await writeSellerNotification(
           db: db,
-          actorUid: appUser.id,
-          data: {
-            'type': 'invoice',
-            'shop_id': shopId,
-            'shop_name': shopName,
-            'route_id': routeId,
-            'seller_id': normalizedCreatedBy,
-            'seller_name': appUser.displayName,
-            'amount': total,
-            'transaction_type': 'return',
-            'invoice_number': invoiceNumber,
-            'ref_id': invoiceRef.id,
-            'target_role': 'admin',
-            'read': false,
-            'tenant_id': appUser.tenantId,
-          },
+          data: buildSellerNotification(
+            sourceType: 'invoice',
+            sourceId: invoiceRef.id,
+            sellerId: appUser.id,
+            sellerName: appUser.displayName,
+            tenantId: tenantId,
+            shopId: shopId,
+            shopName: shopName,
+            routeId: routeId,
+            amount: total,
+            transactionType: 'return',
+            invoiceNumber: result.invoiceNumber,
+          ),
         );
       }
     } catch (error, stackTrace) {
       _logger.w(
-        'Best-effort return notification write failed',
+        'Best-effort invoice notification write failed',
         error: error,
         stackTrace: stackTrace,
       );
@@ -1453,25 +1450,27 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             'quantity_available': FieldValue.increment(stockDelta),
             'updated_at': now,
           });
-          transaction
-              .set(db.collection(Collections.inventoryTransactions).doc(), {
-                'type': docType == InvoiceModel.typeSale
-                    ? 'return_from_shop'
-                    : 'stock_adjustment',
-                'seller_id': inventoryData['seller_id'] as String? ?? '',
-                'seller_name': inventoryData['seller_name'] as String? ?? '',
-                'product_id': inventoryData['product_id'] as String? ?? '',
-                'variant_id': inventoryData['variant_id'] as String? ?? '',
-                'variant_name': inventoryData['variant_name'] as String? ?? '',
-                'quantity': quantity,
-                'direction': stockDelta > 0 ? 'in' : 'out',
-                'previous_quantity': before,
-                'new_quantity': before + stockDelta,
-                'notes': 'invoice_void:$invoiceNumber',
-                'created_by': currentUser.id,
-                'created_at': now,
-                'tenant_id': effectiveTenantId,
-              });
+          transaction.set(
+            db.collection(Collections.inventoryTransactions).doc(),
+            {
+              'type': docType == InvoiceModel.typeSale
+                  ? 'return_from_shop'
+                  : 'stock_adjustment',
+              'seller_id': inventoryData['seller_id'] as String? ?? '',
+              'seller_name': inventoryData['seller_name'] as String? ?? '',
+              'product_id': inventoryData['product_id'] as String? ?? '',
+              'variant_id': inventoryData['variant_id'] as String? ?? '',
+              'variant_name': inventoryData['variant_name'] as String? ?? '',
+              'quantity': quantity,
+              'direction': stockDelta > 0 ? 'in' : 'out',
+              'previous_quantity': before,
+              'new_quantity': before + stockDelta,
+              'notes': 'invoice_void:$invoiceNumber',
+              'created_by': currentUser.id,
+              'created_at': now,
+              'tenant_id': effectiveTenantId,
+            },
+          );
         }
         for (final item in rawItems.whereType<Map<String, dynamic>>()) {
           final variantId = (item['variant_id'] as String?)?.trim() ?? '';
@@ -1488,25 +1487,27 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             'quantity_available': FieldValue.increment(stockDelta),
             'updated_at': now,
           });
-          transaction
-              .set(db.collection(Collections.inventoryTransactions).doc(), {
-                'type': docType == InvoiceModel.typeSale
-                    ? 'return_from_shop'
-                    : 'stock_adjustment',
-                'seller_id': '',
-                'seller_name': 'warehouse',
-                'product_id': variantData['product_id'] as String? ?? '',
-                'variant_id': variantId,
-                'variant_name': variantData['variant_name'] as String? ?? '',
-                'quantity': quantity,
-                'direction': stockDelta > 0 ? 'in' : 'out',
-                'previous_quantity': before,
-                'new_quantity': before + stockDelta,
-                'notes': 'invoice_void:$invoiceNumber',
-                'created_by': currentUser.id,
-                'created_at': now,
-                'tenant_id': effectiveTenantId,
-              });
+          transaction.set(
+            db.collection(Collections.inventoryTransactions).doc(),
+            {
+              'type': docType == InvoiceModel.typeSale
+                  ? 'return_from_shop'
+                  : 'stock_adjustment',
+              'seller_id': '',
+              'seller_name': 'warehouse',
+              'product_id': variantData['product_id'] as String? ?? '',
+              'variant_id': variantId,
+              'variant_name': variantData['variant_name'] as String? ?? '',
+              'quantity': quantity,
+              'direction': stockDelta > 0 ? 'in' : 'out',
+              'previous_quantity': before,
+              'new_quantity': before + stockDelta,
+              'notes': 'invoice_void:$invoiceNumber',
+              'created_by': currentUser.id,
+              'created_at': now,
+              'tenant_id': effectiveTenantId,
+            },
+          );
         }
         if (docType == InvoiceModel.typeSale) {
           if (reversalTransactionRef != null) {

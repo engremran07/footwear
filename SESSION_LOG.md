@@ -6,6 +6,730 @@
 
 ---
 
+## SESSION-061 — 2026-10-28 — Gradle Recovery and v3.10.13 Delivery
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Complete the authorized build, phone-delivery, Rules, and Hosting
+sequence after fixing the reported Gradle failure.
+
+- The verified toolchain is Flutter 3.47.8/Dart 3.13.7, JDK 21, Gradle 9.3.1,
+  AGP 9.1.0, Kotlin Gradle Plugin 2.4.0, and Google Services 4.5.0. The
+  cross-volume Gradle plugin-source failure was reproduced and resolved by the
+  existing same-drive `PUB_CACHE`; after `flutter pub get --no-example`, the
+  exact `:flutter_plugin_android_lifecycle:compileDebugUnitTestSources`
+  command reported `BUILD SUCCESSFUL in 55s`.
+- Full Flutter suite: `01:43 +704: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 20.9s)`;
+  `dart analyze test/`: `No issues found!`; Rules Emulator:
+  `190 passing (56s)`; Markdown lint and `git diff --check` exited 0.
+- Split APKs built: ARMv7 31.2 MB, ARM64 32.8 MB, x86_64 34.3 MB. The
+  72.1 MB AAB reported `jar verified.` but its certificate chain is locally
+  untrusted and has no timestamp; Play Console acceptance is not established.
+  ARM64 was copied to the phone's Downloads folder (`1 file pushed`) and
+  installed on `R5GL22RGT9V` (`Success`, versionName `3.10.13`, versionCode
+  `310133124`).
+- Firestore Rules/indexes and Hosting were deployed to
+  `shoeserp-clean-20260327`; each deployment reported `Deploy complete!`.
+  Hosting finalization initially hit a connection reset, then succeeded on
+  retry. Live `version.json` reports `3.10.13+1124`; remote-only indexes and
+  field overrides were preserved.
+- The production notification permission/flicker issue remains unresolved:
+  the browser snapshot recorded a 400 resource response and canceled Firestore
+  Listen request, but neither identified a denied notification/shop query.
+  No business data was inspected or changed. No authenticated smoke test, Play
+  Console upload, commit, or push was performed. Broader audit and
+  modernization todos remain open.
+
+---
+
+## SESSION-060 — 2026-10-28 — Dispositioning Minor Role and Notification Findings
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue Pass 1 P3-08, P4-01, and P4-04 verification.
+
+- P3-08's exact `isWorkspaceAssignableRole()` check is intentional for new
+  workspace role writes: read helpers support legacy aliases, while provider
+  writes normalize roles and Rules tests require canonical lowercase values.
+  The focused emulator test reported `1 passing (9s)` and denied a padded
+  uppercase role.
+- P4-01 is absent: `notificationTenantIdFor()` has no unused `now` parameter.
+  P4-04 is absent: the notification screen header says admins and supervisors,
+  matching current policy.
+- No source or Rules changes were made for these three findings. Rules remain
+  local/undeployed from other work; this test does not prove production
+  deployment. Continue unresolved Pass 1 work, including P4-03 and P1-04.
+
+---
+
+## SESSION-059 — 2026-10-28 — Correcting Operational Capability Guards
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the Pass 1 audit of role checks and resolve the
+  misnamed operational-role wrappers without expanding the audit scope.
+
+- Traced all usages of `canManageOperationalDataRole()` and
+  `isOperationalRoleName()`. These role-string helpers reused `viewRoutes` to
+  guard route-counter reconciliation, product writes, and seller-stock
+  returns, obscuring the operation each method was authorizing.
+- Removed both helpers. Each provider now checks its action-specific
+  `RoleCapabilities` capability: `manageRoutes`, `manageProducts`, or
+  `manageInventory`. The current matrix gives the same role sets, so no
+  authorization grant changed. Firestore Rules remain independent.
+- Added matrix regression assertions for supervisor allowance and seller
+  denial on all three write capabilities. Focused tests:
+  `00:00 +12: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 10.0s)`; `dart analyze test/`:
+  `No issues found!`.
+- The misleading helper names no longer have call sites. The broader P1-04
+  raw-role-check inventory remains open; no blanket replacement was made.
+  No Rules/indexes changed; hot restart unavailable because no app was
+  connected. No release build, phone delivery, deployment, commit, or push
+  occurred.
+
+---
+
+## SESSION-058 — 2026-10-28 — Rechecking Notification Profile Refresh
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the notification audit and verify Pass 1 P3-04 against
+  the reported feed refresh/flicker symptom.
+
+- Traced the Auth UID and profile state into the notification tenant scope,
+  tenant-keyed feed and shop-visibility providers, and screen loading/error
+  states. The current profile helper retains the prior tenant only when the
+  cached profile UID matches the settled Auth UID; Auth errors/loading and UID
+  mismatches do not reuse that scope.
+- The existing widget regression confirms that a same-user profile refresh
+  retains the notification row and does not render shimmer. Missing profile,
+  profile-stream error, feed permission error, and shop-visibility error paths
+  remain separately tested.
+- Focused notification widget/provider suite:
+  `00:03 +23: All tests passed!`.
+- **Disposition:** P3-04 is already fixed in the current worktree; no code
+  change was needed. The separate P2-02 permission-denied issue remains open
+  because no production trace identifies the denied operation or confirms the
+  deployed Rules version. No Rules/indexes changed; no production test,
+  deployment, release build, phone delivery, commit, or push occurred.
+
+---
+
+## SESSION-057 — 2026-10-28 — Consolidating Router Access Decisions
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue Pass 1 P2-11 and verify that the router's tenant-business
+  path list can drift from the canonical route capability policy.
+
+- Confirmed `RouterNotifier` separately maintained a list of tenant-scoped
+  paths solely to choose the unselected-super-admin redirect. This duplicated
+  route classification already owned by `PermissionPolicy`.
+- `PermissionPolicy.routeAccessDecision()` now classifies normalized paths
+  once as allowed, denied, or requiring workspace selection. Both
+  `canAccessRoute()` and the router redirect consume that decision; the
+  duplicate router list is removed. Existing access policy and destinations
+  remain unchanged for registered paths, while unknown routes retain their
+  ordinary denied fallback.
+- Added policy assertions for a denied business route, the global workspace
+  route, and an unknown route, plus a router regression for an unselected
+  super-admin deep-linking to `/routes`.
+- Combined policy/router tests: `00:14 +28: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 5.6s)`;
+  `dart analyze test/`: `No issues found!`.
+- The Dart Tooling Daemon had no active Flutter app, so hot restart was
+  unavailable. No Rules/indexes changed. This local source change is
+  unreleased; no release build, phone delivery, deployment, commit, or push
+  occurred. The wider audit and release tasks remain open.
+
+---
+
+## SESSION-056 — 2026-10-28 — Dashboard Cache Tenant Isolation
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue Pass 1 P2-04 and verify that stale dashboard metrics
+  cannot cross workspace or authenticated-user boundaries.
+
+- Traced dashboard cache reads/writes through `dashboardStatsProvider`, the
+  dashboard screen, `authUserProvider`, and workspace-switch/sign-out cache
+  invalidations. Although those transitions already invalidated the cache,
+  the cache itself was global and could still supply a mismatched scope during
+  stream loading.
+- Added a regression that seeded workspace A's metrics, resolved workspace
+  B's profile, and kept B's metric streams loading. Before the fix, the
+  dashboard showed A's `metrics:11/22` values in workspace B.
+- The cache now binds data to user ID, role, active state, tenant/workspace
+  support context, and sorted assigned route IDs. During profile loading, it
+  reuses metrics only when the retained profile UID matches the current Auth
+  UID. A second regression preserves stale-while-refresh behavior within the
+  same workspace.
+- Dashboard suite: `00:09 +5: All tests passed!`; `flutter analyze lib
+  --no-pub`: `No issues found! (ran in 8.1s)`; `dart analyze test/`:
+  `No issues found!`.
+- The Dart Tooling Daemon reported no active app, so hot restart was
+  unavailable. No Rules changed. This local source change is unreleased;
+  no build, device delivery, deployment, commit, or push occurred.
+
+---
+
+## SESSION-055 — 2026-10-28 — Seller Notification Cooldown Regression
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the notification audit and verify Pass 1 P2-03 without
+  changing the separate notification-feed authorization contract.
+
+- Traced seller notification writes after sale-invoice and standalone
+  transaction commits. The previous five-second per-user cooldown could deny
+  the later best-effort notification while leaving the already committed
+  financial operation successful.
+- Removed the cooldown update path. Notifications now use deterministic IDs
+  tied to their source document, and Firestore Rules validate the persisted
+  source's tenant, seller, shop, route, amount, and transaction type.
+  Notifications remain post-commit and best-effort; authorization failure
+  cannot block or reverse the financial write.
+- The first final Emulator run exposed an incomplete sale-invoice test
+  fixture: the invoice lacked the `shop_name` value present in the
+  notification. After correcting that fixture, focused seller Rules tests
+  passed (`70 passing (24s)`) and the full Rules Emulator reported
+  `190 passing (48s)`. Focused Flutter tests reported
+  `00:03 +20: All tests passed!`.
+- P2-03 is fixed locally. The reported notification feed permission denial
+  remains a separate unresolved production-evidence issue. Rules/indexes are
+  not deployed; no production verification, release build, phone delivery,
+  Hosting deployment, commit, or push occurred. Other audit, modernization,
+  and release tasks remain open.
+
+---
+
+## SESSION-054 — 2026-10-28 — Notification Visibility Error Recheck
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Recheck Pass 1 P2-02 against the current notification provider,
+  screen behavior, and focused regressions.
+
+- Traced both listener sources through the tenant-scoped feed, shop visibility
+  chunks, derived visible-notification state, and screen error/retry rendering.
+  A shop-chunk error currently fails the derived visibility stream. The screen
+  retains its last successful rows and shows a retry banner; on first load,
+  it fails closed because shop active/deleted status has not been verified.
+- Internal failures retain `notifications` versus `shops` source attribution.
+  The screen shows this label only in debug builds. Focused notification
+  provider/widget tests reported `00:04 +23: All tests passed!`, covering
+  cached-row retention, source tagging, mapped errors, and retry.
+- **Disposition:** the prior claim that cached feed rows always disappear is
+  stale. The residual first-load/partial-chunk error and release diagnostics
+  remain. No unfiltered fallback was introduced because that could expose
+  notifications for shops whose visibility is unknown.
+- The browser console supplied earlier did not identify a Firebase query or
+  error code, and no authorized production session was available to reproduce
+  the denial. The underlying permission-denied issue remains open pending
+  that evidence; no Rules/client authorization change was made.
+- No build, phone delivery, Rules/indexes or Hosting deployment, commit, or
+  push occurred.
+
+## SESSION-053 — 2026-10-28 — Mark-All Notification Batch Recheck
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Verify Pass 1 P2-01's 50-write Rules access-call concern against
+  current provider behavior and Emulator coverage.
+
+- Traced notification screen action → `markAllAsRead()` → one Firestore batch
+  capped at 50 → per-document Rules transition. The client sends
+  `read: true` and a server timestamp for each unread ID.
+- The current Rules suite already contains a positive atomic batch test for
+  all 50 feed rows. Full Rules Emulator run reported
+  `190 passing (46s)`, including the 50-notification case; no access-call
+  limit failure occurred.
+- **Disposition:** the missing-test finding is stale in the current worktree
+  and closed for the supported 50-row batch. No chunking workaround or Rules
+  change was needed.
+- Emulator result is local only; production Rules deployment remains
+  unverified. No build, phone delivery, deployment, commit, or push occurred.
+
+## SESSION-052 — 2026-10-28 — Runtime Role-Policy Scope
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Verify Pass 1 P1-03's claim that missing configurable
+  workspace role overrides are an authorization defect.
+
+- Confirmed `SettingsModel` has no runtime role-policy field; app capabilities
+  are defined by the canonical role matrix and `PermissionPolicy`, and Rules
+  independently enforce tenant-scoped permissions.
+- The current runtime contract specifies fixed operation-specific role
+  permissions and centralizes app-side checks; it does not state that
+  workspaces may redefine roles. A deny-only override system would require
+  new schema, editor authorization, migration/default semantics, critical
+  Rules checks, and emulator coverage.
+- **Disposition:** confirmed missing capability, but not a verified defect
+  against the current contract. No dynamic authorization model was added
+  without a product/security decision. The Pass 1 item remains a feature-scope
+  decision, not a code fix.
+- No production access, build, phone delivery, Rules/indexes or Hosting
+  deployment, commit, or push occurred.
+
+## SESSION-051 — 2026-10-28 — Release Deployment Gate
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Verify Pass 1 P1-02's claim that an app release could proceed
+  despite Rules or Hosting deployment failure.
+
+- Inspected the main and tagged-release workflow DAGs. Both currently run
+  Rules emulator tests and deploy Firestore Rules/indexes before Hosting. The
+  tagged-release publication job did not depend on the deployment job, so a
+  failed Rules/Hosting deploy did not block GitHub Release publication.
+- Updated `release.yml` so the GitHub Release job requires successful
+  completion of `deploy`. Local structural validation reported
+  `WORKFLOW_DEPENDENCY_GATE: PASS` and
+  `RULES_BEFORE_HOSTING: PASS (release + main deploy)`.
+- **Disposition:** the GitHub Release publication gap is fixed in source.
+  Production workflow execution and Rules version alignment remain
+  unverified. The manual APK/AAB artifact workflow remains independent and
+  there is no app-startup Rules-version handshake; these are residual
+  version-skew risks, not claimed fixed.
+- No production deployment, release artifact build, device delivery, commit,
+  or push occurred. Other Pass 1 and later-pass findings remain open.
+
+## SESSION-050 — 2026-10-28 — Email Verification Sync Recheck
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Verify Pass 1 P1-01 against the current Auth client, profile
+update Rules, and positive/adversarial emulator coverage.
+
+- Traced both login and app-resume flows: each reloads Firebase Auth, checks
+  the verified state, refreshes the ID token before profile writes, and uses
+  the Auth token as the source for `email`/`email_verified`. The resume path
+  additionally rechecks the current UID and verified state after refresh.
+- Current user Rules permit the self-update fields but bind `email_verified`
+  to `request.auth.token.email_verified`; a changed email must match the
+  verified token email. Emulator coverage denies an unverified self-promotion
+  and a forged email, and allows a verified token sync.
+- Focused Rules Emulator result: `2 passing (8s)`.
+- **Disposition:** the reported contract mismatch is not present in the
+  current working tree, so no additional client or Rules change was made.
+  Real Firebase Auth token-refresh behavior and production Rules deployment
+  were not tested.
+- No production access, build, phone delivery, Rules/indexes or Hosting
+  deployment, commit, or push occurred. Other Pass 1 and later-pass findings
+  remain open.
+
+## SESSION-049 — 2026-10-28 — Large Invoice Rules Budget Check
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Verify Pass 1 P2-10's hypothesis that a normal large seller
+invoice can exceed Firestore Rules access-call limits.
+
+- Traced the sale-invoice provider transaction and Rules checks for the
+  invoice, sequence/settings, sale transaction, shop-balance update, and
+  seller-inventory deductions. The rules do not iterate over invoice line
+  items; each deduction validates against the same after-state invoice.
+- Added a local Rules regression covering a 30-line seller sale with 30
+  distinct inventory deductions, an invoice counter update, linked cash-out
+  row, and exact shop balance. The targeted emulator case passed; the complete
+  Rules Emulator suite reported `190 passing (46s)`.
+- **Disposition:** the 30-line Rules access-call failure was not reproduced;
+  no Rules logic change was warranted. The provider does read each inventory
+  document before commit, so actual read cost and latency remain separate
+  workload-measurement questions and are not certified by the emulator.
+- No production data or deployment, release build, phone delivery, commit, or
+  push occurred. Other Pass 1 and later-pass findings remain open.
+
+## SESSION-048 — 2026-10-28 — Super-Admin Notification Scope Recheck
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Verify Pass 1 finding P2-09 against current app policy, Rules,
+tests, and the documented notification privacy boundary.
+
+- Confirmed `super_admin` does not receive `viewNotifications` in the app
+  capability matrix, and `isNotificationReaderForTenant` independently
+  denies it in Firestore Rules, including selected-workspace support context.
+- Existing Rules Emulator coverage asserts denial for the selected tenant,
+  another tenant, and mark-read writes. Existing runtime documentation already
+  states that tenant notifications are limited to admin/manager,
+  tenant_admin, and supervisor; sellers and super-admins are excluded.
+- The focused role/policy suite reported
+  `00:00 +11: All tests passed!`. The Rules emulator test was inspected but
+  not rerun in this verification.
+- **Disposition:** intentional and documented, not a current defect. No new
+  platform support read capability was added because it would broaden access
+  beyond the recorded privacy contract and requires a separate product and
+  security decision.
+- No production access, build, phone delivery, Rules/indexes or Hosting
+  deployment, commit, or push occurred. Other audit findings and requested
+  release tasks remain open.
+
+## SESSION-047 — 2026-10-28 — Profile-Read Error Routing Recheck
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue verification of Pass 1 finding P2-08 without adding
+another workaround before tracing the routed screen and its tests.
+
+- Traced the authenticated profile-error path through the router,
+  `BootstrapProfileScreen`, and the notification route. The router can send a
+  failed profile read to `/bootstrap-profile`, where the screen's
+  `AsyncValue.when` error branch displays mapped retry feedback rather than
+  missing-profile instructions. The notification route has its own mapped
+  retry state.
+- The focused bootstrap and router suites reported
+  `00:11 +17: All tests passed!`, including profile-read retry, notification
+  permission-error retry, backup route access, and role-route checks.
+- P2-08 is not reproducible in the current source and is recorded as closed
+  for this revision; no code change was warranted. This does not verify the
+  behavior of a previously deployed build.
+- No production account/data access, build, phone delivery, Rules/indexes or
+  Hosting deployment, commit, or push occurred. The wider Pass 1 audit,
+  release sequence, and unrelated pending work remain open.
+
+## SESSION-046 — 2026-10-28 — Super-Admin Settings Listener Expiry
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue verification of Pass 1 finding P2-05: whether a
+selected-workspace support-context expiry leaves tenant listeners active.
+
+- Traced router expiry refresh, auth-profile context, settings document
+  selection, and provider disposal. The router refreshes at eight hours, but
+  the non-`autoDispose` `settingsProvider` had no expiry timer and selected a
+  super-admin's workspace solely from `tenantId`. A pre-fix regression
+  confirmed an expired context still resolved `tenant-42`.
+- The settings provider now rejects missing, expired, inactive-profile, or
+  non-concrete super-admin workspace context for document selection. For a
+  valid selected context it schedules self-invalidation at expiry and cancels
+  the timer on disposal; after expiry it switches to the no-active-workspace
+  settings state, closing the old Firestore stream. The eight-hour client
+  duration is centralized in `UserModel` and reused by the router and
+  tenant-scoped provider timers. Firestore Rules remain the server-side
+  authorization boundary.
+- The settings regression first failed with expected
+  `__no_active_workspace__`, actual `tenant-42`; after the fix the focused
+  settings/model/permission/router suite reported
+  `00:11 +60: All tests passed!`. `flutter analyze lib --no-pub` reported
+  `No issues found! (ran in 5.5s)`; `dart analyze test/` reported
+  `No issues found!`.
+- Updated the multi-tenant SaaS skill to require expiry-aware lifecycle
+  handling for persistent tenant streams and a regression that proves expired
+  context does not read Firestore.
+- Rechecked P2-06 against current Rules, emulator fixtures, and the disabled
+  tenant-backfill scripts. Legacy `__global__` reads are still intentionally
+  represented in code/tests, while new business creates reject the sentinel.
+  Removing compatibility branches is blocked until a reviewed record-to-tenant
+  migration map and recovery plan prove there are no remaining legacy records.
+- Repository Markdown lint exited 0 with no output; `git diff --check` exited
+  0. A hot restart was attempted, but the Dart Tooling Daemon had no active
+  Flutter app connection.
+- No Rules/index changes, build, device delivery, deployment, commit, or push
+  occurred. The wider Pass 1 audit and release tasks remain open.
+
+## SESSION-045 — 2026-10-28 — Archived Workspace Access UX
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Verify and fix the audit finding that archived workspace members
+were left on business screens where Rules denied requests without a clear
+workspace lifecycle recovery path.
+
+- Traced the app-shell route content to the tenant-keyed `tenantProvider` and
+  verified that Firestore Rules allow a member to read their own tenant
+  document while business collections require the tenant to be active.
+- Added an app-shell gate for ordinary tenant members. It waits for the tenant
+  snapshot before mounting business content, maps tenant-read failures to
+  retry feedback, and shows the localized archived/unavailable state with
+  Retry and Sign-out actions. Platform super-admins bypass this gate so their
+  explicitly selected and audited workspace-restoration path remains usable.
+- The new widget regression failed before the fix because the backup screen
+  mounted with an inactive tenant. After the fix, the focused routing suite
+  reported `00:10 +16: All tests passed!`; `flutter analyze lib --no-pub`
+  reported `No issues found! (ran in 4.8s)`; `dart analyze test/` reported
+  `No issues found!`.
+- Repository Markdown lint exited 0 with no output after the documentation
+  updates.
+- No Rules/indexes changed. This change is local and unreleased; production
+  deployment, release builds, phone delivery, commit, and push were not
+  performed.
+
+## SESSION-044 — 2026-10-28 — Android Toolchain and Gradle Recovery
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue compatibility-checked dependency modernization and
+resolve the reproduced Kotlin metadata failure blocking Android release
+artifacts.
+
+- Flutter 3.47.8 / Dart 3.13.7 was confirmed. Flutter's Android template
+  specifies Gradle 9.3.1, AGP 9.1.0, and Kotlin Gradle Plugin 2.4.0; Firebase
+  documents Google Services plugin 4.5.0. The wrapper now uses Gradle 9.3.1
+  with the published SHA-256 checksum.
+- Root cause: Firebase Auth metadata 2.4.0 was incompatible with Kotlin
+  Gradle Plugin 2.2.20. After aligning versions, AGP 9 surfaced deprecated
+  build-script APIs. The app script now uses public `ApplicationExtension`
+  and Kotlin's typed `compilerOptions` rather than the deprecated app DSL and
+  `android.kotlinOptions`.
+- Split APK command completed successfully. Outputs: ARMv7 31.2 MB
+  (`310132124`), ARM64 32.8 MB (`310133124`), and x86_64 34.3 MB
+  (`310135124`); all three verify with APK Signature Scheme v2 and report
+  versionName `3.10.13`.
+- Flutter warns that the app and current Firebase plugins apply Kotlin Gradle
+  Plugin and may fail with future Flutter versions. This upstream warning was
+  not hidden. `flutter doctor -v` also reports unaccepted Android SDK
+  licenses; none were accepted manually.
+- The signed AAB built at `72.1 MB`. `jarsigner -verify` reported
+  `jar verified.` with a self-signed/untrusted local certificate-chain
+  warning and no timestamp; this verifies integrity but not Play Console
+  upload-key acceptance. `adb devices -l` listed no device, so no phone copy
+  or install, Rules/indexes or Hosting deployment, commit, or push occurred.
+  The requested release order remains install first, then Rules/indexes,
+  Hosting, commit, and push.
+- Direct Flutter packages are at latest resolver-compatible versions. Five
+  newer transitive releases remain constrained; no overrides were added.
+  The full test and analyzer evidence from SESSION-043 remains applicable;
+  no Dart source changed in this toolchain recovery.
+- The earlier `flutter pub get --no-example` output showed four attempts
+  blocked while Windows had a user-mapped section open on the shared
+  `windows-x64\icudtl.dat`; a later attempt completed with `Got dependencies!`.
+  Reproducing the command in this session also exited 0. A Windows Restart
+  Manager check found no current owner, and no Flutter test/debug process was
+  found. The lock was transient; no process was terminated, antivirus setting
+  changed, or SDK/cache file deleted. The five newer-version notices are
+  resolver constraints, not `pub get` errors.
+
+## SESSION-043 — 2026-10-28 — Node and Rules-Test Dependency Upgrade
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the compatibility-checked dependency modernization
+without losing the Flutter SDK/Gradle work blocked by a shared Windows SDK
+artifact lock.
+
+- Updated root `firebase-admin` to `14.5.0`. Updated the Firestore Rules test
+  toolchain to `@firebase/rules-unit-testing 6.0.0`, Firebase `13.1.0`, and
+  Mocha `12.0.3`.
+- The new dependency tree exposed a high-severity `@grpc/grpc-js` advisory.
+  Added a scoped Firestore dependency override to `1.14.6`; root and Rules-test
+  `npm audit` both report `found 0 vulnerabilities`.
+- The first full Rules run exceeded the existing 30-second Mocha timeout.
+  Raised the Rules test timeout to 120 seconds and reran the canonical
+  emulator command; it reported `185 passing (2m)` and
+  `Script exited successfully (code 0)`. Focused receipt coverage also
+  reported `7 passing (14s)`.
+- `dart pub outdated --show-all` was able to inventory app packages directly
+  with the bundled Dart executable. `dart pub upgrade` updated 102 package
+  resolutions within current `pubspec.yaml` constraints. Direct Dart analysis
+  reported `No issues found!` for both `lib/` and `test/`.
+- Ten direct Flutter package constraints were upgraded in compatibility
+  groups: FlutterFire (`firebase_core 5.1.0`, `firebase_auth 7.0.1`,
+  `cloud_firestore 7.1.0`, `firebase_crashlytics 6.0.1`,
+  `firebase_app_check 0.5.1`), `go_router 18.1.1`, media/rendering
+  (`cached_network_image 4.0.5`, `image 4.12.0`, `archive 4.5.2`,
+  `pdf 3.13.1`, `printing 5.15.1`), and UI primitives (`cupertino_icons
+  2.0.0`, `shimmer 4.0.0`). Direct analysis of `lib/` and `test/` remained
+  clean after every group. The final package inventory shows all direct
+  dependencies at their latest versions.
+- Five transitive packages remain newer than the latest resolver-compatible
+  release (`cross_file`, `material_color_utilities`, `qr`, `test_api`, and
+  `cli_util`); their current parent or SDK constraints do not resolve to those
+  releases. Do not force overrides without compatibility testing.
+- Flutter test/build commands still fail while preparing the shared SDK's
+  locked Windows engine artifact. Process inspection found five
+  `flutter_tester.exe` processes with unavailable parent processes; none were
+  terminated and no shared cache was deleted.
+- Final root and Rules-test `npm audit` each reported `found 0 vulnerabilities`;
+  npm outdated reported no rows. Repository Markdown lint completed with exit
+  0 and no output; `git diff --check` exited 0.
+- Gradle and Android plugin versions were not changed because no
+  incompatibility was reproduced. The verified baseline remains Gradle
+  `8.14`, AGP `8.11.1`, Kotlin Android plugin `2.2.20`, Java `21.0.12`, and
+  SDK 36.
+- The workspace-admin maintenance visibility correction and its existing
+  regressions remain local; Flutter verification is still blocked by the SDK
+  issue. No Rules/indexes or Hosting deployment, APK/AAB build or install,
+  commit, or push was performed.
+
+## SESSION-042 — 2026-10-28 — Notification Profile-Refresh Regression
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue tracing the notification feed disappearing after the
+prior commit-history audit and local notification authorization work.
+
+- Traced the feed from `NotificationCenterScreen` through
+  `notificationTenantScopeProvider` and compared the commit history. The
+  regression came from treating every profile `AsyncLoading` as unavailable,
+  despite Riverpod retaining a prior profile value, and clearing tenant scope
+  during that same-user refresh.
+- The provider now reuses the retained profile only when its ID matches the
+  settled Firebase Auth UID. Auth loading/errors and UID mismatch produce no
+  tenant scope. The screen retains cached notification rows only while the
+  authorized tenant remains unchanged.
+- Added a widget regression. It failed before the fix because “Shop One”
+  disappeared during same-user profile refresh. Afterward, focused widget
+  tests reported `00:03 +9: All tests passed!`; notification visibility tests
+  reported `00:00 +13: All tests passed!`; full Flutter suite:
+  `01:36 +689: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 116.5s)`; `dart analyze test/`:
+  `No issues found!`.
+- Updated the notification skill and runtime, app, system, UI-audit, and skill
+  modernization documentation with the UID-bound cache rule and evidence.
+- No Firestore Rules/indexes changed in this follow-up. Earlier local Rules
+  changes remain undeployed. Free RAM was `1.27 GB` and `adb devices -l`
+  showed no device, so release build and phone delivery were not attempted.
+  No Hosting/Rules deployment, commit, or push occurred.
+- Open: verify the refresh fix with an authenticated production workspace;
+  investigate any residual timed disappearance separately if reproduced;
+  continue the existing notification and 832-line frontend modernization
+  tasks. This session does not claim the broader audit or release complete.
+
+## SESSION-041 — 2026-10-28 — Full-Frontend Modernization Baseline
+
+**Agent:** GitHub Copilot
+
+**Trigger:** The user supplied a read-only 832-line Flutter/SaaS modernization
+prompt and requested full review, phased tasks, implementation, and durable
+continuity. The prompt and companion skill snapshot were read completely.
+
+### Baseline Evidence
+
+- Repository: `main`, commit
+  `2f2c09b2b522249142e428093b2ee86e24714cd7`. The worktree contained only
+  an unexplained zero-byte untracked file under `tests/firestore-rules/`;
+  it was preserved.
+- Flutter/Dart: Flutter `3.41.6`, Dart `3.11.4`; app version remains
+  `3.10.12+1123`.
+- `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 94.0s)`.
+- `dart analyze test/`: `No issues found!`.
+- `flutter test -r expanded --dart-define=use_arabic=true`:
+  `01:24 +685: All tests passed!`.
+- `flutter build web --release --dart-define=use_arabic=true`:
+  `EXIT: 0`; WebAssembly dry-run succeeded.
+- Existing Android artifact build/install evidence is recorded in SESSION-040;
+  Android builds were not repeated during this baseline pass.
+
+### Initial Findings and Planning
+
+- The router has 32 registered route patterns. The existing authenticated
+  shell is width-responsive: compact navigation below 720 logical pixels,
+  navigation rail at 720, and extended rail at 1024. The inspected shell does
+  not select its composition with `kIsWeb`; detailed per-screen desktop
+  suitability is not yet audited.
+- Existing design tokens, theme, typography, motion, localization, and shared
+  controls are already centralized. No parallel design package or unproven
+  dependency upgrade was introduced.
+- The bounded route/UI audit found missing direct shell tests at the 720/1024
+  breakpoints and no platform-specific web composition test in the inspected
+  shell tests; it did not reproduce a responsive defect.
+- The bounded Riverpod review flagged transaction-write concurrency and
+  idempotency, settings mutation state, notification mutation scope, and
+  listener-cancellation test coverage. These remain candidates requiring
+  reproduction and Rules-path validation, not confirmed authorization flaws.
+- Preliminary external references retrieved: official Flutter accessibility
+  guidance, W3C WCAG 2.2, Shopify Polaris references, and Odoo Inventory and
+  stock-report documentation. No code, assets, SDK, or package was adopted.
+  The Flutter adaptive-responsive page could not be fetched because of a
+  transport error; commercial/open-source pattern comparison remains
+  incomplete.
+- Thirteen phase todos were added. All twenty pre-existing open todos covering
+  multi-tenant permissions, notification behavior, invoices/users, super-admin
+  access, browser diagnostics, workspace visibility/reset, and seller history
+  were preserved. Phase A baseline is complete; feature inventory is active.
+
+### Persisted Modernization Backlog
+
+The session todo database contains the detailed descriptions and dependencies;
+these IDs and current states are mirrored here so a new account can continue:
+
+| Todo ID | Scope | Status |
+|---|---|---|
+| `modernization-baseline` | Toolchain, Git, test, and build baseline | Done |
+| `modernization-feature-audit` | Full route, screen, provider, role, and feature-gap inventory | In progress |
+| `modernization-design-research` | Evidence-backed open-source/commercial design and accessibility research | In progress |
+| `modernization-platform-experiences` | Distinct desktop-web and Android compositions | Pending |
+| `modernization-design-system` | Existing tokens and shared component unification | Pending |
+| `modernization-riverpod` | State ownership, cache lifecycle, mutation integrity, and duplication | In progress |
+| `modernization-skills-tools` | Skills, agents, MCP, and failed Hosting automation authentication | In progress |
+| `modernization-dependencies-gradle` | Verified package and Android toolchain compatibility | Pending |
+| `modernization-footwear-workflows` | End-to-end footwear product, stock, route, shop, invoice, and report gaps | Pending |
+| `modernization-performance-accessibility` | Measured performance, responsive, keyboard, screen-reader, and RTL review | Pending |
+| `modernization-firebase-consistency` | Cross-platform provider, Rules, role, tenant, and atomic-write behavior | Pending |
+| `modernization-regression-verification` | Tests and Android/web builds for implemented phases | Pending |
+| `modernization-deliverables` | Canonical reports, evidence, and prioritized remaining backlog | Pending |
+
+Phase B must finish the evidence-based comparison before platform composition
+decisions; responsive implementation depends on Phases B and D. Regression
+verification depends on implementation tasks. The existing twenty unrelated
+open todos were not replaced or silently dropped.
+
+### Deployment Workflow Follow-up
+
+- GitHub Actions run
+  [40608861968](https://github.com/engremran07/footwear/actions/runs/40608861968)
+  completed with failure. Its Firestore Rules Emulator job succeeded; the
+  Hosting job failed with `Error: Failed to authenticate, have you run firebase
+  login?`. This is a CI authentication/configuration failure, not a Flutter
+  build or Rules Emulator failure.
+- The preceding turn reported manual Rules/index and Hosting deployments as
+  complete and pushed commit `2f2c09b2b522249142e428093b2ee86e24714cd7`.
+- Live `version.json` returned version `3.10.12`, build `1123`. A direct
+  `curl.exe -I` request for `/index.html` returned HTTP `200` with
+  `Cache-Control: no-cache, no-store, must-revalidate`. The live shell is
+  reachable, but this does not verify authenticated business screens or repair
+  the failed automated workflow.
+- No production data was changed, no Play upload was performed, and this
+  baseline pass made no runtime, Rules, index, release-version, deployment,
+  commit, or push changes. The UI audit report now records the partial phase
+  plan and verified evidence; remaining phase evidence must be appended as
+  work proceeds.
+
+### Local Provider and Notification Rules Follow-up
+
+- The transaction UI calls `TransactionNotifier.create()` from the shop
+  transaction dialog and maps thrown errors to visible feedback. Its notifier
+  previously returned successfully when another write was in flight. It now
+  throws instead. Keyed creates use deterministic tenant-scoped IDs and a
+  Firestore transaction to atomically create the ledger row and increment the
+  shop balance. Existing unkeyed batch writes and the legacy idempotency-key
+  lookup remain. The concurrent guard regression was RED against the prior
+  behavior and GREEN after the change. The unit test uses an invalid shop to
+  force overlapping calls; there is not yet a Rules Emulator race test for
+  concurrent persisted writes.
+- Notification screen mark-one and mark-all calls pass through
+  `NotificationNotifier`. The provider now sends server timestamp sentinels;
+  Rules require `read: false` to become `true`, both read fields to change
+  together, and `read_at == request.time`. Readers must be authorized and
+  tenant-scoped to an active concrete workspace. Sellers, super-admins,
+  global/unassigned scope, inactive profiles/tenants, partial changes, resets,
+  client timestamps, and cross-tenant access are denied by Rules.
+- RED/GREEN evidence for notification Rules was recorded by the Rules author:
+  old Rules allowed the new reset/global-scope attacks (focused suite
+  `7 passing, 2 failing`); after the fixes, the focused suite reported
+  `9 passing (16s)`. The provider sentinel regression reported
+  `00:00 +13: All tests passed!`. Parent rerun of both affected test files:
+  `00:00 +21: All tests passed!`; full Flutter suite:
+  `01:34 +688: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 15.4s)`; `dart analyze test/`:
+  `No issues found!`; full Rules Emulator: `185 passing (46s)`.
+- The full emulator output included non-failing diagnostics that some other
+  Rules paths exceeded the emulator's 1,000-expression evaluation limit.
+  Focused notification tests did not show that diagnostic. This remains an
+  open Rules-complexity concern and is not represented as resolved by the
+  passing suite.
+- These provider and Rules changes are local and undeployed. The transaction
+  persistence race has no emulator-backed concurrency test. No version bump,
+  release build, device delivery, Rules/index or Hosting deploy, commit, or
+  push was performed in this follow-up.
+
+---
+
 ## SESSION-040 — 2026-10-28 — Local Web and Android Release Artifacts
 
 **Agent:** GitHub Copilot

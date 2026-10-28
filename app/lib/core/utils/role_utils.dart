@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../../models/user_model.dart';
 import 'role_names.dart';
 import 'permission_policy.dart';
@@ -14,12 +15,6 @@ String normalizeRoleName(String role) {
 bool canManageUserAccountsRole(String role) {
   return RoleCapabilities.allows(role, AppCapability.manageUsers);
 }
-
-bool canManageOperationalDataRole(String role) {
-  return RoleCapabilities.allows(role, AppCapability.viewRoutes);
-}
-
-bool isOperationalRoleName(String role) => canManageOperationalDataRole(role);
 
 bool canManageWorkspaceRole(String role) {
   return RoleCapabilities.allows(role, AppCapability.manageWorkspaces);

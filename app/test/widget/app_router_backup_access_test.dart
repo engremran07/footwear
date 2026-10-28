@@ -161,6 +161,87 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'archived workspace blocks business screens with recovery actions',
+    (tester) async {
+      final now = Timestamp.now();
+      final router = await _pumpBackupRoute(
+        tester,
+        role: UserRole.tenantAdmin,
+        routeIds: const [],
+        tenantOverride: TenantModel(
+          id: 'tenant-1',
+          name: 'Workspace One',
+          slug: 'workspace-one',
+          active: false,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      expect(
+        router.routerDelegate.currentConfiguration.uri.path,
+        '/settings/backup',
+      );
+      expect(find.byType(DatabaseBackupScreen), findsNothing);
+      expect(
+        find.text(
+          'This workspace has been archived. Contact your platform administrator.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Retry'), findsOneWidget);
+      expect(find.text('Sign out'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('missing workspace shows a retryable access state', (
+    tester,
+  ) async {
+    await _pumpBackupRoute(
+      tester,
+      role: UserRole.tenantAdmin,
+      routeIds: const [],
+      tenantStreamOverride: () => Stream.value(null),
+    );
+
+    expect(find.byType(DatabaseBackupScreen), findsNothing);
+    expect(
+      find.text(
+        'The selected workspace is unavailable. Refresh and try again.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('workspace read failure shows mapped retry feedback', (
+    tester,
+  ) async {
+    final error = FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'permission-denied',
+    );
+    await _pumpBackupRoute(
+      tester,
+      role: UserRole.tenantAdmin,
+      routeIds: const [],
+      tenantStreamOverride: () => Stream.error(error),
+    );
+
+    expect(find.byType(DatabaseBackupScreen), findsNothing);
+    expect(
+      find.text('You do not have permission to perform this action.'),
+      findsOneWidget,
+    );
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('workspace names stay hidden in the wide app shell', (
     tester,
   ) async {
@@ -195,6 +276,21 @@ void main() {
     expect(find.text('Workspaces'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'unselected super-admin is directed to workspaces from a denied business route',
+    (tester) async {
+      final router = await _pumpBackupRoute(
+        tester,
+        role: UserRole.superAdmin,
+        routeIds: const [],
+        location: '/routes',
+      );
+
+      expect(router.routerDelegate.currentConfiguration.uri.path, '/tenants');
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('supervisor can open operational and notification screens', (
     tester,
@@ -326,6 +422,8 @@ Future<GoRouter> _pumpBackupRoute(
   UserRole role = UserRole.seller,
   bool disableAnimations = false,
   String location = '/settings/backup',
+  TenantModel? tenantOverride,
+  Stream<TenantModel?> Function()? tenantStreamOverride,
   void Function(WidgetTester tester)? onTransitionFrame,
 }) async {
   SharedPreferences.setMockInitialValues({
@@ -343,13 +441,15 @@ Future<GoRouter> _pumpBackupRoute(
     createdAt: now,
     updatedAt: now,
   );
-  final tenant = TenantModel(
-    id: 'tenant-1',
-    name: 'Workspace One',
-    slug: 'workspace-one',
-    createdAt: now,
-    updatedAt: now,
-  );
+  final tenant =
+      tenantOverride ??
+      TenantModel(
+        id: 'tenant-1',
+        name: 'Workspace One',
+        slug: 'workspace-one',
+        createdAt: now,
+        updatedAt: now,
+      );
   late GoRouter router;
   late AsyncValue<UserModel?> renderedUser;
 
@@ -365,10 +465,13 @@ Future<GoRouter> _pumpBackupRoute(
         notificationsProvider.overrideWith(
           (ref, tenantId) => Stream.value(const []),
         ),
+        tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
         activeNotificationShopIdsProvider.overrideWith(
           (ref, tenantId) => Stream.value(const <String>{}),
         ),
-        tenantProvider(tenant.id).overrideWith((ref) => Stream.value(tenant)),
+        tenantProvider(tenant.id).overrideWith(
+          (ref) => tenantStreamOverride?.call() ?? Stream.value(tenant),
+        ),
       ],
       child: Consumer(
         builder: (context, ref, child) {
@@ -377,9 +480,8 @@ Future<GoRouter> _pumpBackupRoute(
           return MaterialApp.router(
             routerConfig: router,
             builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(disableAnimations: disableAnimations),
+              data: MediaQuery.of(context)
+                  .copyWith(disableAnimations: disableAnimations),
               child: child!,
             ),
           );

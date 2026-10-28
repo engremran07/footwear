@@ -1,9 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../core/constants/collections.dart';
 import '../core/utils/firestore_pagination.dart';
-import '../core/utils/role_utils.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
@@ -144,7 +145,7 @@ class ProductNotifier extends AsyncNotifier<void> {
         .doc(authUser.uid)
         .get();
     final role = (me.data()?['role'] as String? ?? '').trim();
-    if (!canManageOperationalDataRole(role)) {
+    if (!RoleCapabilities.allows(role, AppCapability.manageProducts)) {
       throw StateError('Only admin can manage products');
     }
   }

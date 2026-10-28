@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../core/utils/role_names.dart';
 
 enum UserRole { admin, supervisor, seller, tenantAdmin, superAdmin, unknown }
@@ -40,6 +41,8 @@ String _roleToString(UserRole r) {
 }
 
 class UserModel {
+  static const workspaceSupportContextTtl = Duration(hours: 8);
+
   final String id;
   final String email;
   final String displayName;
@@ -66,6 +69,7 @@ class UserModel {
     required this.displayName,
     required this.role,
     this.phone,
+    // The public tenantId input intentionally maps to private stored scope.
     String? tenantId,
     this.activeWorkspaceId,
     this.activeWorkspaceReason,
@@ -77,7 +81,9 @@ class UserModel {
     this.emailVerified = false,
     required this.createdAt,
     required this.updatedAt,
-  }) : _tenantId = tenantId;
+  })
+    // ignore: prefer_initializing_formals
+    : _tenantId = tenantId;
 
   bool get isAdmin =>
       role == UserRole.admin ||
@@ -117,7 +123,7 @@ class UserModel {
         activeWorkspaceId == workspaceId &&
         (activeWorkspaceReason?.trim().length ?? 0) >= 10 &&
         selectedAt != null &&
-        currentTime.isBefore(selectedAt.add(const Duration(hours: 8)));
+        currentTime.isBefore(selectedAt.add(workspaceSupportContextTtl));
   }
 
   /// True for any user who can carry vehicle (seller) inventory.

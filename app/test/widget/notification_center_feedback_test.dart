@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,80 @@ import 'package:footwear_erp/screens/notification_center_screen.dart';
 import 'package:footwear_erp/widgets/shimmer_loading.dart';
 
 void main() {
+  testWidgets('keeps the notification feed visible during profile refresh', (
+    tester,
+  ) async {
+    final profiles = StreamController<UserModel?>.broadcast();
+    addTearDown(profiles.close);
+    final user = UserModel(
+      id: 'admin-1',
+      email: 'admin@example.com',
+      displayName: 'Admin',
+      role: UserRole.admin,
+      tenantId: 'tenant-1',
+      active: true,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final notification = NotificationModel(
+      id: 'notification-1',
+      type: 'transaction',
+      shopId: 'shop-1',
+      shopName: 'Shop One',
+      routeId: 'route-1',
+      sellerId: 'seller-1',
+      sellerName: 'Seller',
+      amount: 10,
+      transactionType: 'cash_in',
+      refId: 'transaction-1',
+      targetRole: 'admin',
+      createdBy: 'seller-1',
+      createdAt: Timestamp.now(),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authStateProvider.overrideWith(
+            (ref) => _authenticatedUserStream(user.id),
+          ),
+          authUserProvider.overrideWith((ref) {
+            ref.watch(_profileRefreshProvider);
+            return profiles.stream;
+          }),
+          notificationsProvider.overrideWith(
+            (ref, tenantId) => Stream.value([notification]),
+          ),
+          activeNotificationShopIdsProvider.overrideWith(
+            (ref, tenantId) => Stream.value({'shop-1'}),
+          ),
+        ],
+        child: const MaterialApp(home: NotificationCenterScreen()),
+      ),
+    );
+    await tester.pump();
+    profiles.add(user);
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(NotificationCenterScreen)),
+    );
+    expect(container.read(authUserProvider).value?.id, user.id);
+    expect(container.read(notificationTenantScopeProvider), 'tenant-1');
+    expect(container.read(notificationTenantScopeProvider), 'tenant-1');
+    await tester.pump();
+    expect(find.text('Shop One'), findsOneWidget);
+
+    container.read(_profileRefreshProvider.notifier).refresh();
+    await tester.pump();
+
+    final refreshingProfile = container.read(authUserProvider);
+    expect(refreshingProfile.isLoading, isTrue);
+    expect(refreshingProfile.value?.id, user.id);
+    expect(container.read(notificationTenantScopeProvider), 'tenant-1');
+    expect(find.text('Shop One'), findsOneWidget);
+    expect(find.byType(ShimmerLoading), findsNothing);
+  });
+
   testWidgets('missing profile is actionable and does not start the feed', (
     tester,
   ) async {
@@ -102,6 +177,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          authStateProvider.overrideWith(
+            (ref) => _authenticatedUserStream(user.id),
+          ),
           authUserProvider.overrideWith((ref) => Stream.value(user)),
           notificationsProvider.overrideWith(
             (ref, tenantId) => Stream<List<NotificationModel>>.error(feedError),
@@ -120,6 +198,7 @@ void main() {
       find.text('You do not have permission to perform this action.'),
       findsOneWidget,
     );
+    expect(find.text('Stream: notifications'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
     expect(shopVisibilitySubscriptions, 0);
     expect(tester.takeException(), isNull);
@@ -163,6 +242,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          authStateProvider.overrideWith(
+            (ref) => _authenticatedUserStream(user.id),
+          ),
           authUserProvider.overrideWith((ref) => Stream.value(user)),
           notificationsProvider.overrideWith((ref, tenantId) => feed.stream),
           activeNotificationShopIdsProvider.overrideWith(
@@ -188,6 +270,7 @@ void main() {
 
     expect(find.text('Shop One'), findsOneWidget);
     expect(find.byKey(const Key('notification_feed_error')), findsOneWidget);
+    expect(find.text('Stream: notifications'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
     expect(
       providerContainer.read(visibleNotificationsProvider).hasError,
@@ -234,6 +317,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          authStateProvider.overrideWith(
+            (ref) => _authenticatedUserStream(user.id),
+          ),
           authUserProvider.overrideWith((ref) => Stream.value(user)),
           notificationsProvider.overrideWith((ref, tenantId) => feed.stream),
           activeNotificationShopIdsProvider.overrideWith(
@@ -273,6 +359,7 @@ void main() {
       reason: 'feed=$feedState, visible=$visibleState',
     );
     expect(find.byKey(const Key('notification_feed_error')), findsOneWidget);
+    expect(find.text('Stream: shops'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -294,6 +381,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            authStateProvider.overrideWith(
+              (ref) => _authenticatedUserStream(user.id),
+            ),
             authUserProvider.overrideWith((ref) => Stream.value(user)),
             notificationsProvider.overrideWith((ref, tenantId) {
               notificationSubscriptions++;
@@ -357,6 +447,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            authStateProvider.overrideWith(
+              (ref) => _authenticatedUserStream(user.id),
+            ),
             authUserProvider.overrideWith((ref) => Stream.value(user)),
             notificationsProvider.overrideWith(
               (ref, tenantId) => Stream.value([notification]),
@@ -423,6 +516,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          authStateProvider.overrideWith(
+            (ref) => _authenticatedUserStream(user.id),
+          ),
           authUserProvider.overrideWith((ref) => Stream.value(user)),
           notificationsProvider.overrideWith(
             (ref, tenantId) =>
@@ -479,3 +575,27 @@ class _DelayedNotificationNotifier extends NotificationNotifier {
     return completer.future;
   }
 }
+
+final _profileRefreshProvider = NotifierProvider<_ProfileRefreshNotifier, int>(
+  _ProfileRefreshNotifier.new,
+);
+
+class _ProfileRefreshNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void refresh() => state++;
+}
+
+class _AuthenticatedUser implements User {
+  @override
+  final String uid;
+
+  _AuthenticatedUser(this.uid);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+Stream<User?> _authenticatedUserStream(String uid) =>
+    Stream.value(_AuthenticatedUser(uid));

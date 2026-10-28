@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/core/utils/tenant_scope.dart';
@@ -38,29 +40,86 @@ void main() {
   }
 
   group('Workspace settings resolution', () {
+    test('uses the current tenant settings document instead of the global fallback', () {
+      final tenantUser = seller.copyWith(tenantId: 'tenant-42');
+      final platformAdmin = UserModel(
+        id: 'platform-admin',
+        email: 'admin@example.com',
+        displayName: 'Platform Admin',
+        role: UserRole.superAdmin,
+        activeWorkspaceId: 'tenant-42',
+        activeWorkspaceReason: 'Workspace settings support',
+        activeWorkspaceSelectedAt: Timestamp.fromDate(
+          DateTime.now().subtract(const Duration(minutes: 1)),
+        ),
+        active: true,
+        createdAt: ts,
+        updatedAt: ts,
+      );
+
+      expect(settingsDocumentIdForUser(tenantUser), 'tenant-42');
+      expect(settingsDocumentIdForUser(platformAdmin), 'tenant-42');
+      expect(settingsDocumentIdForUser(null), TenantScope.noActiveWorkspaceId);
+    });
+
     test(
-      'uses the current tenant settings document instead of the global fallback',
+      'does not resolve settings after super-admin support context expiry',
       () {
-        final tenantUser = seller.copyWith(tenantId: 'tenant-42');
-        final platformAdmin = UserModel(
+        final now = DateTime.now();
+        final expiredPlatformAdmin = UserModel(
           id: 'platform-admin',
           email: 'admin@example.com',
           displayName: 'Platform Admin',
           role: UserRole.superAdmin,
           activeWorkspaceId: 'tenant-42',
           activeWorkspaceReason: 'Workspace settings support',
-          activeWorkspaceSelectedAt: ts,
+          activeWorkspaceSelectedAt: Timestamp.fromDate(
+            now.subtract(const Duration(hours: 8, minutes: 1)),
+          ),
           active: true,
           createdAt: ts,
           updatedAt: ts,
         );
 
-        expect(settingsDocumentIdForUser(tenantUser), 'tenant-42');
-        expect(settingsDocumentIdForUser(platformAdmin), 'tenant-42');
         expect(
-          settingsDocumentIdForUser(null),
+          settingsDocumentIdForUser(expiredPlatformAdmin),
           TenantScope.noActiveWorkspaceId,
         );
+      },
+    );
+
+    test(
+      'settings provider avoids Firestore for expired support context',
+      () async {
+        final expiredPlatformAdmin = UserModel(
+          id: 'platform-admin',
+          email: 'admin@example.com',
+          displayName: 'Platform Admin',
+          role: UserRole.superAdmin,
+          activeWorkspaceId: 'tenant-42',
+          activeWorkspaceReason: 'Workspace settings support',
+          activeWorkspaceSelectedAt: Timestamp.fromDate(
+            DateTime.now().subtract(const Duration(hours: 8, minutes: 1)),
+          ),
+          active: true,
+          createdAt: ts,
+          updatedAt: ts,
+        );
+        final container = containerWithUser(expiredPlatformAdmin);
+        addTearDown(container.dispose);
+        final authSub = keepAuthAlive(container);
+        addTearDown(authSub.close);
+        await container.read(authUserProvider.future);
+        final settingsSub = container.listen(
+          settingsProvider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(settingsSub.close);
+
+        final settings = await container.read(settingsProvider.future);
+
+        expect(settings.tenantId, TenantScope.noActiveWorkspaceId);
       },
     );
   });

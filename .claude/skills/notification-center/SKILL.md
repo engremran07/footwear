@@ -1,6 +1,6 @@
 ---
 name: notification-center
-description: "Use when: fixing notification feed flicker, unread badge refresh, shop-visibility subscriptions, role-scoped notification queries, or mark-as-read permission feedback in ShoesERP."
+description: "Use when: auditing tenant-scoped notification permissions, Rules mark-read integrity, feed flicker, unread badge refresh, shop-visibility subscriptions, or notification error feedback in ShoesERP."
 ---
 
 # Skill: ShoesERP Notification Center
@@ -119,3 +119,52 @@ states, and do not solve flicker by broadening Firestore permissions.
 - An auth/profile stream error is not equivalent to a null profile. Do not
   drive screen state from `AsyncValue.value` alone: inspect error and loading
   state before interpreting a null data value.
+- Riverpod refresh/reload states may be loading while retaining the last
+  profile in `AsyncValue.value`. Do not replace an authorized notification
+  screen with shimmer solely because `isLoading` is true. Reuse that cached
+  profile only while its user ID still matches the settled Firebase Auth UID;
+  clear notification scope during auth loading/errors or on UID mismatch so a
+  different account cannot inherit the prior tenant feed.
+- Commit `6e5a433` made notification scope null while the profile stream was
+  loading or errored, which tears down the tenant-keyed listeners during a
+  same-user refresh. The UID-bound cached-profile guard prevents that listener
+  churn during profile refresh without carrying scope across auth transitions.
+- A generic “permission denied” message does not identify which Firestore
+  operation failed. Trace profile loading, the notification feed query,
+  referenced-shop queries, mark-one writes, and mark-all batches separately.
+  Do not broaden Rules or treat the refresh fix as resolution of a remaining
+  permission error until the denied operation and its tenant/profile state are
+  evidenced.
+- Seller invoice/transaction notifications are post-commit, best-effort writes.
+  Do not couple them atomically to financial writes or silently depend on a
+  per-user cooldown: a rejected notification must not invalidate an already
+  committed ledger operation. Use a deterministic source-scoped notification
+  ID and Rules that compare the notification against the persisted,
+  same-tenant source. Test rapid valid notifications and detached or
+  mismatched payloads. This source-link contract is separate from feed
+  read/visibility authorization and does not prove production Rules are
+  deployed.
+
+## Read-State Integrity Contract
+
+Marking a notification read is a one-way, tenant-scoped operation:
+
+- Allow an authorized reader to transition an unread notification to
+  `read: true`; do not allow resetting it to `false`.
+- Update `read` and `read_at` together. The client must use a server timestamp,
+  and Rules must reject a client-chosen or malformed timestamp.
+- Apply the same per-document invariant to mark-one and mark-all batches.
+  Batch writes must not broaden role or tenant scope.
+- Deny notification access for missing, inactive, or sentinel tenant contexts;
+  notifications are not a `__global__` inbox.
+- Preserve the existing valid mark-read path for tenant admins, admin-equivalent
+  roles, and supervisors. Sellers, platform super-admins, unassigned users,
+  cross-tenant actors, and inactive tenants remain denied.
+
+Add positive and adversarial Rules Emulator regressions for a valid mark-one
+and mark-all, resetting `read`, changing only one field, malformed or
+client-selected `read_at`, unassigned/global scope, inactive profiles or
+tenants, and cross-tenant document IDs. Reproduce the failing assertion before
+editing Rules, run the complete local emulator suite after the change, and
+report deployment separately; a local pass does not prove production Rules
+are deployed.

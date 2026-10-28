@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/core/constants/app_brand.dart';
 import 'package:footwear_erp/core/l10n/app_locale.dart';
+import 'package:footwear_erp/models/settings_model.dart';
 import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
+import 'package:footwear_erp/providers/settings_provider.dart';
 import 'package:footwear_erp/screens/about_screen.dart';
 import 'package:footwear_erp/screens/settings_screen.dart';
 import 'package:footwear_erp/widgets/app_shell.dart';
@@ -71,6 +73,43 @@ void main() {
     expect(find.text("What's New"), findsOneWidget);
     expect(find.text('Company Name'), findsNothing);
   });
+
+  for (final role in [UserRole.admin, UserRole.tenantAdmin]) {
+    testWidgets('$role sees the maintenance entry after scrolling', (
+      tester,
+    ) async {
+      final account = _user(role, tenantId: 'workspace-1');
+      final settings = SettingsModel(
+        tenantId: 'workspace-1',
+        currency: 'SAR',
+        pairsPerCarton: 12,
+        updatedAt: Timestamp.now(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(account)),
+            settingsProvider.overrideWith((ref) => Stream.value(settings)),
+          ],
+          child: const MaterialApp(home: SettingsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final maintenanceEntry = find.widgetWithText(ListTile, 'Danger Zone');
+      await tester.scrollUntilVisible(
+        maintenanceEntry,
+        240,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(maintenanceEntry, findsOneWidget);
+      expect(
+        tester.widget<ListTile>(maintenanceEntry).onTap,
+        isNotNull,
+      );
+    });
+  }
 
   for (final locale in [AppLocale.ar, AppLocale.ur]) {
     testWidgets('About screen renders in ${locale.name}', (tester) async {

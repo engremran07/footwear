@@ -1,6 +1,6 @@
 # ShoesERP System Deep Dive
 
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
 ## Backup and Restore
 
@@ -25,6 +25,13 @@ and recovery feedback.
 
 Workspace archival and restoration are selected-super-admin provider operations. The tenant lifecycle update does not change member profiles; Firestore Rules require both an active profile and active tenant, so business reads and writes stop while the tenant is archived and resume only after restoration. A super-admin may select an existing inactive tenant with a reason of at least 10 characters; selection is logged in `platform_access_logs`, and the selected context remains subject to the eight-hour Rules limit. The workspace screen requires explicit confirmation before archive or restore. Emulator tests cover inactive selection, restoration, and denial of member business access before restoration.
 
+The app shell watches the tenant document for ordinary authenticated workspace
+members before mounting business-route content. It keeps the shell in a
+loading state until the tenant is known, then shows localized retry and
+sign-out feedback for missing, inactive, or failed tenant reads. The
+platform-super-admin restoration path is excluded from this member gate.
+Firestore Rules continue to deny inactive-tenant business reads and writes.
+
 ## Database Flush and Reset
 
 The client flush/reset screen and its provider fail closed. Deleting multiple
@@ -35,6 +42,12 @@ export, destructive whole-collection restore, and direct-balance reset scripts
 also fail closed. The supported recovery path is the encrypted,
 workspace-scoped app backup; tenant administrators merge without pruning, and
 selected super-admins may replace only the active support workspace.
+
+The Settings screen exposes the maintenance-page entry to authorized
+workspace admins using the same `PermissionPolicy` route decision as
+`/settings/flush`. This is navigation visibility only: all component reset
+controls remain disabled, provider reset methods remain fail-closed, and
+Firestore Rules continue to enforce their independent authorization.
 
 Tenant roots cannot be hard-deleted by Firestore Rules. Archive/restore is the
 workspace lifecycle path and preserves the tenant anchor for its business
@@ -76,6 +89,28 @@ Arabic and Urdu retain their locale-specific primary families. This UI fix
 does not alter the separate PDF font/shaping path. The reported inspector
 total and category counts still disagree.
 
+## Selected-Workspace Listener Expiry
+
+The selected platform super-admin workspace context expires after eight hours
+in Firestore Rules. The router refreshes at the client-side expiry boundary,
+but that redirect alone is not enough for persistent Riverpod listeners.
+`settingsProvider` is intentionally non-`autoDispose`; it now validates the
+support context before resolving `settings/{tenantId}`, schedules
+self-invalidation at the same shared TTL, cancels its timer on disposal, and
+switches to a no-active-workspace state at expiry. This closes the old
+settings stream instead of re-subscribing after a profile refresh. The
+user-model, router, and tenant-user provider timers share one client TTL
+constant. Client timers are lifecycle hygiene only; Firestore Rules continue
+to enforce the authoritative server-time limit.
+
+The regression reproduced the stale path before the fix:
+`settingsDocumentIdForUser` returned `tenant-42` for a support context older
+than eight hours; the fixed provider returns `__no_active_workspace__`
+without opening Firestore. Focused settings/model/permission/router tests:
+`00:11 +60: All tests passed!`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 5.5s)`; `dart analyze test/`:
+`No issues found!`. Rules/indexes were unchanged and not deployed.
+
 ## Mixed-Script UI Font Fallback
 
 Firestore names, descriptions, and formatted currency may contain Arabic or
@@ -97,11 +132,24 @@ changes member profile activity.
 
 ## Notification Feed Stability
 
+Profile-stream refreshes may emit `AsyncLoading` while Riverpod retains the
+last successful profile value. The notification scope may use that retained
+profile only when its ID matches the settled Firebase Auth UID. This preserves
+the current tenant feed during a same-user refresh; auth loading/errors or an
+identity mismatch must clear the scope to prevent cross-account cache reuse.
+The screen retains the already-authorized feed only when the current tenant
+still matches the authorized tenant scope. A widget regression reproduces the
+feed disappearing under the previous unconditional loading gate; the focused
+widget and provider suites and full Flutter suite pass after the correction.
+This is app-state continuity, not an authorization grant; Firestore Rules
+remain authoritative.
+
 The notification center and unread badge use one active-tenant-scoped stream.
-Legacy admin, tenant-admin, selected-context super-admin, and supervisor
-profiles can read and mark notifications for their own workspace; sellers
-remain excluded. Shop visibility is resolved from only the shop IDs referenced
-by that bounded feed. The child shop listener depends on a sorted,
+Legacy admin, tenant-admin, and supervisor profiles can read and mark
+notifications for their own workspace; sellers and platform super-admins
+remain excluded, including selected-context super-admins. Shop visibility is
+resolved from only the shop IDs referenced by that bounded feed. The child
+shop listener depends on a sorted,
 deduplicated shop-ID key rather than notification objects, so read-state-only
 snapshots do not cancel and recreate shop subscriptions.
 
@@ -120,6 +168,31 @@ tenant ID. This prevents Riverpod's retained provider state from displaying
 the previous workspace's notifications after a workspace switch. A missing or
 `__global__` context starts no notification query; the existing cache behavior
 is retained only within the same tenant.
+
+Read-state mutation is one-way: only an unread-to-read transition is allowed,
+and `read` plus `read_at` must change together. The notifier sends
+`FieldValue.serverTimestamp()` for both individual and batch operations;
+Firestore Rules require the resolved value to equal `request.time`. Arbitrary
+client timestamps, partial updates, read resets, inactive profiles/tenants,
+unassigned/global tenant scope, and cross-tenant access are denied. Focused
+Rules Emulator coverage includes valid mark-one and mark-all batches and these
+negative cases. The latest full local emulator run reported `185 passing
+(46s)`; it also logged non-failing expression-limit diagnostics in other
+Rules paths. This Rules change remains undeployed.
+
+## Standalone Transaction Retry Integrity
+
+The notifier rejects overlapping writes by throwing rather than completing a
+second submission as a success-shaped no-op. When an idempotency key is
+provided, a deterministic tenant-scoped document ID and Firestore transaction
+serialize retries, writing the transaction and applying the corresponding
+`shop.balance` delta atomically. The unkeyed batch path remains unchanged.
+Focused provider tests cover caller-visible rejection and tenant-scoped ID
+stability; the current tests do not include an emulator-backed concurrent
+persistence race. Full Flutter suite: `01:34 +688: All tests passed!`;
+`flutter analyze lib --no-pub`: `No issues found! (ran in 15.4s)`;
+`dart analyze test/`: `No issues found!`. These changes remain local and
+unreleased.
 
 Platform settings-hub visibility is separate from permission to manage
 workspace settings: a root platform super-admin may open the metadata-only hub,
@@ -601,3 +674,36 @@ Focused affected tests: `00:00 +54: All tests passed!`; full Flutter suite:
 `No issues found! (ran in 9.1s)`; `dart analyze test/`: `No issues found!`.
 This follow-up remains unreleased at `3.10.12+1123`; no new web/APK/AAB
 artifacts, production deployment, phone install, commit, or push are claimed.
+
+## 2026-10-28 Seller Notification Cooldown Fix
+
+Seller notifications are written best-effort after their financial source
+commits. The former five-second per-user cooldown could reject a notification
+without reversing the successful transaction or invoice. Notification IDs
+are now deterministic from the source type and ID, and Firestore Rules require
+the notification tenant, seller, shop, route, amount, and transaction type to
+match the persisted invoice or standalone transaction. This keeps notification
+availability outside the financial atomic-write boundary.
+
+Local regressions verify consecutive seller transaction notifications,
+matching invoice notifications, and denial of detached or mismatched sources.
+The full Rules Emulator reports `190 passing (48s)`; focused Flutter tests
+report `00:03 +20: All tests passed!`. Rules/indexes are not deployed. The
+separate production notification-feed permission/flicker report remains open.
+
+## 2026-10-28 Dashboard Cache Tenant Isolation
+
+Dashboard fallback metrics are kept in a scope-tagged cache entry keyed by
+user identity, role, active state, effective tenant/workspace context,
+support-session identity, and assigned routes. A cached result is eligible
+only for the matching scope. During a profile refresh, the cached profile ID
+must also match the settled Firebase Auth UID. A missing profile or
+permission/auth error cannot display cached business metrics.
+
+The regression reproduced workspace A's cached metrics rendering under
+workspace B while B's data providers were loading. After the fix, B remains
+in loading until its own data is ready, and same-workspace refresh retains its
+own fallback. Dashboard tests: `00:09 +5: All tests passed!`;
+`flutter analyze lib --no-pub`: `No issues found! (ran in 8.1s)`;
+`dart analyze test/`: `No issues found!`. No Rules/query changes or release
+operations occurred.

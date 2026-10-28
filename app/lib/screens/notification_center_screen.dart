@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,7 +17,7 @@ import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
 
 // =============================================================================
-// NotificationCenterScreen — operational-admin in-app notification feed.
+// NotificationCenterScreen — admin and supervisor in-app notification feed.
 //
 // PERMISSION RULES:
 //   • The router and widget require notification access; sellers are
@@ -61,7 +62,7 @@ class _NotificationCenterScreenState
         ),
       );
     }
-    if (userState.isLoading) {
+    if (userState.isLoading && userState.value == null) {
       return const Scaffold(body: ShimmerLoading());
     }
     final user = userState.value;
@@ -80,7 +81,11 @@ class _NotificationCenterScreenState
     if (!user.canAccessNotifications) {
       return Scaffold(body: Center(child: Text(tr('no_access', ref))));
     }
-    if (notificationTenantIdFor(user) == null) {
+    final tenantId = notificationTenantIdFor(user);
+    if (tenantId == null) {
+      if (userState.isLoading) {
+        return const Scaffold(body: ShimmerLoading());
+      }
       final key = !user.active
           ? 'err_user_disabled'
           : user.isSuperAdmin
@@ -93,9 +98,22 @@ class _NotificationCenterScreenState
         ),
       );
     }
+    final authorizedTenantId = ref.watch(notificationTenantScopeProvider);
+    if (authorizedTenantId != tenantId) {
+      if (userState.isLoading) {
+        return const Scaffold(body: ShimmerLoading());
+      }
+      return Scaffold(
+        body: ErrorState(
+          message: tr('err_account_not_assigned', ref),
+          errorType: ErrorType.permission,
+          onRetry: () => ref.invalidate(authUserProvider),
+          retryLabel: tr('retry', ref),
+        ),
+      );
+    }
 
     final notifAsync = ref.watch(visibleNotificationsProvider);
-    final tenantId = notificationTenantIdFor(user);
     if (_lastTenantId != tenantId) {
       _lastTenantId = tenantId;
       _lastNotifications = const [];
@@ -156,18 +174,35 @@ class _NotificationCenterScreenState
   ) {
     if (state.hasError) {
       final error = state.error!;
+      final failure = error is NotificationStreamFailure ? error : null;
+      final cause = failure?.cause ?? error;
       if (_lastNotifications.isEmpty) {
-        return mappedErrorState(
-          error: error,
-          ref: ref,
-          onRetry: () => _retryFeed(tenantId),
+        return Column(
+          children: [
+            Expanded(
+              child: mappedErrorState(
+                error: cause,
+                ref: ref,
+                onRetry: () => _retryFeed(tenantId),
+              ),
+            ),
+            if (kDebugMode && failure != null)
+              _notificationStreamSource(failure),
+          ],
         );
       }
       return Column(
         children: [
           MaterialBanner(
             key: const Key('notification_feed_error'),
-            content: Text(tr(AppErrorMapper.key(error), ref)),
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tr(AppErrorMapper.key(cause), ref)),
+                if (kDebugMode && failure != null)
+                  _notificationStreamSource(failure),
+              ],
+            ),
             leading: Icon(
               Icons.error_outline,
               color: Theme.of(context).colorScheme.error,
@@ -206,6 +241,15 @@ class _NotificationCenterScreenState
       itemBuilder: (_, i) => _listItem(context, ref, groups, i),
     );
   }
+
+  Widget _notificationStreamSource(NotificationStreamFailure failure) =>
+      Padding(
+        padding: const EdgeInsets.only(top: AppTokens.s4),
+        child: Text(
+          'Stream: ${failure.source.name}',
+          key: const Key('notification_stream_source'),
+        ),
+      );
 
   void _retryFeed(String? tenantId) {
     if (tenantId == null) {
@@ -308,18 +352,22 @@ List<_DayGroup> _groupByDay(List<NotificationModel> notifications) {
   for (final n in notifications) {
     final date = n.createdAt.toDate();
     final day = DateTime(date.year, date.month, date.day);
-    final offset = today.difference(day).inDays;
+    final dayOffset = today.difference(day).inDays;
+    final offset = dayOffset < 0 ? 0 : dayOffset;
     byOffset.putIfAbsent(offset, () => []).add(n);
   }
 
   final sorted = byOffset.entries.toList()
     ..sort((a, b) => a.key.compareTo(b.key));
 
-  return sorted.map((e) => _DayGroup(_dayLabel(e.key), e.value)).toList();
+  return sorted
+      .map((e) => _DayGroup(notificationDayLabel(e.key), e.value))
+      .toList();
 }
 
-String _dayLabel(int daysAgo) {
-  if (daysAgo == 0) return '__today__';
+@visibleForTesting
+String notificationDayLabel(int daysAgo) {
+  if (daysAgo <= 0) return '__today__';
   if (daysAgo == 1) return '__yesterday__';
   return '__n_days_ago:${daysAgo}__';
 }

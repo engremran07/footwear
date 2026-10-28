@@ -28,6 +28,23 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.10.13',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔄',
+        text: {
+          AppLocale.en:
+              'Workspace and notification screens now behave more consistently during refresh, and core app libraries have been updated for current compatibility.',
+          AppLocale.ar:
+              'أصبحت شاشات مساحة العمل والإشعارات أكثر اتساقًا أثناء التحديث، وتم تحديث مكتبات التطبيق الأساسية لتحسين التوافق.',
+          AppLocale.ur:
+              'ریفریش کے دوران ورک اسپیس اور نوٹیفکیشن اسکرینز اب زیادہ مستقل انداز میں کام کرتی ہیں، اور مطابقت بہتر بنانے کے لیے ایپ کی بنیادی لائبریریاں اپ ڈیٹ کی گئی ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.10.12',
     date: 'October 2026',
     items: [

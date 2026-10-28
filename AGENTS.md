@@ -1,6 +1,6 @@
 ﻿# ShoesERP AGENTS Runtime Contract
 
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
 ## 1) Runtime Truth (Authoritative)
 
@@ -618,6 +618,197 @@ locale. Cover these contracts, actual color pairs, and RTL direction in focused
 widget tests.
 
 ## 10) Current Audit Status
+
+2026-10-28 v3.10.13+1124 delivery status:
+
+- Full Flutter suite: `01:43 +704: All tests passed!`; `flutter analyze lib
+  --no-pub`: `No issues found! (ran in 20.9s)`; `dart analyze test/`:
+  `No issues found!`; Firestore Rules Emulator: `190 passing (56s)`.
+- Split APKs built at 31.2/32.8/34.3 MB; the signed 72.1 MB AAB reported
+  `jar verified.` with a local certificate-chain trust warning. ARM64 was
+  copied to and installed on `R5GL22RGT9V` (`1 file pushed`; `Success`,
+  versionName `3.10.13`, versionCode `310133124`).
+- Web build: `EXIT: 0`; Firestore Rules/indexes and Hosting each reported
+  `Deploy complete!`; live `version.json` is `3.10.13+1124`. Twenty-three
+  remote indexes and two field overrides absent locally were preserved.
+- The production notification permission/flicker report remains open: the
+  reported denied Firestore operation and code were not identified. No
+  authenticated business-flow check, Play Console upload, commit, or push was
+  performed. The broader audit and modernization todos remain in progress.
+
+2026-10-28 role-write and notification minor-finding verification:
+
+- P3-08 is an intentional canonical-write contract: role readers accept
+  legacy aliases/casing, but workspace role writers persist canonical
+  lowercase values. The focused Rules Emulator regression reported
+  `1 passing (9s)` and denied a padded uppercase value. No Rules change was
+  made.
+- P4-01 and P4-04 are not present in current source: the notification tenant
+  helper has no unused `now` parameter, and the screen comment correctly
+  identifies admin and supervisor access.
+- The emulator result is local only and does not establish production Rules
+  deployment. P4-03 and the broader P1-04 role-check audit remain open.
+
+2026-10-28 operational capability-guard alignment — local, unreleased:
+
+- Removed the misleading `isOperationalRoleName()` and
+  `canManageOperationalDataRole()` wrappers, which used `viewRoutes` as a
+  proxy for route, product, and inventory writes. Provider guards now check
+  `manageRoutes`, `manageProducts`, and `manageInventory` respectively. The
+  current role sets are unchanged; Rules remain the authorization boundary.
+- Focused capability tests: `00:00 +12: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 10.0s)`;
+  `dart analyze test/`: `No issues found!`.
+- This closes the narrow P3-05 semantic-drift issue only. The broader P1-04
+  raw-role-check audit remains open. No Rules/indexes changed, and no
+  deployment, release build, phone delivery, commit, or push occurred.
+
+2026-10-28 router route-policy consolidation — local, unreleased:
+
+- The router's duplicate tenant-business path list was a confirmed drift risk
+  beside `PermissionPolicy.canAccessRoute()`. Route normalization and access
+  now produce one `RouteAccessDecision`, which distinguishes ordinary denial
+  from the required workspace-selection redirect. The router consumes that
+  policy decision; the unselected super-admin guard no longer has a separate
+  route catalog.
+- Focused permission/router tests: `00:14 +28: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 5.6s)`;
+  `dart analyze test/`: `No issues found!`. The Dart Tooling Daemon had no
+  active app, so hot restart was unavailable.
+- No Rules/indexes changed. The source change is local and unreleased; no
+  phone delivery, release build, production deployment, commit, or push
+  occurred. The remaining audit and release work stays open.
+
+2026-10-28 archived workspace access UX — local, unreleased:
+
+- The app shell now waits for ordinary workspace members' tenant document
+  before mounting business routes. Missing, inactive, or failed tenant reads
+  show localized recovery feedback and sign-out; selected platform
+  super-admins remain outside this gate so the audited restore path works.
+- The new router/widget regression failed before the change because the
+  backup screen still mounted for an archived tenant. Focused routing suite:
+  `00:10 +16: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 4.8s)`; `dart analyze test/`:
+  `No issues found!`.
+- No Rules or index files changed. The access gate is local and unreleased;
+  final release validation, phone delivery, deployment, commit, and push
+  remain pending.
+
+2026-10-28 super-admin support-context listener expiry — local, unreleased:
+
+- The selected-workspace expiry timer refreshed the router, but the
+  non-`autoDispose` `settingsProvider` stayed subscribed to the prior
+  `settings/{tenantId}` stream. After the eight-hour support context expired,
+  Rules could correctly deny that listener while the provider remained alive.
+- The provider now validates the selected context before resolving a settings
+  document, schedules its own invalidation at context expiry, cancels the timer
+  when disposed, and emits the no-active-workspace settings state instead of
+  reconnecting to the expired tenant. The eight-hour client TTL is shared by
+  the model, router, and tenant-scoped provider timers; Firestore Rules remain
+  authoritative.
+- The new regression failed before the fix: expected
+  `__no_active_workspace__`, received `tenant-42`. Focused settings/model/
+  permission/router suite: `00:11 +60: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 5.5s)`;
+  `dart analyze test/`: `No issues found!`.
+- No Rules/indexes changed. This source and documentation update is local and
+  unreleased; phone delivery, release builds, production deployment, commit,
+  and push remain pending.
+
+2026-10-28 Android toolchain recovery — local, unreleased:
+
+- The initial APK build failure was reproduced at `:firebase_auth:compileReleaseKotlin`: Firebase Auth metadata 2.4.0 was incompatible with Kotlin Gradle Plugin 2.2.20. The Android toolchain now matches Flutter 3.47.8's template versions: Gradle 9.3.1, AGP 9.1.0, Kotlin Gradle Plugin 2.4.0, and Google Services 4.5.0. The wrapper distribution is SHA-256 pinned.
+- The app Gradle script now configures AGP's public `ApplicationExtension` and the typed Kotlin `compilerOptions` API. The split APK build succeeded: ARMv7 31.2 MB / versionCode `310132124`, ARM64 32.8 MB / `310133124`, and x86_64 34.3 MB / `310135124`. All three APK signatures verified with APK Signature Scheme v2; each reports versionName `3.10.13`.
+- Flutter still emits a Kotlin Gradle Plugin migration warning for the app and Firebase plugins. It remains visible and unsuppressed because the dependency plugins still apply KGP.
+- The signed AAB built at 72.1 MB. `jarsigner -verify` reported `jar verified.` and warned that the upload certificate is self-signed/untrusted locally and has no timestamp; this does not prove Play Console acceptance. Phone copy/install, Rules/indexes deployment, Hosting deployment, commit, and push remain pending because `adb devices` listed no connected device. Existing local Rules edits remain undeployed.
+
+2026-10-28 transient Flutter SDK artifact lock — recovered locally:
+
+- The reported `flutter pub get --no-example` failures named a Windows user-mapped section lock on the shared Flutter SDK's `windows-x64\icudtl.dat`, not a dependency solver failure. The same command later completed with `Got dependencies!`; a fresh reproduction also exited 0. Windows Restart Manager then reported no current owner, and no Flutter test/debug owner was found. No process was terminated and no SDK/cache file was deleted.
+- The five “newer available” Dart packages remain blocked by dependency or SDK constraints; `pub get` succeeds and no overrides were added. Serialize Flutter artifact operations and close only the owning test/debug run through its IDE before retrying. Do not disable antivirus or delete shared cache files.
+
+2026-10-28 workspace maintenance entry visibility — local, unreleased:
+
+- The Settings screen now derives its Danger Zone entry visibility from the
+  same `/settings/flush` route policy used by the router. Workspace admins
+  (legacy admin and tenant admin) can reach the read-only maintenance page;
+  sellers, supervisors, and unscoped platform super-admins do not get the
+  entry. The reset controls remain disabled and provider reset methods remain
+  fail-closed. The scroll-aware widget regression and focused settings suite
+  passed (`00:02 +6: All tests passed!`); controls remain intentionally disabled.
+
+2026-10-28 notification profile-refresh regression — local, unreleased:
+
+- Commit-history tracing isolated a notification disappearance during profile
+  refresh: the screen treated every `AsyncLoading` profile as unusable, and
+  notification scope discarded the retained tenant. The fix keeps the cached
+  feed only during a refresh whose profile ID still matches the settled
+  Firebase Auth UID. Auth loading/errors and UID mismatches clear the scope.
+- The widget regression failed before the fix because the cached notification
+  disappeared during same-user profile refresh. Focused notification-center
+  widget tests: `00:03 +9: All tests passed!`; notification visibility/provider
+  tests: `00:00 +13: All tests passed!`; full Flutter suite:
+  `01:36 +689: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 116.5s)`; `dart analyze test/`:
+  `No issues found!`.
+- No Rules/indexes changed in this follow-up. Existing local Rules changes
+  remain undeployed. No authenticated production verification, release build,
+  phone delivery, deployment, commit, or push was performed. The wider
+  modernization and remaining audit tasks stay open.
+
+2026-10-28 seller notification cooldown regression — local, undeployed:
+
+- The five-second per-user cooldown could reject a seller notification after
+  its invoice or standalone ledger write had already committed. Notifications
+  remain best-effort post-commit writes; deterministic source-scoped document
+  IDs plus Rules checks against the persisted tenant, seller, shop, route,
+  amount, and type now replace the cooldown.
+- Positive and adversarial coverage verifies rapid valid notifications,
+  detached/mismatched sources, and denial of the obsolete cooldown-field
+  update. The full Rules Emulator reported `190 passing (48s)`; focused
+  notification writer/provider/widget tests reported
+  `00:03 +20: All tests passed!`.
+- P2-03 is fixed in local source. This does not resolve the separate
+  production feed permission/flicker report. Rules/indexes remain undeployed;
+  no fresh release build, phone delivery, production deployment, commit, or
+  push was performed.
+
+2026-10-28 dashboard cache tenant isolation — local, unreleased:
+
+- The dashboard's global last-good stats cache could expose workspace A's
+  metrics while workspace B's providers were loading. The regression showed
+  `metrics:11/22` from A rendered with B's active profile. Cache entries are
+  now bound to user, role, active state, tenant/workspace context, support
+  session, and seller route assignments. Profile-refresh fallback also
+  requires the cached profile UID to match Firebase Auth.
+- Dashboard tests reported `00:09 +5: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 8.1s)`;
+  `dart analyze test/`: `No issues found!`. The DTD had no active Flutter app
+  for hot restart. No Rules changed and no release/deployment/Git operation
+  occurred.
+
+2026-10-28 local notification and transaction integrity follow-up — unreleased:
+
+- Notification mark-one and mark-all now use Firestore server timestamps.
+  Rules require an unread-to-read transition with both `read` and `read_at`
+  changed together and `read_at == request.time`; resetting read state,
+  partial updates, client-chosen timestamps, unassigned/global tenants,
+  inactive profiles/tenants, and cross-tenant access are denied.
+- Keyed standalone transaction creation uses a deterministic tenant-scoped
+  transaction ID and an atomic Firestore transaction for the ledger row and
+  `shop.balance`. A concurrent write rejected by the notifier guard now
+  propagates a `StateError` instead of silently appearing successful.
+- Targeted Flutter regressions: `00:00 +21: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 15.4s)`.
+  Full Flutter suite: `01:34 +688: All tests passed!`; `dart analyze test/`:
+  `No issues found!`.
+  Full Rules Emulator: `185 passing (46s)`; output included unrelated
+  Firestore Rules expression-limit diagnostics that did not fail the suite.
+  `git diff --check` exited 0; repository Markdown lint is pending the final
+  documentation edit.
+- Rules and provider changes remain local and undeployed. Full Flutter suite,
+  Dart test analysis, release artifacts, device delivery, deployment,
+  authenticated production verification, commit, and push remain pending.
 
 2026-10-28 local settings and workspace-access follow-up — unreleased:
 

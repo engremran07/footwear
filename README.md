@@ -1,6 +1,62 @@
-# FootWear ERP — v3.10.12+1123 (web deployed; Android pending)
+# FootWear ERP — v3.10.13+1124 (Hosting and Rules deployed; ARM64 installed)
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
+
+## Archived Workspace Access Gate (v3.10.13+1124)
+
+The app shell waits for the signed-in member's tenant record before mounting
+business routes. Archived or unavailable workspace state shows localized
+retry and sign-out actions instead of allowing business screens to surface
+permission-denied errors. Platform super-admins remain able to use the
+separately authorized workspace restoration path. Firestore Rules continue to
+enforce business access independently.
+
+The archived-workspace routing regression failed before the gate and passed
+afterward. The focused routing suite reported `00:10 +16: All tests passed!`;
+`flutter analyze lib --no-pub` reported
+`No issues found! (ran in 4.8s)`, and `dart analyze test/` reported
+`No issues found!`. This gate is included in v3.10.13+1124; Hosting and
+Firestore Rules/indexes are deployed.
+
+## 2026-10-28 Support-Context Listener Expiry (v3.10.13+1124)
+
+The eight-hour selected-super-admin context expiry now also closes the
+non-`autoDispose` workspace settings listener. The provider checks context
+before selecting `settings/{tenantId}`, invalidates at expiry, cancels its
+timer on disposal, and returns a no-active-workspace state rather than
+re-subscribing to an expired tenant document. Firestore Rules remain the
+authorization boundary. The regression failed before the fix with
+`tenant-42` instead of `__no_active_workspace__`; the focused suite reported
+`00:11 +60: All tests passed!`; `flutter analyze lib --no-pub` reported
+`No issues found! (ran in 5.5s)`; `dart analyze test/` reported
+`No issues found!`. The change is included in the v3.10.13+1124 APK, AAB, and
+web build.
+
+## v3.10.13+1124 Dependency and Android Build Release
+
+The app's Flutter/Dart baseline is Flutter `3.47.8` / Dart `3.13.7`. Direct
+Flutter packages were upgraded to their latest resolver-compatible versions;
+five newer transitive releases remain blocked by parent or SDK constraints and
+were not forced. Android tooling now matches the Flutter 3.47.8 template:
+Gradle `9.3.1`, AGP `9.1.0`, Kotlin Gradle Plugin `2.4.0`, and Google Services
+`4.5.0`. The Android app build script uses AGP's public `ApplicationExtension`
+and Kotlin's typed `compilerOptions`.
+
+The split release APK build succeeded: ARMv7 `31.2 MB` (versionCode
+`310132124`), ARM64 `32.8 MB` (`310133124`), and x86_64 `34.3 MB`
+(`310135124`). All three APKs verified with APK Signature Scheme v2. The
+signed Play Console AAB built at `72.1 MB`; `jarsigner -verify` reported
+`jar verified.` and also reported a self-signed, locally untrusted certificate
+chain with no timestamp. This verifies signature integrity, not Play Console
+upload-key acceptance. The ARM64 APK (`32.8 MB`, versionCode `310133124`) was
+copied to the connected phone and installed successfully. Firestore
+Rules/indexes and Hosting were deployed; the live `version.json` reports
+`3.10.13+1124`. The 23 remote indexes and two field overrides absent from the
+local definition were preserved. Flutter's KGP migration warning from the app
+and Firebase plugins remains visible and is not suppressed. Git commit/push
+and Play Console upload have not been performed. The reported notification
+feed permission denial remains unresolved because its failing query/write has
+not been identified from an authorized runtime trace.
 
 > **v3.10.11+1122 deployment:** Backup scope feedback is visible
 > to workspace members without disclosing the workspace name, and app startup
@@ -45,15 +101,74 @@ The invoice-header non-stock switch now saves its tenant setting immediately.
 It writes only `allow_non_stock_invoices`; other unsaved header edits remain
 local. Failed writes restore the previous switch value and show mapped
 feedback. Workspace admins can view maintenance components, but all reset
-actions remain disabled and fail-closed. Notification access is limited to
-admin/manager, tenant_admin, and supervisor roles; sellers and platform
-super-admins are excluded.
+actions remain disabled and fail-closed. The Settings entry follows the same
+`PermissionPolicy` route decision as `/settings/flush`; it is shown to legacy
+and tenant workspace admins, not sellers, supervisors, or unscoped platform
+super-admins. Notification access is limited to admin/manager, tenant_admin,
+and supervisor roles; sellers and platform super-admins are excluded.
 
 Focused affected tests: `00:00 +54: All tests passed!`; full Flutter suite:
 `01:26 +684: All tests passed!`; `flutter analyze lib --no-pub`:
 `No issues found! (ran in 9.1s)`; `dart analyze test/`: `No issues found!`.
 These local changes have not been versioned, built, deployed, or delivered to a
 phone; do not infer production behavior from local tests.
+
+## Local Notification and Ledger Integrity Follow-up
+
+The notification feed now survives a same-user profile refresh: the cached
+profile is considered only when its UID matches the settled Firebase Auth UID,
+and auth loading/errors or a UID mismatch remove tenant scope. This fixes a
+reproduced loading-state regression rather than weakening role or tenant
+authorization. Focused widget tests: `00:03 +9: All tests passed!`;
+notification visibility/provider tests: `00:00 +13: All tests passed!`;
+full Flutter suite: `01:36 +689: All tests passed!`; both analyzers are clean.
+The source change is local and unreleased; production behavior has not been
+verified, and release/deployment/device/Git operations were not performed.
+
+## Local Seller Notification Cooldown Fix
+
+The seller notification cooldown that could drop a notification after a
+successful financial write has been removed. Source-specific deterministic
+IDs and Firestore Rules checks now tie each best-effort seller notification
+to its persisted invoice or standalone transaction. This preserves
+post-commit notification behavior and does not make ledger writes depend on
+notification availability.
+
+The full local Rules Emulator reports `190 passing (48s)` and focused
+notification Flutter tests report `00:03 +20: All tests passed!`. Rules are
+not deployed. The separately reported feed permission/flicker issue still
+requires evidence identifying the denied production request.
+
+## Local Dashboard Cache Tenant Isolation
+
+Dashboard last-good metrics are now scoped to the authenticated user and
+effective tenant/workspace context, including role, active state, support
+session, and assigned routes. A stale fallback from one workspace is not shown
+while another workspace's metric streams load. Same-workspace refresh still
+uses its own cached metrics.
+
+The regression reproduced workspace A's `metrics:11/22` under workspace B
+before the fix. Dashboard tests report `00:09 +5: All tests passed!`;
+`flutter analyze lib --no-pub` reports
+`No issues found! (ran in 8.1s)`, and `dart analyze test/` reports
+`No issues found!`. This source change is local and unreleased.
+
+The notification provider now sends server timestamps for mark-one and
+mark-all. Firestore Rules allow only an unread-to-read transition where both
+read fields change together and the timestamp equals request time. Notification
+read/update access requires an authorized operational role and a concrete
+active tenant; seller, platform super-admin, global/unassigned, inactive, and
+cross-tenant paths remain denied. Keyed standalone transaction creates use a
+deterministic tenant-specific document ID and atomically commit the ledger
+entry and shop balance. Overlapping notifier writes now surface a rejection
+instead of returning success-shaped no-op.
+
+Focused Flutter tests: `00:00 +21: All tests passed!`; application analysis:
+`No issues found! (ran in 15.4s)`; Rules Emulator: `185 passing (46s)`.
+The full emulator log included non-failing expression-limit diagnostics in
+other Rules paths. These source changes remain local; full-suite validation,
+release artifacts, phone delivery, Rules/Hosting deployment, and Git
+publication are pending.
 
 > **Local audit follow-up, not yet deployed:** super-admin workspace selection
 > and exit/switch now require same-batch, linked append-only start/end records;
@@ -199,16 +314,16 @@ English, Arabic (RTL), Urdu (RTL) — 372+ translation keys synced across all sc
 
 | Layer | Technology |
 | --- | --- |
-| Mobile + Web | Flutter 3.41.6 — Android split-per-ABI APKs + Firebase Hosting web |
-| Dart SDK | >=3.11.0 |
-| State management | flutter_riverpod 3.3.1 (`NotifierProvider`, `AsyncNotifierProvider`, `StreamProvider`) |
-| Navigation | go_router 17.2.0 with role-based redirect guards |
+| Mobile + Web | Flutter 3.47.8 — Android split-per-ABI APKs + Firebase Hosting web |
+| Dart SDK | >=3.13.0 |
+| State management | flutter_riverpod 3.4.3 (`NotifierProvider`, `AsyncNotifierProvider`, `StreamProvider`) |
+| Navigation | go_router 18.1.1 with role-based redirect guards |
 | Backend / Auth | Firebase (Firestore + Auth only) — zero Storage, zero Cloud Functions |
 | Design system | AppTokens, AppAnimations, AppSanitizer, AppInputFormatters |
-| Charts | fl_chart 1.2.0 (BarChart, LineChart, PieChart) |
+| Charts | fl_chart 1.3.0 (BarChart, LineChart, PieChart) |
 | PDF export | Shared `pdf` builders embed Noto Sans Arabic; Arabic shaping requires `--dart-define=use_arabic=true` and otherwise fails closed |
 | Excel export | Custom xlsx writer (`excel_export.dart`) using `archive ^4.0.0` |
-| Print / Share | `printing` + share_plus 13.0.0 |
+| Print / Share | `printing` + share_plus 13.3.1 |
 | Image compression | `flutter_image_compress` (base64 logo) |
 | Animations | `flutter_animate` + `shimmer` |
 
@@ -263,7 +378,7 @@ shoeserp/
 
 ### Prerequisites
 
-- Flutter SDK 3.41.6
+- Flutter SDK 3.47.8
 - Android Studio / Android SDK (API 21+)
 - Firebase project (`firebase login`)
 - Java 17+

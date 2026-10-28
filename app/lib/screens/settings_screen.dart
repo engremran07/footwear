@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
+import '../core/utils/permission_policy.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/utils/workspace_logo_processor.dart';
 import '../models/settings_model.dart';
@@ -175,6 +176,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
 
     final settingsAsync = ref.watch(settingsProvider);
+    final canViewDataMaintenance = PermissionPolicy.canAccessRoute(
+      currentUser,
+      '/settings/flush',
+    );
     if (!currentUser.isAdmin) {
       return Scaffold(body: Center(child: Text(tr('permission_denied', ref))));
     }
@@ -314,7 +319,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                if (ref.watch(authUserProvider).value?.isSuperAdmin == true)
+                if (canViewDataMaintenance)
                   Card(
                     color: AppBrand.errorColor.withAlpha(12),
                     shape: RoundedRectangleBorder(

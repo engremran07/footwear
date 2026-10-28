@@ -1,9 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../core/constants/collections.dart';
-import '../core/utils/role_utils.dart';
 import '../core/utils/firestore_pagination.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/seller_inventory_model.dart';
 import 'auth_provider.dart';
@@ -125,7 +126,7 @@ class SellerInventoryNotifier extends AsyncNotifier<void> {
         .doc(authUser.uid)
         .get();
     final role = (me.data()?['role'] as String? ?? '').trim();
-    if (!canManageOperationalDataRole(role)) {
+    if (!RoleCapabilities.allows(role, AppCapability.manageInventory)) {
       throw StateError('Only admin can return stock to warehouse');
     }
   }

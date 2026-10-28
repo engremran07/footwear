@@ -1,6 +1,84 @@
-# FootWear ERP — Flutter App (v3.10.12+1123; web deployed, Android pending)
+# FootWear ERP — Flutter App (v3.10.13+1124; Hosting/Rules deployed, ARM64 installed)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
+
+## Archived Workspace Access Gate (v3.10.13+1124)
+
+Before rendering workspace business routes, the app shell waits for the
+authenticated member's tenant document. Missing, archived, and failed tenant
+reads show localized recovery feedback with Retry where possible and a
+Sign-out action. Platform super-admins bypass this member gate so an
+explicitly selected, audited workspace can still be restored. Firestore Rules
+remain the authorization boundary.
+
+The new archived-workspace widget regression failed before the gate. The
+focused router suite reported `00:10 +16: All tests passed!`;
+`flutter analyze lib --no-pub` reported
+`No issues found! (ran in 4.8s)`, and `dart analyze test/` reported
+`No issues found!`. This gate is included in v3.10.13+1124; Hosting and
+Firestore Rules/indexes are deployed.
+
+## 2026-10-28 Support-Context Listener Expiry (v3.10.13+1124)
+
+The selected super-admin support context expires after eight hours. Route
+refresh alone did not stop the persistent settings stream, so the provider
+now validates the context before selecting a settings document, invalidates
+itself at expiry, cancels its timer on disposal, and emits a no-workspace
+state rather than reconnecting to the expired tenant. Firestore Rules remain
+the authorization boundary. The pre-fix regression returned `tenant-42`
+instead of `__no_active_workspace__`; the focused suite reported
+`00:11 +60: All tests passed!`; `flutter analyze lib --no-pub` reported
+`No issues found! (ran in 5.5s)`; `dart analyze test/` reported
+`No issues found!`. The change is included in the v3.10.13+1124 APK, AAB, and
+web build.
+
+## v3.10.13+1124 Android Toolchain and Release
+
+Flutter/Dart is `3.47.8` / `3.13.7`. The Android toolchain now follows the
+Flutter 3.47.8 compatibility baseline: Gradle `9.3.1`, AGP `9.1.0`, Kotlin
+Gradle Plugin `2.4.0`, and Google Services `4.5.0`. The original build failure
+was Firebase Auth Kotlin metadata `2.4.0` being consumed by Kotlin Gradle
+Plugin `2.2.20`; the app build script was also migrated to AGP's public
+`ApplicationExtension` and Kotlin's typed `compilerOptions`.
+
+The split APK build succeeded at `31.2 MB` (ARMv7), `32.8 MB` (ARM64), and
+`34.3 MB` (x86_64); all three signatures verify with APK v2. The signed AAB
+also built at `72.1 MB`; `jarsigner -verify` reported `jar verified.` with a
+self-signed, locally untrusted certificate-chain warning and no timestamp.
+This does not prove Play Console upload-key acceptance. The ARM64 APK
+(`32.8 MB`, versionCode `310133124`) was copied to the connected phone and
+installed successfully. Firestore Rules/indexes and Hosting were deployed;
+live `version.json` reports `3.10.13+1124`. The 23 remote indexes and two
+field overrides absent from the local definition were preserved. Flutter's
+KGP migration warning from Firebase plugins remains unsuppressed. Git
+commit/push and Play Console upload have not been performed.
+
+## Seller Notification Cooldown Fix (v3.10.13+1124)
+
+Seller notifications are now separate post-commit, best-effort writes with
+deterministic IDs tied to their source invoice or standalone transaction.
+Firestore Rules reject detached or payload-mismatched notifications without
+making successful financial writes depend on notification availability. The
+five-second per-user cooldown is removed.
+
+Validation: the full Rules Emulator reports `190 passing (56s)`, and focused
+notification Flutter tests report `00:03 +20: All tests passed!`. The updated
+Rules are deployed. The independent notification-feed permission/flicker
+report remains unresolved pending evidence of the denied query or write.
+
+## Dashboard Cache Tenant Isolation (v3.10.13+1124)
+
+The dashboard's last-good stats fallback is bound to the active user and
+business-data scope, including tenant/workspace, role, support-session
+identity, and seller route assignments. It cannot show a previous workspace's
+totals while a new workspace's streams load. Same-scope stream refresh retains
+the expected cached fallback.
+
+The pre-fix widget regression visibly rendered workspace A metrics under
+workspace B. The dashboard suite reports `00:09 +5: All tests passed!`;
+application analysis reports `No issues found! (ran in 8.1s)`, and test
+analysis reports `No issues found!`. No Rules changed for this finding; the
+fix is included in v3.10.13+1124.
 
 ## v3.10.11 Backup and Startup-Permission Follow-up
 
@@ -37,17 +115,26 @@ Shared English styles retain Syne/DM Sans as primary fonts and fall back to
 bundled Noto Sans Arabic and Noto Nastaliq Urdu when Firestore-backed text
 contains those scripts. Arabic and Urdu locales retain their own primary font
 with the other script family as fallback. The PDF font/shaping policy is
-unchanged. Focused and full tests, analysis, the successful web build, the
-Hosting deployment, and the pending Android artifact/phone-delivery status
-are recorded in `SESSION_LOG.md`.
+unchanged. Focused and full tests, analysis, the successful web build,
+Hosting and Firestore Rules/index deployment, split APK/AAB artifact details,
+and ARM64 phone installation are recorded in `SESSION_LOG.md`. The Play
+Console upload was not performed. The post-push GitHub Hosting job failed
+because Firebase CLI authentication was unavailable to that workflow; its
+Firestore Rules Emulator job succeeded. This CI failure does not invalidate
+the preceding reported manual deployments, but automated deployment health
+must be rechecked after repository authentication is configured.
 
-## Local 2026-10-28 Workspace Follow-up (Unreleased)
+## v3.10.12 Workspace Follow-up
 
 The invoice-header non-stock switch now writes only the current tenant's
 `allow_non_stock_invoices` setting immediately through `SettingsNotifier`.
 Unrelated header edits remain unsaved; a failed write restores the previous
 switch value and displays mapped feedback. Workspace admins may view
-component-level maintenance options, but reset controls remain disabled.
+component-level maintenance options through an entry gated by the same
+`PermissionPolicy` route check as `/settings/flush`. Legacy and tenant
+workspace admins see the entry; sellers, supervisors, and unscoped platform
+super-admins do not. Reset controls remain disabled, and provider operations
+remain fail-closed.
 Notification feeds are restricted to admin/manager, tenant_admin, and
 supervisor roles; sellers and platform super-admins are excluded.
 
@@ -56,6 +143,36 @@ Focused affected tests: `00:00 +54: All tests passed!`; full Flutter suite:
 `No issues found! (ran in 9.1s)`; `dart analyze test/`: `No issues found!`.
 Version/build, release artifacts, production deployment, and device delivery
 remain unchanged and pending.
+
+## Local Notification and Transaction Integrity Follow-up
+
+The notification center retains its last successful feed while the same
+authenticated user's profile refreshes. The cached profile is eligible only
+when its ID matches the settled Firebase Auth UID; auth loading/errors and
+identity changes clear notification scope. This avoids hiding authorized feed
+rows during a profile refresh without carrying data into another account.
+Regression evidence: widget suite `00:03 +9: All tests passed!`, visibility
+suite `00:00 +13: All tests passed!`, full suite
+`01:36 +689: All tests passed!`; analyzers are clean. The change remains local
+and unreleased; production behavior and release operations remain unverified.
+
+Notification mark-one and mark-all use Firestore server timestamps. Rules now
+require an unread-to-read transition with both read fields changed together
+and `read_at` equal to request time. Notification reads and updates require an
+authorized operational role, active profile, and concrete active tenant.
+Standalone transaction notifier writes no longer silently return when another
+write is in flight. Idempotency-keyed standalone creates use a deterministic
+tenant-scoped document ID and atomically write the ledger row with the shop
+balance.
+
+Focused Flutter tests: `00:00 +21: All tests passed!`; full suite:
+`01:34 +688: All tests passed!`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 15.4s)`; `dart analyze test/`:
+`No issues found!`. The full local Firestore Rules Emulator suite reported
+`185 passing (46s)`; its output included non-failing expression-limit
+diagnostics in other Rules paths. Rules and client changes remain local and
+undeployed. Release artifacts, phone delivery, Hosting/Rules deployment,
+commit, and push have not been performed for this follow-up.
 
 ## Local v3.10.10 Audit Follow-up
 
@@ -391,7 +508,7 @@ Workspace creation does not wait for a global user list. Owner choices during ed
 
 ## Requirements
 
-- Flutter 3.41.6 (Dart >=3.11.0)
+- Flutter 3.47.8 (Dart >=3.13.0)
 - Android SDK (API 21+)
 - Java 17
 - Firebase project with Firestore and Auth enabled (no Storage, no Cloud Functions needed)
@@ -475,8 +592,8 @@ adb install --streaming -r /sdcard/Download/app-arm64-v8a-release.apk
 
 | Concern | Choice |
 | --- | --- |
-| State | flutter_riverpod 3.3.1 (`NotifierProvider`, `AsyncNotifierProvider`, `StreamProvider`) — **StateProvider is BANNED** |
-| Navigation | go_router 17.2.0 with role-based redirect guards |
+| State | flutter_riverpod 3.4.3 (`NotifierProvider`, `AsyncNotifierProvider`, `StreamProvider`) — **StateProvider is BANNED** |
+| Navigation | go_router 18.1.1 with role-based redirect guards |
 | Backend | Cloud Firestore (realtime streams) |
 | Auth | Firebase Auth (email/password) via secondary `FirebaseApp` for user creation |
 | Design system | AppTokens, AppAnimations, AppSanitizer, AppInputFormatters |

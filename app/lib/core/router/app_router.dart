@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../utils/permission_policy.dart';
@@ -142,7 +143,7 @@ class RouterNotifier extends ChangeNotifier {
     if (user?.isSuperAdmin != true) return;
     final selectedAt = user!.activeWorkspaceSelectedAt?.toDate();
     if (selectedAt == null) return;
-    final expiresAt = selectedAt.add(const Duration(hours: 8));
+    final expiresAt = selectedAt.add(UserModel.workspaceSupportContextTtl);
     final remaining = expiresAt.difference(DateTime.now());
     _workspaceExpiryTimer = Timer(
       remaining.isNegative ? Duration.zero : remaining,
@@ -193,34 +194,17 @@ class RouterNotifier extends ChangeNotifier {
 
     if (isLoginRoute || isBootstrapRoute) return '/';
 
-    if (appUser.isSuperAdmin &&
-        !PermissionPolicy.can(appUser, AppCapability.viewDashboard) &&
-        (state.matchedLocation == '/' ||
-            _isTenantBusinessPath(state.matchedLocation))) {
-      return '/tenants';
+    switch (PermissionPolicy.routeAccessDecision(
+      appUser,
+      state.matchedLocation,
+    )) {
+      case RouteAccessDecision.allowed:
+        return null;
+      case RouteAccessDecision.denied:
+        return '/';
+      case RouteAccessDecision.workspaceSelectionRequired:
+        return '/tenants';
     }
-
-    if (!PermissionPolicy.canAccessRoute(appUser, state.matchedLocation)) {
-      return '/';
-    }
-    return null;
-  }
-
-  bool _isTenantBusinessPath(String path) {
-    return path == '/routes' ||
-        path.startsWith('/routes/') ||
-        path == '/shops' ||
-        path.startsWith('/shops/') ||
-        path == '/products' ||
-        path.startsWith('/products/') ||
-        path == '/inventory' ||
-        path == '/invoices' ||
-        path.startsWith('/invoices/') ||
-        path == '/reports' ||
-        path == '/history' ||
-        path == '/notifications' ||
-        path == '/users' ||
-        path.startsWith('/settings/');
   }
 }
 

@@ -306,11 +306,11 @@ describe('users collection', () => {
     }
   });
 
-  it('self profile updates cannot write email_verified', async () => {
+  it('self profile updates cannot set email_verified beyond the auth claim', async () => {
     await seedUser('seller-uid', 'seller');
     const db = testEnv.authenticatedContext('seller-uid', {
       email: 'seller@test.com',
-      email_verified: true,
+      email_verified: false,
     }).firestore();
     const profile = db.collection('users').doc('seller-uid');
 
@@ -320,6 +320,49 @@ describe('users collection', () => {
         updated_at: firebase.firestore.FieldValue.serverTimestamp(),
       }),
     );
+  });
+
+  it('verified users can sync email_verified from the auth claim', async () => {
+    await seedUser('seller-uid', 'seller', true, { email: 'old@test.com' });
+    const db = testEnv.authenticatedContext('seller-uid', {
+      email: 'new@test.com',
+      email_verified: true,
+    }).firestore();
+    const profile = db.collection('users').doc('seller-uid');
+
+    await assertSucceeds(
+      profile.update({
+        email: 'new@test.com',
+        email_verified: true,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+  });
+
+  it('self profile email sync must match the verified auth email claim', async () => {
+    await seedUser('seller-uid', 'seller');
+    const db = testEnv.authenticatedContext('seller-uid', {
+      email: 'seller@test.com',
+      email_verified: true,
+    }).firestore();
+
+    await assertFails(
+      db.collection('users').doc('seller-uid').update({
+        email: 'attacker@test.com',
+        email_verified: true,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+  });
+
+  it('self profile updates can still change allowed profile fields', async () => {
+    await seedUser('seller-uid', 'seller');
+    const db = testEnv.authenticatedContext('seller-uid', {
+      email: 'seller@test.com',
+      email_verified: true,
+    }).firestore();
+    const profile = db.collection('users').doc('seller-uid');
+
     await assertSucceeds(
       profile.update({
         display_name: 'Updated profile',
@@ -2198,6 +2241,7 @@ describe('invoices collection', () => {
           logo_base64: 'workspace-logo',
         },
         shop_id: 'shop-1',
+        shop_name: 'Shop One',
         route_id: 'route-1',
         tenant_id: 'tenant-1',
         seller_id: invoiceSellerId,
@@ -2236,6 +2280,114 @@ describe('invoices collection', () => {
     };
     await assertFails(buildBatch('another-seller').commit());
     await assertSucceeds(buildBatch('seller-uid').commit());
+    await assertSucceeds(
+      db.collection('notifications').doc(`invoice_${invoiceRef.id}`).set({
+        type: 'invoice',
+        shop_id: 'shop-1',
+        shop_name: 'Shop One',
+        route_id: 'route-1',
+        seller_id: 'seller-uid',
+        seller_name: 'Test User',
+        amount: 100,
+        transaction_type: 'cash_out',
+        invoice_number: 'INV-2026-0001',
+        ref_id: invoiceRef.id,
+        target_role: 'admin',
+        read: false,
+        tenant_id: 'tenant-1',
+        created_by: 'seller-uid',
+        created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+  });
+
+  it('seller: can atomically create a 30-line sale with 30 stock deductions', async () => {
+    await seedUser('seller-uid', 'seller', true, {
+      assigned_route_id: 'route-1',
+    });
+    await seedShop('shop-1', { balance: 0 });
+    await seedSettings();
+
+    const inventoryIds = Array.from(
+      { length: 30 },
+      (_, index) => `inventory-${index + 1}`,
+    );
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      const batch = db.batch();
+      for (const inventoryId of inventoryIds) {
+        batch.set(db.collection('seller_inventory').doc(inventoryId), {
+          seller_id: 'seller-uid',
+          tenant_id: 'tenant-1',
+          quantity_available: 5,
+          active: true,
+        });
+      }
+      await batch.commit();
+    });
+
+    const db = sellerCtx(testEnv).firestore();
+    const invoiceRef = db.collection('invoices').doc('large-sale');
+    const saleRef = db.collection('transactions').doc('large-sale-tx');
+    const items = inventoryIds.map((_, index) => ({
+      variant_id: `variant-${index + 1}`,
+      qty: 1,
+      unit_price: 10,
+    }));
+    const deductions = Object.fromEntries(
+      inventoryIds.map((inventoryId) => [inventoryId, 1]),
+    );
+    const batch = db.batch();
+
+    batch.update(db.collection('settings').doc('tenant-1'), {
+      last_invoice_number: 1,
+      last_invoice_id: invoiceRef.id,
+    });
+    batch.set(invoiceRef, {
+      created_by: 'seller-uid',
+      type: 'sale',
+      invoice_number: 'INV-2026-0030',
+      invoice_sequence: 1,
+      sale_transaction_id: saleRef.id,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      seller_id: 'seller-uid',
+      fulfillment_mode: 'stock',
+      seller_inventory_deductions: deductions,
+      items,
+      subtotal: 300,
+      discount: 0,
+      total: 300,
+      amount_received: 0,
+    });
+    batch.set(saleRef, {
+      created_by: 'seller-uid',
+      type: 'cash_out',
+      amount: 300,
+      invoice_id: invoiceRef.id,
+      invoice_number: 'INV-2026-0030',
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 300,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 300,
+      last_transaction_id: saleRef.id,
+    });
+    for (const inventoryId of inventoryIds) {
+      batch.update(db.collection('seller_inventory').doc(inventoryId), {
+        quantity_available: 4,
+        updated_at: new Date(),
+        last_sale_invoice_id: invoiceRef.id,
+      });
+    }
+
+    await assertSucceeds(batch.commit());
   });
 
   it('seller: cannot create a sale invoice without its ledger and balance writes', async () => {
@@ -4347,8 +4499,215 @@ describe('notifications collection', () => {
     await assertSucceeds(
       db.collection('notifications').doc('tenant-notification').update({
         read: true,
+        read_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+  });
+
+  it('authorized readers can mark one or several unread notifications read', async () => {
+    await seedUser('admin-uid', 'admin');
+    const readAt = firebase.firestore.Timestamp.now();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const id of [
+        'mark-one',
+        'mark-all-one',
+        'mark-all-two',
+      ]) {
+        await db.collection('notifications').doc(id).set({
+          target_role: 'admin',
+          tenant_id: 'tenant-1',
+          read: false,
+          created_at: readAt,
+        });
+      }
+    });
+
+    const db = adminCtx(testEnv).firestore();
+    await assertSucceeds(
+      db.collection('notifications').doc('mark-one').update({
+        read: true,
+        read_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+
+    const markAll = db.batch();
+    for (const id of ['mark-all-one', 'mark-all-two']) {
+      markAll.update(db.collection('notifications').doc(id), {
+        read: true,
+        read_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    await assertSucceeds(markAll.commit());
+  });
+
+  it('authorized readers can mark the full 50-notification feed read atomically', async () => {
+    await seedUser('admin-uid', 'admin');
+    const readAt = firebase.firestore.Timestamp.now();
+    const ids = Array.from({ length: 50 }, (_, index) => `mark-all-${index}`);
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const batch = db.batch();
+      for (const id of ids) {
+        batch.set(db.collection('notifications').doc(id), {
+          target_role: 'admin',
+          tenant_id: 'tenant-1',
+          read: false,
+          created_at: readAt,
+        });
+      }
+      await batch.commit();
+    });
+
+    const db = adminCtx(testEnv).firestore();
+    const markAll = db.batch();
+    for (const id of ids) {
+      markAll.update(db.collection('notifications').doc(id), {
+        read: true,
+        read_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    await assertSucceeds(markAll.commit());
+  });
+
+  it('notification readers cannot reset read state or partially/malform mark-read', async () => {
+    await seedUser('admin-uid', 'admin');
+    const readAt = firebase.firestore.Timestamp.now();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.collection('notifications').doc('already-read').set({
+        target_role: 'admin',
+        tenant_id: 'tenant-1',
+        read: true,
+        read_at: readAt,
+        created_at: readAt,
+      });
+      for (const id of [
+        'unread-one',
+        'unread-two',
+        'unread-three',
+        'unread-client-timestamp',
+      ]) {
+        await db.collection('notifications').doc(id).set({
+          target_role: 'admin',
+          tenant_id: 'tenant-1',
+          read: false,
+          created_at: readAt,
+        });
+      }
+    });
+
+    const db = adminCtx(testEnv).firestore();
+    const notifications = db.collection('notifications');
+
+    await assertFails(
+      notifications.doc('already-read').update({
+        read: false,
         read_at: firebase.firestore.Timestamp.now(),
       }),
+    );
+    await assertFails(
+      notifications.doc('unread-one').update({ read: true }),
+    );
+    await assertFails(
+      notifications.doc('unread-two').update({
+        read_at: firebase.firestore.Timestamp.now(),
+      }),
+    );
+    await assertFails(
+      notifications.doc('unread-three').update({
+        read_at: 'not-a-timestamp',
+      }),
+    );
+    await assertFails(
+      notifications.doc('unread-client-timestamp').update({
+        read: true,
+        read_at: firebase.firestore.Timestamp.now(),
+      }),
+    );
+  });
+
+  it('notification reads and updates require an active concrete tenant', async () => {
+    await seedUser('global-notification-admin', 'admin', true, {
+      tenant_id: null,
+    });
+    await seedUser('inactive-notification-admin', 'admin', false);
+    await seedUser('inactive-tenant-notification-admin', 'admin');
+    const readAt = firebase.firestore.Timestamp.now();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.collection('notifications').doc('global-notification').set({
+        target_role: 'admin',
+        tenant_id: '__global__',
+        read: false,
+        created_at: readAt,
+      });
+      for (const id of [
+        'inactive-user-notification',
+        'inactive-tenant-notification',
+      ]) {
+        await db.collection('notifications').doc(id).set({
+          target_role: 'admin',
+          tenant_id: 'tenant-1',
+          read: false,
+          created_at: readAt,
+        });
+      }
+      await db.collection('tenants').doc('tenant-1').update({
+        active: false,
+      });
+    });
+
+    const globalDb = testEnv.authenticatedContext(
+      'global-notification-admin',
+    ).firestore();
+    const globalQuery = globalDb.collection('notifications')
+      .where('tenant_id', '==', '__global__')
+      .where('target_role', '==', 'admin')
+      .orderBy('created_at', 'desc');
+    await assertFails(globalQuery.get());
+    await assertFails(
+      globalDb.collection('notifications').doc('global-notification').update({
+        read: true,
+        read_at: firebase.firestore.Timestamp.now(),
+      }),
+    );
+
+    const inactiveUserDb = testEnv.authenticatedContext(
+      'inactive-notification-admin',
+    ).firestore();
+    await assertFails(
+      inactiveUserDb.collection('notifications')
+        .where('tenant_id', '==', 'tenant-1')
+        .where('target_role', '==', 'admin')
+        .orderBy('created_at', 'desc')
+        .get(),
+    );
+    await assertFails(
+      inactiveUserDb.collection('notifications')
+        .doc('inactive-user-notification')
+        .update({
+          read: true,
+          read_at: firebase.firestore.Timestamp.now(),
+        }),
+    );
+
+    const inactiveTenantDb = adminCtx(testEnv).firestore();
+    await assertFails(
+      inactiveTenantDb.collection('notifications')
+        .where('tenant_id', '==', 'tenant-1')
+        .where('target_role', '==', 'admin')
+        .orderBy('created_at', 'desc')
+        .get(),
+    );
+    await assertFails(
+      inactiveTenantDb.collection('notifications')
+        .doc('inactive-tenant-notification')
+        .update({
+          read: true,
+          read_at: firebase.firestore.Timestamp.now(),
+        }),
     );
   });
 
@@ -4389,7 +4748,7 @@ describe('notifications collection', () => {
     await assertSucceeds(
       db.collection('notifications').doc('tenant-notification').update({
         read: true,
-        read_at: firebase.firestore.Timestamp.now(),
+        read_at: firebase.firestore.FieldValue.serverTimestamp(),
       }),
     );
     await assertFails(
@@ -4483,7 +4842,7 @@ describe('notifications collection', () => {
         await assertFails(
           db.collection('notifications').doc(fixture.notificationId).update({
             read: true,
-            read_at: firebase.firestore.Timestamp.now(),
+            read_at: firebase.firestore.FieldValue.serverTimestamp(),
           }),
         );
       } else {
@@ -4497,7 +4856,7 @@ describe('notifications collection', () => {
         await assertSucceeds(
           db.collection('notifications').doc(fixture.notificationId).update({
             read: true,
-            read_at: firebase.firestore.Timestamp.now(),
+            read_at: firebase.firestore.FieldValue.serverTimestamp(),
           }),
         );
       }
@@ -4544,41 +4903,122 @@ describe('notifications collection', () => {
     );
   });
 
-  it('seller: cannot create notifications without atomic rate state', async () => {
+  it('seller: cannot create a notification without a matching source', async () => {
     await seedUser('seller-uid', 'seller');
+    const db = sellerCtx(testEnv).firestore();
     await assertFails(
-      sellerCtx(testEnv).firestore().collection('notifications').doc('n1').set({
+      db.collection('notifications').doc('n1').set({
         created_by: 'seller-uid',
         tenant_id: 'tenant-1',
         created_at: firebase.firestore.FieldValue.serverTimestamp(),
       }),
     );
+    await assertFails(
+      db.collection('users').doc('seller-uid').update({
+        last_notification_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
   });
 
-  it('seller: can create a notification once per cooldown window', async () => {
+  it('seller: can notify for each persisted transaction without a cooldown', async () => {
     await seedUser('seller-uid', 'seller');
+    await seedShop('shop-1', { balance: 100 });
     const db = sellerCtx(testEnv).firestore();
-    const batch = db.batch();
-    batch.set(db.collection('notifications').doc('n1'), {
-      created_by: 'seller-uid',
-      tenant_id: 'tenant-1',
-      created_at: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-    batch.update(db.collection('users').doc('seller-uid'), {
-      last_notification_at: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-    await assertSucceeds(batch.commit());
+    const shopRef = db.collection('customers').doc('shop-1');
+    const entries = [
+      { id: 'tx-one', type: 'cash_out', amount: 25, balance: 125 },
+      { id: 'tx-two', type: 'cash_in', amount: 5, balance: 120 },
+    ];
 
-    const rapidBatch = db.batch();
-    rapidBatch.set(db.collection('notifications').doc('n2'), {
-      created_by: 'seller-uid',
+    for (const entry of entries) {
+      const txRef = db.collection('transactions').doc(entry.id);
+      const batch = db.batch();
+      batch.set(txRef, {
+        shop_id: 'shop-1',
+        customer_id: 'shop-1',
+        shop_name: 'Shop One',
+        route_id: 'route-1',
+        tenant_id: 'tenant-1',
+        type: entry.type,
+        amount: entry.amount,
+        description: 'Standalone cash transaction',
+        created_by: 'seller-uid',
+        created_at: firebase.firestore.FieldValue.serverTimestamp(),
+        deleted: false,
+      });
+      batch.update(shopRef, {
+        balance: entry.balance,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+        last_transaction_at: firebase.firestore.FieldValue.serverTimestamp(),
+        last_transaction_type: entry.type,
+        last_transaction_amount: entry.amount,
+        last_transaction_id: txRef.id,
+      });
+      await assertSucceeds(batch.commit());
+      await assertSucceeds(
+        db.collection('notifications').doc(`transaction_${txRef.id}`).set({
+          type: 'transaction',
+          shop_id: 'shop-1',
+          shop_name: 'Shop One',
+          route_id: 'route-1',
+          seller_id: 'seller-uid',
+          seller_name: 'Test User',
+          amount: entry.amount,
+          transaction_type: entry.type,
+          ref_id: txRef.id,
+          target_role: 'admin',
+          read: false,
+          tenant_id: 'tenant-1',
+          created_by: 'seller-uid',
+          created_at: firebase.firestore.FieldValue.serverTimestamp(),
+        }),
+      );
+    }
+
+    const txRef = db.collection('transactions').doc('tx-mismatched-notif');
+    const mismatchedBatch = db.batch();
+    mismatchedBatch.set(txRef, {
+      shop_id: 'shop-1',
+      customer_id: 'shop-1',
+      shop_name: 'Shop One',
+      route_id: 'route-1',
       tenant_id: 'tenant-1',
+      type: 'cash_out',
+      amount: 10,
+      description: 'Standalone cash transaction',
+      created_by: 'seller-uid',
       created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      deleted: false,
     });
-    rapidBatch.update(db.collection('users').doc('seller-uid'), {
-      last_notification_at: firebase.firestore.FieldValue.serverTimestamp(),
+    mismatchedBatch.update(shopRef, {
+      balance: 130,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_transaction_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 10,
+      last_transaction_id: txRef.id,
     });
-    await assertFails(rapidBatch.commit());
+    await assertSucceeds(mismatchedBatch.commit());
+    await assertFails(
+      db.collection('notifications').doc(`transaction_${txRef.id}`).set({
+        type: 'transaction',
+        shop_id: 'shop-1',
+        shop_name: 'Shop One',
+        route_id: 'route-1',
+        seller_id: 'seller-uid',
+        seller_name: 'Test User',
+        amount: 999,
+        transaction_type: 'cash_out',
+        ref_id: txRef.id,
+        target_role: 'admin',
+        read: false,
+        tenant_id: 'tenant-1',
+        created_by: 'seller-uid',
+        created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
+    const shopAfterNotificationFailure = await assertSucceeds(shopRef.get());
+    assert.strictEqual(shopAfterNotificationFailure.data().balance, 130);
   });
 });
 

@@ -9,10 +9,23 @@ Claude-oriented orchestration skill. Existing navigation, form, performance,
 testing, and export guidance was corrected and retained where useful. No
 upstream skill text or runtime package was copied into the repository.
 
-The app baseline is Flutter 3.41.6 / Dart 3.11.4 on branch `main`. Repository
+The app baseline at this report's review date was Flutter 3.41.6 / Dart 3.11.4
+on branch `main`. Repository
 customizations are discoverable through root `AGENTS.md` / `CLAUDE.md`,
 `.claude/CLAUDE.md`, `.claude/skills/*/SKILL.md`, and path-targeted
 `.github/instructions/*.instructions.md`.
+
+### Toolchain follow-up — 2026-10-28
+
+The review above remains a historical frontend-guidance assessment. The
+current app baseline is Flutter `3.47.8` / Dart `3.13.7`; current UI guidance
+must be checked against that SDK rather than the historical 3.41.6 baseline.
+The Android toolchain was aligned to Gradle `9.3.1`, AGP `9.1.0`, Kotlin
+Gradle Plugin `2.4.0`, and Google Services `4.5.0`. Split APKs and the signed
+72.1 MB AAB built successfully. The AAB signature verifies locally, with a
+self-signed/untrusted certificate-chain warning; connected-device delivery
+and production deployments remain pending. See the latest session entry for
+exact evidence.
 
 ## Instruction ecosystem and discoverability
 
@@ -158,3 +171,74 @@ runtime component system.
 - No release build, deployment, commit, or push was authorized or performed.
 - External research did not run or certify the upstream skills' example
   applications against Flutter 3.41.6.
+
+## 2026-10-28 Modernization Skill and Tool Baseline
+
+### Notification refresh regression added to operational guidance
+
+Commit-history tracing found that the notification screen and tenant-scope
+provider treated every profile `AsyncLoading` state as if no usable profile
+existed, even when Riverpod retained the previous value for the same signed-in
+UID. The regression test failed before the correction. The notification skill
+now requires UID-bound use of a retained profile during same-user refresh and
+requires scope removal during auth loading/errors or UID mismatch. This keeps
+the feed stable without permitting old-account tenant cache reuse.
+
+Verification: focused widget tests `00:03 +9: All tests passed!`;
+visibility/provider tests `00:00 +13: All tests passed!`; full suite
+`01:36 +689: All tests passed!`; both analyzers reported `No issues found!`.
+This code change is local and unreleased; production and release verification
+remain open.
+
+The full-frontend modernization prompt was reviewed against the current
+repository skill ecosystem. Focused review covered the Flutter frontend
+modernization, multi-tenant SaaS, notification center, Android build/signing,
+vibe-debugging, transaction-ledger, and data-integrity contracts.
+
+- The existing multi-tenant skill already defines concrete tenant scope,
+  role parity, super-admin support-context linkage, invoice operation
+  separation, notification role scope, 15-workspace test expectations, and
+  fail-closed destructive operations. No duplicate tenant skill was added.
+- The multi-tenant skill now adds a cross-workspace feature-parity regression:
+  tenant-owned setting persistence, stock/non-stock/receipt operation checks,
+  global Firebase Auth email uniqueness handling, role-scoped workspace
+  metadata, tenant-keyed cache switching, and fail-closed reset boundaries.
+- The notification skill already describes the full auth-to-Rules lifecycle,
+  tenant-keyed providers, cached refresh behavior, retryable failures, and
+  role/tenant test cases. It now makes mark-read monotonicity explicit: read
+  state and server timestamp must change together, read cannot be reset, and
+  malformed timestamps, unassigned/global scopes, and invalid mark-all batches
+  require adversarial emulator coverage. The provider and Rules now use and
+  enforce `FieldValue.serverTimestamp()` / `request.time`; focused notification
+  Rules tests reported `9 passing (16s)`, and the full local Rules Emulator
+  reported `185 passing (46s)`. No production Rules deployment is claimed.
+- The Android build skill already records the checked-in Gradle/AGP/Kotlin/
+  Java baseline, wrapper-first diagnosis, signing safeguards, APK/AAB
+  commands, and Windows-specific verification notes. It now requires exact
+  failure evidence and classification before changing Gradle, and explicitly
+  rejects claiming all build issues fixed without reproducing each failure.
+  The inspected toolchain has no evidenced compatibility mismatch; no Gradle
+  version change or Gradle fix is justified by this baseline.
+- Existing local Flutter, Dart, Gradle-wrapper, and Rules Emulator commands
+  were sufficient for baseline verification. No MCP, package, external agent
+  configuration, or credential scope was added. A broader provenance and
+  host-configuration inventory remains open.
+- Research retrieved official Flutter accessibility guidance, W3C WCAG 2.2,
+  Shopify Polaris references, and Odoo inventory/stock-report documentation.
+  These are pattern references only; no source code, assets, SDK, or package
+  was adopted. The Flutter adaptive-responsive page was unreachable in this
+  run, and the full commercial/open-source comparison remains pending.
+
+This is a baseline review, not a claim that the skill/tool modernization
+phase is complete. Future skill edits must answer a verified repository gap,
+remain consistent with `AGENTS.md` and the path-specific instructions, and
+pass Markdown lint.
+
+The transaction follow-up also changes no Gradle settings: the verified
+configuration still does not identify a Gradle compatibility defect. The
+transaction notifier's overlapping-write rejection and keyed atomic persistence
+were covered by focused tests; the full Flutter suite reported
+`01:34 +688: All tests passed!`, both analyzers were clean, and the Rules
+Emulator reported `185 passing (46s)`. A real concurrent persistence race is
+not yet emulator-tested. Android package builds and delivery remain separate
+release gates.

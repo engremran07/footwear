@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+
 import '../core/constants/collections.dart';
 import '../core/utils/backup_scope_policy.dart';
 import '../core/utils/firestore_pagination.dart';
@@ -38,6 +40,14 @@ const _shopTransactionsLiveLimit = 150;
 const _shopsAnalyticsTransactionsLimit = 500;
 
 final _logger = Logger();
+
+String transactionIdempotencyDocumentId({
+  required String tenantId,
+  required String idempotencyKey,
+}) => const Uuid().v5(
+  Namespace.url.value,
+  '$tenantId:standalone-transaction:$idempotencyKey',
+);
 
 bool _isCustomerLedgerEntry(Map<String, dynamic> data) =>
     data['deleted'] != true && data['voided'] != true;
@@ -409,7 +419,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
   Future<void> _runWriteGuard(Future<void> Function() op) async {
     if (_writeInFlight) {
-      return;
+      throw StateError('Another transaction write is already in progress.');
     }
     _writeInFlight = true;
     try {
@@ -417,6 +427,81 @@ class TransactionNotifier extends AsyncNotifier<void> {
     } finally {
       _writeInFlight = false;
     }
+  }
+
+  Future<bool> _createWithIdempotencyKey({
+    required FirebaseFirestore db,
+    required String tenantId,
+    required String idempotencyKey,
+    required String shopId,
+    required String shopName,
+    required String routeId,
+    required String type,
+    required double amount,
+    required String? description,
+    required String? saleType,
+    required String createdBy,
+    required Timestamp? transactionDate,
+  }) async {
+    final txRef = db
+        .collection(Collections.transactions)
+        .doc(
+          transactionIdempotencyDocumentId(
+            tenantId: tenantId,
+            idempotencyKey: idempotencyKey,
+          ),
+        );
+    final existing = await db
+        .collection(Collections.transactions)
+        .where('tenant_id', isEqualTo: tenantId)
+        .where('idempotency_key', isEqualTo: idempotencyKey)
+        .limit(1)
+        .get();
+    if (existing.docs.isNotEmpty) return false;
+    final shopRef = db.collection(Collections.customers).doc(shopId);
+    final createdAt = transactionDate ?? Timestamp.now();
+    final balanceDelta = type == 'cash_out' ? amount : -amount;
+    return db
+        .runTransaction<bool>((transaction) async {
+          if ((await transaction.get(txRef)).exists) return false;
+          final shopSnapshot = await transaction.get(shopRef);
+          final shopData = shopSnapshot.data();
+          if (!shopSnapshot.exists ||
+              shopData == null ||
+              !TenantScope.matchesTenant(shopData, tenantId) ||
+              shopData['route_id'] != routeId) {
+            throw StateError(
+              'Transaction shop is outside the active workspace and route.',
+            );
+          }
+
+          transaction.set(txRef, {
+            'shop_id': shopId,
+            'customer_id': shopId,
+            'shop_name': shopName,
+            'route_id': routeId,
+            'tenant_id': tenantId,
+            'type': type,
+            'sale_type': saleType,
+            'amount': amount,
+            'description': description,
+            'items': const <Map<String, dynamic>>[],
+            'created_by': createdBy,
+            'created_at': createdAt,
+            'deleted': false,
+            'idempotency_key': idempotencyKey,
+          });
+          transaction.update(shopRef, {
+            'balance': FieldValue.increment(balanceDelta),
+            'updated_at': Timestamp.now(),
+            'last_transaction_at': createdAt,
+            'last_transaction_type': type,
+            'last_transaction_amount': amount,
+            'last_transaction_id': txRef.id,
+          });
+          return true;
+        })
+        .timeout(const Duration(seconds: 20));
   }
 
   void _stageTransactionUpdate({
@@ -523,44 +608,49 @@ class TransactionNotifier extends AsyncNotifier<void> {
       }
 
       final db = FirebaseFirestore.instance;
-      final batch = db.batch();
       final tenantId = await _currentTenantId();
       final normalizedKey = idempotencyKey?.trim();
-      if (normalizedKey != null && normalizedKey.isNotEmpty) {
-        final existing = await db
-            .collection(Collections.transactions)
-            .where('tenant_id', isEqualTo: tenantId)
-            .where('idempotency_key', isEqualTo: normalizedKey)
-            .limit(1)
-            .get();
-        if (existing.docs.isNotEmpty) {
-          return;
-        }
-      }
-
-      // Create transaction doc
-      final txRef = db.collection(Collections.transactions).doc();
-      batch.set(txRef, {
-        'shop_id': shopId,
-        'customer_id': shopId,
-        'shop_name': shopName,
-        'route_id': routeId,
-        'tenant_id': tenantId,
-        'type': type,
-        'sale_type': saleType,
-        'amount': amount,
-        'description': description,
-        'items': items.map((e) => e.toJson()).toList(),
-        'created_by': normalizedCreatedBy,
-        'created_at': transactionDate ?? Timestamp.now(),
-        'deleted':
-            false, // DI-01: required for isNotEqualTo filter in allTransactionsProvider
-        if (normalizedKey != null && normalizedKey.isNotEmpty)
-          'idempotency_key': normalizedKey,
-      });
-
-      // Update shop balance: cash_out adds, cash_in subtracts
-      if (shopId.isNotEmpty) {
+      final hasIdempotencyKey = normalizedKey?.isNotEmpty == true;
+      late final String txId;
+      if (hasIdempotencyKey) {
+        txId = transactionIdempotencyDocumentId(
+          tenantId: tenantId,
+          idempotencyKey: normalizedKey!,
+        );
+        final created = await _createWithIdempotencyKey(
+          db: db,
+          tenantId: tenantId,
+          idempotencyKey: normalizedKey,
+          shopId: shopId,
+          shopName: shopName,
+          routeId: routeId,
+          type: type,
+          amount: amount,
+          description: description,
+          saleType: saleType,
+          createdBy: normalizedCreatedBy,
+          transactionDate: transactionDate,
+        );
+        if (!created) return;
+      } else {
+        final batch = db.batch();
+        final txRef = db.collection(Collections.transactions).doc();
+        txId = txRef.id;
+        batch.set(txRef, {
+          'shop_id': shopId,
+          'customer_id': shopId,
+          'shop_name': shopName,
+          'route_id': routeId,
+          'tenant_id': tenantId,
+          'type': type,
+          'sale_type': saleType,
+          'amount': amount,
+          'description': description,
+          'items': items.map((e) => e.toJson()).toList(),
+          'created_by': normalizedCreatedBy,
+          'created_at': transactionDate ?? Timestamp.now(),
+          'deleted': false,
+        });
         final balanceDelta = type == 'cash_out' ? amount : -amount;
         batch.update(db.collection(Collections.customers).doc(shopId), {
           'balance': FieldValue.increment(balanceDelta),
@@ -570,33 +660,26 @@ class TransactionNotifier extends AsyncNotifier<void> {
           'last_transaction_amount': amount,
           'last_transaction_id': txRef.id,
         });
+        await _commit(batch);
       }
 
-      await _commit(batch);
-
-      // Best-effort notification for admin feed (non-critical, fire-and-forget).
-      // Only written when a seller creates the transaction — admin notifies themselves.
-      // P1-10 FIX: Include tenant_id to prevent cross-tenant leakage.
       try {
         final appUser = await ref.read(authUserProvider.future);
         if (appUser != null && appUser.isSeller) {
-          await writeRateLimitedNotification(
+          await writeSellerNotification(
             db: db,
-            actorUid: appUser.id,
-            data: {
-              'type': 'transaction',
-              'shop_id': shopId,
-              'shop_name': shopName,
-              'route_id': routeId,
-              'seller_id': normalizedCreatedBy,
-              'seller_name': appUser.displayName,
-              'amount': amount,
-              'transaction_type': type,
-              'ref_id': txRef.id,
-              'target_role': 'admin',
-              'read': false,
-              'tenant_id': appUser.tenantId,
-            },
+            data: buildSellerNotification(
+              sourceType: 'transaction',
+              sourceId: txId,
+              sellerId: normalizedCreatedBy,
+              sellerName: appUser.displayName,
+              tenantId: tenantId,
+              shopId: shopId,
+              shopName: shopName,
+              routeId: routeId,
+              amount: amount,
+              transactionType: type,
+            ),
           );
         }
       } catch (error, stackTrace) {
