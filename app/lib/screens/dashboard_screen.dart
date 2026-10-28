@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
 import '../core/design/app_tokens.dart';
@@ -23,6 +24,8 @@ import '../models/shop_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
 import '../widgets/app_section_header.dart';
+import '../widgets/app_contextual_actions.dart';
+import '../widgets/contextual_action_catalog.dart';
 import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/stat_card.dart';
@@ -68,9 +71,8 @@ class DashboardScreen extends ConsumerWidget {
                   'pending_edit_requests_count',
                   ref,
                 ).replaceAll('%s', '${pendingEdits.length}'),
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: AppTokens.s8),
               Text(
@@ -88,27 +90,37 @@ class DashboardScreen extends ConsumerWidget {
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (_, index) {
                     final tx = pendingEdits[index];
-                    return ListTile(
-                      leading: const Icon(
-                        Icons.pending_actions,
-                        color: AppBrand.warningColor,
+                    return AppContextualActions(
+                      entity: ContextualEntity.transaction,
+                      actions: transactionContextualActions(
+                        context: context,
+                        ref: ref,
+                        transaction: tx,
                       ),
-                      title: Text(
-                        tx.shopName.isNotEmpty ? tx.shopName : tr('shop', ref),
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.pending_actions,
+                          color: AppBrand.warningColor,
+                        ),
+                        title: Text(
+                          tx.shopName.isNotEmpty
+                              ? tx.shopName
+                              : tr('shop', ref),
+                        ),
+                        subtitle: Text(
+                          '${AppFormatters.dateTime(tx.createdAt)} • '
+                          '${AppFormatters.currency(tx.amount)}',
+                        ),
+                        trailing: tx.shopId.isEmpty
+                            ? null
+                            : const Icon(Icons.chevron_right),
+                        onTap: tx.shopId.isEmpty
+                            ? null
+                            : () {
+                                Navigator.pop(sheetContext);
+                                context.push('/shops/${tx.shopId}');
+                              },
                       ),
-                      subtitle: Text(
-                        '${AppFormatters.dateTime(tx.createdAt)} • '
-                        '${AppFormatters.currency(tx.amount)}',
-                      ),
-                      trailing: tx.shopId.isEmpty
-                          ? null
-                          : const Icon(Icons.chevron_right),
-                      onTap: tx.shopId.isEmpty
-                          ? null
-                          : () {
-                              Navigator.pop(sheetContext);
-                              context.push('/shops/${tx.shopId}');
-                            },
                     );
                   },
                 ),
@@ -186,9 +198,9 @@ class DashboardScreen extends ConsumerWidget {
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(
                                   fontWeight: FontWeight.w700,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface,
                                 ),
                             children: [
                               TextSpan(
@@ -600,103 +612,112 @@ class _SellerDashboard extends ConsumerWidget {
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: Card(
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => context.push('/routes/${route.id}'),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primaryContainer,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Text(
-                                      '${route.routeNumber}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimaryContainer,
+                    child: AppContextualActions(
+                      entity: ContextualEntity.route,
+                      actions: routeContextualActions(
+                        context: context,
+                        ref: ref,
+                        route: route,
+                      ),
+                      child: Card(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => context.push('/routes/${route.id}'),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 42,
+                                      height: 42,
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primaryContainer,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        '${route.routeNumber}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimaryContainer,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          route.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            route.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          [
-                                            if (route.area?.isNotEmpty == true)
-                                              route.area,
-                                            route.currency,
-                                          ].join(' · '),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.bodySmall,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Icon(
-                                    Icons.chevron_right,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _SellerRouteMetricChip(
-                                      icon: Icons.storefront,
-                                      label: tr('shops', ref),
-                                      value: '${routeShops.length}',
-                                      color: AppBrand.secondaryColor,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: _SellerRouteMetricChip(
-                                      icon: Icons.account_balance_wallet,
-                                      label: tr('outstanding_balance', ref),
-                                      value: AppFormatters.currency(
-                                        routeOutstanding,
-                                        route.currency,
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            [
+                                              if (route.area?.isNotEmpty ==
+                                                  true)
+                                                route.area,
+                                              route.currency,
+                                            ].join(' · '),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall,
+                                          ),
+                                        ],
                                       ),
-                                      color: routeOutstanding > 0
-                                          ? AppBrand.errorColor
-                                          : AppBrand.successColor,
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                    Icon(
+                                      Icons.chevron_right,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _SellerRouteMetricChip(
+                                        icon: Icons.storefront,
+                                        label: tr('shops', ref),
+                                        value: '${routeShops.length}',
+                                        color: AppBrand.secondaryColor,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: _SellerRouteMetricChip(
+                                        icon: Icons.account_balance_wallet,
+                                        label: tr('outstanding_balance', ref),
+                                        value: AppFormatters.currency(
+                                          routeOutstanding,
+                                          route.currency,
+                                        ),
+                                        color: routeOutstanding > 0
+                                            ? AppBrand.errorColor
+                                            : AppBrand.successColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -803,9 +824,8 @@ class _SellerRouteMetricChip extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  style: Theme.of(context).textTheme.labelSmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
                 ),
               ],
             ),
@@ -903,32 +923,40 @@ class _RouteAnalyticsSection extends ConsumerWidget {
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {
                   final row = analytics[index];
-                  return Material(
-                    type: MaterialType.transparency,
-                    child: ListTile(
-                      key: ValueKey(row.route.id),
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        radius: 14,
-                        child: Text('${row.route.routeNumber}'),
-                      ),
-                      title: Text(row.route.name),
-                      subtitle: Text('${row.totalShops} ${tr('shops', ref)}'),
-                      trailing: Text(
-                        AppFormatters.currency(
-                          row.outstanding,
-                          row.route.currency,
+                  return AppContextualActions(
+                    entity: ContextualEntity.route,
+                    actions: routeContextualActions(
+                      context: context,
+                      ref: ref,
+                      route: row.route,
+                    ),
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: ListTile(
+                        key: ValueKey(row.route.id),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          radius: 14,
+                          child: Text('${row.route.routeNumber}'),
                         ),
-                        style: TextStyle(
-                          color: row.outstanding > 0
-                              ? AppBrand.errorColor
-                              : AppBrand.successColor,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+                        title: Text(row.route.name),
+                        subtitle: Text('${row.totalShops} ${tr('shops', ref)}'),
+                        trailing: Text(
+                          AppFormatters.currency(
+                            row.outstanding,
+                            row.route.currency,
+                          ),
+                          style: TextStyle(
+                            color: row.outstanding > 0
+                                ? AppBrand.errorColor
+                                : AppBrand.successColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
                         ),
+                        onTap: () => context.push('/routes/${row.route.id}'),
                       ),
-                      onTap: () => context.push('/routes/${row.route.id}'),
                     ),
                   );
                 }, childCount: analytics.length),

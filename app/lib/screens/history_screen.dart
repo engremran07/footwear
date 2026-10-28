@@ -16,6 +16,8 @@ import '../providers/user_provider.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
+import '../widgets/app_contextual_actions.dart';
+import '../widgets/contextual_action_catalog.dart';
 
 // =============================================================================
 // HistoryScreen — 7-day live transaction feed.
@@ -265,118 +267,124 @@ class _HistoryTile extends ConsumerWidget {
     final entryByName = tx.createdBy.isEmpty
         ? unknownUserLabel
         : (entryByMap[tx.createdBy] ?? unknownUserLabel);
+    final hasInvoice = tx.invoiceId?.isNotEmpty == true;
 
-    // Invoice link badge
-    final bool hasInvoice = tx.invoiceId != null && tx.invoiceId!.isNotEmpty;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(
-        horizontal: AppTokens.s12,
-        vertical: AppTokens.s4,
+    return AppContextualActions(
+      entity: ContextualEntity.transaction,
+      actions: transactionContextualActions(
+        context: context,
+        ref: ref,
+        transaction: tx,
       ),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppTokens.brMD,
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+      child: Card(
+        margin: const EdgeInsets.symmetric(
+          horizontal: AppTokens.s12,
+          vertical: AppTokens.s4,
         ),
-      ),
-      child: InkWell(
-        borderRadius: AppTokens.brMD,
-        onTap: tx.shopId.isNotEmpty
-            ? () => context.push('/shops/${tx.shopId}')
-            : null,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTokens.s12,
-            vertical: AppTokens.s8,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppTokens.brMD,
+          side: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
           ),
-          child: Row(
-            children: [
-              // Leading icon
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: accentColor.withValues(alpha: 0.12),
-                child: Icon(leadIcon, color: accentColor, size: 18),
-              ),
-              const SizedBox(width: AppTokens.s12),
-              // Body
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Shop name + invoice badge
-                    Row(
-                      textDirection: TextDirection.ltr,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            tx.shopName.isNotEmpty
-                                ? tx.shopName
-                                : tr('shop', ref),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (hasInvoice) ...[
-                          const SizedBox(width: AppTokens.s4),
-                          _SmallBadge(
-                            label: tx.invoiceNumber ?? 'INV',
-                            bgColor: AppBrand.infoBg,
-                            fgColor: AppBrand.infoFg,
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: AppTokens.s2),
-                    // Type label + seller (admin only)
-                    Row(
-                      children: [
-                        _TypeChip(type: tx.type),
-                        if (showSellerName && tx.createdBy.isNotEmpty) ...[
-                          const SizedBox(width: AppTokens.s4),
+        ),
+        child: InkWell(
+          borderRadius: AppTokens.brMD,
+          onTap: tx.shopId.isNotEmpty
+              ? () => context.push('/shops/${tx.shopId}')
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.s12,
+              vertical: AppTokens.s8,
+            ),
+            child: Row(
+              children: [
+                // Leading icon
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: accentColor.withValues(alpha: 0.12),
+                  child: Icon(leadIcon, color: accentColor, size: 18),
+                ),
+                const SizedBox(width: AppTokens.s12),
+                // Body
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Shop name + invoice badge
+                      Row(
+                        textDirection: TextDirection.ltr,
+                        children: [
                           Expanded(
                             child: Text(
-                              entryByName,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
+                              tx.shopName.isNotEmpty
+                                  ? tx.shopName
+                                  : tr('shop', ref),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          if (hasInvoice) ...[
+                            const SizedBox(width: AppTokens.s4),
+                            _SmallBadge(
+                              label: tx.invoiceNumber ?? 'INV',
+                              bgColor: AppBrand.infoBg,
+                              fgColor: AppBrand.infoFg,
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                    const SizedBox(height: AppTokens.s2),
-                    Text(
-                      AppFormatters.dateTime(tx.createdAt),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: AppTokens.s2),
+                      // Type label + seller (admin only)
+                      Row(
+                        children: [
+                          _TypeChip(type: tx.type),
+                          if (showSellerName && tx.createdBy.isNotEmpty) ...[
+                            const SizedBox(width: AppTokens.s4),
+                            Expanded(
+                              child: Text(
+                                entryByName,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: AppTokens.s2),
+                      Text(
+                        AppFormatters.dateTime(tx.createdAt),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppTokens.s8),
-              // Amount
-              Text(
-                amountText,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: accentColor,
+                const SizedBox(width: AppTokens.s8),
+                // Amount
+                Text(
+                  amountText,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: accentColor,
+                  ),
                 ),
-              ),
-              if (tx.shopId.isNotEmpty)
-                Icon(
-                  Icons.chevron_right,
-                  size: 18,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-            ],
+                if (tx.shopId.isNotEmpty)
+                  Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+              ],
+            ),
           ),
         ),
       ),

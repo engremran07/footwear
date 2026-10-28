@@ -28,6 +28,20 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.10.15',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '⚡',
+        text: {
+          AppLocale.en: 'Quick, role-aware actions are now available on route, shop, product, inventory, invoice, notification, and transaction records.',
+          AppLocale.ar: 'أصبحت الإجراءات السريعة المتوافقة مع الصلاحيات متاحة الآن لسجلات المسارات والمتاجر والمنتجات والمخزون والفواتير والإشعارات والمعاملات.',
+          AppLocale.ur: 'اب روٹ، دکان، پروڈکٹ، انوینٹری، انوائس، نوٹیفکیشن اور ٹرانزیکشن ریکارڈز پر صارف کے اختیار کے مطابق فوری اقدامات دستیاب ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.10.14',
     date: 'October 2026',
     items: [

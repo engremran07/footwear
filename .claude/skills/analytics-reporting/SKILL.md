@@ -382,6 +382,15 @@ signal, not endorsement; do not copy skill text):
 12. Task continuity: when user adds new export/report work mid-session, merge into
     existing todo list. Never discard prior pending export tasks.
 
+13. Workspace logo appearance is preserved: transparency stays transparent,
+    and an opaque colored background remains present with its colors. Never
+    auto-remove, replace, tint, crop, or flatten a background. Optimize locally
+    within Firestore limits while preserving alpha and visual appearance.
+    Reuse the shared logo source, invoice/receipt fallback, and `visibleFields`
+    behavior across PDF, report, image, print, and share paths. Test transparent
+    and colored-background assets through processing, persistence, and
+    rasterized export; embedding assertions alone are not pixel-level proof.
+
 ## Output, boundaries, and validation
 
 Report affected formats and scope, exact builders, role/tenant rules, locale

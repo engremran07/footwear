@@ -1,6 +1,27 @@
-# FootWear ERP — v3.10.14+1125 (Hosting/Rules deployed; ARM64 installed)
+# FootWear ERP — v3.10.15+1126 (Hosting/Rules deployed; ARM64 installed)
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
+
+## v3.10.15+1126 Contextual Record Actions
+
+Record rows across routes, shops, products, inventory, invoices, transactions,
+notifications, dashboard, and reports now share a contextual-action
+presentation. It supports touch long-press, web secondary click, keyboard
+context-menu shortcuts, and screen-reader custom actions while retaining
+existing row taps and provider-backed handlers. Actions are filtered and
+rechecked through the existing capability policy; the UI is not an
+authorization boundary. Full serial Flutter suite: `02:40 +716: All tests
+passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 16.2s)`;
+`dart analyze test/`: `No issues found!`. Web build: `EXIT: 0`; Hosting and
+Firestore Rules/indexes each reported `Deploy complete!`; live
+`version.json` reports `3.10.15+1126` with `no-store, must-revalidate,
+no-cache`. Split APKs built at 31.4/32.9/34.5 MB and verified with APK v2.
+The ARM64 APK was copied and installed on `R5GL22RGT9V` (`1 file pushed`,
+`Success`, versionCode `310153126`). The signed 72.3 MB AAB reports
+`jar verified.`; its locally untrusted self-signed certificate and missing
+timestamp do not establish Play Console upload-key acceptance. No Play
+Console upload occurred. Authenticated visual and manual assistive-technology
+acceptance remain unverified.
 
 ## v3.10.14+1125 Notification Visibility and Android Alerts
 
@@ -374,6 +395,15 @@ page and remain single-page. Pin row order with explicit PDF
 parameter. Urdu PDFs use Naskh-style shaping; a standalone Nastaliq proof is
 not production support until branding, selectable text, pagination, and
 Web/Android report parity are verified.
+
+Workspace-logo processing is local and lossless: transparent pixels remain
+transparent, and opaque colored backgrounds are retained without background
+removal or substitution. The same saved logo bytes flow through workspace
+settings backups and invoice snapshots; PDF, print, share, and PNG exports use
+the shared PDF header path. XLSX currently does not embed a logo. Before
+implementing a feature, review the active tasks and Git delta, load applicable
+skills and path instructions, and read the affected runtime docs and source;
+`AGENTS.md` §8 is the canonical pre-edit gate.
 
 ---
 

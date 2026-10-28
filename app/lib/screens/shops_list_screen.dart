@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
@@ -25,6 +26,8 @@ import '../providers/shop_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/app_pull_refresh.dart';
+import '../widgets/app_contextual_actions.dart';
+import '../widgets/contextual_action_catalog.dart';
 import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
@@ -1371,101 +1374,105 @@ class _ShopTile extends ConsumerWidget {
       ),
     };
 
-    return Card(
-      child: ListTile(
-        leading: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            CircleAvatar(
-              backgroundColor: hasDebt
-                  ? AppTheme.debtBg(cs)
-                  : AppTheme.clearBg(cs),
-              child: Icon(
-                Icons.store,
-                color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
-              ),
-            ),
-            if (hasDuplicate)
-              Positioned(
-                top: -4,
-                right: -4,
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: AppTheme.warningFg(cs),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: cs.surface, width: 1.5),
-                  ),
-                  child: Icon(
-                    Icons.priority_high,
-                    size: 12,
-                    color: cs.onInverseSurface,
-                  ),
+    return AppContextualActions(
+      entity: ContextualEntity.shop,
+      actions: shopContextualActions(context: context, ref: ref, shop: shop),
+      child: Card(
+        child: ListTile(
+          leading: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              CircleAvatar(
+                backgroundColor: hasDebt
+                    ? AppTheme.debtBg(cs)
+                    : AppTheme.clearBg(cs),
+                child: Icon(
+                  Icons.store,
+                  color: hasDebt ? AppTheme.debtFg(cs) : AppTheme.clearFg(cs),
                 ),
               ),
-          ],
-        ),
-        title: Text(
-          shop.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              [
-                if (shop.phone != null) shop.phone!,
-                // Show route number only when name is duplicated within the
-                // list so the user can tell the shops apart.
-                if (hasDuplicate) 'R${shop.routeNumber}',
-                if (shop.area != null) shop.area!,
-                if (shop.category?.trim().isNotEmpty == true) shop.category!,
-              ].join(' · '),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            _LastTxRow(
-              shop: shop,
-              currency: currency,
-              ref: ref,
-              lastTxFallback: lastTxFallback,
-            ),
-          ],
-        ),
-        // Show the amount that matches the selected analytics chip.
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            WhatsAppShopCtaButton(
-              shop: shop,
-              iconSize: 20,
-              onViewStatement: () => context.push('/shops/${shop.id}'),
-            ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  AppFormatters.currency(trailingAmount, currency),
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: trailingColor,
+              if (hasDuplicate)
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: AppTheme.warningFg(cs),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: cs.surface, width: 1.5),
+                    ),
+                    child: Icon(
+                      Icons.priority_high,
+                      size: 12,
+                      color: cs.onInverseSurface,
+                    ),
                   ),
                 ),
-                Text(
-                  trailingLabel,
-                  style: TextStyle(fontSize: 10, color: trailingColor),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
+          title: Text(
+            shop.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                [
+                  if (shop.phone != null) shop.phone!,
+                  // Show route number only when name is duplicated within the
+                  // list so the user can tell the shops apart.
+                  if (hasDuplicate) 'R${shop.routeNumber}',
+                  if (shop.area != null) shop.area!,
+                  if (shop.category?.trim().isNotEmpty == true) shop.category!,
+                ].join(' · '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              _LastTxRow(
+                shop: shop,
+                currency: currency,
+                ref: ref,
+                lastTxFallback: lastTxFallback,
+              ),
+            ],
+          ),
+          // Show the amount that matches the selected analytics chip.
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              WhatsAppShopCtaButton(
+                shop: shop,
+                iconSize: 20,
+                onViewStatement: () => context.push('/shops/${shop.id}'),
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    AppFormatters.currency(trailingAmount, currency),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: trailingColor,
+                    ),
+                  ),
+                  Text(
+                    trailingLabel,
+                    style: TextStyle(fontSize: 10, color: trailingColor),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          onTap: () => context.push('/shops/${shop.id}'),
         ),
-        onTap: () => context.push('/shops/${shop.id}'),
       ),
     );
   }
@@ -1501,9 +1508,8 @@ class _LastTxRow extends StatelessWidget {
           width: 72,
           margin: const EdgeInsets.only(top: 2),
           decoration: BoxDecoration(
-            color: Theme.of(
-              context,
-            ).colorScheme.outlineVariant.withValues(alpha: 0.35),
+            color: Theme.of(context).colorScheme.outlineVariant
+                .withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(4),
           ),
         );
@@ -1652,9 +1658,8 @@ class _AdminGroupedShopsViewState
                       (r?.assignedSellerNames.isNotEmpty ?? false))
                     Text(
                       r!.assignedSellerNames.join(', '),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.labelSmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   const SizedBox(width: 8),
                   // Per-route outstanding balance
@@ -1694,9 +1699,8 @@ class _AdminGroupedShopsViewState
                   ),
                   Text(
                     '${section.items.length}',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
+                    style: Theme.of(context).textTheme.labelSmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   const SizedBox(width: 4),
                   AnimatedRotation(

@@ -30,6 +30,68 @@ void main() {
     },
   );
 
+  test('preserves transparent pixels and visible logo colors through settings bytes', () async {
+    final source = image.Image(width: 40, height: 20, numChannels: 4);
+    image.fill(source, color: image.ColorRgba8(220, 30, 160, 0));
+    source.setPixelRgba(20, 10, 24, 136, 208, 192);
+
+    final processed = await WorkspaceLogoProcessor.process(
+      Uint8List.fromList(image.encodePng(source)),
+    );
+    final settings = SettingsModel.fromJson({
+      'logo_base64': processed.base64,
+      'currency': 'SAR',
+      'pairs_per_carton': 12,
+    });
+    final restored = image.decodeImage(settings.logoBytes!)!;
+    final transparentPixel = restored.getPixel(0, 0);
+    final visiblePixel = restored.getPixel(20, 10);
+
+    expect(settings.toJson()['logo_base64'], processed.base64);
+    expect(settings.invoiceHeaderSnapshot['logo_base64'], processed.base64);
+    expect(transparentPixel.a, 0);
+    expect(visiblePixel.r, 24);
+    expect(visiblePixel.g, 136);
+    expect(visiblePixel.b, 208);
+    expect(visiblePixel.a, 192);
+  });
+
+  test(
+    'retains opaque colored backgrounds when resizing the uploaded logo',
+    () async {
+      final source = image.Image(width: 1200, height: 600, numChannels: 4);
+      image.fill(source, color: image.ColorRgba8(24, 82, 146, 255));
+      for (var y = 200; y < 400; y++) {
+        for (var x = 400; x < 800; x++) {
+          source.setPixelRgba(x, y, 226, 72, 28, 255);
+        }
+      }
+
+      final processed = await WorkspaceLogoProcessor.process(
+        Uint8List.fromList(image.encodePng(source)),
+      );
+      final restored = image.decodeImage(
+        Uint8List.fromList(
+          SettingsModel.fromJson({
+            'logo_base64': processed.base64,
+            'currency': 'SAR',
+            'pairs_per_carton': 12,
+          }).logoBytes!,
+        ),
+      )!;
+      final background = restored.getPixel(10, 10);
+      final mark = restored.getPixel(400, 200);
+
+      expect(processed.width, 800);
+      expect(processed.height, 400);
+      expect(
+        (background.r, background.g, background.b, background.a),
+        (24, 82, 146, 255),
+      );
+      expect((mark.r, mark.g, mark.b, mark.a), (226, 72, 28, 255));
+    },
+  );
+
   test('rejects files that cannot be decoded as an image', () async {
     await expectLater(
       WorkspaceLogoProcessor.process(Uint8List.fromList([1, 2, 3, 4])),

@@ -368,6 +368,38 @@ device, or WCAG conformance evaluation. See
 `docs/frontend/screen-register.md` and
 `docs/frontend/ui-ux-audit-report.md` for screen coverage and remaining checks.
 
+## Shared Contextual Record Actions (v3.10.15+1126)
+
+Record-level secondary actions use `AppContextualAction`,
+`AppContextualActions`, and the shared route/shop/transaction catalog. Current
+integrations cover route and shop lists/details, product lists/details,
+inventory variants, invoice lists, history, notifications, dashboard rows,
+outstanding-shop reports, and the shop ledger. The presenter preserves the
+existing primary tap and nested controls and opens from touch long-press, web
+secondary click, context-menu/Shift+F10 keys, and semantic custom actions.
+Shop-ledger actions retain their visible menu button for discoverability.
+
+The resolver filters by entity, enabled state, active profile, concrete
+tenant, and `PermissionPolicy` capability. Selection obtains the current
+profile again and invokes the current eligible action callback. All routes,
+confirmation flows, and notifier methods remain the existing guarded paths;
+no direct Firestore write or authorization change was introduced. Unit and
+widget regressions cover role filtering, inactive/unscoped users, row and
+nested taps, long-press, keyboard menu invocation, and a narrow RTL large-text
+layout. The full serial Flutter suite passed `02:40 +716: All tests passed!`;
+focused release regressions passed `00:11 +33: All tests passed!`;
+`flutter analyze lib --no-pub` reported
+`No issues found! (ran in 16.2s)` and `dart analyze test/` reported
+`No issues found!`. Hot restart was unavailable because the connected DTD had
+no active app. Web build reported `EXIT: 0`; Hosting and Firestore
+Rules/indexes each reported `Deploy complete!`; live `version.json` reports
+`3.10.15+1126` and the shell uses `no-store, must-revalidate, no-cache`.
+Split APKs (31.4/32.9/34.5 MB) verify with APK v2; the 72.3 MB AAB reports
+`jar verified.` with a local self-signed-certificate warning and no timestamp.
+ARM64 was copied and installed on `R5GL22RGT9V` (`Success`, versionCode
+`310153126`). Authenticated browser/device and manual assistive-technology
+acceptance remain unverified; Play Console upload was not performed.
+
 ## Edit-Form Loading and Recovery
 
 Route, shop, product, and variant edit forms wait for the authenticated profile
@@ -495,10 +527,21 @@ explicit workspace-access action instead of showing an endless loading bar.
 
 Logo processing is local to the client and uses deterministic PNG decoding,
 orientation correction, proportional resizing, and lossless re-encoding. It
-retains transparency and reduces dimensions until the Base64 value is within
-the Firestore field limit. The operation has no network dependency and does
-not use an AI model; an image that still cannot meet the limit fails with a
-localized size error rather than reaching Firestore as a failed upload.
+retains transparent pixels and opaque colored backgrounds, and reduces
+dimensions until the Base64 value is within the Firestore field limit. It does
+not remove or substitute a background. The operation has no network dependency
+and does not use an AI model; an image that still cannot meet the limit fails
+with a localized size error rather than reaching Firestore as a failed upload.
+
+The settings backup serializes the tenant settings document without rewriting
+the `logo_base64` string; restore writes that value back unchanged. Invoice
+creation copies the same value into its branding snapshot. Financial PDFs use
+the shared logo bytes/header policy and respect `visible_fields`; PNG, print,
+and share rasterize or pass through those same PDF bytes. XLSX currently has
+no logo-embedding path. Before feature implementation, engineers first review
+the current todos and Git delta, load the applicable skills and path
+instructions, and read the affected runtime docs and source paths as required
+by `AGENTS.md` §8.
 
 ## Cash Receipt Presentation
 

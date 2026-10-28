@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
@@ -16,6 +17,7 @@ import '../core/utils/name_resolver.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
+import '../core/utils/role_names.dart';
 import '../models/settings_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
@@ -32,6 +34,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
 import '../widgets/export_sheet.dart';
 import '../widgets/transaction_description_field.dart';
+import '../widgets/app_contextual_actions.dart';
 import '../widgets/whatsapp_button.dart';
 
 // =============================================================================
@@ -260,9 +263,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     } catch (e) {
                       if (ctx.mounted) {
                         final key = AppErrorMapper.key(e);
-                        ScaffoldMessenger.of(
-                          ctx,
-                        ).showSnackBar(errorSnackBar(tr(key, ref)));
+                        ScaffoldMessenger.of(ctx)
+                            .showSnackBar(errorSnackBar(tr(key, ref)));
                       }
                     } finally {
                       _transactionGuard.finish();
@@ -286,9 +288,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   /// If admin approval is enabled, this submits a pending request.
   Future<void> _showSellerEditTransactionDialog(TransactionModel tx) async {
     if (tx.type != 'cash_in' && tx.type != 'cash_out') {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(warningSnackBar(tr('seller_edit_cash_only', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(warningSnackBar(tr('seller_edit_cash_only', ref)));
       return;
     }
 
@@ -479,9 +480,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     } catch (e) {
                       if (sheetContext.mounted) {
                         final key = AppErrorMapper.key(e);
-                        ScaffoldMessenger.of(
-                          sheetContext,
-                        ).showSnackBar(errorSnackBar(tr(key, ref)));
+                        ScaffoldMessenger.of(sheetContext)
+                            .showSnackBar(errorSnackBar(tr(key, ref)));
                       }
                     } finally {
                       _transactionGuard.finish();
@@ -535,9 +535,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     final actionContext = context;
     if (!_transactionGuard.tryStart()) {
       if (actionContext.mounted) {
-        ScaffoldMessenger.of(
-          actionContext,
-        ).showSnackBar(infoSnackBar(tr('action_in_progress', ref)));
+        ScaffoldMessenger.of(actionContext)
+            .showSnackBar(infoSnackBar(tr('action_in_progress', ref)));
       }
       return;
     }
@@ -729,9 +728,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     } catch (e) {
                       if (ctx.mounted) {
                         final key = AppErrorMapper.key(e);
-                        ScaffoldMessenger.of(
-                          ctx,
-                        ).showSnackBar(errorSnackBar(tr(key, ref)));
+                        ScaffoldMessenger.of(ctx)
+                            .showSnackBar(errorSnackBar(tr(key, ref)));
                       }
                     } finally {
                       _transactionGuard.finish();
@@ -833,9 +831,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             } catch (e) {
                               if (context.mounted) {
                                 final key = AppErrorMapper.key(e);
-                                ScaffoldMessenger.of(
-                                  context,
-                                ).showSnackBar(errorSnackBar(tr(key, ref)));
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(errorSnackBar(tr(key, ref)));
                               }
                             }
 
@@ -857,9 +854,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             } catch (e) {
                               if (!context.mounted) return;
                               final key = AppErrorMapper.key(e);
-                              ScaffoldMessenger.of(
-                                context,
-                              ).showSnackBar(errorSnackBar(tr(key, ref)));
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(errorSnackBar(tr(key, ref)));
                             }
 
                           case _ShopAction.recoverDebt:
@@ -880,9 +876,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             } catch (e) {
                               if (!context.mounted) return;
                               final key = AppErrorMapper.key(e);
-                              ScaffoldMessenger.of(
-                                context,
-                              ).showSnackBar(errorSnackBar(tr(key, ref)));
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(errorSnackBar(tr(key, ref)));
                             }
 
                           case _ShopAction.export:
@@ -1007,9 +1002,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             } catch (e) {
                               if (!context.mounted) return;
                               final key = AppErrorMapper.key(e);
-                              ScaffoldMessenger.of(
-                                context,
-                              ).showSnackBar(errorSnackBar(tr(key, ref)));
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(errorSnackBar(tr(key, ref)));
                             }
                         }
                       },
@@ -1172,9 +1166,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                       ) ??
                                       Text(
                                         '—',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.titleSmall,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall,
                                       ),
                                 ],
                               ),
@@ -1299,9 +1293,9 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                     ),
                                     Text(
                                       '${tr('bad_debt_amount', ref)}: ${AppFormatters.currency(shop.badDebtAmount, currency)}',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall,
                                     ),
                                   ],
                                 ),
@@ -1373,9 +1367,8 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                   children: [
                     Text(
                       tr('transactions', ref),
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context).textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const Spacer(),
                     txAsync.whenOrNull(
@@ -1464,17 +1457,17 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                 horizontal: 16,
                                 vertical: 6,
                               ),
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerHighest,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
                               child: Text(
                                 item.monthHeader!,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
                                 ),
                               ),
                             );
@@ -1557,151 +1550,148 @@ class _TransactionTile extends ConsumerWidget {
     final ppc = ref.watch(settingsProvider).value?.pairsPerCarton ?? 12;
     final totalQty = tx.items.fold<int>(0, (acc, item) => acc + item.qty);
 
-    return ListTile(
-      leading: CircleAvatar(
-        radius: 18,
-        backgroundColor: color.withAlpha(25),
-        child: Icon(
-          isDeleted
-              ? Icons.remove_circle_outline
-              : tx.isReturn
-              ? Icons.assignment_return
-              : isWriteOff
-              ? Icons.money_off
-              : (reducesBalance ? Icons.arrow_downward : Icons.arrow_upward),
-          color: color,
-          size: 20,
+    final contextualActions = <AppContextualAction>[
+      if (canEdit)
+        AppContextualAction(
+          entity: ContextualEntity.transaction,
+          id: ContextualActionId.edit,
+          label: tr('edit', ref),
+          icon: Icons.edit_outlined,
+          requiredCapability: AppCapability.viewHistory,
+          onSelected: onEdit!,
+        ),
+      if (canApproveEdit)
+        AppContextualAction(
+          entity: ContextualEntity.transaction,
+          id: ContextualActionId.approveEdit,
+          label: tr('approve_seller_edit', ref),
+          icon: Icons.check_circle_outline,
+          requiredCapability: AppCapability.editLedger,
+          onSelected: onApproveEdit!,
+        ),
+      if (canApproveEdit)
+        AppContextualAction(
+          entity: ContextualEntity.transaction,
+          id: ContextualActionId.rejectEdit,
+          label: tr('reject_seller_edit', ref),
+          icon: Icons.cancel_outlined,
+          requiredCapability: AppCapability.editLedger,
+          onSelected: onRejectEdit!,
+        ),
+      if (canDelete)
+        AppContextualAction(
+          entity: ContextualEntity.transaction,
+          id: ContextualActionId.delete,
+          label: tr('delete', ref),
+          icon: Icons.delete_outline,
+          requiredCapability: AppCapability.editLedger,
+          destructive: true,
+          onSelected: onDelete!,
+        ),
+      AppContextualAction(
+        entity: ContextualEntity.transaction,
+        id: ContextualActionId.copyReference,
+        label: tr('copy_reference', ref),
+        icon: Icons.copy_outlined,
+        requiredCapability: AppCapability.viewHistory,
+        onSelected: () => copyContextualText(
+          context: context,
+          ref: ref,
+          text: tx.invoiceNumber?.isNotEmpty == true
+              ? tx.invoiceNumber!
+              : tx.id,
         ),
       ),
-      title: Text(
-        '$sign ${AppFormatters.currency(tx.amount, ref.watch(routeCurrencyProvider(tx.routeId)))}',
-
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: color,
-          fontSize: 15,
-        ),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (isDeleted)
-            Text(
-              tr('void', ref).toUpperCase(),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          if (tx.editRequestPending)
-            Text(
-              tr('pending_admin_approval', ref).toUpperCase(),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          if (tx.description != null && tx.description!.isNotEmpty)
-            Text(tx.description!, maxLines: 1, overflow: TextOverflow.ellipsis),
-          if (tx.hasItems)
-            Text(
-              '${tr('items', ref)}: ${AppFormatters.stock(totalQty, ppc)}',
-              style: TextStyle(
-                fontSize: 11,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          Text(
-            AppFormatters.dateTime(tx.createdAt),
-            style: Theme.of(context).textTheme.bodySmall,
+    ];
+    return AppContextualActions(
+      entity: ContextualEntity.transaction,
+      actions: contextualActions,
+      child: ListTile(
+        leading: CircleAvatar(
+          radius: 18,
+          backgroundColor: color.withAlpha(25),
+          child: Icon(
+            isDeleted
+                ? Icons.remove_circle_outline
+                : tx.isReturn
+                ? Icons.assignment_return
+                : isWriteOff
+                ? Icons.money_off
+                : (reducesBalance ? Icons.arrow_downward : Icons.arrow_upward),
+            color: color,
+            size: 20,
           ),
-          // Running balance (CreditBook-style)
-          if (runningBalance != null)
-            Text(
-              '${tr('running_balance', ref)}: ${AppFormatters.currency(runningBalance!, ref.watch(routeCurrencyProvider(tx.routeId)))}',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: runningBalance! > 0
-                    ? AppBrand.errorColor
-                    : runningBalance! < 0
-                    ? AppBrand.successColor
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        title: Text(
+          '$sign ${AppFormatters.currency(tx.amount, ref.watch(routeCurrencyProvider(tx.routeId)))}',
+
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: color,
+            fontSize: 15,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isDeleted)
+              Text(
+                tr('void', ref).toUpperCase(),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
+            if (tx.editRequestPending)
+              Text(
+                tr('pending_admin_approval', ref).toUpperCase(),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            if (tx.description != null && tx.description!.isNotEmpty)
+              Text(
+                tx.description!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            if (tx.hasItems)
+              Text(
+                '${tr('items', ref)}: ${AppFormatters.stock(totalQty, ppc)}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            Text(
+              AppFormatters.dateTime(tx.createdAt),
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-        ],
+            // Running balance (CreditBook-style)
+            if (runningBalance != null)
+              Text(
+                '${tr('running_balance', ref)}: ${AppFormatters.currency(runningBalance!, ref.watch(routeCurrencyProvider(tx.routeId)))}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: runningBalance! > 0
+                      ? AppBrand.errorColor
+                      : runningBalance! < 0
+                      ? AppBrand.successColor
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
+        trailing: AppContextualActionsButton(
+          entity: ContextualEntity.transaction,
+          actions: contextualActions,
+        ),
+        dense: true,
       ),
-      trailing: (canEdit || canApproveEdit)
-          ? PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, size: 20),
-              onSelected: (v) {
-                if (v == 'edit' && onEdit != null) onEdit!();
-                if (v == 'approve_edit' && onApproveEdit != null) {
-                  onApproveEdit!();
-                }
-                if (v == 'reject_edit' && onRejectEdit != null) {
-                  onRejectEdit!();
-                }
-                if (v == 'delete' && onDelete != null) onDelete!();
-              },
-              itemBuilder: (_) => [
-                if (canEdit)
-                  PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.edit, size: 16),
-                        const SizedBox(width: 8),
-                        Text(tr('edit', ref)),
-                      ],
-                    ),
-                  ),
-                if (canApproveEdit)
-                  PopupMenuItem(
-                    value: 'approve_edit',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_circle, size: 16),
-                        const SizedBox(width: 8),
-                        Text(tr('approve_seller_edit', ref)),
-                      ],
-                    ),
-                  ),
-                if (canApproveEdit)
-                  PopupMenuItem(
-                    value: 'reject_edit',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.cancel, size: 16),
-                        const SizedBox(width: 8),
-                        Text(tr('reject_seller_edit', ref)),
-                      ],
-                    ),
-                  ),
-                if (canDelete)
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.delete,
-                          size: 16,
-                          color: AppBrand.errorColor,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          tr('delete', ref),
-                          style: const TextStyle(color: AppBrand.errorColor),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            )
-          : null,
-      dense: true,
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
@@ -18,6 +19,8 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
 import '../widgets/app_pull_refresh.dart';
+import '../widgets/app_contextual_actions.dart';
+import '../widgets/contextual_action_catalog.dart';
 import '../widgets/whatsapp_button.dart';
 
 class RouteDetailScreen extends ConsumerWidget {
@@ -79,9 +82,8 @@ class RouteDetailScreen extends ConsumerWidget {
                             } catch (e) {
                               if (context.mounted) {
                                 final key = AppErrorMapper.key(e);
-                                ScaffoldMessenger.of(
-                                  context,
-                                ).showSnackBar(errorSnackBar(tr(key, ref)));
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(errorSnackBar(tr(key, ref)));
                               }
                             }
                           },
@@ -297,70 +299,80 @@ class RouteDetailScreen extends ConsumerWidget {
                         final shop = sorted[i];
                         final hasDebt = shop.balance > 0;
                         final cs = Theme.of(context).colorScheme;
-                        return Card(
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: hasDebt
-                                  ? AppTheme.debtBg(cs)
-                                  : AppTheme.clearBg(cs),
-                              child: Icon(
-                                Icons.store,
-                                color: hasDebt
-                                    ? AppTheme.debtFg(cs)
-                                    : AppTheme.clearFg(cs),
+                        return AppContextualActions(
+                          entity: ContextualEntity.shop,
+                          actions: shopContextualActions(
+                            context: context,
+                            ref: ref,
+                            shop: shop,
+                          ),
+                          child: Card(
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: hasDebt
+                                    ? AppTheme.debtBg(cs)
+                                    : AppTheme.clearBg(cs),
+                                child: Icon(
+                                  Icons.store,
+                                  color: hasDebt
+                                      ? AppTheme.debtFg(cs)
+                                      : AppTheme.clearFg(cs),
+                                ),
                               ),
-                            ),
-                            title: Text(
-                              shop.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
+                              title: Text(
+                                shop.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    if (shop.phone != null)
-                                      Expanded(
-                                        child: Text(
-                                          shop.phone!,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
+                                      if (shop.phone != null)
+                                        Expanded(
+                                          child: Text(
+                                            shop.phone!,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        )
+                                      else
+                                        const Expanded(
+                                          child: SizedBox.shrink(),
                                         ),
-                                      )
-                                    else
-                                      const Expanded(child: SizedBox.shrink()),
-                                    WhatsAppIconButton(
-                                      phone: shop.phone,
-                                      iconSize: 18,
-                                    ),
-                                  ],
-                                ),
-                                _LastTxSubtitle(
-                                  shop: shop,
-                                  ref: ref,
-                                  currency: route.currency,
-                                  lastTxFallback: lastTxByShop[shop.id],
-                                ),
-                              ],
-                            ),
-                            trailing: Text(
-                              AppFormatters.currency(
-                                shop.balance,
-                                route.currency,
+                                      WhatsAppIconButton(
+                                        phone: shop.phone,
+                                        iconSize: 18,
+                                      ),
+                                    ],
+                                  ),
+                                  _LastTxSubtitle(
+                                    shop: shop,
+                                    ref: ref,
+                                    currency: route.currency,
+                                    lastTxFallback: lastTxByShop[shop.id],
+                                  ),
+                                ],
                               ),
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: hasDebt
-                                    ? AppTheme.debtFg(cs)
-                                    : AppTheme.clearFg(cs),
+                              trailing: Text(
+                                AppFormatters.currency(
+                                  shop.balance,
+                                  route.currency,
+                                ),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: hasDebt
+                                      ? AppTheme.debtFg(cs)
+                                      : AppTheme.clearFg(cs),
+                                ),
                               ),
+                              onTap: () => context.push('/shops/${shop.id}'),
                             ),
-                            onTap: () => context.push('/shops/${shop.id}'),
                           ),
                         );
                       },
@@ -425,9 +437,8 @@ class _LastTxSubtitle extends StatelessWidget {
           width: 72,
           margin: const EdgeInsets.only(top: 2),
           decoration: BoxDecoration(
-            color: Theme.of(
-              context,
-            ).colorScheme.outlineVariant.withValues(alpha: 0.35),
+            color: Theme.of(context).colorScheme.outlineVariant
+                .withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(4),
           ),
         );

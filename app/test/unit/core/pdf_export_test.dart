@@ -12,10 +12,15 @@ import 'package:footwear_erp/models/invoice_model.dart';
 import 'package:footwear_erp/models/settings_model.dart';
 import 'package:footwear_erp/models/transaction_model.dart';
 
-final _testLogoBase64 = base64Encode(
-  img.encodePng(img.Image(width: 2, height: 2)),
-);
+final _testLogoBase64 = base64Encode(_createTestLogoBytes());
 final _testLogoBytes = base64Decode(_testLogoBase64);
+
+Uint8List _createTestLogoBytes() {
+  final logo = img.Image(width: 2, height: 2, numChannels: 4);
+  img.fill(logo, color: img.ColorRgba8(24, 82, 146, 255));
+  logo.setPixelRgba(0, 0, 24, 82, 146, 0);
+  return Uint8List.fromList(img.encodePng(logo));
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -174,9 +179,8 @@ void main() {
         final pageCount = RegExp(r'/Count\s+(\d+)').firstMatch(pdf);
         expect(pageCount, isNotNull);
         expect(int.parse(pageCount!.group(1)!), 1);
-        final mediaBox = RegExp(
-          r'/MediaBox\[0 0 ([\d.]+) ([\d.]+)\]',
-        ).firstMatch(pdf);
+        final mediaBox = RegExp(r'/MediaBox\[0 0 ([\d.]+) ([\d.]+)\]')
+            .firstMatch(pdf);
         expect(mediaBox, isNotNull);
         expect(
           double.parse(mediaBox!.group(1)!),
@@ -187,6 +191,7 @@ void main() {
           closeTo(PdfPageFormat.a5.height, 0.1),
         );
         expect(pdf, contains('/Subtype/Image'));
+        expect(pdf, contains('/SMask'));
         expect(pdf, contains('NotoSansArabic'));
         expect(pdf, contains('/FontFile2'));
       }
@@ -295,9 +300,8 @@ void main() {
       companyName: 'Workspace',
     );
 
-    final pageCount = RegExp(
-      r'/Count\s+(\d+)',
-    ).firstMatch(latin1.decode(bytes, allowInvalid: true));
+    final pageCount = RegExp(r'/Count\s+(\d+)')
+        .firstMatch(latin1.decode(bytes, allowInvalid: true));
     expect(pageCount, isNotNull);
     expect(int.parse(pageCount!.group(1)!), greaterThan(1));
   });
@@ -365,6 +369,73 @@ void main() {
       isNot(contains('/Subtype/Image')),
     );
   });
+
+  test(
+    'shared PDF header preserves logo alpha and opaque image treatment',
+    () async {
+      final transparentLogo = img.Image(width: 4, height: 4, numChannels: 4);
+      img.fill(transparentLogo, color: img.ColorRgba8(0, 120, 200, 255));
+      transparentLogo.setPixelRgba(0, 0, 0, 0, 0, 0);
+      final transparentPdf = await buildPdfTable(
+        title: 'Logo report',
+        headers: const ['Shop'],
+        rows: const [
+          ['Sample Shop'],
+        ],
+        companyName: 'Workspace Name',
+        locale: AppLocale.en,
+        logoBytes: Uint8List.fromList(img.encodePng(transparentLogo)),
+        header: const InvoiceHeaderConfig(
+          nameEn: 'Workspace Name',
+          visibleFields: {'logo'},
+        ),
+      );
+      final transparentPdfText = latin1.decode(
+        transparentPdf,
+        allowInvalid: true,
+      );
+      expect(transparentPdfText, contains('/Subtype/Image'));
+      expect(transparentPdfText, contains('/SMask'));
+
+      final opaqueLogo = img.Image(width: 4, height: 4, numChannels: 3);
+      img.fill(opaqueLogo, color: img.ColorRgb8(24, 82, 146));
+      final opaquePdf = await buildPdfTable(
+        title: 'Logo report',
+        headers: const ['Shop'],
+        rows: const [
+          ['Sample Shop'],
+        ],
+        companyName: 'Workspace Name',
+        locale: AppLocale.en,
+        logoBytes: Uint8List.fromList(img.encodePng(opaqueLogo)),
+        header: const InvoiceHeaderConfig(
+          nameEn: 'Workspace Name',
+          visibleFields: {'logo'},
+        ),
+      );
+      final opaquePdfText = latin1.decode(opaquePdf, allowInvalid: true);
+      expect(opaquePdfText, contains('/Subtype/Image'));
+
+      final hiddenLogoPdf = await buildPdfTable(
+        title: 'Logo report',
+        headers: const ['Shop'],
+        rows: const [
+          ['Sample Shop'],
+        ],
+        companyName: 'Workspace Name',
+        locale: AppLocale.en,
+        logoBytes: Uint8List.fromList(img.encodePng(transparentLogo)),
+        header: const InvoiceHeaderConfig(
+          nameEn: 'Workspace Name',
+          visibleFields: {},
+        ),
+      );
+      expect(
+        latin1.decode(hiddenLogoPdf, allowInvalid: true),
+        isNot(contains('/Subtype/Image')),
+      );
+    },
+  );
 
   test('Arabic and Urdu text builds across shared PDF report paths', () async {
     final date = Timestamp.fromDate(DateTime(2026, 10, 22));
@@ -440,9 +511,9 @@ void main() {
       contains('/Subtype/Image'),
     );
     expect(
-      RegExp(
-        r'/Count\s+(\d+)',
-      ).firstMatch(latin1.decode(ledgerPdf, allowInvalid: true))?.group(1),
+      RegExp(r'/Count\s+(\d+)')
+          .firstMatch(latin1.decode(ledgerPdf, allowInvalid: true))
+          ?.group(1),
       '1',
     );
 

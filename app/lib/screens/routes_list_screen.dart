@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../models/route_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/route_provider.dart';
+import '../widgets/app_contextual_actions.dart';
+import '../widgets/contextual_action_catalog.dart';
 import '../widgets/app_pull_refresh.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
@@ -106,112 +109,116 @@ class _RouteTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    return Card(
-      child: ListTile(
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: cs.primaryContainer,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            '${route.routeNumber}',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: cs.onPrimaryContainer,
+    return AppContextualActions(
+      entity: ContextualEntity.route,
+      actions: routeContextualActions(context: context, ref: ref, route: route),
+      child: Card(
+        child: ListTile(
+          leading: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: cs.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '${route.routeNumber}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: cs.onPrimaryContainer,
+              ),
             ),
           ),
-        ),
-        title: Text(
-          route.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    [
-                      if (route.area != null) route.area,
-                      '${route.totalShops} ${tr('shops', ref)}',
-                    ].join(' · '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: route.currency == 'PKR'
-                        ? cs.tertiaryContainer
-                        : cs.secondaryContainer,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    route.currency,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: route.currency == 'PKR'
-                          ? cs.onTertiaryContainer
-                          : cs.onSecondaryContainer,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (route.assignedSellerNames.isNotEmpty)
+          title: Text(
+            route.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Row(
                 children: [
-                  Icon(Icons.person, size: 12, color: cs.primary),
-                  const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      route.assignedSellerNames.join(', '),
+                      [
+                        if (route.area != null) route.area,
+                        '${route.totalShops} ${tr('shops', ref)}',
+                      ].join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: cs.primary),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: route.currency == 'PKR'
+                          ? cs.tertiaryContainer
+                          : cs.secondaryContainer,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      route.currency,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: route.currency == 'PKR'
+                            ? cs.onTertiaryContainer
+                            : cs.onSecondaryContainer,
+                      ),
                     ),
                   ),
                 ],
               ),
-          ],
-        ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.store, size: 14, color: cs.onSurfaceVariant),
-              const SizedBox(width: 4),
-              Text(
-                '${route.totalShops}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: cs.onSurfaceVariant,
+              if (route.assignedSellerNames.isNotEmpty)
+                Row(
+                  children: [
+                    Icon(Icons.person, size: 12, color: cs.primary),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        route.assignedSellerNames.join(', '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: cs.primary),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
             ],
           ),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.store, size: 14, color: cs.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Text(
+                  '${route.totalShops}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          onTap: () => context.push('/routes/${route.id}'),
         ),
-        onTap: () => context.push('/routes/${route.id}'),
       ),
     );
   }

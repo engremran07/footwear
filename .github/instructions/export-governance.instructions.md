@@ -79,6 +79,26 @@ page may be RTL; in `pdf` 3.12.0, `pw.Row` has no `textDirection` parameter.
 Set each child `pw.Text` direction independently. Cash receipts are A5 and
 single-page.
 
+## Workspace Logo Preservation
+
+The uploaded asset's appearance is part of the workspace data contract:
+
+- Transparent pixels stay transparent. Do not flatten a transparent logo onto
+  a white canvas during upload, resizing, PDF generation, or report imaging.
+- An opaque logo with a colored background keeps that background and its
+  colors. Do not infer that a solid background should be removed or replaced.
+- Optimize locally and deterministically within Firestore document-size
+  limits. Resizing or re-encoding must preserve alpha and avoid unintended
+  crop, tint, background substitution, or color-space changes.
+- Keep the same current-workspace logo selection, invoice/receipt fallback,
+  shared placement, and `visibleFields` behavior for PDF, report, print, share,
+  and PNG outputs. PNG pages generated from the shared PDF bytes must match the
+  PDF's logo treatment.
+- Test transparent and opaque colored-background fixtures through processing,
+  settings persistence, shared PDF resources, and image/report export. A PDF
+  image-resource assertion proves embedding, not pixel appearance; inspect
+  rasterized output when available and state when it is unavailable.
+
 Focused regression coverage belongs in `pdf_export_test.dart`,
 `export_sheet_page_export_test.dart`, and `excel_export_test.dart`. Include
 Arabic plus Urdu-specific letters (`ٹ ڈ ڑ ں ھ ے`), verify the PDF embeds

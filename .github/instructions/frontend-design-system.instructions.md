@@ -66,6 +66,23 @@ into identical metric cards or add decorative data, gradients, or motion.
 - Respect `MediaQuery.disableAnimations` for newly introduced motion. Motion
   must communicate a state change and must not delay a business action.
 
+## Contextual record actions
+
+- Use the shared `AppContextualActions` and `AppContextualAction` pattern for
+  record-level secondary actions instead of creating screen-local menus.
+- Preserve the row's primary tap and nested controls. Context menus may open
+  from long-press, secondary click, the context-menu key or Shift+F10, and
+  screen-reader custom actions. Keep a visible menu button where the action
+  would otherwise be difficult to discover.
+- Declare entity and `AppCapability` for each action. Resolve actions through
+  `PermissionPolicy` for an active profile and concrete tenant; re-check the
+  current profile and capability when an action is selected.
+- Reuse existing route, screen, and notifier callbacks. Contextual menus are
+  not an authorization boundary and must not perform Firestore writes.
+- Cover role filtering, inactive/unscoped users, primary and nested taps,
+  keyboard/assistive entry points, RTL, and large text where the surface
+  supports them. Existing submit/provider guards remain mandatory.
+
 ## Accessibility, localization, and RTL
 
 - Preserve English, Arabic, and Urdu. Do not hardcode user-visible text.

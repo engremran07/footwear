@@ -6,6 +6,73 @@
 
 ---
 
+## SESSION-065 — 2026-10-28 — v3.10.15+1126 Release Completion
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Complete the authorized v3.10.15 release sequence after
+contextual-action and workspace-logo work, and record exact delivery evidence.
+
+- Synchronized `app/pubspec.yaml`, `AppBrand`, and the trilingual changelog to
+  `3.10.15+1126`.
+- Focused release regressions: `00:11 +33: All tests passed!`; full serial
+  Flutter suite: `02:40 +716: All tests passed!`; `flutter analyze lib
+  --no-pub`: `No issues found! (ran in 16.2s)`; `dart analyze test/`:
+  `No issues found!`.
+- Web build reported `EXIT: 0`; Firebase Hosting and Firestore
+  Rules/indexes each reported `Deploy complete!`. Live `version.json` reports
+  `3.10.15+1126`; shell cache headers are `no-store, must-revalidate,
+  no-cache`.
+- Split APKs built at 31.4/32.9/34.5 MB and verified with APK v2. ARM64 copy
+  reported `1 file pushed`; install reported `Success` on `R5GL22RGT9V`,
+  versionCode `310153126`. The signed 72.3 MB AAB reports `jar verified.`;
+  its self-signed/untrusted local certificate and missing timestamp do not
+  confirm Play Console upload-key acceptance. No Play upload occurred.
+- Documentation was updated to reflect delivered status and remaining
+  limitations. Pixel-level PDF logo inspection and authenticated
+  accessibility/browser/device acceptance remain open. The user-reported PDF
+  connected-letter issue remains unconfirmed because its original document
+  and viewer/runtime details are unavailable; no font policy was changed.
+- Git commit/push are the remaining authorized publication operations.
+  A push to `main` triggers the repository deployment workflow.
+
+---
+
+## SESSION-064 — 2026-10-28 — Skills-First Governance and Logo Preservation
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Require the governance/skills/documentation review before feature
+edits, preserve the active task list, and verify that workspace logos retain
+transparent or opaque colored backgrounds through processing and exports.
+
+- Updated `AGENTS.md`, `CLAUDE.md`, the frontend design-system instruction,
+  frontend/export/audit skills, export governance, the README files, and the
+  system deep dive to establish the skills-first feature gate and logo
+  preservation contract.
+- Audited the local logo processing, settings serialization, backup/restore,
+  invoice snapshots, and shared PDF-derived export path. Processing already
+  preserves alpha and opaque source colors while resizing to the Firestore
+  limit; no production Dart change was justified.
+- Added regressions for alpha/RGB and opaque colors through processing and
+  settings serialization, PDF alpha-mask embedding, invoice-snapshot fallback,
+  and `visibleFields` suppression. Pixel-level PDF/PNG rendering was not
+  verified because no PDF rasterizer was available; XLSX does not embed logos.
+- Contextual-action unit/widget suite: `00:01 +5: All tests passed!`; logo
+  processor/PDF suite: `00:01 +18: All tests passed!`; serial full suite:
+  `02:50 +716: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 11.6s)`; `dart analyze test/`:
+  `No issues found!`.
+- A parallel full-suite runner stalled after 606 tests and was stopped after
+  its Dart child became idle; the last notification-route test passed alone,
+  and the full serial rerun passed. Hot restart was unavailable because the
+  connected Dart Tooling Daemon had no Flutter app.
+- Markdown lint exited 0 with no output; `git diff --check` exited 0.
+- Local, unreleased source/test/documentation only. No version bump, build,
+  install, deployment, commit, or push was performed.
+
+---
+
 ## SESSION-063 — 2026-10-28 — Notification Query Budget and Android Alerts
 
 **Agent:** GitHub Copilot

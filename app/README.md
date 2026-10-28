@@ -1,6 +1,25 @@
-# FootWear ERP — Flutter App (v3.10.14+1125; Hosting/Rules deployed, ARM64 installed)
+# FootWear ERP — Flutter App (v3.10.15+1126; Hosting/Rules deployed, ARM64 installed)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
+
+## v3.10.15+1126 Contextual Record Actions
+
+Record-level secondary actions now use the shared contextual-action
+presenter across route, shop, product, inventory, invoice, transaction,
+notification, dashboard, and report rows. Touch long-press, web secondary
+click, keyboard context-menu shortcuts, and screen-reader custom actions
+invoke existing guarded callbacks; ordinary row taps and nested controls are
+preserved. Eligibility uses the active profile, tenant scope, and
+`PermissionPolicy`, with a second check at selection. This UI filtering does
+not replace provider or Firestore authorization. Full serial Flutter suite:
+`02:40 +716: All tests passed!`; focused release regressions:
+`00:11 +33: All tests passed!`; both Dart analyzers reported `No issues
+found!`. Web build: `EXIT: 0`; Hosting and Firestore Rules/indexes reported
+`Deploy complete!`; live `version.json` is `3.10.15+1126`. Split APKs
+(31.4/32.9/34.5 MB) and a signed 72.3 MB AAB were built; APK v2 and AAB JAR
+signatures verified. ARM64 was installed on `R5GL22RGT9V` (`Success`,
+versionCode `310153126`). Manual visual and assistive-technology acceptance
+remains unverified, and Play Console upload was not performed.
 
 ## v3.10.14+1125 Notification Visibility and Android Alerts
 
@@ -373,7 +392,11 @@ the free-tier cap remains 10 non-platform members.
 Workspace logos are resized locally on the device, preserving transparency and
 reducing dimensions until the encoded logo fits the Firestore limit. This uses
 deterministic image processing and does not require an AI model or network
-service.
+service. Opaque colored backgrounds remain present with their original colors;
+the processor does not infer or remove a background. Settings backups serialize
+the raw tenant settings logo value, and invoice snapshots retain that same
+Base64 asset. Shared PDF, print, share, and PNG paths reuse the same logo/header
+selection and `visibleFields`; XLSX does not currently embed logos.
 
 Cash-receipt detail and PDFs use a compact bilingual table layout. Receipt PDFs
 are deliberately single-page and omit the account-balance-movement block; the
@@ -567,7 +590,9 @@ workspace brand header: English business information is left-aligned and the
 selected Arabic/Urdu information is right-aligned independently of app locale.
 Current workspace logo bytes take priority, with an invoice/receipt snapshot
 fallback when they are unavailable and the configured logo visibility allows
-it. Cash receipts use an A5 page and remain single-page. Font metadata tests
+it. Source transparency and opaque colored backgrounds are preserved through
+local processing and PDF image embedding. Cash receipts use an A5 page and
+remain single-page. Font metadata tests
 and rendered-layout checks are separate; an embedded font does not prove
 correct glyph appearance. Rows use an explicit LTR `Directionality` wrapper
 because the page may be RTL and `pdf` 3.12.0 `Row` has no direction argument.

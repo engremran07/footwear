@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/utils/role_names.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
 import '../models/invoice_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/invoice_provider.dart';
 import '../widgets/app_pull_refresh.dart';
+import '../widgets/app_contextual_actions.dart';
 import '../widgets/app_search_bar.dart';
 import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
@@ -200,72 +203,97 @@ class _InvoiceTile extends ConsumerWidget {
         ? tr('sale_invoice', ref)
         : tr('credit_note', ref);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        onTap: () => context.push('/invoices/${invoice.id}'),
-        leading: CircleAvatar(
-          backgroundColor: invoice.isCashReceipt
-              ? AppTheme.clearBg(cs)
-              : invoice.isSale
-              ? AppTheme.debtBg(cs)
-              : AppTheme.clearBg(cs),
-          child: Icon(
-            invoice.isCashReceipt
-                ? Icons.payments_outlined
-                : invoice.isSale
-                ? Icons.receipt
-                : Icons.assignment_return,
-            size: 20,
-            color: invoice.isSale && !invoice.isCashReceipt
-                ? cs.error
-                : cs.primary,
+    return AppContextualActions(
+      entity: ContextualEntity.invoice,
+      actions: [
+        AppContextualAction(
+          entity: ContextualEntity.invoice,
+          id: ContextualActionId.viewDetails,
+          label: tr('details', ref),
+          icon: Icons.open_in_new,
+          requiredCapability: AppCapability.viewInvoices,
+          onSelected: () => context.push('/invoices/${invoice.id}'),
+        ),
+        AppContextualAction(
+          entity: ContextualEntity.invoice,
+          id: ContextualActionId.copyReference,
+          label: tr('copy_reference', ref),
+          icon: Icons.copy_outlined,
+          requiredCapability: AppCapability.viewInvoices,
+          onSelected: () => copyContextualText(
+            context: context,
+            ref: ref,
+            text: invoice.invoiceNumber,
           ),
         ),
-        title: Text(
-          invoice.invoiceNumber,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${invoice.shopName} • $dateStr',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+      ],
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: ListTile(
+          onTap: () => context.push('/invoices/${invoice.id}'),
+          leading: CircleAvatar(
+            backgroundColor: invoice.isCashReceipt
+                ? AppTheme.clearBg(cs)
+                : invoice.isSale
+                ? AppTheme.debtBg(cs)
+                : AppTheme.clearBg(cs),
+            child: Icon(
+              invoice.isCashReceipt
+                  ? Icons.payments_outlined
+                  : invoice.isSale
+                  ? Icons.receipt
+                  : Icons.assignment_return,
+              size: 20,
+              color: invoice.isSale && !invoice.isCashReceipt
+                  ? cs.error
+                  : cs.primary,
             ),
-            Text(
-              invoiceTypeLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
-          ],
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              AppFormatters.currency(invoice.total, invoice.currency),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: invoice.isSale ? cs.error : cs.primary,
+          ),
+          title: Text(
+            invoice.invoiceNumber,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${invoice.shopName} • $dateStr',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: statusColor,
-                borderRadius: BorderRadius.circular(4),
+              Text(
+                invoiceTypeLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall,
               ),
-              child: Text(
-                statusLabel.toUpperCase(),
-                style: const TextStyle(fontSize: 10),
+            ],
+          ),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                AppFormatters.currency(invoice.total, invoice.currency),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: invoice.isSale ? cs.error : cs.primary,
+                ),
               ),
-            ),
-          ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusColor,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  statusLabel.toUpperCase(),
+                  style: const TextStyle(fontSize: 10),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -399,9 +427,8 @@ class _IStat extends StatelessWidget {
       ),
       Text(
         label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
+        style: Theme.of(context).textTheme.labelSmall
+            ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
     ],
   );

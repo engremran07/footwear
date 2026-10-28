@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/share_helper.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
+import '../widgets/app_contextual_actions.dart';
 
 String _stockLabel(int qty, int ppc, WidgetRef ref) {
   if (qty <= 0) return '0 ${tr('pairs', ref)}';
@@ -200,9 +203,8 @@ class ProductDetailScreen extends ConsumerWidget {
                   children: [
                     Text(
                       tr('variants', ref),
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context).textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const Spacer(),
                     variantsAsync.whenOrNull(
@@ -240,56 +242,85 @@ class ProductDetailScreen extends ConsumerWidget {
                       itemBuilder: (_, i) {
                         final v = variants[i];
                         final cs = Theme.of(context).colorScheme;
-                        return Card(
-                          child: ListTile(
-                            title: Text(
-                              v.variantName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
+                        return AppContextualActions(
+                          entity: ContextualEntity.product,
+                          actions: [
+                            AppContextualAction(
+                              entity: ContextualEntity.product,
+                              id: ContextualActionId.edit,
+                              label: tr('edit', ref),
+                              icon: Icons.edit_outlined,
+                              requiredCapability: AppCapability.manageProducts,
+                              onSelected: () => context.push(
+                                '/products/$productId/variants/${v.id}/edit',
                               ),
                             ),
-                            subtitle: Text(
-                              '${tr('qty', ref)}: ${AppFormatters.number(v.quantityAvailable)} ${tr('pairs', ref)}',
+                            AppContextualAction(
+                              entity: ContextualEntity.product,
+                              id: ContextualActionId.copyReference,
+                              label: tr('copy_reference', ref),
+                              icon: Icons.copy_outlined,
+                              requiredCapability: AppCapability.viewProducts,
+                              onSelected: () => copyContextualText(
+                                context: context,
+                                ref: ref,
+                                text: v.variantName,
+                              ),
                             ),
-                            trailing: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 130),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
+                          ],
+                          child: Card(
+                            child: ListTile(
+                              title: Text(
+                                v.variantName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: v.quantityAvailable > 0
-                                      ? AppTheme.clearBg(cs)
-                                      : AppTheme.debtBg(cs),
-                                  borderRadius: BorderRadius.circular(12),
+                              ),
+                              subtitle: Text(
+                                '${tr('qty', ref)}: ${AppFormatters.number(v.quantityAvailable)} ${tr('pairs', ref)}',
+                              ),
+                              trailing: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 130,
                                 ),
-                                child: Text(
-                                  _stockLabel(
-                                    v.quantityAvailable,
-                                    settings?.pairsPerCarton ?? 12,
-                                    ref,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
                                   ),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                                  decoration: BoxDecoration(
                                     color: v.quantityAvailable > 0
-                                        ? AppTheme.clearFg(cs)
-                                        : AppTheme.debtFg(cs),
+                                        ? AppTheme.clearBg(cs)
+                                        : AppTheme.debtBg(cs),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                  child: Text(
+                                    _stockLabel(
+                                      v.quantityAvailable,
+                                      settings?.pairsPerCarton ?? 12,
+                                      ref,
+                                    ),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: v.quantityAvailable > 0
+                                          ? AppTheme.clearFg(cs)
+                                          : AppTheme.debtFg(cs),
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ),
+                              onTap: user?.canManageOperationalData == true
+                                  ? () => context.push(
+                                      '/products/$productId/variants/${v.id}/edit',
+                                    )
+                                  : null,
                             ),
-                            onTap: user?.canManageOperationalData == true
-                                ? () => context.push(
-                                    '/products/$productId/variants/${v.id}/edit',
-                                  )
-                                : null,
                           ),
                         );
                       },

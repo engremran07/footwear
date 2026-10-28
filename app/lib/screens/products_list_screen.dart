@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
+import '../core/utils/role_names.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
+import '../widgets/app_contextual_actions.dart';
 import '../widgets/app_pull_refresh.dart';
 import '../widgets/app_search_bar.dart';
 import '../widgets/empty_state.dart';
@@ -92,29 +95,66 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                     itemCount: filtered.length,
                     itemBuilder: (_, i) {
                       final p = filtered[i];
-                      return Card(
-                        child: ListTile(
-                          leading: p.imageUrl != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    p.imageUrl!,
-                                    width: 48,
-                                    height: 48,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => _productIcon(cs),
-                                  ),
-                                )
-                              : _productIcon(cs),
-                          title: Text(
-                            p.name,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                      return AppContextualActions(
+                        entity: ContextualEntity.product,
+                        actions: [
+                          AppContextualAction(
+                            entity: ContextualEntity.product,
+                            id: ContextualActionId.viewDetails,
+                            label: tr('details', ref),
+                            icon: Icons.open_in_new,
+                            requiredCapability: AppCapability.viewProducts,
+                            onSelected: () => context.push('/products/${p.id}'),
                           ),
-                          subtitle: Text(p.category),
-                          trailing: const Icon(Icons.chevron_right, size: 20),
-                          onTap: () => context.push('/products/${p.id}'),
-                        ),
-                      ).listEntry(i);
+                          AppContextualAction(
+                            entity: ContextualEntity.product,
+                            id: ContextualActionId.edit,
+                            label: tr('edit', ref),
+                            icon: Icons.edit_outlined,
+                            requiredCapability: AppCapability.manageProducts,
+                            onSelected: () =>
+                                context.push('/products/${p.id}/edit'),
+                          ),
+                          AppContextualAction(
+                            entity: ContextualEntity.product,
+                            id: ContextualActionId.copyReference,
+                            label: tr('copy_reference', ref),
+                            icon: Icons.copy_outlined,
+                            requiredCapability: AppCapability.viewProducts,
+                            onSelected: () => copyContextualText(
+                              context: context,
+                              ref: ref,
+                              text: p.name,
+                            ),
+                          ),
+                        ],
+                        child: Card(
+                          child: ListTile(
+                            leading: p.imageUrl != null
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      p.imageUrl!,
+                                      width: 48,
+                                      height: 48,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, _, _) =>
+                                          _productIcon(cs),
+                                    ),
+                                  )
+                                : _productIcon(cs),
+                            title: Text(
+                              p.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(p.category),
+                            trailing: const Icon(Icons.chevron_right, size: 20),
+                            onTap: () => context.push('/products/${p.id}'),
+                          ),
+                        ).listEntry(i),
+                      );
                     },
                   ),
                 );

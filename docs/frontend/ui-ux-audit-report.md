@@ -507,3 +507,85 @@ Research references: [Flutter accessibility](https://docs.flutter.dev/ui/accessi
 and [Sortly](https://www.sortly.com/features/). Commercial feature pages are
 vendor claims; pricing, region, licensing, availability, and offline behavior
 must be rechecked before a product or architecture decision.
+
+## v3.10.15+1126 Contextual Record Actions
+
+### Implemented surfaces
+
+A shared contextual-action model, capability resolver, presenter, and
+route/shop/transaction action catalog now support record-level secondary
+actions across routes, shops, products and variants, inventory, invoices,
+history, notifications, dashboard rows, outstanding-shop reports, and the
+shop ledger. The presenter supports touch long-press, web secondary click,
+Context-menu/Shift+F10 keyboard entry, and screen-reader custom actions. The
+shop ledger retains a visible menu button. Existing row taps, nested controls,
+routes, confirmation flows, and notifier callbacks are preserved.
+
+Every action declares an entity and existing `AppCapability`. The shared
+resolver checks active-profile state, concrete tenant scope, enabled state,
+and `PermissionPolicy`; action selection reloads the current profile and uses
+the current eligible callback. No direct Firestore writes, data schema
+changes, Rules changes, or authorization grants were introduced. Role and
+state filtering are UX affordances only; provider and Firestore guards remain
+authoritative. User-management, workspace/settings, and form-level destructive
+operations intentionally retain explicit controls because their confirmation
+and security flows should not be duplicated in generic record menus.
+
+### Verification and remaining acceptance
+
+- Contextual-action unit/widget suite:
+  `00:01 +5: All tests passed!`.
+- Full Flutter suite:
+  `02:40 +716: All tests passed!`.
+- `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 16.2s)`.
+- `dart analyze test/`: `No issues found!`.
+- The focused release suite reported `00:11 +33: All tests passed!`.
+- Web build: `EXIT: 0`; Hosting and Firestore Rules/indexes reported
+  `Deploy complete!`; live `version.json` reports `3.10.15+1126`. Split APKs
+  built at 31.4/32.9/34.5 MB and verify with APK v2; the signed 72.3 MB AAB
+  reports `jar verified.` with a local self-signed certificate warning and no
+  timestamp. ARM64 installation on `R5GL22RGT9V` reported `Success` with
+  versionCode `310153126`.
+- Hot restart could not be performed: the connected Dart Tooling Daemon had no
+  active Flutter application.
+- Automated coverage checks a narrow RTL/large-text layout and keyboard menu
+  entry. Manual screen-reader, secondary-click, authenticated browser/device,
+  role/theme matrix, and visual acceptance remain open.
+
+## v3.10.15+1126 Workspace Logo Preservation Audit
+
+The logo path was traced from local image selection and processing through
+settings serialization, backup/restore, invoice-header snapshots, shared PDF
+builders, and the PDF-derived print/share/PNG path. `WorkspaceLogoProcessor`
+corrects orientation and proportionally resizes to the Firestore size limit;
+it does not remove a transparent background or replace an opaque colored one.
+Settings serialization and invoice snapshots retain the same Base64 PNG value.
+Current workspace bytes remain preferred, with the saved invoice snapshot as
+the existing fallback when current bytes are unavailable. The shared PDF
+header continues to honor `visibleFields`.
+
+No production logo-processing change was warranted by the audit. Regression
+tests now verify transparent alpha and visible RGB through processing and
+settings serialization, opaque background/mark colors after resize, a PDF
+alpha mask for a saved-invoice logo fallback, and omission when the logo is
+hidden. The PDF table, ledger, seller, multi-shop, and invoice builders share
+the existing header path. PNG, print, and share reuse the generated PDF bytes;
+PNG is a page raster and naturally composites transparent logo pixels against
+the page background. XLSX currently does not embed a logo.
+
+Verification:
+
+- Logo processor/PDF suite:
+  `00:01 +18: All tests passed!`.
+- Full serial Flutter suite:
+  `02:40 +716: All tests passed!`.
+- `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 16.2s)`.
+- `dart analyze test/`: `No issues found!`.
+- Markdown lint exited 0 with no output; `git diff --check` exited 0.
+- PDF resource tests establish image and alpha-mask embedding, not pixel-level
+  rendering. No PDF rasterizer was available, so rendered PNG color appearance
+  and browser/device visual acceptance remain unverified.
+- v3.10.15+1126 web, Rules/indexes, split APK, and AAB release steps are
+  recorded above. The Play Console upload was not performed.

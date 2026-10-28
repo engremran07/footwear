@@ -18,6 +18,23 @@ Route registration and the principal shell/contextual entry points have been
 cross-referenced. This is not yet a complete interaction inventory: every
 dialog, sheet, menu, and role-specific state has not been exercised.
 
+## Shared Workspace Logo and Export Path
+
+Workspace logos are selected and processed locally as PNG, with orientation
+correction and proportional resizing to the Firestore size limit. Processing
+does not remove transparency or replace an opaque colored background.
+Settings serialization, backup/restore, and invoice snapshots retain the
+stored Base64 value. Shared financial PDF builders prefer current workspace
+bytes, use the saved invoice logo when current bytes are unavailable, and
+respect `visibleFields`. PDF, print, share, and PNG use the shared generated
+PDF bytes; PNG output rasterizes the full page, so transparent pixels display
+the page background. XLSX does not currently embed logos.
+
+Focused tests verify stored alpha/RGB, opaque colors after resizing, PDF image
+and alpha-mask resources, invoice-snapshot fallback, and logo visibility
+filtering. Pixel-level rasterized PDF/PNG inspection and authenticated
+browser/device visual acceptance remain unverified.
+
 ## Registered routes
 
 | Screen / route | Role / guard context | Purpose and main actions | Data scope | Shared UI / states | Findings and implementation | Verification |
@@ -123,6 +140,43 @@ The public `/login` page was available and rendered in a local browser after
 the fix; authenticated role accounts were not available, so role/theme
 appearance on business screens remains unverified rather than inferred from
 source or widget tests.
+
+## v3.10.15+1126 Contextual-Action Register
+
+The shared contextual presenter is integrated on these record surfaces:
+
+| Surface | Available contextual actions | Eligibility source | Status |
+|---|---|---|---|
+| Routes list and dashboard route rows | Open route details; copy route reference | `viewRoutes` | Implemented |
+| Shop list, route-detail shops, dashboard shop shortcuts, report outstanding shops | Open details; edit where permitted; create invoice; copy phone when present | `viewShops`, `manageShops`, `createInvoice` | Implemented; existing route/provider guards remain |
+| Product list and product details | Open details; edit where permitted; copy product reference | `viewProducts`, `manageProducts` | Implemented |
+| Product-variant rows | Edit where permitted; copy variant reference | `manageProducts`, `viewProducts` | Implemented |
+| Inventory variant rows | Copy product/variant reference | `viewInventory` | Implemented |
+| Invoice list | Open invoice details; copy invoice reference | `viewInvoices` | Implemented |
+| History transaction rows and dashboard pending-edit rows | Open linked invoice/shop where available; copy invoice or transaction reference | `viewHistory` | Implemented |
+| Notification rows | Open the referenced shop when available; mark the notification read | `viewNotifications` | Implemented; existing notifier and Rules contract unchanged |
+| Shop-detail ledger rows | Existing transaction edit, approval, rejection, and soft-delete flows; copy reference | `viewHistory`, `editLedger` plus existing row-state guards | Implemented; visible menu button retained |
+
+The shared wrapper supports touch long-press, web secondary click,
+Context-menu/Shift+F10 keyboard entry, and custom screen-reader actions.
+Ordinary row taps and nested controls remain available. Actions are scoped by
+entity, active profile, concrete tenant, enabled state, and
+`PermissionPolicy`; selection reads the current profile again and invokes the
+current eligible callback. This is presentation filtering only, not a
+replacement for route, provider, or Firestore authorization.
+
+User/workspace administration, settings, and form-level destructive controls
+remain explicit rather than receiving generic record gestures. Their actions
+have distinct confirmation and security flows, or are not record-level list
+targets. This avoids duplicating sensitive operations in an opaque menu.
+
+Automated coverage verifies role/entity filtering, inactive and global-scope
+denial, long-press invocation, primary and nested taps, keyboard context-menu
+entry, and a narrow RTL layout with large text. The focused release suite
+reported `00:11 +33: All tests passed!`; the full serial Flutter suite
+reported `02:40 +716: All tests passed!`. Screen-reader interaction,
+secondary-click behavior, rendered theme contrast, and authenticated device
+acceptance are not yet manually verified.
 
 ## 2026-10-24 Operational Refresh and Financial Presentation
 

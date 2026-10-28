@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/l10n/financial_document_localization.dart';
@@ -26,6 +27,8 @@ import '../providers/transaction_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/export_sheet.dart';
 import '../widgets/error_state.dart';
+import '../widgets/app_contextual_actions.dart';
+import '../widgets/contextual_action_catalog.dart';
 
 Future<List<RouteModel>> _loadExportRoutes(WidgetRef ref) async {
   ref.invalidate(routesExportProvider);
@@ -57,9 +60,8 @@ class ReportsScreen extends ConsumerWidget {
   }
 
   void _showNoData(BuildContext context, WidgetRef ref) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(infoSnackBar(tr('no_data', ref)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(infoSnackBar(tr('no_data', ref)));
   }
 
   @override
@@ -386,9 +388,9 @@ class ReportsScreen extends ConsumerWidget {
       _showNoData(context, ref);
       return;
     }
-    final shops = (await _loadExportShops(
-      ref,
-    )).where((shop) => shop.balance > 0).toList();
+    final shops = (await _loadExportShops(ref))
+        .where((shop) => shop.balance > 0)
+        .toList();
     if (!context.mounted) return;
     if (shops.isEmpty) {
       _showNoData(context, ref);
@@ -529,9 +531,8 @@ class _ExportCardState extends ConsumerState<_ExportCard> {
     } catch (error) {
       debugPrint('Report export failed: $error');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -608,9 +609,8 @@ class _OutstandingTopDebtors extends ConsumerWidget {
               children: [
                 Text(
                   tr('top_outstanding', ref),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 ...top.asMap().entries.map((entry) {
@@ -619,82 +619,90 @@ class _OutstandingTopDebtors extends ConsumerWidget {
                   final ratio = maxBalance > 0
                       ? shop.balance / maxBalance
                       : 0.0;
-                  return Material(
-                    color: cs.surface.withValues(alpha: 0),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () => context.push('/shops/${shop.id}'),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 22,
-                                  height: 22,
-                                  decoration: BoxDecoration(
-                                    color: cs.primaryContainer,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '${i + 1}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: cs.onPrimaryContainer,
+                  return AppContextualActions(
+                    entity: ContextualEntity.shop,
+                    actions: shopContextualActions(
+                      context: context,
+                      ref: ref,
+                      shop: shop,
+                    ),
+                    child: Material(
+                      color: cs.surface.withValues(alpha: 0),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => context.push('/shops/${shop.id}'),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      color: cs.primaryContainer,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '${i + 1}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: cs.onPrimaryContainer,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    shop.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      shop.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  AppFormatters.currency(
-                                    shop.balance,
-                                    ref.watch(
-                                      routeCurrencyProvider(shop.routeId),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    AppFormatters.currency(
+                                      shop.balance,
+                                      ref.watch(
+                                        routeCurrencyProvider(shop.routeId),
+                                      ),
+                                    ),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.debtFg(cs),
+                                      fontSize: 13,
                                     ),
                                   ),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.debtFg(cs),
-                                    fontSize: 13,
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.chevron_right,
+                                    size: 18,
+                                    color: cs.onSurfaceVariant,
                                   ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Icons.chevron_right,
-                                  size: 18,
-                                  color: cs.onSurfaceVariant,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: ratio,
-                                minHeight: 5,
-                                backgroundColor: cs.surfaceContainerHighest,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  AppTheme.debtFg(cs).withValues(alpha: 0.7),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: ratio,
+                                  minHeight: 5,
+                                  backgroundColor: cs.surfaceContainerHighest,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppTheme.debtFg(cs).withValues(alpha: 0.7),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),

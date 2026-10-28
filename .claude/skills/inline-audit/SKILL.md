@@ -18,6 +18,11 @@ role/rules/provider/data invariants, implement the root-cause fix, and report
 what was changed and exactly how it was verified. Do not turn unrelated
 observations into scope creep.
 
+Before any implementation, preserve the current todo list and Git delta, load
+all applicable project skills and repository instructions, and read the
+affected source and governing documents. This is the required first step, not
+an after-the-fact audit.
+
 ## Dependencies and boundaries
 
 Use `AGENTS.md`, `CLAUDE.md`, and the applicable specialist skill as sources of
@@ -184,6 +189,8 @@ authorized by a user-visible code change.
 [ ] Export providers are NOT autoDispose (one-shot Firestore .get() must survive past first microtask)
 [ ] Every ref.read(exportProvider.future) has ref.invalidate() before it for fresh data
 [ ] Firebase Auth sign-in validates the active profile and preserves role, tenant, and selected-workspace authorization
+[ ] Applicable skills and repository instructions were loaded before edits; new tasks were merged into the active todo list
+[ ] Workspace-logo processing preserves alpha transparency and opaque colored backgrounds in stored and exported outputs
 
 ```
 

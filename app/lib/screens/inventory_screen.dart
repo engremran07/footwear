@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../core/design/app_animations.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
@@ -7,6 +8,7 @@ import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
+import '../core/utils/role_names.dart';
 import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
 import '../models/seller_inventory_model.dart';
@@ -18,6 +20,7 @@ import '../providers/seller_inventory_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/app_search_bar.dart';
+import '../widgets/app_contextual_actions.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
 import '../widgets/export_sheet.dart';
@@ -215,9 +218,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 } catch (e) {
                   if (mounted) {
                     final key = AppErrorMapper.key(e);
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(errorSnackBar(tr(key, ref)));
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(errorSnackBar(tr(key, ref)));
                   }
                 }
               },
@@ -450,51 +452,71 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         variant.quantityAvailable < ppc;
                     final isOutOfStock = variant.quantityAvailable <= 0;
                     final cs = Theme.of(ctx).colorScheme;
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      child: ListTile(
-                        leading: isOutOfStock
-                            ? Icon(Icons.cancel, color: cs.error, size: 20)
-                            : isLowStock
-                            ? Icon(
-                                Icons.warning_amber,
-                                color: AppTheme.warningFg(cs),
-                                size: 20,
-                              )
-                            : null,
-                        title: Text(
-                          variant.variantName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          tr('lbl_stock_value', ref).replaceAll(
-                            '%s',
-                            AppFormatters.stock(variant.quantityAvailable, ppc),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: isOutOfStock
-                                ? cs.error
-                                : isLowStock
-                                ? AppTheme.warningFg(cs)
-                                : null,
-                            fontWeight: isOutOfStock || isLowStock
-                                ? FontWeight.w600
-                                : null,
+                    return AppContextualActions(
+                      entity: ContextualEntity.inventory,
+                      actions: [
+                        AppContextualAction(
+                          entity: ContextualEntity.inventory,
+                          id: ContextualActionId.copyReference,
+                          label: tr('copy_reference', ref),
+                          icon: Icons.copy_outlined,
+                          requiredCapability: AppCapability.viewInventory,
+                          onSelected: () => copyContextualText(
+                            context: context,
+                            ref: ref,
+                            text: variant.variantName,
                           ),
                         ),
-                        trailing: ElevatedButton.icon(
-                          icon: const Icon(Icons.add),
-                          label: Text(tr('inventory_add_stock', ref)),
-                          onPressed: () => _showAddStockDialog(variant, ppc),
+                      ],
+                      child: Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
                         ),
-                      ),
-                    ).listEntry(i);
+                        child: ListTile(
+                          leading: isOutOfStock
+                              ? Icon(Icons.cancel, color: cs.error, size: 20)
+                              : isLowStock
+                              ? Icon(
+                                  Icons.warning_amber,
+                                  color: AppTheme.warningFg(cs),
+                                  size: 20,
+                                )
+                              : null,
+                          title: Text(
+                            variant.variantName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            tr('lbl_stock_value', ref).replaceAll(
+                              '%s',
+                              AppFormatters.stock(
+                                variant.quantityAvailable,
+                                ppc,
+                              ),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isOutOfStock
+                                  ? cs.error
+                                  : isLowStock
+                                  ? AppTheme.warningFg(cs)
+                                  : null,
+                              fontWeight: isOutOfStock || isLowStock
+                                  ? FontWeight.w600
+                                  : null,
+                            ),
+                          ),
+                          trailing: ElevatedButton.icon(
+                            icon: const Icon(Icons.add),
+                            label: Text(tr('inventory_add_stock', ref)),
+                            onPressed: () => _showAddStockDialog(variant, ppc),
+                          ),
+                        ),
+                      ).listEntry(i),
+                    );
                   },
                 ),
               ),
@@ -546,43 +568,65 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   itemCount: filtered.length,
                   itemBuilder: (ctx, i) {
                     final variant = filtered[i];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      child: ListTile(
-                        title: Text(
-                          variant.variantName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          tr('lbl_stock_value', ref).replaceAll(
-                            '%s',
-                            AppFormatters.stock(variant.quantityAvailable, ppc),
+                    return AppContextualActions(
+                      entity: ContextualEntity.inventory,
+                      actions: [
+                        AppContextualAction(
+                          entity: ContextualEntity.inventory,
+                          id: ContextualActionId.copyReference,
+                          label: tr('copy_reference', ref),
+                          icon: Icons.copy_outlined,
+                          requiredCapability: AppCapability.viewInventory,
+                          onSelected: () => copyContextualText(
+                            context: context,
+                            ref: ref,
+                            text: variant.variantName,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: currentUser.canManageOperationalData
-                            ? IconButton(
-                                icon: Icon(
-                                  Icons.undo,
-                                  color: AppTheme.warningFg(
-                                    Theme.of(ctx).colorScheme,
+                      ],
+                      child: Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        child: ListTile(
+                          title: Text(
+                            variant.variantName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            tr('lbl_stock_value', ref).replaceAll(
+                              '%s',
+                              AppFormatters.stock(
+                                variant.quantityAvailable,
+                                ppc,
+                              ),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: currentUser.canManageOperationalData
+                              ? IconButton(
+                                  icon: Icon(
+                                    Icons.undo,
+                                    color: AppTheme.warningFg(
+                                      Theme.of(ctx).colorScheme,
+                                    ),
                                   ),
-                                ),
-                                tooltip: tr(
-                                  'inventory_return_to_warehouse',
-                                  ref,
-                                ),
-                                onPressed: () =>
-                                    _showReturnToWarehouseDialog(variant, ppc),
-                              )
-                            : null,
-                      ),
-                    ).listEntry(i);
+                                  tooltip: tr(
+                                    'inventory_return_to_warehouse',
+                                    ref,
+                                  ),
+                                  onPressed: () => _showReturnToWarehouseDialog(
+                                    variant,
+                                    ppc,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ).listEntry(i),
+                    );
                   },
                 ),
               ),
@@ -683,9 +727,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       } catch (e) {
                         if (ctx.mounted) {
                           final key = AppErrorMapper.key(e);
-                          ScaffoldMessenger.of(
-                            ctx,
-                          ).showSnackBar(errorSnackBar(tr(key, ref)));
+                          ScaffoldMessenger.of(ctx)
+                              .showSnackBar(errorSnackBar(tr(key, ref)));
                         }
                       } finally {
                         if (ctx.mounted) setS(() => isSubmitting = false);
@@ -730,9 +773,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Theme.of(
-                        ctx,
-                      ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant
+                          .withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -741,9 +783,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
                       tr('transfer_history', ref),
-                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(ctx).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                   ),
                   const Divider(),
@@ -833,9 +874,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Theme.of(
-                        ctx,
-                      ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant
+                          .withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -844,9 +884,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
                       tr('inventory_warehouse_stock', ref),
-                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(ctx).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                   ),
                   const Divider(),
@@ -951,9 +990,8 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
     }
     final total = _total;
     if (total <= 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(warningSnackBar(tr('msg_enter_stock_gt_zero', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(warningSnackBar(tr('msg_enter_stock_gt_zero', ref)));
       return;
     }
     setState(() => _saving = true);
@@ -1119,9 +1157,8 @@ class _AddInventoryDialogState extends ConsumerState<_AddInventoryDialog> {
                 'lbl_adding_stock',
                 ref,
               ).replaceAll('%s', AppFormatters.stock(_total, ppc)),
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -1228,9 +1265,8 @@ class _TransferToSellerDialogState
     final selectedSeller = _selectedSeller!;
     final total = _total;
     if (total <= 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(warningSnackBar(tr('msg_enter_qty_gt_zero', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(warningSnackBar(tr('msg_enter_qty_gt_zero', ref)));
       return;
     }
     if (total > _selectedVariant!.quantityAvailable) {
@@ -1454,9 +1490,8 @@ class _TransferToSellerDialogState
                   'lbl_transferring',
                   ref,
                 ).replaceAll('%s', AppFormatters.stock(_total, ppc)),
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               if (_exceedsStock)
                 Padding(

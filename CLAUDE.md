@@ -37,6 +37,9 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
 
 ## Must-Check Before Edits
 
+0. Review current todos and merge new work; inspect `git status`/`git diff`;
+   load all applicable project skills and `.github/instructions`, then read
+   the relevant runtime/design docs and affected source paths before editing.
 1. app/lib/models/user_model.dart
 2. firestore.rules
 3. app/lib/core/constants/collections.dart
@@ -150,6 +153,19 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
     testing must remain within an explicitly authorized local/emulator scope;
     do not probe production or third-party targets without separate written
     authorization.
+39. Before implementing any new or changed feature, review the active task list
+    and Git delta, load all applicable skills and repository instructions, and
+    read the affected runtime/design documentation and source paths. This is
+    the first implementation step, not a post-edit checklist. Merge new
+    requests into existing todos without dropping unfinished work.
+40. Preserve the uploaded workspace logo's visual treatment end to end:
+    transparency stays transparent; an opaque colored background stays present
+    and unchanged. Do not auto-remove or replace backgrounds, tint logos, or
+    flatten transparent input onto white. Keep alpha-aware, local optimization
+    within Firestore size limits and use the shared logo/fallback/`visibleFields`
+    contract consistently across PDFs, reports, image exports, print, and
+    share. Verify transparent and colored-background fixtures in stored and
+    rendered outputs.
 
 ## Frontend UI Governance
 
@@ -168,6 +184,14 @@ through `AppMotion`; custom GoRouter fade/slide transitions must return their
 child without optional effects when reduced motion is enabled. Visible-value
 semantics use the active locale. Widget tests must cover these contracts,
 relevant theme contrast, and RTL direction where the component supports it.
+For every new feature, load applicable skills and instruction files before
+source edits; the frontend modernization skill maintains the screen/action
+register and reports acceptance gaps. Workspace logos preserve source
+transparency or opaque background treatment through all shared export paths.
+Record-level secondary actions reuse `AppContextualActions`, preserve primary
+and nested interactions, use `PermissionPolicy` for active tenant-scoped
+eligibility, and re-check the current profile on selection. They call existing
+guarded callbacks and do not replace provider or Firestore authorization.
 
 ## Financial Pathways (never mix these)
 
@@ -449,6 +473,31 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- v3.10.15+1126 adds shared contextual record actions across route, shop,
+  product, inventory, invoice, history, notification, dashboard, report, and
+  ledger surfaces without changing provider or Firestore authorization.
+  The skills-first governance gate now requires task/diff review, applicable
+  instructions, runtime contracts, documentation, and source paths before
+  implementation; new work merges into the active todo list.
+- The workspace-logo audit verified existing processing preserves transparent
+  alpha and opaque colored backgrounds while resizing. Regressions cover
+  processing/settings pixels, PDF alpha-mask embedding, invoice snapshot
+  fallback, and `visibleFields`; production logo logic did not change.
+  Rasterized export appearance remains unverified; XLSX does not embed logos.
+- Focused release regressions: `00:11 +33: All tests passed!`; full serial
+  Flutter suite: `02:40 +716: All tests passed!`; `flutter analyze lib
+  --no-pub`: `No issues found! (ran in 16.2s)`; `dart analyze test/`:
+  `No issues found!`. Markdown lint exited 0 with no output and
+  `git diff --check` exited 0.
+- Web build `EXIT: 0`; Hosting and Firestore Rules/indexes reported
+  `Deploy complete!`; live `version.json` reports `3.10.15+1126`. Split APKs
+  built at 31.4/32.9/34.5 MB and verify with APK v2; ARM64 was installed on
+  `R5GL22RGT9V` (`Success`, versionCode `310153126`). The signed 72.3 MB AAB
+  reports `jar verified.` with a locally untrusted self-signed certificate
+  and no timestamp; Play Console upload-key acceptance is not established.
+- Authenticated visual and manual assistive-technology acceptance remain
+  unverified. The original user-reported PDF and runtime details are still
+  needed to confirm its rendering defect; no font-policy change was made.
 - v3.10.14+1125 bounds notification shop-visibility Rules work by querying
   referenced shop IDs in five-ID batches; positive scale coverage includes
   workspace admins and supervisors. Local Android alerts are opt-in,

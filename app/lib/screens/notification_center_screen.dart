@@ -11,6 +11,7 @@ import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/snack_helper.dart';
+import '../core/utils/role_names.dart';
 import '../models/notification_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/android_notification_provider.dart';
@@ -18,6 +19,7 @@ import '../providers/notification_provider.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
 import '../widgets/shimmer_loading.dart';
+import '../widgets/app_contextual_actions.dart';
 
 // =============================================================================
 // NotificationCenterScreen — admin and supervisor in-app notification feed.
@@ -498,102 +500,127 @@ class _NotificationTile extends ConsumerWidget {
         ? '$eventLabel  #${n.invoiceNumber}'
         : eventLabel;
 
-    return Material(
-      color: tileBg,
-      child: InkWell(
-        onTap: n.shopId.isNotEmpty ? () => _onTap(context, ref, n) : null,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTokens.s12,
-            vertical: AppTokens.s8,
+    return AppContextualActions(
+      entity: ContextualEntity.notification,
+      actions: [
+        if (n.shopId.isNotEmpty)
+          AppContextualAction(
+            entity: ContextualEntity.notification,
+            id: ContextualActionId.viewDetails,
+            label: tr('details', ref),
+            icon: Icons.open_in_new,
+            requiredCapability: AppCapability.viewNotifications,
+            onSelected: () => _onTap(context, ref, n),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Leading icon — filled circle to make unread pop
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: accentColor.withValues(
-                  alpha: isUnread ? 0.2 : 0.1,
+        if (isUnread)
+          AppContextualAction(
+            entity: ContextualEntity.notification,
+            id: ContextualActionId.markAsRead,
+            label: tr('mark_as_read', ref),
+            icon: Icons.mark_email_read_outlined,
+            requiredCapability: AppCapability.viewNotifications,
+            onSelected: () => ref
+                .read(notificationNotifierProvider.notifier)
+                .markAsRead(n.id),
+          ),
+      ],
+      child: Material(
+        color: tileBg,
+        child: InkWell(
+          onTap: n.shopId.isNotEmpty ? () => _onTap(context, ref, n) : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.s12,
+              vertical: AppTokens.s8,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Leading icon — filled circle to make unread pop
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: accentColor.withValues(
+                    alpha: isUnread ? 0.2 : 0.1,
+                  ),
+                  child: Icon(leadIcon, color: accentColor, size: 18),
                 ),
-                child: Icon(leadIcon, color: accentColor, size: 18),
-              ),
-              const SizedBox(width: AppTokens.s12),
-              // Body
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Shop name
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            n.shopName.isNotEmpty
-                                ? n.shopName
-                                : tr('shop', ref),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: isUnread
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (isUnread)
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.tertiary,
-                              shape: BoxShape.circle,
+                const SizedBox(width: AppTokens.s12),
+                // Body
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Shop name
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              n.shopName.isNotEmpty
+                                  ? n.shopName
+                                  : tr('shop', ref),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: isUnread
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: AppTokens.s2),
-                    // Event label + amount
-                    Text(
-                      '$subtitle  •  ${AppFormatters.currency(n.amount)}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: isUnread
-                            ? FontWeight.w600
-                            : FontWeight.normal,
+                          if (isUnread)
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.tertiary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                        ],
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: AppTokens.s4),
-                    // Seller name
-                    if (n.sellerName.isNotEmpty)
+                      const SizedBox(height: AppTokens.s2),
+                      // Event label + amount
                       Text(
-                        n.sellerName,
+                        '$subtitle  •  ${AppFormatters.currency(n.amount)}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: isUnread
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: AppTokens.s4),
+                      // Seller name
+                      if (n.sellerName.isNotEmpty)
+                        Text(
+                          n.sellerName,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      const SizedBox(height: AppTokens.s2),
+                      // Timestamp
+                      Text(
+                        AppFormatters.dateTime(n.createdAt),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 11,
                         ),
                       ),
-                    const SizedBox(height: AppTokens.s2),
-                    // Timestamp
-                    Text(
-                      AppFormatters.dateTime(n.createdAt),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppTokens.s4),
-              if (n.shopId.isNotEmpty)
-                Icon(
-                  Icons.chevron_right,
-                  size: 18,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-            ],
+                const SizedBox(width: AppTokens.s4),
+                if (n.shopId.isNotEmpty)
+                  Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+              ],
+            ),
           ),
         ),
       ),

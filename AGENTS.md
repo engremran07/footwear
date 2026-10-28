@@ -348,6 +348,23 @@ changes.
   assert PDF font, image, page-count, and page-size resources, and inspect
   rendered output when available; font embedding alone is not visual proof.
 
+1. **Feature prework is a required first step.** Before implementation, review
+  the active todo list and current Git status/diff, load every applicable
+  project skill and `.github/instructions` file, and read the relevant
+  runtime/design documents and affected source paths. Do not start feature
+  edits until this context gate is complete. Merge new requests into the
+  existing todo list; preserve unfinished work and record real dependencies.
+
+1. **Workspace logo appearance is preserved across every output.** A source
+  logo with transparent pixels remains transparent; an uploaded logo with an
+  opaque colored background keeps that background and its colors. Never
+  automatically remove, replace, tint, or flatten a background. Any local
+  resize or encoding step must preserve alpha and appearance while respecting
+  the Firestore size limit. PDFs, reports, image exports, print, and share use
+  the shared logo bytes/header policy, including `visibleFields` and the
+  documented current-workspace/saved-invoice fallback. Test both transparent
+  and colored-background inputs through persistence and exported output.
+
 ## 5) Known Failure Signatures
 
 1. permission-denied on route create/inventory add
@@ -433,6 +450,12 @@ unless the user explicitly authorizes that operation.
 
 ### Before writing code
 
+- Review the active todos, merge any new task into them, inspect `git status`
+  and the current diff, and preserve unrelated work.
+- Load applicable project skills and `.github/instructions` before editing;
+  read the affected runtime, design, data-flow, and testing documents and
+  source paths. Record required tests and operational boundaries in the task
+  plan. This skills-and-documents gate is the first implementation step.
 - Read AGENTS.md and CLAUDE.md
 - Validate role/rules/collection alignment
 
@@ -618,9 +641,50 @@ Optional shared-component transitions honor `MediaQuery.disableAnimations`
 through `AppMotion`; router fade/slide transitions must also bypass optional
 effects when reduced motion is enabled. Visible-value semantics use the active
 locale. Cover these contracts, actual color pairs, and RTL direction in focused
-widget tests.
+widget tests. Record-level secondary actions use the shared
+`AppContextualActions` pattern, retain primary/nested interactions, and are
+filtered and rechecked with `PermissionPolicy`; they reuse guarded callbacks
+and never replace provider or Firestore authorization.
 
 ## 10) Current Audit Status
+
+2026-10-28 v3.10.15+1126 release — contextual actions and logo governance:
+
+- The governance pack now requires applicable skills/instructions, current
+  todos and Git delta, runtime contracts, affected documentation, and source
+  paths to be reviewed before feature edits. New work merges into the active
+  todo list instead of replacing unfinished work.
+- Contextual record actions are integrated across route, shop, product,
+  inventory, invoice, history, notification, dashboard, report, and ledger
+  rows. Existing `PermissionPolicy`, provider, and Rules guards remain the
+  authorization boundary; no Rules schema or authorization change was made.
+- The logo audit traced selection/processing, settings serialization,
+  backup/restore, invoice snapshots, shared PDF builders, and PDF-derived
+  image/print/share output. Existing processing preserves alpha and opaque
+  colors while resizing to Firestore's encoded-size limit. Regression tests
+  cover processed/serialized pixels, PDF alpha-mask embedding, invoice
+  snapshot fallback, and `visibleFields`; no production logo code changed.
+  XLSX does not embed logos. Pixel-level rasterized export inspection remains
+  unverified because a PDF rasterizer was unavailable.
+- Focused release regressions: `00:11 +33: All tests passed!`; full serial
+  Flutter suite: `02:40 +716: All tests passed!`; `flutter analyze lib
+  --no-pub`: `No issues found! (ran in 16.2s)`; `dart analyze test/`:
+  `No issues found!`. Markdown lint exited 0 with no output and
+  `git diff --check` exited 0.
+- Version is synchronized to `3.10.15+1126`. Web build reported `EXIT: 0`;
+  Hosting and Firestore Rules/indexes each reported `Deploy complete!`.
+  Live `version.json` reports `3.10.15+1126`; Flutter shell cache headers are
+  `no-store, must-revalidate, no-cache`.
+- Split APKs built at 31.4/32.9/34.5 MB and verify with APK v2. The ARM64 APK
+  was copied to and installed on `R5GL22RGT9V` (`1 file pushed`, `Success`,
+  versionCode `310153126`). The signed 72.3 MB AAB reports `jar verified.`;
+  its locally untrusted self-signed certificate and missing timestamp do not
+  establish Play Console upload-key acceptance. No Play Console upload was
+  performed.
+- Hot restart was unavailable because the Dart Tooling Daemon had no active
+  Flutter app. Authenticated browser/device, manual assistive-technology, and
+  pixel-level export acceptance remain unverified. The user-reported PDF
+  rendering issue remains open pending its original PDF and runtime details.
 
 2026-10-28 v3.10.14+1125 notification visibility and Android alerts:
 
