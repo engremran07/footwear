@@ -5,6 +5,8 @@ import 'package:uuid/uuid.dart';
 
 import '../core/constants/collections.dart';
 import '../core/utils/backup_scope_policy.dart';
+import '../core/utils/formatters.dart';
+import '../core/utils/financial_amount_policy.dart';
 import '../core/utils/firestore_pagination.dart';
 import '../core/utils/notification_writer.dart';
 import '../core/utils/tenant_scope.dart';
@@ -405,10 +407,6 @@ final sellerTransactionsExportProvider =
 class TransactionNotifier extends AsyncNotifier<void> {
   bool _writeInFlight = false;
 
-  Future<void> _commit(WriteBatch batch) {
-    return batch.commit().timeout(const Duration(seconds: 20));
-  }
-
   Future<String> _currentTenantId() async {
     final user = await ref.read(authUserProvider.future);
     return TenantScope.requireTenant(user?.tenantId);
@@ -451,57 +449,68 @@ class TransactionNotifier extends AsyncNotifier<void> {
             idempotencyKey: idempotencyKey,
           ),
         );
-    final existing = await db
-        .collection(Collections.transactions)
-        .where('tenant_id', isEqualTo: tenantId)
-        .where('idempotency_key', isEqualTo: idempotencyKey)
-        .limit(1)
-        .get();
-    if (existing.docs.isNotEmpty) return false;
     final shopRef = db.collection(Collections.customers).doc(shopId);
     final createdAt = transactionDate ?? Timestamp.now();
     final balanceDelta = type == 'cash_out' ? amount : -amount;
-    return db
-        .runTransaction<bool>((transaction) async {
-          if ((await transaction.get(txRef)).exists) return false;
-          final shopSnapshot = await transaction.get(shopRef);
-          final shopData = shopSnapshot.data();
-          if (!shopSnapshot.exists ||
-              shopData == null ||
-              !TenantScope.matchesTenant(shopData, tenantId) ||
-              shopData['route_id'] != routeId) {
-            throw StateError(
-              'Transaction shop is outside the active workspace and route.',
-            );
-          }
+    return db.runTransaction<bool>((transaction) async {
+      final existingSnapshot = await transaction.get(txRef);
+      if (existingSnapshot.exists) {
+        final existing = existingSnapshot.data()!;
+        final existingCreatedAt = existing['created_at'] as Timestamp?;
+        final matchesRequest =
+            existing['tenant_id'] == tenantId &&
+            existing['idempotency_key'] == idempotencyKey &&
+            existing['shop_id'] == shopId &&
+            existing['shop_name'] == shopName &&
+            existing['route_id'] == routeId &&
+            existing['type'] == type &&
+            existing['sale_type'] == saleType &&
+            existing['amount'] == amount &&
+            existing['description'] == description &&
+            existing['created_by'] == createdBy &&
+            existingCreatedAt?.microsecondsSinceEpoch ==
+                createdAt.microsecondsSinceEpoch;
+        if (matchesRequest) return false;
+        throw StateError('Transaction idempotency key was reused');
+      }
 
-          transaction.set(txRef, {
-            'shop_id': shopId,
-            'customer_id': shopId,
-            'shop_name': shopName,
-            'route_id': routeId,
-            'tenant_id': tenantId,
-            'type': type,
-            'sale_type': saleType,
-            'amount': amount,
-            'description': description,
-            'items': const <Map<String, dynamic>>[],
-            'created_by': createdBy,
-            'created_at': createdAt,
-            'deleted': false,
-            'idempotency_key': idempotencyKey,
-          });
-          transaction.update(shopRef, {
-            'balance': FieldValue.increment(balanceDelta),
-            'updated_at': Timestamp.now(),
-            'last_transaction_at': createdAt,
-            'last_transaction_type': type,
-            'last_transaction_amount': amount,
-            'last_transaction_id': txRef.id,
-          });
-          return true;
-        })
-        .timeout(const Duration(seconds: 20));
+      final shopSnapshot = await transaction.get(shopRef);
+      final shopData = shopSnapshot.data();
+      if (!shopSnapshot.exists ||
+          shopData == null ||
+          !TenantScope.matchesTenant(shopData, tenantId) ||
+          shopData['route_id'] != routeId) {
+        throw StateError(
+          'Transaction shop is outside the active workspace and route.',
+        );
+      }
+
+      transaction.set(txRef, {
+        'shop_id': shopId,
+        'customer_id': shopId,
+        'shop_name': shopName,
+        'route_id': routeId,
+        'tenant_id': tenantId,
+        'type': type,
+        'sale_type': saleType,
+        'amount': amount,
+        'description': description,
+        'items': const <Map<String, dynamic>>[],
+        'created_by': createdBy,
+        'created_at': createdAt,
+        'deleted': false,
+        'idempotency_key': idempotencyKey,
+      });
+      transaction.update(shopRef, {
+        'balance': FieldValue.increment(balanceDelta),
+        'updated_at': Timestamp.now(),
+        'last_transaction_at': createdAt,
+        'last_transaction_type': type,
+        'last_transaction_amount': amount,
+        'last_transaction_id': txRef.id,
+      });
+      return true;
+    });
   }
 
   void _stageTransactionUpdate({
@@ -522,6 +531,12 @@ class TransactionNotifier extends AsyncNotifier<void> {
     Timestamp? transactionDate,
     Map<String, dynamic> extraTxFields = const <String, dynamic>{},
   }) {
+    if (!AppFormatters.hasAtMostTwoDecimalPlaces(newAmount) ||
+        newAmount > FinancialAmountPolicy.maximumAmount) {
+      throw ArgumentError(
+        'Transaction amounts must be within the supported two-decimal limit',
+      );
+    }
     final historyEntry = <String, dynamic>{
       'previous_amount': oldAmount,
       'previous_type': oldType,
@@ -580,7 +595,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
     List<TransactionItem> items = const [],
     required String createdBy,
     Timestamp? transactionDate,
-    String? idempotencyKey,
+    required String idempotencyKey,
   }) async {
     await _runWriteGuard(() async {
       final normalizedCreatedBy = createdBy.trim();
@@ -594,6 +609,12 @@ class TransactionNotifier extends AsyncNotifier<void> {
       }
       if (amount <= 0) {
         throw ArgumentError('Transaction amount must be greater than 0');
+      }
+      if (!AppFormatters.hasAtMostTwoDecimalPlaces(amount) ||
+          amount > FinancialAmountPolicy.maximumAmount) {
+        throw ArgumentError(
+          'Transaction amounts must be within the supported two-decimal limit',
+        );
       }
       if (shopId.trim().isEmpty) {
         throw ArgumentError('shopId must not be empty');
@@ -609,59 +630,29 @@ class TransactionNotifier extends AsyncNotifier<void> {
 
       final db = FirebaseFirestore.instance;
       final tenantId = await _currentTenantId();
-      final normalizedKey = idempotencyKey?.trim();
-      final hasIdempotencyKey = normalizedKey?.isNotEmpty == true;
-      late final String txId;
-      if (hasIdempotencyKey) {
-        txId = transactionIdempotencyDocumentId(
-          tenantId: tenantId,
-          idempotencyKey: normalizedKey!,
-        );
-        final created = await _createWithIdempotencyKey(
-          db: db,
-          tenantId: tenantId,
-          idempotencyKey: normalizedKey,
-          shopId: shopId,
-          shopName: shopName,
-          routeId: routeId,
-          type: type,
-          amount: amount,
-          description: description,
-          saleType: saleType,
-          createdBy: normalizedCreatedBy,
-          transactionDate: transactionDate,
-        );
-        if (!created) return;
-      } else {
-        final batch = db.batch();
-        final txRef = db.collection(Collections.transactions).doc();
-        txId = txRef.id;
-        batch.set(txRef, {
-          'shop_id': shopId,
-          'customer_id': shopId,
-          'shop_name': shopName,
-          'route_id': routeId,
-          'tenant_id': tenantId,
-          'type': type,
-          'sale_type': saleType,
-          'amount': amount,
-          'description': description,
-          'items': items.map((e) => e.toJson()).toList(),
-          'created_by': normalizedCreatedBy,
-          'created_at': transactionDate ?? Timestamp.now(),
-          'deleted': false,
-        });
-        final balanceDelta = type == 'cash_out' ? amount : -amount;
-        batch.update(db.collection(Collections.customers).doc(shopId), {
-          'balance': FieldValue.increment(balanceDelta),
-          'updated_at': Timestamp.now(),
-          'last_transaction_at': transactionDate ?? Timestamp.now(),
-          'last_transaction_type': type,
-          'last_transaction_amount': amount,
-          'last_transaction_id': txRef.id,
-        });
-        await _commit(batch);
+      final normalizedKey = idempotencyKey.trim();
+      if (normalizedKey.isEmpty) {
+        throw ArgumentError('idempotencyKey must not be empty');
       }
+      final txId = transactionIdempotencyDocumentId(
+        tenantId: tenantId,
+        idempotencyKey: normalizedKey,
+      );
+      final created = await _createWithIdempotencyKey(
+        db: db,
+        tenantId: tenantId,
+        idempotencyKey: normalizedKey,
+        shopId: shopId,
+        shopName: shopName,
+        routeId: routeId,
+        type: type,
+        amount: amount,
+        description: description,
+        saleType: saleType,
+        createdBy: normalizedCreatedBy,
+        transactionDate: transactionDate,
+      );
+      if (!created) return;
 
       try {
         final appUser = await ref.read(authUserProvider.future);
@@ -832,69 +823,69 @@ class TransactionNotifier extends AsyncNotifier<void> {
       final transactionRef = db
           .collection(Collections.transactions)
           .doc(txId.trim());
-      final snapshot = await transactionRef.get();
-      final data = snapshot.data();
-      if (!snapshot.exists || data == null) {
-        throw StateError('Transaction not found.');
-      }
-      if (data['tenant_id'] != tenantId) {
-        throw StateError('Transaction is outside the active workspace.');
-      }
-      if (data['deleted'] == true) return;
-      if ((data['invoice_id'] as String?)?.trim().isNotEmpty == true) {
-        throw StateError(
-          'Invoice-linked transactions cannot be deleted. Void or credit the invoice instead.',
-        );
-      }
-      final storedType = data['type'] as String? ?? '';
-      final storedAmount = (data['amount'] as num?)?.toDouble() ?? 0;
-      if ((storedType != TransactionModel.typeCashIn &&
-              storedType != TransactionModel.typeCashOut) ||
-          storedAmount <= 0 ||
-          storedAmount != amount ||
-          storedType != type) {
-        throw StateError(
-          'Transaction changed or is not deletable. Refresh and retry.',
-        );
-      }
-      final storedShopId = (data['shop_id'] as String?)?.trim() ?? '';
-      if (storedShopId.isEmpty || storedShopId != shopId?.trim()) {
-        throw StateError('Transaction shop does not match.');
-      }
-      final shopRef = db.collection(Collections.customers).doc(storedShopId);
-      final shopSnapshot = await shopRef.get();
-      final shopData = shopSnapshot.data();
-      if (!shopSnapshot.exists ||
-          shopData == null ||
-          shopData['tenant_id'] != tenantId) {
-        throw StateError('Transaction shop is outside the active workspace.');
-      }
+      await db.runTransaction<void>((transaction) async {
+        final snapshot = await transaction.get(transactionRef);
+        final data = snapshot.data();
+        if (!snapshot.exists || data == null) {
+          throw StateError('Transaction not found.');
+        }
+        if (data['tenant_id'] != tenantId) {
+          throw StateError('Transaction is outside the active workspace.');
+        }
+        if (data['deleted'] == true) return;
+        if ((data['invoice_id'] as String?)?.trim().isNotEmpty == true) {
+          throw StateError(
+            'Invoice-linked transactions cannot be deleted. Void or credit the invoice instead.',
+          );
+        }
+        final storedType = data['type'] as String? ?? '';
+        final storedAmount = (data['amount'] as num?)?.toDouble() ?? 0;
+        if ((storedType != TransactionModel.typeCashIn &&
+                storedType != TransactionModel.typeCashOut) ||
+            storedAmount <= 0 ||
+            storedAmount != amount ||
+            storedType != type) {
+          throw StateError(
+            'Transaction changed or is not deletable. Refresh and retry.',
+          );
+        }
+        final storedShopId = (data['shop_id'] as String?)?.trim() ?? '';
+        if (storedShopId.isEmpty || storedShopId != shopId?.trim()) {
+          throw StateError('Transaction shop does not match.');
+        }
+        final shopRef = db.collection(Collections.customers).doc(storedShopId);
+        final shopSnapshot = await transaction.get(shopRef);
+        final shopData = shopSnapshot.data();
+        if (!shopSnapshot.exists ||
+            shopData == null ||
+            shopData['tenant_id'] != tenantId) {
+          throw StateError('Transaction shop is outside the active workspace.');
+        }
 
-      final reversalDelta = storedType == TransactionModel.typeCashOut
-          ? -storedAmount
-          : storedAmount;
-      final batch = db.batch();
-      batch.update(transactionRef, {
-        'deleted': true,
-        'deleted_at': FieldValue.serverTimestamp(),
-        'deleted_by': user.id,
-        'updated_at': FieldValue.serverTimestamp(),
-      });
-      final shopUpdate = <String, dynamic>{
-        'balance': FieldValue.increment(reversalDelta),
-        'updated_at': FieldValue.serverTimestamp(),
-        'last_balance_correction_transaction_id': txId.trim(),
-      };
-      if (shopData['last_transaction_id'] == txId.trim()) {
-        shopUpdate.addAll({
-          'last_transaction_at': FieldValue.delete(),
-          'last_transaction_type': FieldValue.delete(),
-          'last_transaction_amount': FieldValue.delete(),
-          'last_transaction_id': FieldValue.delete(),
+        final reversalDelta = storedType == TransactionModel.typeCashOut
+            ? -storedAmount
+            : storedAmount;
+        transaction.update(transactionRef, {
+          'deleted': true,
+          'deleted_at': FieldValue.serverTimestamp(),
+          'deleted_by': user.id,
+          'updated_at': FieldValue.serverTimestamp(),
         });
-      }
-      batch.update(shopRef, shopUpdate);
-      await _commit(batch);
+        final shopUpdate = <String, dynamic>{
+          'balance': FieldValue.increment(reversalDelta),
+          'updated_at': FieldValue.serverTimestamp(),
+          'last_balance_correction_transaction_id': txId.trim(),
+        };
+        if (shopData['last_transaction_id'] == txId.trim()) {
+          shopUpdate.addAll({
+            'last_transaction_at': FieldValue.delete(),
+            'last_transaction_type': FieldValue.delete(),
+            'last_transaction_amount': FieldValue.delete(),
+            'last_transaction_id': FieldValue.delete(),
+          });
+        }
+        transaction.update(shopRef, shopUpdate);
+      });
     });
   }
 
@@ -917,6 +908,12 @@ class TransactionNotifier extends AsyncNotifier<void> {
       }
       if (newAmount <= 0) {
         throw ArgumentError('newAmount must be greater than 0');
+      }
+      if (!AppFormatters.hasAtMostTwoDecimalPlaces(newAmount) ||
+          newAmount > FinancialAmountPolicy.maximumAmount) {
+        throw ArgumentError(
+          'Transaction amounts must be within the supported two-decimal limit',
+        );
       }
       if (!TransactionModel.isStandaloneCashType(newType) ||
           !TransactionModel.isStandaloneCashType(oldType)) {
@@ -1028,6 +1025,12 @@ class TransactionNotifier extends AsyncNotifier<void> {
     if (newAmount <= 0) {
       throw ArgumentError('newAmount must be greater than 0');
     }
+    if (!AppFormatters.hasAtMostTwoDecimalPlaces(newAmount) ||
+        newAmount > FinancialAmountPolicy.maximumAmount) {
+      throw ArgumentError(
+        'Transaction amounts must be within the supported two-decimal limit',
+      );
+    }
     if (newType != 'cash_in' && newType != 'cash_out') {
       throw ArgumentError('Seller can edit only cash_in/cash_out transactions');
     }
@@ -1070,13 +1073,14 @@ class TransactionNotifier extends AsyncNotifier<void> {
         .collection(Collections.settings)
         .doc(tenantId)
         .get();
-    final requireApproval =
+    final allowEditRequests =
+        (settingsDoc.data()?['allow_seller_edit_requests'] as bool?) ??
         (settingsDoc
                 .data()?['require_admin_approval_for_seller_transaction_edits']
             as bool?) ??
         false;
 
-    if (requireApproval) {
+    if (allowEditRequests) {
       await txRef
           .update({
             'edit_request_pending': true,
@@ -1177,6 +1181,8 @@ class TransactionNotifier extends AsyncNotifier<void> {
               !TransactionModel.isStandaloneCashType(newType) ||
               oldAmount <= 0 ||
               newAmount <= 0 ||
+              !AppFormatters.hasAtMostTwoDecimalPlaces(newAmount) ||
+              newAmount > FinancialAmountPolicy.maximumAmount ||
               (data['invoice_id'] as String?)?.trim().isNotEmpty == true) {
             throw StateError(
               'Transaction is not eligible for seller correction.',

@@ -1099,7 +1099,7 @@ describe('supervisor operational access', () => {
       created_by: 'supervisor-uid',
       seller_id: 'supervisor-uid',
       type: 'sale',
-      invoice_number: 'INV-SUPERVISOR-1',
+      invoice_number: 'INV-0001',
       invoice_sequence: 1,
       sale_transaction_id: saleRef.id,
       fulfillment_mode: 'non_stock',
@@ -1107,130 +1107,177 @@ describe('supervisor operational access', () => {
       shop_id: 'shop-1',
       route_id: 'route-1',
       tenant_id: 'tenant-1',
-      items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
-      subtotal: 100,
+      items: [{ variant_id: 'v1', qty: 1, unit_price: 999999.99 }],
+      subtotal: 999999.99,
       discount: 0,
-      total: 100,
+      total: 999999.99,
       amount_received: 0,
     });
     batch.set(saleRef, {
       created_by: 'supervisor-uid',
       type: 'cash_out',
-      amount: 100,
+      amount: 999999.99,
       invoice_id: invoiceRef.id,
-      invoice_number: 'INV-SUPERVISOR-1',
+      invoice_number: 'INV-0001',
       shop_id: 'shop-1',
       route_id: 'route-1',
       tenant_id: 'tenant-1',
     });
     batch.update(db.collection('customers').doc('shop-1'), {
-      balance: 100,
+      balance: 999999.99,
       updated_at: new Date(),
       last_transaction_at: new Date(),
       last_transaction_type: 'cash_out',
-      last_transaction_amount: 100,
+      last_transaction_amount: 999999.99,
       last_transaction_id: saleRef.id,
     });
 
     await assertSucceeds(batch.commit());
   });
 
-  it('cannot create a sale invoice without advancing its workspace sequence', async () => {
+  it('cannot create a linked sale invoice above the financial amount limit', async () => {
     await seedUser('supervisor-uid', 'supervisor');
     await seedShop('shop-1', { balance: 0 });
     await seedSettings({ allow_non_stock_invoices: true });
     const db = supervisorCtx(testEnv).firestore();
-    const invoiceRef = db.collection('invoices').doc('supervisor-sale-no-sequence');
-    const saleRef = db.collection('transactions').doc('supervisor-sale-no-sequence-tx');
+    const invoiceRef = db.collection('invoices').doc('supervisor-sale-over-limit');
+    const saleRef = db.collection('transactions').doc('supervisor-sale-over-limit-tx');
     const batch = db.batch();
+    batch.update(db.collection('settings').doc('tenant-1'), {
+      last_invoice_number: 1,
+      last_invoice_id: invoiceRef.id,
+    });
     batch.set(invoiceRef, {
-      tenant_id: 'tenant-1',
       created_by: 'supervisor-uid',
       seller_id: 'supervisor-uid',
       type: 'sale',
-      invoice_number: 'INV-SUPERVISOR-1',
+      invoice_number: 'INV-0001',
       invoice_sequence: 1,
       sale_transaction_id: saleRef.id,
       fulfillment_mode: 'non_stock',
       seller_inventory_deductions: {},
       shop_id: 'shop-1',
       route_id: 'route-1',
-      items: [{ variant_id: 'v1', qty: 1, unit_price: 100 }],
-      subtotal: 100,
+      tenant_id: 'tenant-1',
+      items: [{ variant_id: 'v1', qty: 1, unit_price: 1000000 }],
+      subtotal: 1000000,
       discount: 0,
-      total: 100,
+      total: 1000000,
       amount_received: 0,
     });
     batch.set(saleRef, {
-      tenant_id: 'tenant-1',
       created_by: 'supervisor-uid',
       type: 'cash_out',
-      amount: 100,
+      amount: 1000000,
       invoice_id: invoiceRef.id,
-      invoice_number: 'INV-SUPERVISOR-1',
+      invoice_number: 'INV-0001',
       shop_id: 'shop-1',
       route_id: 'route-1',
+      tenant_id: 'tenant-1',
     });
     batch.update(db.collection('customers').doc('shop-1'), {
-      balance: 100,
+      balance: 1000000,
       updated_at: new Date(),
       last_transaction_at: new Date(),
       last_transaction_type: 'cash_out',
-      last_transaction_amount: 100,
+      last_transaction_amount: 1000000,
       last_transaction_id: saleRef.id,
     });
 
     await assertFails(batch.commit());
   });
 
+  it('cannot advance the invoice counter below the shared high-water mark', async () => {
+    await seedUser('supervisor-uid', 'supervisor');
+    await seedSettings({
+      last_invoice_number: 4,
+      last_cash_receipt_number: 1,
+    });
+    const db = supervisorCtx(testEnv).firestore();
+    await assertFails(
+      db.collection('settings').doc('tenant-1').update({
+        last_invoice_number: 2,
+        last_invoice_id: 'stale-invoice-counter',
+      }),
+    );
+    await assertFails(
+      db.collection('settings').doc('tenant-1').update({
+        last_invoice_number: 5,
+        last_invoice_id: 'orphan-invoice-id',
+      }),
+    );
+  });
+
   it('supervisor can create a linked cash receipt and reduce shop balance', async () => {
     await seedUser('supervisor-uid', 'supervisor');
     await seedShop('shop-1', { balance: 100 });
-    await seedSettings();
+    await seedSettings({
+      last_invoice_number: 4,
+      last_cash_receipt_number: 1,
+    });
     const db = supervisorCtx(testEnv).firestore();
     const invoiceRef = db.collection('invoices').doc('supervisor-receipt');
     const transactionRef = db.collection('transactions')
       .doc('supervisor-receipt-tx');
-    const batch = db.batch();
-    batch.update(db.collection('settings').doc('tenant-1'), {
-      last_cash_receipt_number: 1,
-    });
-    batch.set(invoiceRef, {
-      tenant_id: 'tenant-1',
-      created_by: 'supervisor-uid',
-      type: 'cash_receipt',
-      fulfillment_mode: 'none',
-      cash_receipt_transaction_id: transactionRef.id,
-      cash_receipt_sequence: 1,
-      shop_id: 'shop-1',
-      shop_name: 'Seed Shop',
-      route_id: 'route-1',
-      seller_id: 'supervisor-uid',
-      items: [],
-      subtotal: 0,
-      discount: 0,
-      total: 25,
-      amount_received: 25,
-      status: 'paid',
-    });
-    batch.set(transactionRef, {
-      tenant_id: 'tenant-1',
-      created_by: 'supervisor-uid',
-      type: 'cash_in',
-      amount: 25,
-      shop_id: 'shop-1',
-      route_id: 'route-1',
-      invoice_id: invoiceRef.id,
-    });
-    batch.update(db.collection('customers').doc('shop-1'), {
-      balance: 75,
-      updated_at: new Date(),
-      last_transaction_at: new Date(),
-      last_transaction_type: 'cash_in',
-      last_transaction_amount: 25,
-      last_transaction_id: transactionRef.id,
-    });
-    await assertSucceeds(batch.commit());
+    const receiptBatch = (sequence) => {
+      const batch = db.batch();
+      const invoiceNumber = `REC-${String(sequence).padStart(4, '0')}`;
+      batch.update(db.collection('settings').doc('tenant-1'), {
+        last_cash_receipt_number: sequence,
+        last_cash_receipt_id: invoiceRef.id,
+      });
+      batch.set(invoiceRef, {
+        tenant_id: 'tenant-1',
+        created_by: 'supervisor-uid',
+        type: 'cash_receipt',
+        fulfillment_mode: 'none',
+        cash_receipt_transaction_id: transactionRef.id,
+        cash_receipt_sequence: sequence,
+        invoice_number: invoiceNumber,
+        shop_id: 'shop-1',
+        shop_name: 'Seed Shop',
+        route_id: 'route-1',
+        seller_id: 'supervisor-uid',
+        items: [],
+        subtotal: 0,
+        discount: 0,
+        total: 25,
+        amount_received: 25,
+        status: 'paid',
+      });
+      batch.set(transactionRef, {
+        tenant_id: 'tenant-1',
+        created_by: 'supervisor-uid',
+        type: 'cash_in',
+        amount: 25,
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        invoice_id: invoiceRef.id,
+        invoice_number: invoiceNumber,
+      });
+      batch.update(db.collection('customers').doc('shop-1'), {
+        balance: 75,
+        updated_at: new Date(),
+        last_transaction_at: new Date(),
+        last_transaction_type: 'cash_in',
+        last_transaction_amount: 25,
+        last_transaction_id: transactionRef.id,
+      });
+      return batch;
+    };
+    await assertFails(
+      db.collection('settings').doc('tenant-1').update({
+        last_cash_receipt_number: 2,
+        last_cash_receipt_id: 'stale-receipt-id',
+      }),
+    );
+    await assertFails(
+      db.collection('settings').doc('tenant-1').update({
+        last_cash_receipt_number: 5,
+        last_cash_receipt_id: 'orphan-receipt-id',
+      }),
+    );
+    await assertSucceeds(receiptBatch(5).commit());
   });
 
   it('[INVOICE_TYPE_ALLOWLIST] operational roles cannot create unsupported invoice types', async () => {
@@ -1304,6 +1351,7 @@ describe('supervisor operational access', () => {
         type: 'sale',
         status: 'issued',
         total: 100,
+        created_at: new Date(),
         credit_note_total: 0,
       });
     });
@@ -1673,6 +1721,60 @@ describe('customers collection', () => {
     await assertSucceeds(batch.commit());
   });
 
+  it('seller cannot create an over-limit transaction with a matching balance update', async () => {
+    await seedUser('seller-uid', 'seller');
+    await seedShop('shop-1', { balance: 0 });
+    const db = sellerCtx(testEnv).firestore();
+    const transactionRef = db.collection('transactions').doc('tx-seller-over-limit');
+    const batch = db.batch();
+    batch.set(transactionRef, {
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      created_by: 'seller-uid',
+      amount: 1000000,
+      type: 'cash_out',
+      description: 'Over-limit sale',
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 1000000,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 1000000,
+      last_transaction_id: transactionRef.id,
+    });
+
+    await assertFails(batch.commit());
+  });
+
+  it('workspace admin cannot create an over-limit transaction with a matching balance update', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedShop('shop-1', { balance: 0 });
+    const db = adminCtx(testEnv).firestore();
+    const transactionRef = db.collection('transactions').doc('tx-admin-over-limit');
+    const batch = db.batch();
+    batch.set(transactionRef, {
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      tenant_id: 'tenant-1',
+      created_by: 'admin-uid',
+      amount: 1000000,
+      type: 'cash_out',
+      description: 'Over-limit sale',
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 1000000,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'cash_out',
+      last_transaction_amount: 1000000,
+      last_transaction_id: transactionRef.id,
+    });
+
+    await assertFails(batch.commit());
+  });
+
   it('seller: cannot mismatch linked transaction amount and balance delta', async () => {
     await seedUser('seller-uid', 'seller');
     await seedShop('shop-1', { balance: 100 });
@@ -1990,6 +2092,7 @@ describe('invoices collection', () => {
           shop_id: 'shop-1',
           route_id: 'route-1',
           total: 100,
+          created_at: new Date(),
           amount_received: 0,
           outstanding_amount: 100,
         });
@@ -2093,10 +2196,21 @@ describe('invoices collection', () => {
         type: 'sale',
         status: 'issued',
         total: 100,
+        created_at: new Date(),
         credit_note_total: 0,
+        amount_received: 0,
+        outstanding_amount: 100,
       });
     });
     const db = adminCtx(testEnv).firestore();
+    const linkedHistory = await assertSucceeds(
+      db
+        .collection('invoices')
+        .where('tenant_id', '==', 'tenant-1')
+        .where('linked_invoice_id', '==', 'original-sale')
+        .get(),
+    );
+    assert.strictEqual(linkedHistory.size, 0);
     const batch = db.batch();
     const creditRef = db.collection('invoices').doc('credit-valid');
     const returnRef = db.collection('transactions').doc('credit-valid-tx');
@@ -2107,12 +2221,14 @@ describe('invoices collection', () => {
     batch.update(db.collection('invoices').doc('original-sale'), {
       credit_note_total: 40,
       latest_credit_note_invoice_id: creditRef.id,
+      outstanding_amount: 60,
     });
     batch.set(creditRef, {
       tenant_id: 'tenant-1',
       created_by: 'admin-uid',
       type: 'credit_note',
       invoice_sequence: 1,
+      invoice_number: 'CN-0001',
       return_transaction_id: returnRef.id,
       linked_invoice_id: 'original-sale',
       shop_id: 'shop-1',
@@ -2141,6 +2257,78 @@ describe('invoices collection', () => {
       last_transaction_id: returnRef.id,
     });
     await assertSucceeds(batch.commit());
+    const updatedOriginal = await db
+      .collection('invoices')
+      .doc('original-sale')
+      .get();
+    assert.strictEqual(updatedOriginal.data().outstanding_amount, 60);
+  });
+
+  it('admin: cannot create a credit note more than 30 days after the sale', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedShop('shop-1', { balance: 100 });
+    await seedSettings();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('invoices').doc('expired-sale').set({
+        tenant_id: 'tenant-1',
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        type: 'sale',
+        status: 'issued',
+        total: 100,
+        credit_note_total: 0,
+        amount_received: 0,
+        outstanding_amount: 100,
+        created_at: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000),
+      });
+    });
+
+    const db = adminCtx(testEnv).firestore();
+    const batch = db.batch();
+    const creditRef = db.collection('invoices').doc('expired-credit');
+    const returnRef = db.collection('transactions').doc('expired-credit-tx');
+    batch.update(db.collection('settings').doc('tenant-1'), {
+      last_invoice_number: 1,
+      last_invoice_id: creditRef.id,
+    });
+    batch.update(db.collection('invoices').doc('expired-sale'), {
+      credit_note_total: 40,
+      latest_credit_note_invoice_id: creditRef.id,
+      outstanding_amount: 60,
+    });
+    batch.set(creditRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'admin-uid',
+      type: 'credit_note',
+      invoice_sequence: 1,
+      return_transaction_id: returnRef.id,
+      linked_invoice_id: 'expired-sale',
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      items: [{ variant_id: 'variant-1', qty: 1, unit_price: 40 }],
+      subtotal: 40,
+      discount: 0,
+      total: 40,
+      amount_received: 0,
+    });
+    batch.set(returnRef, {
+      tenant_id: 'tenant-1',
+      created_by: 'admin-uid',
+      type: 'return',
+      amount: 40,
+      shop_id: 'shop-1',
+      route_id: 'route-1',
+      invoice_id: creditRef.id,
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: 60,
+      updated_at: new Date(),
+      last_transaction_at: new Date(),
+      last_transaction_type: 'return',
+      last_transaction_amount: 40,
+      last_transaction_id: returnRef.id,
+    });
+    await assertFails(batch.commit());
   });
 
   it('admin: cannot create a credit note without its return transaction and shop update', async () => {
@@ -2153,6 +2341,9 @@ describe('invoices collection', () => {
         type: 'sale',
         status: 'issued',
         total: 100,
+        created_at: new Date(),
+        amount_received: 0,
+        outstanding_amount: 100,
         credit_note_total: 0,
       });
     });
@@ -2186,6 +2377,7 @@ describe('invoices collection', () => {
         type: 'sale',
         status: 'issued',
         total: 100,
+        created_at: new Date(),
         credit_note_total: 80,
       });
     });
@@ -2769,6 +2961,7 @@ describe('invoices collection', () => {
     const batch = db.batch();
     batch.update(db.collection('settings').doc('tenant-1'), {
       last_cash_receipt_number: 1,
+      last_cash_receipt_id: invoiceRef.id,
     });
     batch.set(invoiceRef, {
       created_by: 'tenant-admin-uid',
@@ -2797,6 +2990,7 @@ describe('invoices collection', () => {
       route_id: 'route-1',
       tenant_id: 'tenant-1',
       invoice_id: invoiceRef.id,
+      invoice_number: 'REC-2026-0001',
     });
     batch.update(db.collection('customers').doc('shop-1'), {
       balance: 75,
@@ -2823,6 +3017,7 @@ describe('invoices collection', () => {
         type: 'sale',
         status: 'issued',
         total: 100,
+        created_at: new Date(),
         credit_note_total: 0,
       });
     });
@@ -2838,12 +3033,14 @@ describe('invoices collection', () => {
     batch.update(originalRef, {
       credit_note_total: 40,
       latest_credit_note_invoice_id: creditRef.id,
+      outstanding_amount: 60,
     });
     batch.set(creditRef, {
       tenant_id: 'tenant-1',
       created_by: 'tenant-admin-uid',
       type: 'credit_note',
       invoice_sequence: 1,
+      invoice_number: 'CN-0001',
       return_transaction_id: returnRef.id,
       linked_invoice_id: originalRef.id,
       shop_id: 'shop-1',
@@ -3107,6 +3304,7 @@ describe('invoices collection', () => {
     const batch = db.batch();
     batch.update(db.collection('settings').doc('tenant-1'), {
       last_cash_receipt_number: 1,
+      last_cash_receipt_id: invoiceRef.id,
     });
     batch.set(invoiceRef, {
       created_by: 'seller-uid',
@@ -3114,6 +3312,7 @@ describe('invoices collection', () => {
       fulfillment_mode: 'none',
       cash_receipt_transaction_id: transactionRef.id,
       cash_receipt_sequence: 1,
+      invoice_number: 'REC-0001',
       invoice_header_snapshot: {
         name_en: 'Workspace Name',
         visible_fields: [],
@@ -3141,6 +3340,7 @@ describe('invoices collection', () => {
       route_id: 'route-1',
       tenant_id: 'tenant-1',
       invoice_id: invoiceRef.id,
+      invoice_number: 'REC-0001',
     });
     batch.update(db.collection('customers').doc('shop-1'), {
       balance: 75,
@@ -3171,6 +3371,7 @@ describe('invoices collection', () => {
     const batch = db.batch();
     batch.update(db.collection('settings').doc('tenant-1'), {
       last_cash_receipt_number: 1,
+      last_cash_receipt_id: invoiceRef.id,
     });
     batch.set(invoiceRef, {
       created_by: 'seller-uid',
@@ -3274,6 +3475,7 @@ describe('invoices collection', () => {
     const batch = db.batch();
     batch.update(db.collection('settings').doc('tenant-1'), {
       last_cash_receipt_number: 1,
+      last_cash_receipt_id: invoiceRef.id,
     });
     batch.set(invoiceRef, {
       created_by: 'seller-uid',
@@ -3561,6 +3763,23 @@ describe('tenant destructive operations', () => {
 // 7. transactions collection
 // ═══════════════════════════════════════════════════════════════════════════
 describe('transactions collection', () => {
+  it('seller can read a deterministic missing transaction ID but cannot run the broad idempotency query', async () => {
+    await seedUser('seller-uid', 'seller');
+    const db = sellerCtx(testEnv).firestore();
+    await assertSucceeds(
+      db.collection('transactions')
+        .doc('tenant-1:standalone-transaction:retry-key')
+        .get(),
+    );
+    await assertFails(
+      db.collection('transactions')
+        .where('tenant_id', '==', 'tenant-1')
+        .where('idempotency_key', '==', 'retry-key')
+        .limit(1)
+        .get(),
+    );
+  });
+
   it('admin: cannot overwrite financial fields without an edit history entry', async () => {
     await seedUser('admin-uid', 'admin');
     await seedTransaction('tx-admin-edit', {
@@ -3612,6 +3831,40 @@ describe('transactions collection', () => {
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     await assertSucceeds(batch.commit());
+  });
+
+  it('admin: cannot correct a transaction above the financial amount limit', async () => {
+    await seedUser('admin-uid', 'admin');
+    const createdAt = new Date('2026-01-01T00:00:00.000Z');
+    await seedShop('shop-1', { balance: -100 });
+    await seedTransaction('tx-over-limit', {
+      shop_id: 'shop-1',
+      created_at: createdAt,
+      description: 'Original entry',
+    });
+    const db = adminCtx(testEnv).firestore();
+    const transaction = db.collection('transactions').doc('tx-over-limit');
+    const batch = db.batch();
+    batch.update(transaction, {
+      amount: 1000000,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      edit_history: [{
+        previous_amount: 100,
+        previous_type: 'cash_in',
+        previous_created_at: createdAt,
+        previous_description: 'Original entry',
+        changed_by: 'admin-uid',
+        reason: 'Correct excessive transaction amount',
+        changed_at: new Date(),
+      }],
+    });
+    batch.update(db.collection('customers').doc('shop-1'), {
+      balance: -1000000,
+      last_balance_correction_transaction_id: transaction.id,
+      last_transaction_amount: 1000000,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await assertFails(batch.commit());
   });
 
   it('admin cannot correct a transaction without its atomic shop balance update', async () => {
@@ -4182,9 +4435,9 @@ describe('transactions collection', () => {
     );
   });
 
-  it('seller: can submit edit request metadata when approval is enabled', async () => {
+  it('seller: can submit edit request metadata when requests are enabled', async () => {
     await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
-    await seedSettings({ require_admin_approval_for_seller_transaction_edits: true });
+    await seedSettings({ allow_seller_edit_requests: true });
     await seedTransaction('tx1');
     await assertSucceeds(
       sellerCtx(testEnv).firestore().collection('transactions').doc('tx1').update({
@@ -4196,6 +4449,28 @@ describe('transactions collection', () => {
         edit_request_requested_by: 'seller-uid',
         edit_request_requested_at: new Date(),
         edit_request_new_amount: 120,
+        edit_request_new_type: 'cash_in',
+        edit_request_new_description: 'Need correction',
+        edit_request_new_sale_type: 'cash',
+        edit_request_new_created_at: new Date(),
+      }),
+    );
+  });
+
+  it('seller cannot submit an over-limit transaction edit request', async () => {
+    await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
+    await seedSettings({ allow_seller_edit_requests: true });
+    await seedTransaction('tx1');
+    await assertFails(
+      sellerCtx(testEnv).firestore().collection('transactions').doc('tx1').update({
+        description: 'Need correction',
+        updated_at: new Date(),
+        updated_by: 'seller-uid',
+        edit_request_pending: true,
+        edit_request_status: 'pending',
+        edit_request_requested_by: 'seller-uid',
+        edit_request_requested_at: new Date(),
+        edit_request_new_amount: 1000000,
         edit_request_new_type: 'cash_in',
         edit_request_new_description: 'Need correction',
         edit_request_new_sale_type: 'cash',
@@ -4827,6 +5102,59 @@ describe('notifications collection', () => {
         read: true,
         read_at: firebase.firestore.Timestamp.now(),
       }),
+    );
+  });
+
+  it('seller cash receipt notifications must link to the matching receipt', async () => {
+    await seedUser('seller-uid', 'seller');
+    await seedUser('admin-uid', 'admin');
+    await seedShop('shop-1');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('invoices').doc('receipt-1').set({
+        tenant_id: 'tenant-1',
+        type: 'cash_receipt',
+        created_by: 'seller-uid',
+        seller_id: 'seller-uid',
+        shop_id: 'shop-1',
+        shop_name: 'Seed Shop',
+        route_id: 'route-1',
+        invoice_number: 'REC-2026-0001',
+        total: 125,
+      });
+    });
+
+    const db = sellerCtx(testEnv).firestore();
+    const notification = {
+      type: 'invoice',
+      shop_id: 'shop-1',
+      shop_name: 'Seed Shop',
+      route_id: 'route-1',
+      seller_id: 'seller-uid',
+      seller_name: 'Test User',
+      amount: 125,
+      transaction_type: 'cash_in',
+      invoice_number: 'REC-2026-0001',
+      ref_id: 'receipt-1',
+      target_role: 'admin',
+      read: false,
+      tenant_id: 'tenant-1',
+      created_by: 'seller-uid',
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    await assertSucceeds(
+      db.collection('notifications').doc('invoice_receipt-1').set(notification),
+    );
+    await assertFails(
+      db.collection('notifications').doc('invoice_wrong-type').set({
+        ...notification,
+        transaction_type: 'cash_out',
+      }),
+    );
+    await assertSucceeds(
+      adminCtx(testEnv).firestore()
+        .collection('notifications')
+        .doc('invoice_receipt-1')
+        .get(),
     );
   });
 
@@ -6048,7 +6376,13 @@ describe('client transactions that read documents before creating them', () => {
     }));
   });
 
-  async function seedSale({ role, uid, lineCount = 1 }) {
+  async function seedSale({
+    role,
+    uid,
+    lineCount = 1,
+    lastInvoiceNumber = 0,
+    lastCashReceiptNumber = 0,
+  }) {
     await seedTenant();
     await seedUser(uid, role, true, { assigned_route_ids: ['route-1'] });
     await seedShop('shop-1', { balance: 0 });
@@ -6056,7 +6390,8 @@ describe('client transactions that read documents before creating them', () => {
       company_name: 'Acme Footwear',
       invoice_header: { show_phone: true },
       logo_base64: null,
-      last_invoice_number: 0,
+      last_invoice_number: lastInvoiceNumber,
+      last_cash_receipt_number: lastCashReceiptNumber,
     });
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
@@ -6100,14 +6435,20 @@ describe('client transactions that read documents before creating them', () => {
       assert.ok(inventorySnapshots.every((snapshot) => snapshot.exists));
 
       const now = new Date();
+      const settingsData = settingsSnapshot.data();
+      const invoiceSequence = Math.max(
+        settingsData.last_invoice_number ?? 0,
+        settingsData.last_cash_receipt_number ?? 0,
+      ) + 1;
+      const invoiceNumber = `INV-${String(invoiceSequence).padStart(4, '0')}`;
       transaction.update(settingsRef, {
-        last_invoice_number: 1,
+        last_invoice_number: invoiceSequence,
         last_invoice_id: invoiceRef.id,
       });
       transaction.set(invoiceRef, {
         tenant_id: 'tenant-1',
-        invoice_number: 'INV-2026-0001',
-        invoice_sequence: 1,
+        invoice_number: invoiceNumber,
+        invoice_sequence: invoiceSequence,
         sale_transaction_id: saleRef.id,
         idempotency_key: 'client-shape-key',
         type: 'sale',
@@ -6150,10 +6491,10 @@ describe('client transactions that read documents before creating them', () => {
         type: 'cash_out',
         sale_type: amountReceived >= total ? 'cash' : 'credit',
         amount: total,
-        description: 'Invoice INV-2026-0001',
+        description: `Invoice ${invoiceNumber}`,
         items,
         invoice_id: invoiceRef.id,
-        invoice_number: 'INV-2026-0001',
+        invoice_number: invoiceNumber,
         created_by: uid,
         created_at: now,
         deleted: false,
@@ -6167,10 +6508,10 @@ describe('client transactions that read documents before creating them', () => {
           type: 'cash_in',
           sale_type: 'cash',
           amount: amountReceived,
-          description: 'Payment for INV-2026-0001',
+          description: `Payment for ${invoiceNumber}`,
           items: [],
           invoice_id: invoiceRef.id,
-          invoice_number: 'INV-2026-0001',
+          invoice_number: invoiceNumber,
           created_by: uid,
           created_at: now,
           deleted: false,
@@ -6202,6 +6543,20 @@ describe('client transactions that read documents before creating them', () => {
     ));
   });
 
+  it('seller sale sequence continues after a higher cash receipt counter', async () => {
+    await seedSale({
+      role: 'seller',
+      uid: 'seller-uid',
+      lastCashReceiptNumber: 4,
+    });
+    const db = sellerCtx(testEnv).firestore();
+    await assertSucceeds(saleTransaction(db, 'seller-uid'));
+    const invoice = await db.collection('invoices')
+      .doc('invoice-client-shape').get();
+    assert.strictEqual(invoice.data().invoice_sequence, 5);
+    assert.strictEqual(invoice.data().invoice_number, 'INV-0005');
+  });
+
   it('seller can create a paid sale invoice after reading its missing id', async () => {
     await seedSale({ role: 'seller', uid: 'seller-uid' });
     await assertSucceeds(saleTransaction(
@@ -6226,5 +6581,26 @@ describe('client transactions that read documents before creating them', () => {
       'seller-uid',
       { lineCount: 3, amountReceived: 40 },
     ));
+  });
+
+  it('seller four-line stock sale with payment stays within the Rules access budget', async () => {
+    await seedSale({ role: 'seller', uid: 'seller-uid', lineCount: 4 });
+    await assertSucceeds(saleTransaction(
+      sellerCtx(testEnv).firestore(),
+      'seller-uid',
+      { lineCount: 4, amountReceived: 40 },
+    ));
+  });
+
+  it('seller stock sales with 5 to 30 lines stay within the Rules access budget', async () => {
+    for (const lineCount of [5, 10, 15, 20, 30]) {
+      await testEnv.clearFirestore();
+      await seedSale({ role: 'seller', uid: 'seller-uid', lineCount });
+      await assertSucceeds(saleTransaction(
+        sellerCtx(testEnv).firestore(),
+        'seller-uid',
+        { lineCount, amountReceived: 40 },
+      ));
+    }
   });
 });

@@ -35,7 +35,7 @@ SettingsModel _defaultSettings(String settingsDocId) => SettingsModel(
   tenantId: settingsDocId,
   currency: 'SAR',
   pairsPerCarton: 12,
-  requireAdminApprovalForSellerTransactionEdits: false,
+  allowSellerEditRequests: false,
   updatedAt: Timestamp.now(),
 );
 

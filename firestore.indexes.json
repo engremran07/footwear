@@ -193,6 +193,20 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "linked_invoice_id",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tenant_id",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "seller_id",
           "order": "ASCENDING"
         },

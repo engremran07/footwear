@@ -7,6 +7,14 @@ Most recent first.
 
 ---
 
+## [3.10.17+1128] — 2026-10-29 — Financial workflow safeguards
+
+### Changed
+
+- Sales, credit notes, and cash receipts use a tenant-scoped high-water invoice sequence while preserving their document prefixes.
+- Financial input validation covers supported precision and amount limits; dashboard totals keep route currencies separate.
+- Arabic, Urdu, and English mixed-script financial output preserves the intended reading order.
+
 ## [3.10.13+1124] — 2026-10-28 — Dependency and Android build compatibility
 
 ### Changed

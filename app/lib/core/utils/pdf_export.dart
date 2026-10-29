@@ -1218,10 +1218,12 @@ Future<Uint8List> buildPdfLedger({
                       textDirection: dir,
                     ),
                   pw.Spacer(),
-                  _pairedLabelText(
-                    '${_pdfLabel(labels, 'page', locale)} ${ctx.pageNumber} / ${ctx.pagesCount}',
-                    style: ts(size: 7, color: PdfColors.grey500),
-                    align: pw.TextAlign.right,
+                  pw.Expanded(
+                    child: _pairedLabelText(
+                      '${_pdfLabel(labels, 'page', locale)} ${ctx.pageNumber} / ${ctx.pagesCount}',
+                      style: ts(size: 7, color: PdfColors.grey500),
+                      align: pw.TextAlign.right,
+                    ),
                   ),
                 ],
               ),
@@ -1277,7 +1279,7 @@ Future<Uint8List> buildPdfLedger({
                         ),
                       ),
                     ),
-                    child: pw.Text(
+                    child: _pairedLabelText(
                       _pdfLabel(labels, 'net_payable', locale),
                       style: pw.TextStyle(
                         fontSize: 9,
@@ -1286,7 +1288,6 @@ Future<Uint8List> buildPdfLedger({
                         font: primaryFont,
                         fontFallback: ff,
                       ),
-                      textDirection: dir,
                     ),
                   ),
                   pw.Container(
@@ -3431,57 +3432,59 @@ Future<Uint8List> buildPdfMultiShopLedger({
                   bottom: pw.BorderSide(color: PdfColors.grey400, width: 0.5),
                 ),
               ),
-              child: pw.Row(
-                children: [
-                  pw.Container(
-                    width: colWidths
-                        .take(colCount - 1)
-                        .fold<double>(0, (a, b) => a + b),
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 5,
-                    ),
-                    decoration: const pw.BoxDecoration(
-                      border: pw.Border(
-                        right: pw.BorderSide(
-                          color: PdfColors.grey400,
-                          width: 0.5,
+              child: pw.Directionality(
+                textDirection: pw.TextDirection.ltr,
+                child: pw.Row(
+                  children: [
+                    pw.Container(
+                      width: colWidths
+                          .take(colCount - 1)
+                          .fold<double>(0, (a, b) => a + b),
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 5,
+                      ),
+                      decoration: const pw.BoxDecoration(
+                        border: pw.Border(
+                          right: pw.BorderSide(
+                            color: PdfColors.grey400,
+                            width: 0.5,
+                          ),
+                        ),
+                      ),
+                      child: _pairedLabelText(
+                        _pdfLabel(labels, 'net_payable', locale),
+                        style: pw.TextStyle(
+                          fontSize: 9,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.blue800,
+                          font: primaryFont,
+                          fontFallback: ff,
                         ),
                       ),
                     ),
-                    child: pw.Text(
-                      _pdfLabel(labels, 'net_payable', locale),
-                      style: pw.TextStyle(
-                        fontSize: 9,
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.blue800,
-                        font: primaryFont,
-                        fontFallback: ff,
+                    pw.Container(
+                      width: colWidths.last,
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 5,
                       ),
-                      textDirection: dir,
-                    ),
-                  ),
-                  pw.Container(
-                    width: colWidths.last,
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 5,
-                    ),
-                    child: pw.Text(
-                      _fmtAmtC(finalBal, currencyLabel),
-                      style: pw.TextStyle(
-                        fontSize: 9,
-                        fontWeight: pw.FontWeight.bold,
-                        color: finalBal >= 0
-                            ? PdfColors.red800
-                            : PdfColors.green800,
-                        font: primaryFont,
-                        fontFallback: ff,
+                      child: pw.Text(
+                        _fmtAmtC(finalBal, currencyLabel),
+                        style: pw.TextStyle(
+                          fontSize: 9,
+                          fontWeight: pw.FontWeight.bold,
+                          color: finalBal >= 0
+                              ? PdfColors.red800
+                              : PdfColors.green800,
+                          font: primaryFont,
+                          fontFallback: ff,
+                        ),
+                        textDirection: _amountDir,
                       ),
-                      textDirection: _amountDir,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],

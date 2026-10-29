@@ -99,6 +99,20 @@ service cloud.firestore {
         tenantId != '__global__';
     }
 
+    function isWithinFinancialWriteLimit(amount) {
+      return amount is number && amount > 0 && amount <= 999999.99;
+    }
+
+    function isValidInvoiceNumber(type, invoiceNumber) {
+      return invoiceNumber is string &&
+        ((type == 'sale' &&
+          (invoiceNumber.matches('^INV-[0-9]{4,}$') ||
+           invoiceNumber.matches('^INV-[0-9]{4}-[A-Z0-9-]+$'))) ||
+         (type == 'credit_note' &&
+          (invoiceNumber.matches('^CN-[0-9]{4,}$') ||
+           invoiceNumber.matches('^INV-[0-9]{4}-[A-Z0-9-]+$'))));
+    }
+
     function isSuperAdminForSelectedWorkspace(tenantId) {
       return isSuperAdmin() &&
         hasSelectedWorkspaceSupportContext(userDoc().data, tenantId);
@@ -515,7 +529,12 @@ service cloud.firestore {
         refId.size() > 0 &&
         notifId == 'invoice_' + refId &&
         exists(invoicePath) &&
-        invoice.get('type', '') == 'sale' &&
+        (
+          (invoice.get('type', '') == 'sale' &&
+            request.resource.data.transaction_type == 'cash_out') ||
+          (invoice.get('type', '') == 'cash_receipt' &&
+            request.resource.data.transaction_type == 'cash_in')
+        ) &&
         invoice.get('created_by', '') == request.auth.uid &&
         invoice.get('seller_id', '') == request.auth.uid &&
         invoice.get('tenant_id', '') == request.resource.data.tenant_id &&
@@ -684,6 +703,9 @@ service cloud.firestore {
         original.shop_id == request.resource.data.shop_id &&
         original.type == 'sale' &&
         original.status != 'void' &&
+        original.created_at is timestamp &&
+        original.created_at >= request.time - duration.value(30, 'd') &&
+        original.created_at <= request.time &&
         request.resource.data.total <= original.total &&
         originalAfter.credit_note_total is number &&
         originalAfter.credit_note_total == creditedBefore + request.resource.data.total &&
@@ -771,7 +793,7 @@ service cloud.firestore {
       let invoicePath = /databases/$(database)/documents/invoices/$(invoiceId);
       let invoiceData = getAfter(invoicePath).data;
       return invoiceId is string && invoiceId != '' &&
-        !exists(invoicePath) && existsAfter(invoicePath) &&
+        !exists(invoicePath) && invoiceData is map &&
         invoiceData.type == 'sale' &&
         invoiceData.created_by == request.auth.uid &&
         invoiceData.seller_id == request.auth.uid &&
@@ -794,10 +816,15 @@ service cloud.firestore {
         userDoc().data.tenant_id != '' ? userDoc().data.tenant_id : '__global__';
     }
 
-    function requiresSellerTransactionEditApproval() {
-      return exists(/databases/$(database)/documents/settings/$(currentUserSettingsDocId())) &&
-        get(/databases/$(database)/documents/settings/$(currentUserSettingsDocId()))
-          .data.require_admin_approval_for_seller_transaction_edits == true;
+    function sellerEditRequestsEnabled() {
+      let settingsPath = /databases/$(database)/documents/settings/$(currentUserSettingsDocId());
+      let settingsExists = exists(settingsPath);
+      let settingsData = settingsExists ? get(settingsPath).data : {};
+      return settingsExists &&
+        settingsData.get(
+          'allow_seller_edit_requests',
+          settingsData.get('require_admin_approval_for_seller_transaction_edits', false)
+        ) == true;
     }
 
     function sellerInvoiceBalanceMatches(shopId, transactionData, transactionId) {
@@ -855,16 +882,24 @@ service cloud.firestore {
         shop is map && shop.last_transaction_id == saleId;
     }
 
+    function nextInvoiceSequence(settingsData) {
+      let invoiceCounter = settingsData.get('last_invoice_number', 0);
+      let receiptCounter = settingsData.get('last_cash_receipt_number', 0);
+      return settingsData is map &&
+        invoiceCounter is number && invoiceCounter >= 0 &&
+        receiptCounter is number && receiptCounter >= 0
+        ? (invoiceCounter > receiptCounter
+          ? invoiceCounter
+          : receiptCounter) + 1
+        : -1;
+    }
+
     function invoiceSequenceIsLinked(tenantId, sequence, invoiceId) {
       let settingsPath = /databases/$(database)/documents/settings/$(tenantId);
-      let settingsBefore = get(settingsPath).data;
       let settingsAfter = getAfter(settingsPath).data;
       return isConcreteTenantId(tenantId) &&
         sequence is int && sequence > 0 &&
-        settingsBefore is map && settingsAfter is map &&
-        ((settingsBefore.get('last_invoice_number', null) is number &&
-            sequence == settingsBefore.last_invoice_number + 1) ||
-          (!('last_invoice_number' in settingsBefore) && sequence == 1)) &&
+        settingsAfter is map &&
         settingsAfter.last_invoice_number == sequence &&
         settingsAfter.last_invoice_id == invoiceId;
     }
@@ -879,15 +914,41 @@ service cloud.firestore {
         changed.hasOnly(['last_invoice_number', 'last_invoice_id']) &&
         changed.hasAll(['last_invoice_number', 'last_invoice_id']) &&
         sequence is int &&
-        ((resource.data.get('last_invoice_number', null) is number &&
-            sequence == resource.data.last_invoice_number + 1) ||
-          (!('last_invoice_number' in resource.data) && sequence == 1)) &&
+        sequence == nextInvoiceSequence(resource.data) &&
         invoiceId is string && invoiceId != '' &&
         !exists(invoicePath) && existsAfter(invoicePath) &&
         invoice.tenant_id == tenantId &&
         invoice.invoice_sequence == sequence &&
         invoice.created_by == request.auth.uid &&
-        invoice.type in ['sale', 'credit_note'];
+        invoice.type in ['sale', 'credit_note'] &&
+        isValidInvoiceNumber(
+          invoice.type,
+          invoice.get('invoice_number', '')
+        );
+    }
+
+    function receiptCounterUpdateIsLinked(tenantId) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let sequence = request.resource.data.get('last_cash_receipt_number', null);
+      let invoiceId = request.resource.data.get('last_cash_receipt_id', '');
+      let invoicePath = /databases/$(database)/documents/invoices/$(invoiceId);
+      let invoice = getAfter(invoicePath).data;
+      let invoiceNumber = invoice is map
+        ? invoice.get('invoice_number', '')
+        : '';
+      return isConcreteTenantId(tenantId) &&
+        changed.hasOnly(['last_cash_receipt_number', 'last_cash_receipt_id']) &&
+        changed.hasAll(['last_cash_receipt_number', 'last_cash_receipt_id']) &&
+        sequence is int &&
+        sequence == nextInvoiceSequence(resource.data) &&
+        invoiceId is string && invoiceId != '' &&
+        !exists(invoicePath) && existsAfter(invoicePath) &&
+        invoice.tenant_id == tenantId &&
+        invoice.cash_receipt_sequence == sequence &&
+        invoice.created_by == request.auth.uid &&
+        invoice.type == 'cash_receipt' &&
+        invoiceNumber is string &&
+        invoiceNumber.matches('^REC-[0-9]{4,}$|^REC-[0-9]{4}-[A-Z0-9-]+$');
     }
 
     function sellerCashReceiptBalanceMatches(shopId, transactionId, transactionData) {
@@ -918,20 +979,22 @@ service cloud.firestore {
       let shopPath = /databases/$(database)/documents/customers/$(request.resource.data.shop_id);
       let shopAfter = getAfter(shopPath).data;
       let settingsPath = /databases/$(database)/documents/settings/$(request.resource.data.tenant_id);
-      let settingsBefore = get(settingsPath).data;
       let settingsAfter = getAfter(settingsPath).data;
       let sequence = request.resource.data.cash_receipt_sequence;
       return transactionId is string && transactionId != '' &&
         !exists(transactionPath) && existsAfter(transactionPath) &&
         sequence is int && sequence > 0 &&
-        settingsBefore is map && settingsAfter is map &&
-        ((('last_cash_receipt_number' in settingsBefore) &&
-            settingsBefore.last_cash_receipt_number is int &&
-            sequence == settingsBefore.last_cash_receipt_number + 1) ||
-          (!('last_cash_receipt_number' in settingsBefore) && sequence == 1)) &&
+        settingsAfter is map &&
         settingsAfter.last_cash_receipt_number == sequence &&
+        settingsAfter.last_cash_receipt_id == invoiceId &&
+        request.resource.data.get('invoice_number', '') is string &&
+        request.resource.data.get('invoice_number', '').matches(
+          '^REC-[0-9]{4,}$|^REC-[0-9]{4}-[A-Z0-9-]+$'
+        ) &&
         transactionData.type == 'cash_in' &&
         transactionData.amount == request.resource.data.total &&
+        transactionData.get('invoice_number', '') ==
+          request.resource.data.get('invoice_number', '') &&
         transactionData.invoice_id == invoiceId &&
         transactionData.shop_id == request.resource.data.shop_id &&
         transactionData.route_id == request.resource.data.route_id &&
@@ -1157,7 +1220,8 @@ service cloud.firestore {
         : txId;
       return invoiceData is map &&
         invoiceData.created_by == request.auth.uid &&
-        invoiceData.total is number && invoiceData.total > 0 &&
+        isWithinFinancialWriteLimit(invoiceData.total) &&
+        invoiceData.total <= 999999.99 &&
         invoiceData.amount_received is number &&
         (saleCashOut || saleCashIn || cashReceipt || creditNote) &&
         expectedLastId is string &&
@@ -1365,9 +1429,18 @@ service cloud.firestore {
       let credit = getAfter(creditPath).data;
       let creditAmount = request.resource.data.credit_note_total -
         resource.data.get('credit_note_total', 0);
+      let outstandingAfterCredits = resource.data.total -
+        resource.data.get('amount_received', 0) -
+        request.resource.data.credit_note_total;
+      let expectedStatus = outstandingAfterCredits > 0
+        ? (resource.data.get('amount_received', 0) > 0 ? 'partial' : 'issued')
+        : 'paid';
       return creditId is string && creditId != '__missing__' &&
         resource.data.get('credit_note_total', 0) is number &&
         request.resource.data.credit_note_total is number &&
+        request.resource.data.get('outstanding_amount', null) ==
+          (outstandingAfterCredits > 0 ? outstandingAfterCredits : 0) &&
+        request.resource.data.get('status', '') == expectedStatus &&
         creditAmount > 0 &&
         !exists(creditPath) && existsAfter(creditPath) &&
         credit is map &&
@@ -1391,6 +1464,12 @@ service cloud.firestore {
       let creditTotal = creditBefore is map
         ? creditBefore.get('total', 0)
         : 0;
+      let outstandingAfterCredits = resource.data.total -
+        resource.data.get('amount_received', 0) -
+        request.resource.data.credit_note_total;
+      let expectedStatus = outstandingAfterCredits > 0
+        ? (resource.data.get('amount_received', 0) > 0 ? 'partial' : 'issued')
+        : 'paid';
       return creditId is string && creditId != '__missing__' &&
         resource.data.get('credit_note_total', 0) is number &&
         request.resource.data.credit_note_total is number &&
@@ -1405,7 +1484,10 @@ service cloud.firestore {
         creditAfter.tenant_id == resource.data.tenant_id &&
         creditAfter.shop_id == resource.data.shop_id &&
         request.resource.data.credit_note_total ==
-          resource.data.get('credit_note_total', 0) - creditTotal;
+          resource.data.get('credit_note_total', 0) - creditTotal &&
+        request.resource.data.get('outstanding_amount', null) ==
+          (outstandingAfterCredits > 0 ? outstandingAfterCredits : 0) &&
+        request.resource.data.get('status', '') == expectedStatus;
     }
 
     function invoiceUpdateIsLinked(invoiceId) {
@@ -1438,6 +1520,8 @@ service cloud.firestore {
         (totalAfter > totalBefore &&
             changed.hasOnly([
               'credit_note_total',
+              'outstanding_amount',
+              'status',
               'latest_credit_note_invoice_id',
               'updated_at',
             ]) &&
@@ -1445,6 +1529,8 @@ service cloud.firestore {
         (totalAfter < totalBefore &&
             changed.hasOnly([
               'credit_note_total',
+              'outstanding_amount',
+              'status',
               'voided_credit_note_id',
               'updated_at',
             ]) &&
@@ -2140,6 +2226,7 @@ service cloud.firestore {
           isValidSellerTransactionType(request.resource.data.type) &&
           request.resource.data.amount is number &&
           request.resource.data.amount > 0 &&
+          request.resource.data.amount <= 999999.99 &&
           request.resource.data.route_id != null &&
           request.resource.data.route_id != '' &&
           isSellerForRoute(request.resource.data.route_id) &&
@@ -2154,7 +2241,8 @@ service cloud.firestore {
         && (isSeller() || (
           isValidTransactionType(request.resource.data.type) &&
           request.resource.data.amount is number &&
-          request.resource.data.amount > 0
+          request.resource.data.amount > 0 &&
+          request.resource.data.amount <= 999999.99
         ));
       // Sellers may annotate their own entries or submit a pending edit request.
       // Amount, type, and date remain immutable unless an admin applies the edit.
@@ -2162,6 +2250,9 @@ service cloud.firestore {
         ? (isAdminForTenant(resource.data.tenant_id) &&
           request.resource.data.tenant_id == resource.data.tenant_id &&
           isValidTransactionType(request.resource.data.type) &&
+          (!request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['amount']) ||
+            request.resource.data.amount <= 999999.99) &&
           (!request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['deleted', 'deleted_at', 'deleted_by']) ||
             (request.resource.data.get('deleted', false) == true &&
@@ -2192,7 +2283,7 @@ service cloud.firestore {
               'description', 'updated_at', 'updated_by'
             ]) ||
             (
-              requiresSellerTransactionEditApproval() &&
+              sellerEditRequestsEnabled() &&
               request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 'description',
                 'updated_at',
@@ -2213,7 +2304,8 @@ service cloud.firestore {
                 isValidSellerTransactionType(request.resource.data.edit_request_new_type)) &&
               (!('edit_request_new_amount' in request.resource.data) ||
                 (request.resource.data.edit_request_new_amount is number &&
-                  request.resource.data.edit_request_new_amount > 0))
+                  request.resource.data.edit_request_new_amount > 0 &&
+                  request.resource.data.edit_request_new_amount <= 999999.99))
             )
           )
         );
@@ -2304,9 +2396,27 @@ service cloud.firestore {
       allow update: if (
         isAdminForTenant(docId) &&
         (
-          !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['last_invoice_number', 'last_invoice_id']) ||
-          invoiceCounterUpdateIsLinked(docId)
+          (!request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny([
+                'last_invoice_number',
+                'last_invoice_id',
+                'last_cash_receipt_number',
+                'last_cash_receipt_id'
+              ])) ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['last_invoice_number', 'last_invoice_id']) &&
+            !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['last_cash_receipt_number', 'last_cash_receipt_id']) &&
+            invoiceCounterUpdateIsLinked(docId)
+          ) ||
+          (
+            !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['last_invoice_number', 'last_invoice_id']) &&
+            request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['last_cash_receipt_number', 'last_cash_receipt_id']) &&
+            receiptCounterUpdateIsLinked(docId)
+          )
         )
       ) ||
         (isActiveUser() &&
@@ -2319,14 +2429,16 @@ service cloud.firestore {
               .hasAll(['last_invoice_number', 'last_invoice_id']) &&
             invoiceCounterUpdateIsLinked(docId)) ||
            (request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['last_cash_receipt_number']) &&
-            request.resource.data.last_cash_receipt_number is number &&
-            ((('last_cash_receipt_number' in resource.data) &&
-              resource.data.last_cash_receipt_number is number &&
-              request.resource.data.last_cash_receipt_number ==
-                resource.data.last_cash_receipt_number + 1) ||
-             (!('last_cash_receipt_number' in resource.data) &&
-              request.resource.data.last_cash_receipt_number == 1)))
+              .hasOnly([
+                'last_cash_receipt_number',
+                'last_cash_receipt_id'
+              ]) &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasAll([
+                'last_cash_receipt_number',
+                'last_cash_receipt_id'
+              ]) &&
+            receiptCounterUpdateIsLinked(docId))
          )) && docSizeOk();
     }
 
@@ -2372,8 +2484,12 @@ service cloud.firestore {
         && request.resource.data.subtotal >= 0
         && request.resource.data.discount >= 0
         && request.resource.data.total > 0
+        && request.resource.data.total <= 999999.99
+        && request.resource.data.subtotal <= 999999.99
+        && request.resource.data.discount <= 999999.99
         && request.resource.data.amount_received is number
         && request.resource.data.amount_received >= 0
+        && request.resource.data.amount_received <= 999999.99
         && request.resource.data.amount_received <= request.resource.data.total + 0.01
         && (
           (request.resource.data.type == 'cash_receipt' &&
@@ -2468,7 +2584,7 @@ service cloud.firestore {
           && (
             (
               request.resource.data.type == 'invoice' &&
-              request.resource.data.transaction_type == 'cash_out' &&
+              request.resource.data.transaction_type in ['cash_out', 'cash_in'] &&
               notificationIsLinkedToInvoice(notifId)
             ) ||
             (

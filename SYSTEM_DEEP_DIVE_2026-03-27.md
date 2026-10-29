@@ -265,7 +265,7 @@ APK was installed; the hosted release remained undeployed.
 
 Invoice entry separates stock-backed sales, non-stock catalog sales, and cash receipt invoices. Non-stock sales retain product and variant detail while leaving seller inventory unchanged; Firestore rules enforce the workspace enablement setting and reject a stock sale without deduction metadata. Shop detail opens the shared invoice form with the current shop selected.
 
-Cash receipt creation increments the tenant's receipt sequence in the same Firestore transaction that creates the receipt invoice and `cash_in` ledger entry and reduces `shop.balance`. Rules bind the invoice, transaction, amount, and resulting balance so none of those writes can succeed alone. Ledger-only `cash_in` remains a separate operation when no receipt document is required.
+Cash receipt creation increments the tenant's receipt counter in the same Firestore transaction that creates the receipt invoice and `cash_in` ledger entry and reduces `shop.balance`. The settings update includes `last_cash_receipt_id` so Rules can bind the counter to the exact receipt invoice. Sale, credit-note, and receipt numbers share a high-water sequence allocated above the greater of the legacy invoice and receipt counters; Firestore Rules independently validate that next sequence on counter updates and linked invoice writes. Rules also bind the receipt, transaction, amount, and resulting balance so none of those writes can succeed alone. Ledger-only `cash_in` remains a separate operation when no receipt document is required.
 
 Sale-invoice and cash-receipt creation is granted to active admins, tenant
 admins, supervisors, and sellers through the app capability policy and
@@ -275,7 +275,30 @@ does not grant settlement, correction, credit-note, or invoice-void rights.
 
 Sale invoices link to their `cash_out` ledger row and, when money is received, to the matching `cash_in` row. The shop-balance delta must be written atomically with those records. These links are enforced for admins and sellers; seller rules additionally verify the exact outstanding-balance delta. Non-stock invoicing defaults to disabled when a workspace setting is absent and must be explicitly enabled. Transaction descriptions use a multiline field for notes.
 
-Sale and credit-note invoice numbers are allocated from `settings/{tenantId}.last_invoice_number` inside the same Firestore transaction as the business writes. Deterministic tenant-scoped invoice IDs make retries idempotent without a query-before-write race. Credit-note transactions also update the original invoice's cumulative credit amount and shop balance atomically. A credit-note void reverses both the stock restoration and that cumulative amount; sale voids restore sale stock and apply the selected refund mode.
+Sale and credit-note invoice numbers are allocated from the greater of the workspace's legacy invoice and receipt counters inside the same Firestore transaction as the business writes. The operation advances its own legacy counter while preserving the shared high-water sequence. Deterministic tenant-scoped invoice IDs make retries idempotent without a query-before-write race. Credit-note transactions also update the original invoice's cumulative credit amount and shop balance atomically. A credit-note void reverses both the stock restoration and that cumulative amount; sale voids restore sale stock and apply the selected refund mode.
+
+Unreleased Pass 2 policy changes use that same tenant-wide sequence without a
+device-clock year and apply distinct `INV-`, `CN-`, and `REC-` prefixes for
+sales, credit notes, and receipts. Historical identifiers are unchanged. The
+current local source applies a shared `999999.99` maximum to SAR and PKR
+financial writes in providers and Firestore Rules, including standalone cash
+and correction operations. The amount is provisional and does not resolve
+currency-specific limits. Financial storage remains double-based; integer
+minor-unit conversion, historical reconciliation, old-client compatibility,
+and production rollout remain unresolved and release-blocking.
+
+The sale provider aggregates item quantities by variant and converts `qty`
+(dozens) plus `extra_pairs` to pairs using the active workspace's
+`pairs_per_carton`. It rejects a sale unless that result exactly matches the
+seller-inventory deduction map. Credit-note restore maps are cumulatively
+bounded by the original sale's deductions, and voided notes do not consume
+that allowance. This is a client-side integrity guard: Rules validate the
+same-batch stock delta against the invoice's deduction metadata but cannot
+iterate item lists to prove that metadata matches the item lines. Modified
+clients remain a documented residual until the data representation is
+server-verifiable.
+
+SAR and PKR financial inputs allow at most two fractional digits. The amount parser rejects ambiguous three-decimal forms while preserving supported digit scripts and comma-grouped thousands; invoice, receipt, ledger, and transaction-correction providers enforce the same precision before writing. Credit-note item quantities are aggregated by variant and checked cumulatively against the original sale. Legacy linked notes are reconstructed with a tenant-scoped query capped at 50 documents and fail closed for larger or inconsistent histories. The Rules expression budget prevented adding an aggregate field to the existing linked invoice update contract, so this bounded reconstruction is used instead.
 
 Shop creation Rules reject a nonzero opening balance or seeded cached
 last-transaction summary. Standalone transaction creation must link to the
@@ -436,7 +459,7 @@ Standalone `cash_in` and `cash_out` transactions can be soft-deleted only by a t
 
 ## Invoice Integrity and PDF Behavior
 
-Cash receipts carry a `cash_receipt_sequence` that must equal the `settings/{tenantId}.last_cash_receipt_number` increment in the same atomic write. Invoice voiding reads and updates the invoice, shop balance, stock documents, and reversal transactions in one Firestore transaction. Cash refunds reverse the full sale in the ledger, add the cash-out refund row, and reduce the receivable only by the outstanding amount. Non-stock invoice voids do not restore inventory.
+Cash receipts carry a `cash_receipt_sequence` that must equal the new shared high-water sequence and the `settings/{tenantId}.last_cash_receipt_number` value in the same atomic write. Invoice and receipt counter changes must advance above both pre-write counters. Invoice voiding reads and updates the invoice, shop balance, stock documents, and reversal transactions in one Firestore transaction. Cash refunds reverse the full sale in the ledger, add the cash-out refund row, and reduce the receivable only by the outstanding amount. Non-stock invoice voids do not restore inventory.
 
 Invoice PDFs use the captured workspace branding snapshot, localized payment method labels, mode-specific line tables, and `pw.MultiPage` with localized current/total page numbering. Long catalog invoices are covered by a page-count regression.
 

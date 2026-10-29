@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/constants/collections.dart';
+import '../core/utils/formatters.dart';
+import '../core/utils/financial_amount_policy.dart';
 import '../core/utils/firestore_pagination.dart';
+import '../core/utils/invoice_numbering.dart';
 import '../core/utils/notification_writer.dart';
 import '../core/utils/permission_policy.dart';
 import '../core/utils/role_names.dart';
@@ -14,6 +17,7 @@ import '../models/user_model.dart';
 import 'auth_provider.dart';
 
 final _logger = Logger();
+const _maxCreditNotesForQuantityReconstruction = 50;
 
 // =============================================================================
 // InvoiceProvider — all invoice lifecycle operations.
@@ -35,7 +39,7 @@ final _logger = Logger();
 //
 // PARAMETER NOTE:
 //   createSaleInvoice / createReturnInvoice use shopId/shopName as sole
-//   identifiers. No customer_id field is written to any document.
+//   identifiers. Ledger rows also dual-write customer_id for legacy readers.
 //
 // INVOICE STATE MACHINE:
 //   draft → issued → partial → paid
@@ -238,6 +242,242 @@ bool amountReceivedExceedsInvoiceTotal({
   required double total,
 }) => amountReceived > total;
 
+void validateInvoiceItems(List<Map<String, dynamic>> items) {
+  for (var index = 0; index < items.length; index++) {
+    final item = items[index];
+    final variantId = (item['variant_id'] as String?)?.trim() ?? '';
+    final quantity = item['qty'];
+    final unitPrice = item['unit_price'];
+    if (variantId.isEmpty) {
+      throw ArgumentError('Item $index must have a variant_id');
+    }
+    if (quantity is! num ||
+        !quantity.isFinite ||
+        quantity <= 0 ||
+        quantity % 1 != 0) {
+      throw ArgumentError('Item $index quantity must be a positive integer');
+    }
+    if (unitPrice is! num ||
+        !unitPrice.isFinite ||
+        unitPrice < 0 ||
+        !AppFormatters.hasAtMostTwoDecimalPlaces(unitPrice.toDouble())) {
+      throw ArgumentError('Item $index must have a valid unit_price');
+    }
+  }
+}
+
+Map<String, int> invoiceQuantitiesByVariant(List<Map<String, dynamic>> items) {
+  final quantities = <String, int>{};
+  for (var index = 0; index < items.length; index++) {
+    final item = items[index];
+    final variantId = (item['variant_id'] as String?)?.trim() ?? '';
+    final quantity = item['qty'];
+    if (variantId.isEmpty ||
+        quantity is! num ||
+        !quantity.isFinite ||
+        quantity <= 0 ||
+        quantity % 1 != 0) {
+      throw StateError('Invoice item $index has invalid variant quantity data');
+    }
+    quantities.update(
+      variantId,
+      (current) => current + quantity.toInt(),
+      ifAbsent: () => quantity.toInt(),
+    );
+  }
+  return quantities;
+}
+
+bool sellerInventoryDeductionsMatchInvoiceItems({
+  required List<Map<String, dynamic>> items,
+  required Map<String, int> deductions,
+  required Map<String, String> inventoryVariantIds,
+  required int pairsPerCarton,
+}) {
+  if (pairsPerCarton <= 0 || deductions.isEmpty) return false;
+  final expectedPairsByVariant = <String, int>{};
+  for (final item in items) {
+    final variantId = (item['variant_id'] as String?)?.trim() ?? '';
+    final quantity = item['qty'];
+    final extraPairs = item['extra_pairs'] ?? 0;
+    if (variantId.isEmpty ||
+        quantity is! num ||
+        !quantity.isFinite ||
+        quantity <= 0 ||
+        quantity % 1 != 0 ||
+        extraPairs is! num ||
+        !extraPairs.isFinite ||
+        extraPairs < 0 ||
+        extraPairs >= pairsPerCarton ||
+        extraPairs % 1 != 0) {
+      return false;
+    }
+    expectedPairsByVariant.update(
+      variantId,
+      (current) =>
+          current + quantity.toInt() * pairsPerCarton + extraPairs.toInt(),
+      ifAbsent: () => quantity.toInt() * pairsPerCarton + extraPairs.toInt(),
+    );
+  }
+
+  final deductedPairsByVariant = <String, int>{};
+  for (final entry in deductions.entries) {
+    final variantId = inventoryVariantIds[entry.key]?.trim() ?? '';
+    if (entry.key.trim().isEmpty || entry.value <= 0 || variantId.isEmpty) {
+      return false;
+    }
+    deductedPairsByVariant.update(
+      variantId,
+      (current) => current + entry.value,
+      ifAbsent: () => entry.value,
+    );
+  }
+  if (expectedPairsByVariant.length != deductedPairsByVariant.length) {
+    return false;
+  }
+  return expectedPairsByVariant.entries.every(
+    (entry) => deductedPairsByVariant[entry.key] == entry.value,
+  );
+}
+
+Map<String, int> creditNoteQuantitiesAfter({
+  required Map<String, int> soldQuantities,
+  required Map<String, int> previouslyCreditedQuantities,
+  required Map<String, int> requestedQuantities,
+}) {
+  for (final entry in previouslyCreditedQuantities.entries) {
+    final sold = soldQuantities[entry.key];
+    if (sold == null || entry.value <= 0 || entry.value > sold) {
+      throw StateError('Existing credit-note quantities exceed the sale');
+    }
+  }
+
+  final updated = Map<String, int>.from(previouslyCreditedQuantities);
+  for (final entry in requestedQuantities.entries) {
+    final sold = soldQuantities[entry.key];
+    if (sold == null || entry.value <= 0) {
+      throw ArgumentError(
+        'Credit note contains an item not sold on the invoice',
+      );
+    }
+    final totalCredited = (updated[entry.key] ?? 0) + entry.value;
+    if (totalCredited > sold) {
+      throw ArgumentError(
+        'Credit-note quantities cannot exceed quantities on the original sale',
+      );
+    }
+    updated[entry.key] = totalCredited;
+  }
+  return updated;
+}
+
+List<Map<String, dynamic>> _invoiceItemMapsFromStored(Object? rawItems) {
+  if (rawItems is! List) {
+    throw StateError('Invoice quantity history is unavailable');
+  }
+  return rawItems.map((rawItem) {
+    if (rawItem is! Map) {
+      throw StateError('Invoice quantity history contains an invalid item');
+    }
+    return Map<String, dynamic>.from(rawItem);
+  }).toList();
+}
+
+Map<String, int> reconstructCreditNoteQuantities({
+  required Map<String, int> soldQuantities,
+  required List<Map<String, dynamic>> existingCreditNotes,
+  int maxCreditNotes = _maxCreditNotesForQuantityReconstruction,
+}) {
+  if (existingCreditNotes.length > maxCreditNotes) {
+    throw StateError(
+      'Credit-note history exceeds the safe reconstruction limit',
+    );
+  }
+  var creditedQuantities = <String, int>{};
+  for (final creditNote in existingCreditNotes) {
+    if (creditNote['type'] != InvoiceModel.typeCreditNote ||
+        creditNote['status'] == InvoiceModel.statusVoid) {
+      continue;
+    }
+    creditedQuantities = creditNoteQuantitiesAfter(
+      soldQuantities: soldQuantities,
+      previouslyCreditedQuantities: creditedQuantities,
+      requestedQuantities: invoiceQuantitiesByVariant(
+        _invoiceItemMapsFromStored(creditNote['items']),
+      ),
+    );
+  }
+  return creditedQuantities;
+}
+
+bool sellerInventoryRestoresWithinOriginalSale({
+  required Object? originalDeductions,
+  required List<Map<String, dynamic>> existingCreditNotes,
+  required Map<String, int> requestedRestores,
+}) {
+  Map<String, int>? parseQuantities(Object? raw) {
+    if (raw == null) return <String, int>{};
+    if (raw is! Map) return null;
+    final quantities = <String, int>{};
+    for (final entry in raw.entries) {
+      final inventoryId = entry.key;
+      final quantity = entry.value;
+      if (inventoryId is! String ||
+          inventoryId.trim().isEmpty ||
+          quantity is! num ||
+          !quantity.isFinite ||
+          quantity <= 0 ||
+          quantity % 1 != 0) {
+        return null;
+      }
+      quantities[inventoryId] = quantity.toInt();
+    }
+    return quantities;
+  }
+
+  final original = parseQuantities(originalDeductions);
+  if (original == null) return false;
+  final restored = <String, int>{};
+  for (final creditNote in existingCreditNotes) {
+    if (creditNote['type'] != InvoiceModel.typeCreditNote ||
+        creditNote['status'] == InvoiceModel.statusVoid) {
+      continue;
+    }
+    final rawRestores = creditNote['seller_inventory_restores'];
+    if (original.isNotEmpty && rawRestores == null) return false;
+    final previous = parseQuantities(rawRestores);
+    if (previous == null) return false;
+    for (final entry in previous.entries) {
+      if (!original.containsKey(entry.key)) return false;
+      restored.update(
+        entry.key,
+        (current) => current + entry.value,
+        ifAbsent: () => entry.value,
+      );
+    }
+  }
+  final requested = parseQuantities(requestedRestores);
+  if (requested == null) return false;
+  for (final entry in requested.entries) {
+    if (!original.containsKey(entry.key)) return false;
+    restored.update(
+      entry.key,
+      (current) => current + entry.value,
+      ifAbsent: () => entry.value,
+    );
+  }
+  return restored.entries.every(
+    (entry) => entry.value <= (original[entry.key] ?? 0),
+  );
+}
+
+bool isCreditNoteWithin30DayWindow({
+  required DateTime invoiceCreatedAt,
+  required DateTime now,
+}) =>
+    !invoiceCreatedAt.isAfter(now) &&
+    now.difference(invoiceCreatedAt) <= const Duration(days: 30);
+
 class InvoiceNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
@@ -315,6 +555,17 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (items.isEmpty) {
       throw ArgumentError('At least one item is required');
     }
+    validateInvoiceItems(items);
+    if (![
+      subtotal,
+      discount,
+      total,
+      amountReceived,
+    ].every(AppFormatters.hasAtMostTwoDecimalPlaces)) {
+      throw ArgumentError(
+        'Invoice amounts may have at most two decimal places',
+      );
+    }
     if (fulfillmentMode != InvoiceModel.fulfillmentStock &&
         fulfillmentMode != InvoiceModel.fulfillmentNonStock) {
       throw ArgumentError('Unsupported invoice fulfillment mode');
@@ -355,20 +606,14 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'cannot exceed invoice total (${total.toStringAsFixed(2)})',
       );
     }
-    // Max-amount cap prevents fraudulent invoices
-    const double maxInvoiceAmount = 999999.99;
-    if (total > maxInvoiceAmount) {
+    if (!FinancialAmountPolicy.accepts(total, currency: currency) ||
+        subtotal > FinancialAmountPolicy.maximumForCurrency(currency) ||
+        discount > FinancialAmountPolicy.maximumForCurrency(currency) ||
+        amountReceived > FinancialAmountPolicy.maximumForCurrency(currency)) {
       throw ArgumentError(
-        'Invoice total exceeds maximum allowed amount '
-        '(${maxInvoiceAmount.toStringAsFixed(2)})',
+        'Invoice amounts exceed the maximum allowed amount '
+        '(${FinancialAmountPolicy.maximumForCurrency(currency).toStringAsFixed(2)} $currency)',
       );
-    }
-    // Per-item validation: reject negative unit_price
-    for (int i = 0; i < items.length; i++) {
-      final price = (items[i]['unit_price'] as num?)?.toDouble() ?? 0;
-      if (price < 0) {
-        throw ArgumentError('Item $i has negative unit_price ($price)');
-      }
     }
     // Item subtotal integrity check: sum of (qty * unit_price) must equal subtotal
     if (items.isNotEmpty) {
@@ -463,6 +708,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           shopSnapshot.data()?['route_id'] != routeId) {
         throw ArgumentError('Shop does not belong to this workspace and route');
       }
+      final settingsData = settingsSnapshot.data();
       final inventorySnapshots =
           <String, DocumentSnapshot<Map<String, dynamic>>>{};
       for (final entry in inventoryRefs.entries) {
@@ -480,6 +726,13 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             'Seller inventory is unavailable in this workspace',
           );
         }
+        final variantId =
+            (inventoryData['variant_id'] as String?)?.trim() ?? '';
+        if (variantId.isEmpty) {
+          throw ArgumentError(
+            'Seller inventory is missing its variant reference',
+          );
+        }
         final availableQty =
             (inventoryData['quantity_available'] as num?)?.toInt() ?? 0;
         if (availableQty < requestedQty) {
@@ -488,15 +741,29 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           );
         }
       }
-      final settingsData = settingsSnapshot.data();
+      if (fulfillmentMode == InvoiceModel.fulfillmentStock &&
+          !sellerInventoryDeductionsMatchInvoiceItems(
+            items: items,
+            deductions: sellerInventoryDeductions,
+            inventoryVariantIds: {
+              for (final entry in inventorySnapshots.entries)
+                entry.key:
+                    (entry.value.data()?['variant_id'] as String?)?.trim() ??
+                    '',
+            },
+            pairsPerCarton:
+                (settingsData?['pairs_per_carton'] as num?)?.toInt() ?? 12,
+          )) {
+        throw ArgumentError(
+          'Seller inventory deductions must match invoice item quantities',
+        );
+      }
       if (fulfillmentMode == InvoiceModel.fulfillmentNonStock &&
           settingsData?['allow_non_stock_invoices'] != true) {
         throw StateError('Non-stock invoices are disabled for this workspace');
       }
-      final sequence =
-          ((settingsData?['last_invoice_number'] as num?)?.toInt() ?? 0) + 1;
-      final invoiceNumber =
-          'INV-${DateTime.now().year}-${sequence.toString().padLeft(4, '0')}';
+      final sequence = InvoiceNumbering.nextSequence(settingsData);
+      final invoiceNumber = InvoiceNumbering.sale(sequence);
       final invoiceHeaderSnapshot = _invoiceHeaderSnapshot(settingsData);
       final now = Timestamp.now();
 
@@ -644,9 +911,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (normalizedShopId.isEmpty || normalizedRouteId.isEmpty) {
       throw ArgumentError('shopId and routeId must not be empty');
     }
-    if (amount <= 0 || amount > 999999.99) {
+    if (!AppFormatters.hasAtMostTwoDecimalPlaces(amount) ||
+        !FinancialAmountPolicy.accepts(amount, currency: currency)) {
       throw ArgumentError(
-        'Receipt amount must be greater than 0 and <= 999999.99',
+        'Receipt amount must have at most two decimal places, be greater than 0, and <= '
+        '${FinancialAmountPolicy.maximumForCurrency(currency).toStringAsFixed(2)} $currency',
       );
     }
     final normalizedSellerId = sellerId.trim();
@@ -673,7 +942,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     final transactionRef = db.collection(Collections.transactions).doc();
     final now = Timestamp.now();
 
-    return db.runTransaction<String>((transaction) async {
+    final receipt = await db.runTransaction<({String id, String number})>((
+      transaction,
+    ) async {
       final settingsSnapshot = await transaction.get(settingsRef);
       final shopSnapshot = await transaction.get(shopRef);
       final invoiceSnapshot = await transaction.get(invoiceRef);
@@ -683,7 +954,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             existingData['type'] == InvoiceModel.typeCashReceipt &&
             existingData['shop_id'] == normalizedShopId &&
             (existingData['total'] as num?)?.toDouble() == amount) {
-          return invoiceRef.id;
+          return (
+            id: invoiceRef.id,
+            number: existingData['invoice_number'] as String? ?? '',
+          );
         }
         throw StateError('Cash receipt idempotency key was reused');
       }
@@ -698,13 +972,8 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         throw ArgumentError('Shop does not belong to this workspace and route');
       }
 
-      final nextNumber =
-          ((settingsSnapshot.data()?['last_cash_receipt_number'] as num?)
-                  ?.toInt() ??
-              0) +
-          1;
-      final receiptNumber =
-          'REC-${now.toDate().year}-${nextNumber.toString().padLeft(4, '0')}';
+      final nextNumber = InvoiceNumbering.nextSequence(settingsSnapshot.data());
+      final receiptNumber = InvoiceNumbering.receipt(nextNumber);
       final balanceBefore =
           (shopSnapshot.data()?['balance'] as num?)?.toDouble() ?? 0;
       final balanceAfter = balanceBefore - amount;
@@ -714,7 +983,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         settingsSnapshot.data(),
       );
 
-      transaction.update(settingsRef, {'last_cash_receipt_number': nextNumber});
+      transaction.update(settingsRef, {
+        'last_cash_receipt_number': nextNumber,
+        'last_cash_receipt_id': invoiceRef.id,
+      });
       transaction.set(invoiceRef, {
         'tenant_id': tenantId,
         'invoice_number': receiptNumber,
@@ -773,8 +1045,35 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'last_transaction_amount': amount,
         'last_transaction_id': transactionRef.id,
       });
-      return receiptId;
+      return (id: receiptId, number: receiptNumber);
     });
+    if (invoiceAccess.user.isSeller) {
+      try {
+        await writeSellerNotification(
+          db: db,
+          data: buildSellerNotification(
+            sourceType: 'invoice',
+            sourceId: receipt.id,
+            sellerId: normalizedSellerId,
+            sellerName: sellerName,
+            tenantId: tenantId,
+            shopId: normalizedShopId,
+            shopName: shopName,
+            routeId: normalizedRouteId,
+            amount: amount,
+            transactionType: 'cash_in',
+            invoiceNumber: receipt.number,
+          ),
+        );
+      } catch (error, stackTrace) {
+        _logger.w(
+          'Best-effort cash receipt notification write failed',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+    }
+    return receipt.id;
   }
 
   /// Creates a return/credit note invoice that reverses balance and restores stock.
@@ -806,6 +1105,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (items.isEmpty) {
       throw ArgumentError('At least one item is required');
     }
+    validateInvoiceItems(items);
     if (sellerInventoryRestores.entries.any(
       (entry) => entry.key.trim().isEmpty || entry.value <= 0,
     )) {
@@ -819,23 +1119,21 @@ class InvoiceNotifier extends AsyncNotifier<void> {
     if (total <= 0) {
       throw ArgumentError('total must be greater than 0');
     }
-    const maxInvoiceAmount = 999999.99;
-    if (total > maxInvoiceAmount || (total - subtotal).abs() > 0.01) {
+    if (!AppFormatters.hasAtMostTwoDecimalPlaces(subtotal) ||
+        !AppFormatters.hasAtMostTwoDecimalPlaces(total) ||
+        total > FinancialAmountPolicy.maximumAmount ||
+        (total - subtotal).abs() > 0.01) {
       throw ArgumentError(
         'Credit note total must equal its subtotal and remain within the invoice limit',
       );
     }
-    final computedSubtotal = items.fold<double>(0, (acc, item) {
-      final quantity = (item['qty'] as num?)?.toDouble() ?? 0;
-      final unitPrice = (item['unit_price'] as num?)?.toDouble() ?? -1;
-      final variantId = (item['variant_id'] as String?)?.trim() ?? '';
-      if (quantity <= 0 || unitPrice < 0 || variantId.isEmpty) {
-        throw ArgumentError(
-          'Credit note items require a variant, positive quantity, and non-negative price',
-        );
-      }
-      return acc + quantity * unitPrice;
-    });
+    final computedSubtotal = items.fold<double>(
+      0,
+      (acc, item) =>
+          acc +
+          (item['qty'] as num).toDouble() *
+              (item['unit_price'] as num).toDouble(),
+    );
     if ((computedSubtotal - subtotal).abs() > 0.01) {
       throw ArgumentError('Credit note item totals do not match the subtotal');
     }
@@ -865,6 +1163,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         .collection(Collections.invoices)
         .doc(normalizedLinkedInvoiceId);
     final settingsRef = db.collection(Collections.settings).doc(tenantId);
+    final legacyCreditNotesQuery = db
+        .collection(Collections.invoices)
+        .where('tenant_id', isEqualTo: tenantId)
+        .where('linked_invoice_id', isEqualTo: normalizedLinkedInvoiceId)
+        .limit(_maxCreditNotesForQuantityReconstruction + 1);
     final shopRef = db.collection(Collections.shops).doc(shopId);
     final transactionRef = db
         .collection(Collections.transactions)
@@ -938,8 +1241,10 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           if (originalCreatedAt == null) {
             throw ArgumentError('Original invoice has no creation timestamp');
           }
-          if (DateTime.now().difference(originalCreatedAt.toDate()).inDays >
-              30) {
+          if (!isCreditNoteWithin30DayWindow(
+            invoiceCreatedAt: originalCreatedAt.toDate(),
+            now: DateTime.now(),
+          )) {
             throw ArgumentError(
               'Credit notes must be created within 30 days of the original invoice',
             );
@@ -952,6 +1257,53 @@ class InvoiceNotifier extends AsyncNotifier<void> {
               'Credit notes cannot exceed the original invoice total',
             );
           }
+          final updatedCreditNoteTotal = creditedTotal + total;
+          final soldQuantities = invoiceQuantitiesByVariant(
+            _invoiceItemMapsFromStored(original['items']),
+          );
+          // Linked credit-note writes also update this pointer atomically. If
+          // it is absent from the bounded query, the query is stale.
+          final legacyCreditNotes = await legacyCreditNotesQuery.get();
+          if (legacyCreditNotes.docs.length >
+              _maxCreditNotesForQuantityReconstruction) {
+            throw StateError(
+              'Credit-note history exceeds the safe reconstruction limit',
+            );
+          }
+          final latestCreditNoteId =
+              (original['latest_credit_note_invoice_id'] as String?)?.trim();
+          if (latestCreditNoteId?.isNotEmpty == true &&
+              !legacyCreditNotes.docs.any(
+                (creditNoteDoc) => creditNoteDoc.id == latestCreditNoteId,
+              )) {
+            throw StateError(
+              'Credit-note history changed during validation; retry the operation',
+            );
+          }
+          final previouslyCreditedQuantities = reconstructCreditNoteQuantities(
+            soldQuantities: soldQuantities,
+            existingCreditNotes: legacyCreditNotes.docs
+                .map((creditNoteDoc) => creditNoteDoc.data())
+                .toList(),
+          );
+          creditNoteQuantitiesAfter(
+            soldQuantities: soldQuantities,
+            previouslyCreditedQuantities: previouslyCreditedQuantities,
+            requestedQuantities: invoiceQuantitiesByVariant(items),
+          );
+          if (!sellerInventoryRestoresWithinOriginalSale(
+            originalDeductions: original['seller_inventory_deductions'],
+            existingCreditNotes: legacyCreditNotes.docs
+                .map((creditNoteDoc) => creditNoteDoc.data())
+                .toList(),
+            requestedRestores: sellerInventoryRestores,
+          )) {
+            throw ArgumentError(
+              'Seller inventory restores cannot exceed stock deducted for the original sale',
+            );
+          }
+          final originalAmountReceived =
+              (original['amount_received'] as num?)?.toDouble() ?? 0;
 
           final shopSnapshot = await transaction.get(shopRef);
           if (!shopSnapshot.exists ||
@@ -979,18 +1331,25 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           }
 
           final settingsData = settingsSnapshot.data();
-          final sequence =
-              ((settingsData?['last_invoice_number'] as num?)?.toInt() ?? 0) +
-              1;
-          final invoiceNumber =
-              'INV-${DateTime.now().year}-${sequence.toString().padLeft(4, '0')}';
+          final sequence = InvoiceNumbering.nextSequence(settingsData);
+          final invoiceNumber = InvoiceNumbering.creditNote(sequence);
           final now = Timestamp.now();
           transaction.update(settingsRef, {
             'last_invoice_number': sequence,
             'last_invoice_id': invoiceRef.id,
           });
           transaction.update(originalRef, {
-            'credit_note_total': creditedTotal + total,
+            'credit_note_total': updatedCreditNoteTotal,
+            'outstanding_amount': invoiceOutstandingAfterCredits(
+              total: originalTotal,
+              amountReceived: originalAmountReceived,
+              creditNoteTotal: updatedCreditNoteTotal,
+            ),
+            'status': invoiceStatusAfterCredits(
+              total: originalTotal,
+              amountReceived: originalAmountReceived,
+              creditNoteTotal: updatedCreditNoteTotal,
+            ),
             'latest_credit_note_invoice_id': invoiceRef.id,
             'updated_at': now,
           });
@@ -1114,33 +1473,6 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         });
     if (!result.created) return invoiceRef.id;
 
-    try {
-      final appUser = await ref.read(authUserProvider.future);
-      if (appUser != null && appUser.isSeller) {
-        await writeSellerNotification(
-          db: db,
-          data: buildSellerNotification(
-            sourceType: 'invoice',
-            sourceId: invoiceRef.id,
-            sellerId: appUser.id,
-            sellerName: appUser.displayName,
-            tenantId: tenantId,
-            shopId: shopId,
-            shopName: shopName,
-            routeId: routeId,
-            amount: total,
-            transactionType: 'return',
-            invoiceNumber: result.invoiceNumber,
-          ),
-        );
-      }
-    } catch (error, stackTrace) {
-      _logger.w(
-        'Best-effort invoice notification write failed',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
     return invoiceRef.id;
   }
 
@@ -1189,7 +1521,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       }
       final data = invSnap.data()!;
       final currentStatus = data['status'] as String? ?? '';
-      if (currentStatus == 'void') {
+      if (currentStatus == InvoiceModel.statusVoid) {
         throw StateError('Invoice $invoiceId is already voided');
       }
       final invoiceTenantId = (data['tenant_id'] as String?)?.trim();
@@ -1327,7 +1659,9 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         warehouseVariantData[entry.key] = snapshot.data()!;
       }
       DocumentReference<Map<String, dynamic>>? originalInvoiceRef;
-      double? updatedCreditNoteTotal;
+      double? updatedOriginalCreditNoteTotal;
+      double? updatedOriginalOutstanding;
+      String? updatedOriginalStatus;
       if (docType == InvoiceModel.typeCreditNote) {
         final linkedInvoiceId = (data['linked_invoice_id'] as String?)?.trim();
         if (linkedInvoiceId == null || linkedInvoiceId.isEmpty) {
@@ -1347,7 +1681,21 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             creditedTotal < docTotal) {
           throw StateError('Linked sale invoice is unavailable for reversal');
         }
-        updatedCreditNoteTotal = creditedTotal - docTotal;
+        final updatedCreditNoteTotal = creditedTotal - docTotal;
+        updatedOriginalCreditNoteTotal = updatedCreditNoteTotal;
+        final originalTotal = (originalData?['total'] as num?)?.toDouble() ?? 0;
+        final originalAmountReceived =
+            (originalData?['amount_received'] as num?)?.toDouble() ?? 0;
+        updatedOriginalOutstanding = invoiceOutstandingAfterCredits(
+          total: originalTotal,
+          amountReceived: originalAmountReceived,
+          creditNoteTotal: updatedCreditNoteTotal,
+        );
+        updatedOriginalStatus = invoiceStatusAfterCredits(
+          total: originalTotal,
+          amountReceived: originalAmountReceived,
+          creditNoteTotal: updatedCreditNoteTotal,
+        );
       }
 
       for (var index = 0; index < linkedTransactionSnapshots.length; index++) {
@@ -1376,14 +1724,18 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           'updated_at': now,
         });
       }
-      if (originalInvoiceRef != null && updatedCreditNoteTotal != null) {
+      if (originalInvoiceRef != null &&
+          updatedOriginalCreditNoteTotal != null &&
+          updatedOriginalOutstanding != null &&
+          updatedOriginalStatus != null) {
         transaction.update(originalInvoiceRef, {
-          'credit_note_total': updatedCreditNoteTotal,
+          'credit_note_total': updatedOriginalCreditNoteTotal,
+          'outstanding_amount': updatedOriginalOutstanding,
+          'status': updatedOriginalStatus,
           'voided_credit_note_id': invoiceId,
           'updated_at': now,
         });
       }
-
       final reversalTransactionRef = shopRef == null || docTotal <= 0
           ? null
           : transactions.doc();
@@ -1590,29 +1942,28 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       if (currentStatus == InvoiceModel.statusVoid) {
         throw StateError('Cannot mark a voided invoice as paid');
       }
-      if (currentStatus == InvoiceModel.statusPaid) {
-        return; // already paid, idempotent
-      }
 
       final invoiceTotal = (invData['total'] as num?)?.toDouble() ?? 0.0;
       final invAmountReceived =
           (invData['amount_received'] as num?)?.toDouble() ?? 0.0;
-      final storedOutstanding = (invData['outstanding_amount'] as num?)
-          ?.toDouble();
-      if (storedOutstanding != null && storedOutstanding < 0) {
+      final creditNoteTotal =
+          (invData['credit_note_total'] as num?)?.toDouble() ?? 0.0;
+      if (invAmountReceived < 0 ||
+          invAmountReceived > invoiceTotal ||
+          creditNoteTotal < 0 ||
+          creditNoteTotal > invoiceTotal) {
         throw StateError(
-          'Invoice $invoiceId has a negative outstanding_amount '
-          '($storedOutstanding)',
+          'Invoice $invoiceId has invalid received or credit-note totals',
         );
       }
-      final computedOutstanding = invoiceTotal - invAmountReceived;
-      if (storedOutstanding == null && computedOutstanding < 0) {
-        throw StateError(
-          'Invoice $invoiceId is overpaid: total $invoiceTotal, '
-          'received $invAmountReceived',
-        );
+      final outstanding = invoiceOutstandingAfterCredits(
+        total: invoiceTotal,
+        amountReceived: invAmountReceived,
+        creditNoteTotal: creditNoteTotal,
+      );
+      if (currentStatus == InvoiceModel.statusPaid && outstanding == 0) {
+        return;
       }
-      final outstanding = storedOutstanding ?? computedOutstanding;
       final invoiceNumber = invData['invoice_number'] as String? ?? '';
       final shopId = invData['shop_id'] as String? ?? '';
       if (shopId.trim().isEmpty) {

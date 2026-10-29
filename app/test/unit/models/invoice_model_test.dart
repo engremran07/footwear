@@ -69,6 +69,16 @@ void main() {
       expect(m.notes, 'Urgent order');
     });
 
+    test('derives outstanding after credit notes instead of stale cache', () {
+      final m = InvoiceModel.fromJson({
+        ...baseJson,
+        'credit_note_total': 300,
+        'outstanding_amount': 1200,
+      }, 'inv-credit-note');
+
+      expect(m.outstandingAmount, 900);
+    });
+
     test('missing fields use defaults', () {
       final m = InvoiceModel.fromJson({}, 'inv2');
       expect(m.invoiceNumber, '');

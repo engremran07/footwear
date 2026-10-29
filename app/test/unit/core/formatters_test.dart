@@ -70,6 +70,33 @@ void main() {
     test('parses Eastern Arabic/Persian numerals', () {
       expect(AppFormatters.parseAmountText('۱٬۲۰۰٫۵۰'), 1200.5);
     });
+
+    test('rejects ambiguous or unsupported three-decimal input', () {
+      expect(AppFormatters.parseAmountText('1.500'), isNull);
+      expect(AppFormatters.parseAmountText('1,234.567'), isNull);
+      expect(AppFormatters.parseAmountText('1.234,567'), isNull);
+    });
+
+    test('keeps three-digit comma grouping and two-decimal inputs', () {
+      expect(AppFormatters.parseAmountText('1,500'), 1500);
+      expect(AppFormatters.parseAmountText('1,200.50'), 1200.5);
+      expect(AppFormatters.parseAmountText('1.200,50'), 1200.5);
+      expect(AppFormatters.parseAmountText('١٬٢٠٠٫٥٠'), 1200.5);
+    });
+  });
+
+  group('AppFormatters.hasAtMostTwoDecimalPlaces', () {
+    test('accepts SAR and PKR minor-unit values', () {
+      expect(AppFormatters.hasAtMostTwoDecimalPlaces(100), isTrue);
+      expect(AppFormatters.hasAtMostTwoDecimalPlaces(100.5), isTrue);
+      expect(AppFormatters.hasAtMostTwoDecimalPlaces(100.05), isTrue);
+    });
+
+    test('rejects extra precision and non-finite amounts', () {
+      expect(AppFormatters.hasAtMostTwoDecimalPlaces(100.005), isFalse);
+      expect(AppFormatters.hasAtMostTwoDecimalPlaces(double.infinity), isFalse);
+      expect(AppFormatters.hasAtMostTwoDecimalPlaces(double.nan), isFalse);
+    });
   });
 
   group('AppFormatters.currency', () {

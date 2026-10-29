@@ -2,6 +2,21 @@
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
+## Local Pass 2 Financial Safeguards — Unreleased
+
+The current local source enforces a `999999.99` maximum for invoice, receipt,
+standalone cash, and transaction-correction writes across providers and
+Firestore Rules. SAR and PKR currently share this provisional maximum; no
+currency-specific policy has been established. New sale, credit-note, and
+receipt numbers use one tenant-wide high-water sequence with `INV-`, `CN-`,
+and `REC-` prefixes and no device-clock year. Allocation continues above the
+greater of the legacy invoice and receipt counters, and Firestore Rules enforce
+the same sequence in linked atomic writes. Receipt counter updates carry a
+same-batch `last_cash_receipt_id` link to the receipt invoice. Existing invoice
+identifiers remain unchanged. The integer minor-unit migration and historical reconciliation
+remain blocked pending a reviewed compatibility and rollout plan, so these
+local changes are not a production release.
+
 ## v3.10.15+1126 Contextual Record Actions
 
 Record rows across routes, shops, products, inventory, invoices, transactions,
@@ -535,6 +550,12 @@ ShoesERP is designed as a single-project SaaS app. All tenant data lives in one 
 - Transaction corrections use soft deletion only. Workspace admins can reverse standalone cash-in/cash-out transactions only with an exact same-batch shop-balance update; seller deletes and invoice-linked deletes are denied.
 - Super-admin business access expires after 8 hours and remains enforced by Firestore rules. Legacy admins manage seller profiles; workspace-admin role changes require an active super-admin support context.
 - Seller stock reductions must match exact same-batch invoice deductions. Warehouse stock movements and returns append tenant-scoped inventory audit records atomically.
+- Stock-sale provider validation also matches invoice quantities by variant
+  (`qty` dozens plus `extra_pairs`) to pair-denominated seller inventory
+  deductions using workspace `pairs_per_carton`. Credit-note restores are
+  cumulatively bounded by the original sale's deductions. This item-to-map
+  reconciliation is client-side only; Rules link stock deltas to deduction
+  metadata but cannot iterate invoice item lists.
 - Financial corrections preserve prior values, actor, and a correction reason; invoice-linked transactions are corrected through invoice void/credit-note flows.
 - Exports page to exhaustion. Tenant-admin restore is upsert-only; selected super-admin restore upserts before pruning obsolete documents. Plaintext legacy archives are rejected.
 - Transient token-refresh failures do not sign users out. If Firebase initialization fails, the app shows a retry state rather than opening an unusable shell.
@@ -613,6 +634,7 @@ boundary; client visibility is never the security control.
 6. **Void/return:** `InvoiceNotifier.voidInvoice()` — admin only; stock returns only for stock-backed invoices, with one reversal transaction.
 7. Never create a sale invoice for cash-only collection. Never create a standalone transaction for a new goods sale.
 8. Client transaction reads of missing invoice/transaction IDs require an active profile and concrete active tenant; selected super-admins must retain valid support context. Missing seller-inventory reads are admin-equivalent only. Workspace-creation settings reads are limited to missing documents whose tenant has not yet been created. Existing-document reads remain governed by normal tenant and route rules.
+9. SAR/PKR amounts accept no more than two fractional digits. Ambiguous three-decimal forms are rejected; comma-grouped thousands remain supported. Credit-note item quantities are cumulative by variant and cannot exceed the quantities on the original sale. Legacy linked-note history is reconstructed with a 50-document ceiling and fails closed when incomplete or inconsistent.
 
 ---
 

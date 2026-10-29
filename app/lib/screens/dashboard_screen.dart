@@ -47,6 +47,25 @@ TextStyle _userNameStyle(BuildContext context, WidgetRef ref) {
   );
 }
 
+Map<String, double> outstandingBalanceByCurrency({
+  required Iterable<ShopModel> shops,
+  required Iterable<RouteModel> routes,
+}) {
+  final currenciesByRoute = {
+    for (final route in routes) route.id: route.currency,
+  };
+  final balances = <String, double>{};
+  for (final shop in shops) {
+    final currency = currenciesByRoute[shop.routeId] ?? 'SAR';
+    balances.update(
+      currency,
+      (amount) => amount + shop.balance,
+      ifAbsent: () => shop.balance,
+    );
+  }
+  return Map.unmodifiable(balances);
+}
+
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -554,10 +573,25 @@ class _SellerDashboard extends ConsumerWidget {
     // renders immediately without a nested spinner.
     final pairs = inventoryPairsAsync.value ?? 0;
 
-    final outstanding = shops.fold<double>(0, (acc, s) => acc + s.balance);
     final hasMultipleRoutes = routeIds.length > 1;
-    // Currency from the first assigned route — no extra provider watch needed.
-    final primaryCurrency = routes.firstOrNull?.currency ?? 'SAR';
+    final outstandingByCurrency = outstandingBalanceByCurrency(
+      shops: shops,
+      routes: routes,
+    );
+    final outstanding = outstandingByCurrency.values.fold<double>(
+      0,
+      (total, amount) => total + amount,
+    );
+    final outstandingCurrencies = outstandingByCurrency.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    final outstandingLabel = outstandingCurrencies.length <= 1
+        ? AppFormatters.currency(
+            outstanding,
+            outstandingCurrencies.firstOrNull?.key ?? 'SAR',
+          )
+        : outstandingCurrencies
+              .map((entry) => AppFormatters.currency(entry.value, entry.key))
+              .join(' · ');
     final sortedRoutes = List.of(routes)
       ..sort((a, b) => a.routeNumber.compareTo(b.routeNumber));
 
@@ -748,9 +782,7 @@ class _SellerDashboard extends ConsumerWidget {
                 ),
                 StatCard(
                   title: tr('dashboard_outstanding', ref),
-                  value: hasMultipleRoutes
-                      ? AppFormatters.compact(outstanding)
-                      : AppFormatters.currency(outstanding, primaryCurrency),
+                  value: outstandingLabel,
                   subtitle: hasMultipleRoutes
                       ? '${routeIds.length} ${tr('routes', ref).toLowerCase()}'
                       : null,

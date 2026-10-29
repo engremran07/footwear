@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 
 import '../core/constants/app_brand.dart';
 import '../core/design/app_animations.dart';
@@ -285,7 +286,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   }
 
   /// Seller edit flow for cash_in/cash_out transactions.
-  /// If admin approval is enabled, this submits a pending request.
+  /// If seller edit requests are enabled, this submits a pending request.
   Future<void> _showSellerEditTransactionDialog(TransactionModel tx) async {
     if (tx.type != 'cash_in' && tx.type != 'cash_out') {
       ScaffoldMessenger.of(context)
@@ -304,8 +305,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
       return;
     }
     if (!mounted) return;
-    final requireApproval =
-        settings.requireAdminApprovalForSellerTransactionEdits;
+    final allowEditRequests = settings.allowSellerEditRequests;
 
     final amountC = TextEditingController(text: tx.amount.toStringAsFixed(2));
     final descC = TextEditingController(text: tx.description ?? '');
@@ -329,7 +329,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
             children: [
               Text(tr('edit', ref), style: Theme.of(ctx).textTheme.titleLarge),
               const SizedBox(height: 16),
-              if (requireApproval) ...[
+              if (allowEditRequests) ...[
                 Row(
                   children: [
                     Expanded(
@@ -374,7 +374,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                 controller: descC,
                 label: tr('description', ref),
               ),
-              if (requireApproval) ...[
+              if (allowEditRequests) ...[
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -441,12 +441,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                     final parsedAmount = AppFormatters.parseAmountText(
                       amountC.text,
                     );
-                    if (requireApproval &&
+                    if (allowEditRequests &&
                         (parsedAmount == null || parsedAmount <= 0)) {
                       _transactionGuard.finish();
                       return;
                     }
-                    final newAmount = requireApproval
+                    final newAmount = allowEditRequests
                         ? parsedAmount!
                         : tx.amount;
                     try {
@@ -457,12 +457,12 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                             txId: tx.id,
                             sellerId: user?.id ?? '',
                             newAmount: newAmount,
-                            newType: requireApproval ? txType : tx.type,
+                            newType: allowEditRequests ? txType : tx.type,
                             description: descC.text.trim().isEmpty
                                 ? null
                                 : descC.text.trim(),
-                            saleType: requireApproval ? saleType : null,
-                            transactionDate: requireApproval
+                            saleType: allowEditRequests ? saleType : null,
+                            transactionDate: allowEditRequests
                                 ? Timestamp.fromDate(selectedDate)
                                 : null,
                           );
@@ -583,6 +583,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
   void _showQuickCash(String type) {
     final amountC = TextEditingController();
     final descC = TextEditingController();
+    final idempotencyKey = const Uuid().v4();
     DateTime selectedDate = DateTime.now();
     String saleType = 'cash';
     showModalBottomSheet(
@@ -723,6 +724,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                                 : descC.text.trim(),
                             createdBy: user.id,
                             transactionDate: Timestamp.fromDate(selectedDate),
+                            idempotencyKey: idempotencyKey,
                           );
                       if (ctx.mounted) Navigator.pop(ctx);
                     } catch (e) {

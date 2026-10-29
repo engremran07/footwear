@@ -56,7 +56,7 @@ Map<String, dynamic> buildSellerNotification({
   }
   if ((normalizedSourceType == 'invoice' &&
           transactionType != 'cash_out' &&
-          transactionType != 'return') ||
+          transactionType != 'cash_in') ||
       (normalizedSourceType == 'transaction' &&
           transactionType != 'cash_in' &&
           transactionType != 'cash_out')) {

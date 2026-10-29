@@ -10,6 +10,110 @@
 
 ---
 
+## Scope-Specific Addendum — 2026-10-29 Pass 2 Financial Findings
+
+### Finding-by-Finding Disposition
+
+The attached Pass 2 report contains 21 findings. "Fixed" below refers to
+current local source and test evidence, not production deployment. Partial
+client-side checks are explicitly separated from Firestore Rules enforcement.
+
+| Finding | Disposition | Evidence and remaining limit |
+| --- | --- | --- |
+| P1-01: seller stock-sale Rules access-call budget | Not reproduced in tested range | Emulator coverage exercises 30-line sales and sampled counts of 5, 10, 15, 20, and 30. There is no declared maximum or proof for more than 30 lines, so unbounded cart size remains unverified. |
+| P1-02: settlement ignores credit notes | Fixed | `markAsPaid` settles the remaining amount after receipts and credits; credit-note writes update the original outstanding amount/status atomically. `mark_paid_outstanding_test.dart` covers credit-aware settlement. |
+| P1-03: cash-entry retries can duplicate writes | Fixed for supported client flow | Standalone cash entries use a caller-stable idempotency key, deterministic tenant-scoped document ID, and Firestore transaction. The 20-second wrapper timeout was removed; delayed-network behavior was not fault-injected. |
+| P1-04: money uses doubles and tolerance comparisons | Partially fixed; migration deferred | Parser/provider guards reject ambiguous and sub-cent input. Stored amounts and balances remain doubles and Rules retain existing tolerances. Integer minor-unit migration requires historical reconciliation, backup/PDF compatibility, Rules rollout, and a minimum-client policy. |
+| P2-01: seller cash receipts do not notify admins | Fixed in current client/Rules | Receipt creation writes a linked `cash_in` invoice notification after its financial transaction; Rules accept only a matching cash-receipt invoice. Notification delivery remains best-effort and logged. |
+| P2-02: amount caps are inconsistent and currency-agnostic | Partially fixed; currency policy remains unresolved | Local providers and Rules now apply the established `999999.99` ceiling to sale/credit invoices, receipts, standalone cash, seller edit requests, and corrections. SAR and PKR share the same provisional ceiling; no currency-specific business limits have been approved. |
+| P2-03: ambiguous precision and sub-cent input | Fixed at parser/provider boundaries | `1.500` is rejected while supported grouping such as `1,500` remains valid; changed financial provider inputs reject more than two decimals. The broader server/double residual is tracked under P1-04. |
+| P2-04: seller dashboard combines route currencies | Fixed | Seller dashboard totals use currency-grouped route/shop statistics instead of labeling a cross-currency sum with the first route's currency. A focused dashboard currency test exists. |
+| P2-05: credit-note lines and 30-day window are not validated | Fixed for supported provider flow | Quantities are aggregated by variant against the original sale and active notes; the server Rules window uses request time. Seller-stock restores are additionally bounded cumulatively by the original sale's recorded deductions. |
+| P2-06: sale lines can disagree with stock deductions | Partially fixed; Rules residual remains | Provider validates positive whole quantities, variant IDs, and exact pair deductions by variant (`qty` dozens plus `extra_pairs`, converted using workspace `pairs_per_carton`). Rules cannot iterate item lists, so a modified client can bypass this comparison; no periodic admin reconciliation report was added. |
+| P2-07: each invoice stores a logo copy | Retained by current output contract | Invoice header snapshots and saved-logo fallback are required by the current PDF governance contract. The proposed removal would break historical branding/fallback behavior; storage cost has not been separately measured. |
+| P2-08: invoice year uses device clock and credit notes share `INV-` | Fixed for new writes; historical identifiers unchanged | New sale, credit-note, and receipt numbers use the tenant-wide high-water sequence above the greater of the legacy invoice and receipt counters, with `INV-`, `CN-`, and `REC-` prefixes and no device-clock year. Firestore Rules validate the shared sequence on same-batch counter/invoice writes; receipt updates carry `last_cash_receipt_id` to bind the exact invoice. Existing identifiers and counters remain unchanged until advanced by a new operation. Deployment remains gated on a client compatibility/minimum-version rollout because older clients still increment only one counter. |
+| P3-01: unreachable return-notification block | Fixed / no longer present | Current return/credit-note completion has no seller-notification call; the shared writer accepts invoice and standalone transaction sources, not `return`. |
+| P3-02: invoice counter serializes concurrent sales | Hypothesis not measured | Counter increment is inside the same Firestore transaction as invoice writes. No concurrent-load emulator benchmark established a user-visible contention failure; changing to block allocation would alter numbering and is not justified by current evidence. |
+| P3-03: transaction deletion is read-then-batch | Fixed | `deleteTransaction` re-reads transaction and shop inside `runTransaction`, then soft-deletes and reverses the exact balance atomically. |
+| P3-04: `customer_id` remains dual-written | Finding conflicts with runtime contract | `customer_id == shop_id` is intentionally retained for legacy readers and is mandated by the current dual-write contract. The inaccurate provider comment was corrected rather than removing the field. |
+| P3-05: idempotency pre-check query is dead and unauthorized | Fixed | The list-query pre-check is absent; the deterministic document ID is read inside the transaction. |
+| P3-06: invoice void discovers linked transactions before its transaction | Partially mitigated; legacy edge remains | Void reads invoice-stored transaction IDs inside the transaction and reads each referenced row there. Current settlement atomically appends its payment ID to the invoice, causing transaction retries to observe concurrent current-client settlements. The outside query is retained to include legacy rows lacking invoice pointers; no forced interleaving test covers obsolete clients. |
+| P3-07: seller edit setting name is inverted | Fixed with migration compatibility | Current writes use `allow_seller_edit_requests`; model/provider reads fall back to the legacy key. Serialization writes only the canonical key. |
+| P4-01: literal `void` differs from the model constant | Fixed in Dart | Provider comparisons use `InvoiceModel.statusVoid`; Firestore Rules retain the canonical persisted string because Rules cannot reference Dart constants. |
+| P4-02: duplicate amount constants | Fixed locally | Provider amount checks use the shared financial amount policy, and Firestore Rules enforce the same `999999.99` ceiling across invoice, receipt, standalone transaction, edit-request, and correction paths. Currency-specific limits remain open under P2-02. |
+
+### Verification and Residual Risks
+
+- The previous focused monetary/credit-note suite reported
+  `00:00 +70: All tests passed!`. The follow-up stock sale/restore suite
+  reported `00:00 +40: All tests passed!`.
+- Previous Pass 2 validation: full Flutter suite
+  `01:40 +759: All tests passed!`; Rules Emulator `201 passing (52s)`;
+  `dart analyze test/`: `No issues found!`. Coverage includes valid invoice
+  boundaries, over-limit sale/receipt/standalone transaction and correction
+  batches, and a denied over-limit seller edit request.
+- Shared-sequence correction: `InvoiceNumbering.nextSequence` allocates above
+  the greater of the legacy invoice and receipt counters for sales,
+  credit-notes, and receipts. Rules enforce the same next counter value and
+  bind the advanced counter to the invoice in the same write. Regressions
+  prove a receipt after invoice counter 4 uses 5, a sale after receipt counter
+  4 uses 5, and a stale invoice/receipt counter update is denied. Current
+  local verification: focused numbering suite `00:00 +5: All tests passed!`;
+  full Flutter suite `01:48 +761: All tests passed!`; Rules Emulator
+  `202 passing (57s)`; `dart analyze test/`: `No issues found!`. Flutter
+  library analysis retains one pre-existing unused `_commit` diagnostic
+  (`1 issue found. (ran in 8.1s)`). The emulator still prints expression-limit
+  diagnostics for some broad negative transaction batches; the added
+  counter-only stale-write denials evaluate and reject directly.
+- The new Rules contract is local only. Older clients increment one counter
+  independently and can be denied when the other counter is higher; no
+  minimum-client enforcement or migration rollout has been implemented.
+- `flutter analyze lib --no-pub` reports one pre-existing unused-element
+  diagnostic for `TransactionNotifier._commit` at line 410
+  (`1 issue found. (ran in 167.1s)`). The helper was traced to commit
+  `805b6072`; it was not removed because it is unrelated to the financial
+  policy changes.
+- Repository Markdown lint and `git diff --check` exited 0. Hot restart was
+  attempted through the connected Dart Tooling Daemon, but it had no running
+  Flutter app.
+- A composite invoice index for `(tenant_id, linked_invoice_id)` is present
+  locally. The provider-side item-to-deduction check is not Rules enforcement.
+  P1-04 remains release-blocking: stored monetary values and shop balances are
+  still doubles with tolerance comparisons; integer minor-unit conversion,
+  historical reconciliation, backup/PDF compatibility, and a minimum-client
+  rollout strategy have not been implemented. Equal SAR/PKR caps do not settle
+  currency-specific policy. Invoice-counter contention has not been measured.
+- Safe cutover sequence identified; implementation remains blocked pending
+  reviewed schema and access authorization:
+  1. Inventory every monetary field and writer/reader, including shop balances,
+     invoice lifecycle totals, ledger rows, backups/restores, and export/PDF
+     calculations. Add dual-read and representation-consistency tests before
+     changing persisted data.
+  2. Release a compatibility client that reads legacy values while
+     dual-writing validated integer minor units with legacy values in the same
+     atomic financial operation. Rules must check both representations agree
+     and preserve existing client writes during this migration phase.
+  3. Take a verified, tenant-scoped backup and run a paged, read-only
+     production preview. Reject sub-cent/ambiguous values, tenant mismatches,
+     missing links, and shop-ledger reconciliation exceptions; do not infer
+     shop balances by summing incomplete/voided historical ledger rows.
+  4. Review the preview and reconcile exceptions before any write. Backfill
+     only companion integer fields in idempotent tenant-scoped batches without
+     changing historical monetary values or deleting ledger records.
+  5. Establish and enforce a minimum compatible client version (old clients
+     must fail with actionable update guidance), then deploy Rules requiring
+     integer values and exact minor-unit balance deltas. Only after every
+     tenant is reconciled may integer fields become the sole monetary source
+     and legacy double fields be retired.
+  No production reads or writes have been authorized for this session, and no
+  approved backup artifact, reconciliation preview, or minimum-client
+  mechanism is evidenced; therefore no backfill or release is safe yet.
+- Rules/index deployment, Hosting, release builds, device delivery, commit,
+  and push are separate operations and are not represented as completed by
+  this audit entry.
+
+---
+
 ## Scope-Specific Addendum — 2026-10-28 v3.10.14+1125 Notifications
 
 ### Verified Finding and Change

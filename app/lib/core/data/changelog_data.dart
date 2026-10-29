@@ -28,6 +28,30 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.10.17',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧾',
+        text: {
+          AppLocale.en: 'Sales, credit notes, and receipts now share a safer numbering sequence, with clearer checks for financial entries.',
+          AppLocale.ar: 'تستخدم المبيعات والإشعارات الدائنة والإيصالات الآن تسلسلاً أكثر أمانًا للترقيم، مع تحقق أوضح للقيود المالية.',
+          AppLocale.ur: 'سیلز، کریڈٹ نوٹس اور رسیدیں اب زیادہ محفوظ مشترکہ نمبرنگ ترتیب استعمال کرتی ہیں، اور مالی اندراجات کی جانچ بھی واضح ہے۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📊',
+        text: {
+          AppLocale.en:
+              'Dashboard totals now keep different route currencies separate.',
+          AppLocale.ar: 'تعرض إجماليات لوحة المعلومات عملات المسارات المختلفة بشكل منفصل.',
+          AppLocale.ur:
+              'ڈیش بورڈ کے مجموعے اب مختلف روٹس کی کرنسیوں کو الگ رکھتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.10.16',
     date: 'October 2026',
     items: [

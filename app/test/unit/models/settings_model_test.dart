@@ -1,4 +1,4 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:footwear_erp/core/l10n/financial_document_localization.dart';
 import 'package:footwear_erp/models/settings_model.dart';
@@ -74,6 +74,28 @@ void main() {
 
       expect(settings.allowNonStockInvoices, isTrue);
       expect(settings.toJson()['allow_non_stock_invoices'], isTrue);
+    });
+
+    test('reads seller edit requests and migrates the legacy setting key', () {
+      final legacySettings = SettingsModel.fromJson({
+        ...baseJson,
+        'require_admin_approval_for_seller_transaction_edits': true,
+      });
+      final canonicalSettings = SettingsModel.fromJson({
+        ...baseJson,
+        'allow_seller_edit_requests': true,
+        'require_admin_approval_for_seller_transaction_edits': false,
+      });
+
+      expect(legacySettings.allowSellerEditRequests, isTrue);
+      expect(canonicalSettings.allowSellerEditRequests, isTrue);
+      expect(canonicalSettings.toJson()['allow_seller_edit_requests'], isTrue);
+      expect(
+        canonicalSettings.toJson().containsKey(
+          'require_admin_approval_for_seller_transaction_edits',
+        ),
+        isFalse,
+      );
     });
 
     test('invoice header snapshot includes tenant branding and logo', () {

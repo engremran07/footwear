@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../core/l10n/financial_document_localization.dart';
 
 class InvoiceHeaderConfig {
@@ -171,7 +173,7 @@ class SettingsModel {
   final String tenantId;
   final String currency;
   final int pairsPerCarton;
-  final bool requireAdminApprovalForSellerTransactionEdits;
+  final bool allowSellerEditRequests;
   final bool allowNonStockInvoices;
   final InvoiceHeaderConfig invoiceHeader;
 
@@ -184,7 +186,7 @@ class SettingsModel {
     this.tenantId = '__global__',
     required this.currency,
     required this.pairsPerCarton,
-    this.requireAdminApprovalForSellerTransactionEdits = false,
+    this.allowSellerEditRequests = false,
     this.allowNonStockInvoices = false,
     this.invoiceHeader = const InvoiceHeaderConfig(),
     this.logoBase64,
@@ -206,7 +208,7 @@ class SettingsModel {
     String? tenantId,
     String? currency,
     int? pairsPerCarton,
-    bool? requireAdminApprovalForSellerTransactionEdits,
+    bool? allowSellerEditRequests,
     bool? allowNonStockInvoices,
     InvoiceHeaderConfig? invoiceHeader,
     String? logoBase64,
@@ -217,9 +219,8 @@ class SettingsModel {
       tenantId: tenantId ?? this.tenantId,
       currency: currency ?? this.currency,
       pairsPerCarton: pairsPerCarton ?? this.pairsPerCarton,
-      requireAdminApprovalForSellerTransactionEdits:
-          requireAdminApprovalForSellerTransactionEdits ??
-          this.requireAdminApprovalForSellerTransactionEdits,
+      allowSellerEditRequests:
+          allowSellerEditRequests ?? this.allowSellerEditRequests,
       allowNonStockInvoices:
           allowNonStockInvoices ?? this.allowNonStockInvoices,
       invoiceHeader: invoiceHeader ?? this.invoiceHeader,
@@ -261,7 +262,8 @@ class SettingsModel {
       tenantId: tenantId,
       currency: json['currency'] as String? ?? 'SAR',
       pairsPerCarton: json['pairs_per_carton'] as int? ?? 12,
-      requireAdminApprovalForSellerTransactionEdits:
+      allowSellerEditRequests:
+          json['allow_seller_edit_requests'] as bool? ??
           json['require_admin_approval_for_seller_transaction_edits']
               as bool? ??
           false,
@@ -276,8 +278,7 @@ class SettingsModel {
     'tenant_id': tenantId,
     'currency': currency,
     'pairs_per_carton': pairsPerCarton,
-    'require_admin_approval_for_seller_transaction_edits':
-        requireAdminApprovalForSellerTransactionEdits,
+    'allow_seller_edit_requests': allowSellerEditRequests,
     'allow_non_stock_invoices': allowNonStockInvoices,
     'invoice_header': invoiceHeader.toJson(),
     'logo_base64': logoBase64,
@@ -291,8 +292,7 @@ class SettingsModel {
           other.tenantId == tenantId &&
           other.currency == currency &&
           other.pairsPerCarton == pairsPerCarton &&
-          other.requireAdminApprovalForSellerTransactionEdits ==
-              requireAdminApprovalForSellerTransactionEdits &&
+          other.allowSellerEditRequests == allowSellerEditRequests &&
           other.allowNonStockInvoices == allowNonStockInvoices &&
           other.invoiceHeader.toJson().toString() ==
               invoiceHeader.toJson().toString() &&
@@ -304,7 +304,7 @@ class SettingsModel {
     tenantId,
     currency,
     pairsPerCarton,
-    requireAdminApprovalForSellerTransactionEdits,
+    allowSellerEditRequests,
     allowNonStockInvoices,
     invoiceHeader.toJson().toString(),
     logoBase64,

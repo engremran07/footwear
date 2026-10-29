@@ -244,9 +244,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'edit_request_approved': 'Edit request approved.',
     'edit_request_rejected': 'Edit request rejected.',
     'pending_admin_approval': 'Pending admin approval',
-    'require_approval_title':
-        'Require admin approval for seller transaction edits',
-    'require_approval_subtitle': 'ON: seller edits are pending until approved. OFF: seller edits are auto-approved.',
+    'seller_edit_requests_title': 'Allow seller transaction edit requests',
+    'seller_edit_requests_subtitle': 'ON: seller requests wait for admin approval. OFF: sellers can add notes only.',
     // ── Seller Sell-Stock ──
     'sell_stock': 'Sell Stock',
     'no_stock_available': 'No stock available',
@@ -1756,8 +1755,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'edit_request_approved': 'تمت الموافقة على طلب التعديل.',
     'edit_request_rejected': 'تم رفض طلب التعديل.',
     'pending_admin_approval': 'بانتظار موافقة المسؤول',
-    'require_approval_title': 'طلب موافقة المسؤول على تعديلات البائع للمعاملات',
-    'require_approval_subtitle': 'تشغيل: تعديلات البائع تبقى معلقة حتى الموافقة. إيقاف: تُعتمد تلقائياً.',
+    'seller_edit_requests_title': 'السماح للبائعين بطلب تعديل المعاملات',
+    'seller_edit_requests_subtitle': 'تشغيل: تنتظر طلبات البائع موافقة المسؤول. إيقاف: يمكن للبائعين إضافة ملاحظات فقط.',
     // ── بيع المخزون ──
     'sell_stock': 'بيع المخزون',
     'no_stock_available': 'لا يوجد مخزون متاح',
@@ -3271,10 +3270,9 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'edit_request_approved': 'ترمیم کی درخواست منظور ہو گئی۔',
     'edit_request_rejected': 'ترمیم کی درخواست مسترد ہو گئی۔',
     'pending_admin_approval': 'ایڈمن منظوری زیر التوا',
-    'require_approval_title':
-        'سیلر ٹرانزیکشن ترامیم کے لیے ایڈمن منظوری لازمی کریں',
-    'require_approval_subtitle':
-        'آن: سیلر ترامیم منظوری تک زیر التوا رہیں گی۔ آف: خودکار منظوری ہو گی۔',
+    'seller_edit_requests_title':
+        'سیلرز کو ٹرانزیکشن میں ترمیم کی درخواست دینے کی اجازت دیں',
+    'seller_edit_requests_subtitle': 'آن: سیلر کی درخواستیں ایڈمن کی منظوری تک زیر التوا رہیں گی۔ آف: سیلرز صرف نوٹس شامل کر سکتے ہیں۔',
     // ── اسٹاک فروخت ──
     'sell_stock': 'اسٹاک بیچیں',
     'no_stock_available': 'کوئی اسٹاک دستیاب نہیں',

@@ -179,7 +179,7 @@ void main() {
         cashReceiptSequence: 1,
         linkedInvoiceId: 'INV-2026-0001',
         sellerName: 'Workspace Seller',
-        notes: 'Old account collection · یہ اردو ٹیسٹ ہے؛ ٹ ڈ ڑ ں ھ ے',
+        notes: 'Old account collection · صافي المستحق · یہ اردو ٹیسٹ ہے؛ ادائیگی؛ ٹ ڈ ڑ ں ھ ے',
         createdBy: 'seller-1',
         createdAt: now,
         updatedAt: now,
@@ -480,10 +480,17 @@ void main() {
 
   test('Arabic and Urdu text builds across shared PDF report paths', () async {
     final date = Timestamp.fromDate(DateTime(2026, 10, 22));
-    const arabic = 'تقرير الحساب';
-    const urdu = 'یہ اردو رپورٹ ٹیسٹ ہے؛ ٹ ڈ ڑ ں ھ ے';
-    Map<String, String> labelsFor(AppLocale locale, List<String> keys) => {
-      for (final key in keys) key: trRead(key, locale),
+    const arabic = 'تقرير الحساب؛ صافي المستحق؛ يجري';
+    const urdu = 'یہ اردو رپورٹ ٹیسٹ ہے؛ ادائیگی؛ ٹ ڈ ڑ ں ھ ے';
+    Map<String, String> labelsFor(
+      AppLocale locale,
+      List<String> keys, {
+      FinancialDocumentLanguagePair? pair,
+    }) => {
+      for (final key in keys)
+        key: pair == null
+            ? trRead(key, locale)
+            : financialDocumentLabel(key, pair, fallback: trRead(key, locale)),
     };
     void expectPdf(List<int> bytes) {
       expect(bytes, isNotEmpty);
@@ -536,7 +543,11 @@ void main() {
       transactions: [transaction],
       dateFrom: DateTime(2026, 8, 23),
       dateTo: DateTime(2026, 10, 25),
-      labels: labelsFor(AppLocale.ur, ledgerKeys),
+      labels: labelsFor(
+        AppLocale.ur,
+        ledgerKeys,
+        pair: FinancialDocumentLanguagePair.englishUrdu,
+      ),
       locale: AppLocale.ur,
       logoBytes: _testLogoBytes,
       header: const InvoiceHeaderConfig(
@@ -547,6 +558,25 @@ void main() {
       ),
     );
     expectPdf(ledgerPdf);
+    final arabicLedgerPdf = await buildPdfLedger(
+      shopName: arabic,
+      companyName: 'Footwear',
+      openingBalance: 10,
+      transactions: [transaction],
+      dateFrom: DateTime(2026, 8, 23),
+      dateTo: DateTime(2026, 10, 25),
+      labels: labelsFor(
+        AppLocale.ar,
+        ledgerKeys,
+        pair: FinancialDocumentLanguagePair.englishArabic,
+      ),
+      locale: AppLocale.ar,
+      header: const InvoiceHeaderConfig(
+        nameEn: 'Footwear',
+        nameAr: 'شركة الأحذية',
+      ),
+    );
+    expectPdf(arabicLedgerPdf);
     expect(
       latin1.decode(ledgerPdf, allowInvalid: true),
       contains('/Subtype/Image'),
@@ -680,7 +710,11 @@ void main() {
           transactions: [transaction],
         ),
       ],
-      labels: labelsFor(AppLocale.ur, multiShopKeys),
+      labels: labelsFor(
+        AppLocale.ur,
+        multiShopKeys,
+        pair: FinancialDocumentLanguagePair.englishUrdu,
+      ),
       locale: AppLocale.ur,
       logoBytes: _testLogoBytes,
       header: const InvoiceHeaderConfig(

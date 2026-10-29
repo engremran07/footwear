@@ -56,6 +56,12 @@ class AppFormatters {
     return normalized;
   }
 
+  static bool hasAtMostTwoDecimalPlaces(double amount) {
+    if (!amount.isFinite) return false;
+    final scaled = amount * 100;
+    return (scaled - scaled.roundToDouble()).abs() <= 1e-8;
+  }
+
   static double? parseAmountText(String? raw) {
     final input = raw?.trim();
     if (input == null || input.isEmpty) return null;
@@ -75,23 +81,38 @@ class AppFormatters {
     if (cleaned.contains(',') && cleaned.contains('.')) {
       final commaIndex = cleaned.lastIndexOf(',');
       final dotIndex = cleaned.lastIndexOf('.');
-      if (commaIndex > dotIndex) {
-        return double.tryParse(
-          cleaned.replaceAll('.', '').replaceAll(',', '.'),
-        );
+      final decimalIndex = commaIndex > dotIndex ? commaIndex : dotIndex;
+      final fraction = cleaned.substring(decimalIndex + 1);
+      if (fraction.length > 2 || fraction.contains(RegExp(r'[,\.]'))) {
+        return null;
       }
-      return double.tryParse(cleaned.replaceAll(',', ''));
+      final whole = cleaned
+          .substring(0, decimalIndex)
+          .replaceAll(RegExp(r'[,\.]'), '');
+      return double.tryParse(fraction.isEmpty ? whole : '$whole.$fraction');
     }
 
     if (cleaned.contains(',')) {
       final parts = cleaned.split(',');
       if (parts.length > 2) {
+        if (!RegExp(r'^-?\d{1,3}(,\d{3})+$').hasMatch(cleaned)) return null;
         return double.tryParse(cleaned.replaceAll(',', ''));
       }
       if (parts.length == 2 && parts[1].length == 3) {
+        if (!RegExp(r'^-?\d{1,3},\d{3}$').hasMatch(cleaned)) return null;
         return double.tryParse(parts.join());
       }
+      if (parts.length == 2 && parts[1].length > 2) return null;
       return double.tryParse(cleaned.replaceAll(',', '.'));
+    }
+
+    if (cleaned.contains('.')) {
+      final parts = cleaned.split('.');
+      if (parts.length > 2) {
+        if (!RegExp(r'^-?\d{1,3}(?:\.\d{3})+$').hasMatch(cleaned)) return null;
+        return double.tryParse(cleaned.replaceAll('.', ''));
+      }
+      if (parts.length == 2 && parts[1].length > 2) return null;
     }
 
     return double.tryParse(cleaned);

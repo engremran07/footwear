@@ -259,7 +259,7 @@ class TenantManagementNotifier extends AsyncNotifier<void> {
           'currency': 'SAR',
           'pairs_per_carton': 12,
           'invoice_header': {'name_en': tenantName},
-          'require_admin_approval_for_seller_transaction_edits': false,
+          'allow_seller_edit_requests': false,
           'last_invoice_number': 0,
           'updated_at': FieldValue.serverTimestamp(),
         });

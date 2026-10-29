@@ -1,5 +1,32 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'transaction_model.dart';
+
+double invoiceOutstandingAfterCredits({
+  required double total,
+  required double amountReceived,
+  required double creditNoteTotal,
+}) => (total - amountReceived - creditNoteTotal)
+    .clamp(0.0, double.infinity)
+    .toDouble();
+
+String invoiceStatusAfterCredits({
+  required double total,
+  required double amountReceived,
+  required double creditNoteTotal,
+}) {
+  if (invoiceOutstandingAfterCredits(
+        total: total,
+        amountReceived: amountReceived,
+        creditNoteTotal: creditNoteTotal,
+      ) ==
+      0) {
+    return InvoiceModel.statusPaid;
+  }
+  return amountReceived > 0
+      ? InvoiceModel.statusPartial
+      : InvoiceModel.statusIssued;
+}
 
 // =============================================================================
 // InvoiceModel — sale invoice or credit note for a shop.
@@ -21,12 +48,12 @@ import 'transaction_model.dart';
 //   linkedInvoiceId. Credit notes must be created within 30 days of original.
 //
 // INVOICE NUMBER:
-//   Format INV-YYYY-NNNN. Counter in settings/{tenant_id}.last_invoice_number.
-//   Incremented atomically with invoice, ledger, balance, and stock writes.
+//   New documents use a year-independent type prefix and tenant sequence.
+//   Historical year-prefixed identifiers remain unchanged.
 // =============================================================================
 class InvoiceModel {
   final String id;
-  final String invoiceNumber; // INV-YYYY-NNNN
+  final String invoiceNumber; // INV-NNNN, CN-NNNN, or REC-NNNN
   final String type; // sale | return | credit_note
   static const String typeSale = 'sale';
   static const String typeReturn = 'return';
@@ -45,7 +72,7 @@ class InvoiceModel {
   final double total;
   final String saleType; // cash | credit
   final double amountReceived; // cash collected at time of invoice
-  final double outstandingAmount; // amount still owed = total - amountReceived
+  final double outstandingAmount;
   final String status; // draft | issued | paid | partial | void
   static const String statusDraft = 'draft';
   static const String statusIssued = 'issued';
@@ -117,6 +144,8 @@ class InvoiceModel {
     final rawItems = json['items'] as List<dynamic>?;
     final total = (json['total'] as num?)?.toDouble() ?? 0;
     final amountReceived = (json['amount_received'] as num?)?.toDouble() ?? 0;
+    final creditNoteTotal =
+        (json['credit_note_total'] as num?)?.toDouble() ?? 0;
     final rawDeductions =
         (json['seller_inventory_deductions'] as Map<String, dynamic>?) ??
         const <String, dynamic>{};
@@ -144,9 +173,11 @@ class InvoiceModel {
       total: total,
       saleType: json['sale_type'] as String? ?? 'credit',
       amountReceived: amountReceived,
-      outstandingAmount:
-          (json['outstanding_amount'] as num?)?.toDouble() ??
-          (total - amountReceived),
+      outstandingAmount: invoiceOutstandingAfterCredits(
+        total: total,
+        amountReceived: amountReceived,
+        creditNoteTotal: creditNoteTotal,
+      ),
       status: json['status'] as String? ?? statusDraft,
       notes: json['notes'] as String?,
       paymentMethod: json['payment_method'] as String?,

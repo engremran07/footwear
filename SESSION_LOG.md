@@ -6,6 +6,194 @@
 
 ---
 
+## SESSION-070 — 2026-10-29 — v3.10.17 Local Release Candidate
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the requested Android delivery after reproducing the
+Gradle source-root failure and resolving local release build setup.
+
+- The reported VS Code Gradle task failure was caused by the Pub cache and
+  app build outputs residing on different Windows volumes. Using the
+  workspace-volume Pub cache made the exact wrapper task pass; no dependency
+  or Gradle version downgrade was used.
+- Built synchronized version `3.10.17+1128`: ARMv7 APK
+  `32,906,333` bytes, ARM64 APK `34,585,857` bytes, x86_64 APK
+  `36,208,389` bytes, and signed AAB `75,902,291` bytes. APK v2 signature
+  verification passed for all three APKs; `jarsigner -verify` reported
+  `jar verified.` for the AAB. APK and AAB certificate SHA-256 is
+  `0cdf6ff844f9279758f23c4d7b91942820d7d38d0a987507c7f7d383a21d4fa3`.
+- The ARM64 APK was copied to the connected `R5GL22RGT9V` device
+  (`1 file pushed`), and the remote file hash matched the local file hash
+  `4486b517a824444e86fc4665f4ac5d770b1ab5d2de7f77b21a6f41e37bbf2f03`.
+  `adb install --streaming -r` reported `Success`; package metadata reports
+  versionName `3.10.17`, versionCode `310173128`. The app activity launched.
+  Authenticated business-flow smoke tests were not performed.
+- The user selected preserving and migrating existing Firestore data, no
+  forced-update feature, support for both Play and sideloaded distributions,
+  and local AAB only (no Play upload). The Android update installed without
+  uninstalling app data.
+- Production Rules/indexes and Hosting deployment remain held: the new
+  receipt sequence contract is not verified against deployed Rules, and
+  P1-04's historical minor-unit reconciliation/rollout has no approved
+  implementation plan. Existing clients therefore remain a compatibility
+  concern. No production data was read or modified. No Rules/indexes or
+  Hosting deployment, Play upload, commit, or push was performed.
+- The provided Urdu/Arabic audit records remaining visual coverage gaps:
+  no complete representative fixture corpus or full Web/Android rendered
+  comparison. Prior font-resource assertions are not visual proof. No
+  authenticated document render was available during this device install.
+
+---
+
+## SESSION-069 — 2026-10-29 — Shared Invoice Sequence Correction
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the Pass 2 audit after finding that independent legacy
+invoice and receipt counters could allocate duplicate or out-of-order numbers.
+
+- Added `InvoiceNumbering.nextSequence`, which advances above the greater of
+  `last_invoice_number` and `last_cash_receipt_number`. Sale invoices,
+  credit-notes, and receipts all use this allocation while preserving their
+  existing per-type counter fields and `INV-`/`CN-`/`REC-` prefixes.
+- Firestore Rules validate the shared high-water mark on counter updates and
+  bind the new sequence to its same-batch invoice. Receipt counter updates
+  include `last_cash_receipt_id`; Rules deny both stale and orphan counter
+  advances. Regressions verify receipt number 5 after invoice counter 4 and
+  sale number 5 after receipt counter 4. The helper is
+  shared in Rules; linked invoice checks rely on the same-batch counter guard
+  to avoid repeating the counter computation and exhausting expression budget.
+- Focused numbering tests: `00:00 +5: All tests passed!`; full Flutter suite:
+  `01:48 +761: All tests passed!`; Firestore Rules Emulator:
+  `202 passing (57s)`; `dart analyze test/`: `No issues found!`; repository
+  Markdown lint and `git diff --check` exited 0.
+- `flutter analyze lib --no-pub` still reports one pre-existing
+  `TransactionNotifier._commit` unused-element diagnostic
+  (`1 issue found. (ran in 8.1s)`). The connected Dart Tooling Daemon had no
+  running app, so hot restart was unavailable. The Rules Emulator emits
+  expression-limit diagnostics in some broad negative transaction cases;
+  newly added stale-counter-only denials evaluate directly.
+- The Rules and client changes remain local and undeployed. Existing clients
+  that advance only one legacy counter may be rejected after the Rules change;
+  no minimum-client rollout or P1-04 integer-minor-unit compatibility plan is
+  complete. No build, deployment, phone delivery, commit, or push was done.
+
+---
+
+## SESSION-068 — 2026-10-29 — Financial Limits and Invoice Numbering
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the Pass 2 amount-cap and numbering findings, and
+resolve the five Rules Emulator failures introduced by the new write policy.
+
+- Kept the established `999999.99` ceiling and applied it across SAR/PKR
+  sale/credit invoices, receipts, standalone ledger writes, seller edit
+  requests, and corrections in app providers and Firestore Rules. Emulator
+  regressions prove authorized linked writes at the boundary and deny
+  over-limit linked sale, standalone seller/admin transaction, correction,
+  and seller edit-request writes. The shared SAR/PKR ceiling remains
+  provisional and does not resolve currency-specific policy.
+- New sale, credit-note, and receipt identifiers use the tenant-wide
+  monotonic sequence with `INV-`, `CN-`, and `REC-` prefixes, without a
+  device-clock year. Historical identifiers remain unchanged. Rules now use
+  safe map access for optional invoice-number fields and require the expected
+  prefix on new linked writes; valid emulator fixtures include the complete
+  client shape.
+- The previous emulator run had `193 passing, 5 failing` because positive
+  legacy-shaped receipt and credit-note fixtures omitted the now-required
+  `invoice_number` field; direct property access raised a Rules evaluation
+  error. After safe lookups and client-shaped fixture updates, the complete
+  Rules Emulator reported `201 passing (52s)`.
+- Full Flutter suite: `01:40 +759: All tests passed!`;
+  `dart analyze test/`: `No issues found!`. `flutter analyze lib --no-pub`
+  reports one pre-existing unused `_commit` diagnostic
+  (`1 issue found. (ran in 167.1s)`), previously attributed by `git blame`
+  to `805b6072`. Hot restart found no running Flutter app in the connected
+  Dart Tooling Daemon.
+- P1-04 remains unresolved: financial values and `shop.balance` are still
+  doubles with tolerance comparisons. No historical minor-unit migration,
+  production data read/write, release build, Rules/index deployment, Hosting
+  deployment, device delivery, commit, or push was performed. These operations
+  remain blocked pending a reviewed reconciliation and compatibility plan.
+
+---
+
+## SESSION-067 — 2026-10-29 — Pass 2 Financial Finding Dispositions
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the attached 21-finding Pass 2 financial review,
+reconcile verified issues without speculative policy changes, and record
+current local evidence.
+
+- Added provider-level sale reconciliation: invoice quantities are aggregated
+  by variant, converted from dozens plus `extra_pairs` to pairs using the
+  workspace `pairs_per_carton`, and checked against the exact seller-inventory
+  deduction map. Added cumulative credit-note restore checks against the
+  original sale's recorded deductions; voided notes do not consume the restore
+  allowance. The new restore regression suite reported
+  `00:00 +40: All tests passed!`.
+- Removed the 20-second timeout wrapper around deterministic standalone cash
+  transactions so an unresolved commit is not reported as a final failure
+  while the atomic transaction is still resolving. Corrected the stale
+  `customer_id` comment; the field remains intentionally dual-written.
+- The audit report now dispositions all 21 findings. Open/residual items
+  include minor-unit storage and exact server arithmetic, currency-specific
+  amount caps, invoice-number year/prefix policy, stock-line verification in
+  Rules, unbounded invoice line counts, counter load measurement, and legacy
+  transaction discovery during invoice void.
+- Full Flutter suite: `01:39 +753: All tests passed!`; Firestore Rules
+  Emulator: `196 passing (53s)`; `dart analyze test/`: `No issues found!`.
+  `flutter analyze lib --no-pub` reports one pre-existing unused `_commit`
+  diagnostic (`1 issue found. (ran in 42.4s)`), attributed by blame to
+  `805b6072`. Markdown lint and `git diff --check` exited 0.
+- Hot restart could not be performed because the connected Dart Tooling
+  Daemon had no active Flutter app. Rules/index deployment, Hosting, builds,
+  phone delivery, commit, and push remain unperformed.
+
+---
+
+## SESSION-066 — 2026-10-29 — Pass 2 Financial Input and Credit-Note Guards
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue validating the attached Pass 2 financial audit and
+implement verified safeguards using the previously recorded conservative
+defaults.
+
+- SAR/PKR amount parsing now rejects ambiguous or over-precision values such
+  as `1.500`, preserves supported Arabic digit scripts and comma-grouped
+  thousands, and keeps accepted inputs within two decimal places. Provider
+  write guards cover sale/return lines, invoice totals, receipts, standalone
+  cash transactions, seller edit requests, and admin corrections.
+- Credit notes now aggregate item quantities by variant and reject cumulative
+  returns above the original sale. Legacy linked notes are read with a
+  tenant-scoped query capped at 51 results; the provider fails closed above 50,
+  on malformed or inconsistent history, or if the original invoice's latest
+  credit-note pointer is absent from the queried history.
+- A persisted aggregate field was prototyped but removed after the Rules
+  Emulator showed the existing linked invoice batch exceeded its 1,000
+  expression budget. The bounded query is retained instead, with up to 50
+  additional document reads for a legacy return. A composite index on
+  `invoices(tenant_id, linked_invoice_id)` was added.
+- Evidence-first test: the standalone transaction precision regression failed
+  before the provider guard with `[core/no-app]` instead of the required
+  `ArgumentError`. After the guard, focused amount/return suite:
+  `00:00 +70: All tests passed!`; full Flutter suite:
+  `01:37 +747: All tests passed!`; Rules Emulator: `195 passing (50s)`.
+- `dart analyze test/`: `No issues found!`. `flutter analyze lib --no-pub`
+  reports one pre-existing unused `_commit` helper in
+  `transaction_provider.dart`; `git blame` traces it to commit `805b6072`.
+  This unrelated helper was not changed.
+- Minor-unit storage migration, currency-specific caps, historical repair,
+  and invoice numbering remain open or deferred. Existing caps and numbering
+  are unchanged. The changes and index remain local and unreleased; no
+  production deploy, release build, phone delivery, commit, or push occurred.
+
+---
+
 ## SESSION-065 — 2026-10-28 — v3.10.15+1126 Release Completion
 
 **Agent:** GitHub Copilot

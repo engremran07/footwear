@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/utils/error_mapper.dart';
@@ -25,9 +26,8 @@ Future<bool> _requireAdminSettingsAccess(
   final user = await ref.read(authUserProvider.future);
   if (user?.isAdmin == true) return true;
   if (context.mounted) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(errorSnackBar(tr('permission_denied', ref)));
   }
   return false;
 }
@@ -40,7 +40,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _ppcC = TextEditingController();
-  bool _requireAdminApprovalForSellerTransactionEdits = false;
+  bool _allowSellerEditRequests = false;
   bool _settingsLoaded = false;
   bool _isDirty = false;
   bool _savingSettings = false;
@@ -58,8 +58,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       text: ppcStr,
       selection: TextSelection.collapsed(offset: ppcStr.length),
     );
-    _requireAdminApprovalForSellerTransactionEdits =
-        settings.requireAdminApprovalForSellerTransactionEdits;
+    _allowSellerEditRequests = settings.allowSellerEditRequests;
     _settingsLoaded = true;
   }
 
@@ -132,15 +131,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
       await ref.read(settingsNotifierProvider.notifier).save({
         'pairs_per_carton': pairsPerCarton,
-        'require_admin_approval_for_seller_transaction_edits':
-            _requireAdminApprovalForSellerTransactionEdits,
+        'allow_seller_edit_requests': _allowSellerEditRequests,
       });
       if (mounted) {
         setState(() => _isDirty = false);
         ref.invalidate(settingsProvider);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       }
     } catch (e) {
       if (mounted) {
@@ -228,9 +225,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     children: [
                       Text(
                         tr('business_settings', ref),
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -246,16 +242,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const SizedBox(height: 8),
                       SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,
-                        value: _requireAdminApprovalForSellerTransactionEdits,
+                        value: _allowSellerEditRequests,
                         onChanged: (value) {
                           setState(() {
-                            _requireAdminApprovalForSellerTransactionEdits =
-                                value;
+                            _allowSellerEditRequests = value;
                             _isDirty = true;
                           });
                         },
-                        title: Text(tr('require_approval_title', ref)),
-                        subtitle: Text(tr('require_approval_subtitle', ref)),
+                        title: Text(tr('seller_edit_requests_title', ref)),
+                        subtitle: Text(
+                          tr('seller_edit_requests_subtitle', ref),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       SizedBox(
@@ -425,9 +422,8 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
     } catch (error, stackTrace) {
       debugPrint('Workspace logo processing failed: $error\n$stackTrace');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
       }
     } finally {
       if (mounted) setState(() => _processing = false);
@@ -448,17 +444,15 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
 
       if (mounted) {
         setState(() => _pendingLogo = null);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(successSnackBar(tr('msg_logo_uploaded', ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(successSnackBar(tr('msg_logo_uploaded', ref)));
       }
     } catch (e) {
       if (mounted) {
         final detail = e is FirebaseException ? ' [${e.plugin}/${e.code}]' : '';
         final key = AppErrorMapper.key(e);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(errorSnackBar('${tr(key, ref)}$detail'));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar('${tr(key, ref)}$detail'));
       }
     } finally {
       if (mounted) {
@@ -482,9 +476,8 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
       if (!await _requireAdminSettingsAccess(context, ref)) return;
       await ref.read(settingsNotifierProvider.notifier).deleteLogo();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(successSnackBar(tr('msg_logo_removed', ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(successSnackBar(tr('msg_logo_removed', ref)));
       }
     } catch (e) {
       if (mounted) {
@@ -511,9 +504,8 @@ class _LogoCardState extends ConsumerState<_LogoCard> {
           children: [
             Text(
               tr('settings_company_logo', ref),
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(

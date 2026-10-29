@@ -472,7 +472,7 @@ class _NotificationTile extends ConsumerWidget {
     switch (n.transactionType) {
       case 'cash_in':
         accentColor = AppTheme.success;
-        leadIcon = Icons.arrow_downward;
+        leadIcon = isInvoice ? Icons.receipt_long : Icons.arrow_downward;
       case 'cash_out':
         accentColor = cs.error;
         leadIcon = isInvoice ? Icons.receipt_long : Icons.arrow_upward;

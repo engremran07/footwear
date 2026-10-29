@@ -183,7 +183,7 @@ changes.
   created_by, route_id, shop_id) must validate non-empty identifiers before
   committing batched writes.
 
-1. Seller inventory may only decrease in the same batch as a sale invoice whose `seller_inventory_deductions` map matches the exact quantity delta. Warehouse transfers, adjustments, and returns must atomically update stock and append tenant-scoped `inventory_transactions` records.
+1. Seller inventory may only decrease in the same batch as a sale invoice whose `seller_inventory_deductions` map matches the exact quantity delta. `InvoiceNotifier` also reconciles each sale's variant quantities (`qty` in dozens plus `extra_pairs`) against pair-denominated deductions using the workspace's `pairs_per_carton`, and bounds cumulative credit-note restores by the original sale's recorded deductions. These are app-side integrity guards; Firestore Rules independently link each stock delta to invoice deduction metadata but cannot iterate invoice item lists, so a modified client can bypass the line-to-deduction comparison. Warehouse transfers, adjustments, and returns must atomically update stock and append tenant-scoped `inventory_transactions` records.
 
 1. Financial transaction corrections must preserve the previous amount/type/date in an append-only `edit_history` entry with actor and a reason of at least 10 characters. Invoice-linked ledger rows are corrected only by void/credit-note flows.
 
@@ -647,6 +647,60 @@ filtered and rechecked with `PermissionPolicy`; they reuse guarded callbacks
 and never replace provider or Firestore authorization.
 
 ## 10) Current Audit Status
+
+2026-10-29 Pass 2 financial and stock-reconciliation audit — local:
+
+- SAR and PKR manual amounts now accept at most two fractional digits.
+  Ambiguous three-decimal input such as `1.500` is rejected; comma-grouped
+  `1,500` remains 1,500. Invoice line prices, invoice totals, receipts,
+  standalone cash entries, and transaction corrections reject sub-cent values
+  at provider boundaries.
+- Credit-note quantities are checked cumulatively against original sale
+  quantities by variant. Existing linked notes are reconstructed from a
+  tenant-scoped query capped at 51 documents; histories above 50, malformed
+  entries, inconsistent prior returns, and stale latest-note pointers fail
+  closed. This avoids a new original-invoice aggregate field because the
+  existing linked-write Rules path exceeded its expression budget when that
+  field was added. The bounded query may read up to 50 prior notes per return.
+- Stock-sale invoice lines are checked against exact seller-inventory pair
+  deductions by variant, including dozen conversion and extra pairs.
+  Credit-note stock restores are checked cumulatively against the original
+  sale's recorded deductions. Firestore Rules still cannot compare item lists
+  with deduction maps; this client-side reconciliation is not a server-side
+  guarantee against modified clients.
+- Focused sale/return guard suite: `00:00 +40: All tests passed!`; full
+  Flutter suite: `01:39 +753: All tests passed!`; Rules Emulator:
+  `196 passing (53s)`; `dart analyze test/`: `No issues found!`.
+  `flutter analyze lib --no-pub` reports one pre-existing unused private
+  `_commit` diagnostic at `transaction_provider.dart:409`, attributed by
+  `git blame` to commit `805b6072`.
+- The 21-item Pass 2 ledger records fixes, partial fixes, retained contract
+  behavior, hypotheses not reproduced, and policy/migration blockers in
+  `AUDIT_REPORT_FOOTWEAR_ERP.md`. Hot restart was unavailable because the
+  connected Dart Tooling Daemon had no running Flutter app.
+- A composite invoice index for tenant plus linked invoice ID was added.
+  Source changes and the index are local and unreleased; Firestore deployment,
+  Hosting, release builds, device delivery, commit, and push remain pending.
+- Follow-up policy work now applies the existing `999999.99` maximum to SAR
+  and PKR invoice, receipt, standalone-ledger, and correction writes in the
+  providers and Firestore Rules. The same maximum is used for both currencies;
+  this resolves inconsistent limits but does not establish a currency-specific
+  business policy. New sale, credit-note, and receipt numbers share a
+  tenant-wide high-water sequence: allocate one above the greater of the
+  legacy `last_invoice_number` and `last_cash_receipt_number` counters, with
+  `INV-`, `CN-`, and `REC-` prefixes and no device-clock year. Firestore Rules
+  enforce the same sequence on counter updates and linked invoice batches;
+  receipt counters also point to their receipt invoice through
+  `last_cash_receipt_id` in that batch.
+  Historical numbers are unchanged. Latest local
+  verification: Flutter suite `01:48 +761: All tests passed!`; Rules Emulator
+  `202 passing (57s)`; focused numbering tests `00:00 +5: All tests passed!`;
+  `dart analyze test/`: `No issues found!`. `flutter analyze lib --no-pub`
+  still reports the previously identified unused `_commit` helper
+  (`1 issue found. (ran in 8.1s)`). Hot restart found no connected Flutter
+  app. Integer minor-unit storage and exact server
+  arithmetic remain unresolved under P1-04 and block release/deployment;
+  no build, production deployment, phone delivery, commit, or push occurred.
 
 2026-10-28 v3.10.16+1127 PDF direction correction:
 

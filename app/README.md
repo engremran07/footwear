@@ -543,7 +543,35 @@ Business-data Rules also require the tenant itself to be active; an active membe
 
 Invoice creation supports stock sales, workspace-enabled non-stock catalog sales, and cash receipt invoices for active admins, tenant admins, supervisors, and sellers. Seller creation remains constrained to assigned routes. Creation does not grant settlement, correction, credit-note, or void rights. Non-stock invoices preserve catalog item details without reducing inventory. Receipt numbering, receipt ledger entries, and shop balance changes are atomic and workspace-scoped. Workspace administrators configure bilingual invoice headers; generated PDFs use the header snapshot stored on each invoice. Shop detail provides a preselected invoice entry point while retaining ledger-only cash-in.
 
-Non-stock invoicing is disabled for new and legacy workspaces unless an administrator explicitly enables it. Sale and credit-note creation commit the workspace invoice counter, invoice, ledger, shop balance, and stock movements in one Firestore transaction. Firestore Rules require invoice/ledger/shop links for sales, receipts, and credit notes; seller sales also validate the exact balance delta. Voiding a credit note reverses its stock movement and the original invoice's cumulative credit total. Transaction descriptions accept multiline notes.
+Non-stock invoicing is disabled for new and legacy workspaces unless an administrator explicitly enables it. Sale and credit-note creation commit the workspace invoice counter, invoice, ledger, shop balance, and stock movements in one Firestore transaction. Sale, credit-note, and receipt numbering shares a high-water sequence that continues above the greater of the legacy invoice and receipt counters; Rules enforce the same next sequence on same-batch counter and invoice writes. Receipt counter updates include `last_cash_receipt_id` to bind the counter to its invoice. Firestore Rules require invoice/ledger/shop links for sales, receipts, and credit notes; seller sales also validate the exact balance delta. Voiding a credit note reverses its stock movement and the original invoice's cumulative credit total. Transaction descriptions accept multiline notes.
+
+Stock-sale invoice validation aggregates line quantities by variant, converts
+dozens plus `extra_pairs` to pairs using the active workspace's
+`pairs_per_carton`, and requires an exact match to the seller-inventory
+deduction map. Credit-note restores are cumulatively bounded by the original
+sale's recorded deductions. These provider checks do not replace Rules:
+Rules independently validate same-batch inventory deltas against invoice
+metadata, but cannot iterate invoice item lists to verify the item-to-map
+relationship. A modified client can bypass that comparison.
+
+SAR and PKR financial inputs allow at most two fractional digits. The amount
+parser rejects ambiguous three-decimal forms while preserving supported
+Arabic-script numerals and comma-grouped thousands. Credit-note quantities are
+reconstructed by variant from at most 50 linked prior notes when necessary;
+larger or inconsistent legacy histories fail closed. This bounded read is used
+instead of adding an aggregate invoice field that exceeded the existing Rules
+expression budget.
+
+The unreleased Pass 2 safeguards apply the shared `999999.99` write ceiling to
+SAR and PKR invoice, receipt, standalone-ledger, seller edit-request, and
+correction paths in app providers and Firestore Rules. The equal currency
+limits are a conservative provisional default, not a currency-specific
+financial policy. New sale, credit-note, and receipt identifiers use the
+tenant-wide monotonic counter with `INV-`, `CN-`, and `REC-` prefixes; the
+device clock does not contribute a year. Historical identifiers are
+preserved. Stored monetary values remain doubles, and the integer minor-unit
+migration remains blocked pending historical reconciliation, backup/export
+compatibility, Rules rollout, and a minimum-client strategy.
 
 Standalone cash-in/cash-out corrections use audited soft deletion only. The provider records the actor, reverses the exact shop-balance delta, and clears the cached latest-transaction summary when it points to the deleted row, all in the same batch. Workspace admins may perform this correction; sellers cannot delete transactions, hard deletion is denied, and invoice-linked transactions remain immutable outside invoice void/credit-note flows.
 

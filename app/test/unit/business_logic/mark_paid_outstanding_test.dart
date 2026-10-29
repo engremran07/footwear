@@ -7,21 +7,7 @@
 // are handled correctly and never produce negative outstanding values.
 
 import 'package:flutter_test/flutter_test.dart';
-
-// ── pure-logic helper mirroring markAsPaid outstanding resolution ──────────
-
-/// Resolves the outstanding amount for an invoice document.
-///
-/// Mirrors the logic in invoice_provider.dart markAsPaid:
-///   final outstanding = stored ?? (total - received).clamp(0, ∞)
-double resolveOutstanding({
-  required double? storedOutstanding,
-  required double total,
-  required double amountReceived,
-}) {
-  return storedOutstanding ??
-      (total - amountReceived).clamp(0.0, double.infinity);
-}
+import 'package:footwear_erp/models/invoice_model.dart';
 
 // ── tests ──────────────────────────────────────────────────────────────────
 
@@ -29,79 +15,86 @@ void main() {
   group('markAsPaid — outstanding resolution', () {
     test('uses stored outstanding when present', () {
       expect(
-        resolveOutstanding(
-          storedOutstanding: 300,
+        invoiceOutstandingAfterCredits(
           total: 1000,
           amountReceived: 700,
+          creditNoteTotal: 0,
         ),
         equals(300),
       );
     });
 
-    test('fallback computes total minus amountReceived', () {
+    test('credit notes reduce the outstanding amount before settlement', () {
       expect(
-        resolveOutstanding(
-          storedOutstanding: null,
+        invoiceOutstandingAfterCredits(
           total: 1000,
-          amountReceived: 700,
+          amountReceived: 0,
+          creditNoteTotal: 300,
         ),
-        equals(300),
+        equals(700),
       );
     });
 
-    test('fallback with zero amountReceived returns full total', () {
+    test('partial payments and credit notes both reduce outstanding', () {
       expect(
-        resolveOutstanding(
-          storedOutstanding: null,
+        invoiceOutstandingAfterCredits(
+          total: 1000,
+          amountReceived: 500,
+          creditNoteTotal: 300,
+        ),
+        equals(200),
+      );
+    });
+
+    test('credit notes cannot make outstanding negative', () {
+      expect(
+        invoiceOutstandingAfterCredits(
+          total: 1000,
+          amountReceived: 0,
+          creditNoteTotal: 1200,
+        ),
+        equals(0),
+      );
+    });
+
+    test('legacy invoices without credit notes retain full outstanding', () {
+      expect(
+        invoiceOutstandingAfterCredits(
           total: 1500,
           amountReceived: 0,
+          creditNoteTotal: 0,
         ),
         equals(1500),
       );
     });
 
-    test('fallback with full payment returns zero', () {
+    test('full payment returns zero outstanding', () {
       expect(
-        resolveOutstanding(
-          storedOutstanding: null,
+        invoiceOutstandingAfterCredits(
           total: 1000,
           amountReceived: 1000,
+          creditNoteTotal: 0,
         ),
-        equals(0.0),
+        equals(0),
       );
     });
 
-    test('fallback clamps negative result to zero (overpayment guard)', () {
-      // amountReceived > total — stored outstanding missing; must not go negative
+    test('credit balances settle an invoice without collecting twice', () {
       expect(
-        resolveOutstanding(
-          storedOutstanding: null,
-          total: 1000,
-          amountReceived: 1200,
-        ),
-        equals(0.0),
-      );
-    });
-
-    test('stored outstanding of zero is used as-is (not treated as null)', () {
-      expect(
-        resolveOutstanding(
-          storedOutstanding: 0,
+        invoiceStatusAfterCredits(
           total: 1000,
           amountReceived: 0,
+          creditNoteTotal: 1000,
         ),
-        equals(0.0),
+        InvoiceModel.statusPaid,
       );
-    });
-
-    test('fallback fractional result is preserved', () {
       expect(
-        resolveOutstanding(
-          storedOutstanding: null,
-          total: 999.99,
-          amountReceived: 333.33,
+        invoiceStatusAfterCredits(
+          total: 1000,
+          amountReceived: 500,
+          creditNoteTotal: 200,
         ),
-        closeTo(666.66, 0.01),
+        InvoiceModel.statusPartial,
       );
     });
   });

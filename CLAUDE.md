@@ -126,7 +126,7 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
     or assign supervisor and seller roles only to eligible non-owner profiles;
     admin, tenant-admin, and platform-role changes require the authorized
     selected platform-super-admin path.
-29. Seller stock decrements must match a same-batch sale invoice's exact `seller_inventory_deductions` entry. Every warehouse stock mutation requires an atomic tenant-scoped inventory audit row.
+29. Seller stock decrements must match a same-batch sale invoice's exact `seller_inventory_deductions` entry. The provider also reconciles invoice variant quantities (`qty` in dozens plus `extra_pairs`) against pair-denominated deductions using workspace `pairs_per_carton`, and caps cumulative credit-note restores at the original sale's deductions. This line-to-deduction comparison is app-side only: Rules cannot iterate item lists, so it is not protection against a modified client. Every warehouse stock mutation requires an atomic tenant-scoped inventory audit row.
 30. Admin financial corrections append the prior amount/type/date, actor, and a reason of at least 10 characters to `edit_history`; invoice-linked transaction amounts/types/dates are immutable outside void/credit-note flows. Standalone cash-in/cash-out transactions may only be soft-deleted by a tenant admin-equivalent with an exact atomic shop-balance reversal and correction transaction link. Clear cached last-transaction fields only if they point at the deleted row. Sellers, invoice-linked entries, and hard deletes are denied.
 31. Shop creation starts with a zero balance and no fabricated last-transaction fields. Standalone transactions must be linked to a same-batch shop/balance update. Invoice batches may contain multiple ledger rows and use validated invoice references plus aggregate balance changes; do not impose a one-row/one-delta rule.
 32. Export queries must cursor-page to exhaustion. Workspace-admin backup
@@ -472,6 +472,44 @@ must not be described as a release or production signoff.
 - User creation via secondary FirebaseApp (no server-side admin SDK needed)
 
 ## Done In This Baseline
+
+- The local 2026-10-29 Pass 2 safeguards reject ambiguous or sub-cent
+  monetary inputs for SAR/PKR and validate invoice, receipt, ledger, and
+  correction amounts to two decimal places. Credit-note quantities are
+  reconstructed by variant from at most 50 tenant-linked prior notes and
+  checked against original sold quantities; larger or inconsistent histories
+  fail closed. Stock-sale lines are reconciled by variant against pair-based
+  inventory deductions, and cumulative credit-note restores cannot exceed
+  the original sale's recorded deductions. Rules cannot compare the invoice
+  item list with the deduction map, so this reconciliation remains client-side.
+  No quantity aggregate is written to the original invoice: the Rules
+  emulator exceeded its expression budget when that extra linked field was
+  introduced. Each legacy-history reconstruction can read up to 50 documents.
+  Focused suite: `00:00 +40: All tests passed!`; full Flutter suite:
+  `01:39 +753: All tests passed!`; Rules Emulator: `196 passing (53s)`;
+  `dart analyze test/`: `No issues found!`. `flutter analyze lib --no-pub`
+  reports one pre-existing unused private `_commit` warning, traced by blame
+  to commit `805b6072`. A linked-invoice composite index is local; no
+  production deployment or Git publication occurred.
+- A follow-up applies the established `999999.99` ceiling to invoice, receipt,
+  standalone cash, seller edit-request, and correction paths in app providers
+  and Rules. SAR and PKR currently share this provisional maximum; currency-
+  specific limits are not established. New sale, credit-note, and receipt
+  numbers use one tenant-wide high-water sequence, continuing above the
+  greater of the legacy invoice and receipt counters, with `INV-`, `CN-`, and
+  `REC-` prefixes and no device-clock year. Firestore Rules independently
+  enforce the same sequence on linked counter and invoice writes; receipt
+  counter updates point to their invoice through `last_cash_receipt_id`.
+  Existing stored numbers are not changed.
+  The Rules Emulator rejects over-limit, client-shaped transaction batches and
+  validates the new prefixes. Latest local suite: Flutter
+  `01:48 +761: All tests passed!`; Rules Emulator `202 passing (57s)`;
+  focused numbering tests `00:00 +5: All tests passed!`;
+  `dart analyze test/`: `No issues found!`. Flutter library analysis still
+  reports the pre-existing unused `_commit` helper
+  (`1 issue found. (ran in 8.1s)`). P1-04's double-to-minor-unit migration,
+  historical reconciliation, and client rollout strategy remain unresolved;
+  no release or production operation was performed.
 
 - v3.10.16+1127 releases the shared mixed-script PDF direction correction:
   English-first mixed values retain source order in Arabic/Urdu invoices and

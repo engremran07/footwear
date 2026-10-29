@@ -47,6 +47,45 @@ void main() {
     expect(notification['created_at'], isNotNull);
   });
 
+  test('cash-receipt invoices can create linked cash-in notifications', () {
+    final notification = buildSellerNotification(
+      sourceType: 'invoice',
+      sourceId: 'receipt-123',
+      sellerId: 'seller-1',
+      sellerName: 'Seller One',
+      tenantId: 'tenant-1',
+      shopId: 'shop-1',
+      shopName: 'Shop One',
+      routeId: 'route-1',
+      amount: 125,
+      transactionType: 'cash_in',
+      invoiceNumber: 'REC-2026-0001',
+    );
+
+    expect(notification, containsPair('type', 'invoice'));
+    expect(notification, containsPair('transaction_type', 'cash_in'));
+    expect(notification, containsPair('invoice_number', 'REC-2026-0001'));
+  });
+
+  test('invoice notifications reject credit-note returns', () {
+    expect(
+      () => buildSellerNotification(
+        sourceType: 'invoice',
+        sourceId: 'credit-note-1',
+        sellerId: 'seller-1',
+        sellerName: 'Seller One',
+        tenantId: 'tenant-1',
+        shopId: 'shop-1',
+        shopName: 'Shop One',
+        routeId: 'route-1',
+        amount: 125,
+        transactionType: 'return',
+        invoiceNumber: 'CN-2026-0001',
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test('seller notification builders reject invalid source data', () {
     expect(
       () => sellerNotificationDocumentId(
