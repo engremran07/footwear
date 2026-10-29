@@ -75,9 +75,16 @@ workspace logo bytes when available; invoice/receipt snapshots are the
 fallback only when those bytes are unavailable, and `visibleFields` remains
 the user's visibility control. Pin physical row order with
 `pw.Directionality(textDirection: pw.TextDirection.ltr)` when the containing
-page may be RTL; in `pdf` 3.12.0, `pw.Row` has no `textDirection` parameter.
+page may be RTL; in pinned `pdf` 3.13.1, `pw.Row` has no `textDirection`
+parameter.
 Set each child `pw.Text` direction independently. Cash receipts are A5 and
 single-page.
+
+The PDF renderer shapes Arabic-script text only in RTL-directed text widgets.
+English-first mixed-script values must pass through `pdfTextForDirection`
+(via `_cellText`) before LTR layout. Keep the widget LTR to preserve
+English-first order, and regression-test Arabic Yeh and Urdu Yeh in medial
+positions as well as already-shaped input.
 
 ## Workspace Logo Preservation
 

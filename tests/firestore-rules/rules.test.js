@@ -1112,6 +1112,14 @@ describe('supervisor operational access', () => {
       discount: 0,
       total: 999999.99,
       amount_received: 0,
+      financial_minor_units: {
+        subtotal: 99999999,
+        discount: 0,
+        total: 99999999,
+        amount_received: 0,
+        outstanding_amount: 99999999,
+        'items.0.unit_price': 99999999,
+      },
     });
     batch.set(saleRef, {
       created_by: 'supervisor-uid',
@@ -1122,9 +1130,17 @@ describe('supervisor operational access', () => {
       shop_id: 'shop-1',
       route_id: 'route-1',
       tenant_id: 'tenant-1',
+      financial_minor_units: {
+        amount: 99999999,
+        'items.0.unit_price': 99999999,
+      },
     });
     batch.update(db.collection('customers').doc('shop-1'), {
       balance: 999999.99,
+      financial_minor_units: {
+        balance: 99999999,
+        last_transaction_amount: 99999999,
+      },
       updated_at: new Date(),
       last_transaction_at: new Date(),
       last_transaction_type: 'cash_out',
@@ -1133,6 +1149,62 @@ describe('supervisor operational access', () => {
     });
 
     await assertSucceeds(batch.commit());
+  });
+
+  it('workspace admin can backfill integer companions without changing amounts', async () => {
+    await seedUser('admin-uid', 'admin');
+    await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
+    await seedShop('shop-1', { balance: 12.5 });
+    await seedTransaction('tx-minor-units', { amount: 10.25 });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('invoices').doc('invoice-minor-units').set({
+        tenant_id: 'tenant-1',
+        type: 'sale',
+        shop_id: 'shop-1',
+        route_id: 'route-1',
+        total: 10.25,
+        amount_received: 0,
+        items: [],
+      });
+    });
+
+    const db = adminCtx(testEnv).firestore();
+    const batch = db.batch();
+    batch.update(db.collection('customers').doc('shop-1'), {
+      financial_minor_units: { balance: 1250 },
+    });
+    batch.update(db.collection('transactions').doc('tx-minor-units'), {
+      financial_minor_units: { amount: 1025 },
+    });
+    batch.update(db.collection('invoices').doc('invoice-minor-units'), {
+      financial_minor_units: {
+        total: 1025,
+        amount_received: 0,
+      },
+    });
+
+    await assertSucceeds(batch.commit());
+    const shop = await db.collection('customers').doc('shop-1').get();
+    const transaction = await db
+      .collection('transactions')
+      .doc('tx-minor-units')
+      .get();
+    const invoice = await db
+      .collection('invoices')
+      .doc('invoice-minor-units')
+      .get();
+    assert.strictEqual(shop.data().balance, 12.5);
+    assert.strictEqual(transaction.data().amount, 10.25);
+    assert.strictEqual(invoice.data().total, 10.25);
+    await assertFails(
+      sellerCtx(testEnv)
+        .firestore()
+        .collection('invoices')
+        .doc('invoice-minor-units')
+        .update({
+          financial_minor_units: { total: 999999 },
+        }),
+    );
   });
 
   it('cannot create a linked sale invoice above the financial amount limit', async () => {
@@ -4449,10 +4521,30 @@ describe('transactions collection', () => {
         edit_request_requested_by: 'seller-uid',
         edit_request_requested_at: new Date(),
         edit_request_new_amount: 120,
+        financial_minor_units: {
+          amount: 10000,
+          edit_request_new_amount: 12000,
+        },
         edit_request_new_type: 'cash_in',
         edit_request_new_description: 'Need correction',
         edit_request_new_sale_type: 'cash',
         edit_request_new_created_at: new Date(),
+      }),
+    );
+  });
+
+  it('seller: cannot submit a malformed financial companion', async () => {
+    await seedUser('seller-uid', 'seller', true, { assigned_route_id: 'route-1' });
+    await seedSettings({ allow_seller_edit_requests: true });
+    await seedTransaction('tx1');
+    await assertFails(
+      sellerCtx(testEnv).firestore().collection('transactions').doc('tx1').update({
+        edit_request_pending: true,
+        edit_request_status: 'pending',
+        edit_request_requested_by: 'seller-uid',
+        edit_request_requested_at: new Date(),
+        edit_request_new_amount: 120,
+        financial_minor_units: 'not-a-map',
       }),
     );
   });
@@ -6382,6 +6474,7 @@ describe('client transactions that read documents before creating them', () => {
     lineCount = 1,
     lastInvoiceNumber = 0,
     lastCashReceiptNumber = 0,
+    allowNonStockInvoices = false,
   }) {
     await seedTenant();
     await seedUser(uid, role, true, { assigned_route_ids: ['route-1'] });
@@ -6392,6 +6485,7 @@ describe('client transactions that read documents before creating them', () => {
       logo_base64: null,
       last_invoice_number: lastInvoiceNumber,
       last_cash_receipt_number: lastCashReceiptNumber,
+      ...(allowNonStockInvoices ? { allow_non_stock_invoices: true } : {}),
     });
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
@@ -6405,21 +6499,41 @@ describe('client transactions that read documents before creating them', () => {
     });
   }
 
-  function saleTransaction(db, uid, { lineCount = 1, amountReceived = 0 } = {}) {
+  function saleTransaction(
+    db,
+    uid,
+    {
+      lineCount = 1,
+      amountReceived = 0,
+      fulfillmentMode = 'stock',
+      includeFinancialMinorUnits = false,
+    } = {},
+  ) {
     const settingsRef = db.collection('settings').doc('tenant-1');
     const shopRef = db.collection('customers').doc('shop-1');
     const invoiceRef = db.collection('invoices').doc('invoice-client-shape');
     const saleRef = db.collection('transactions').doc('sale-client-shape');
     const paymentRef = db.collection('transactions').doc('payment-client-shape');
-    const inventoryRefs = Array.from({ length: lineCount }, (_, index) =>
-      db.collection('seller_inventory').doc(`inventory-${index + 1}`),
-    );
+    const inventoryRefs = fulfillmentMode == 'stock'
+      ? Array.from({ length: lineCount }, (_, index) =>
+          db.collection('seller_inventory').doc(`inventory-${index + 1}`),
+        )
+      : [];
     const total = lineCount * 100;
     const items = Array.from({ length: lineCount }, (_, index) => ({
       variant_id: `variant-${index + 1}`,
       qty: 1,
       unit_price: 100,
+      ...(includeFinancialMinorUnits ? { subtotal: 100 } : {}),
     }));
+    const itemMinorUnits = Object.fromEntries(
+      items.flatMap((item, index) => [
+        [`items.${index}.unit_price`, 10000],
+        ...(includeFinancialMinorUnits
+          ? [[`items.${index}.subtotal`, 10000]]
+          : []),
+      ]),
+    );
 
     return db.runTransaction(async (transaction) => {
       const settingsSnapshot = await transaction.get(settingsRef);
@@ -6452,7 +6566,7 @@ describe('client transactions that read documents before creating them', () => {
         sale_transaction_id: saleRef.id,
         idempotency_key: 'client-shape-key',
         type: 'sale',
-        fulfillment_mode: 'stock',
+        fulfillment_mode: fulfillmentMode,
         invoice_header_snapshot: {
           show_phone: true,
           company_name: 'Acme Footwear',
@@ -6476,12 +6590,24 @@ describe('client transactions that read documents before creating them', () => {
           : (amountReceived > 0 ? 'partial' : 'issued'),
         notes: null,
         linked_invoice_id: null,
-        seller_inventory_deductions: Object.fromEntries(
-          inventoryRefs.map((ref) => [ref.id, 1]),
-        ),
+        seller_inventory_deductions: fulfillmentMode == 'stock'
+          ? Object.fromEntries(inventoryRefs.map((ref) => [ref.id, 1]))
+          : {},
         created_by: uid,
         created_at: now,
         updated_at: now,
+        ...(includeFinancialMinorUnits
+          ? {
+              financial_minor_units: {
+                subtotal: total * 100,
+                discount: 0,
+                total: total * 100,
+                amount_received: amountReceived * 100,
+                outstanding_amount: (total - amountReceived) * 100,
+                ...itemMinorUnits,
+              },
+            }
+          : {}),
       });
       transaction.set(saleRef, {
         tenant_id: 'tenant-1',
@@ -6498,6 +6624,14 @@ describe('client transactions that read documents before creating them', () => {
         created_by: uid,
         created_at: now,
         deleted: false,
+        ...(includeFinancialMinorUnits
+          ? {
+              financial_minor_units: {
+                amount: total * 100,
+                ...itemMinorUnits,
+              },
+            }
+          : {}),
       });
       if (amountReceived > 0) {
         transaction.set(paymentRef, {
@@ -6515,6 +6649,9 @@ describe('client transactions that read documents before creating them', () => {
           created_by: uid,
           created_at: now,
           deleted: false,
+          ...(includeFinancialMinorUnits
+            ? { financial_minor_units: { amount: amountReceived * 100 } }
+            : {}),
         });
       }
       transaction.update(shopRef, {
@@ -6524,6 +6661,14 @@ describe('client transactions that read documents before creating them', () => {
         last_transaction_type: 'cash_out',
         last_transaction_amount: total,
         last_transaction_id: saleRef.id,
+        ...(includeFinancialMinorUnits
+          ? {
+              financial_minor_units: {
+                balance: (total - amountReceived) * 100,
+                last_transaction_amount: total * 100,
+              },
+            }
+          : {}),
       });
       for (const inventoryRef of inventoryRefs) {
         transaction.update(inventoryRef, {
@@ -6571,6 +6716,51 @@ describe('client transactions that read documents before creating them', () => {
     await assertSucceeds(saleTransaction(
       adminCtx(testEnv).firestore(),
       'admin-uid',
+    ));
+  });
+
+  it('tenant admin can create a non-stock sale in a provider-shaped transaction', async () => {
+    await seedSale({
+      role: 'tenant_admin',
+      uid: 'tenant-admin-uid',
+      allowNonStockInvoices: true,
+    });
+    await assertSucceeds(saleTransaction(
+      tenantAdminCtx(testEnv).firestore(),
+      'tenant-admin-uid',
+      {
+        fulfillmentMode: 'non_stock',
+        includeFinancialMinorUnits: true,
+      },
+    ));
+  });
+
+  it('admin can create the first non-stock sale after a prior receipt sequence', async () => {
+    await seedSale({
+      role: 'admin',
+      uid: 'admin-uid',
+      lastCashReceiptNumber: 1,
+      allowNonStockInvoices: true,
+    });
+    await assertSucceeds(saleTransaction(
+      adminCtx(testEnv).firestore(),
+      'admin-uid',
+      { fulfillmentMode: 'non_stock' },
+    ));
+  });
+
+  it('tenant admin cannot create a non-stock sale when the workspace disables it', async () => {
+    await seedSale({
+      role: 'tenant_admin',
+      uid: 'tenant-admin-uid',
+    });
+    await assertFails(saleTransaction(
+      tenantAdminCtx(testEnv).firestore(),
+      'tenant-admin-uid',
+      {
+        fulfillmentMode: 'non_stock',
+        includeFinancialMinorUnits: true,
+      },
     ));
   });
 

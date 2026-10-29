@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:bidi/bidi.dart' as bidi;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
@@ -345,6 +346,46 @@ void main() {
         .firstMatch(latin1.decode(bytes, allowInvalid: true));
     expect(pageCount, isNotNull);
     expect(int.parse(pageCount!.group(1)!), greaterThan(1));
+  });
+
+  test('mixed LTR-first Arabic and Urdu text is shaped before PDF layout', () {
+    const arabic = 'Person: تاريخ جاويد';
+    const urdu = 'Person: تاریخ جاوید';
+    const arabicMedialYeh = 'Person: بيت';
+    const urduMedialYeh = 'Person: بین';
+    final shapedArabic = String.fromCharCodes(bidi.logicalToVisual(arabic));
+    final shapedUrdu = String.fromCharCodes(bidi.logicalToVisual(urdu));
+    final shapedArabicMedialYeh = String.fromCharCodes(
+      bidi.logicalToVisual(arabicMedialYeh),
+    );
+    final shapedUrduMedialYeh = String.fromCharCodes(
+      bidi.logicalToVisual(urduMedialYeh),
+    );
+
+    expect(pdfTextForDirection(arabic, pw.TextDirection.ltr), shapedArabic);
+    expect(pdfTextForDirection(urdu, pw.TextDirection.ltr), shapedUrdu);
+    expect(shapedArabic, isNot(arabic));
+    expect(shapedUrdu, isNot(urdu));
+    expect(
+      pdfTextForDirection(shapedArabic, pw.TextDirection.ltr),
+      shapedArabic,
+    );
+    expect(
+      pdfTextForDirection(arabicMedialYeh, pw.TextDirection.ltr),
+      shapedArabicMedialYeh,
+    );
+    expect(
+      pdfTextForDirection(urduMedialYeh, pw.TextDirection.ltr),
+      shapedUrduMedialYeh,
+    );
+    expect(
+      pdfTextForDirection('تاريخ جاويد', pw.TextDirection.rtl),
+      'تاريخ جاويد',
+    );
+    expect(
+      pdfTextForDirection('English only', pw.TextDirection.ltr),
+      'English only',
+    );
   });
 
   test('PDF test builds enable the Arabic shaping algorithm', () {

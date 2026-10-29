@@ -1,6 +1,6 @@
 ﻿# ShoesERP AI Coding Rules (CLAUDE.md)
 
-Last updated: 2026-10-28
+Last updated: 2026-10-29
 
 ## Runtime Override (Always First)
 
@@ -87,7 +87,9 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
     provide full Nastaliq OpenType shaping, so Noto Nastaliq Urdu is UI-only.
     Bilingual PDF rows must use an explicit LTR `pw.Directionality` wrapper
     for English-left/RTL-right placement; `pw.Row` has no direction parameter
-    in the pinned `pdf` 3.12.0 API. Verify actual Arabic and Urdu renders.
+    in pinned `pdf` 3.13.1. English-first mixed-script text must be shaped
+    through `pdfTextForDirection` (via `_cellText`) before LTR layout. Verify
+    medial Arabic and Urdu Yeh in actual renders.
     PNG, print, and PDF share the generated PDF bytes. XLSX preserves Unicode
     and RTL sheet direction but does not embed a font.
 19. Every `ExportSheet.show()` call MUST provide `pdfBytesBuilder` when the data is a
@@ -507,9 +509,34 @@ must not be described as a release or production signoff.
   focused numbering tests `00:00 +5: All tests passed!`;
   `dart analyze test/`: `No issues found!`. Flutter library analysis still
   reports the pre-existing unused `_commit` helper
-  (`1 issue found. (ran in 8.1s)`). P1-04's double-to-minor-unit migration,
-  historical reconciliation, and client rollout strategy remain unresolved;
-  no release or production operation was performed.
+  (`1 issue found. (ran in 8.1s)`). The staged minor-unit compatibility
+  implementation is now present locally, but P1-04's historical
+  reconciliation, compatible-client rollout, and strict Rules cutover remain
+  unresolved; no production migration or release operation was performed.
+- The local minor-unit compatibility stage adds `financial_minor_units`
+  companions to shop, transaction, and invoice financial fields. Models prefer
+  only companions consistent with legacy values; providers write companions
+  atomically beside existing financial updates, and backup restore regenerates
+  companions without changing the legacy values. A tenant-scoped backup
+  preview and bounded admin backfill API are available, but neither a
+  production preview nor a backfill was executed. Backfill updates companion
+  fields only, defaults to 100 documents per page, and caps page size at 400.
+  Firestore Rules allow staged writes but do not yet require integer
+  companions or exact minor-unit arithmetic. Focused suite:
+  `00:08 +137: All tests passed!`; Rules Emulator: `204 passing (1m)`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 108.8s)`;
+  `dart analyze test/`: `No issues found!`. Firestore Rules/indexes were
+  subsequently deployed after `207 passing (56s)` in the Rules Emulator;
+  Firebase reported `Deploy complete!`. No production data migration,
+  Hosting deployment, app release/build, device delivery, commit, or push
+  occurred. P1-04 remains open.
+- After that Rules deployment, the user reports successful invoice creation,
+  non-stock sales, and cash receipts for admin, supervisor, and seller on the
+  designated `Testing` route / `owerty` test shop. This supports the shared
+  invoice/receipt sequence mismatch as the likely blocker, but the original
+  denied rule and live counter values were not captured. The live log capture
+  showed background Firestore DNS `UNAVAILABLE` and App Check token API 403 /
+  retry warnings, not `PERMISSION_DENIED`; treat these as separate signals.
 
 - v3.10.16+1127 releases the shared mixed-script PDF direction correction:
   English-first mixed values retain source order in Arabic/Urdu invoices and

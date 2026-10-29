@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:bidi/bidi.dart' as bidi;
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
@@ -144,7 +145,7 @@ pw.Widget _pairedLabelText(
   final lines = text.split('\n');
   if (lines.length < 2) {
     return pw.Text(
-      lines.first,
+      _cellText(lines.first, pw.TextDirection.ltr),
       style: style,
       textAlign: align,
       textDirection: _cellDir(lines.first, pw.TextDirection.ltr),
@@ -168,7 +169,7 @@ pw.Widget _pairedLabelText(
           child: pw.Align(
             alignment: horizontalAlign,
             child: pw.Text(
-              lines.first,
+              _cellText(lines.first, pw.TextDirection.ltr),
               style: style,
               textAlign: pw.TextAlign.left,
               textDirection: pw.TextDirection.ltr,
@@ -182,7 +183,7 @@ pw.Widget _pairedLabelText(
             child: pw.Align(
               alignment: horizontalAlign,
               child: pw.Text(
-                lines[1],
+                _cellText(lines[1], pw.TextDirection.rtl),
                 style: style,
                 textAlign: pw.TextAlign.right,
                 textDirection: pw.TextDirection.rtl,
@@ -200,7 +201,7 @@ pw.Widget _bilingualHeaderText(String text, {required pw.TextStyle style}) {
   final lines = text.split('\n');
   if (lines.length < 2) {
     return pw.Text(
-      lines.first,
+      _cellText(lines.first, pw.TextDirection.ltr),
       style: style,
       textDirection: _cellDir(lines.first, pw.TextDirection.ltr),
     );
@@ -213,7 +214,7 @@ pw.Widget _bilingualHeaderText(String text, {required pw.TextStyle style}) {
       children: [
         pw.Expanded(
           child: pw.Text(
-            lines.first,
+            _cellText(lines.first, pw.TextDirection.ltr),
             style: style,
             textDirection: pw.TextDirection.ltr,
             textAlign: pw.TextAlign.left,
@@ -223,7 +224,7 @@ pw.Widget _bilingualHeaderText(String text, {required pw.TextStyle style}) {
         pw.SizedBox(width: 10),
         pw.Expanded(
           child: pw.Text(
-            lines[1],
+            _cellText(lines[1], pw.TextDirection.rtl),
             style: style,
             textDirection: pw.TextDirection.rtl,
             textAlign: pw.TextAlign.right,
@@ -268,6 +269,21 @@ pw.TextDirection pdfTextDirectionFor(String text, pw.TextDirection fallback) {
   }
   return containsDigit ? pw.TextDirection.ltr : fallback;
 }
+
+@visibleForTesting
+String pdfTextForDirection(String text, pw.TextDirection direction) {
+  if (direction != pw.TextDirection.ltr ||
+      !text.runes.any(_isArabicScriptLetter) ||
+      text.runes.any((rune) => rune >= 0xfb50 && rune <= 0xfefc)) {
+    return text;
+  }
+  // The PDF renderer shapes RTL text only; mixed LTR-first text needs shaping
+  // before layout while remaining LTR to preserve the physical reading order.
+  return String.fromCharCodes(bidi.logicalToVisual(text));
+}
+
+String _cellText(String text, pw.TextDirection direction) =>
+    pdfTextForDirection(text, direction);
 
 pw.TextDirection _cellDir(String text, pw.TextDirection fallback) =>
     pdfTextDirectionFor(text, fallback);
@@ -469,7 +485,7 @@ pw.Widget _workspaceBrandHeader({
     PdfColor color = PdfColors.black,
   }) {
     final textWidget = pw.Text(
-      _s(text),
+      _cellText(_s(text), direction),
       style: localeConfig.ts(
         size: size,
         fw: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
@@ -642,19 +658,19 @@ Future<Uint8List> buildPdfTable({
                   pw.SizedBox(height: 8),
                 ],
                 pw.Text(
-                  _s(title),
+                  _cellText(_s(title), _cellDir(title, dir)),
                   style: titleStyle,
                   textDirection: _cellDir(title, dir),
                 ),
                 if (subtitle != null)
                   pw.Text(
-                    _s(subtitle),
+                    _cellText(_s(subtitle), _cellDir(subtitle, dir)),
                     style: pw.TextStyle(
                       fontSize: 10,
                       color: PdfColors.grey700,
                       fontFallback: fontFallback,
                     ),
-                    textDirection: dir,
+                    textDirection: _cellDir(subtitle, dir),
                   ),
                 pw.SizedBox(height: 12),
               ],
@@ -663,7 +679,7 @@ Future<Uint8List> buildPdfTable({
                 headers: headers
                     .map(
                       (h) => pw.Text(
-                        h,
+                        _cellText(h, _cellDir(h, dir)),
                         style: headerStyle,
                         textDirection: _cellDir(h, dir),
                         textAlign: pw.TextAlign.center,
@@ -697,7 +713,7 @@ Future<Uint8List> buildPdfTable({
                 cellBuilder: (colIdx, data, rowNum) {
                   final text = data?.toString() ?? '';
                   return pw.Text(
-                    text,
+                    _cellText(text, _cellDir(text, dir)),
                     style: cellStyle,
                     textDirection: _cellDir(text, dir),
                     textAlign: pw.TextAlign.center,
@@ -974,12 +990,13 @@ Future<Uint8List> buildPdfLedger({
     ) {
       final lines = text.split('\n');
       if (languageIndex >= lines.length) return pw.SizedBox.shrink();
+      final direction = languageIndex == 0
+          ? pw.TextDirection.ltr
+          : pw.TextDirection.rtl;
       return pw.Text(
-        lines[languageIndex],
+        _cellText(lines[languageIndex], direction),
         style: style,
-        textDirection: languageIndex == 0
-            ? pw.TextDirection.ltr
-            : pw.TextDirection.rtl,
+        textDirection: direction,
         textAlign: textAlign,
         maxLines: 2,
       );
@@ -1055,7 +1072,7 @@ Future<Uint8List> buildPdfLedger({
                           crossAxisAlignment: pw.CrossAxisAlignment.center,
                           children: [
                             pw.Text(
-                              _s(shopName),
+                              _cellText(_s(shopName), _cellDir(shopName, dir)),
                               style: ts(size: 14, fw: pw.FontWeight.bold),
                               textDirection: _cellDir(shopName, dir),
                               textAlign: pw.TextAlign.center,
@@ -1502,7 +1519,7 @@ pw.Widget _buildLedgerDataRow(
               ),
             ),
             child: pw.Text(
-              cells[i],
+              _cellText(cells[i], _cellDir(cells[i], dir)),
               style: pw.TextStyle(
                 fontSize: 7.5,
                 color: color,
@@ -1598,6 +1615,10 @@ Future<Uint8List> buildPdfSellerReport({
       PdfColor color = PdfColors.black,
     }) => lc.ts(size: size, fw: fw, color: color);
 
+    final sellerDetails =
+        '${_pdfLabel(labels, 'seller', locale)}: ${_s(sellerName)}';
+    final routeDetails =
+        '${_pdfLabel(labels, 'route', locale)}: ${_s(routeName)}';
     final currencyTotals = sellerReportTotalsByCurrency(shops);
     int totalPairs = 0;
     for (final c in shops) {
@@ -1664,9 +1685,9 @@ Future<Uint8List> buildPdfSellerReport({
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
-                      '${_pdfLabel(labels, 'seller', locale)}: ${_s(sellerName)}',
+                      _cellText(sellerDetails, _cellDir(sellerDetails, dir)),
                       style: ts(size: 9.5, fw: pw.FontWeight.bold),
-                      textDirection: _cellDir(sellerName, dir),
+                      textDirection: _cellDir(sellerDetails, dir),
                     ),
                     pw.Text(
                       _s(sellerPhone),
@@ -1676,9 +1697,9 @@ Future<Uint8List> buildPdfSellerReport({
                   ],
                 ),
                 pw.Text(
-                  '${_pdfLabel(labels, 'route', locale)}: ${_s(routeName)}',
+                  _cellText(routeDetails, _cellDir(routeDetails, dir)),
                   style: ts(size: 9.5, fw: pw.FontWeight.bold),
-                  textDirection: _cellDir(routeName, dir),
+                  textDirection: _cellDir(routeDetails, dir),
                 ),
               ],
             ),
@@ -1738,7 +1759,7 @@ Future<Uint8List> buildPdfSellerReport({
                     ]
                     .map(
                       (h) => pw.Text(
-                        h,
+                        _cellText(h, _cellDir(h, dir)),
                         style: lc.ts(
                           size: 8,
                           fw: pw.FontWeight.bold,
@@ -1784,7 +1805,7 @@ Future<Uint8List> buildPdfSellerReport({
             cellBuilder: (colIdx, data, rowNum) {
               final text = data?.toString() ?? '';
               return pw.Text(
-                text,
+                _cellText(text, colIdx >= 1 ? _amountDir : _cellDir(text, dir)),
                 style: lc.ts(size: 8),
                 textDirection: colIdx >= 1 ? _amountDir : _cellDir(text, dir),
                 textAlign: pw.TextAlign.center,
@@ -2082,7 +2103,10 @@ Future<Uint8List> generateInvoicePdf({
                 pw.SizedBox(width: 5),
                 pw.Expanded(
                   child: pw.Text(
-                    _pdfExcerpt(value, maxRunes: maxRunes),
+                    _cellText(
+                      _pdfExcerpt(value, maxRunes: maxRunes),
+                      _cellDir(value, pw.TextDirection.ltr),
+                    ),
                     style: ts(
                       size: key == 'receipt_sum_of' ? 9 : 7.8,
                       fw: key == 'receipt_sum_of'
@@ -2398,9 +2422,15 @@ Future<Uint8List> generateInvoicePdf({
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
-                  '${_s(displayCompanyName)} • $dateStr',
+                  _cellText(
+                    '${_s(displayCompanyName)} • $dateStr',
+                    _cellDir('${_s(displayCompanyName)} • $dateStr', dir),
+                  ),
                   style: ts(size: 7, color: PdfColors.grey500),
-                  textDirection: _cellDir(displayCompanyName, dir),
+                  textDirection: _cellDir(
+                    '${_s(displayCompanyName)} • $dateStr',
+                    dir,
+                  ),
                 ),
                 pairedLabel(
                   _documentLabelWithSuffix(
@@ -2592,7 +2622,7 @@ Future<Uint8List> generateInvoicePdf({
                                 vertical: 3,
                               ),
                               child: pw.Text(
-                                c,
+                                _cellText(c, _cellDir(c, dir)),
                                 style: pw.TextStyle(
                                   fontSize: 8,
                                   font: primaryFont,
@@ -2685,7 +2715,11 @@ Future<Uint8List> generateInvoicePdf({
               lblNotes.split('\n').map((line) => '$line:').join('\n'),
               style: ts(size: 9, fw: pw.FontWeight.bold),
             ),
-            pw.Text(_s(invoice.notes!), style: ts(size: 9)),
+            pw.Text(
+              _cellText(_s(invoice.notes!), _cellDir(_s(invoice.notes!), dir)),
+              style: ts(size: 9),
+              textDirection: _cellDir(_s(invoice.notes!), dir),
+            ),
             pw.SizedBox(height: 8),
           ],
 
@@ -2758,7 +2792,7 @@ pw.Widget _coverCell(
       ),
     ),
     child: pw.Text(
-      text,
+      _cellText(text, dir),
       style: pw.TextStyle(
         fontSize: 8,
         fontWeight: (isHeader || isBold)
@@ -2921,7 +2955,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
               ),
             ),
             child: pw.Text(
-              _s(sec.routeLabel),
+              _cellText(_s(sec.routeLabel), _cellDir(sec.routeLabel, dir)),
               style: pw.TextStyle(
                 fontSize: 8,
                 fontWeight: pw.FontWeight.bold,
@@ -3258,7 +3292,10 @@ Future<Uint8List> buildPdfMultiShopLedger({
                       borderRadius: pw.BorderRadius.circular(4),
                     ),
                     child: pw.Text(
-                      _s(sec.routeLabel),
+                      _cellText(
+                        _s(sec.routeLabel),
+                        _cellDir(sec.routeLabel, dir),
+                      ),
                       style: ts(
                         size: 10,
                         fw: pw.FontWeight.bold,
@@ -3287,14 +3324,26 @@ Future<Uint8List> buildPdfMultiShopLedger({
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text(
-                        _s(sec.shopName),
+                        _cellText(
+                          _s(sec.shopName),
+                          _cellDir(sec.shopName, dir),
+                        ),
                         style: ts(size: 12, fw: pw.FontWeight.bold),
                         textDirection: _cellDir(sec.shopName, dir),
                       ),
                       pw.Text(
-                        '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(now)}  |  ${_pdfLabel(labels, 'generated_by', locale)}: ${_s(generatedBy)}',
+                        _cellText(
+                          '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(now)}  |  ${_pdfLabel(labels, 'generated_by', locale)}: ${_s(generatedBy)}',
+                          _cellDir(
+                            '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(now)}  |  ${_pdfLabel(labels, 'generated_by', locale)}: ${_s(generatedBy)}',
+                            dir,
+                          ),
+                        ),
                         style: ts(size: 7, color: PdfColors.grey700),
-                        textDirection: dir,
+                        textDirection: _cellDir(
+                          '${_pdfLabel(labels, 'report_date', locale)}: ${_fmtDate(now)}  |  ${_pdfLabel(labels, 'generated_by', locale)}: ${_s(generatedBy)}',
+                          dir,
+                        ),
                       ),
                     ],
                   ),
@@ -3348,7 +3397,10 @@ Future<Uint8List> buildPdfMultiShopLedger({
                 ),
                 pw.SizedBox(height: 4),
                 pw.Text(
-                  '${_pdfLabel(labels, 'total_entries', locale)}: $entryCount',
+                  _cellText(
+                    '${_pdfLabel(labels, 'total_entries', locale)}: $entryCount',
+                    dir,
+                  ),
                   style: ts(size: 8, color: PdfColors.grey600),
                   textDirection: dir,
                 ),
@@ -3376,7 +3428,10 @@ Future<Uint8List> buildPdfMultiShopLedger({
                   ),
                   decoration: const pw.BoxDecoration(color: PdfColors.blue50),
                   child: pw.Text(
-                    '${_s(sec.shopName)} (cont.)',
+                    _cellText(
+                      '${_s(sec.shopName)} (cont.)',
+                      _cellDir(sec.shopName, dir),
+                    ),
                     style: ts(size: 9, fw: pw.FontWeight.bold),
                     textDirection: _cellDir(sec.shopName, dir),
                   ),
@@ -3399,7 +3454,10 @@ Future<Uint8List> buildPdfMultiShopLedger({
               pw.Align(
                 alignment: pw.Alignment.centerRight,
                 child: pw.Text(
-                  '${_s(sec.shopName)} — ${_pdfLabel(labels, 'page', locale)} ${ctx.pageNumber} / ${ctx.pagesCount}',
+                  _cellText(
+                    '${_s(sec.shopName)} — ${_pdfLabel(labels, 'page', locale)} ${ctx.pageNumber} / ${ctx.pagesCount}',
+                    _cellDir(sec.shopName, dir),
+                  ),
                   style: ts(size: 7, color: PdfColors.grey500),
                 ),
               ),

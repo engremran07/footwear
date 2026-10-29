@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../core/constants/collections.dart';
+import '../core/utils/financial_minor_unit_migration.dart';
 import '../core/utils/firestore_pagination.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/shop_model.dart';
@@ -322,20 +324,23 @@ class ShopNotifier extends AsyncNotifier<void> {
 
       final totalShops = (routeData['total_shops'] as num?)?.toInt() ?? 0;
       final now = Timestamp.now();
-      transaction.set(shopRef, {
-        ...TenantScope.applyToData(data, tenantId: tenantId),
-        'name': name,
-        'route_id': routeId,
-        'route_number':
-            (routeData['route_number'] as num?)?.toInt() ??
-            (data['route_number'] as num?)?.toInt() ??
-            0,
-        'created_by': uid,
-        'balance': 0.0,
-        'active': true,
-        'created_at': now,
-        'updated_at': now,
-      });
+      transaction.set(
+        shopRef,
+        FinancialMinorUnitMigration.withMinorUnits('shops', {
+          ...TenantScope.applyToData(data, tenantId: tenantId),
+          'name': name,
+          'route_id': routeId,
+          'route_number':
+              (routeData['route_number'] as num?)?.toInt() ??
+              (data['route_number'] as num?)?.toInt() ??
+              0,
+          'created_by': uid,
+          'balance': 0.0,
+          'active': true,
+          'created_at': now,
+          'updated_at': now,
+        }),
+      );
       transaction.update(routeRef, {
         'total_shops': totalShops + 1,
         'last_shop_created_id': shopRef.id,
@@ -516,20 +521,23 @@ class ShopNotifier extends AsyncNotifier<void> {
       }
       final now = Timestamp.now();
 
-      transaction.set(txRef, {
-        'tenant_id': tenantId,
-        'type': 'write_off',
-        'shop_id': normalizedShopId,
-        'shop_name': shopData['name'] ?? '',
-        'route_id': routeId,
-        'amount': balance,
-        'description': 'Bad debt write-off',
-        'items': <Map<String, dynamic>>[],
-        'created_by': user.id,
-        'created_at': now,
-        'deleted': false,
-      });
-      transaction.update(shopRef, {
+      transaction.set(
+        txRef,
+        FinancialMinorUnitMigration.withMinorUnits('transactions', {
+          'tenant_id': tenantId,
+          'type': 'write_off',
+          'shop_id': normalizedShopId,
+          'shop_name': shopData['name'] ?? '',
+          'route_id': routeId,
+          'amount': balance,
+          'description': 'Bad debt write-off',
+          'items': <Map<String, dynamic>>[],
+          'created_by': user.id,
+          'created_at': now,
+          'deleted': false,
+        }),
+      );
+      final shopUpdate = <String, dynamic>{
         'bad_debt': true,
         'bad_debt_amount': balance,
         'bad_debt_date': now,
@@ -539,7 +547,18 @@ class ShopNotifier extends AsyncNotifier<void> {
         'last_transaction_type': 'write_off',
         'last_transaction_amount': balance,
         'last_transaction_id': txRef.id,
-      });
+        'financial_minor_units':
+            FinancialMinorUnitMigration.companionsAfterUpdate(
+              'shops',
+              shopData,
+              {
+                'balance': 0.0,
+                'bad_debt_amount': balance,
+                'last_transaction_amount': balance,
+              },
+            ),
+      };
+      transaction.update(shopRef, shopUpdate);
     });
   }
 
@@ -585,20 +604,23 @@ class ShopNotifier extends AsyncNotifier<void> {
       }
       final now = Timestamp.now();
 
-      transaction.set(txRef, {
-        'tenant_id': tenantId,
-        'type': 'cash_out',
-        'shop_id': normalizedShopId,
-        'shop_name': shopData['name'] ?? '',
-        'route_id': routeId,
-        'amount': amount,
-        'description': 'Bad debt recovered — balance restored',
-        'items': <Map<String, dynamic>>[],
-        'created_by': user.id,
-        'created_at': now,
-        'deleted': false,
-      });
-      transaction.update(shopRef, {
+      transaction.set(
+        txRef,
+        FinancialMinorUnitMigration.withMinorUnits('transactions', {
+          'tenant_id': tenantId,
+          'type': 'cash_out',
+          'shop_id': normalizedShopId,
+          'shop_name': shopData['name'] ?? '',
+          'route_id': routeId,
+          'amount': amount,
+          'description': 'Bad debt recovered — balance restored',
+          'items': <Map<String, dynamic>>[],
+          'created_by': user.id,
+          'created_at': now,
+          'deleted': false,
+        }),
+      );
+      final shopUpdate = <String, dynamic>{
         'bad_debt': false,
         'bad_debt_amount': 0,
         'bad_debt_date': null,
@@ -608,7 +630,18 @@ class ShopNotifier extends AsyncNotifier<void> {
         'last_transaction_type': 'cash_out',
         'last_transaction_amount': amount,
         'last_transaction_id': txRef.id,
-      });
+        'financial_minor_units':
+            FinancialMinorUnitMigration.companionsAfterUpdate(
+              'shops',
+              shopData,
+              {
+                'balance': (shopData['balance'] as num).toDouble() + amount,
+                'bad_debt_amount': 0.0,
+                'last_transaction_amount': amount,
+              },
+            ),
+      };
+      transaction.update(shopRef, shopUpdate);
     });
   }
 

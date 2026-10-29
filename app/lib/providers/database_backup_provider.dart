@@ -16,6 +16,7 @@ import '../core/constants/collections.dart';
 import '../core/services/google_drive_backup_service.dart';
 import '../core/utils/backup_cipher.dart';
 import '../core/utils/backup_scope_policy.dart';
+import '../core/utils/financial_minor_unit_migration.dart';
 import '../core/utils/firestore_pagination.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/user_model.dart';
@@ -454,11 +455,10 @@ class DatabaseBackupNotifier extends Notifier<void> {
             result.add({
               '__id': document.id,
               ..._sanitize({
-                    for (final entry in documentData.entries)
-                      if (safeProfileFields.contains(entry.key))
-                        entry.key: entry.value,
-                  })
-                  as Map<String, dynamic>,
+                for (final entry in documentData.entries)
+                  if (safeProfileFields.contains(entry.key))
+                    entry.key: entry.value,
+              }) as Map<String, dynamic>,
             });
           } else {
             result.add({
@@ -515,6 +515,19 @@ class DatabaseBackupNotifier extends Notifier<void> {
         final id = doc['__id'] as String;
         final data = Map<String, dynamic>.from(doc)..remove('__id');
         final restored = _restoreTypes(data) as Map<String, dynamic>;
+        if (path == Collections.shops ||
+            path == Collections.transactions ||
+            path == Collections.invoices) {
+          restored.remove(FinancialMinorUnitMigration.companionField);
+          final migrationCollection =
+              FinancialMinorUnitMigration.collectionKeyForFirestorePath(path);
+          restored[FinancialMinorUnitMigration.companionField] =
+              FinancialMinorUnitMigration.withMinorUnits(
+                    migrationCollection,
+                    restored,
+                  )[FinancialMinorUnitMigration.companionField]
+                  as Map<String, dynamic>;
+        }
         final reference = _db.collection(path).doc(id);
         if (merge) {
           batch.set(reference, restored, SetOptions(merge: true));
@@ -869,6 +882,7 @@ class DatabaseBackupNotifier extends Notifier<void> {
     if (parsed is! Map<String, dynamic>) {
       throw const FormatException('Invalid backup file — not a JSON object');
     }
+
     final metadata = parsed['metadata'] as Map<String, dynamic>?;
     if (metadata == null) {
       throw const FormatException('Missing metadata section in backup file');
@@ -899,6 +913,128 @@ class DatabaseBackupNotifier extends Notifier<void> {
       checksumOk: checksumOk,
       rawData: data,
     );
+  }
+
+  Future<FinancialMinorUnitMigrationPlan> previewFinancialMinorUnits(
+    BackupPreview backup,
+  ) async {
+    final user = await ref.read(authUserProvider.future);
+    if (user == null ||
+        !user.active ||
+        user.isSuperAdmin ||
+        (!user.isAdmin && !user.isTenantAdmin)) {
+      throw StateError(
+        'An active workspace administrator is required for migration preview',
+      );
+    }
+
+    final tenantId = TenantScope.requireTenant(user.tenantId);
+    if (!backup.checksumOk ||
+        backup.scope != 'workspace' ||
+        backup.tenantId != tenantId) {
+      throw StateError(
+        'Migration preview requires a verified backup from the active workspace',
+      );
+    }
+
+    for (final collection in const ['shops', 'transactions', 'invoices']) {
+      final documents = backup.rawData[collection];
+      if (documents is! List || backup.counts[collection] != documents.length) {
+        throw FormatException(
+          'Backup is incomplete or its $collection count is inconsistent',
+        );
+      }
+    }
+
+    return FinancialMinorUnitMigration.preview(
+      tenantId: tenantId,
+      collections: backup.rawData,
+    );
+  }
+
+  /// Backfills only integer companions. Financial major-unit fields are never
+  /// rewritten, so old clients remain authoritative during the compatibility
+  /// rollout. Do not invoke this until the workspace has been manually checked
+  /// for supported client versions.
+  Future<int> backfillFinancialMinorUnits({int pageSize = 100}) async {
+    if (pageSize <= 0 || pageSize > 400) {
+      throw ArgumentError.value(pageSize, 'pageSize', 'Use 1 through 400.');
+    }
+
+    final user = await ref.read(authUserProvider.future);
+    if (user == null ||
+        !user.active ||
+        user.isSuperAdmin ||
+        (!user.isAdmin && !user.isTenantAdmin)) {
+      throw StateError(
+        'An active workspace administrator is required for financial backfill',
+      );
+    }
+    final tenantId = TenantScope.requireTenant(user.tenantId);
+    final database = _db;
+    var updatedDocuments = 0;
+
+    for (final collectionPath in const [
+      Collections.shops,
+      Collections.transactions,
+      Collections.invoices,
+    ]) {
+      final migrationCollection =
+          FinancialMinorUnitMigration.collectionKeyForFirestorePath(
+            collectionPath,
+          );
+      final scopedQuery = TenantScope.applyToQuery(
+        database.collection(collectionPath),
+        tenantId: tenantId,
+      ).orderBy(FieldPath.documentId);
+      QueryDocumentSnapshot<Map<String, dynamic>>? lastDocument;
+
+      while (true) {
+        var pageQuery = scopedQuery.limit(pageSize);
+        if (lastDocument != null) {
+          pageQuery = pageQuery.startAfterDocument(lastDocument);
+        }
+        final page = await pageQuery.get();
+        if (page.docs.isEmpty) break;
+
+        final batch = database.batch();
+        var pageWrites = 0;
+        for (final snapshot in page.docs) {
+          final data = snapshot.data();
+          if (data['tenant_id'] != tenantId) {
+            throw StateError(
+              'Financial backfill query returned a cross-workspace document',
+            );
+          }
+          final companions = FinancialMinorUnitMigration.companionsForBackfill(
+            migrationCollection,
+            data,
+          );
+          final existing = data[FinancialMinorUnitMigration.companionField];
+          final alreadyCurrent =
+              existing is Map &&
+              existing.length == companions.length &&
+              companions.entries.every(
+                (entry) =>
+                    existing[entry.key] is int &&
+                    existing[entry.key] == entry.value,
+              );
+          if (alreadyCurrent) continue;
+
+          batch.update(snapshot.reference, {
+            FinancialMinorUnitMigration.companionField: companions,
+          });
+          pageWrites++;
+        }
+
+        if (pageWrites > 0) await batch.commit();
+        updatedDocuments += pageWrites;
+        if (page.docs.length < pageSize) break;
+        lastDocument = page.docs.last;
+      }
+    }
+
+    return updatedDocuments;
   }
 
   Future<BackupPreview> decryptAndVerifyBackup({
@@ -1064,9 +1200,9 @@ class DatabaseBackupNotifier extends Notifier<void> {
       final documentsByRoute = <String, List<Map<String, dynamic>>>{};
       if (rawTransactions != null) {
         for (final rawDoc in rawTransactions as List<dynamic>) {
-          final restoredDocument =
-              _restoreTypes(Map<String, dynamic>.from(rawDoc as Map))
-                  as Map<String, dynamic>;
+          final restoredDocument = _restoreTypes(
+            Map<String, dynamic>.from(rawDoc as Map),
+          ) as Map<String, dynamic>;
           final routeId = (restoredDocument['route_id'] as String? ?? '')
               .trim();
           if (assignedRouteIds.contains(routeId)) {

@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../core/constants/collections.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/financial_amount_policy.dart';
+import '../core/utils/financial_minor_unit_migration.dart';
 import '../core/utils/firestore_pagination.dart';
 import '../core/utils/invoice_numbering.dart';
 import '../core/utils/notification_writer.dart';
@@ -703,9 +704,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         throw StateError('Workspace settings are required for invoicing');
       }
       final shopSnapshot = await transaction.get(shopRef);
+      final shopData = shopSnapshot.data();
       if (!shopSnapshot.exists ||
-          shopSnapshot.data()?['tenant_id'] != tenantId ||
-          shopSnapshot.data()?['route_id'] != routeId) {
+          shopData == null ||
+          shopData['tenant_id'] != tenantId ||
+          shopData['route_id'] != routeId) {
         throw ArgumentError('Shop does not belong to this workspace and route');
       }
       final settingsData = settingsSnapshot.data();
@@ -771,74 +774,97 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'last_invoice_number': sequence,
         'last_invoice_id': invRef.id,
       });
-      transaction.set(invRef, {
-        'tenant_id': tenantId,
-        'invoice_number': invoiceNumber,
-        'invoice_sequence': sequence,
-        'sale_transaction_id': txRef.id,
-        'idempotency_key': resolvedKey,
-        'type': InvoiceModel.typeSale,
-        'fulfillment_mode': fulfillmentMode,
-        'invoice_header_snapshot': invoiceHeaderSnapshot,
-        'shop_id': shopId,
-        'shop_name': shopName,
-        'route_id': routeId,
-        'seller_id': sellerId,
-        'seller_name': sellerName,
-        'items': items,
-        'subtotal': subtotal,
-        'discount': discount,
-        'total': total,
-        'amount_received': amountReceived,
-        if (paymentTxRef != null) 'payment_transaction_id': paymentTxRef.id,
-        'payment_transaction_ids': [if (paymentTxRef != null) paymentTxRef.id],
-        'outstanding_amount': total - amountReceived,
-        'currency': currency,
-        'sale_type': saleType,
-        'status': invoiceStatus,
-        'notes': notes,
-        'linked_invoice_id': null,
-        'seller_inventory_deductions': sellerInventoryDeductions,
-        'created_by': normalizedCreatedBy,
-        'created_at': now,
-        'updated_at': now,
-      });
-      transaction.set(txRef, {
-        'tenant_id': tenantId,
-        'shop_id': shopId,
-        'shop_name': shopName,
-        'route_id': routeId,
-        'type': 'cash_out',
-        'sale_type': saleType,
-        'amount': total,
-        'description': 'Invoice $invoiceNumber',
-        'items': items,
-        'invoice_id': invRef.id,
-        'invoice_number': invoiceNumber,
-        'created_by': normalizedCreatedBy,
-        'created_at': now,
-        'deleted': false,
-      });
-      if (paymentTxRef != null) {
-        transaction.set(paymentTxRef, {
+      transaction.set(
+        invRef,
+        FinancialMinorUnitMigration.withMinorUnits('invoices', {
+          'tenant_id': tenantId,
+          'invoice_number': invoiceNumber,
+          'invoice_sequence': sequence,
+          'sale_transaction_id': txRef.id,
+          'idempotency_key': resolvedKey,
+          'type': InvoiceModel.typeSale,
+          'fulfillment_mode': fulfillmentMode,
+          'invoice_header_snapshot': invoiceHeaderSnapshot,
+          'shop_id': shopId,
+          'shop_name': shopName,
+          'route_id': routeId,
+          'seller_id': sellerId,
+          'seller_name': sellerName,
+          'items': items,
+          'subtotal': subtotal,
+          'discount': discount,
+          'total': total,
+          'amount_received': amountReceived,
+          if (paymentTxRef != null) 'payment_transaction_id': paymentTxRef.id,
+          'payment_transaction_ids': [
+            if (paymentTxRef != null) paymentTxRef.id,
+          ],
+          'outstanding_amount': total - amountReceived,
+          'currency': currency,
+          'sale_type': saleType,
+          'status': invoiceStatus,
+          'notes': notes,
+          'linked_invoice_id': null,
+          'seller_inventory_deductions': sellerInventoryDeductions,
+          'created_by': normalizedCreatedBy,
+          'created_at': now,
+          'updated_at': now,
+        }),
+      );
+      transaction.set(
+        txRef,
+        FinancialMinorUnitMigration.withMinorUnits('transactions', {
           'tenant_id': tenantId,
           'shop_id': shopId,
           'shop_name': shopName,
           'route_id': routeId,
-          'type': 'cash_in',
-          'sale_type': 'cash',
-          'amount': amountReceived,
-          'description': 'Payment for $invoiceNumber',
-          'items': <Map<String, dynamic>>[],
+          'type': 'cash_out',
+          'sale_type': saleType,
+          'amount': total,
+          'description': 'Invoice $invoiceNumber',
+          'items': items,
           'invoice_id': invRef.id,
           'invoice_number': invoiceNumber,
           'created_by': normalizedCreatedBy,
           'created_at': now,
           'deleted': false,
-        });
+        }),
+      );
+      if (paymentTxRef != null) {
+        transaction.set(
+          paymentTxRef,
+          FinancialMinorUnitMigration.withMinorUnits('transactions', {
+            'tenant_id': tenantId,
+            'shop_id': shopId,
+            'shop_name': shopName,
+            'route_id': routeId,
+            'type': 'cash_in',
+            'sale_type': 'cash',
+            'amount': amountReceived,
+            'description': 'Payment for $invoiceNumber',
+            'items': <Map<String, dynamic>>[],
+            'invoice_id': invRef.id,
+            'invoice_number': invoiceNumber,
+            'created_by': normalizedCreatedBy,
+            'created_at': now,
+            'deleted': false,
+          }),
+        );
       }
       transaction.update(shopRef, {
         'balance': FieldValue.increment(total - amountReceived),
+        'financial_minor_units':
+            FinancialMinorUnitMigration.companionsAfterUpdate(
+              'shops',
+              shopData,
+              {
+                'balance':
+                    (shopData['balance'] as num).toDouble() +
+                    total -
+                    amountReceived,
+                'last_transaction_amount': total,
+              },
+            ),
         'updated_at': now,
         'last_transaction_at': now,
         'last_transaction_type': 'cash_out',
@@ -966,16 +992,17 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           'Workspace settings are required for receipt numbering',
         );
       }
+      final shopData = shopSnapshot.data();
       if (!shopSnapshot.exists ||
-          shopSnapshot.data()?['tenant_id'] != tenantId ||
-          shopSnapshot.data()?['route_id'] != normalizedRouteId) {
+          shopData == null ||
+          shopData['tenant_id'] != tenantId ||
+          shopData['route_id'] != normalizedRouteId) {
         throw ArgumentError('Shop does not belong to this workspace and route');
       }
 
       final nextNumber = InvoiceNumbering.nextSequence(settingsSnapshot.data());
       final receiptNumber = InvoiceNumbering.receipt(nextNumber);
-      final balanceBefore =
-          (shopSnapshot.data()?['balance'] as num?)?.toDouble() ?? 0;
+      final balanceBefore = (shopData['balance'] as num?)?.toDouble() ?? 0;
       final balanceAfter = balanceBefore - amount;
       final cleanedMethod = paymentMethod?.trim();
       final cleanedReference = referenceNumber?.trim();
@@ -987,58 +1014,70 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         'last_cash_receipt_number': nextNumber,
         'last_cash_receipt_id': invoiceRef.id,
       });
-      transaction.set(invoiceRef, {
-        'tenant_id': tenantId,
-        'invoice_number': receiptNumber,
-        'idempotency_key': resolvedKey,
-        'type': InvoiceModel.typeCashReceipt,
-        'fulfillment_mode': 'none',
-        'invoice_header_snapshot': invoiceHeaderSnapshot,
-        'cash_receipt_sequence': nextNumber,
-        'shop_id': normalizedShopId,
-        'shop_name': shopName,
-        'route_id': normalizedRouteId,
-        'seller_id': normalizedSellerId,
-        'seller_name': sellerName,
-        'items': <Map<String, dynamic>>[],
-        'subtotal': 0,
-        'discount': 0,
-        'total': amount,
-        'amount_received': amount,
-        'outstanding_amount': 0,
-        'shop_balance_before': balanceBefore,
-        'shop_balance_after': balanceAfter,
-        'currency': currency,
-        'sale_type': 'cash',
-        'status': InvoiceModel.statusPaid,
-        'notes': notes,
-        if (cleanedMethod != null && cleanedMethod.isNotEmpty)
-          'payment_method': cleanedMethod,
-        if (cleanedReference != null && cleanedReference.isNotEmpty)
-          'payment_reference': cleanedReference,
-        'cash_receipt_transaction_id': transactionRef.id,
-        'created_by': normalizedCreatedBy,
-        'created_at': now,
-        'updated_at': now,
-      });
-      transaction.set(transactionRef, {
-        'tenant_id': tenantId,
-        'shop_id': normalizedShopId,
-        'shop_name': shopName,
-        'route_id': normalizedRouteId,
-        'type': 'cash_in',
-        'sale_type': 'cash',
-        'amount': amount,
-        'description': 'Cash receipt $receiptNumber',
-        'items': <Map<String, dynamic>>[],
-        'invoice_id': receiptId,
-        'invoice_number': receiptNumber,
-        'created_by': normalizedCreatedBy,
-        'created_at': now,
-        'deleted': false,
-      });
+      transaction.set(
+        invoiceRef,
+        FinancialMinorUnitMigration.withMinorUnits('invoices', {
+          'tenant_id': tenantId,
+          'invoice_number': receiptNumber,
+          'idempotency_key': resolvedKey,
+          'type': InvoiceModel.typeCashReceipt,
+          'fulfillment_mode': 'none',
+          'invoice_header_snapshot': invoiceHeaderSnapshot,
+          'cash_receipt_sequence': nextNumber,
+          'shop_id': normalizedShopId,
+          'shop_name': shopName,
+          'route_id': normalizedRouteId,
+          'seller_id': normalizedSellerId,
+          'seller_name': sellerName,
+          'items': <Map<String, dynamic>>[],
+          'subtotal': 0,
+          'discount': 0,
+          'total': amount,
+          'amount_received': amount,
+          'outstanding_amount': 0,
+          'shop_balance_before': balanceBefore,
+          'shop_balance_after': balanceAfter,
+          'currency': currency,
+          'sale_type': 'cash',
+          'status': InvoiceModel.statusPaid,
+          'notes': notes,
+          if (cleanedMethod != null && cleanedMethod.isNotEmpty)
+            'payment_method': cleanedMethod,
+          if (cleanedReference != null && cleanedReference.isNotEmpty)
+            'payment_reference': cleanedReference,
+          'cash_receipt_transaction_id': transactionRef.id,
+          'created_by': normalizedCreatedBy,
+          'created_at': now,
+          'updated_at': now,
+        }),
+      );
+      transaction.set(
+        transactionRef,
+        FinancialMinorUnitMigration.withMinorUnits('transactions', {
+          'tenant_id': tenantId,
+          'shop_id': normalizedShopId,
+          'shop_name': shopName,
+          'route_id': normalizedRouteId,
+          'type': 'cash_in',
+          'sale_type': 'cash',
+          'amount': amount,
+          'description': 'Cash receipt $receiptNumber',
+          'items': <Map<String, dynamic>>[],
+          'invoice_id': receiptId,
+          'invoice_number': receiptNumber,
+          'created_by': normalizedCreatedBy,
+          'created_at': now,
+          'deleted': false,
+        }),
+      );
       transaction.update(shopRef, {
         'balance': FieldValue.increment(-amount),
+        'financial_minor_units':
+            FinancialMinorUnitMigration.companionsAfterUpdate(
+              'shops',
+              shopData,
+              {'balance': balanceAfter, 'last_transaction_amount': amount},
+            ),
         'updated_at': now,
         'last_transaction_at': now,
         'last_transaction_type': 'cash_in',
@@ -1306,9 +1345,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
               (original['amount_received'] as num?)?.toDouble() ?? 0;
 
           final shopSnapshot = await transaction.get(shopRef);
+          final shopData = shopSnapshot.data();
           if (!shopSnapshot.exists ||
-              shopSnapshot.data()?['tenant_id'] != tenantId ||
-              shopSnapshot.data()?['route_id'] != routeId) {
+              shopData == null ||
+              shopData['tenant_id'] != tenantId ||
+              shopData['route_id'] != routeId) {
             throw ArgumentError(
               'Shop does not belong to this workspace and route',
             );
@@ -1338,67 +1379,92 @@ class InvoiceNotifier extends AsyncNotifier<void> {
             'last_invoice_number': sequence,
             'last_invoice_id': invoiceRef.id,
           });
+          final originalOutstanding = invoiceOutstandingAfterCredits(
+            total: originalTotal,
+            amountReceived: originalAmountReceived,
+            creditNoteTotal: updatedCreditNoteTotal,
+          );
           transaction.update(originalRef, {
             'credit_note_total': updatedCreditNoteTotal,
-            'outstanding_amount': invoiceOutstandingAfterCredits(
-              total: originalTotal,
-              amountReceived: originalAmountReceived,
-              creditNoteTotal: updatedCreditNoteTotal,
-            ),
+            'outstanding_amount': originalOutstanding,
             'status': invoiceStatusAfterCredits(
               total: originalTotal,
               amountReceived: originalAmountReceived,
               creditNoteTotal: updatedCreditNoteTotal,
             ),
             'latest_credit_note_invoice_id': invoiceRef.id,
+            'financial_minor_units':
+                FinancialMinorUnitMigration.companionsAfterUpdate(
+                  'invoices',
+                  original,
+                  {
+                    'credit_note_total': updatedCreditNoteTotal,
+                    'outstanding_amount': originalOutstanding,
+                  },
+                ),
             'updated_at': now,
           });
-          transaction.set(invoiceRef, {
-            'tenant_id': tenantId,
-            'invoice_number': invoiceNumber,
-            'invoice_sequence': sequence,
-            'idempotency_key': resolvedKey,
-            'type': InvoiceModel.typeCreditNote,
-            'invoice_header_snapshot': _invoiceHeaderSnapshot(settingsData),
-            'shop_id': shopId,
-            'shop_name': shopName,
-            'route_id': routeId,
-            'seller_id': sellerId,
-            'seller_name': sellerName,
-            'items': items,
-            'subtotal': subtotal,
-            'discount': 0,
-            'total': total,
-            'amount_received': 0,
-            'outstanding_amount': 0,
-            'sale_type': 'return',
-            'status': InvoiceModel.statusIssued,
-            'notes': notes,
-            'linked_invoice_id': normalizedLinkedInvoiceId,
-            'return_transaction_id': transactionRef.id,
-            'seller_inventory_restores': sellerInventoryRestores,
-            'created_by': normalizedCreatedBy,
-            'created_at': now,
-            'updated_at': now,
-          });
-          transaction.set(transactionRef, {
-            'tenant_id': tenantId,
-            'shop_id': shopId,
-            'shop_name': shopName,
-            'route_id': routeId,
-            'type': 'return',
-            'sale_type': 'return',
-            'amount': total,
-            'description': 'Credit note $invoiceNumber',
-            'items': items,
-            'invoice_id': invoiceId,
-            'invoice_number': invoiceNumber,
-            'created_by': normalizedCreatedBy,
-            'created_at': now,
-            'deleted': false,
-          });
+          transaction.set(
+            invoiceRef,
+            FinancialMinorUnitMigration.withMinorUnits('invoices', {
+              'tenant_id': tenantId,
+              'invoice_number': invoiceNumber,
+              'invoice_sequence': sequence,
+              'idempotency_key': resolvedKey,
+              'type': InvoiceModel.typeCreditNote,
+              'invoice_header_snapshot': _invoiceHeaderSnapshot(settingsData),
+              'shop_id': shopId,
+              'shop_name': shopName,
+              'route_id': routeId,
+              'seller_id': sellerId,
+              'seller_name': sellerName,
+              'items': items,
+              'subtotal': subtotal,
+              'discount': 0,
+              'total': total,
+              'amount_received': 0,
+              'outstanding_amount': 0,
+              'sale_type': 'return',
+              'status': InvoiceModel.statusIssued,
+              'notes': notes,
+              'linked_invoice_id': normalizedLinkedInvoiceId,
+              'return_transaction_id': transactionRef.id,
+              'seller_inventory_restores': sellerInventoryRestores,
+              'created_by': normalizedCreatedBy,
+              'created_at': now,
+              'updated_at': now,
+            }),
+          );
+          transaction.set(
+            transactionRef,
+            FinancialMinorUnitMigration.withMinorUnits('transactions', {
+              'tenant_id': tenantId,
+              'shop_id': shopId,
+              'shop_name': shopName,
+              'route_id': routeId,
+              'type': 'return',
+              'sale_type': 'return',
+              'amount': total,
+              'description': 'Credit note $invoiceNumber',
+              'items': items,
+              'invoice_id': invoiceId,
+              'invoice_number': invoiceNumber,
+              'created_by': normalizedCreatedBy,
+              'created_at': now,
+              'deleted': false,
+            }),
+          );
           transaction.update(shopRef, {
             'balance': FieldValue.increment(-total),
+            'financial_minor_units':
+                FinancialMinorUnitMigration.companionsAfterUpdate(
+                  'shops',
+                  shopData,
+                  {
+                    'balance': (shopData['balance'] as num).toDouble() - total,
+                    'last_transaction_amount': total,
+                  },
+                ),
             'updated_at': now,
             'last_transaction_at': now,
             'last_transaction_type': 'return',
@@ -1635,12 +1701,15 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       ];
       final snapshots = await Future.wait(refsToRead.map(transaction.get));
       var snapshotIndex = 0;
+      Map<String, dynamic>? shopData;
       final sellerInventoryData = <String, Map<String, dynamic>>{};
       final warehouseVariantData = <String, Map<String, dynamic>>{};
       if (shopRef != null) {
         final shopSnapshot = snapshots[snapshotIndex++];
+        shopData = shopSnapshot.data();
         if (!shopSnapshot.exists ||
-            shopSnapshot.data()?['tenant_id'] != tenantId) {
+            shopData == null ||
+            shopData['tenant_id'] != tenantId) {
           throw StateError('Invoice shop is unavailable in this workspace');
         }
       }
@@ -1659,6 +1728,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         warehouseVariantData[entry.key] = snapshot.data()!;
       }
       DocumentReference<Map<String, dynamic>>? originalInvoiceRef;
+      Map<String, int>? updatedOriginalFinancialMinorUnits;
       double? updatedOriginalCreditNoteTotal;
       double? updatedOriginalOutstanding;
       String? updatedOriginalStatus;
@@ -1675,27 +1745,38 @@ class InvoiceNotifier extends AsyncNotifier<void> {
         final creditedTotal =
             (originalData?['credit_note_total'] as num?)?.toDouble() ?? 0;
         if (!originalSnapshot.exists ||
-            originalData?['tenant_id'] != tenantId ||
-            originalData?['type'] != InvoiceModel.typeSale ||
-            originalData?['shop_id'] != shopId ||
+            originalData == null ||
+            originalData['tenant_id'] != tenantId ||
+            originalData['type'] != InvoiceModel.typeSale ||
+            originalData['shop_id'] != shopId ||
             creditedTotal < docTotal) {
           throw StateError('Linked sale invoice is unavailable for reversal');
         }
         final updatedCreditNoteTotal = creditedTotal - docTotal;
         updatedOriginalCreditNoteTotal = updatedCreditNoteTotal;
-        final originalTotal = (originalData?['total'] as num?)?.toDouble() ?? 0;
+        final originalTotal = (originalData['total'] as num?)?.toDouble() ?? 0;
         final originalAmountReceived =
-            (originalData?['amount_received'] as num?)?.toDouble() ?? 0;
-        updatedOriginalOutstanding = invoiceOutstandingAfterCredits(
+            (originalData['amount_received'] as num?)?.toDouble() ?? 0;
+        final updatedOutstanding = invoiceOutstandingAfterCredits(
           total: originalTotal,
           amountReceived: originalAmountReceived,
           creditNoteTotal: updatedCreditNoteTotal,
         );
+        updatedOriginalOutstanding = updatedOutstanding;
         updatedOriginalStatus = invoiceStatusAfterCredits(
           total: originalTotal,
           amountReceived: originalAmountReceived,
           creditNoteTotal: updatedCreditNoteTotal,
         );
+        updatedOriginalFinancialMinorUnits =
+            FinancialMinorUnitMigration.companionsAfterUpdate(
+              'invoices',
+              originalData,
+              {
+                'credit_note_total': updatedCreditNoteTotal,
+                'outstanding_amount': updatedOutstanding,
+              },
+            );
       }
 
       for (var index = 0; index < linkedTransactionSnapshots.length; index++) {
@@ -1733,6 +1814,7 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           'outstanding_amount': updatedOriginalOutstanding,
           'status': updatedOriginalStatus,
           'voided_credit_note_id': invoiceId,
+          'financial_minor_units': updatedOriginalFinancialMinorUnits,
           'updated_at': now,
         });
       }
@@ -1782,8 +1864,24 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       });
 
       if (shopRef != null) {
+        final currentShopData = shopData;
+        if (currentShopData == null) {
+          throw StateError('Invoice shop data is unavailable');
+        }
         transaction.update(shopRef, {
           'balance': FieldValue.increment(accountingPlan.balanceDelta),
+          'financial_minor_units':
+              FinancialMinorUnitMigration.companionsAfterUpdate(
+                'shops',
+                currentShopData,
+                {
+                  'balance':
+                      (currentShopData['balance'] as num).toDouble() +
+                      accountingPlan.balanceDelta,
+                  'last_transaction_amount':
+                      accountingPlan.lastTransactionAmount,
+                },
+              ),
           'updated_at': now,
           'last_transaction_at': now,
           'last_transaction_type': accountingPlan.lastTransactionType,
@@ -1865,33 +1963,42 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           if (reversalTransactionRef != null) {
             transaction.set(
               reversalTransactionRef,
-              transactionData(
-                txType: 'return',
-                amount: accountingPlan.reversalTransactionAmount,
-                description: refundMode == VoidRefundMode.creditBalance
-                    ? 'Credit for voided invoice $invoiceNumber'
-                    : 'Full reversal for voided invoice $invoiceNumber',
+              FinancialMinorUnitMigration.withMinorUnits(
+                'transactions',
+                transactionData(
+                  txType: 'return',
+                  amount: accountingPlan.reversalTransactionAmount,
+                  description: refundMode == VoidRefundMode.creditBalance
+                      ? 'Credit for voided invoice $invoiceNumber'
+                      : 'Full reversal for voided invoice $invoiceNumber',
+                ),
               ),
             );
           }
           if (refundTransactionRef != null) {
             transaction.set(
               refundTransactionRef,
-              transactionData(
-                txType: 'cash_out',
-                amount: accountingPlan.cashRefundAmount,
-                description: 'Cash refund for voided invoice $invoiceNumber',
+              FinancialMinorUnitMigration.withMinorUnits(
+                'transactions',
+                transactionData(
+                  txType: 'cash_out',
+                  amount: accountingPlan.cashRefundAmount,
+                  description: 'Cash refund for voided invoice $invoiceNumber',
+                ),
               ),
             );
           }
         } else if (reversalTransactionRef != null) {
           transaction.set(
             reversalTransactionRef,
-            transactionData(
-              txType: 'cash_out',
-              amount: accountingPlan.reversalTransactionAmount,
-              description: 'Reversed invoice $invoiceNumber',
-              items: rawItems.whereType<Map<String, dynamic>>().toList(),
+            FinancialMinorUnitMigration.withMinorUnits(
+              'transactions',
+              transactionData(
+                txType: 'cash_out',
+                amount: accountingPlan.reversalTransactionAmount,
+                description: 'Reversed invoice $invoiceNumber',
+                items: rawItems.whereType<Map<String, dynamic>>().toList(),
+              ),
             ),
           );
         }
@@ -1972,9 +2079,11 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       final shopName = invData['shop_name'] as String? ?? '';
       final shopRef = db.collection(Collections.shops).doc(shopId);
       final shopSnapshot = await txn.get(shopRef);
+      final shopData = shopSnapshot.data();
       if (!shopSnapshot.exists ||
-          shopSnapshot.data()?['tenant_id'] != tenantId ||
-          shopSnapshot.data()?['route_id'] != invoiceRouteId) {
+          shopData == null ||
+          shopData['tenant_id'] != tenantId ||
+          shopData['route_id'] != invoiceRouteId) {
         throw StateError('Invoice shop is unavailable in this workspace');
       }
       final now = Timestamp.now();
@@ -1990,6 +2099,15 @@ class InvoiceNotifier extends AsyncNotifier<void> {
           outstanding > 0 ? outstanding : 0,
         ),
         'outstanding_amount': 0,
+        'financial_minor_units':
+            FinancialMinorUnitMigration.companionsAfterUpdate(
+              'invoices',
+              invData,
+              {
+                'amount_received': invAmountReceived + outstanding,
+                'outstanding_amount': 0,
+              },
+            ),
         if (payRef != null)
           'payment_transaction_ids': FieldValue.arrayUnion([payRef.id]),
         if (payRef != null) 'latest_payment_transaction_id': payRef.id,
@@ -1998,27 +2116,40 @@ class InvoiceNotifier extends AsyncNotifier<void> {
 
       // Create cash_in transaction for the settled amount
       if (payRef != null) {
-        txn.set(payRef, {
-          'tenant_id': tenantId,
-          'shop_id': shopId,
-          'shop_name': shopName,
-          'route_id': invoiceRouteId,
-          'type': 'cash_in',
-          'sale_type': 'cash',
-          'amount': outstanding,
-          'description': 'Settled invoice $invoiceNumber',
-          'items': <Map<String, dynamic>>[],
-          'invoice_id': invoiceId,
-          'invoice_number': invoiceNumber,
-          'created_by': createdBy.trim(),
-          'created_at': now,
-          'deleted': false,
-        });
+        txn.set(
+          payRef,
+          FinancialMinorUnitMigration.withMinorUnits('transactions', {
+            'tenant_id': tenantId,
+            'shop_id': shopId,
+            'shop_name': shopName,
+            'route_id': invoiceRouteId,
+            'type': 'cash_in',
+            'sale_type': 'cash',
+            'amount': outstanding,
+            'description': 'Settled invoice $invoiceNumber',
+            'items': <Map<String, dynamic>>[],
+            'invoice_id': invoiceId,
+            'invoice_number': invoiceNumber,
+            'created_by': createdBy.trim(),
+            'created_at': now,
+            'deleted': false,
+          }),
+        );
 
         // Decrement customer balance
         if (shopId.isNotEmpty) {
           txn.update(shopRef, {
             'balance': FieldValue.increment(-outstanding),
+            'financial_minor_units':
+                FinancialMinorUnitMigration.companionsAfterUpdate(
+                  'shops',
+                  shopData,
+                  {
+                    'balance':
+                        (shopData['balance'] as num).toDouble() - outstanding,
+                    'last_transaction_amount': outstanding,
+                  },
+                ),
             'updated_at': now,
             'last_transaction_at': now,
             'last_transaction_type': 'cash_in',

@@ -11,6 +11,7 @@ import '../core/l10n/app_locale.dart';
 import '../core/services/google_drive_backup_service.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/backup_scope_policy.dart';
+import '../core/utils/financial_minor_unit_migration.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/utils/tenant_scope.dart';
 import '../core/models/tenant_model.dart';
@@ -38,6 +39,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
   bool _loadingPrefs = true;
   bool _loading = false; // backup creation in progress
   bool _restoring = false; // restore in progress
+  bool _migrationPreviewing = false;
+  FinancialMinorUnitMigrationPlan? _migrationPlan;
 
   // ── prefs state ───────────────────────────────────────────────────────────
   bool _autoEnabled = false;
@@ -98,9 +101,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
 
   void _showMappedError(Object error) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
   }
 
   Future<UserModel?> _readCurrentUser() async {
@@ -232,9 +234,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
         _lastLocalBackupAt = DateTime.now();
         _loading = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(successSnackBar(tr('backup_phone_save_success', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(successSnackBar(tr('backup_phone_save_success', ref)));
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -269,9 +270,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
         _lastDriveBackupAt = DateTime.now();
         _loading = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(successSnackBar(tr('backup_drive_success', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(successSnackBar(tr('backup_drive_success', ref)));
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -283,9 +283,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     final user = await _readCurrentUser();
     if (!mounted) return;
     if (user == null || !user.active || !user.canCreateBackup) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
       return;
     }
     if (!GoogleDriveBackupService.isConfigured) {
@@ -308,9 +307,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     );
     if (picked == null || !mounted) return;
     if (!picked.name.toLowerCase().endsWith('.shoesbackup')) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr('backup_restore_invalid', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr('backup_restore_invalid', ref)));
       return;
     }
     final passphrase = await _requestBackupPassphrase(confirmPassphrase: false);
@@ -331,9 +329,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
         _lastDriveBackupAt = DateTime.now();
         _loading = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(successSnackBar(tr('backup_drive_success', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(successSnackBar(tr('backup_drive_success', ref)));
     } catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -345,15 +342,13 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     final user = await _readCurrentUser();
     if (!mounted) return;
     if (user == null || !user.active) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
       return;
     }
     if (!user.canRestoreBackup) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
       return;
     }
     final workspaceId = _workspaceIdFor(user);
@@ -363,9 +358,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
           .listDriveBackups(tenantIdOverride: workspaceId);
       if (!mounted) return;
       if (files.isEmpty) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(infoSnackBar(tr('backup_drive_none', ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(infoSnackBar(tr('backup_drive_none', ref)));
         return;
       }
       final picked = await showModalBottomSheet<GoogleDriveBackupFile>(
@@ -405,9 +399,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _restoring = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
     }
   }
 
@@ -421,22 +414,19 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     final user = await _readCurrentUser();
     if (!mounted) return;
     if (user == null || !user.active) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr('permission_denied', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr('permission_denied', ref)));
       return;
     }
     if (!user.canRestoreBackup) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
       return;
     }
     final workspaceId = _workspaceIdFor(user);
     if (workspaceId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(warningSnackBar(tr('select_workspace', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(warningSnackBar(tr('select_workspace', ref)));
       return;
     }
     final List<LocalBackupFile> backups;
@@ -451,9 +441,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     if (!mounted) return;
 
     if (backups.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(infoSnackBar(tr('backup_no_local', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(infoSnackBar(tr('backup_no_local', ref)));
       return;
     }
 
@@ -503,15 +492,14 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     final user = await _readCurrentUser();
     if (!mounted) return;
     if (user == null || !user.active || !user.canRestoreBackup) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
       return;
     }
+
     if (_workspaceIdFor(user) == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(warningSnackBar(tr('select_workspace', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(warningSnackBar(tr('select_workspace', ref)));
       return;
     }
     final picked = await FilePicker.pickFile(
@@ -521,15 +509,68 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
     );
     if (picked == null || !mounted) return;
     if (!picked.name.toLowerCase().endsWith('.shoesbackup')) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr('backup_restore_invalid', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr('backup_restore_invalid', ref)));
       return;
     }
     try {
       await _restoreBackupBytes(await picked.readAsBytes(), user);
     } catch (error) {
       _showMappedError(error);
+    }
+  }
+
+  Future<void> _previewFinancialMigration() async {
+    final user = await _readCurrentUser();
+    if (!mounted) return;
+    if (user == null ||
+        !user.active ||
+        user.isSuperAdmin ||
+        !user.canCreateWorkspaceBackup) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr('backup_restore_scope_denied', ref)));
+      return;
+    }
+
+    final picked = await FilePicker.pickFile(
+      dialogTitle: tr('backup_pick_phone_file_title', ref),
+      type: FileType.custom,
+      allowedExtensions: const ['shoesbackup'],
+    );
+    if (picked == null || !mounted) return;
+    if (!picked.name.toLowerCase().endsWith('.shoesbackup')) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr('backup_restore_invalid', ref)));
+      return;
+    }
+    final passphrase = await _requestBackupPassphrase(confirmPassphrase: false);
+    if (passphrase == null || !mounted) return;
+
+    setState(() {
+      _migrationPreviewing = true;
+      _migrationPlan = null;
+    });
+    try {
+      final notifier = ref.read(databaseBackupProvider.notifier);
+      final backup = await notifier.decryptAndVerifyBackup(
+        archiveBytes: Uint8List.fromList(await picked.readAsBytes()),
+        passphrase: passphrase,
+      );
+      final plan = await notifier.previewFinancialMinorUnits(backup);
+      if (!mounted) return;
+      setState(() {
+        _migrationPreviewing = false;
+        _migrationPlan = plan;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _migrationPreviewing = false);
+      if (error is FormatException) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar(tr('backup_restore_invalid', ref)));
+      } else {
+        _showMappedError(error);
+      }
     }
   }
 
@@ -579,9 +620,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
       if (!mounted) return;
       setState(() => _restoring = false);
       if (error is FormatException) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(errorSnackBar(tr('backup_restore_invalid', ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar(tr('backup_restore_invalid', ref)));
       } else {
         _showMappedError(error);
       }
@@ -964,9 +1004,9 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                                   child: Text(
                                     tr(AppErrorMapper.key(error), ref),
                                     style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.error,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .error,
                                     ),
                                   ),
                                 ),
@@ -1187,6 +1227,66 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
                       ),
                     const SizedBox(height: 32),
 
+                    if (user.isAdmin &&
+                        !user.isSuperAdmin &&
+                        user.canCreateWorkspaceBackup) ...[
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                tr('financial_migration_title', ref),
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                tr('financial_migration_description', ref),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                key: const ValueKey(
+                                  'financial-migration-preview-button',
+                                ),
+                                onPressed:
+                                    _migrationPreviewing ||
+                                        !workspaceReady ||
+                                        _restoring
+                                    ? null
+                                    : _previewFinancialMigration,
+                                icon: _migrationPreviewing
+                                    ? const SizedBox.square(
+                                        dimension: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.fact_check_outlined),
+                                label: Text(
+                                  _migrationPreviewing
+                                      ? tr(
+                                          'financial_migration_previewing',
+                                          ref,
+                                        )
+                                      : tr('financial_migration_preview', ref),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(48),
+                                ),
+                              ),
+                              if (_migrationPlan case final plan?) ...[
+                                const SizedBox(height: 12),
+                                _MigrationPreviewSummary(plan: plan),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
                     if (user.canRestoreBackup) ...[
                       // ── Restore section ──────────────────────────────
                       const Divider(),
@@ -1299,9 +1399,8 @@ class _DatabaseBackupScreenState extends ConsumerState<DatabaseBackupScreen> {
         if (_restoring)
           Positioned.fill(
             child: ColoredBox(
-              color: Theme.of(
-                context,
-              ).colorScheme.scrim.withValues(alpha: 0.58),
+              color: Theme.of(context).colorScheme.scrim
+                  .withValues(alpha: 0.58),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1452,6 +1551,116 @@ class _StatusRow extends StatelessWidget {
   }
 }
 
+class _MigrationPreviewSummary extends ConsumerWidget {
+  const _MigrationPreviewSummary({required this.plan});
+
+  final FinancialMinorUnitMigrationPlan plan;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final color = plan.isClean
+        ? AppBrand.successColor
+        : theme.colorScheme.error;
+    final visibleExceptions = plan.exceptions.take(20).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _MigrationCountRow(
+          label: tr('financial_migration_records', ref),
+          count: plan.documentCount,
+        ),
+        _MigrationCountRow(
+          label: tr('financial_migration_eligible', ref),
+          count: plan.eligibleDocumentCount,
+        ),
+        _MigrationCountRow(
+          label: tr('financial_migration_planned_documents', ref),
+          count: plan.documents.length,
+        ),
+        _MigrationCountRow(
+          label: tr('financial_migration_minor_fields', ref),
+          count: plan.companionFieldCount,
+        ),
+        _MigrationCountRow(
+          label: tr('financial_migration_exceptions_count', ref),
+          count: plan.exceptions.length,
+          valueColor: color,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          tr(
+            plan.isClean
+                ? 'financial_migration_preview_clean'
+                : 'financial_migration_preview_blocked',
+            ref,
+          ),
+          style: theme.textTheme.bodySmall?.copyWith(color: color),
+        ),
+        if (visibleExceptions.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          for (final exception in visibleExceptions)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text(
+                [
+                  exception.collection,
+                  if (exception.documentId.isNotEmpty) exception.documentId,
+                  if (exception.fieldPath.isNotEmpty) exception.fieldPath,
+                ].join(' / '),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ),
+          if (plan.exceptions.length > visibleExceptions.length)
+            Text(
+              tr('financial_migration_more_exceptions', ref).replaceAll(
+                '%s',
+                '${plan.exceptions.length - visibleExceptions.length}',
+              ),
+              style: theme.textTheme.labelSmall,
+            ),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          tr('financial_migration_write_blocked', ref),
+          style: theme.textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+}
+
+class _MigrationCountRow extends StatelessWidget {
+  const _MigrationCountRow({
+    required this.label,
+    required this.count,
+    this.valueColor,
+  });
+
+  final String label;
+  final int count;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ),
+        Text(
+          '$count',
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(fontWeight: FontWeight.w600, color: valueColor),
+        ),
+      ],
+    ),
+  );
+}
+
 class _CollectionTile extends ConsumerWidget {
   final String collectionKey;
   final String labelKey;
@@ -1558,14 +1767,12 @@ class _BackupArchivePickerSheetState<T>
       setState(
         () => _entries.removeWhere((candidate) => candidate.id == entry.id),
       );
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(successSnackBar(widget.deleteSuccessMessage));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(successSnackBar(widget.deleteSuccessMessage));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
     } finally {
       if (mounted) setState(() => _deletingIds.remove(entry.id));
     }
@@ -1593,9 +1800,8 @@ class _BackupArchivePickerSheetState<T>
             const SizedBox(height: 12),
             Text(
               widget.title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const Divider(),
             Expanded(

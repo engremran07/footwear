@@ -1,8 +1,8 @@
-# FootWear ERP — v3.10.15+1126 (Hosting/Rules deployed; ARM64 installed)
+# FootWear ERP — v3.10.17+1128 source (Rules/indexes deployed; app release pending)
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
 
-## Local Pass 2 Financial Safeguards — Unreleased
+## Local Financial Safeguards and Minor-Unit Compatibility — Unreleased
 
 The current local source enforces a `999999.99` maximum for invoice, receipt,
 standalone cash, and transaction-correction writes across providers and
@@ -13,9 +13,25 @@ and `REC-` prefixes and no device-clock year. Allocation continues above the
 greater of the legacy invoice and receipt counters, and Firestore Rules enforce
 the same sequence in linked atomic writes. Receipt counter updates carry a
 same-batch `last_cash_receipt_id` link to the receipt invoice. Existing invoice
-identifiers remain unchanged. The integer minor-unit migration and historical reconciliation
-remain blocked pending a reviewed compatibility and rollout plan, so these
-local changes are not a production release.
+identifiers remain unchanged.
+
+A staged integer minor-unit compatibility layer now dual-reads and dual-writes
+the optional `financial_minor_units` companion map for shop, transaction, and
+invoice financial fields while preserving existing legacy values. A verified,
+tenant-scoped backup preview and bounded admin backfill API are available;
+the backfill changes companion fields only and has not been run. Legacy doubles
+remain authoritative for compatibility, Firestore Rules do not yet require
+minor-unit values, and historical reconciliation plus the client rollout and
+strict cutover remain unresolved. No production migration is represented by
+this local work. Firestore Rules/indexes were subsequently deployed after
+`207 passing (56s)` in the Rules Emulator; this deployment does not include
+Hosting or an app release. The user reports that invoice creation, non-stock
+sales, and cash receipts now succeed for admin, supervisor, and seller on the
+designated JBM `Testing` route / `owerty` test shop. The original denied
+Rules condition remains unconfirmed because its Firebase error code and live
+counters were not captured. The live log capture also showed background
+Firestore DNS `UNAVAILABLE` and App Check token API 403/retry warnings; these
+are separate follow-up signals, not evidence that the invoice writes failed.
 
 ## v3.10.15+1126 Contextual Record Actions
 
@@ -406,7 +422,7 @@ locale. Current workspace logo bytes are preferred; invoice/receipt snapshots
 provide a logo fallback only when current bytes are unavailable and the
 configured `visibleFields` includes the logo. Cash receipt PDFs use an A5
 page and remain single-page. Pin row order with explicit PDF
-`Directionality`; the `pdf` 3.12.0 `Row` API does not accept a direction
+`Directionality`; the pinned `pdf` 3.13.1 `Row` API does not accept a direction
 parameter. Urdu PDFs use Naskh-style shaping; a standalone Nastaliq proof is
 not production support until branding, selectable text, pagination, and
 Web/Android report parity are verified.
@@ -417,6 +433,12 @@ character appears. Numeric-only date cells use LTR direction. This correction
 was released in v3.10.16+1127; it does not change font shaping, date formatting,
 timestamp values, or financial calculations. The reported production date
 discrepancy remains unverified without its source PDF.
+
+The local mixed-script follow-up shapes English-first Arabic/Urdu values with
+`pdfTextForDirection` before LTR layout. This preserves English-first reading
+order while connecting medial Arabic and Urdu letters. The fix is locally
+tested but unreleased; the original production PDF was unavailable for direct
+visual comparison.
 
 Workspace-logo processing is local and lossless: transparent pixels remain
 transparent, and opaque colored backgrounds are retained without background

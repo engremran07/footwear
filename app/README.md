@@ -1,6 +1,17 @@
-# FootWear ERP — Flutter App (v3.10.15+1126; Hosting/Rules deployed, ARM64 installed)
+# FootWear ERP — Flutter App (v3.10.17+1128 source; Rules/indexes deployed)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
+
+Firestore Rules/indexes for the shared invoice/receipt sequence were deployed
+after `207 passing (56s)` in the Rules Emulator. Hosting and an app release
+were not part of that deployment. The user reports successful invoice
+creation, non-stock sales, and cash receipts for admin, supervisor, and seller
+using the designated JBM `Testing` route / `owerty` test shop. The original
+denied Rules condition is still unconfirmed because its Firebase error code
+and live counters were not captured. Live logs also showed background
+Firestore DNS `UNAVAILABLE` and App Check token API 403/retry warnings; these
+are separate follow-up signals. The agent did not directly read or write
+production business data.
 
 ## v3.10.15+1126 Contextual Record Actions
 
@@ -564,14 +575,23 @@ expression budget.
 
 The unreleased Pass 2 safeguards apply the shared `999999.99` write ceiling to
 SAR and PKR invoice, receipt, standalone-ledger, seller edit-request, and
-correction paths in app providers and Firestore Rules. The equal currency
-limits are a conservative provisional default, not a currency-specific
-financial policy. New sale, credit-note, and receipt identifiers use the
-tenant-wide monotonic counter with `INV-`, `CN-`, and `REC-` prefixes; the
-device clock does not contribute a year. Historical identifiers are
-preserved. Stored monetary values remain doubles, and the integer minor-unit
-migration remains blocked pending historical reconciliation, backup/export
-compatibility, Rules rollout, and a minimum-client strategy.
+correction paths in app providers and Firestore Rules. The equal currency limits are a conservative provisional default, not a
+currency-specific financial policy. New sale, credit-note, and receipt
+identifiers use the tenant-wide monotonic counter with `INV-`, `CN-`, and
+`REC-` prefixes; the device clock does not contribute a year. Historical
+identifiers are preserved.
+
+The local staged minor-unit compatibility layer adds optional
+`financial_minor_units` companions for shop, transaction, and invoice monetary
+fields. Models trust a companion only when it matches the preserved legacy
+value; provider writes update both representations atomically, and backup
+restore regenerates companions without rewriting legacy values. An
+administrator-only, tenant-scoped preview and bounded backfill API are
+available. Backfill updates companions only and has not been run. Legacy
+doubles remain authoritative for compatibility, Rules do not yet enforce
+integer arithmetic, and historical reconciliation, client rollout, and strict
+cutover remain unresolved. This is local implementation, not a production
+migration or release.
 
 Standalone cash-in/cash-out corrections use audited soft deletion only. The provider records the actor, reverses the exact shop-balance delta, and clears the cached latest-transaction summary when it points to the deleted row, all in the same batch. Workspace admins may perform this correction; sellers cannot delete transactions, hard deletion is denied, and invoice-linked transactions remain immutable outside invoice void/credit-note flows.
 
@@ -623,7 +643,8 @@ local processing and PDF image embedding. Cash receipts use an A5 page and
 remain single-page. Font metadata tests
 and rendered-layout checks are separate; an embedded font does not prove
 correct glyph appearance. Rows use an explicit LTR `Directionality` wrapper
-because the page may be RTL and `pdf` 3.12.0 `Row` has no direction argument.
+because the page may be RTL and pinned `pdf` 3.13.1 `Row` has no direction
+argument.
 The current Urdu renderer remains Naskh-style; a Nastaliq prototype has not
 passed logo, text-extraction, pagination, and cross-platform report parity
 gates.
@@ -634,6 +655,12 @@ portion. Numeric-only date cells use LTR direction. This correction was
 released in v3.10.16+1127; it does not change date formatting, timestamp
 values, financial calculations, or the Noto Sans Arabic font policy. The
 reported production date discrepancy remains unverified without its source PDF.
+
+English-first mixed-script values require an additional shaping step before
+LTR PDF layout: `pdfTextForDirection` applies bidi shaping while preserving
+the LTR paragraph direction. This keeps English-first order and connects
+medial Arabic/Urdu letters. The follow-up is local and unreleased; the
+original production PDF was unavailable for direct comparison.
 
 Place `google-services.json` in `android/app/` before running (obtain from Firebase Console — gitignored).
 

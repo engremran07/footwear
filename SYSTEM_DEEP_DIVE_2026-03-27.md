@@ -251,6 +251,16 @@ was made. The rendering correction was released in v3.10.16+1127; Hosting
 reports the deployed version, and the matching ARM64 APK was installed on the
 connected test phone. Firestore Rules and indexes were unchanged.
 
+The 2026-10-29 follow-up traced an additional medial-letter defect in
+English-first mixed-script values: the pinned `pdf` 3.13.1 renderer does not
+shape Arabic-script glyphs when a text widget is LTR. The shared
+`pdfTextForDirection` helper applies `bidi.logicalToVisual` before LTR layout,
+without changing paragraph direction or English-first physical order. Shared
+PDF text paths use the helper, with regression coverage for Arabic, Urdu,
+already-shaped, and non-mixed text. The focused suite and both analyzers pass.
+A synthetic raster was visually checked; the reported production PDF was not
+available. This change is local and unreleased.
+
 The supplied cash-receipt reference is now available. The local v3.10.7+1118
 receipt body follows its compact bilingual structure, retains the existing
 shared workspace header, uses saved balance fields, and remains a single A5
@@ -283,9 +293,20 @@ sales, credit notes, and receipts. Historical identifiers are unchanged. The
 current local source applies a shared `999999.99` maximum to SAR and PKR
 financial writes in providers and Firestore Rules, including standalone cash
 and correction operations. The amount is provisional and does not resolve
-currency-specific limits. Financial storage remains double-based; integer
-minor-unit conversion, historical reconciliation, old-client compatibility,
-and production rollout remain unresolved and release-blocking.
+currency-specific limits.
+
+The local staged minor-unit compatibility layer dual-reads and dual-writes
+optional `financial_minor_units` companions for shop, transaction, and invoice
+financial fields. A companion is used only when consistent with the legacy
+value; mismatches fall back to that legacy value. Provider writes keep both
+representations in the same atomic operation, and backup restore regenerates
+companions without changing existing financial values. The tenant-scoped
+backup preview and admin backfill API are implemented, but no production
+preview or backfill has been run. The backfill updates companions only and is
+paged at 100 documents by default, with a maximum page size of 400. Legacy
+doubles and Rules tolerances remain authoritative; exact integer arithmetic,
+historical reconciliation, compatible-client rollout, and strict Rules
+cutover remain unresolved and release-blocking.
 
 The sale provider aggregates item quantities by variant and converts `qty`
 (dozens) plus `extra_pairs` to pairs using the active workspace's
@@ -810,3 +831,26 @@ own fallback. Dashboard tests: `00:09 +5: All tests passed!`;
 `flutter analyze lib --no-pub`: `No issues found! (ran in 8.1s)`;
 `dart analyze test/`: `No issues found!`. No Rules/query changes or release
 operations occurred.
+
+## 2026-10-29 Invoice Rules Deployment Status
+
+The shared invoice/receipt high-water sequence Rules and composite indexes
+were deployed to `shoeserp-clean-20260327` after the local Rules Emulator
+reported `207 passing (56s)`. Firebase reported `Deploy complete!` and
+preserved 23 remote indexes and 2 field overrides absent from the local
+manifest. This is a Rules/indexes deployment only; it does not include
+Hosting, an app release, device delivery, commit, or push.
+
+The user confirmed active JBM Impex devices use v3.10.17+1128 and reports
+that invoice creation, non-stock sales, and cash receipts succeeded for
+admin, supervisor, and seller on the designated `Testing` route / `owerty`
+test shop after deployment. This supports the shared-sequence Rules mismatch
+as the likely blocker, but the original Firebase error code and live counter
+values were not captured, so the exact rejected rule remains unproven.
+
+The live log capture showed background Firestore `UNAVAILABLE` errors caused
+by DNS lookup failures for `firestore.googleapis.com` and App Check token
+API 403/too-many-attempts warnings. The capture did not show
+`PERMISSION_DENIED`. These are separate connectivity/configuration signals;
+they do not contradict the user's report that the test writes succeeded.
+The agent did not directly read or write production business data.

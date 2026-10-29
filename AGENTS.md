@@ -1,6 +1,6 @@
 ﻿# ShoesERP AGENTS Runtime Contract
 
-Last updated: 2026-10-28
+Last updated: 2026-10-29
 
 ## 1) Runtime Truth (Authoritative)
 
@@ -281,9 +281,13 @@ changes.
 
 1. Bilingual financial PDF columns must keep English physically left and the
   selected Arabic/Urdu content physically right, regardless of page locale.
-  With `pdf` 3.12.0, `pw.Row` has no `textDirection` argument; wrap the row in
-  `pw.Directionality(textDirection: pw.TextDirection.ltr)` and set each text
-  widget's direction explicitly. Verify actual Arabic and Urdu output.
+  With the pinned `pdf` 3.13.1 package, `pw.Row` has no `textDirection`
+  argument; wrap the row in `pw.Directionality(textDirection:
+  pw.TextDirection.ltr)` and set each text widget's direction explicitly. For
+  English-first mixed-script text, pass it through `pdfTextForDirection` (via
+  `_cellText`) before LTR layout: the renderer shapes Arabic-script text only
+  for RTL-directed widgets. Preserve LTR direction so English-first reading
+  order remains intact. Verify medial Arabic and Urdu Yeh in rendered output.
 
 1. **`changelog_data.dart` MUST be updated on every version bump.** When
   `app/pubspec.yaml` version is bumped, a corresponding entry MUST be added
@@ -648,6 +652,99 @@ and never replace provider or Firestore authorization.
 
 ## 10) Current Audit Status
 
+2026-10-29 v3.10.17+1128 delivery:
+
+- Flutter validation: `flutter analyze lib --no-pub` reported
+  `No issues found! (ran in 22.8s)`; `dart analyze test/` reported
+  `No issues found!`; the full Flutter suite reported
+  `01:44 +779: All tests passed!`; the Firestore Rules Emulator reported
+  `207 passing (59s)`.
+- Web build reported `EXIT: 0`. Hosting deployed to
+  `shoeserp-clean-20260327`; live `version.json` reports version `3.10.17`,
+  build `1128`, and `main.dart.js` returns
+  `no-store, must-revalidate, no-cache`.
+- Firestore Rules/index deployment reported `Deploy complete!`; Rules were
+  already current and the index deployment preserved 23 remote indexes and
+  2 field overrides absent from the local manifest.
+- Split APKs built at 31.4 MB (ARMv7), 33.0 MB (ARM64), and 34.5 MB
+  (x86_64). ARM64 APK v2 signature verification succeeded; `adb push`
+  reported `1 file pushed`, and `adb install --streaming -r` reported
+  `Success` on `R5GL22RGT9V` (versionName `3.10.17`, versionCode
+  `310173128`).
+- The signed Play Console AAB built at 72.5 MB; `jarsigner -verify`
+  reported `jar verified.` with a self-signed/untrusted certificate warning
+  and no timestamp. It was not uploaded. No version bump was made, so
+  Play Console acceptance depends on whether versionCode `310173128` has
+  already been used.
+- P1-04 historical financial reconciliation, integer-minor-unit cutover,
+  and compatible-client rollout remain unresolved. These delivery checks do
+  not close those audit blockers or prove authenticated business workflows.
+
+2026-10-29 mixed-script PDF shaping follow-up — local, unreleased:
+
+- The pinned `pdf` 3.13.1 renderer does not shape Arabic-script glyphs in
+  English-first text widgets directed LTR. `pdfTextForDirection` now applies
+  `bidi.logicalToVisual` before LTR layout for those mixed values and leaves
+  RTL text and existing presentation forms unchanged. Shared PDF text paths
+  use the helper; paragraph direction and physical column order are preserved.
+- Focused PDF suite: `00:01 +16: All tests passed!`; full Flutter suite:
+  `03:27 +779: All tests passed!`; `flutter analyze lib --no-pub` reports
+  `No issues found! (ran in 93.6s)`; `dart analyze test/` reports
+  `No issues found!`. A synthetic raster probe was visually checked earlier
+  in this session; the original production PDF was unavailable. Hot restart
+  was attempted, but the connected Dart Tooling Daemon had no running app.
+- The user reports that, after Rules/indexes deployment, invoice creation,
+  non-stock sales, and cash receipts succeeded for admin, supervisor, and
+  seller using the designated `Testing` route / `owerty` test shop. This
+  user-reported matrix is consistent with the shared invoice/receipt sequence
+  Rules mismatch being the blocker, but the original denial code and live
+  counter values were not captured, so the exact rejected Rules condition is
+  unproven. Live device logs during the test showed background Firestore
+  `UNAVAILABLE`/DNS lookup failures and App Check token API 403/too-many-
+  attempts warnings; they did not show `PERMISSION_DENIED`. Those network and
+  App Check warnings are separate follow-up signals, not proof of the invoice
+  failure cause. The agent did not read or write production business data.
+- Rules/indexes were deployed to `shoeserp-clean-20260327` after the local
+  Rules Emulator reported `207 passing (56s)`; Firebase reported
+  `Deploy complete!` and preserved 23 remote indexes and 2 field overrides
+  absent from the local manifest. Hosting, app release/build, device
+  delivery, commit, and push were not part of that deployment. P1-04
+  historical reconciliation, compatible-client rollout, and strict
+  minor-unit cutover remain unresolved.
+- Rules/indexes deployment did not include Hosting, an app release/build,
+  device delivery, commit, or push. P1-04 historical reconciliation,
+  compatible-client rollout, and strict minor-unit cutover remain unresolved.
+
+2026-10-29 staged minor-unit compatibility — local, unreleased:
+
+- Added the optional `financial_minor_units` companion map for shop balances
+  and cached financial summaries, transaction amounts and nested item/edit
+  history amounts, and invoice totals, balances, and nested item amounts.
+  Models use a companion only when it matches the legacy value; otherwise
+  they fall back to the legacy double. Financial provider writes dual-write
+  the companion atomically, and backup restore rebuilds it from the preserved
+  legacy values.
+- Added a verified, workspace-scoped backup preview and an admin-only paged
+  backfill API. Backfill defaults to 100 documents per page, caps pages at
+  400, and updates only companion fields. The `customers` Firestore path for
+  shops maps through one tested helper to the migration schema key `shops`.
+  Neither the backfill nor any production preview was run.
+- Local Rules permit the staged companion writes without requiring them from
+  older clients. They do not yet enforce exact integer balance arithmetic or
+  a strict minor-unit cutover; existing doubles and Rules tolerances remain
+  authoritative for compatibility.
+- Focused financial/migration suite: `00:08 +137: All tests passed!`;
+  Firestore Rules Emulator: `204 passing (1m)` and `EMULATOR_EXIT: 0`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 108.8s)`;
+  `dart analyze test/`: `No issues found!`.
+- Hot restart was attempted, but the connected Dart Tooling Daemon had no
+  active Flutter app. Rules/indexes were subsequently deployed to
+  `shoeserp-clean-20260327` after `207 passing (56s)` in the Rules Emulator;
+  Firebase reported `Deploy complete!`. No production data migration,
+  Hosting deployment, release build, device delivery, commit, or push was
+  performed. P1-04 remains open pending backup review, reconciliation,
+  compatible-client rollout, and strict-cutover authorization.
+
 2026-10-29 Pass 2 financial and stock-reconciliation audit — local:
 
 - SAR and PKR manual amounts now accept at most two fractional digits.
@@ -678,9 +775,10 @@ and never replace provider or Firestore authorization.
   behavior, hypotheses not reproduced, and policy/migration blockers in
   `AUDIT_REPORT_FOOTWEAR_ERP.md`. Hot restart was unavailable because the
   connected Dart Tooling Daemon had no running Flutter app.
-- A composite invoice index for tenant plus linked invoice ID was added.
-  Source changes and the index are local and unreleased; Firestore deployment,
-  Hosting, release builds, device delivery, commit, and push remain pending.
+- A composite invoice index for tenant plus linked invoice ID was added and
+  deployed with the Rules/indexes deployment recorded above. The app source
+  remains unreleased; Hosting, release builds, device delivery, commit, and
+  push remain pending.
 - Follow-up policy work now applies the existing `999999.99` maximum to SAR
   and PKR invoice, receipt, standalone-ledger, and correction writes in the
   providers and Firestore Rules. The same maximum is used for both currencies;

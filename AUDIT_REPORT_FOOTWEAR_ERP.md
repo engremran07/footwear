@@ -10,6 +10,89 @@
 
 ---
 
+## Scope-Specific Addendum — 2026-10-29 v3.10.17+1128 Delivery
+
+- Flutter analysis and tests: `flutter analyze lib --no-pub` reported
+  `No issues found! (ran in 22.8s)`; `dart analyze test/` reported
+  `No issues found!`; the complete Flutter suite reported
+  `01:44 +779: All tests passed!`; the Rules Emulator reported
+  `207 passing (59s)`.
+- Web build reported `EXIT: 0`; Firebase Hosting reported
+  `Deploy complete!`. Live `version.json` reports `3.10.17` / build `1128`,
+  and `main.dart.js` has `no-store, must-revalidate, no-cache`.
+- Firestore Rules/indexes deploy reported `Deploy complete!`; Rules were
+  already current, indexes deployed, and 23 remote indexes plus 2 field
+  overrides absent from the local manifest were preserved.
+- Split APKs built at 31.4/33.0/34.5 MB. ARM64 APK v2 verification passed;
+  ADB reported `1 file pushed` and install `Success` on `R5GL22RGT9V`
+  (versionCode `310173128`).
+- The signed 72.5 MB AAB reports `jar verified.` with a locally
+  untrusted self-signed certificate and no timestamp. It was not uploaded to
+  Play Console. The existing version code was not bumped; Play Console
+  acceptance remains conditional on that code being unused.
+- P1-04 remains open: historical financial reconciliation, exact minor-unit
+  Rules enforcement/cutover, and compatible-client rollout are incomplete.
+  These release operations do not close those audit findings or establish
+  authenticated production workflow acceptance.
+
+## Scope-Specific Addendum — 2026-10-29 Mixed-Script PDF Yeh Rendering
+
+### Verified Local Defect and Correction
+
+- The synthetic English-first Arabic/Urdu case reproduced a shaping gap:
+  the `pdf` 3.13.1 renderer keeps LTR order but does not shape Arabic-script
+  glyphs when the text widget is LTR. Medial Yeh therefore appeared
+  disconnected. This is separate from changing paragraph direction, which
+  would reverse English-first values.
+- `pdfTextForDirection` now applies `bidi.logicalToVisual` before LTR layout
+  for Arabic-script values without existing presentation forms. Shared PDF
+  text paths use the helper; RTL and plain-English paths retain their
+  behavior.
+- Focused PDF suite: `00:01 +16: All tests passed!`; full Flutter suite:
+  `03:27 +779: All tests passed!`; application analysis:
+  `No issues found! (ran in 93.6s)`; test analysis: `No issues found!`.
+  A synthetic raster probe was visually checked against the transformed
+  reference. The user's original production PDF was unavailable, so its
+  exact viewer/output context remains unverified.
+
+### JBM Impex Invoice Failure — User-Reported Recovery; Exact Trigger Unconfirmed
+
+- The user reports the same generic permission message for admin, supervisor,
+  and seller attempts using app v3.10.17+1128 in JBM Impex. The exact Firebase
+  SDK code and whether the attempted document was a stock sale, non-stock
+  sale, or cash receipt remain unknown.
+- Git evidence shows `origin/main` at v3.10.16+1127, where client and Rules
+  advanced invoice and receipt counters independently. The v3.10.17 client
+  computes `max(last_invoice_number, last_cash_receipt_number) + 1`; new
+  receipt counter writes also link `last_cash_receipt_id`. The user confirmed
+  active JBM Impex devices use v3.10.17+1128. Firestore Rules/indexes were
+  deployed to `shoeserp-clean-20260327` after `207 passing (56s)` in the Rules
+  Emulator. Firebase reported `Deploy complete!` and preserved 23 remote
+  indexes plus 2 field overrides absent from the local manifest. This
+  deployment addressed the counter-sequence mismatch hypothesis. Afterward,
+  the user reports successful invoice creation, non-stock sales, and cash
+  receipts for admin, supervisor, and seller on the designated `Testing`
+  route / `owerty` test shop. The new `REC-` prefix without a year is expected
+  for v3.10.17.
+- This successful post-deployment matrix supports the shared-sequence Rules
+  mismatch as the likely blocker, but does not identify the exact rule or
+  counter condition that rejected the earlier attempts. The original Firebase
+  error code and live counter values were not captured. During live log
+  capture, background Firestore streams reported `UNAVAILABLE` with DNS lookup
+  failures for `firestore.googleapis.com`; App Check also logged API 403 and
+  retry warnings. The capture showed no `PERMISSION_DENIED`. These are
+  separate connectivity/configuration signals, not proof of the invoice
+  failure cause. The agent did not directly read or write production business
+  data; the user reports performing the test writes on the designated test
+  shop.
+- Rules/indexes are deployed, but Hosting and app release/build, device
+  delivery, commit, and push were not performed. P1-04 historical financial
+  reconciliation, compatible-client rollout, and strict minor-unit cutover
+  remain unresolved. Do not treat the local PDF fix or emulator result as
+  production release evidence.
+
+---
+
 ## Scope-Specific Addendum — 2026-10-29 Pass 2 Financial Findings
 
 ### Finding-by-Finding Disposition
@@ -23,7 +106,7 @@ client-side checks are explicitly separated from Firestore Rules enforcement.
 | P1-01: seller stock-sale Rules access-call budget | Not reproduced in tested range | Emulator coverage exercises 30-line sales and sampled counts of 5, 10, 15, 20, and 30. There is no declared maximum or proof for more than 30 lines, so unbounded cart size remains unverified. |
 | P1-02: settlement ignores credit notes | Fixed | `markAsPaid` settles the remaining amount after receipts and credits; credit-note writes update the original outstanding amount/status atomically. `mark_paid_outstanding_test.dart` covers credit-aware settlement. |
 | P1-03: cash-entry retries can duplicate writes | Fixed for supported client flow | Standalone cash entries use a caller-stable idempotency key, deterministic tenant-scoped document ID, and Firestore transaction. The 20-second wrapper timeout was removed; delayed-network behavior was not fault-injected. |
-| P1-04: money uses doubles and tolerance comparisons | Partially fixed; migration deferred | Parser/provider guards reject ambiguous and sub-cent input. Stored amounts and balances remain doubles and Rules retain existing tolerances. Integer minor-unit migration requires historical reconciliation, backup/PDF compatibility, Rules rollout, and a minimum-client policy. |
+| P1-04: money uses doubles and tolerance comparisons | Compatibility stage implemented locally; strict migration deferred | Shop, transaction, and invoice models/providers now support optional `financial_minor_units` companions with legacy fallback and atomic dual-writes. A verified backup preview and bounded tenant-scoped companion backfill are available but have not been run. Existing doubles and Rules tolerances remain authoritative; historical reconciliation, backup/client rollout, exact Rules enforcement, and strict cutover are unresolved. |
 | P2-01: seller cash receipts do not notify admins | Fixed in current client/Rules | Receipt creation writes a linked `cash_in` invoice notification after its financial transaction; Rules accept only a matching cash-receipt invoice. Notification delivery remains best-effort and logged. |
 | P2-02: amount caps are inconsistent and currency-agnostic | Partially fixed; currency policy remains unresolved | Local providers and Rules now apply the established `999999.99` ceiling to sale/credit invoices, receipts, standalone cash, seller edit requests, and corrections. SAR and PKR share the same provisional ceiling; no currency-specific business limits have been approved. |
 | P2-03: ambiguous precision and sub-cent input | Fixed at parser/provider boundaries | `1.500` is rejected while supported grouping such as `1,500` remains valid; changed financial provider inputs reject more than two decimals. The broader server/double residual is tracked under P1-04. |
@@ -31,7 +114,7 @@ client-side checks are explicitly separated from Firestore Rules enforcement.
 | P2-05: credit-note lines and 30-day window are not validated | Fixed for supported provider flow | Quantities are aggregated by variant against the original sale and active notes; the server Rules window uses request time. Seller-stock restores are additionally bounded cumulatively by the original sale's recorded deductions. |
 | P2-06: sale lines can disagree with stock deductions | Partially fixed; Rules residual remains | Provider validates positive whole quantities, variant IDs, and exact pair deductions by variant (`qty` dozens plus `extra_pairs`, converted using workspace `pairs_per_carton`). Rules cannot iterate item lists, so a modified client can bypass this comparison; no periodic admin reconciliation report was added. |
 | P2-07: each invoice stores a logo copy | Retained by current output contract | Invoice header snapshots and saved-logo fallback are required by the current PDF governance contract. The proposed removal would break historical branding/fallback behavior; storage cost has not been separately measured. |
-| P2-08: invoice year uses device clock and credit notes share `INV-` | Fixed for new writes; historical identifiers unchanged | New sale, credit-note, and receipt numbers use the tenant-wide high-water sequence above the greater of the legacy invoice and receipt counters, with `INV-`, `CN-`, and `REC-` prefixes and no device-clock year. Firestore Rules validate the shared sequence on same-batch counter/invoice writes; receipt updates carry `last_cash_receipt_id` to bind the exact invoice. Existing identifiers and counters remain unchanged until advanced by a new operation. Deployment remains gated on a client compatibility/minimum-version rollout because older clients still increment only one counter. |
+| P2-08: invoice year uses device clock and credit notes share `INV-` | Fixed for new writes; historical identifiers unchanged | New sale, credit-note, and receipt numbers use the tenant-wide high-water sequence above the greater of the legacy invoice and receipt counters, with `INV-`, `CN-`, and `REC-` prefixes and no device-clock year. Firestore Rules validate the shared sequence on same-batch counter/invoice writes; receipt updates carry `last_cash_receipt_id` to bind the exact invoice. Existing identifiers and counters remain unchanged until advanced by a new operation. The matching Rules/indexes deployment completed after 207 emulator tests passed; the user reports current clients on JBM Impex. Older-client compatibility remains a rollout risk, and no minimum-version enforcement was added. |
 | P3-01: unreachable return-notification block | Fixed / no longer present | Current return/credit-note completion has no seller-notification call; the shared writer accepts invoice and standalone transaction sources, not `return`. |
 | P3-02: invoice counter serializes concurrent sales | Hypothesis not measured | Counter increment is inside the same Firestore transaction as invoice writes. No concurrent-load emulator benchmark established a user-visible contention failure; changing to block allocation would alter numbering and is not justified by current evidence. |
 | P3-03: transaction deletion is read-then-batch | Fixed | `deleteTransaction` re-reads transaction and shop inside `runTransaction`, then soft-deletes and reverses the exact balance atomically. |
@@ -78,36 +161,60 @@ client-side checks are explicitly separated from Firestore Rules enforcement.
   Flutter app.
 - A composite invoice index for `(tenant_id, linked_invoice_id)` is present
   locally. The provider-side item-to-deduction check is not Rules enforcement.
-  P1-04 remains release-blocking: stored monetary values and shop balances are
-  still doubles with tolerance comparisons; integer minor-unit conversion,
-  historical reconciliation, backup/PDF compatibility, and a minimum-client
-  rollout strategy have not been implemented. Equal SAR/PKR caps do not settle
-  currency-specific policy. Invoice-counter contention has not been measured.
-- Safe cutover sequence identified; implementation remains blocked pending
-  reviewed schema and access authorization:
-  1. Inventory every monetary field and writer/reader, including shop balances,
-     invoice lifecycle totals, ledger rows, backups/restores, and export/PDF
-     calculations. Add dual-read and representation-consistency tests before
-     changing persisted data.
-  2. Release a compatibility client that reads legacy values while
-     dual-writing validated integer minor units with legacy values in the same
-     atomic financial operation. Rules must check both representations agree
-     and preserve existing client writes during this migration phase.
-  3. Take a verified, tenant-scoped backup and run a paged, read-only
-     production preview. Reject sub-cent/ambiguous values, tenant mismatches,
-     missing links, and shop-ledger reconciliation exceptions; do not infer
-     shop balances by summing incomplete/voided historical ledger rows.
-  4. Review the preview and reconcile exceptions before any write. Backfill
-     only companion integer fields in idempotent tenant-scoped batches without
-     changing historical monetary values or deleting ledger records.
-  5. Establish and enforce a minimum compatible client version (old clients
-     must fail with actionable update guidance), then deploy Rules requiring
-     integer values and exact minor-unit balance deltas. Only after every
-     tenant is reconciled may integer fields become the sole monetary source
-     and legacy double fields be retired.
-  No production reads or writes have been authorized for this session, and no
-  approved backup artifact, reconciliation preview, or minimum-client
-  mechanism is evidenced; therefore no backfill or release is safe yet.
+- The local compatibility stage adds `financial_minor_units` for shop
+  balance/bad-debt/latest-transaction amounts; transaction amount, edit
+  request, line-item, and edit-history amounts; and invoice total, subtotal,
+  discount, receipt/outstanding/credit totals, shop-balance snapshots, and
+  line-item amounts. A model reads a companion only when it agrees with the
+  legacy value; missing, stale, or mismatched companions retain legacy
+  behavior. Financial providers dual-write companions with their existing
+  atomic writes, and backup restore rebuilds companions from unchanged legacy
+  amounts.
+- The backup preview validates a verified same-tenant workspace archive and
+  reports malformed, sub-cent, duplicate, or cross-tenant records. The
+  admin-only backfill is document-ID paged (100 by default, maximum 400),
+  tenant-scoped, idempotent, and updates companion fields only. A shared
+  mapping translates the legacy Firestore `customers` path to migration key
+  `shops`. No production backup preview or backfill was run.
+- Local Rules permit optional staged companions, including companion-only
+  backfill writes, while keeping older-client writes possible. They do not
+  yet require companions, validate every representation pair, or enforce
+  exact minor-unit balance deltas. Existing doubles and tolerance checks
+  remain authoritative; this compatibility code is not a strict migration.
+- Final local verification after the mapping regression: focused Flutter suite
+  `00:08 +137: All tests passed!`; Rules Emulator `204 passing (1m)` with
+  `EMULATOR_EXIT: 0`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 108.8s)`; `dart analyze test/`:
+  `No issues found!`. Hot restart was attempted, but no app was registered
+  with the connected Dart Tooling Daemon. Markdown lint and `git diff --check`
+  are required after these documentation edits.
+- P1-04 remains release-blocking: legacy doubles are still present and
+  authoritative, while historical reconciliation, backup/PDF/client rollout,
+  strict Rules enforcement, and exact integer balance arithmetic remain
+  unresolved. Equal SAR/PKR caps do not settle currency-specific policy.
+  Invoice-counter contention has not been measured.
+- Safe cutover sequence identified; production migration remains blocked
+  pending review, compatibility deployment, and explicit data-write
+  authorization:
+  1. Complete review of every monetary field, reader, writer, backup/restore,
+     and export/PDF path against the companion schema.
+  2. Complete compatibility testing, then release the dual-read/write client
+     to the approved Play and sideload channels. Manually verify relevant
+     installed clients; do not assume forced updates.
+  3. Take a verified, tenant-scoped backup and review the existing preview.
+     Reject sub-cent/ambiguous values, tenant mismatches, missing links, and
+     shop-ledger reconciliation exceptions; do not infer balances by summing
+     incomplete or voided ledger history.
+  4. Review the preview and reconcile exceptions before authorizing any
+     write. Run the idempotent companion-only backfill without changing
+     historical monetary values or deleting ledger records.
+  5. Establish a minimum compatible client policy and deploy Rules that
+     require integer values and exact minor-unit balance deltas. Only after
+     every tenant is reconciled may integer fields become the sole monetary
+     source and legacy doubles be retired.
+  Production access, backup review, preview, backfill, strict Rules
+  deployment, release, and client delivery remain unauthorized or incomplete;
+  no production financial data was read or changed.
 - Rules/index deployment, Hosting, release builds, device delivery, commit,
   and push are separate operations and are not represented as completed by
   this audit entry.
@@ -121,8 +228,11 @@ client-side checks are explicitly separated from Firestore Rules enforcement.
 - The notification screen's referenced-shop visibility stream previously
   queried as many as 30 IDs at once. The Rules path combines tenant, active
   profile, role, and shop-visibility checks; the large query exceeded the
-  Firestore Rules document-access-call budget in a larger workspace. This
-  explains why smaller workspaces could work while JBM Impex failed.
+  Firestore Rules document-access-call budget in emulator coverage for larger
+  workspaces. This was a verified scale-related failure mode, but the
+  continuing JBM Impex notification report still needs an authenticated
+  production check; the emulator result does not prove that it is the live
+  workspace's current cause.
 - Shop visibility now resolves IDs in batches of five. App authorization and
   Firestore Rules were not weakened. A 50-shop emulator regression covers
   both workspace admins and supervisors across ten chunks.

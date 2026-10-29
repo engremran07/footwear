@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/constants/collections.dart';
 import '../core/utils/backup_scope_policy.dart';
+import '../core/utils/financial_minor_unit_migration.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/financial_amount_policy.dart';
 import '../core/utils/firestore_pagination.dart';
@@ -485,24 +486,37 @@ class TransactionNotifier extends AsyncNotifier<void> {
         );
       }
 
-      transaction.set(txRef, {
-        'shop_id': shopId,
-        'customer_id': shopId,
-        'shop_name': shopName,
-        'route_id': routeId,
-        'tenant_id': tenantId,
-        'type': type,
-        'sale_type': saleType,
-        'amount': amount,
-        'description': description,
-        'items': const <Map<String, dynamic>>[],
-        'created_by': createdBy,
-        'created_at': createdAt,
-        'deleted': false,
-        'idempotency_key': idempotencyKey,
-      });
+      transaction.set(
+        txRef,
+        FinancialMinorUnitMigration.withMinorUnits('transactions', {
+          'shop_id': shopId,
+          'customer_id': shopId,
+          'shop_name': shopName,
+          'route_id': routeId,
+          'tenant_id': tenantId,
+          'type': type,
+          'sale_type': saleType,
+          'amount': amount,
+          'description': description,
+          'items': const <Map<String, dynamic>>[],
+          'created_by': createdBy,
+          'created_at': createdAt,
+          'deleted': false,
+          'idempotency_key': idempotencyKey,
+        }),
+      );
       transaction.update(shopRef, {
         'balance': FieldValue.increment(balanceDelta),
+        'financial_minor_units':
+            FinancialMinorUnitMigration.companionsAfterUpdate(
+              'shops',
+              shopData,
+              {
+                'balance':
+                    (shopData['balance'] as num).toDouble() + balanceDelta,
+                'last_transaction_amount': amount,
+              },
+            ),
         'updated_at': Timestamp.now(),
         'last_transaction_at': createdAt,
         'last_transaction_type': type,
@@ -557,6 +571,24 @@ class TransactionNotifier extends AsyncNotifier<void> {
     if (saleType != null) updatePayload['sale_type'] = saleType;
     if (transactionDate != null) updatePayload['created_at'] = transactionDate;
 
+    final oldEditHistory = sourceData['edit_history'];
+    if (oldEditHistory != null && oldEditHistory is! List) {
+      throw StateError('Transaction edit history is malformed');
+    }
+    final updatedTransactionData = Map<String, dynamic>.from(sourceData)
+      ..remove(FinancialMinorUnitMigration.companionField)
+      ..['amount'] = newAmount
+      ..['type'] = newType
+      ..['edit_history'] = [...?oldEditHistory as List?, historyEntry];
+    if (extraTxFields.containsKey('edit_request_new_amount')) {
+      updatedTransactionData.remove('edit_request_new_amount');
+    }
+    updatePayload['financial_minor_units'] =
+        FinancialMinorUnitMigration.withMinorUnits(
+          'transactions',
+          updatedTransactionData,
+        )['financial_minor_units'];
+
     transaction.update(transactionRef, updatePayload);
 
     final oldDelta = oldType == TransactionModel.typeCashOut
@@ -568,6 +600,12 @@ class TransactionNotifier extends AsyncNotifier<void> {
     final netChange = -oldDelta + newDelta;
     final shopUpdate = <String, dynamic>{
       'balance': FieldValue.increment(netChange),
+      'financial_minor_units':
+          FinancialMinorUnitMigration.companionsAfterUpdate('shops', shopData, {
+            'balance': (shopData['balance'] as num).toDouble() + netChange,
+            if (shopData['last_transaction_id'] == txId)
+              'last_transaction_amount': newAmount,
+          }),
       'last_balance_correction_transaction_id': txId,
       'updated_at': Timestamp.now(),
     };
@@ -751,6 +789,8 @@ class TransactionNotifier extends AsyncNotifier<void> {
             'tenant_id': tenantId,
             'deleted': false,
           });
+          final balanceAfter =
+              (shopData['balance'] as num).toDouble() + model.balanceImpact;
           final shopUpdate = <String, dynamic>{
             'balance': FieldValue.increment(model.balanceImpact),
             'updated_at': Timestamp.now(),
@@ -764,6 +804,16 @@ class TransactionNotifier extends AsyncNotifier<void> {
               'last_transaction_id': txId,
             });
           }
+          shopUpdate['financial_minor_units'] =
+              FinancialMinorUnitMigration.companionsAfterUpdate(
+                'shops',
+                shopData,
+                {
+                  'balance': balanceAfter,
+                  if (shopUpdate.containsKey('last_transaction_amount'))
+                    'last_transaction_amount': model.amount,
+                },
+              );
           transaction.update(shopRef, shopUpdate);
           return true;
         });
@@ -876,6 +926,9 @@ class TransactionNotifier extends AsyncNotifier<void> {
           'updated_at': FieldValue.serverTimestamp(),
           'last_balance_correction_transaction_id': txId.trim(),
         };
+        final shopFinancialUpdates = <String, dynamic>{
+          'balance': (shopData['balance'] as num).toDouble() + reversalDelta,
+        };
         if (shopData['last_transaction_id'] == txId.trim()) {
           shopUpdate.addAll({
             'last_transaction_at': FieldValue.delete(),
@@ -883,7 +936,14 @@ class TransactionNotifier extends AsyncNotifier<void> {
             'last_transaction_amount': FieldValue.delete(),
             'last_transaction_id': FieldValue.delete(),
           });
+          shopFinancialUpdates['last_transaction_amount'] = null;
         }
+        shopUpdate['financial_minor_units'] =
+            FinancialMinorUnitMigration.companionsAfterUpdate(
+              'shops',
+              shopData,
+              shopFinancialUpdates,
+            );
         transaction.update(shopRef, shopUpdate);
       });
     });
@@ -1081,6 +1141,12 @@ class TransactionNotifier extends AsyncNotifier<void> {
         false;
 
     if (allowEditRequests) {
+      final financialMinorUnits =
+          FinancialMinorUnitMigration.companionsAfterUpdate(
+            'transactions',
+            data,
+            {'edit_request_new_amount': newAmount},
+          );
       await txRef
           .update({
             'edit_request_pending': true,
@@ -1088,6 +1154,7 @@ class TransactionNotifier extends AsyncNotifier<void> {
             'edit_request_requested_by': sellerId.trim(),
             'edit_request_requested_at': Timestamp.now(),
             'edit_request_new_amount': newAmount,
+            'financial_minor_units': financialMinorUnits,
             'edit_request_new_type': newType,
             'edit_request_new_description': description,
             'edit_request_new_sale_type': saleType,

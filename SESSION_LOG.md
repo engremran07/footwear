@@ -6,6 +6,176 @@
 
 ---
 
+## SESSION-075 — 2026-10-29 — v3.10.17+1128 Delivery
+
+**Agent:** GitHub Copilot
+
+**Trigger:** User explicitly requested current-source APK/AAB builds, device
+delivery, Firestore Rules/indexes and Hosting deployment, and Git publication.
+
+- `flutter analyze lib --no-pub`: `No issues found! (ran in 22.8s)`;
+  `dart analyze test/`: `No issues found!`; full Flutter suite:
+  `01:44 +779: All tests passed!`; Firestore Rules Emulator:
+  `207 passing (59s)`.
+- Web release build reported `EXIT: 0`. Firebase Hosting deployed to
+  `shoeserp-clean-20260327` and reported `Deploy complete!`; live
+  `version.json` reports `3.10.17` / build `1128`, and the main bundle
+  returns `no-store, must-revalidate, no-cache`.
+- `firebase deploy --only firestore:rules,firestore:indexes` reported
+  `Deploy complete!`. Rules were already current; indexes deployed, while 23
+  remote indexes and 2 field overrides absent from the local manifest were
+  preserved.
+- Split APKs built at 31.4 MB (ARMv7), 33.0 MB (ARM64), and 34.5 MB
+  (x86_64). ARM64 v2 signature verification succeeded. ADB reported
+  `1 file pushed` and streamed install `Success` on `R5GL22RGT9V`;
+  installed versionName is `3.10.17`, versionCode `310173128`.
+- The signed 72.5 MB AAB reports `jar verified.`; the local signer chain is
+  self-signed/untrusted and has no timestamp. It was not uploaded to Play
+  Console. No version bump was made, so upload eligibility depends on whether
+  Play Console has already consumed versionCode `310173128`.
+- P1-04's historical reconciliation, strict minor-unit migration, and
+  compatible-client rollout remain unresolved. Emulator success does not
+  prove production business-flow compatibility.
+- Git publication remains pending; no production business data was read or
+  changed.
+
+---
+
+## SESSION-074 — 2026-10-29 — JBM Invoice Recovery Check
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Verify invoice behavior after the authorized Rules/indexes
+deployment using the user's designated JBM test route and shop.
+
+- The user reports that invoice creation, non-stock sales, and cash receipts
+  succeeded for admin, supervisor, and seller on the `Testing` route /
+  `owerty` test shop. The reported recovery after Rules deployment supports
+  the shared invoice/receipt sequence mismatch as the likely blocker; the
+  original denied rule and live counter condition remain unconfirmed because
+  no pre-fix SDK error or counter values were captured.
+- A live `adb logcat` capture from the already installed v3.10.17+1128 app
+  showed background Firestore `UNAVAILABLE` errors from DNS resolution
+  failures for `firestore.googleapis.com`, plus App Check token API 403 and
+  retry warnings. It showed no `PERMISSION_DENIED`. These do not identify the
+  invoice failure and may be separate intermittent connectivity/configuration
+  issues.
+- The user operated the test flows; the agent did not directly read or write
+  business data. No debug APK was built or installed because the existing
+  release app provided production-equivalent logging without replacing the
+  installed package. Hosting, app release/build, commit, and push remain
+  unperformed; P1-04 remains open.
+
+---
+
+## SESSION-073 — 2026-10-29 — Invoice Rules Deployment Follow-Up
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue JBM Impex invoice triage after the user authorized
+Firestore Rules/indexes deployment.
+
+- The local Firestore Rules Emulator completed with
+  `207 passing (56s)` and `RULES_EMULATOR_EXIT: 0`.
+- `firebase deploy --only firestore:rules,firestore:indexes` completed
+  against `shoeserp-clean-20260327`; Firebase reported `Deploy complete!`.
+  The deployment preserved 23 remote indexes and 2 field overrides absent
+  from the local manifest; `--force` was not used.
+- The user confirmed active JBM Impex devices use v3.10.17+1128. The deployed
+  Rules address the shared invoice/receipt high-water sequence contract, but
+  no post-deployment invoice attempt or exact Firebase SDK error was captured.
+  The JBM-specific failure therefore remains unconfirmed; no production
+  counters, invoices, or customer data were read or changed.
+- The connected device remains on v3.10.17, version code `310173128`.
+  Hosting, APK/AAB build, device delivery, commit, and push were not performed.
+  P1-04 historical financial reconciliation and strict minor-unit cutover
+  remain open.
+
+---
+
+## SESSION-072 — 2026-10-29 — Mixed-Script PDF Yeh Rendering
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue tracing Arabic/Urdu medial Yeh rendering and the
+workspace-specific invoice failure without touching production data.
+
+- Root cause for the reproduced synthetic PDF case: English-first mixed
+  Arabic/Urdu values were correctly kept LTR to preserve reading order, but
+  the `pdf` 3.13.1 renderer only shapes Arabic-script glyphs in RTL-directed
+  text widgets. The medial Yeh therefore remained unshaped in the LTR widget.
+- Added `pdfTextForDirection` and routed shared PDF text paths through it.
+  English-first mixed text is transformed with `bidi.logicalToVisual` before
+  LTR layout; RTL values and existing presentation forms are left unchanged.
+  Regression coverage checks Arabic and Urdu values, already-shaped text,
+  and plain English. The synthetic raster probe visually matched the
+  transformed reference.
+- Focused PDF suite: `00:01 +16: All tests passed!`; full Flutter suite:
+  `03:27 +779: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 93.6s)`;
+  `dart analyze test/`: `No issues found!`. Hot restart was attempted, but
+  the connected DTD had no running Flutter app.
+- The original production PDF was not available, so its exact rendering
+  remains unverified. The user reports that v3.10.17+1128 shows the same
+  generic permission message for admin, supervisor, and seller invoice
+  attempts in JBM Impex; the exact Firebase code and sequence values are not
+  yet available.
+- Git comparison confirms `origin/main` is v3.10.16+1127, whose provider and
+  Rules increment invoice and receipt counters independently. Local v3.10.17
+  uses the shared high-water sequence and adds the linked receipt ID. The
+  recorded v3.10.17 delivery explicitly did not deploy Rules/indexes. If JBM's
+  receipt counter is higher than its invoice counter and the deployed Rules
+  remain at the recorded remote baseline, the new sale sequence is denied
+  for every role. This is the leading cause, not yet confirmed from live
+  counters/deployed Rules. `REC-` without a year is expected under the new
+  number format. Firestore free-tier quota exhaustion would normally report
+  `resource-exhausted`, not a permission denial; the original SDK error code
+  is still needed.
+- No production Rules, counters, invoices, or customer data were accessed.
+  Before any Rules rollout, confirm both counters, deployed Rules state, and
+  that every active client is compatible. Existing local Rules Emulator
+  results do not prove production deployment.
+- No version bump, release build, device install, production deployment,
+  commit, or push was performed. Delivery remains blocked by old-client
+  sequence incompatibility and the unresolved P1-04 migration/rollout gates.
+
+---
+
+## SESSION-071 — 2026-10-29 — Staging Minor-Unit Compatibility
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the approved local implementation of a staged financial
+minor-unit migration without modifying production data or enforcing a
+minimum-client policy.
+
+- Added optional `financial_minor_units` companions for the defined shop,
+  transaction, and invoice monetary fields. Models use a companion only when
+  it agrees with the legacy value; otherwise they fall back to the old value.
+  Financial provider writes dual-write companions atomically. Restore
+  regenerates companions without rewriting legacy values.
+- Added a same-tenant verified-backup preview and an admin-only,
+  document-ID-paged, idempotent backfill API. It defaults to 100 documents per
+  page, caps pages at 400, and writes only companions. The `customers`
+  Firestore path is mapped to the logical `shops` schema by a shared tested
+  helper used by restore and backfill. Neither API was run against production.
+- Firestore Rules include local staged allowances for companion-only updates
+  but do not require integer companions or exact minor-unit arithmetic. Older
+  clients remain a cutover concern; existing doubles and Rules tolerances
+  continue to govern current writes.
+- Focused Flutter financial/migration suite:
+  `00:08 +137: All tests passed!`; full Rules Emulator:
+  `204 passing (1m)`, `EMULATOR_EXIT: 0`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 108.8s)`; `dart analyze test/`:
+  `No issues found!`. Hot restart was attempted, but the connected DTD had no
+  running Flutter app.
+- No production data was read or modified. Rules/Hosting deployment, release
+  builds, phone delivery, commit, and push were not performed. P1-04 remains
+  open until backup/reconciliation, manual client rollout, strict Rules
+  cutover, and explicit production authorization are complete.
+
+---
+
 ## SESSION-070 — 2026-10-29 — v3.10.17 Local Release Candidate
 
 **Agent:** GitHub Copilot

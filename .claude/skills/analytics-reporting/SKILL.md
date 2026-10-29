@@ -289,8 +289,8 @@ For shared financial documents:
   placement and size; set text direction explicitly for each side and pin
   physical row order with
   `pw.Directionality(textDirection: pw.TextDirection.ltr)` when a page-level
-  RTL direction could reverse children. `pw.Row` in `pdf` 3.12.0 does not
-  accept a `textDirection` argument.
+  RTL direction could reverse children. `pw.Row` in pinned `pdf` 3.13.1
+  does not accept a `textDirection` argument.
 - Prefer current workspace logo bytes when available, but preserve a saved
   invoice logo when the current-header path has no usable logo bytes. Respect
   the explicit `visibleFields` logo setting.
@@ -306,12 +306,16 @@ For shared financial documents:
   or a font-resource assertion.
 
   For RTL financial tables, verify physical columns in the rendered PDF, not
-  only the extracted text or successful PDF generation. In `pdf` 3.12.0, the
+  only the extracted text or successful PDF generation. In `pdf` 3.13.1, the
   page-level RTL direction can reverse `pw.Row`/table children. Wrap table
   headers, data rows, summary blocks, and final-balance rows in explicit LTR
   directionality when the intended physical order is English-left and
   amount/balance-right; give each Arabic/Urdu text widget its own RTL direction.
   Keep amount direction explicit as well.
+  English-first mixed-script values must be shaped through
+  `pdfTextForDirection` before LTR layout. Test medial Arabic and Urdu Yeh,
+  and avoid changing the paragraph to RTL merely because Arabic/Urdu occurs
+  later in the value.
 
   Statement-specific density changes must preserve the shared workspace
   header and financial calculations. Centralized logo placement and sizing

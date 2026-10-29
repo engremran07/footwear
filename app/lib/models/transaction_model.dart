@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../core/utils/financial_minor_unit_migration.dart';
+
 // =============================================================================
 // TransactionModel — single ledger entry for a shop's account.
 //
@@ -64,7 +66,11 @@ class TransactionItem {
     );
   }
 
-  factory TransactionItem.fromJson(Map<String, dynamic> json) {
+  factory TransactionItem.fromJson(
+    Map<String, dynamic> json, {
+    Map<String, dynamic>? financialMinorUnits,
+    String? itemPath,
+  }) {
     return TransactionItem(
       variantId: json['variant_id'] as String? ?? '',
       sku: json['sku'] as String? ?? '',
@@ -72,8 +78,16 @@ class TransactionItem {
       size: json['size'] as String? ?? '',
       color: json['color'] as String? ?? '',
       qty: json['qty'] as int? ?? 0,
-      unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0,
-      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0,
+      unitPrice: FinancialMinorUnitMigration.readMajorAmount(
+        json['unit_price'] as num?,
+        financialMinorUnits,
+        itemPath == null ? 'unit_price' : '$itemPath.unit_price',
+      ),
+      subtotal: FinancialMinorUnitMigration.readMajorAmount(
+        json['subtotal'] as num?,
+        financialMinorUnits,
+        itemPath == null ? 'subtotal' : '$itemPath.subtotal',
+      ),
     );
   }
 
@@ -185,6 +199,8 @@ class TransactionModel {
 
   factory TransactionModel.fromJson(Map<String, dynamic> json, String docId) {
     final rawItems = json['items'] as List<dynamic>?;
+    final financialMinorUnits =
+        json['financial_minor_units'] as Map<String, dynamic>?;
     final shopId = (json['shop_id'] as String?)?.trim() ?? '';
     final shopName = (json['shop_name'] as String?)?.trim() ?? '';
     return TransactionModel(
@@ -194,14 +210,23 @@ class TransactionModel {
       routeId: json['route_id'] as String? ?? '',
       type: json['type'] as String? ?? 'cash_out',
       saleType: json['sale_type'] as String?,
-      amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      amount: FinancialMinorUnitMigration.readMajorAmount(
+        json['amount'] as num?,
+        financialMinorUnits,
+        'amount',
+      ),
       currency: json['currency'] as String? ?? 'SAR',
       description: json['description'] as String?,
-      items:
-          rawItems
-              ?.map((e) => TransactionItem.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
+      items: rawItems == null
+          ? []
+          : [
+              for (var index = 0; index < rawItems.length; index++)
+                TransactionItem.fromJson(
+                  rawItems[index] as Map<String, dynamic>,
+                  financialMinorUnits: financialMinorUnits,
+                  itemPath: 'items.$index',
+                ),
+            ],
       invoiceId: json['invoice_id'] as String?,
       invoiceNumber: json['invoice_number'] as String?,
       createdBy: json['created_by'] as String? ?? '',
@@ -217,8 +242,13 @@ class TransactionModel {
       editRequestStatus: json['edit_request_status'] as String?,
       editRequestRequestedBy: json['edit_request_requested_by'] as String?,
       editRequestRequestedAt: json['edit_request_requested_at'] as Timestamp?,
-      editRequestNewAmount: (json['edit_request_new_amount'] as num?)
-          ?.toDouble(),
+      editRequestNewAmount: json['edit_request_new_amount'] == null
+          ? null
+          : FinancialMinorUnitMigration.readMajorAmount(
+              json['edit_request_new_amount'] as num?,
+              financialMinorUnits,
+              'edit_request_new_amount',
+            ),
       editRequestNewType: json['edit_request_new_type'] as String?,
       editRequestNewDescription:
           json['edit_request_new_description'] as String?,
@@ -230,47 +260,49 @@ class TransactionModel {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'shop_id': shopId,
-    'shop_name': shopName,
-    'route_id': routeId,
-    'type': type,
-    'sale_type': saleType,
-    'amount': amount,
-    'currency': currency,
-    'description': description,
-    'items': items.map((e) => e.toJson()).toList(),
-    if (invoiceId != null) 'invoice_id': invoiceId,
-    if (invoiceNumber != null) 'invoice_number': invoiceNumber,
-    'created_by': createdBy,
-    'created_at': createdAt,
-    'deleted': deleted,
-    if (deletedAt != null) 'deleted_at': deletedAt,
-    if (deletedBy != null) 'deleted_by': deletedBy,
-    'voided': voided,
-    if (voidedInvoiceId != null) 'voided_invoice_id': voidedInvoiceId,
-    if (voidedAt != null) 'voided_at': voidedAt,
-    if (voidedBy != null) 'voided_by': voidedBy,
-    'edit_request_pending': editRequestPending,
-    if (editRequestStatus != null) 'edit_request_status': editRequestStatus,
-    if (editRequestRequestedBy != null)
-      'edit_request_requested_by': editRequestRequestedBy,
-    if (editRequestRequestedAt != null)
-      'edit_request_requested_at': editRequestRequestedAt,
-    if (editRequestNewAmount != null)
-      'edit_request_new_amount': editRequestNewAmount,
-    if (editRequestNewType != null) 'edit_request_new_type': editRequestNewType,
-    if (editRequestNewDescription != null)
-      'edit_request_new_description': editRequestNewDescription,
-    if (editRequestNewSaleType != null)
-      'edit_request_new_sale_type': editRequestNewSaleType,
-    if (editRequestNewCreatedAt != null)
-      'edit_request_new_created_at': editRequestNewCreatedAt,
-    if (editRequestReviewedBy != null)
-      'edit_request_reviewed_by': editRequestReviewedBy,
-    if (editRequestReviewedAt != null)
-      'edit_request_reviewed_at': editRequestReviewedAt,
-  };
+  Map<String, dynamic> toJson() =>
+      FinancialMinorUnitMigration.withMinorUnits('transactions', {
+        'shop_id': shopId,
+        'shop_name': shopName,
+        'route_id': routeId,
+        'type': type,
+        'sale_type': saleType,
+        'amount': amount,
+        'currency': currency,
+        'description': description,
+        'items': items.map((e) => e.toJson()).toList(),
+        if (invoiceId != null) 'invoice_id': invoiceId,
+        if (invoiceNumber != null) 'invoice_number': invoiceNumber,
+        'created_by': createdBy,
+        'created_at': createdAt,
+        'deleted': deleted,
+        if (deletedAt != null) 'deleted_at': deletedAt,
+        if (deletedBy != null) 'deleted_by': deletedBy,
+        'voided': voided,
+        if (voidedInvoiceId != null) 'voided_invoice_id': voidedInvoiceId,
+        if (voidedAt != null) 'voided_at': voidedAt,
+        if (voidedBy != null) 'voided_by': voidedBy,
+        'edit_request_pending': editRequestPending,
+        if (editRequestStatus != null) 'edit_request_status': editRequestStatus,
+        if (editRequestRequestedBy != null)
+          'edit_request_requested_by': editRequestRequestedBy,
+        if (editRequestRequestedAt != null)
+          'edit_request_requested_at': editRequestRequestedAt,
+        if (editRequestNewAmount != null)
+          'edit_request_new_amount': editRequestNewAmount,
+        if (editRequestNewType != null)
+          'edit_request_new_type': editRequestNewType,
+        if (editRequestNewDescription != null)
+          'edit_request_new_description': editRequestNewDescription,
+        if (editRequestNewSaleType != null)
+          'edit_request_new_sale_type': editRequestNewSaleType,
+        if (editRequestNewCreatedAt != null)
+          'edit_request_new_created_at': editRequestNewCreatedAt,
+        if (editRequestReviewedBy != null)
+          'edit_request_reviewed_by': editRequestReviewedBy,
+        if (editRequestReviewedAt != null)
+          'edit_request_reviewed_at': editRequestReviewedAt,
+      });
 
   TransactionModel copyWith({
     String? id,

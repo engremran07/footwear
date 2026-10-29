@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../core/utils/financial_minor_unit_migration.dart';
+
 // =============================================================================
 // ShopModel — canonical entity for retail shops / distribution points.
 //
@@ -75,6 +77,8 @@ class ShopModel {
   bool get hasOutstanding => balance > 0;
 
   factory ShopModel.fromJson(Map<String, dynamic> json, String docId) {
+    final financialMinorUnits =
+        json['financial_minor_units'] as Map<String, dynamic>?;
     return ShopModel(
       id: docId,
       name: json['name'] as String? ?? '',
@@ -86,51 +90,69 @@ class ShopModel {
       city: json['city'] as String?,
       contactName: json['contact_name'] as String?,
       category: json['category'] as String?,
-      balance: (json['balance'] as num?)?.toDouble() ?? 0,
+      balance: FinancialMinorUnitMigration.readMajorAmount(
+        json['balance'] as num?,
+        financialMinorUnits,
+        'balance',
+      ),
       notes: json['notes'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       active: json['active'] as bool? ?? true,
       badDebt: json['bad_debt'] as bool? ?? false,
-      badDebtAmount: (json['bad_debt_amount'] as num?)?.toDouble() ?? 0,
+      badDebtAmount: FinancialMinorUnitMigration.readMajorAmount(
+        json['bad_debt_amount'] as num?,
+        financialMinorUnits,
+        'bad_debt_amount',
+      ),
       badDebtDate: json['bad_debt_date'] as Timestamp?,
       createdBy: json['created_by'] as String? ?? '',
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
       updatedAt: json['updated_at'] as Timestamp? ?? Timestamp.now(),
       lastTransactionAt: json['last_transaction_at'] as Timestamp?,
       lastTransactionType: json['last_transaction_type'] as String?,
-      lastTransactionAmount: (json['last_transaction_amount'] as num?)
-          ?.toDouble(),
+      lastTransactionAmount:
+          json['last_transaction_amount'] == null &&
+              financialMinorUnits?['last_transaction_amount'] == null
+          ? null
+          : FinancialMinorUnitMigration.readMajorAmount(
+              json['last_transaction_amount'] as num?,
+              financialMinorUnits,
+              'last_transaction_amount',
+            ),
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'route_id': routeId,
-    'route_number': routeNumber,
-    'phone': phone,
-    'address': address,
-    'area': area,
-    'city': city,
-    'contact_name': contactName,
-    if (category != null && category!.trim().isNotEmpty) 'category': category,
-    'balance': balance,
-    'notes': notes,
-    'latitude': latitude,
-    'longitude': longitude,
-    'active': active,
-    'bad_debt': badDebt,
-    'bad_debt_amount': badDebtAmount,
-    if (badDebtDate != null) 'bad_debt_date': badDebtDate,
-    'created_by': createdBy,
-    'created_at': createdAt,
-    'updated_at': updatedAt,
-    if (lastTransactionAt != null) 'last_transaction_at': lastTransactionAt,
-    if (lastTransactionType != null)
-      'last_transaction_type': lastTransactionType,
-    if (lastTransactionAmount != null)
-      'last_transaction_amount': lastTransactionAmount,
-  };
+  Map<String, dynamic> toJson() => FinancialMinorUnitMigration.withMinorUnits(
+    'shops',
+    {
+      'name': name,
+      'route_id': routeId,
+      'route_number': routeNumber,
+      'phone': phone,
+      'address': address,
+      'area': area,
+      'city': city,
+      'contact_name': contactName,
+      if (category != null && category!.trim().isNotEmpty) 'category': category,
+      'balance': balance,
+      'notes': notes,
+      'latitude': latitude,
+      'longitude': longitude,
+      'active': active,
+      'bad_debt': badDebt,
+      'bad_debt_amount': badDebtAmount,
+      if (badDebtDate != null) 'bad_debt_date': badDebtDate,
+      'created_by': createdBy,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+      if (lastTransactionAt != null) 'last_transaction_at': lastTransactionAt,
+      if (lastTransactionType != null)
+        'last_transaction_type': lastTransactionType,
+      if (lastTransactionAmount != null)
+        'last_transaction_amount': lastTransactionAmount,
+    },
+  );
 
   @override
   bool operator ==(Object other) =>

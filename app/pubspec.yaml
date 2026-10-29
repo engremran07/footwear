@@ -23,6 +23,7 @@ dependencies:
   image_picker: ^1.1.2
   uuid: ^4.5.1
   logger: ^2.4.0
+  bidi: ^2.0.13
   pdf: ^3.13.1
   printing: ^5.15.1
   share_plus: ^13.3.0

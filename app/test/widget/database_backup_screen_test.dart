@@ -71,24 +71,64 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView), const Offset(0, -700));
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('Save backup to phone storage'),
+      300,
+      scrollable: scrollable,
+    );
     await tester.pumpAndSettle();
     final createBackup = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Save backup to phone storage'),
     );
     expect(createBackup.onPressed, isNotNull);
+    expect(find.text('Save backup to phone storage'), findsOneWidget);
+    expect(find.text('Backup Now'), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.text('Financial precision migration'),
+      300,
+      scrollable: scrollable,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Financial precision migration'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Restore from app backup'),
+      300,
+      scrollable: scrollable,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Restore from app backup'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Restore from phone storage'),
+      300,
+      scrollable: scrollable,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Restore from phone storage'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Restore from Google Drive'),
+      300,
+      scrollable: scrollable,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Restore from Google Drive'), findsOneWidget);
     expect(
       find.text(
         'Automatic Google Drive backup is unavailable until this build is configured.',
       ),
       findsOneWidget,
     );
-    expect(find.text('Save backup to phone storage'), findsOneWidget);
-    expect(find.text('Backup Now'), findsNothing);
-    expect(find.text('Restore from app backup'), findsOneWidget);
-    expect(find.text('Restore from phone storage'), findsOneWidget);
-    expect(find.text('Restore from Google Drive'), findsOneWidget);
 
+    await tester.scrollUntilVisible(
+      find.text('Restore from app backup'),
+      -300,
+      scrollable: scrollable,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Restore from app backup'));
     await tester.pumpAndSettle();
     expect(find.text('test.shoesbackup'), findsOneWidget);
@@ -224,6 +264,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Routes'), findsNothing);
+    expect(find.text('Financial precision migration'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -287,6 +328,7 @@ void main() {
     );
     expect(localRestore.onPressed, isNotNull);
     expect(find.text('Restore from app backup'), findsOneWidget);
+    expect(find.text('Financial precision migration'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../core/utils/financial_minor_unit_migration.dart';
 import 'transaction_model.dart';
 
 double invoiceOutstandingAfterCredits({
@@ -72,6 +73,7 @@ class InvoiceModel {
   final double total;
   final String saleType; // cash | credit
   final double amountReceived; // cash collected at time of invoice
+  final double creditNoteTotal;
   final double outstandingAmount;
   final String status; // draft | issued | paid | partial | void
   static const String statusDraft = 'draft';
@@ -110,6 +112,7 @@ class InvoiceModel {
     required this.total,
     this.saleType = 'credit',
     this.amountReceived = 0,
+    this.creditNoteTotal = 0,
     this.outstandingAmount = 0,
     required this.status,
     this.notes,
@@ -142,10 +145,23 @@ class InvoiceModel {
 
   factory InvoiceModel.fromJson(Map<String, dynamic> json, String docId) {
     final rawItems = json['items'] as List<dynamic>?;
-    final total = (json['total'] as num?)?.toDouble() ?? 0;
-    final amountReceived = (json['amount_received'] as num?)?.toDouble() ?? 0;
-    final creditNoteTotal =
-        (json['credit_note_total'] as num?)?.toDouble() ?? 0;
+    final financialMinorUnits =
+        json['financial_minor_units'] as Map<String, dynamic>?;
+    final total = FinancialMinorUnitMigration.readMajorAmount(
+      json['total'] as num?,
+      financialMinorUnits,
+      'total',
+    );
+    final amountReceived = FinancialMinorUnitMigration.readMajorAmount(
+      json['amount_received'] as num?,
+      financialMinorUnits,
+      'amount_received',
+    );
+    final creditNoteTotal = FinancialMinorUnitMigration.readMajorAmount(
+      json['credit_note_total'] as num?,
+      financialMinorUnits,
+      'credit_note_total',
+    );
     final rawDeductions =
         (json['seller_inventory_deductions'] as Map<String, dynamic>?) ??
         const <String, dynamic>{};
@@ -163,16 +179,30 @@ class InvoiceModel {
       routeId: json['route_id'] as String? ?? '',
       sellerId: json['seller_id'] as String? ?? '',
       sellerName: json['seller_name'] as String? ?? '',
-      items:
-          rawItems
-              ?.map((e) => TransactionItem.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0,
-      discount: (json['discount'] as num?)?.toDouble() ?? 0,
+      items: rawItems == null
+          ? []
+          : [
+              for (var index = 0; index < rawItems.length; index++)
+                TransactionItem.fromJson(
+                  rawItems[index] as Map<String, dynamic>,
+                  financialMinorUnits: financialMinorUnits,
+                  itemPath: 'items.$index',
+                ),
+            ],
+      subtotal: FinancialMinorUnitMigration.readMajorAmount(
+        json['subtotal'] as num?,
+        financialMinorUnits,
+        'subtotal',
+      ),
+      discount: FinancialMinorUnitMigration.readMajorAmount(
+        json['discount'] as num?,
+        financialMinorUnits,
+        'discount',
+      ),
       total: total,
       saleType: json['sale_type'] as String? ?? 'credit',
       amountReceived: amountReceived,
+      creditNoteTotal: creditNoteTotal,
       outstandingAmount: invoiceOutstandingAfterCredits(
         total: total,
         amountReceived: amountReceived,
@@ -182,8 +212,20 @@ class InvoiceModel {
       notes: json['notes'] as String?,
       paymentMethod: json['payment_method'] as String?,
       paymentReference: json['payment_reference'] as String?,
-      shopBalanceBefore: (json['shop_balance_before'] as num?)?.toDouble(),
-      shopBalanceAfter: (json['shop_balance_after'] as num?)?.toDouble(),
+      shopBalanceBefore: json['shop_balance_before'] == null
+          ? null
+          : FinancialMinorUnitMigration.readMajorAmount(
+              json['shop_balance_before'] as num?,
+              financialMinorUnits,
+              'shop_balance_before',
+            ),
+      shopBalanceAfter: json['shop_balance_after'] == null
+          ? null
+          : FinancialMinorUnitMigration.readMajorAmount(
+              json['shop_balance_after'] as num?,
+              financialMinorUnits,
+              'shop_balance_after',
+            ),
       cashReceiptSequence: (json['cash_receipt_sequence'] as num?)?.toInt(),
       linkedInvoiceId: json['linked_invoice_id'] as String?,
       idempotencyKey: json['idempotency_key'] as String?,
@@ -200,40 +242,44 @@ class InvoiceModel {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'invoice_number': invoiceNumber,
-    'type': type,
-    'shop_id': shopId,
-    'shop_name': shopName,
-    'route_id': routeId,
-    'seller_id': sellerId,
-    'seller_name': sellerName,
-    'items': items.map((e) => e.toJson()).toList(),
-    'subtotal': subtotal,
-    'discount': discount,
-    'total': total,
-    'sale_type': saleType,
-    'amount_received': amountReceived,
-    'outstanding_amount': outstandingAmount,
-    'status': status,
-    'notes': notes,
-    if (paymentMethod != null) 'payment_method': paymentMethod,
-    if (paymentReference != null) 'payment_reference': paymentReference,
-    if (shopBalanceBefore != null) 'shop_balance_before': shopBalanceBefore,
-    if (shopBalanceAfter != null) 'shop_balance_after': shopBalanceAfter,
-    if (cashReceiptSequence != null)
-      'cash_receipt_sequence': cashReceiptSequence,
-    'linked_invoice_id': linkedInvoiceId,
-    if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
-    if (sellerInventoryDeductions.isNotEmpty)
-      'seller_inventory_deductions': sellerInventoryDeductions,
-    'fulfillment_mode': fulfillmentMode,
-    if (headerSnapshot.isNotEmpty) 'invoice_header_snapshot': headerSnapshot,
-    'currency': currency,
-    'created_by': createdBy,
-    'created_at': createdAt,
-    'updated_at': updatedAt,
-  };
+  Map<String, dynamic> toJson() => FinancialMinorUnitMigration.withMinorUnits(
+    'invoices',
+    {
+      'invoice_number': invoiceNumber,
+      'type': type,
+      'shop_id': shopId,
+      'shop_name': shopName,
+      'route_id': routeId,
+      'seller_id': sellerId,
+      'seller_name': sellerName,
+      'items': items.map((e) => e.toJson()).toList(),
+      'subtotal': subtotal,
+      'discount': discount,
+      'total': total,
+      'sale_type': saleType,
+      'amount_received': amountReceived,
+      'credit_note_total': creditNoteTotal,
+      'outstanding_amount': outstandingAmount,
+      'status': status,
+      'notes': notes,
+      if (paymentMethod != null) 'payment_method': paymentMethod,
+      if (paymentReference != null) 'payment_reference': paymentReference,
+      if (shopBalanceBefore != null) 'shop_balance_before': shopBalanceBefore,
+      if (shopBalanceAfter != null) 'shop_balance_after': shopBalanceAfter,
+      if (cashReceiptSequence != null)
+        'cash_receipt_sequence': cashReceiptSequence,
+      'linked_invoice_id': linkedInvoiceId,
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (sellerInventoryDeductions.isNotEmpty)
+        'seller_inventory_deductions': sellerInventoryDeductions,
+      'fulfillment_mode': fulfillmentMode,
+      if (headerSnapshot.isNotEmpty) 'invoice_header_snapshot': headerSnapshot,
+      'currency': currency,
+      'created_by': createdBy,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+    },
+  );
 
   InvoiceModel copyWith({
     String? id,
@@ -250,6 +296,7 @@ class InvoiceModel {
     double? total,
     String? saleType,
     double? amountReceived,
+    double? creditNoteTotal,
     double? outstandingAmount,
     String? status,
     String? notes,
@@ -283,6 +330,7 @@ class InvoiceModel {
       total: total ?? this.total,
       saleType: saleType ?? this.saleType,
       amountReceived: amountReceived ?? this.amountReceived,
+      creditNoteTotal: creditNoteTotal ?? this.creditNoteTotal,
       outstandingAmount: outstandingAmount ?? this.outstandingAmount,
       status: status ?? this.status,
       notes: notes ?? this.notes,
