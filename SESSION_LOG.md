@@ -38,11 +38,17 @@ Gradle source-root failure and resolving local release build setup.
   P1-04's historical minor-unit reconciliation/rollout has no approved
   implementation plan. Existing clients therefore remain a compatibility
   concern. No production data was read or modified. No Rules/indexes or
-  Hosting deployment, Play upload, commit, or push was performed.
+  Hosting deployment, Play upload, or push was performed; the local commit is
+  recorded below.
 - The provided Urdu/Arabic audit records remaining visual coverage gaps:
   no complete representative fixture corpus or full Web/Android rendered
   comparison. Prior font-resource assertions are not visual proof. No
   authenticated document render was available during this device install.
+- The reviewed source, Rules, indexes, tests, and governance changes were
+  committed locally as `f38683a` (`fix: harden financial workflows for
+  v3.10.17`); the unrelated stray untracked path was excluded. The commit was
+  not pushed because doing so would trigger deployment while the financial
+  migration and old-client compatibility gates remain unresolved.
 
 ---
 
