@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../core/l10n/app_locale.dart';
 import '../core/l10n/financial_document_localization.dart';
 import '../core/theme/app_theme.dart';
@@ -140,9 +141,8 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       final actionContext = context;
       if (!_actionGuard.tryStart()) {
         if (actionContext.mounted) {
-          ScaffoldMessenger.of(
-            actionContext,
-          ).showSnackBar(infoSnackBar(tr('action_in_progress', ref)));
+          ScaffoldMessenger.of(actionContext)
+              .showSnackBar(infoSnackBar(tr('action_in_progress', ref)));
         }
         return;
       }
@@ -161,9 +161,8 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       } catch (e) {
         if (actionContext.mounted) {
           final key = AppErrorMapper.key(e);
-          ScaffoldMessenger.of(
-            actionContext,
-          ).showSnackBar(errorSnackBar(tr(key, ref)));
+          ScaffoldMessenger.of(actionContext)
+              .showSnackBar(errorSnackBar(tr(key, ref)));
         }
       } finally {
         _actionGuard.finish();
@@ -172,9 +171,8 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       final actionContext = context;
       if (!_actionGuard.tryStart()) {
         if (actionContext.mounted) {
-          ScaffoldMessenger.of(
-            actionContext,
-          ).showSnackBar(infoSnackBar(tr('action_in_progress', ref)));
+          ScaffoldMessenger.of(actionContext)
+              .showSnackBar(infoSnackBar(tr('action_in_progress', ref)));
         }
         return;
       }
@@ -191,9 +189,8 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       } catch (e) {
         if (actionContext.mounted) {
           final key = AppErrorMapper.key(e);
-          ScaffoldMessenger.of(
-            actionContext,
-          ).showSnackBar(errorSnackBar(tr(key, ref)));
+          ScaffoldMessenger.of(actionContext)
+              .showSnackBar(errorSnackBar(tr(key, ref)));
         }
       } finally {
         _actionGuard.finish();
@@ -235,10 +232,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         inv.invoiceNumber,
       ),
       subtitle: '${trRead('shop', locale)}: ${inv.shopName}',
-      initialDocumentLanguagePair:
-          FinancialDocumentLanguagePair.fromJson(
-            inv.headerSnapshot['document_language_pair'],
-          ),
+      initialDocumentLanguagePair: FinancialDocumentLanguagePair.fromJson(
+        inv.headerSnapshot['document_language_pair'],
+      ),
       pdfBytesBuilderWithLanguagePair: (pair) async {
         final settings = await ref.read(settingsProvider.future);
         return generateInvoicePdf(
@@ -395,17 +391,15 @@ class _InvoiceBody extends ConsumerWidget {
                   children: [
                     Text(
                       lines.first,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: Theme.of(context).textTheme.labelMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     if (lines.length > 1)
                       Text(
                         lines[1],
                         textDirection: TextDirection.rtl,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
+                        style: Theme.of(context).textTheme.labelSmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
                       ),
                   ],
                 );
@@ -530,9 +524,8 @@ class _InvoiceBody extends ConsumerWidget {
                 children: [
                   Text(
                     tr('items', ref),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   ...invoice.items.map(

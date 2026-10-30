@@ -511,63 +511,63 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('invoice header hides language setting and preserves legacy pair', (
-    tester,
-  ) async {
-    final settingsStream = StreamController<SettingsModel>.broadcast();
-    addTearDown(settingsStream.close);
-    final savedPayloads = <Map<String, dynamic>>[];
-    final settingsNotifier = _SavingSettingsNotifier((data) async {
-      savedPayloads.add(Map<String, dynamic>.from(data));
-    });
-    final existingSettings = settings().copyWith(
-      invoiceHeader: settings().invoiceHeader.copyWith(
-        documentLanguagePair: FinancialDocumentLanguagePair.englishUrdu,
-      ),
-    );
+  testWidgets(
+    'invoice header hides language setting and preserves legacy pair',
+    (tester) async {
+      final settingsStream = StreamController<SettingsModel>.broadcast();
+      addTearDown(settingsStream.close);
+      final savedPayloads = <Map<String, dynamic>>[];
+      final settingsNotifier = _SavingSettingsNotifier((data) async {
+        savedPayloads.add(Map<String, dynamic>.from(data));
+      });
+      final existingSettings = settings().copyWith(
+        invoiceHeader: settings().invoiceHeader.copyWith(
+          documentLanguagePair: FinancialDocumentLanguagePair.englishUrdu,
+        ),
+      );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authUserProvider.overrideWith((ref) => Stream.value(admin)),
-          settingsProvider.overrideWith((ref) => settingsStream.stream),
-          settingsNotifierProvider.overrideWith(() => settingsNotifier),
-        ],
-        child: const MaterialApp(home: InvoiceHeaderSettingsScreen()),
-      ),
-    );
-    settingsStream.add(existingSettings);
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(admin)),
+            settingsProvider.overrideWith((ref) => settingsStream.stream),
+            settingsNotifierProvider.overrideWith(() => settingsNotifier),
+          ],
+          child: const MaterialApp(home: InvoiceHeaderSettingsScreen()),
+        ),
+      );
+      settingsStream.add(existingSettings);
+      await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey('financial_document_language_pair')),
-      findsNothing,
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('invoice_header_field_name_en')),
-      'Updated header',
-    );
-    tester.testTextInput.hide();
-    await tester.pump();
+      expect(
+        find.byKey(const ValueKey('financial_document_language_pair')),
+        findsNothing,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('invoice_header_field_name_en')),
+        'Updated header',
+      );
+      tester.testTextInput.hide();
+      await tester.pump();
 
-    final saveButton = find.widgetWithText(FilledButton, 'Save');
-    await tester.scrollUntilVisible(
-      saveButton,
-      240,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(saveButton);
-    await tester.pumpAndSettle();
+      final saveButton = find.widgetWithText(FilledButton, 'Save');
+      await tester.scrollUntilVisible(
+        saveButton,
+        240,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(saveButton);
+      await tester.pumpAndSettle();
 
-    expect(savedPayloads, hasLength(1));
-    expect(
-      (savedPayloads.single['invoice_header'] as Map<String, dynamic>)[
-        'document_language_pair'
-      ],
-      'english_urdu',
-    );
-    expect(tester.takeException(), isNull);
-  });
+      expect(savedPayloads, hasLength(1));
+      expect(
+        (savedPayloads.single['invoice_header']
+            as Map<String, dynamic>)['document_language_pair'],
+        'english_urdu',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('clean workspace settings follow remote changes', (tester) async {
     final settingsStream = StreamController<SettingsModel>();
