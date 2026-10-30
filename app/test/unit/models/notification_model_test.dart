@@ -49,6 +49,16 @@ void main() {
       expect(m.read, isFalse);
     });
 
+    test('sourceDeleted defaults to false and round-trips when true', () {
+      final active = NotificationModel.fromJson(baseJson, 'active');
+      expect(active.toJson()['source_deleted'], isFalse);
+
+      final retiredJson = Map<String, dynamic>.from(baseJson)
+        ..['source_deleted'] = true;
+      final retired = NotificationModel.fromJson(retiredJson, 'retired');
+      expect(retired.toJson()['source_deleted'], isTrue);
+    });
+
     test('invoiceNumber is populated for invoice type', () {
       final json = Map<String, dynamic>.from(baseJson)
         ..['type'] = 'invoice'

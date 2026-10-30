@@ -22,6 +22,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -40,7 +42,30 @@ jobs:
         run: cd app && flutter pub get
 
       - name: dart format --set-exit-if-changed
-        run: cd app && dart format --set-exit-if-changed lib test
+        env:
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          base_sha="$EVENT_BASE_SHA"
+          if [ -z "$base_sha" ] || ! git cat-file -e "$base_sha^{commit}" 2>/dev/null; then
+            base_sha="$(git rev-parse "$GITHUB_SHA^" 2>/dev/null || true)"
+          fi
+
+          if [ -z "$base_sha" ]; then
+            echo "::error::Could not determine the base commit for the Dart format check."
+            exit 1
+          fi
+
+          mapfile -t changed_files < <(
+            git diff --name-only --diff-filter=ACMR "$base_sha" "$GITHUB_SHA" -- app/lib app/test \
+              | grep -E '\.dart$' || true
+          )
+          if [ "${#changed_files[@]}" -eq 0 ]; then
+            echo "No changed Dart files to format-check."
+            exit 0
+          fi
+
+          dart format --output=none --set-exit-if-changed "${changed_files[@]}"
 
       - name: flutter analyze
         run: cd app && flutter analyze lib --no-pub

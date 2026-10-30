@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -21,6 +22,7 @@ import 'package:footwear_erp/screens/notification_center_screen.dart';
 import 'package:footwear_erp/screens/route_form_screen.dart';
 import 'package:footwear_erp/screens/shop_form_screen.dart';
 import 'package:footwear_erp/widgets/app_shell.dart';
+import 'package:footwear_erp/widgets/shimmer_loading.dart';
 
 void main() {
   testWidgets('router page transitions are disabled for reduced motion', (
@@ -141,6 +143,85 @@ void main() {
     );
     expect(find.byType(DatabaseBackupScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('backup route stays visible while role profile is loading', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'whats_new_seen_version': AppBrand.appVersion,
+    });
+    final profile = StreamController<UserModel?>();
+    addTearDown(profile.close);
+    final now = Timestamp.now();
+    final tenant = TenantModel(
+      id: 'tenant-1',
+      name: 'Workspace One',
+      slug: 'workspace-one',
+      createdAt: now,
+      updatedAt: now,
+    );
+    late GoRouter router;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authStateProvider.overrideWith(
+            (ref) => Stream.value(_TestFirebaseUser('test-user')),
+          ),
+          authUserProvider.overrideWith((ref) => profile.stream),
+          databaseBackupProvider.overrideWith(_TestBackupNotifier.new),
+          isOnlineProvider.overrideWith((ref) => Stream.value(true)),
+          tenantProvider('tenant-1')
+              .overrideWith((ref) => Stream.value(tenant)),
+        ],
+        child: Consumer(
+          builder: (context, ref, child) {
+            router = ref.watch(appRouterProvider);
+            return MaterialApp.router(
+              routerConfig: router,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(disableAnimations: true),
+                child: child!,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    router.go('/settings/backup');
+    await tester.pumpAndSettle();
+
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '/settings/backup',
+    );
+    expect(find.byType(ShimmerLoading), findsOneWidget);
+    expect(find.byType(DatabaseBackupScreen), findsNothing);
+
+    profile.add(
+      UserModel(
+        id: 'test-user',
+        email: 'admin@example.com',
+        displayName: 'Workspace Admin',
+        role: UserRole.admin,
+        tenantId: 'tenant-1',
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '/settings/backup',
+    );
+    expect(find.byType(DatabaseBackupScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pump(const Duration(seconds: 7));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('workspace members do not see workspace names in backup UI', (

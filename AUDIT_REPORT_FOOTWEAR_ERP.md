@@ -8,6 +8,306 @@
 **Branch:** main  
 **Firebase project:** shoeserp-clean-20260327
 
+## Scope-Specific Addendum — 2026-10-30 v3.10.20+1132 Export and Release
+
+- The shops-list export now uses complete cursor-paged shop/route data;
+  seller multi-route statements use only assigned-route transaction exports.
+  The PDF keeps empty shops in its cover index but omits their blank ledger
+  sections when both opening balance and transaction list are empty. Section
+  headers use document-global page numbers. PNG page conversion is sequential.
+- Focused export/workspace tests: `00:08 +37: All tests passed!`; full Flutter
+  suite: `01:46 +823: All tests passed!`; Flutter library analyzer:
+  `No issues found! (ran in 26.8s)`; Dart test analyzer: `No issues found!`;
+  Rules Emulator: `214 passing (1m)`.
+- Version/build are synchronized at `3.10.20+1132`. Web build `EXIT: 0`;
+  Hosting deployed; live `version.json` reports `3.10.20+1132` and
+  `main.dart.js` returns `no-cache, no-store, must-revalidate`. Rules/indexes
+  deployment reported `Deploy complete!`; remote-only 23 indexes and 2 field
+  overrides were preserved.
+- ARM64 APK (34,881,627 bytes) verifies with APK v2, was copied to Downloads,
+  and installed on `R5GL22RGT9V` (`Success`, version code `310193132`).
+  Signed AAB (76,447,355 bytes) reports `jar verified.`; its local
+  self-signed/untrusted certificate chain and lack of timestamp remain
+  warnings. Bundletool was unavailable to independently extract its code;
+  the synchronized source/Gradle formula yields `310191132`. It was not
+  uploaded pending Play App Integrity confirmation.
+- Firestore Rules were already current according to deployment output. The
+  local exit-feedback regression confirms permission-denied errors are mapped,
+  and emulator coverage validates the batch-link Rules contract. Neither
+  reproduces the reported production exit denial, so its root cause remains
+  unverified without the affected profile/event state or its exact Firebase
+  error details. No production business documents were inspected or changed.
+- Gradle wrapper 9.3.1, AGP 9.1.0, Kotlin plugin 2.4.0, and Google Services
+  4.5.0 built both APK and AAB. Flutter's future Kotlin plugin migration
+  warning remains. P1-04 financial compatibility/reconciliation, Play upload
+  signer confirmation, and commit/push are still outstanding.
+
+## Scope-Specific Addendum — 2026-10-30 v3.10.20 Android Release
+
+- Added flexible Play updates, required-update policy for Play priority 4+,
+  an owner-configurable Remote Config minimum-version gate, and Android
+  username/email/password autofill hints. ShoesERP does not store passwords.
+- Full Flutter suite: `02:19 +819: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 139.3s)`;
+  `dart analyze test/`: `No issues found!`; Rules Emulator:
+  `214 passing (56s)`. Focused update tests: `00:05 +16: All tests passed!`.
+- Firestore Rules/indexes and Hosting deployed; live web version is
+  `3.10.20+1131` and the Flutter main bundle is not cached. Split APKs built;
+  ARM64 was installed on the connected phone (`Success`, version code
+  `310193131`).
+- Bundletool verifies the signed AAB as `footwear.com.pk`, version `3.10.20`,
+  code `310191131`, one above the prior Play code. Its SHA-256 is
+  `6E83B3AAD2C9AEDB4528B3F5B5653FCE35C685DA09873CFD6856AAD7D8E30BCA`.
+  It was not uploaded because the signing certificate has not been confirmed
+  against Play App Integrity. The Remote Config minimum remains `0` until
+  owner-configured; Play-installed update behavior is not yet verified.
+- APK and AAB builds succeeded with Gradle 9.3.1, AGP 9.1.0, Kotlin Gradle
+  Plugin 2.4.0, and Google Services 4.5.0. A non-blocking future Kotlin
+  Gradle Plugin migration warning from the app/Firebase plugins remains.
+- P1-04, remaining owner-only Play setup/declarations, commit, and push remain
+  open or unperformed. This addendum does not claim Play review or rollout.
+
+## Scope-Specific Addendum — 2026-10-30 Connected Phone Delivery
+
+- The existing signed ARM64 release APK was verified as package
+  `footwear.com.pk`, version `3.10.19`, version code `310193130`; APK v2
+  signature verification succeeded. The connected phone already contained
+  this same version before the reinstall.
+- Copied the APK to the device (`1 file pushed`), reinstalled it
+  (`Success`), and launched the app. Android reports version code
+  `310193130`, version name `3.10.19`, and
+  `lastUpdateTime=2026-10-30 17:47:49`. The post-launch log filter found no
+  fatal Flutter exception, unhandled exception, or `PERMISSION_DENIED`.
+- The CLI DTD still lists the running `Unknown web app`, and the runtime
+  error tool reports `No runtime errors found.` The separate IDE DTD has no
+  connected app.
+- The Closed testing Alpha release remains a draft. Play setup is `1 of 11`
+  complete, with privacy policy, sign-in details, Ads, content rating, target
+  audience, Data safety, government-app status, financial-features
+  declaration, category/contact information, and store listing still
+  outstanding. The release review still requires app setup, full description,
+  financial-features declaration, and acknowledgement of the version-code
+  warning. No declaration or review submission was made because the required
+  owner-approved legal/policy and test-access details are not present.
+
+---
+
+## Scope-Specific Addendum — 2026-10-30 v3.10.19 Deployment and Play Draft
+
+- Release preflight evidence: Firestore Rules Emulator `214 passing (1m)`;
+  full Flutter suite `01:51 +806: All tests passed!`;
+  `flutter analyze lib --no-pub` reported
+  `No issues found! (ran in 9.8s)`; `dart analyze test/` reported
+  `No issues found!`; web build reported `WEB_BUILD_EXIT: 0`.
+- Firestore Rules/indexes and Hosting were deployed to
+  `shoeserp-clean-20260327`, preserving 23 remote-only indexes and 2 field
+  overrides. Live `version.json` reports version `3.10.19`, and
+  `main.dart.js` returns `no-store, must-revalidate, no-cache`.
+- The split APKs are 31.4 MB, 33.0 MB, and 34.6 MB. The signed AAB is
+  76,093,640 bytes (72.6 MB), SHA-256
+  `DA5B54B9591DBDE9386DEAA68EAB3C9F55F90394EDC521517166BEDB612A519F`.
+  The existing Play listing and registered upload certificate match the
+  artifact.
+- The AAB is saved in Closed testing Alpha as draft
+  `3.10.19 (310191130)`. The authorized one-person tester list and existing
+  Alpha tester list are selected; Pakistan is the only target country. The
+  health declaration is complete. No review submission or rollout occurred.
+- Play reports four remaining release errors: incomplete app setup, missing
+  full description, missing financial-features declaration, and an
+  unacknowledged high-version-code warning. The app setup dashboard is 1/11
+  complete; sign-in details, privacy policy, other app-content declarations,
+  category/contact data, and store listing work remain. The local
+  `docs/legal/privacy-policy-draft.html` is not a public URL. No legal
+  declaration or version-warning acknowledgement was submitted.
+- Flutter was launched on Chrome and connected to the command-line DTD; the
+  VM service reported `No runtime errors found.` No Android device was
+  attached for a new APK copy/install. Existing unrelated dirty work remains;
+  no commit or push was performed.
+
+---
+
+## Scope-Specific Addendum — 2026-10-30 Statement Export and Shop Actions
+
+- The shops-list multi-shop statement previously used a fixed PDF callback,
+  so users could not choose Arabic versus Urdu as they can for single-shop
+  statements. A widget regression reproduced the missing selector before the
+  change; the export now passes the selected pair into both multi-shop labels
+  and the workspace header. PDF-derived image, print, and share remain on the
+  same byte-generation path.
+- Shop-detail contextual actions now share the contact row with phone and
+  WhatsApp above the Total In/Total Out summary. The change does not add direct
+  screen writes or alter `PermissionPolicy`, provider guards, financial
+  calculations, or Firestore Rules. Shop-list export and primary navigation
+  remain unchanged.
+- Cash receipt extra contact numbers are supplied from the effective header to
+  the A5 receipt footer; current PDF tests verify contact selection, page size,
+  page count, font, and image resources. Pixel-level inspection of the footer
+  was not performed in this segment.
+- Focused multi-shop, shop-action, PDF, ExportSheet, and settings tests passed.
+  The normal Flutter discovery suite reports `02:00 +806: All tests passed!`;
+  `flutter analyze lib --no-pub` reports
+  `No issues found! (ran in 11.0s)`, and `dart analyze test/` reports
+  `No issues found!`.
+- An initial hand-aggregated `test/all_tests.dart` invocation showed
+  cross-suite locale-state failures; the standard Flutter discovery run passed
+  all 806 tests. No Rules/index deployment, release build, version bump,
+  Hosting deployment, device delivery, commit, or push was performed.
+
+---
+
+## Scope-Specific Addendum — 2026-10-30 Profile and Settings Regressions
+
+- The profile failure was an app-policy ordering issue: the profile UI used a
+  user-management update path, so role-based administration checks rejected
+  self-service name changes. A dedicated provider method now validates the
+  active profile and authenticated UID and writes only the owner's
+  `display_name` and update timestamp. Firestore Rules tests cover admin,
+  legacy manager, tenant admin, super-admin, supervisor, and seller, and deny
+  tenant-ID tampering.
+- Dirty invoice-header navigation now offers Save, Discard, or Cancel. Save
+  failure retains the page and draft and shows mapped feedback. Invoice,
+  statement, and receipt previews are covered by the settings widget tests.
+- Package identity is now consistent across Android application ID,
+  namespace, `MainActivity`, Firebase configuration, ProGuard, and Fastlane:
+  `footwear.com.pk`. The older package value in the package-alignment
+  addendum below records the prior state, not the current configuration.
+- Focused tests: `00:11 +28: All tests passed!`; full Flutter suite:
+  `02:10 +801: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 18.1s)`; `dart analyze test/`:
+  `No issues found!`; Rules Emulator: `214 passing (1m)`.
+- No index change was needed for the self-profile document write. No release
+  artifact was rebuilt, no Rules/Hosting deployment or Play publication was
+  performed, and no device was connected for hot restart/install. The
+  existing APK/AAB predate these latest profile/settings changes.
+
+---
+
+## Scope-Specific Addendum — 2026-10-30 Play Package Identity
+
+- The authenticated Play Console `FootWear` app card identifies the package
+  as `footwear.com.pk`; source `applicationId` was `footwear.pk.com`.
+- Registered a matching Android app in the existing Firebase project and
+  aligned the Android application ID, `google-services.json`, and Dart
+  Firebase Android app ID. The Android namespace/Kotlin source package remain
+  `footwear.pk.com` by design.
+- After the alignment, Flutter library analysis reported
+  `No issues found! (ran in 11.8s)`, Dart test analysis reported
+  `No issues found!`, and the changelog test reported
+  `00:00 +10: All tests passed!`. Free RAM recovered to `3.61 GB` before the
+  signed AAB build. Flutter reported `Running Gradle task 'bundleRelease'...
+  674.5s` and `Built build\app\outputs\bundle\release\app-release.aab
+  (72.5MB)`.
+- Play parsed package `footwear.com.pk`, version `3.10.18`, and code
+  `310181129`; the AAB SHA-256 is
+  `E604DA3993F19AB2B5A0BB8E6DFA2F1E33919938AD2C2176418704F96904ACD7`.
+  `jarsigner -verify` reported `jar verified.` with self-signed/untrusted
+  certificate-chain and no-timestamp warnings.
+- The AAB was uploaded to the Play Console Internal testing track and saved as
+  a draft. Play confirmed the changes were saved and the release can be
+  previewed before publishing. No preview, rollout, or tester distribution
+  occurred. The bundle fingerprint was not independently compared with a
+  registered Play upload certificate.
+- Production deployment, device delivery, APK build/install, commit, and push
+  did not occur. Play setup/closed-testing prerequisites and P1-04 financial
+  compatibility/reconciliation gates remain open. The successful build still
+  emitted a non-blocking future Kotlin Gradle Plugin migration warning for
+  the app and Firebase plugins.
+
+---
+
+## Scope-Specific Addendum — 2026-10-30 Notification Lifecycle Audit Continuation
+
+- Re-traced notification access from auth/profile and tenant scope through the
+  tenant-keyed 50-entry feed, sorted/deduplicated shop-ID visibility listeners,
+  screen error handling, unread badge, mark-read notifier, and Firestore Rules.
+  The feed query has the matching tenant/target-role/created-at composite
+  index. Shop visibility splits the bounded 50 IDs into five-ID queries to
+  stay within Rules document-access limits.
+- No additional local notification defect or JBM-only failure was reproduced.
+  Existing coverage exercises same-tenant refresh, tenant switching, feed and
+  shop-listener errors, 15 tenant/role combinations, a 50-shop lookup, atomic
+  50-item mark-read, inactive/global contexts, and seller/platform denial.
+  Focused Flutter notification tests: `00:03 +34: All tests passed!`;
+  complete local Firestore Rules Emulator: `213 passing (55s)`, exit 0.
+- Android alerts remain opt-in and foreground-only. Official Firebase
+  documentation describes FCM as requiring a trusted sending environment;
+  FCM is listed as no-cost, while Cloud Functions access requires Blaze.
+  Android 13+ requires runtime `POST_NOTIFICATIONS` permission. WorkManager is
+  scheduled background work, not a real-time push transport; adding periodic
+  polling would not identify or fix this feed's live authorization failure.
+  References: [FCM architecture](https://firebase.google.com/docs/cloud-messaging),
+  [Firebase pricing plans](https://firebase.google.com/docs/projects/billing/firebase-pricing-plans),
+  [Android notification permission](https://developer.android.com/develop/ui/views/notifications/notification-permission),
+  and [WorkManager periodic work](https://developer.android.com/develop/background-work/background-tasks/persistent/getting-started/define-work).
+- The live JBM-specific failure remains unassigned to profile, notification
+  feed, shop-visibility listener, or read-state write. The UI distinguishes
+  feed from shop-visibility failures and displays the Firebase error code;
+  obtain that operation/source and code, app version, profile role/active
+  state, and active tenant state before changing Rules or query scope. No
+  production data or Firebase Console metrics were accessed. Rules, Hosting,
+  release, device, Play, and Git operations were not performed.
+
+## Scope-Specific Addendum — 2026-10-30 Account Routing and Notification Regression Triage
+
+- The current role policy intentionally excludes `manageUsers` and
+  `manageBackup` from `supervisor`. Supervisors retain the operational routes,
+  reports, and tenant notification access. Router/widget regressions confirm
+  `/users` and `/settings/backup` redirect to `/` for supervisors, while
+  operational routes and notifications remain accessible. A seller promoted
+  to supervisor will not gain Users or workspace-backup access.
+- The RoleGuard previously returned an invisible `SizedBox` during profile
+  loading, profile errors, and denied capabilities without a caller-provided
+  fallback. Added a shimmer while the profile is unresolved, mapped retry
+  feedback on profile errors, and a localized denial state; explicit
+  fallbacks remain honored. New loading and profile-error regressions failed
+  before the fix and pass afterward. No router redirect, role capability, or
+  Firestore Rules behavior was relaxed.
+- Focused local validation across RoleGuard, router/backup, Users,
+  notification-center, notification-visibility, and notification-writer
+  tests: `00:20 +65: All tests passed!`, including the integrated backup route
+  while the role profile loads; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 13.5s)`; `dart analyze test/`:
+  `No issues found!`. One test emitted a non-fatal SharedPreferences
+  `MissingPluginException` warning. Hot restart was unavailable because no
+  Flutter app was connected to DTD.
+- The Users screen has mapped profile/query error states and Retry coverage;
+  its active-user query is guarded by tenant-scoped `manageUsers` capability.
+  The local backup route permits legacy admins and tenant admins. These tests
+  do not reproduce the affected account's persistent loading or establish
+  whether its role, active status, tenant, workspace lifecycle, query, or
+  deployed Rules caused the live behavior. The exact production operation
+  and Firebase error remain required before changing authorization or query
+  behavior.
+- Notification providers retain cached rows across tested feed and shop
+  refresh/error cases and require a concrete tenant plus an authorized role.
+  Local regressions pass, but the reported production refresh has not been
+  attributed to a feed query, shop-visibility query, profile/router refresh,
+  or Rules denial.
+- No production data was accessed. Rules, Hosting, release builds, device
+  delivery, Play upload, commit, and push did not occur in this continuation.
+  The existing 37 open audit/release todos remain in force.
+
+---
+
+## Scope-Specific Addendum — 2026-10-30 Archived-Shop and Notification Integrity
+
+- Archived shops are denied new sale invoices and cash-out/debt transactions.
+  Cash-in collections and cash-receipt invoices remain allowed so customers
+  can pay existing balances. Provider and Rules checks are aligned.
+- Soft-deleting a standalone cash transaction retires the deterministic
+  notification atomically with the ledger soft-delete and exact shop-balance
+  reversal. A missing notification receives a source-linked tombstone.
+  Delayed publication checks the source transaction, and retired notifications
+  are filtered from feeds and foreground alerts.
+- Local evidence: full Flutter suite `01:50 +785: All tests passed!`; full
+  Rules Emulator `213 passing (1m)`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 151.5s)`; `dart analyze test/`:
+  `No issues found!`.
+- Hot restart was unavailable because no Flutter app was connected to the
+  Dart Tooling Daemon. No production Rules/indexes deployment, Hosting
+  deployment, release build, phone delivery, commit, or push was performed.
+  P1-04 and older-client rollout blockers remain open.
+
 ---
 
 ## Scope-Specific Addendum — 2026-10-29 v3.10.17+1128 Delivery
@@ -683,8 +983,8 @@ client-side checks are explicitly separated from Firestore Rules enforcement.
   role/policy suite reported `00:00 +11: All tests passed!`.
 - **Disposition:** no capability or Rules change is warranted. Adding a
   support-only read permission would broaden platform access and conflict with
-  the current privacy policy; treat that as a separate product/security
-  decision, not an audit bug.
+  the documented runtime notification access policy; treat that as a separate
+  product/security decision, not an audit bug.
 
 ### Validation Boundary
 
@@ -692,6 +992,37 @@ client-side checks are explicitly separated from Firestore Rules enforcement.
   published runtime documentation were inspected. The emulator test itself
   was not rerun in this verification. No production access or deployment
   occurred.
+
+---
+
+## Scope-Specific Addendum — 2026-10-30 Privacy Policy and Account Deletion
+
+### Verification and Action
+
+- Repository search found no privacy-policy page. The current user-management
+  code supports administrator profile deactivation; its separate permanent
+  profile deletion does not delete the Firebase Authentication account.
+  No end-user account deletion flow or public deletion-request resource was
+  found.
+- Created `docs/legal/privacy-policy-draft.html` as a review-only draft based
+  on the inspected Firebase Auth/Firestore, Crashlytics, App Check,
+  user-triggered encrypted Google Drive backup, and external product-image
+  flows. It is explicitly marked not approved for publication and identifies
+  facts that remain unverified or require an owner decision.
+- Google Play's User Data and account-deletion guidance requires a valid
+  privacy policy and, for apps with account creation, in-app account deletion
+  plus a public web deletion-request resource. The draft does not claim that
+  these deletion paths exist.
+
+### Blockers and Validation Boundary
+
+- Legal publisher identity/jurisdiction, privacy contact, retention and
+  business-record deletion policy, Firebase project region, final SDK/
+  subprocessor review, and canonical public HTTPS URL require owner review.
+  The in-app and public account-deletion paths are implementation gaps, not
+  wording gaps.
+- The HTML draft is not hosted, linked from the app, or submitted to Play.
+  No production deployment or Play Console declaration was made.
 
 ---
 
@@ -1926,3 +2257,91 @@ Focused affected tests: `00:00 +54: All tests passed!`; full Flutter suite:
 `No issues found! (ran in 9.1s)`; `dart analyze test/`:
 `No issues found!`. Local Rules Emulator evidence is `182 passing (41s)`.
 Production behavior remains unverified; this work is local and unreleased.
+
+## Scope-Specific Addendum — 2026-10-30 PDF Yeh Rendering and Privacy-Policy Delivery
+
+- Re-ran the focused PDF export suite with `--dart-define=use_arabic=true`:
+  `00:02 +17: All tests passed!`. A temporary visual probe also passed:
+  `00:00 +1: All tests passed!`.
+- Generated Arabic and Urdu statement, invoice, and cash-receipt PDFs with
+  medial Arabic Yeh (`U+064A`) and Urdu Yeh (`U+06CC`) in sample business text.
+  Rasterized all six outputs and visually inspected them. The tested Yeh
+  forms appear connected, including both statement Net Payable labels. The
+  statement/invoice pages are A4 (595 x 842 pt); receipt pages are A5 (420 x
+  595 pt). All six were one page and embedded `NotoSansArabic-Regular`.
+  The generated date `30/10/2026` rendered correctly in these samples.
+- A separate isolated one-page comparison rendered `بيت` and `بین` both as
+  pure RTL input and as LTR-first values after the shared
+  `pdfTextForDirection` transform. At 30 pt, medial Yeh visibly connected
+  in all four renderings. This isolates both the renderer's RTL shaping path
+  and the shared mixed-direction shaping path; it still does not establish
+  the rendering of a user's unavailable original PDF or installed APK.
+- This is synthetic local-source evidence only. No original user PDF was
+  available; the PDF text-extraction probe did not recover the source Arabic
+  strings, so extraction is not claimed as verified. No APK/device output or
+  production data was tested, and no production code change was made from
+  this probe. The rendering/release concern remains open pending comparison
+  with an affected original PDF and a versioned installed artifact.
+- `docs/legal/privacy-policy-draft.html` remains an internal review draft. It
+  is not declared as a Flutter asset, linked from About, or hosted as a
+  canonical public policy page. It is intentionally not linked into an APK
+  because it is unapproved and still has legal/operational review gates.
+  The app also lacks a user-initiated Firebase Auth deletion or public
+  deletion-request flow; Play privacy/account-deletion readiness is not
+  established.
+- No APK/AAB build, install, deployment, Play submission, commit, or push was
+  performed. No Flutter app was connected to the Dart Tooling Daemon, so a
+  hot restart could not be run.
+
+## Scope-Specific Addendum — 2026-10-30 Confirmed PDF Glyph-Subset Defect
+
+- The permanent regression reproduced the prior suspected corruption in
+  `pdf 3.13.1`: Arabic/Urdu code points that alias one source glyph ID could
+  be assigned an incorrect subset slot. This confirms a subset-writer defect,
+  rather than evidence for replacing Noto Sans Arabic or changing the shaping
+  dependency. Pub's released `pdf 3.13.1` is locally patched; its upstream
+  version remains unchanged.
+- The local writer now preserves a separate subset slot per Unicode code
+  point and copies mutable glyph data before compound-glyph remapping. The
+  app's `pdf` path override points at this vendored package. Before the fix,
+  the regression failed with three failures; after it,
+  `00:00 +4: All tests passed!`. The full Flutter suite reports
+  `02:37 +794: All tests passed!`.
+- Verification: `flutter analyze lib --no-pub` reported
+  `No issues found! (ran in 163.4s)`; `dart analyze test/` reported
+  `No issues found!`. The six synthetic statement, invoice, and receipt
+  samples from the prior visual probe were rasterized and inspected; they
+  showed connected Yeh, embedded `NotoSansArabic-Regular`, and retained the
+  existing A4 statement/invoice and one-page A5 receipt layouts.
+- This is local source evidence only. The original user PDFs were unavailable
+  and their text could not be recovered; rendering on an installed artifact
+  is unverified. No version bump or rebuild was made for this patch. The
+  previously built v3.10.18+1129 AAB predates the fix and must not be treated
+  as containing it. No release, production deployment, commit, or push was
+  performed.
+- No Flutter app was connected to DTD, so hot restart was unavailable.
+
+## Scope-Specific Addendum — 2026-10-30 v3.10.19 PDF Test APK
+
+- Version `3.10.19+1130` is synchronized across `pubspec.yaml`, `AppBrand`,
+  and the trilingual changelog. The focused glyph-alias regression reported
+  `00:00 +4: All tests passed!`; Flutter library analysis reported
+  `No issues found! (ran in 84.3s)`; test analysis reported
+  `No issues found!`.
+- The split release build completed in `851.6s`: ARMv7 `31.4 MB`, ARM64
+  `33.0 MB`, and x86_64 `34.5 MB`. All three APKs verified with APK v2 and
+  contain package `footwear.com.pk`, version `3.10.19`, with ABI version
+  codes `310192130`, `310193130`, and `310195130`.
+- The ARM64 APK was copied to `R5GL22RGT9V` (`1 file pushed`) and installed
+  (`Success`). Android reports version code `310193130`; the app process
+  started without a fatal entry in the filtered Flutter/Android runtime log.
+- The initial Problems-panel diagnostics were limited to vendored `pdf`
+  files. Restoring that package's upstream `analysis_options.yaml` brought
+  `dart analyze third_party/pdf/lib` to `No issues found!`; this restores the
+  dependency's intended analyzer scope rather than changing PDF implementation
+  behavior.
+- Build/install/startup evidence does not establish visual PDF correctness on
+  the installed artifact. The original affected report remains unavailable;
+  user inspection is still needed. No AAB rebuild, Play upload, deployment,
+  commit, or push was performed. No debug app was connected to DTD, so hot
+  restart was unavailable.

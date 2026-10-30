@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:printing/printing.dart';
 import 'package:footwear_erp/models/settings_model.dart';
 import 'package:footwear_erp/core/l10n/financial_document_localization.dart';
 import 'package:footwear_erp/models/user_model.dart';
@@ -43,6 +44,70 @@ void main() {
     ),
     updatedAt: now,
   );
+
+  testWidgets('invoice header opens invoice, statement, and receipt previews', (
+    tester,
+  ) async {
+    final settingsStream = StreamController<SettingsModel>();
+    addTearDown(settingsStream.close);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(admin)),
+          settingsProvider.overrideWith((ref) => settingsStream.stream),
+        ],
+        child: const MaterialApp(home: InvoiceHeaderSettingsScreen()),
+      ),
+    );
+    settingsStream.add(settings());
+    await tester.pumpAndSettle();
+
+    final previews = <(String, String, String)>[
+      (
+        'invoice_header_preview_button',
+        'Preview Invoice',
+        'invoice_header_preview',
+      ),
+      (
+        'invoice_header_statement_preview_button',
+        'Preview Account Statement',
+        'invoice_header_preview_statement',
+      ),
+      (
+        'invoice_header_receipt_preview_button',
+        'Preview Cash Receipt',
+        'invoice_header_preview_receipt',
+      ),
+    ];
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.byType(FilledButton),
+      250,
+      scrollable: scrollable,
+    );
+    for (final (key, _, _) in previews) {
+      expect(find.byKey(ValueKey(key)), findsOneWidget);
+    }
+
+    for (final (key, title, titleKey) in previews) {
+      final button = find.byKey(ValueKey(key));
+      await tester.tap(button);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text(title), findsNWidgets(2));
+      expect(
+        find.byKey(ValueKey('financial_document_preview_title_$titleKey')),
+        findsOneWidget,
+      );
+      expect(find.byType(PdfPreview), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      Navigator.of(tester.element(find.byType(PdfPreview))).pop();
+      await tester.pumpAndSettle();
+    }
+  });
 
   testWidgets('clean invoice header follows remote changes, dirty form wins', (
     tester,
@@ -142,6 +207,13 @@ void main() {
 
       await tester.pageBack();
       await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Discard'),
+        ),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Open invoice header'));
       await tester.pumpAndSettle();
 
@@ -197,6 +269,181 @@ void main() {
       isFalse,
     );
     expect(find.byType(SnackBar), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('dirty invoice header can be cancelled or discarded on back', (
+    tester,
+  ) async {
+    final settingsStream = StreamController<SettingsModel>.broadcast();
+    addTearDown(settingsStream.close);
+    final savedPayloads = <Map<String, dynamic>>[];
+    final settingsNotifier = _SavingSettingsNotifier((data) async {
+      savedPayloads.add(Map<String, dynamic>.from(data));
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(admin)),
+          settingsProvider.overrideWith((ref) => settingsStream.stream),
+          settingsNotifierProvider.overrideWith(() => settingsNotifier),
+        ],
+        child: const MaterialApp(home: _InvoiceHeaderEntry()),
+      ),
+    );
+    await tester.tap(find.text('Open invoice header'));
+    await tester.pump();
+    settingsStream.add(settings());
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('invoice_header_field_name_en')),
+      'Unsaved name',
+    );
+    tester.testTextInput.hide();
+    await tester.pump();
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Unsaved Changes'), findsOneWidget);
+    expect(find.text('Discard'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
+    expect(find.byType(InvoiceHeaderSettingsScreen), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Cancel'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(InvoiceHeaderSettingsScreen), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('invoice_header_field_name_en')),
+          )
+          .controller!
+          .text,
+      'Unsaved name',
+    );
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Discard'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InvoiceHeaderSettingsScreen), findsNothing);
+    expect(savedPayloads, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('invoice header saves successfully before leaving on back', (
+    tester,
+  ) async {
+    final settingsStream = StreamController<SettingsModel>.broadcast();
+    addTearDown(settingsStream.close);
+    final savedPayloads = <Map<String, dynamic>>[];
+    final settingsNotifier = _SavingSettingsNotifier((data) async {
+      savedPayloads.add(Map<String, dynamic>.from(data));
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(admin)),
+          settingsProvider.overrideWith((ref) => settingsStream.stream),
+          settingsNotifierProvider.overrideWith(() => settingsNotifier),
+        ],
+        child: const MaterialApp(home: _InvoiceHeaderEntry()),
+      ),
+    );
+    await tester.tap(find.text('Open invoice header'));
+    await tester.pump();
+    settingsStream.add(settings());
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('invoice_header_field_name_en')),
+      'Saved before leaving',
+    );
+    tester.testTextInput.hide();
+    await tester.pump();
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    await tester.tap(find.descendant(of: dialog, matching: find.text('Save')));
+    await tester.pumpAndSettle();
+
+    expect(savedPayloads, hasLength(1));
+    expect(
+      (savedPayloads.single['invoice_header'] as Map)['name_en'],
+      'Saved before leaving',
+    );
+    expect(find.byType(InvoiceHeaderSettingsScreen), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('invoice header stays open and shows failure when save fails', (
+    tester,
+  ) async {
+    final settingsStream = StreamController<SettingsModel>.broadcast();
+    addTearDown(settingsStream.close);
+    final settingsNotifier = _SavingSettingsNotifier((_) async {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      );
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(admin)),
+          settingsProvider.overrideWith((ref) => settingsStream.stream),
+          settingsNotifierProvider.overrideWith(() => settingsNotifier),
+        ],
+        child: const MaterialApp(home: _InvoiceHeaderEntry()),
+      ),
+    );
+    await tester.tap(find.text('Open invoice header'));
+    await tester.pump();
+    settingsStream.add(settings());
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('invoice_header_field_name_en')),
+      'Unsaved name',
+    );
+    tester.testTextInput.hide();
+    await tester.pump();
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Save'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InvoiceHeaderSettingsScreen), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('invoice_header_field_name_en')),
+          )
+          .controller!
+          .text,
+      'Unsaved name',
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -264,54 +511,60 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('invoice header settings follow remote language pair changes', (
+  testWidgets('invoice header hides language setting and preserves legacy pair', (
     tester,
   ) async {
-    final settingsStream = StreamController<SettingsModel>();
+    final settingsStream = StreamController<SettingsModel>.broadcast();
     addTearDown(settingsStream.close);
+    final savedPayloads = <Map<String, dynamic>>[];
+    final settingsNotifier = _SavingSettingsNotifier((data) async {
+      savedPayloads.add(Map<String, dynamic>.from(data));
+    });
+    final existingSettings = settings().copyWith(
+      invoiceHeader: settings().invoiceHeader.copyWith(
+        documentLanguagePair: FinancialDocumentLanguagePair.englishUrdu,
+      ),
+    );
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           authUserProvider.overrideWith((ref) => Stream.value(admin)),
           settingsProvider.overrideWith((ref) => settingsStream.stream),
+          settingsNotifierProvider.overrideWith(() => settingsNotifier),
         ],
         child: const MaterialApp(home: InvoiceHeaderSettingsScreen()),
       ),
     );
-    settingsStream.add(settings());
+    settingsStream.add(existingSettings);
     await tester.pumpAndSettle();
 
-    final selector = find.byKey(
-      const ValueKey('financial_document_language_pair'),
-    );
-    expect(selector, findsOneWidget);
     expect(
-      tester
-          .widget<DropdownButtonFormField<FinancialDocumentLanguagePair>>(
-            selector,
-          )
-          .initialValue,
-      FinancialDocumentLanguagePair.englishArabic,
+      find.byKey(const ValueKey('financial_document_language_pair')),
+      findsNothing,
     );
-
-    settingsStream.add(
-      settings().copyWith(
-        invoiceHeader: settings().invoiceHeader.copyWith(
-          documentLanguagePair: FinancialDocumentLanguagePair.englishUrdu,
-        ),
-      ),
+    await tester.enterText(
+      find.byKey(const ValueKey('invoice_header_field_name_en')),
+      'Updated header',
     );
-    await tester.pump();
+    tester.testTextInput.hide();
     await tester.pump();
 
+    final saveButton = find.widgetWithText(FilledButton, 'Save');
+    await tester.scrollUntilVisible(
+      saveButton,
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+
+    expect(savedPayloads, hasLength(1));
     expect(
-      tester
-          .widget<DropdownButtonFormField<FinancialDocumentLanguagePair>>(
-            selector,
-          )
-          .initialValue,
-      FinancialDocumentLanguagePair.englishUrdu,
+      (savedPayloads.single['invoice_header'] as Map<String, dynamic>)[
+        'document_language_pair'
+      ],
+      'english_urdu',
     );
     expect(tester.takeException(), isNull);
   });

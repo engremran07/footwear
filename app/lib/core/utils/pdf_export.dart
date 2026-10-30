@@ -776,6 +776,12 @@ InvoiceHeaderConfig resolveInvoiceHeaderForPrint({
   return const InvoiceHeaderConfig();
 }
 
+@visibleForTesting
+List<String> receiptContactNumbersForHeader(InvoiceHeaderConfig header) => [
+  header.receiptPhone2,
+  header.receiptPhone3,
+].map(_s).where((phone) => phone.isNotEmpty).toList(growable: false);
+
 class LedgerSummary {
   final double totalDebit;
   final double totalCredit;
@@ -2048,10 +2054,7 @@ Future<Uint8List> generateInvoicePdf({
       final receiptNumber =
           invoice.cashReceiptSequence?.toString().padLeft(4, '0') ??
           _pdfExcerpt(invoice.invoiceNumber, maxRunes: 24);
-      final receiptPhoneNumbers = [
-        headerConfig.receiptPhone2,
-        headerConfig.receiptPhone3,
-      ].map(_s).where((phone) => phone.isNotEmpty).toList();
+      final receiptPhoneNumbers = receiptContactNumbersForHeader(headerConfig);
       String amountOrDash(double? value) =>
           value == null ? '—' : _fmtAmtC(value, currencyLabel);
 
@@ -2377,13 +2380,13 @@ Future<Uint8List> generateInvoicePdf({
                 ),
               ),
               if (receiptPhoneNumbers.isNotEmpty) ...[
-                pw.SizedBox(height: 5),
+                pw.SizedBox(height: 3),
                 pw.Directionality(
                   textDirection: pw.TextDirection.ltr,
                   child: pw.Text(
                     receiptPhoneNumbers.join('   /   '),
                     style: ts(
-                      size: 8,
+                      size: 7.5,
                       fw: pw.FontWeight.bold,
                       color: accentColor,
                     ),
@@ -3212,6 +3215,8 @@ Future<Uint8List> buildPdfMultiShopLedger({
       final sortedTx = [...sec.transactions]
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
       final entryCount = sortedTx.length;
+      if (entryCount == 0 && sec.openingBalance == 0) continue;
+      final sectionFirstPageNumber = pdf.document.pdfPageList.pages.length + 1;
       final shopRows = <_LedgerRow>[];
 
       if (sec.openingBalance != 0) {
@@ -3276,7 +3281,7 @@ Future<Uint8List> buildPdfMultiShopLedger({
           margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 24),
           textDirection: dir,
           header: (ctx) {
-            if (ctx.pageNumber == 1) {
+            if (ctx.pageNumber == sectionFirstPageNumber) {
               final widgets = <pw.Widget>[];
               if (sec.routeLabel.trim().isNotEmpty) {
                 widgets.add(

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
+
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
 import '../core/theme/app_theme.dart';
@@ -259,6 +260,9 @@ class _CreateSaleInvoiceScreenState
     }
 
     final routeIds = user.assignedRouteIds;
+    final preselectedShopAsync = widget.preselectedShopId == null
+        ? null
+        : ref.watch(shopDetailProvider(widget.preselectedShopId!));
     final shopsAsync = user.canManageOperationalData
         ? ref.watch(shopsProvider)
         : (routeIds.isNotEmpty
@@ -280,11 +284,28 @@ class _CreateSaleInvoiceScreenState
     // Auto-select shop if preselected.
     if (widget.preselectedShopId != null && !_shopAutoSelected) {
       shopsAsync.whenData((shops) {
-        final match = shops.where((s) => s.id == widget.preselectedShopId);
-        if (match.isNotEmpty && _selectedShop == null) {
+        final activeShop = shops
+            .where((shop) => shop.id == widget.preselectedShopId)
+            .firstOrNull;
+        final detailShop = preselectedShopAsync?.value;
+        final archivedShop =
+            detailShop?.id == widget.preselectedShopId &&
+                !detailShop!.canAcceptNewSales &&
+                PermissionPolicy.can(user, AppCapability.createCashReceipt)
+            ? detailShop
+            : null;
+        final selectedShop = activeShop ?? archivedShop;
+        if (selectedShop != null && _selectedShop == null) {
           _shopAutoSelected = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _selectedShop = match.first);
+            if (mounted) {
+              setState(() {
+                _selectedShop = selectedShop;
+                if (!selectedShop.canAcceptNewSales) {
+                  _entryMode = InvoiceEntryMode.cashReceipt;
+                }
+              });
+            }
           });
         }
       });
@@ -335,6 +356,7 @@ class _CreateSaleInvoiceScreenState
                     context,
                     user,
                     shopsAsync,
+                    preselectedShopAsync,
                     settings,
                     inventory
                         .where((item) => item.quantityAvailable > 0)
@@ -348,6 +370,7 @@ class _CreateSaleInvoiceScreenState
                 context,
                 user,
                 shopsAsync,
+                preselectedShopAsync,
                 settings,
                 const <SellerInventoryModel>[],
                 productsAsync,
@@ -364,6 +387,7 @@ class _CreateSaleInvoiceScreenState
     BuildContext context,
     UserModel user,
     AsyncValue<List<ShopModel>> shopsAsync,
+    AsyncValue<ShopModel?>? preselectedShopAsync,
     SettingsModel settings,
     List<SellerInventoryModel> inventory,
     AsyncValue<List<ProductModel>> productsAsync,
@@ -385,6 +409,7 @@ class _CreateSaleInvoiceScreenState
       products,
       selectedVariants,
     );
+    final canSellFromSelectedShop = _selectedShop?.canAcceptNewSales ?? true;
     final nonStockSubtotal = nonStockItems.fold<double>(
       0,
       (sum, item) => sum + (item['subtotal'] as num).toDouble(),
@@ -435,12 +460,14 @@ class _CreateSaleInvoiceScreenState
                 const SizedBox(height: 8),
                 SegmentedButton<InvoiceEntryMode>(
                   segments: [
-                    ButtonSegment(
-                      value: InvoiceEntryMode.stock,
-                      icon: const Icon(Icons.inventory_2_outlined),
-                      label: Text(tr('invoice_stock_mode', ref)),
-                    ),
-                    if (settings.allowNonStockInvoices)
+                    if (canSellFromSelectedShop)
+                      ButtonSegment(
+                        value: InvoiceEntryMode.stock,
+                        icon: const Icon(Icons.inventory_2_outlined),
+                        label: Text(tr('invoice_stock_mode', ref)),
+                      ),
+                    if (canSellFromSelectedShop &&
+                        settings.allowNonStockInvoices)
                       ButtonSegment(
                         value: InvoiceEntryMode.nonStock,
                         icon: const Icon(Icons.shopping_bag_outlined),
@@ -486,16 +513,33 @@ class _CreateSaleInvoiceScreenState
                     },
                   ),
                   data: (shops) {
-                    if (shops.isEmpty) {
-                      return Text(tr('no_data', ref));
-                    }
-                    final matchedShop = _selectedShop == null
+                    final listedShop = _selectedShop == null
                         ? null
                         : shops
-                              .where((s) => s.id == _selectedShop!.id)
+                              .where((shop) => shop.id == _selectedShop!.id)
                               .firstOrNull;
+                    final archivedPreselection =
+                        _selectedShop?.canAcceptNewSales == false &&
+                            _entryMode == InvoiceEntryMode.cashReceipt
+                        ? _selectedShop
+                        : null;
+                    final matchedShop = listedShop ?? archivedPreselection;
+                    if (shops.isEmpty && matchedShop == null) {
+                      if (preselectedShopAsync?.hasError == true) {
+                        return mappedErrorState(
+                          error: preselectedShopAsync!.error!,
+                          ref: ref,
+                          onRetry: () => ref.invalidate(
+                            shopDetailProvider(widget.preselectedShopId!),
+                          ),
+                        );
+                      }
+                      return Text(tr('no_data', ref));
+                    }
                     return GestureDetector(
-                      onTap: () => _pickShop(context, shops),
+                      onTap: shops.isEmpty
+                          ? null
+                          : () => _pickShop(context, shops),
                       child: InputDecorator(
                         isEmpty: matchedShop == null,
                         decoration: InputDecoration(
@@ -511,6 +555,8 @@ class _CreateSaleInvoiceScreenState
                                     _isDirty = true;
                                   }),
                                 )
+                              : shops.isEmpty
+                              ? null
                               : const Icon(Icons.arrow_drop_down),
                         ),
                         child: matchedShop != null
@@ -597,9 +643,9 @@ class _CreateSaleInvoiceScreenState
                                 children: [
                                   Text(
                                     tr('lbl_cartons', ref),
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
                                   ),
                                   const Spacer(),
                                   IconButton(
@@ -652,9 +698,9 @@ class _CreateSaleInvoiceScreenState
                                   children: [
                                     Text(
                                       tr('lbl_extra_pairs', ref),
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall,
                                     ),
                                     const Spacer(),
                                     IconButton(
@@ -1094,9 +1140,8 @@ class _CreateSaleInvoiceScreenState
             color: cs.surface,
             boxShadow: [
               BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.shadow.withValues(alpha: 0.08),
+                color: Theme.of(context).colorScheme.shadow
+                    .withValues(alpha: 0.08),
                 blurRadius: 4,
                 offset: const Offset(0, -2),
               ),

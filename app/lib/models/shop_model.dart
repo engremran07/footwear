@@ -75,6 +75,7 @@ class ShopModel {
 
   bool get hasLocation => latitude != null && longitude != null;
   bool get hasOutstanding => balance > 0;
+  bool get canAcceptNewSales => active;
 
   factory ShopModel.fromJson(Map<String, dynamic> json, String docId) {
     final financialMinorUnits =

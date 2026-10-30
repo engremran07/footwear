@@ -40,6 +40,7 @@ class NotificationModel {
   final String refId;
   final String targetRole; // 'admin'
   final bool read;
+  final bool sourceDeleted;
   final Timestamp? readAt;
   final String createdBy;
   final Timestamp createdAt;
@@ -58,6 +59,7 @@ class NotificationModel {
     required this.refId,
     required this.targetRole,
     this.read = false,
+    this.sourceDeleted = false,
     this.readAt,
     required this.createdBy,
     required this.createdAt,
@@ -78,6 +80,7 @@ class NotificationModel {
       refId: json['ref_id'] as String? ?? '',
       targetRole: json['target_role'] as String? ?? 'admin',
       read: json['read'] as bool? ?? false,
+      sourceDeleted: json['source_deleted'] as bool? ?? false,
       readAt: json['read_at'] as Timestamp?,
       createdBy: json['created_by'] as String? ?? '',
       createdAt: json['created_at'] as Timestamp? ?? Timestamp.now(),
@@ -97,6 +100,7 @@ class NotificationModel {
     'ref_id': refId,
     'target_role': targetRole,
     'read': read,
+    'source_deleted': sourceDeleted,
     if (readAt != null) 'read_at': readAt,
     'created_by': createdBy,
     'created_at': createdAt,
@@ -123,6 +127,7 @@ class NotificationModel {
     String? refId,
     String? targetRole,
     bool? read,
+    bool? sourceDeleted,
     Timestamp? readAt,
     String? createdBy,
     Timestamp? createdAt,
@@ -141,6 +146,7 @@ class NotificationModel {
       refId: refId ?? this.refId,
       targetRole: targetRole ?? this.targetRole,
       read: read ?? this.read,
+      sourceDeleted: sourceDeleted ?? this.sourceDeleted,
       readAt: readAt ?? this.readAt,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,

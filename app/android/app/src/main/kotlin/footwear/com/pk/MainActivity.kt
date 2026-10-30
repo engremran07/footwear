@@ -1,4 +1,4 @@
-package footwear.pk.com
+package footwear.com.pk
 
 import io.flutter.embedding.android.FlutterActivity
 

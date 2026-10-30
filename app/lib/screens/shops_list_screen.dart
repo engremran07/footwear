@@ -50,6 +50,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
   String _search = '';
   _ShopQuickFilter _filter = _ShopQuickFilter.collective;
   String? _selectedRouteId;
+  bool _loadingShopExport = false;
 
   @override
   void initState() {
@@ -277,16 +278,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
                   icon: const Icon(Icons.file_download_outlined),
                   tooltip: tr('export_report', ref),
                   onSelected: (value) {
-                    final shops = shopsAsync.value;
-                    if (shops == null || shops.isEmpty) return;
-                    final routes = routeList;
-                    if (value == 'all') {
-                      _exportAllShops(shops, routes);
-                    } else if (value == 'per_route') {
-                      _exportPerRoute(shops, routes);
-                    } else if (value == 'pdf_ledger') {
-                      _showPdfExportDialog(shops, routes);
-                    }
+                    _loadShopExportData(value);
                   },
                   itemBuilder: (_) => [
                     PopupMenuItem(
@@ -672,6 +664,73 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
 
   // ── Export helpers ──────────────────────────────────────────────────────
 
+  Future<void> _loadShopExportData(String action) async {
+    if (_loadingShopExport) return;
+    _loadingShopExport = true;
+    var progressDismissed = false;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16),
+            Expanded(child: Text(tr('generating_report', ref))),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final user = await ref.read(authUserProvider.future);
+      if (user == null || !user.active) {
+        throw StateError('not authenticated');
+      }
+
+      ref.invalidate(shopsExportProvider);
+      ref.invalidate(routesExportProvider);
+      final shops = await ref.read(shopsExportProvider.future);
+      final routes = await ref.read(routesExportProvider.future);
+
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        progressDismissed = true;
+      }
+      if (!mounted) return;
+
+      switch (action) {
+        case 'all':
+          _exportAllShops(shops, routes);
+          break;
+        case 'per_route':
+          _exportPerRoute(shops, routes);
+          break;
+        case 'pdf_ledger':
+          _showPdfExportDialog(shops, routes);
+          break;
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Shop export data load failed: $error\n$stackTrace');
+      if (!kIsWeb) {
+        FirebaseCrashlytics.instance.recordError(
+          error,
+          stackTrace,
+          reason: 'shop export data load',
+        );
+      }
+      if (mounted) {
+        if (!progressDismissed) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+      }
+    } finally {
+      _loadingShopExport = false;
+    }
+  }
+
   void _exportAllShops(List<ShopModel> shops, List<RouteModel> routes) {
     final routeMap = {for (final r in routes) r.id: r};
     final fallbackCurrency =
@@ -867,14 +926,32 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
       // potentially-null .value while the StreamProvider is still loading.
       final user = await ref.read(authUserProvider.future);
 
-      // Invalidate export providers to ensure fresh data, then read.
-      // These are NOT autoDispose — they persist until invalidated.
+      // Sellers must read only assigned route exports; the aggregate
+      // all-transactions export is intentionally admin-only.
       final List<TransactionModel> txList;
       if (routeId != null) {
         ref.invalidate(routeTransactionsExportProvider(routeId));
         txList = await ref.read(
           routeTransactionsExportProvider(routeId).future,
         );
+      } else if (user?.isSeller == true) {
+        final assignedRouteIds = routes
+            .map((route) => route.id)
+            .where(user!.assignedRouteIds.contains)
+            .toList();
+        for (final assignedRouteId in assignedRouteIds) {
+          ref.invalidate(routeTransactionsExportProvider(assignedRouteId));
+        }
+        final transactionsByRoute = await Future.wait(
+          assignedRouteIds.map(
+            (assignedRouteId) => ref.read(
+              routeTransactionsExportProvider(assignedRouteId).future,
+            ),
+          ),
+        );
+        txList = transactionsByRoute
+            .expand((transactions) => transactions)
+            .toList();
       } else {
         ref.invalidate(allTransactionsExportProvider);
         txList = await ref.read(allTransactionsExportProvider.future);
@@ -955,7 +1032,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
           ? '${routeMap[routeId]?.routeNumber ?? ''} · ${routeMap[routeId]?.name ?? ''}'
           : tr('all_routes', ref);
 
-      final labels = trilingualLabels({
+      final labelValues = {
         'date': tr('date', ref),
         'description': tr('description', ref),
         'debit': tr('debit', ref),
@@ -974,7 +1051,7 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         'name': tr('name', ref),
         'route': tr('route', ref),
         'all_routes': tr('all_routes', ref),
-      }, pair: settings.invoiceHeader.documentLanguagePair);
+      };
 
       // Flatten transactions into rows for Excel export
       final excelHeaders = [
@@ -1018,16 +1095,18 @@ class _ShopsListScreenState extends ConsumerState<ShopsListScreen> {
         rows: excelRows,
         fileName: AppFormatters.exportFileName(ExportNames.ledger, routeName),
         subtitle: tr('export_pdf_ledger', ref),
-        pdfBytesBuilder: () => buildPdfMultiShopLedger(
+        initialDocumentLanguagePair:
+            settings.invoiceHeader.documentLanguagePair,
+        pdfBytesBuilderWithLanguagePair: (pair) => buildPdfMultiShopLedger(
           title: routeName,
           subtitle: tr('export_pdf_ledger', ref),
           companyName: settings.companyName,
           generatedBy: user?.displayName ?? '',
           sections: sections,
-          labels: labels,
+          labels: trilingualLabels(labelValues, pair: pair),
           locale: locale,
           logoBytes: settings.logoBytes,
-          header: settings.invoiceHeader,
+          header: settings.invoiceHeader.copyWith(documentLanguagePair: pair),
           currency: settings.currency,
           showEntryBy: user?.isAdmin == true,
           entryByMap: names.map,

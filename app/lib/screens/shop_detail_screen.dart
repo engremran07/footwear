@@ -20,6 +20,7 @@ import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
 import '../core/utils/role_names.dart';
 import '../models/settings_model.dart';
+import '../models/shop_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
@@ -580,6 +581,219 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
     return [...txs]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   }
 
+  List<AppContextualAction> _shopContextualActions(
+    ShopModel shop,
+    UserModel? user,
+    bool canManageShop,
+  ) => [
+    if (canManageShop)
+      AppContextualAction(
+        entity: ContextualEntity.shop,
+        id: ContextualActionId.edit,
+        label: tr('tooltip_edit_shop', ref),
+        icon: Icons.edit_outlined,
+        requiredCapability: AppCapability.manageShops,
+        onSelected: () => _handleShopAction(shop, _ShopAction.edit),
+      ),
+    if (user?.isAdmin == true)
+      AppContextualAction(
+        entity: ContextualEntity.shop,
+        id: ContextualActionId.delete,
+        label: tr('tooltip_delete_shop', ref),
+        icon: Icons.delete_outline,
+        requiredCapability: AppCapability.deactivateShop,
+        destructive: true,
+        onSelected: () => _handleShopAction(shop, _ShopAction.delete),
+      ),
+    if (user?.isAdmin == true && shop.balance > 0 && !shop.badDebt)
+      AppContextualAction(
+        entity: ContextualEntity.shop,
+        id: ContextualActionId.markBadDebt,
+        label: tr('mark_bad_debt', ref),
+        icon: Icons.money_off,
+        requiredCapability: AppCapability.writeOff,
+        onSelected: () => _handleShopAction(shop, _ShopAction.badDebt),
+      ),
+    if (user?.isAdmin == true && shop.badDebt)
+      AppContextualAction(
+        entity: ContextualEntity.shop,
+        id: ContextualActionId.recoverBadDebt,
+        label: tr('recover_bad_debt', ref),
+        icon: Icons.undo,
+        requiredCapability: AppCapability.writeOff,
+        onSelected: () => _handleShopAction(shop, _ShopAction.recoverDebt),
+      ),
+    AppContextualAction(
+      entity: ContextualEntity.shop,
+      id: ContextualActionId.export,
+      label: tr('export_share', ref),
+      icon: Icons.table_chart_outlined,
+      requiredCapability: AppCapability.viewShops,
+      onSelected: () => _handleShopAction(shop, _ShopAction.export),
+    ),
+  ];
+
+  Future<void> _handleShopAction(ShopModel shop, _ShopAction action) async {
+    switch (action) {
+      case _ShopAction.edit:
+        context.push('/shops/${shop.id}/edit');
+      case _ShopAction.delete:
+        final ok = await ConfirmDialog.show(
+          context,
+          title: tr('delete', ref),
+          message: tr('confirm_delete_shop', ref),
+        );
+        if (ok != true) return;
+        try {
+          await ref
+              .read(shopNotifierProvider.notifier)
+              .deactivate(shop.id, shop.routeId);
+          if (mounted) context.go('/shops');
+        } catch (error) {
+          if (mounted) {
+            final key = AppErrorMapper.key(error);
+            ScaffoldMessenger.of(context)
+                .showSnackBar(errorSnackBar(tr(key, ref)));
+          }
+        }
+      case _ShopAction.badDebt:
+        final ok = await ConfirmDialog.show(
+          context,
+          title: tr('bad_debt', ref),
+          message: tr('confirm_bad_debt', ref),
+        );
+        if (ok != true) return;
+        try {
+          await ref.read(shopNotifierProvider.notifier).markAsBadDebt(shop.id);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context)
+              .showSnackBar(successSnackBar(tr('success_updated', ref)));
+        } catch (error) {
+          if (!mounted) return;
+          final key = AppErrorMapper.key(error);
+          ScaffoldMessenger.of(context)
+              .showSnackBar(errorSnackBar(tr(key, ref)));
+        }
+      case _ShopAction.recoverDebt:
+        final ok = await ConfirmDialog.show(
+          context,
+          title: tr('recover_bad_debt', ref),
+          message: tr('confirm_recover_bad_debt', ref),
+        );
+        if (ok != true) return;
+        try {
+          await ref.read(shopNotifierProvider.notifier).recoverBadDebt(shop.id);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context)
+              .showSnackBar(successSnackBar(tr('success_updated', ref)));
+        } catch (error) {
+          if (!mounted) return;
+          final key = AppErrorMapper.key(error);
+          ScaffoldMessenger.of(context)
+              .showSnackBar(errorSnackBar(tr(key, ref)));
+        }
+      case _ShopAction.export:
+      case _ShopAction.share:
+        await _showShopStatementExport(shop);
+    }
+  }
+
+  Future<void> _showShopStatementExport(ShopModel shop) async {
+    try {
+      final sorted = await _loadFullTransactions();
+      if (!mounted) return;
+      final locale = ref.read(appLocaleProvider);
+      final authUser = await ref.read(authUserProvider.future);
+      final isAdmin = authUser?.isAdmin == true;
+      final settings = await ref.read(settingsProvider.future);
+      ref.invalidate(allUsersExportProvider);
+      final allUsers = isAdmin
+          ? await ref.read(allUsersExportProvider.future)
+          : <UserModel>[];
+      final names = NameResolver(
+        users: allUsers,
+        extra: {if (authUser != null) authUser.id: authUser.displayName},
+        unknownLabel: trRead('unknown_user', locale),
+      );
+      if (!mounted) return;
+      final netTx = sorted.fold<double>(
+        0.0,
+        (acc, tx) => acc + tx.balanceImpact,
+      );
+      final openingBalance = shop.balance - netTx;
+      final accountRoute = shop.routeId.trim().isEmpty
+          ? null
+          : await ref.read(routeDetailProvider(shop.routeId).future);
+      final accountCurrency = accountRoute?.currency ?? 'SAR';
+      if (!mounted) return;
+      final labels = trilingualLabels(<String, String>{
+        for (final key in const [
+          'date',
+          'description',
+          'debit',
+          'credit',
+          'running_balance',
+          'account_statement',
+          'opening_balance',
+          'net_payable',
+          'cash_in',
+          'cash_out',
+          'total_entries',
+          'page',
+          'report_date',
+          'generated_by',
+          'entry_by',
+          'duration',
+        ])
+          key: tr(key, ref),
+      }, pair: settings.invoiceHeader.documentLanguagePair);
+      ExportSheet.show(
+        context,
+        ref,
+        title: '${shop.name} - ${tr('account_statement', ref)}',
+        headers: [
+          triCol('date'),
+          triCol('type'),
+          triCol('amount'),
+          triCol('description'),
+        ],
+        rows: sorted
+            .map(
+              (tx) => [
+                AppFormatters.dateTime(tx.createdAt),
+                _transactionTypeLabel(tx),
+                AppFormatters.currency(tx.amount, accountCurrency),
+                tx.description ?? '',
+              ],
+            )
+            .toList(),
+        fileName: AppFormatters.exportFileName(ExportNames.ledger, shop.name),
+        initialDocumentLanguagePair:
+            settings.invoiceHeader.documentLanguagePair,
+        pdfBytesBuilderWithLanguagePair: (pair) => buildPdfLedger(
+          shopName: shop.name,
+          companyName: settings.companyName,
+          generatedBy: authUser?.displayName ?? '',
+          openingBalance: openingBalance,
+          transactions: sorted,
+          entryByMap: names.map,
+          showEntryBy: isAdmin,
+          dateFrom: sorted.isNotEmpty ? sorted.first.createdAt.toDate() : null,
+          dateTo: sorted.isNotEmpty ? sorted.last.createdAt.toDate() : null,
+          labels: trilingualLabels(labels, pair: pair),
+          locale: locale,
+          currency: accountCurrency,
+          logoBytes: settings.logoBytes,
+          header: settings.invoiceHeader.copyWith(documentLanguagePair: pair),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final key = AppErrorMapper.key(error);
+      ScaffoldMessenger.of(context).showSnackBar(errorSnackBar(tr(key, ref)));
+    }
+  }
+
   void _showQuickCash(String type) {
     final amountC = TextEditingController();
     final descC = TextEditingController();
@@ -802,511 +1016,259 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
             (user?.isSeller == true &&
                 (user?.assignedRouteIds.contains(shop.routeId) ?? false));
 
+        final shopActions = _shopContextualActions(shop, user, canManageShop);
+
         return Scaffold(
           body: Column(
             children: [
-              // Actions menu — shop name is shown in AppBar breadcrumb
-              Padding(
-                padding: const EdgeInsetsDirectional.only(end: 4),
-                child: Row(
-                  children: [
-                    const Spacer(),
-                    PopupMenuButton<_ShopAction>(
-                      icon: const Icon(Icons.more_vert),
-                      onSelected: (action) async {
-                        switch (action) {
-                          case _ShopAction.edit:
-                            context.push('/shops/${shop.id}/edit');
-
-                          case _ShopAction.delete:
-                            final ok = await ConfirmDialog.show(
-                              context,
-                              title: tr('delete', ref),
-                              message: tr('confirm_delete_shop', ref),
-                            );
-                            if (ok != true) return;
-                            try {
-                              await ref
-                                  .read(shopNotifierProvider.notifier)
-                                  .deactivate(shop.id, shop.routeId);
-                              if (context.mounted) context.go('/shops');
-                            } catch (e) {
-                              if (context.mounted) {
-                                final key = AppErrorMapper.key(e);
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(errorSnackBar(tr(key, ref)));
-                              }
-                            }
-
-                          case _ShopAction.badDebt:
-                            final ok = await ConfirmDialog.show(
-                              context,
-                              title: tr('bad_debt', ref),
-                              message: tr('confirm_bad_debt', ref),
-                            );
-                            if (ok != true) return;
-                            try {
-                              await ref
-                                  .read(shopNotifierProvider.notifier)
-                                  .markAsBadDebt(shop.id);
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                successSnackBar(tr('success_updated', ref)),
-                              );
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              final key = AppErrorMapper.key(e);
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(errorSnackBar(tr(key, ref)));
-                            }
-
-                          case _ShopAction.recoverDebt:
-                            final ok = await ConfirmDialog.show(
-                              context,
-                              title: tr('recover_bad_debt', ref),
-                              message: tr('confirm_recover_bad_debt', ref),
-                            );
-                            if (ok != true) return;
-                            try {
-                              await ref
-                                  .read(shopNotifierProvider.notifier)
-                                  .recoverBadDebt(shop.id);
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                successSnackBar(tr('success_updated', ref)),
-                              );
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              final key = AppErrorMapper.key(e);
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(errorSnackBar(tr(key, ref)));
-                            }
-
-                          case _ShopAction.export:
-                          case _ShopAction.share:
-                            try {
-                              final sorted = await _loadFullTransactions();
-                              if (!context.mounted) return;
-                              final locale = ref.read(appLocaleProvider);
-                              final authUser = await ref.read(
-                                authUserProvider.future,
-                              );
-                              final isAdmin = authUser?.isAdmin == true;
-                              final settings = await ref.read(
-                                settingsProvider.future,
-                              );
-                              // allUsersExportProvider: no active filter,
-                              // one-shot .get() — covers deactivated sellers.
-                              ref.invalidate(allUsersExportProvider);
-                              final allUsers = isAdmin
-                                  ? await ref.read(
-                                      allUsersExportProvider.future,
-                                    )
-                                  : <UserModel>[];
-                              final names = NameResolver(
-                                users: allUsers,
-                                extra: {
-                                  if (authUser != null)
-                                    authUser.id: authUser.displayName,
-                                },
-                                unknownLabel: trRead('unknown_user', locale),
-                              );
-                              if (!context.mounted) return;
-                              // Reconcile opening balance so running balance
-                              // equals the stored shop.balance.
-                              final netTx = sorted.fold<double>(
-                                0.0,
-                                (s, t) => s + t.balanceImpact,
-                              );
-                              final openingBalance = shop.balance - netTx;
-                              final accountRoute = shop.routeId.trim().isEmpty
-                                  ? null
-                                  : await ref.read(
-                                      routeDetailProvider(shop.routeId).future,
-                                    );
-                              final accountCurrency =
-                                  accountRoute?.currency ?? 'SAR';
-                              if (!context.mounted) return;
-                              final labels = trilingualLabels(
-                                <String, String>{
-                                  for (final k in const [
-                                    'date',
-                                    'description',
-                                    'debit',
-                                    'credit',
-                                    'running_balance',
-                                    'account_statement',
-                                    'opening_balance',
-                                    'net_payable',
-                                    'cash_in',
-                                    'cash_out',
-                                    'total_entries',
-                                    'page',
-                                    'report_date',
-                                    'generated_by',
-                                    'entry_by',
-                                    'duration',
-                                  ])
-                                    k: tr(k, ref),
-                                },
-                                pair:
-                                    settings.invoiceHeader.documentLanguagePair,
-                              );
-                              ExportSheet.show(
-                                context,
-                                ref,
-                                title:
-                                    '${shop.name} - ${tr('account_statement', ref)}',
-                                headers: [
-                                  triCol('date'),
-                                  triCol('type'),
-                                  triCol('amount'),
-                                  triCol('description'),
-                                ],
-                                rows: sorted
-                                    .map(
-                                      (t) => [
-                                        AppFormatters.dateTime(t.createdAt),
-                                        _transactionTypeLabel(t),
-                                        AppFormatters.currency(
-                                          t.amount,
-                                          accountCurrency,
-                                        ),
-                                        t.description ?? '',
-                                      ],
-                                    )
-                                    .toList(),
-                                fileName: AppFormatters.exportFileName(
-                                  ExportNames.ledger,
-                                  shop.name,
-                                ),
-                                pdfBytesBuilder: () => buildPdfLedger(
-                                  shopName: shop.name,
-                                  companyName: settings.companyName,
-                                  generatedBy: authUser?.displayName ?? '',
-                                  openingBalance: openingBalance,
-                                  transactions: sorted,
-                                  entryByMap: names.map,
-                                  showEntryBy: isAdmin,
-                                  dateFrom: sorted.isNotEmpty
-                                      ? sorted.first.createdAt.toDate()
-                                      : null,
-                                  dateTo: sorted.isNotEmpty
-                                      ? sorted.last.createdAt.toDate()
-                                      : null,
-                                  labels: labels,
-                                  locale: locale,
-                                  currency: accountCurrency,
-                                  logoBytes: settings.logoBytes,
-                                  header: settings.invoiceHeader,
-                                ),
-                              );
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              final key = AppErrorMapper.key(e);
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(errorSnackBar(tr(key, ref)));
-                            }
-                        }
-                      },
-                      itemBuilder: (ctx) => [
-                        if (canManageShop)
-                          PopupMenuItem(
-                            value: _ShopAction.edit,
-                            child: ListTile(
-                              leading: const Icon(Icons.edit),
-                              title: Text(tr('tooltip_edit_shop', ref)),
-                              contentPadding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
-                        if (user?.isAdmin == true)
-                          PopupMenuItem(
-                            value: _ShopAction.delete,
-                            child: ListTile(
-                              leading: const Icon(
-                                Icons.delete,
-                                color: AppBrand.errorColor,
-                              ),
-                              title: Text(
-                                tr('tooltip_delete_shop', ref),
-                                style: const TextStyle(
-                                  color: AppBrand.errorColor,
-                                ),
-                              ),
-                              contentPadding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
-                        if (user?.isAdmin == true &&
-                            shop.balance > 0 &&
-                            !shop.badDebt)
-                          PopupMenuItem(
-                            value: _ShopAction.badDebt,
-                            child: ListTile(
-                              leading: const Icon(
-                                Icons.money_off,
-                                color: AppBrand.warningColor,
-                              ),
-                              title: Text(tr('mark_bad_debt', ref)),
-                              contentPadding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
-                        if (user?.isAdmin == true && shop.badDebt)
-                          PopupMenuItem(
-                            value: _ShopAction.recoverDebt,
-                            child: ListTile(
-                              leading: const Icon(
-                                Icons.undo,
-                                color: AppBrand.successColor,
-                              ),
-                              title: Text(tr('recover_bad_debt', ref)),
-                              contentPadding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
-                        PopupMenuItem(
-                          value: _ShopAction.export,
-                          child: ListTile(
-                            leading: const Icon(Icons.table_chart_outlined),
-                            title: Text(tr('export_share', ref)),
-                            contentPadding: EdgeInsets.zero,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
               // Shop info card
-              Card(
-                margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      // Contact bar
-                      Row(
-                        children: [
-                          if (shop.phone != null) ...[
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.phone_outlined,
-                              size: 12,
-                              color: cs.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              shop.phone!,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            WhatsAppShopCtaButton(
-                              shop: shop,
-                              iconSize: 18,
-                              onViewStatement: () =>
-                                  context.push('/shops/${shop.id}'),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      // Total In / Total Out compact summary row
-                      Row(
-                        children: [
-                          // Total In — cash collected from this shop
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 8,
-                                horizontal: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.clearBg(cs),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: AppTheme.clearFg(cs).withAlpha(60),
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    tr('total_in', ref),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(color: AppTheme.clearFg(cs)),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  txAsync.whenOrNull(
-                                        data: (txs) {
-                                          final totalIn = txs
-                                              .where(
-                                                (t) =>
-                                                    !t.deleted &&
-                                                    (t.isCashIn || t.isPayment),
-                                              )
-                                              .fold(
-                                                0.0,
-                                                (s, t) => s + t.amount,
-                                              );
-                                          return Text(
-                                            AppFormatters.currency(
-                                              totalIn,
-                                              currency,
-                                            ),
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .titleSmall
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppTheme.clearFg(cs),
-                                                ),
-                                          );
-                                        },
-                                      ) ??
-                                      Text(
-                                        '—',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleSmall,
-                                      ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Total Out — current outstanding balance
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 8,
-                                horizontal: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: balanceBgColor,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: balanceColor.withAlpha(60),
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    tr('total_out', ref),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(color: balanceColor),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    AppFormatters.currency(
-                                      shop.balance.abs(),
-                                      currency,
-                                    ),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: balanceColor,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (location.isNotEmpty || daysOverdue != null) ...[
-                        const SizedBox(height: 8),
+              AppContextualActions(
+                entity: ContextualEntity.shop,
+                actions: shopActions,
+                child: Card(
+                  margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        // Contact bar
                         Row(
                           children: [
-                            if (location.isNotEmpty)
+                            if (shop.phone != null) ...[
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.phone_outlined,
+                                size: 12,
+                                color: cs.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 3),
                               Expanded(
                                 child: Text(
-                                  location,
+                                  shop.phone!,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ),
-                            if (daysOverdue != null) ...[
-                              if (location.isNotEmpty) const SizedBox(width: 8),
-                              Icon(
-                                Icons.schedule,
-                                size: 14,
-                                color: daysOverdue > 60
-                                    ? AppBrand.errorColor
-                                    : daysOverdue > 30
-                                    ? AppBrand.warningColor
-                                    : cs.onSurfaceVariant,
+                              WhatsAppShopCtaButton(
+                                shop: shop,
+                                iconSize: 18,
+                                onViewStatement: () =>
+                                    context.push('/shops/${shop.id}'),
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$daysOverdue ${tr('days_overdue', ref)}',
-                                maxLines: 1,
-                                style: TextStyle(
-                                  fontSize: 12,
+                            ] else
+                              const Spacer(),
+                            AppContextualActionsButton(
+                              key: const ValueKey('shop_detail_actions'),
+                              entity: ContextualEntity.shop,
+                              actions: shopActions,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Total In / Total Out compact summary row
+                        Row(
+                          children: [
+                            // Total In — cash collected from this shop
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.clearBg(cs),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: AppTheme.clearFg(cs).withAlpha(60),
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      tr('total_in', ref),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: AppTheme.clearFg(cs),
+                                          ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    txAsync.whenOrNull(
+                                          data: (txs) {
+                                            final totalIn = txs
+                                                .where(
+                                                  (t) =>
+                                                      !t.deleted &&
+                                                      (t.isCashIn ||
+                                                          t.isPayment),
+                                                )
+                                                .fold(
+                                                  0.0,
+                                                  (s, t) => s + t.amount,
+                                                );
+                                            return Text(
+                                              AppFormatters.currency(
+                                                totalIn,
+                                                currency,
+                                              ),
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .titleSmall
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppTheme.clearFg(cs),
+                                                  ),
+                                            );
+                                          },
+                                        ) ??
+                                        Text(
+                                          '—',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleSmall,
+                                        ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Total Out — current outstanding balance
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: balanceBgColor,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: balanceColor.withAlpha(60),
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      tr('total_out', ref),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(color: balanceColor),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      AppFormatters.currency(
+                                        shop.balance.abs(),
+                                        currency,
+                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: balanceColor,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (location.isNotEmpty || daysOverdue != null) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              if (location.isNotEmpty)
+                                Expanded(
+                                  child: Text(
+                                    location,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
+                                  ),
+                                ),
+                              if (daysOverdue != null) ...[
+                                if (location.isNotEmpty)
+                                  const SizedBox(width: 8),
+                                Icon(
+                                  Icons.schedule,
+                                  size: 14,
                                   color: daysOverdue > 60
                                       ? AppBrand.errorColor
                                       : daysOverdue > 30
                                       ? AppBrand.warningColor
                                       : cs.onSurfaceVariant,
-                                  fontWeight: FontWeight.w600,
                                 ),
-                              ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$daysOverdue ${tr('days_overdue', ref)}',
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: daysOverdue > 60
+                                        ? AppBrand.errorColor
+                                        : daysOverdue > 30
+                                        ? AppBrand.warningColor
+                                        : cs.onSurfaceVariant,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                      ],
-                      // Bad debt banner
-                      if (shop.badDebt) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppBrand.warningColor.withAlpha(30),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: AppBrand.warningColor.withAlpha(120),
+                          ),
+                        ],
+                        // Bad debt banner
+                        if (shop.badDebt) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppBrand.warningColor.withAlpha(30),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppBrand.warningColor.withAlpha(120),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.warning_amber,
+                                  color: AppBrand.warningColor,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        tr('bad_debt', ref),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: AppBrand.warningColor,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${tr('bad_debt_amount', ref)}: ${AppFormatters.currency(shop.badDebtAmount, currency)}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.warning_amber,
-                                color: AppBrand.warningColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      tr('bad_debt', ref),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: AppBrand.warningColor,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${tr('bad_debt_amount', ref)}: ${AppFormatters.currency(shop.badDebtAmount, currency)}',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -1337,7 +1299,7 @@ class _ShopDetailScreenState extends ConsumerState<ShopDetailScreen> {
                           foregroundColor: AppBrand.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
-                        onPressed: canManageShop
+                        onPressed: canManageShop && shop.canAcceptNewSales
                             ? () => _showQuickCash('cash_out')
                             : null,
                         icon: const Icon(Icons.remove),

@@ -15,21 +15,13 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
-fun computeAndroidVersionCode(versionName: String, buildNumber: Int): Int {
-    val parts = versionName.split(".")
-    val major = parts.getOrNull(0)?.toIntOrNull() ?: 0
-    val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
-    val patch = parts.getOrNull(2)?.toIntOrNull() ?: 0
-    if (major < 1 || minor !in 0..99 || patch !in 0..99 || buildNumber !in 0..9_999) {
-        throw GradleException(
-            "Version components exceed the Android versionCode encoding limits."
-        )
+fun computeAndroidVersionCode(buildNumber: Int): Int {
+    if (buildNumber <= 0) {
+        throw GradleException("The Flutter build number must be a positive sequence.")
     }
-    val versionCode =
-        major.toLong() * 100_000_000L +
-        minor.toLong() * 1_000_000L +
-        patch.toLong() * 10_000L +
-        buildNumber.toLong()
+
+    // Keep in sync with AppBrand.androidVersionCodeBase; anchored to Play code 310191130.
+    val versionCode = 310_190_000L + buildNumber.toLong()
     if (versionCode > 2_100_000_000L) {
         throw GradleException("Android versionCode exceeds the Play Console limit.")
     }
@@ -41,7 +33,7 @@ val buildingAppBundle = gradle.startParameter.taskNames.any {
 }
 
 extensions.configure<ApplicationExtension> {
-    namespace = "footwear.pk.com"
+    namespace = "footwear.com.pk"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -52,10 +44,10 @@ extensions.configure<ApplicationExtension> {
     }
 
     defaultConfig {
-        applicationId = "footwear.pk.com"
+        applicationId = "footwear.com.pk"
         minSdk = 29
         targetSdk = 36
-        versionCode = computeAndroidVersionCode(flutter.versionName, flutter.versionCode)
+        versionCode = computeAndroidVersionCode(flutter.versionCode)
         versionName = flutter.versionName
     }
 

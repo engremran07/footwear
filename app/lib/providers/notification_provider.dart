@@ -76,6 +76,7 @@ List<NotificationModel> filterVisibleNotifications(
   Set<String> activeShopIds,
 ) => notifications
     .where((notification) {
+      if (notification.sourceDeleted) return false;
       final shopId = notification.shopId.trim();
       return shopId.isEmpty || activeShopIds.contains(shopId);
     })
@@ -136,7 +137,8 @@ AsyncValue<List<NotificationModel>> visibleNotificationState(
 String notificationShopIdsKey(AsyncValue<List<NotificationModel>> state) {
   final shopIds =
       state.value
-          ?.map((notification) => notification.shopId.trim())
+          ?.where((notification) => !notification.sourceDeleted)
+          .map((notification) => notification.shopId.trim())
           .where((id) => id.isNotEmpty)
           .toSet()
           .toList()

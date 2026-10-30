@@ -1,6 +1,66 @@
 # ShoesERP System Deep Dive
 
-Last updated: 2026-10-28
+Last updated: 2026-10-30
+
+## Current Release Candidate
+
+The current source version is `3.10.20+1132`. It includes self-scoped
+profile-name updates, dirty-form Save/Discard/Cancel behavior, document
+previews, Android flexible/required update policy, password-manager autofill,
+and complete all-shops statement exports. Android package identity remains
+consistently
+`footwear.com.pk`.
+
+The full Flutter suite reports `01:46 +823: All tests passed!`;
+`flutter analyze lib --no-pub` reports
+`No issues found! (ran in 26.8s)`; `dart analyze test/` reports
+`No issues found!`; and the Rules Emulator reports `214 passing (1m)`.
+Rules/indexes and Hosting were deployed. Web build reports `EXIT: 0`; live
+`version.json` reports `3.10.20+1132` and `main.dart.js` returns
+`no-cache, no-store, must-revalidate`.
+
+The split APKs are 31.7 MB, 33.3 MB, and 34.8 MB. Their package is
+`footwear.com.pk`, version `3.10.20`, and APK v2 signature checks pass. The
+ARM64 APK (34,881,627 bytes; SHA-256
+`91CCDE3A419A8F96AAB7A94498F57E29555D292D4389DA1CE7AC6A820F6090A9`) was
+copied and installed successfully on `R5GL22RGT9V`; the installed code is
+`310193132`.
+
+The signed AAB is 76,447,355 bytes (72.9 MB), SHA-256
+`FF58C84AA80BF18A22946A7FC25ADB82FE888798ADF962B23EDCCAA1CCF69430`.
+Source and Gradle calculate base AAB code `310191132`, one above the previous
+Play upload `310191130`; bundletool was unavailable for independent manifest
+extraction.
+`jarsigner -verify` reports `jar verified.` with self-signed/untrusted-chain
+and no-timestamp warnings. The AAB was not uploaded because its signer still
+requires confirmation against Play App Integrity. The Remote Config minimum
+version defaults to `0`, so mandatory gating is not active until an owner
+configures it after the required release is available. P1-04 reconciliation
+and other Play owner-only setup gates remain open.
+
+## Arabic/Urdu PDF Glyph Subsetting
+
+The medial Yeh corruption was caused by the TrueType subset writer in
+`pdf 3.13.1`, not by the bundled Noto font or Arabic shaping. Different
+Unicode code points may map to the same source glyph ID. The writer removed a
+consumed glyph from its lookup map, so a later alias could receive an
+unrelated fallback glyph. The local vendored fix records placed glyph slots
+per code point and copies glyph data before the compound-glyph remapping step.
+It preserves the existing subset-space behavior and the rest of the shaping
+pipeline. The app path-overrides `pdf` to this patched `3.13.1` source until
+an upstream release contains an equivalent correction.
+
+The alias regression was red before the patch and reports
+`00:00 +4: All tests passed!` after it. The full Flutter suite reports
+`02:37 +794: All tests passed!`; library analysis reports
+`No issues found! (ran in 163.4s)` and test analysis reports
+`No issues found!`. Synthetic Arabic and Urdu statement, invoice, and receipt
+renders were visually inspected, including medial Yeh. The original affected
+PDFs were unavailable, so their exact output is not verified. The patch was
+introduced in v3.10.20+1131 and carried forward into the current v3.10.20+1132
+APK and AAB, and the ARM64 APK was
+installed on the connected phone; that installation does not independently
+verify rendering of the unavailable original PDFs.
 
 ## Backup and Restore
 
@@ -344,6 +404,21 @@ Workspace administrators configure English, Arabic, and Urdu invoice names, subt
 ## Release Surfaces
 
 Web and Android builds use the same version from `app/pubspec.yaml` and `AppBrand`. Google Drive OAuth client IDs are deployment configuration, not source defaults; without them, file export remains available while Drive operations stay unavailable. Firebase Hosting must preserve no-cache headers for Flutter shell files and permit the Google static hosts required by Flutter web.
+
+Android Play updates use the flexible flow for routine releases, immediate
+updates for Play priority 4+, and a Remote Config minimum-version gate. The
+`minimum_supported_version_code` parameter defaults to `0`; owners should
+raise it only after that version is available to the intended distribution
+channels. This coordinator runs only in Android release builds, and Play's
+update availability requires a Play-installed build for end-to-end validation.
+Login advertises Android username/email and password autofill; the app submits
+the autofill context only after Firebase Auth succeeds and never stores
+passwords.
+
+Android Play codes use the monotonic `310190000 + buildNumber` sequence. This
+base is anchored above the last accepted Play code `310191130`; source
+`3.10.20+1132` yields AAB code `310191132`. `AppBrand` and Gradle must use the
+same base, while split APK codes include ABI-specific offsets.
 
 ## Workspace Management UX
 
@@ -854,3 +929,53 @@ API 403/too-many-attempts warnings. The capture did not show
 `PERMISSION_DENIED`. These are separate connectivity/configuration signals;
 they do not contradict the user's report that the test writes succeeded.
 The agent did not directly read or write production business data.
+
+## 2026-10-30 Archived Shops and Transaction Notification Retirement
+
+Archived shops remain readable for historical detail and balance collection,
+but cannot receive new sale invoices or cash-out/debt entries. Cash-in
+transactions and cash-receipt invoices remain available. The app checks this
+at invoice/transaction provider boundaries, and Firestore Rules independently
+reject the disallowed writes.
+
+Standalone transaction soft-delete keeps its ledger and balance invariants:
+the source row is soft-deleted, `shop.balance` is reversed exactly, and the
+deterministic source notification is retired or replaced by a tombstone in one
+Firestore transaction. Delayed notification publication transactionally
+checks the source row to avoid resurrection after deletion. Feed visibility
+and foreground Android alerts filter retired notifications without a
+Firestore `!= true` query, preserving legacy documents that lack the field.
+
+Validation on the local, unreleased source: full Flutter suite
+`01:50 +785: All tests passed!`; full Firestore Rules Emulator
+`213 passing (1m)`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 151.5s)`; `dart analyze test/`:
+`No issues found!`. Hot restart was unavailable because the connected Dart
+Tooling Daemon had no running Flutter app. The Rules change is undeployed;
+release/deployment/device/Git operations were not performed. P1-04 and
+older-client rollout blockers remain open.
+
+## 2026-10-30 Per-Export Language and Shop-Detail Density
+
+Multi-shop statements opened from the shops list now use
+`ExportSheet.pdfBytesBuilderWithLanguagePair`. The selected
+English-Arabic/English-Urdu pair is passed to the multi-shop PDF builder for
+both its localized labels and its copy of the workspace invoice-header
+configuration. The initial selection follows the saved legacy workspace pair;
+the invoice-header UI no longer exposes a language selector. `ExportSheet`
+continues to share the same generated PDF bytes across PDF share, image, and
+print.
+
+Shop-detail contextual actions now occupy the existing contact row with the
+phone and WhatsApp action, immediately above the Total In/Total Out summary.
+No provider, financial calculation, role capability, or Firestore authorization
+was changed. The global shops-list export menu and primary shop-row navigation
+remain in place.
+
+The regression for the multi-shop selector failed before the callback was
+wired and passes afterward. Full Flutter discovery: `02:00 +806: All tests
+passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 11.0s)`;
+`dart analyze test/`: `No issues found!`. The hand-aggregated
+`test/all_tests.dart` run had cross-suite locale-state failures; standard
+discovery passed. No version bump, build, deployment, device delivery, commit,
+or push was performed.

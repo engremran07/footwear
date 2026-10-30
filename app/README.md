@@ -1,6 +1,46 @@
-# FootWear ERP — Flutter App (v3.10.17+1128 source; Rules/indexes deployed)
+# FootWear ERP — Flutter App (v3.10.20+1132; web deployed, APK installed)
 
 Mobile-first Android + Web ERP for footwear distribution. Admins manage products, routes, inventory and users. Field sellers record shop transactions on assigned routes. Full multilingual support: English, Arabic, Urdu.
+
+## Android Updates and Password Autofill — v3.10.20+1132
+
+Android release builds support flexible Google Play updates, priority-4
+immediate updates, and an owner-configurable minimum-version gate. The Remote
+Config parameter `minimum_supported_version_code` defaults to `0`; do not
+raise it until the required release is available to the intended channels.
+The Google Play update API requires a Play-installed build for end-to-end
+validation. Login fields advertise username/email and password autofill, and
+the platform save context is submitted only after successful Firebase Auth.
+ShoesERP never stores passwords.
+
+The compact Play version code is `310190000 + buildNumber`: current source
+`3.10.20+1132` yields expected AAB code `310191132`, one above the recorded
+previous Play upload `310191130`. Keep the base synchronized in `AppBrand` and
+Gradle; split APK codes include ABI offsets. Bundletool was unavailable for
+independent AAB manifest extraction. The AAB signature verifies locally, but
+the Play upload certificate has not been confirmed in App Integrity, so the
+bundle was not uploaded.
+
+The full Flutter suite reports `01:46 +823: All tests passed!`;
+`flutter analyze lib --no-pub` reports `No issues found! (ran in 26.8s)`;
+`dart analyze test/` reports `No issues found!`; and the Rules Emulator reports
+`214 passing (1m)`. Rules/indexes and Hosting deployed; web build reported
+`EXIT: 0`. The ARM64 APK was installed on the connected phone (`Success`,
+code `310193132`).
+
+## Profile and Invoice-Header Regression Fixes — v3.10.20+1131
+
+Own display-name changes use a dedicated provider method that checks the
+authenticated UID and active profile and writes only the owner's display name
+and update timestamp. Invoice-header settings prompt to Save, Discard, or
+Cancel when leaving a dirty form; failed saves keep the draft open. The
+settings screen includes invoice, statement, and receipt previews.
+
+The Android `applicationId`, namespace, Kotlin activity package, Firebase
+configuration, ProGuard, and Fastlane package all match `footwear.com.pk`.
+These fixes were introduced in v3.10.20+1131 and are included in the current
+v3.10.20+1132 APK and AAB; current validation and deployment evidence is
+recorded above.
 
 Firestore Rules/indexes for the shared invoice/receipt sequence were deployed
 after `207 passing (56s)` in the Rules Emulator. Hosting and an app release
@@ -12,6 +52,33 @@ and live counters were not captured. Live logs also showed background
 Firestore DNS `UNAVAILABLE` and App Check token API 403/retry warnings; these
 are separate follow-up signals. The agent did not directly read or write
 production business data.
+
+## Arabic and Urdu PDF Glyph Correction — v3.10.20+1131
+
+`pdf` 3.13.1's TrueType subset writer could map distinct Unicode characters
+sharing one source glyph to the wrong embedded slot. The local vendored patch
+preserves a subset slot per code point and copies glyph data before compound
+remapping; it does not change the Noto font or shaping behavior. The focused
+regression reports `00:00 +4: All tests passed!`; the full Flutter suite
+reports `02:37 +794: All tests passed!`. The patch was introduced in
+v3.10.20+1131 and is included in the current v3.10.20+1132 APK and AAB.
+
+## All-Shops Export — v3.10.20+1132
+
+Shop-list export actions read full cursor-paged data through the existing
+role-scoped export providers; live UI list limits are unchanged. Seller
+multi-route statements query only their assigned routes. Multi-shop PDFs keep
+shops in the cover index but omit empty zero-opening-balance ledger sections.
+Section headers use each section's document-global first page number. PNG
+export streams raster pages through image conversion one page at a time; PDF,
+print, share, and image continue to use the same PDF bytes.
+
+Focused export/workspace tests report `00:08 +37: All tests passed!`; the full
+Flutter suite reports `01:46 +823: All tests passed!`. Library analysis
+reports `No issues found! (ran in 26.8s)` and test analysis reports
+`No issues found!`. The real-world super-admin workspace-exit denial remains
+unreproduced; current Rules were deployed and the local suite passes, while
+the new widget test verifies localized permission-error feedback only.
 
 ## v3.10.15+1126 Contextual Record Actions
 
@@ -197,6 +264,38 @@ Focused affected tests: `00:00 +54: All tests passed!`; full Flutter suite:
 `No issues found! (ran in 9.1s)`; `dart analyze test/`: `No issues found!`.
 Version/build, release artifacts, production deployment, and device delivery
 remain unchanged and pending.
+
+## Local Archived-Shop and Transaction-Notification Integrity — 2026-10-30
+
+Archived shops are blocked from new sale invoices and cash-out/debt
+transactions, but remain available for cash-in collection and cash-receipt
+invoices. Provider guards and Firestore Rules enforce the same boundary.
+Soft-deleting a standalone cash transaction retires its deterministic
+notification atomically with the ledger soft-delete and exact shop-balance
+reversal. Delayed notification publication checks the source row, while feed
+and foreground-alert providers hide retired items.
+
+Full Flutter suite: `01:50 +785: All tests passed!`; Rules Emulator:
+`213 passing (1m)`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 151.5s)`; `dart analyze test/`:
+`No issues found!`. A hot restart could not be completed because the Dart
+Tooling Daemon had no connected Flutter app. Rules/indexes remain local and
+undeployed. No release build, Hosting deployment, phone delivery, commit, or
+push occurred; P1-04 and older-client rollout gates remain unresolved.
+
+## Local Export Language and Shop-Detail Layout — 2026-10-30
+
+Route-level multi-shop statements now use the per-export Arabic/Urdu selector.
+The selected pair is applied to statement labels and the shared workspace
+header; image, print, and share use the same PDF bytes. Invoice-header settings
+hide the language selector but keep old saved values readable.
+
+Shop-detail actions share the phone/WhatsApp row above the Total In/Total Out
+summary. `AppContextualActions`, `PermissionPolicy`, and the existing guarded
+provider methods continue to enforce eligible actions. The shop-list export
+menu and primary row navigation are unchanged. Full Flutter discovery:
+`02:00 +806: All tests passed!`; both analyzers are clean. No Rules/index,
+release, deployment, installation, commit, or push operation occurred.
 
 ## Local Notification and Transaction Integrity Follow-up
 
@@ -664,7 +763,7 @@ original production PDF was unavailable for direct comparison.
 
 Place `google-services.json` in `android/app/` before running (obtain from Firebase Console — gitignored).
 
-Google Drive backup requires a Google OAuth web client and Android client for package `footwear.pk.com`. Configure the release SHA-1 in Google Cloud/Firebase, then provide `GOOGLE_DRIVE_CLIENT_ID` and `GOOGLE_DRIVE_SERVER_CLIENT_ID` as `--dart-define` values for web and Android builds. The app requests only the `drive.file` scope.
+Google Drive backup requires a Google OAuth web client and Android client for package `footwear.com.pk`. Configure the release SHA-1 in Google Cloud/Firebase, then provide `GOOGLE_DRIVE_CLIENT_ID` and `GOOGLE_DRIVE_SERVER_CLIENT_ID` as `--dart-define` values for web and Android builds. The app requests only the `drive.file` scope.
 
 ---
 

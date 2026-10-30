@@ -1,6 +1,74 @@
-# FootWear ERP — v3.10.17+1128 source (Rules/indexes deployed; app release pending)
+# FootWear ERP — v3.10.20+1132 (web deployed; APK installed; AAB built)
 
 A mobile-first enterprise resource planning system for footwear distribution businesses. Built with Flutter (Android + Web) and Firebase. Designed for route-based sales operations where an admin manages products, inventory, and sellers, while field sellers record customer transactions on their assigned routes.
+
+The Android Play package is `footwear.com.pk`; its Firebase Android app
+registration is configured for the same package.
+
+## Android Updates and Password Autofill — v3.10.20+1132
+
+Android supports flexible Google Play updates, required immediate updates for
+Play priority 4+, and an owner-configurable minimum version gate. Firebase
+Remote Config parameter `minimum_supported_version_code` defaults to `0`, so
+the gate stays inactive until configured after the required version is
+available to the intended channels. End-to-end update behavior requires a
+Play-installed app. Login advertises Android username/email and password
+autofill; the autofill context is submitted only after successful Firebase
+Authentication, and the app does not store passwords.
+
+Play version codes use `310190000 + buildNumber`, anchored one above the
+recorded prior Play code `310191130`; current source `3.10.20+1132` yields
+`310191132`. Split APKs add ABI-specific offsets; upload the signed AAB to
+Play and compare its base code with the Console's latest accepted code. The
+source and Gradle calculate AAB code `310191132`; bundletool was unavailable
+for independent manifest extraction.
+
+The local Rules Emulator reports `214 passing (1m)`; the full Flutter suite
+reports `01:46 +823: All tests passed!`; `flutter analyze lib --no-pub`
+reports `No issues found! (ran in 26.8s)` and `dart analyze test/` reports
+`No issues found!`. Firestore Rules/indexes and Hosting deployed. Web reports
+`EXIT: 0`; live `version.json` is `3.10.20+1132`, and the main bundle is
+`no-cache, no-store, must-revalidate`. Split APKs built at 31.7/33.3/34.8 MB.
+The signed 76,447,355-byte AAB reports `jar verified.`; its signer certificate
+still requires confirmation against Play App Integrity, so it was not
+uploaded. The ARM64 APK was copied and installed successfully on
+`R5GL22RGT9V` (code `310193132`).
+
+## Profile and Invoice-Header Regression Fixes — v3.10.20+1131
+
+Profile owners can now change their own display name through a self-scoped
+provider write, regardless of workspace role. Leaving invoice-header settings
+with edits prompts to Save, Discard, or Cancel; failed saves retain the draft.
+The settings screen also provides invoice, statement, and receipt previews.
+Android package identity is aligned to `footwear.com.pk` across Gradle,
+`MainActivity`, Firebase, ProGuard, and Fastlane.
+
+These changes were introduced in v3.10.20+1131 and are included in the
+current v3.10.20+1132 APK and AAB. Current validation and deployment evidence
+is recorded above.
+
+## Arabic and Urdu PDF Glyph Correction — v3.10.20+1131
+
+The medial Yeh corruption was traced to the `pdf 3.13.1` TrueType subset
+writer: distinct Unicode code points that share a source glyph could be
+assigned the wrong embedded glyph slot. A narrow local patch preserves each
+code point's subset slot; the bundled Noto font and shaping pipeline are
+unchanged. The regression and full Flutter suite pass, and generated Arabic
+and Urdu statement, invoice, and receipt samples were visually inspected.
+This fix was introduced in v3.10.20+1131 and is included in the current
+v3.10.20+1132 APK and AAB.
+
+## All-Shops Statement Export — v3.10.20+1132
+
+Shop reports now use complete cursor-paged shop and route data rather than
+the bounded live lists used by the screen. Seller statements include only
+assigned routes. Empty shops with no opening balance no longer generate blank
+ledger pages, and PNG export processes rasterized pages sequentially.
+
+The web build and Hosting deployment succeeded. The v3.10.20+1132 ARM64 APK
+was installed on `R5GL22RGT9V`. The signed AAB was built and verified locally,
+but has not been uploaded to Play while its signing certificate awaits
+confirmation against Play App Integrity.
 
 ## Local Financial Safeguards and Minor-Unit Compatibility — Unreleased
 
@@ -186,6 +254,42 @@ Focused affected tests: `00:00 +54: All tests passed!`; full Flutter suite:
 `No issues found! (ran in 9.1s)`; `dart analyze test/`: `No issues found!`.
 These local changes have not been versioned, built, deployed, or delivered to a
 phone; do not infer production behavior from local tests.
+
+## Local Archived-Shop and Notification Integrity Follow-up — 2026-10-30
+
+Archived shops cannot receive new sale invoices or cash-out/debt transactions.
+Cash-in collection and cash-receipt invoices remain available so existing
+balances can still be collected. The provider and Firestore Rules enforce this
+distinction independently.
+
+Soft-deleting a standalone cash transaction now retires its deterministic
+notification in the same atomic write as the soft-delete and exact shop-balance
+reversal. Delayed notification publication checks the persisted source
+transaction, and retired items are omitted from notification feeds and
+foreground alerts. Full Flutter suite: `01:50 +785: All tests passed!`;
+Rules Emulator: `213 passing (1m)`; `flutter analyze lib --no-pub`:
+`No issues found! (ran in 151.5s)`; `dart analyze test/`:
+`No issues found!`. The hot-restart attempt was unavailable because no
+Flutter app was connected to the Dart Tooling Daemon. The Rules changes remain
+local and undeployed; no release build, Hosting deployment, phone delivery,
+commit, or push was performed. P1-04 and older-client rollout blockers remain
+unresolved.
+
+## Local Statement Export and Shop-Detail Density Follow-up — 2026-10-30
+
+The route-level multi-shop account statement now offers the same per-export
+Arabic/Urdu choice as single-shop statements. The selected language pair drives
+PDF labels and the shared workspace header; PDF-derived image, print, and
+share outputs remain byte-identical. The invoice-header language control stays
+hidden while legacy saved values remain readable.
+
+The shop-detail contextual action button now shares the phone/WhatsApp row
+above the Total In/Total Out summary. Existing role filtering and guarded
+provider actions are unchanged. Focused export, receipt, settings, and
+role-placement tests passed; the full Flutter suite reported
+`02:00 +806: All tests passed!`, and both analyzers are clean. This is local,
+unreleased source; no version, artifact, deployment, device, or Git publication
+operation was performed.
 
 ## Local Notification and Ledger Integrity Follow-up
 

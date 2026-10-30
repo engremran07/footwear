@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:footwear_erp/models/settings_model.dart';
+import 'package:footwear_erp/models/shop_model.dart';
 import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/product_provider.dart';
@@ -36,60 +37,61 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('admin stock empty state explains allocation and non-stock mode', (
-    tester,
-  ) async {
-    final now = Timestamp.now();
-    final admin = UserModel(
-      id: 'admin-uid',
-      email: 'admin@example.com',
-      displayName: 'Admin',
-      role: UserRole.admin,
-      tenantId: 'tenant-1',
-      active: true,
-      createdAt: now,
-      updatedAt: now,
-    );
+  testWidgets(
+    'admin stock empty state explains allocation and non-stock mode',
+    (tester) async {
+      final now = Timestamp.now();
+      final admin = UserModel(
+        id: 'admin-uid',
+        email: 'admin@example.com',
+        displayName: 'Admin',
+        role: UserRole.admin,
+        tenantId: 'tenant-1',
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authUserProvider.overrideWith((ref) => Stream.value(admin)),
-          shopsProvider.overrideWith((ref) => Stream.value(const [])),
-          sellerInventoryProvider.overrideWith(
-            (ref, sellerId) => Stream.value(const []),
-          ),
-          settingsProvider.overrideWith(
-            (ref) => Stream.value(
-              SettingsModel(
-                tenantId: 'tenant-1',
-                currency: 'SAR',
-                pairsPerCarton: 12,
-                allowNonStockInvoices: false,
-                invoiceHeader: const InvoiceHeaderConfig(nameEn: 'Workspace'),
-                updatedAt: now,
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(admin)),
+            shopsProvider.overrideWith((ref) => Stream.value(const [])),
+            sellerInventoryProvider.overrideWith(
+              (ref, sellerId) => Stream.value(const []),
+            ),
+            settingsProvider.overrideWith(
+              (ref) => Stream.value(
+                SettingsModel(
+                  tenantId: 'tenant-1',
+                  currency: 'SAR',
+                  pairsPerCarton: 12,
+                  allowNonStockInvoices: false,
+                  invoiceHeader: const InvoiceHeaderConfig(nameEn: 'Workspace'),
+                  updatedAt: now,
+                ),
               ),
             ),
-          ),
-          productsProvider.overrideWith((ref) => Stream.value(const [])),
-          allVariantsProvider.overrideWith((ref) => Stream.value(const [])),
-        ],
-        child: const MaterialApp(home: CreateSaleInvoiceScreen()),
-      ),
-    );
+            productsProvider.overrideWith((ref) => Stream.value(const [])),
+            allVariantsProvider.overrideWith((ref) => Stream.value(const [])),
+          ],
+          child: const MaterialApp(home: CreateSaleInvoiceScreen()),
+        ),
+      );
 
-    await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-    expect(
-      find.text(
-        'No stock is allocated to you. Transfer warehouse stock to your account, '
-        'or choose a non-stock invoice if this workspace allows it.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('No inventory items available'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+      expect(
+        find.text(
+          'No stock is allocated to you. Transfer warehouse stock to your account, '
+          'or choose a non-stock invoice if this workspace allows it.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('No inventory items available'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'tenant-enabled non-stock mode is visible to every invoice-creating role',
@@ -155,6 +157,79 @@ void main() {
         );
         expect(tester.takeException(), isNull);
       }
+    },
+  );
+
+  testWidgets(
+    'archived preselected shop opens collection mode without sale options',
+    (tester) async {
+      final now = Timestamp.now();
+      final admin = UserModel(
+        id: 'admin-uid',
+        email: 'admin@example.com',
+        displayName: 'Admin',
+        role: UserRole.admin,
+        tenantId: 'tenant-1',
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final archivedShop = ShopModel(
+        id: 'archived-shop',
+        name: 'Archived shop',
+        routeId: 'route-1',
+        routeNumber: 1,
+        balance: 50,
+        active: false,
+        createdBy: 'admin-uid',
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(admin)),
+            shopsProvider.overrideWith((ref) => Stream.value(const [])),
+            shopDetailProvider.overrideWith(
+              (ref, shopId) => Stream.value(archivedShop),
+            ),
+            sellerInventoryProvider.overrideWith(
+              (ref, sellerId) => Stream.value(const []),
+            ),
+            settingsProvider.overrideWith(
+              (ref) => Stream.value(
+                SettingsModel(
+                  tenantId: 'tenant-1',
+                  currency: 'SAR',
+                  pairsPerCarton: 12,
+                  allowNonStockInvoices: true,
+                  invoiceHeader: const InvoiceHeaderConfig(nameEn: 'Workspace'),
+                  updatedAt: now,
+                ),
+              ),
+            ),
+            productsProvider.overrideWith((ref) => Stream.value(const [])),
+            allVariantsProvider.overrideWith((ref) => Stream.value(const [])),
+            routeCurrencyProvider.overrideWith((ref, routeId) => 'SAR'),
+          ],
+          child: const MaterialApp(
+            home: CreateSaleInvoiceScreen(preselectedShopId: 'archived-shop'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final modeSelector = tester.widget<SegmentedButton<InvoiceEntryMode>>(
+        find.byType(SegmentedButton<InvoiceEntryMode>),
+      );
+      expect(modeSelector.selected, {InvoiceEntryMode.cashReceipt});
+      expect(modeSelector.segments.map((segment) => segment.value), [
+        InvoiceEntryMode.cashReceipt,
+      ]);
+      expect(find.text('Archived shop'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 }

@@ -9,6 +9,7 @@ import 'unit/models/shop_model_test.dart' as shop_model;
 import 'unit/models/route_model_test.dart' as route_model;
 import 'unit/models/shop_model_bad_debt_test.dart' as shop_model_bad_debt;
 import 'unit/core/collections_test.dart' as collections;
+import 'unit/core/permission_policy_test.dart' as permission_policy;
 import 'unit/core/backup_cipher_test.dart' as backup_cipher;
 import 'unit/business_logic/financial_pathways_test.dart' as financial_pathways;
 import 'unit/business_logic/bad_debt_writeoff_test.dart' as bad_debt_writeoff;
@@ -25,9 +26,11 @@ import 'unit/core/l10n_test.dart' as l10n;
 import 'unit/core/sanitizer_test.dart' as sanitizer;
 import 'unit/core/error_mapper_test.dart' as error_mapper;
 import 'unit/core/changelog_data_test.dart' as changelog_data;
+import 'unit/core/app_update_policy_test.dart' as app_update_policy;
 import 'unit/core/share_helper_test.dart' as share_helper;
 import 'unit/core/excel_export_test.dart' as excel_export;
 import 'unit/core/pdf_export_test.dart' as pdf_export;
+import 'unit/android_package_identity_test.dart' as android_package_identity;
 import 'unit/core/seller_report_currency_test.dart' as seller_report_currency;
 import 'unit/models/seller_inventory_model_test.dart' as seller_inventory_model;
 import 'unit/models/invoice_model_extended_test.dart' as invoice_model_extended;
@@ -39,6 +42,7 @@ import 'unit/business_logic/mark_paid_outstanding_test.dart'
     as mark_paid_outstanding;
 import 'unit/providers/settings_provider_test.dart' as settings_provider;
 import 'unit/providers/transaction_provider_test.dart' as transaction_provider;
+import 'unit/providers/user_provider_test.dart' as user_provider;
 import 'unit/providers/database_flush_provider_test.dart'
     as database_flush_provider;
 import 'unit/providers/changelog_provider_test.dart' as changelog_provider;
@@ -56,6 +60,9 @@ import 'widget/auth_submit_feedback_test.dart' as auth_submit_feedback_widget;
 import 'widget/invoice_list_summary_test.dart' as invoice_list_summary_widget;
 import 'widget/notification_center_feedback_test.dart'
     as notification_center_feedback_widget;
+import 'widget/app_update_coordinator_test.dart'
+    as app_update_coordinator_widget;
+import 'widget/login_screen_feedback_test.dart' as login_screen_feedback_widget;
 import 'widget/create_invoice_auth_state_test.dart'
     as create_invoice_auth_state_widget;
 import 'widget/profile_dirty_state_test.dart' as profile_dirty_state_widget;
@@ -81,6 +88,8 @@ import 'widget/database_flush_screen_state_test.dart'
 import 'widget/reports_export_feedback_test.dart'
     as reports_export_feedback_widget;
 import 'widget/user_route_options_test.dart' as user_route_options_widget;
+import 'widget/shop_detail_contextual_actions_test.dart'
+    as shop_detail_contextual_actions_widget;
 
 void main() {
   user_model.main();
@@ -90,6 +99,7 @@ void main() {
   route_model.main();
   shop_model_bad_debt.main();
   collections.main();
+  permission_policy.main();
   backup_cipher.main();
   financial_pathways.main();
   bad_debt_writeoff.main();
@@ -105,6 +115,7 @@ void main() {
   mark_paid_outstanding.main();
   settings_provider.main();
   transaction_provider.main();
+  user_provider.main();
   database_flush_provider.main();
   changelog_provider.main();
   validators.main();
@@ -113,9 +124,11 @@ void main() {
   sanitizer.main();
   error_mapper.main();
   changelog_data.main();
+  app_update_policy.main();
   share_helper.main();
   excel_export.main();
   pdf_export.main();
+  android_package_identity.main();
   seller_report_currency.main();
   confirm_dialog_widget.main();
   stat_card_widget.main();
@@ -130,6 +143,8 @@ void main() {
   auth_submit_feedback_widget.main();
   invoice_list_summary_widget.main();
   notification_center_feedback_widget.main();
+  app_update_coordinator_widget.main();
+  login_screen_feedback_widget.main();
   create_invoice_auth_state_widget.main();
   profile_dirty_state_widget.main();
   shops_currency_filter_widget.main();
@@ -145,4 +160,5 @@ void main() {
   database_flush_screen_state_widget.main();
   reports_export_feedback_widget.main();
   user_route_options_widget.main();
+  shop_detail_contextual_actions_widget.main();
 }

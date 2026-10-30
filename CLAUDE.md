@@ -1,6 +1,6 @@
 ﻿# ShoesERP AI Coding Rules (CLAUDE.md)
 
-Last updated: 2026-10-29
+Last updated: 2026-10-30
 
 ## Runtime Override (Always First)
 
@@ -17,6 +17,11 @@ The live codebase is a route/seller distribution ERP.
   correction, credit-note, or void capabilities.
 - Super-admin is platform-only by default. Tenant business data requires explicit `active_workspace_id` plus a reasoned support context; selection start/end is written to append-only `platform_access_logs`. Starting access links `active_workspace_access_log_id` to the exact start event in the same batch, enforced in both directions by Firestore Rules. Ending or switching access must atomically write an end event linked through `last_workspace_access_end_log_id` to the profile transition and, when available, the prior start event.
 - Firebase Auth is the app's only sign-in mechanism. The app has no custom device registration, pairing approval, session slots, or session renewal; Firestore Rules enforce active profile, role, tenant, and selected-workspace scope.
+- The Android Play package is `footwear.com.pk`. Keep the Android
+  `applicationId`, Gradle namespace, Kotlin package, matching Firebase Android
+  app registration, `google-services.json`, and `firebase_options.dart`
+  aligned. The package-identity regression test covers these configuration
+  points.
 - Business-data access additionally requires an active tenant document. An active user profile does not override an inactive workspace; the explicitly selected super-admin restoration path is the limited exception.
 - App-side role/capability checks use `RoleCapabilities` and
   `PermissionPolicy` in `app/lib/core/utils/role_names.dart` and
@@ -34,6 +39,76 @@ The live codebase is a route/seller distribution ERP.
 - Routing source: app/lib/core/router/app_router.dart
 
 If any legacy section conflicts with runtime truth, runtime truth wins.
+
+## Current Local Profile and Invoice-Header Fixes — 2026-10-30
+
+Own-profile display-name updates use a dedicated provider path that validates
+the authenticated UID and active profile; they do not require user-management
+capability. Firestore Rules remain authoritative and deny tenant-ID changes.
+Leaving a dirty invoice-header form prompts to Save, Discard, or Cancel. A
+failed save keeps the form and draft open. Invoice, account-statement, and
+cash-receipt previews use the existing document builders.
+
+The package identity is `footwear.com.pk` in the Android application ID,
+namespace, Kotlin activity package, Firebase configuration, ProGuard, and
+Fastlane. The v3.10.20+1132 split APKs and signed AAB include the
+profile/invoice-header fixes and all-shops export recovery; the ARM64 APK was
+installed on the connected phone. Web and Rules/indexes were deployed. The
+AAB has not been uploaded because its signing certificate still needs
+confirmation against Play App Integrity.
+
+## Android Updates and Password Autofill — 2026-10-30
+
+The `3.10.20+1131` source candidate adds flexible Google Play updates, an
+immediate flow for priority-4 updates, and an owner-configurable minimum
+version gate. Remote Config parameter `minimum_supported_version_code`
+defaults to `0`; required gating is inactive until an owner raises it after
+the target version is available to the intended channels. Play update checks
+are release-Android-only and need a Play-installed build for end-to-end
+validation. Login uses Android autofill hints and commits the autofill context
+only after successful Firebase Auth; ShoesERP does not store passwords.
+
+The base Play code is `310190000`, anchored after previously uploaded code
+`310191130`; the current source build `3.10.20+1132` produces expected AAB
+code `310191132`. Keep the Dart and Gradle bases aligned and increment the
+build number on each Play upload. Split APKs include ABI offsets and are not
+the Play upload artifact.
+
+## All-Shops Export Recovery — v3.10.20+1132
+
+The shops-list export loads complete cursor-paged shop and route data rather
+than live UI windows. Seller multi-route statements use only assigned-route
+transaction exports. Empty zero-balance shops stay in the report index but do
+not emit blank ledger sections; section headers account for document-global
+pages. PNG export consumes the raster stream sequentially. The single-PDF-byte
+path remains shared by PDF, print, share, and image actions.
+
+The 37 focused export/workspace tests and all 823 Flutter tests pass; both Dart
+analyzers are clean. Web and Rules/indexes are deployed, and the ARM64 v1132
+APK was copied to and installed on `R5GL22RGT9V`. The 72.9 MB AAB is built and
+signature-verified, but not uploaded: Play App Integrity certificate
+confirmation remains required. The Gradle/KGP migration warning is not a
+build failure and remains visible. The actual production super-admin exit
+denial is still not reproduced; local coverage verifies error mapping and the
+Rules batch contract, not the live profile/event state.
+
+## Local Export and Shop-Detail Follow-up — 2026-10-30
+
+The route-level multi-shop statement export now uses the per-export
+English-Arabic/English-Urdu selector and applies the selection to its PDF
+labels and workspace header. Invoice-header settings keep the language
+control hidden while preserving the legacy saved pair. Shop-detail actions
+share the phone/WhatsApp row above the Total In/Total Out card; capability
+filters and provider guards remain authoritative. The shop-list export menu
+and primary shop navigation are unchanged.
+
+Verification: the focused selector test failed before the export wiring and
+passes after it; the full Flutter discovery suite reports
+`02:00 +806: All tests passed!`. Both Dart analyzers are clean. This is local
+source only: no version bump, release build, Rules/index deployment, Hosting
+deployment, device installation, commit, or push was performed. The
+hand-aggregated `test/all_tests.dart` runner had cross-suite locale-state
+failures; the standard Flutter discovery run passed.
 
 ## Must-Check Before Edits
 
@@ -168,6 +243,14 @@ If any legacy section conflicts with runtime truth, runtime truth wins.
     contract consistently across PDFs, reports, image exports, print, and
     share. Verify transparent and colored-background fixtures in stored and
     rendered outputs.
+41. Archived/inactive shops cannot receive new sale invoices or cash-out/debt
+    entries. Existing balances and history remain available for collection:
+    cash-in transactions and cash-receipt invoices are still permitted.
+    Provider guards and Firestore Rules must enforce the same distinction.
+    Soft-deleting a standalone cash transaction must retire its deterministic
+    notification atomically with the exact shop-balance reversal; notification
+    publication must check the source row, and retired notifications must not
+    appear in feeds or foreground alerts.
 
 ## Frontend UI Governance
 
@@ -475,6 +558,16 @@ must not be described as a release or production signoff.
 
 ## Done In This Baseline
 
+- The 2026-10-30 Arabic/Urdu PDF Yeh regression is traced to `pdf 3.13.1`'s
+  TrueType subset writer, not the bundled Noto font or shaping path. Distinct
+  Unicode code points may alias one source glyph, so the patched local writer
+  preserves a separate embedded subset slot per code point and copies glyph
+  data before compound remapping. The app path-overrides `pdf` to the vendored
+  patch until upstream publishes an equivalent fix. Regression:
+  `00:00 +4: All tests passed!`; full suite:
+  `02:37 +794: All tests passed!`; both analyzers are clean. The prior
+  v3.10.18+1129 AAB predates this fix; no versioned rebuild or release was
+  performed.
 - The local 2026-10-29 Pass 2 safeguards reject ambiguous or sub-cent
   monetary inputs for SAR/PKR and validate invoice, receipt, ledger, and
   correction amounts to two decimal places. Credit-note quantities are

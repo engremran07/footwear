@@ -30,6 +30,7 @@ List<NotificationModel> foregroundNotificationCandidates({
 }) => notifications
     .where(
       (notification) =>
+          !notification.sourceDeleted &&
           !notification.read &&
           !deliveredNotificationIds.contains(notification.id) &&
           notification.createdAt.toDate().isAfter(sessionStartedAt),

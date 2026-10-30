@@ -31,7 +31,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBkuhoehQ8G7GBCx5Gun_v3KOlM2gqyBDg',
-    appId: '1:759926080214:android:81679cd4f6df2b21fe7f77',
+    appId: '1:759926080214:android:37a839f83a6ffccffe7f77',
     messagingSenderId: '759926080214',
     projectId: 'shoeserp-clean-20260327',
     storageBucket: 'shoeserp-clean-20260327.firebasestorage.app',

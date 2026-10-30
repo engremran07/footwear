@@ -439,6 +439,63 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('workspace exit shows mapped Firestore permission failure', (
+    tester,
+  ) async {
+    final tenant = TenantModel(
+      id: 'alpha',
+      name: 'Alpha',
+      slug: 'alpha',
+      activeUserCount: 0,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final user = UserModel(
+      id: 'platform-admin',
+      email: 'platform@example.com',
+      displayName: 'Platform Admin',
+      role: UserRole.superAdmin,
+      active: true,
+      activeWorkspaceId: tenant.id,
+      activeWorkspaceReason: 'Workspace support review',
+      activeWorkspaceSelectedAt: Timestamp.now(),
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    );
+    final authNotifier = _RecordingAuthNotifier()
+      ..endError = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authUserProvider.overrideWith((ref) => Stream.value(user)),
+          tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
+          tenantWorkspaceUsersProvider.overrideWith(
+            (ref, tenantId) => Stream.value(const <UserModel>[]),
+          ),
+          authNotifierProvider.overrideWith(() => authNotifier),
+        ],
+        child: const MaterialApp(home: TenantManagementScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('End workspace access'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.widgetWithText(FilledButton, 'Confirm'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('You do not have permission to perform this action.'),
+      findsOneWidget,
+    );
+    expect(authNotifier.accessEnded, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('platform admin access selection reports success', (
     tester,
   ) async {
@@ -646,6 +703,7 @@ class _RecordingAuthNotifier extends AuthNotifier {
   String? selectedWorkspaceReason;
   bool accessEnded = false;
   Object? selectionError;
+  Object? endError;
 
   @override
   Future<void> selectWorkspace({
@@ -659,6 +717,7 @@ class _RecordingAuthNotifier extends AuthNotifier {
 
   @override
   Future<void> endWorkspaceAccess() async {
+    if (endError != null) throw endError!;
     accessEnded = true;
   }
 }

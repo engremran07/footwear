@@ -248,6 +248,43 @@ void main() {
   });
 
   group('PermissionPolicy tenant context', () {
+    test(
+      'own display-name updates do not require user-administration rights',
+      () {
+        for (final role in [
+          UserRole.admin,
+          UserRole.tenantAdmin,
+          UserRole.superAdmin,
+          UserRole.supervisor,
+          UserRole.seller,
+        ]) {
+          expect(
+            PermissionPolicy.canUpdateOwnDisplayName(
+              user(role: role),
+              'user-1',
+            ),
+            isTrue,
+            reason: '$role must be able to update its own display name',
+          );
+        }
+
+        expect(
+          PermissionPolicy.canUpdateOwnDisplayName(
+            user(role: UserRole.seller, active: false),
+            'user-1',
+          ),
+          isFalse,
+        );
+        expect(
+          PermissionPolicy.canUpdateOwnDisplayName(
+            user(role: UserRole.seller),
+            'another-user',
+          ),
+          isFalse,
+        );
+      },
+    );
+
     test('inactive and cross-workspace profiles are denied', () {
       final inactive = user(role: UserRole.tenantAdmin, active: false);
       final tenantAdmin = user(role: UserRole.tenantAdmin);

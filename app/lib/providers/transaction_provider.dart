@@ -485,6 +485,12 @@ class TransactionNotifier extends AsyncNotifier<void> {
           'Transaction shop is outside the active workspace and route.',
         );
       }
+      if (type == TransactionModel.typeCashOut &&
+          (shopData['active'] == false || shopData['deleted'] == true)) {
+        throw StateError(
+          'Archived shops cannot accept new cash-out transactions.',
+        );
+      }
 
       transaction.set(
         txRef,
@@ -904,7 +910,16 @@ class TransactionNotifier extends AsyncNotifier<void> {
           throw StateError('Transaction shop does not match.');
         }
         final shopRef = db.collection(Collections.customers).doc(storedShopId);
+        final notificationRef = db
+            .collection(Collections.notifications)
+            .doc(
+              sellerNotificationDocumentId(
+                sourceType: 'transaction',
+                sourceId: txId.trim(),
+              ),
+            );
         final shopSnapshot = await transaction.get(shopRef);
+        final notificationSnapshot = await transaction.get(notificationRef);
         final shopData = shopSnapshot.data();
         if (!shopSnapshot.exists ||
             shopData == null ||
@@ -921,6 +936,21 @@ class TransactionNotifier extends AsyncNotifier<void> {
           'deleted_by': user.id,
           'updated_at': FieldValue.serverTimestamp(),
         });
+        final notificationRetirement = {
+          'source_deleted': true,
+          'source_deleted_at': FieldValue.serverTimestamp(),
+        };
+        if (notificationSnapshot.exists) {
+          transaction.update(notificationRef, notificationRetirement);
+        } else {
+          transaction.set(notificationRef, {
+            'tenant_id': tenantId,
+            'type': 'transaction',
+            'ref_id': txId.trim(),
+            'shop_id': storedShopId,
+            ...notificationRetirement,
+          });
+        }
         final shopUpdate = <String, dynamic>{
           'balance': FieldValue.increment(reversalDelta),
           'updated_at': FieldValue.serverTimestamp(),

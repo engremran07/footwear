@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../core/constants/collections.dart';
 import '../core/models/tenant_model.dart';
 import '../core/utils/firestore_pagination.dart';
@@ -743,6 +744,30 @@ class UserManagementNotifier extends AsyncNotifier<void> {
     }
 
     await batch.commit();
+  }
+
+  Future<void> updateOwnDisplayName(String displayName) async {
+    final name = displayName.trim();
+    if (name.isEmpty || name.length > 100) {
+      throw ArgumentError('Display name must contain 1 to 100 characters.');
+    }
+
+    final uid = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
+    if (uid.isEmpty) throw StateError('No authenticated user found');
+
+    final profile = await ref.read(authUserProvider.future);
+    if (!PermissionPolicy.canUpdateOwnDisplayName(profile, uid) ||
+        FirebaseAuth.instance.currentUser?.uid.trim() != uid) {
+      throw StateError('An active owner profile is required.');
+    }
+
+    await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(uid)
+        .update({
+          'display_name': name,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
   }
 
   Future<void> toggleActive(String uid, bool active) async {

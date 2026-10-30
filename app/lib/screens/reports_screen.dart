@@ -806,7 +806,6 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
       // Reconcile opening balance so the final running balance equals
       // the stored customer.balance regardless of transaction-count limits.
       final netTx = txs.fold<double>(0.0, (s, t) => s + t.balanceImpact);
-      final labels = _labels(ref, settings.invoiceHeader.documentLanguagePair);
       final openingBalance = shop.balance - netTx;
       final accountRoute = shop.routeId.trim().isEmpty
           ? null
@@ -836,7 +835,9 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
             )
             .toList(),
         fileName: AppFormatters.exportFileName(ExportNames.ledger, shop.name),
-        pdfBytesBuilder: () => buildPdfLedger(
+        initialDocumentLanguagePair:
+            settings.invoiceHeader.documentLanguagePair,
+        pdfBytesBuilderWithLanguagePair: (pair) => buildPdfLedger(
           shopName: shop.name,
           companyName: settings.companyName,
           generatedBy: user?.displayName ?? '',
@@ -846,11 +847,11 @@ class _AccountStatementCardState extends ConsumerState<_AccountStatementCard> {
           showEntryBy: true,
           dateFrom: txs.isNotEmpty ? txs.first.createdAt.toDate() : null,
           dateTo: txs.isNotEmpty ? txs.last.createdAt.toDate() : null,
-          labels: labels,
+          labels: _labels(ref, pair),
           locale: locale,
           currency: acctCurrency,
           logoBytes: settings.logoBytes,
-          header: settings.invoiceHeader,
+          header: settings.invoiceHeader.copyWith(documentLanguagePair: pair),
         ),
       );
     } catch (e) {

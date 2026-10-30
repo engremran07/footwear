@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart' show initializeDateFormatting;
 import 'package:url_launcher/url_launcher.dart';
+
 import '../core/utils/share_helper.dart';
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
@@ -16,9 +17,8 @@ final Map<String, Future<String>> _releaseDateByLocale = {};
 Future<String> _localizedReleaseDate(String localeCode) =>
     _releaseDateByLocale.putIfAbsent(localeCode, () async {
       await initializeDateFormatting(localeCode);
-      return DateFormat.yMMMMd(
-        localeCode,
-      ).format(DateTime.parse(AppBrand.releaseDateIso));
+      return DateFormat.yMMMMd(localeCode)
+          .format(DateTime.parse(AppBrand.releaseDateIso));
     });
 
 /// About screen — single source of truth for version / build info.
@@ -215,6 +215,34 @@ class AboutScreen extends ConsumerWidget {
             ),
             onTap: () => _showOpenSourceLicenses(context),
           ),
+          ListTile(
+            key: const Key('privacy_policy_link'),
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: Text(tr('privacy_policy', ref)),
+            subtitle: Text(
+              tr('privacy_policy_subtitle', ref),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+            trailing: const Icon(Icons.open_in_new_outlined),
+            onTap: () => _launchUrl(AppBrand.privacyPolicyUrl, context, ref),
+          ),
+          ListTile(
+            key: const Key('account_deletion_request_link'),
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.person_remove_outlined),
+            title: Text(tr('account_deletion_request', ref)),
+            subtitle: Text(
+              tr('account_deletion_request_subtitle', ref),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+            trailing: const Icon(Icons.open_in_new_outlined),
+            onTap: () => _launchUrl(AppBrand.accountDeletionUrl, context, ref),
+          ),
 
           const SizedBox(height: 32),
           Center(
@@ -237,9 +265,8 @@ class AboutScreen extends ConsumerWidget {
 
   void _copyToClipboard(BuildContext context, String text, WidgetRef ref) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(successSnackBar(tr('copied', ref)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(successSnackBar(tr('copied', ref)));
   }
 
   Future<void> _launchUrl(
@@ -251,9 +278,8 @@ class AboutScreen extends ConsumerWidget {
     if (uri == null) return;
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(errorSnackBar('${tr('err_url_open', ref)}: $url'));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar('${tr('err_url_open', ref)}: $url'));
       }
     }
   }
@@ -268,9 +294,8 @@ class AboutScreen extends ConsumerWidget {
       message: '${tr('whatsapp_greeting', ref)} ${AppBrand.companyName}',
     );
     if (!ok && context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr('err_whatsapp_unavailable', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr('err_whatsapp_unavailable', ref)));
     }
   }
 

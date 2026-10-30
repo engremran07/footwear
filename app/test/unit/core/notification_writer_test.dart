@@ -117,4 +117,38 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('transaction source gate rejects deleted and invoice-linked rows', () {
+    expect(
+      isActiveStandaloneTransactionNotificationSource({
+        'type': 'cash_in',
+        'created_by': 'seller-1',
+        'deleted': false,
+      }),
+      isTrue,
+    );
+    expect(
+      isActiveStandaloneTransactionNotificationSource({
+        'type': 'cash_out',
+        'created_by': 'seller-1',
+        'deleted': true,
+      }),
+      isFalse,
+    );
+    expect(
+      isActiveStandaloneTransactionNotificationSource({
+        'type': 'cash_out',
+        'created_by': 'seller-1',
+        'invoice_id': 'invoice-1',
+      }),
+      isFalse,
+    );
+    expect(
+      isActiveStandaloneTransactionNotificationSource({
+        'type': 'return',
+        'created_by': 'seller-1',
+      }),
+      isFalse,
+    );
+  });
 }

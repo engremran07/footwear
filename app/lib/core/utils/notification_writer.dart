@@ -17,6 +17,18 @@ String sellerNotificationDocumentId({
   return '${normalizedType}_$normalizedId';
 }
 
+bool isActiveStandaloneTransactionNotificationSource(
+  Map<String, dynamic> transaction,
+) {
+  final type = transaction['type'];
+  final createdBy = transaction['created_by'];
+  return (type == 'cash_in' || type == 'cash_out') &&
+      createdBy is String &&
+      createdBy.trim().isNotEmpty &&
+      transaction['deleted'] != true &&
+      !transaction.containsKey('invoice_id');
+}
+
 Map<String, dynamic> buildSellerNotification({
   required String sourceType,
   required String sourceId,
@@ -94,5 +106,21 @@ Future<void> writeSellerNotification({
           sourceId: data['ref_id'] as String? ?? '',
         ),
       );
+  if (data['type'] == 'transaction') {
+    final sourceRef = db
+        .collection(Collections.transactions)
+        .doc(data['ref_id'] as String? ?? '');
+    await db.runTransaction<void>((transaction) async {
+      final sourceSnapshot = await transaction.get(sourceRef);
+      if (!sourceSnapshot.exists ||
+          !isActiveStandaloneTransactionNotificationSource(
+            sourceSnapshot.data()!,
+          )) {
+        return;
+      }
+      transaction.set(notificationRef, data);
+    });
+    return;
+  }
   await notificationRef.set(data);
 }

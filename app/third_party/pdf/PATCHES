@@ -1,0 +1,10 @@
+Upstream: pdf 3.13.1 from https://pub.dev/packages/pdf/versions/3.13.1
+License: see LICENSE (Apache-2.0)
+
+Local patch:
+- lib/src/pdf/font/ttf_writer.dart preserves a separate embedded subset slot
+  for distinct Unicode code points that map to the same font glyph.
+  Regression coverage: app/test/unit/core/pdf_font_subset_alias_test.dart.
+
+Remove the app dependency override only after an upstream release includes an
+equivalent fix and the regression suite passes against that release.

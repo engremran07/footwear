@@ -1,7 +1,11 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:footwear_erp/core/l10n/app_locale.dart';
+import 'package:footwear_erp/core/l10n/financial_document_localization.dart';
 import 'package:footwear_erp/core/utils/pdf_export.dart';
 import 'package:footwear_erp/widgets/export_sheet.dart';
 
@@ -15,10 +19,11 @@ void main() {
     final pageImages = await rasterizePdfPagesToPngs(
       Uint8List.fromList([1, 2, 3]),
       dpi: 200,
-      rasterizer: (pdfBytes, {dpi = 300}) async {
+      rasterizer: (pdfBytes, {dpi = 300}) async* {
         expect(pdfBytes, isNotEmpty);
         expect(dpi, equals(200));
-        return [pageOne, pageTwo];
+        yield pageOne;
+        yield pageTwo;
       },
     );
 
@@ -41,16 +46,77 @@ void main() {
     final pagePng = await _makeTestPng(1, 1);
     final exportedPages = await rasterizePdfPagesToPngs(
       pdfBytes,
-      rasterizer: (sourcePdf, {dpi = 300}) async {
+      rasterizer: (sourcePdf, {dpi = 300}) async* {
         expect(sourcePdf, same(pdfBytes));
         expect(String.fromCharCodes(sourcePdf.take(5)), '%PDF-');
         expect(dpi, 300);
-        return [pagePng];
+        yield pagePng;
       },
     );
 
     expect(exportedPages, hasLength(1));
     expect(exportedPages.single, isNotEmpty);
+  });
+
+  testWidgets('export sheet passes the selected language to the PDF builder', (
+    tester,
+  ) async {
+    FinancialDocumentLanguagePair? receivedPair;
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: Consumer(
+              builder: (context, ref, _) => TextButton(
+                onPressed: () => ExportSheet.show(
+                  context,
+                  ref,
+                  title: 'Statement',
+                  headers: const [],
+                  rows: const [],
+                  fileName: 'statement',
+                  initialDocumentLanguagePair:
+                      FinancialDocumentLanguagePair.englishArabic,
+                  pdfBytesBuilderWithLanguagePair: (pair) async {
+                    receivedPair = pair;
+                    return Uint8List.fromList(const [1, 2, 3]);
+                  },
+                ),
+                child: const Text('Open export'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open export'));
+    await tester.pumpAndSettle();
+    final selector = find.byKey(
+      const ValueKey('export_document_language_selector'),
+    );
+    expect(selector, findsOneWidget);
+    expect(
+      tester
+          .widget<SegmentedButton<FinancialDocumentLanguagePair>>(selector)
+          .selected,
+      {FinancialDocumentLanguagePair.englishArabic},
+    );
+
+    await tester.tap(find.text('Urdu'));
+    await tester.pump();
+    expect(
+      tester
+          .widget<SegmentedButton<FinancialDocumentLanguagePair>>(selector)
+          .selected,
+      {FinancialDocumentLanguagePair.englishUrdu},
+    );
+
+    await tester.tap(find.byKey(const ValueKey('export_share_pdf')));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(receivedPair, FinancialDocumentLanguagePair.englishUrdu);
+    expect(tester.takeException(), isNull);
   });
 }
 

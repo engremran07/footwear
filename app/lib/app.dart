@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_brand.dart';
 import 'core/l10n/app_locale.dart';
 import 'core/services/auth_lifecycle_observer.dart';
 import 'providers/theme_preference_provider.dart';
+import 'widgets/app_update_coordinator.dart';
 
 class FootwearErpApp extends ConsumerWidget {
   const FootwearErpApp({super.key});
@@ -30,7 +32,11 @@ class FootwearErpApp extends ConsumerWidget {
       builder: (context, child) {
         return Directionality(
           textDirection: appLocale.direction,
-          child: AuthLifecycleObserver(child: child ?? const SizedBox.shrink()),
+          child: AppUpdateCoordinator(
+            child: AuthLifecycleObserver(
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
         );
       },
     );

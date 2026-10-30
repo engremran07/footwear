@@ -7,6 +7,17 @@ enum RouteAccessDecision { allowed, denied, workspaceSelectionRequired }
 class PermissionPolicy {
   PermissionPolicy._();
 
+  static bool canUpdateOwnDisplayName(
+    UserModel? user,
+    String authenticatedUid,
+  ) {
+    final uid = authenticatedUid.trim();
+    return user != null &&
+        user.active &&
+        uid.isNotEmpty &&
+        user.id.trim() == uid;
+  }
+
   static bool hasRoleCapability(UserModel? user, AppCapability capability) =>
       user != null &&
       user.active &&

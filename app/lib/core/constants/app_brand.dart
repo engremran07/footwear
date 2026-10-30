@@ -9,20 +9,29 @@ class AppBrand {
   static const String appName = 'FootWear';
   static const String companyName = 'FootWear';
   static const String publisherName = 'Aeonis Labs';
+  static const String androidPackageName = 'footwear.com.pk';
   static const IconData logoIcon = Icons.work_outline;
   static const String logoAsset = 'assets/images/app_icon.png';
 
   // ─── Version ─────────────────────────────────────────────────────────────
-  static const String appVersion = '3.10.17';
-  static const String buildNumber = '1128';
+  static const String appVersion = '3.10.20';
+  static const String buildNumber = '1132';
   static const String versionDisplay = 'v$appVersion+$buildNumber';
-  static const String releaseDateIso = '2026-10-29';
+  static const int androidVersionCodeBase = 310190000;
+  static int get androidVersionCode =>
+      androidVersionCodeBase + int.parse(buildNumber);
+  static const String releaseDateIso = '2026-10-30';
 
   // ─── Contact / About ─────────────────────────────────────────────────────
   static const String contactEmail = 'engremran89@gmail.com';
+  static const String privacyContactEmail = 'a3onislabs@gmail.com';
   static const String contactPhonePrimary = '+923067863310';
   static const String contactPhoneSecondary = '+966530421571';
   static const String websiteUrl = 'https://shoeserp-clean-20260327.web.app/';
+  static const String privacyPolicyUrl =
+      'https://shoeserp-clean-20260327.web.app/privacy-policy.html';
+  static const String accountDeletionUrl =
+      'https://shoeserp-clean-20260327.web.app/account-deletion.html';
   // ─── Arctic Palette ──────────────────────────────────────────────────────
   // Seed drives Material 3 tone generation; override specific roles below.
   static const Color arcticSeedColor = Color(0xFF0288D1); // Arctic Sky Blue

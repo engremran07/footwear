@@ -104,10 +104,7 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(maintenanceEntry, findsOneWidget);
-      expect(
-        tester.widget<ListTile>(maintenanceEntry).onTap,
-        isNotNull,
-      );
+      expect(tester.widget<ListTile>(maintenanceEntry).onTap, isNotNull);
     });
   }
 
@@ -129,6 +126,26 @@ void main() {
       expect(find.text(AppBrand.appName), findsOneWidget);
       expect(find.text('Aeonis Labs'), findsOneWidget);
       expect(find.text(trRead('published_by', locale)), findsOneWidget);
+
+      for (final key in [
+        'privacy_policy_link',
+        'account_deletion_request_link',
+      ]) {
+        final link = find.byKey(Key(key));
+        await tester.scrollUntilVisible(
+          link,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(link, findsOneWidget);
+        expect(tester.widget<ListTile>(link).onTap, isNotNull);
+      }
+
+      expect(find.text(trRead('privacy_policy', locale)), findsOneWidget);
+      expect(
+        find.text(trRead('account_deletion_request', locale)),
+        findsOneWidget,
+      );
     });
   }
 }

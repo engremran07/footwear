@@ -48,6 +48,9 @@ enum ContextualActionId {
   approveEdit,
   rejectEdit,
   delete,
+  markBadDebt,
+  recoverBadDebt,
+  export,
 }
 
 @immutable

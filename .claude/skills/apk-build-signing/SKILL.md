@@ -18,7 +18,7 @@ description: "Use when: diagnosing Android Gradle builds, building or signing Sh
 | Google Services plugin | 4.5.0 |
 | Compile / target SDK | 36 |
 | Minimum SDK | 29 |
-| Application ID | `footwear.pk.com` |
+| Application ID | `footwear.com.pk` |
 
 Use the checked-in Gradle wrapper. Do not install a separate Gradle version or
 upgrade the Android and Kotlin plugins independently of the wrapper. The app
@@ -48,20 +48,42 @@ Verify the exact matching values before building:
 Select-String -Path "app\pubspec.yaml","app\lib\core\constants\app_brand.dart" -Pattern '^version:|appVersion|buildNumber'
 ```
 
-`app/android/app/build.gradle.kts` encodes the Android `versionCode` as:
+`app/android/app/build.gradle.kts` encodes Android `versionCode` as a compact,
+monotonic sequence anchored immediately above the latest accepted Play code:
 
 ```text
-major * 100,000,000 + minor * 1,000,000 + patch * 10,000 + buildNumber
+androidVersionCodeBase + buildNumber
 ```
 
-The component bounds and Play Console's `2,100,000,000` maximum are checked
-before Gradle configures the release. This encoding keeps version segments
-ordered and prevents a newer semantic version from generating a lower code
-than a historical install. Confirm the built APK/AAB version metadata when
-changing this formula. Flutter adds an ABI-specific offset to split APK
-version codes; for example, the ARM64 APK may be higher than the base code
-used by the AAB. Compare the APK against the highest previously distributed
-code rather than assuming every ABI APK has the same code.
+Keep the base synchronized between `AppBrand.androidVersionCodeBase` and the
+Gradle `computeAndroidVersionCode` function. The current base is
+`310190000`, anchored to the prior Play upload `310191130`; source build
+`1132` therefore produces Play bundle code `310191132`. Do not reset the code
+to a low semantic version such as `0.0.1`, reuse a code, or encode the whole
+semantic version into increasingly large digits. Increment the Flutter build
+number for each Play upload and verify that the generated AAB code is greater
+than the latest accepted Play code. The function checks positivity and Play
+Console's `2,100,000,000` maximum. The Android package/version regression test
+checks the Dart and Gradle bases together. Flutter adds ABI-specific offsets
+to split APKs, so compare the base AAB code with Play history and each APK
+against the highest distributed APK code.
+
+## Play In-App Updates and Password Autofill
+
+The Android release build uses flexible Play In-App Updates for routine
+releases. Play priority `4` or higher and the Remote Config parameter
+`minimum_supported_version_code` can require an update; the Remote Config
+default is `0`, so no minimum-version gate is active until an owner configures
+it. Raise that value only after the required version is available to every
+intended distribution channel. The gate is Android-release-only, and Play's
+update API must be validated with a Play-installed build; sideloaded builds
+cannot establish Play update availability. If Play is unavailable, the
+minimum-version gate remains visible with a Play Store recovery link.
+
+Login fields expose Android username/email and password autofill hints. The
+app submits the platform autofill context only after successful Firebase
+Authentication. It does not read, save, or store passwords itself and does
+not add another authentication mechanism.
 
 ## Signing Configuration
 

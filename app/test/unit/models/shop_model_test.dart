@@ -74,6 +74,17 @@ void main() {
       final m = ShopModel.fromJson({...baseJson, 'balance': 0}, 's6');
       expect(m.hasOutstanding, isFalse);
     });
+
+    test('canAcceptNewSales follows the active state', () {
+      final active = ShopModel.fromJson(baseJson, 'active');
+      final archived = ShopModel.fromJson({
+        ...baseJson,
+        'active': false,
+      }, 'archived');
+
+      expect(active.canAcceptNewSales, isTrue);
+      expect(archived.canAcceptNewSales, isFalse);
+    });
   });
 
   group('ShopModel.toJson', () {

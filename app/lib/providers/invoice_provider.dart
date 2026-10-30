@@ -708,8 +708,12 @@ class InvoiceNotifier extends AsyncNotifier<void> {
       if (!shopSnapshot.exists ||
           shopData == null ||
           shopData['tenant_id'] != tenantId ||
-          shopData['route_id'] != routeId) {
-        throw ArgumentError('Shop does not belong to this workspace and route');
+          shopData['route_id'] != routeId ||
+          shopData['active'] == false ||
+          shopData['deleted'] == true) {
+        throw ArgumentError(
+          'Shop does not belong to this workspace and route or cannot accept new sales',
+        );
       }
       final settingsData = settingsSnapshot.data();
       final inventorySnapshots =

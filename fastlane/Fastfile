@@ -15,7 +15,7 @@ platform :android do
     end
 
     supply(
-      package_name: 'footwear.pk.com',
+      package_name: 'footwear.com.pk',
       json_key: json_key_path,
       apk: apk_path,
       track: 'internal'

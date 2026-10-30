@@ -1,8 +1,10 @@
 import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
+
 import '../core/constants/app_brand.dart';
 import '../core/utils/download_helper.dart';
 import '../core/utils/error_mapper.dart';
@@ -30,25 +32,34 @@ import '../providers/settings_provider.dart';
 /// ```
 /// Returns a white-background PNG from the given [pngBytes].
 Future<Uint8List> _whiteBackgroundPng(Uint8List pngBytes) async {
+  ui.Codec? codec;
+  ui.Image? source;
+  ui.Picture? picture;
+  ui.Image? output;
   try {
-    final codec = await ui.instantiateImageCodec(pngBytes);
+    codec = await ui.instantiateImageCodec(pngBytes);
     final frame = await codec.getNextFrame();
-    final src = frame.image;
+    source = frame.image;
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(
       recorder,
-      Rect.fromLTWH(0, 0, src.width.toDouble(), src.height.toDouble()),
+      Rect.fromLTWH(0, 0, source.width.toDouble(), source.height.toDouble()),
     );
     canvas.drawColor(AppBrand.exportCanvas, ui.BlendMode.src);
-    canvas.drawImage(src, Offset.zero, Paint());
-    final picture = recorder.endRecording();
-    final result = await picture.toImage(src.width, src.height);
-    final data = await result.toByteData(format: ui.ImageByteFormat.png);
+    canvas.drawImage(source, Offset.zero, Paint());
+    picture = recorder.endRecording();
+    output = await picture.toImage(source.width, source.height);
+    final data = await output.toByteData(format: ui.ImageByteFormat.png);
     if (data == null) throw Exception('png export failed');
     return data.buffer.asUint8List();
   } catch (e, stack) {
     debugPrint('[ExportSheet] PNG codec error: $e\n$stack');
     throw Exception('pdf_export_failed');
+  } finally {
+    output?.dispose();
+    picture?.dispose();
+    source?.dispose();
+    codec?.dispose();
   }
 }
 
@@ -69,7 +80,13 @@ class ExportSheet {
     /// Optional override: when provided, used for PDF / Image / Print instead
     /// of the generic [buildPdfTable]. Useful for ledger-style exports.
     Future<Uint8List> Function()? pdfBytesBuilder,
+    FinancialDocumentLanguagePair? initialDocumentLanguagePair,
+    Future<Uint8List> Function(FinancialDocumentLanguagePair)?
+    pdfBytesBuilderWithLanguagePair,
   }) {
+    if (pdfBytesBuilder != null && pdfBytesBuilderWithLanguagePair != null) {
+      throw ArgumentError('Provide only one custom PDF builder for an export.');
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -91,6 +108,8 @@ class ExportSheet {
               pdfTitleKey: pdfTitleKey,
               pdfHeaderKeys: pdfHeaderKeys,
               pdfBytesBuilder: pdfBytesBuilder,
+              initialDocumentLanguagePair: initialDocumentLanguagePair,
+              pdfBytesBuilderWithLanguagePair: pdfBytesBuilderWithLanguagePair,
             ),
           ),
         );
@@ -99,24 +118,15 @@ class ExportSheet {
   }
 }
 
-typedef PdfPageRasterizer =
-    Future<List<Uint8List>> Function(Uint8List pdfBytes, {double dpi});
+typedef PdfPageRasterizer = Stream<Uint8List> Function(
+  Uint8List pdfBytes, {
+  double dpi,
+});
 
-Future<List<Uint8List>> _defaultPdfPagesToPngs(
+Stream<Uint8List> _defaultPdfPagesToPngs(
   Uint8List pdfBytes, {
   required double dpi,
-}) async {
-  final pages = await Printing.raster(pdfBytes, dpi: dpi).toList();
-  if (pages.isEmpty) return const <Uint8List>[];
-
-  final pngBytesList = <Uint8List>[];
-  for (final page in pages) {
-    final pngBytes = await page.toPng();
-    pngBytesList.add(pngBytes);
-  }
-
-  return pngBytesList;
-}
+}) => Printing.raster(pdfBytes, dpi: dpi).asyncMap((page) => page.toPng());
 
 /// Converts a PDF into one high-resolution PNG per rasterized page.
 ///
@@ -126,16 +136,13 @@ Future<List<Uint8List>> rasterizePdfPagesToPngs(
   double dpi = 300,
   PdfPageRasterizer? rasterizer,
 }) async {
-  final pngBytesList = await (rasterizer ?? _defaultPdfPagesToPngs)(
+  final whiteBgBytes = <Uint8List>[];
+  await for (final pngBytes in (rasterizer ?? _defaultPdfPagesToPngs)(
     pdfBytes,
     dpi: dpi,
-  );
-
-  final whiteBgBytes = <Uint8List>[];
-  for (final pngBytes in pngBytesList) {
+  )) {
     whiteBgBytes.add(await _whiteBackgroundPng(pngBytes));
   }
-
   return whiteBgBytes;
 }
 
@@ -151,6 +158,9 @@ class _ExportSheetContent extends StatefulWidget {
   final String? pdfTitleKey;
   final List<String>? pdfHeaderKeys;
   final Future<Uint8List> Function()? pdfBytesBuilder;
+  final FinancialDocumentLanguagePair? initialDocumentLanguagePair;
+  final Future<Uint8List> Function(FinancialDocumentLanguagePair)?
+  pdfBytesBuilderWithLanguagePair;
 
   const _ExportSheetContent({
     required this.ref,
@@ -162,6 +172,8 @@ class _ExportSheetContent extends StatefulWidget {
     this.pdfTitleKey,
     this.pdfHeaderKeys,
     this.pdfBytesBuilder,
+    this.initialDocumentLanguagePair,
+    this.pdfBytesBuilderWithLanguagePair,
   });
 
   @override
@@ -171,6 +183,15 @@ class _ExportSheetContent extends StatefulWidget {
 class _ExportSheetContentState extends State<_ExportSheetContent> {
   /// Key of the option tile currently processing, null when idle.
   String? _activeKey;
+  late FinancialDocumentLanguagePair _documentLanguagePair;
+
+  @override
+  void initState() {
+    super.initState();
+    _documentLanguagePair =
+        widget.initialDocumentLanguagePair ??
+        FinancialDocumentLanguagePair.englishArabic;
+  }
 
   WidgetRef get ref => widget.ref;
   AppLocale get _locale => ref.read(appLocaleProvider);
@@ -193,17 +214,29 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
       if (!mounted) return;
       debugPrint('[ExportSheet] $key failed: $e\n$stack');
       setState(() => _activeKey = null);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr(AppErrorMapper.key(e), ref)));
     }
   }
 
   // ── PDF bytes (lazy build) ────────────────────────────────────────────
   Future<Uint8List> _buildPdfBytes() async {
     final headers = _resolvedHeaders();
-    if (widget.rows.isEmpty && widget.pdfBytesBuilder == null) {
+    if (widget.rows.isEmpty &&
+        widget.pdfBytesBuilder == null &&
+        widget.pdfBytesBuilderWithLanguagePair == null) {
       throw Exception('no data to export');
+    }
+    if (widget.pdfBytesBuilderWithLanguagePair != null) {
+      try {
+        return await widget.pdfBytesBuilderWithLanguagePair!(
+          _documentLanguagePair,
+        );
+      } catch (e, stack) {
+        debugPrint('[ExportSheet] custom PDF build failed: $e\n$stack');
+        if (e is PdfExportConfigurationException) rethrow;
+        throw Exception('pdf export failed');
+      }
     }
     if (widget.pdfBytesBuilder != null) {
       try {
@@ -358,6 +391,36 @@ class _ExportSheetContentState extends State<_ExportSheetContent> {
             ),
           ),
           const SizedBox(height: 24),
+          if (widget.pdfBytesBuilderWithLanguagePair != null) ...[
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(
+                tr('document_secondary_language', ref),
+                style: theme.textTheme.labelLarge,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<FinancialDocumentLanguagePair>(
+              key: const ValueKey('export_document_language_selector'),
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: FinancialDocumentLanguagePair.englishArabic,
+                  label: Text(tr('document_language_arabic', ref)),
+                ),
+                ButtonSegment(
+                  value: FinancialDocumentLanguagePair.englishUrdu,
+                  label: Text(tr('document_language_urdu', ref)),
+                ),
+              ],
+              selected: {_documentLanguagePair},
+              onSelectionChanged: _activeKey == null
+                  ? (selection) =>
+                        setState(() => _documentLanguagePair = selection.single)
+                  : null,
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // Option tiles — all go through _execute (no premature pop)
           _OptionTile(

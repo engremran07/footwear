@@ -235,7 +235,11 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         inv.invoiceNumber,
       ),
       subtitle: '${trRead('shop', locale)}: ${inv.shopName}',
-      pdfBytesBuilder: () async {
+      initialDocumentLanguagePair:
+          FinancialDocumentLanguagePair.fromJson(
+            inv.headerSnapshot['document_language_pair'],
+          ),
+      pdfBytesBuilderWithLanguagePair: (pair) async {
         final settings = await ref.read(settingsProvider.future);
         return generateInvoicePdf(
           invoice: inv,
@@ -243,7 +247,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           currency: inv.currency,
           locale: locale,
           logoBytes: settings.logoBytes,
-          header: settings.invoiceHeader,
+          header: settings.invoiceHeader.copyWith(documentLanguagePair: pair),
         );
       },
     );

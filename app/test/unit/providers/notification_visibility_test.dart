@@ -323,6 +323,32 @@ void main() {
     expect(notificationShopIdsKey(unread), '["shop-1","shop-2"]');
   });
 
+  test(
+    'retired source notifications do not stay visible or subscribe shops',
+    () {
+      final retired = NotificationModel.fromJson({
+        'type': 'transaction',
+        'shop_id': 'shop-1',
+        'shop_name': 'Shop One',
+        'route_id': 'route-1',
+        'seller_id': 'seller-1',
+        'seller_name': 'Seller',
+        'amount': 10,
+        'transaction_type': 'cash_out',
+        'ref_id': 'transaction-1',
+        'target_role': 'admin',
+        'read': false,
+        'tenant_id': 'tenant-1',
+        'created_by': 'seller-1',
+        'created_at': Timestamp.now(),
+        'source_deleted': true,
+      }, 'transaction_transaction-1');
+
+      expect(filterVisibleNotifications([retired], {'shop-1'}), isEmpty);
+      expect(notificationShopIdsKey(AsyncData([retired])), '[]');
+    },
+  );
+
   test('referenced shop queries stay within the Firestore Rules budget', () {
     final shopIds = List.generate(50, (index) => 'shop-$index');
 
@@ -381,6 +407,36 @@ void main() {
     );
 
     expect(candidates.map((notification) => notification.id), ['new']);
+  });
+
+  test('foreground alerts exclude retired source notifications', () {
+    final now = DateTime.utc(2026, 10, 28, 12);
+    final retired = NotificationModel.fromJson({
+      'type': 'transaction',
+      'shop_id': 'shop-1',
+      'shop_name': 'Shop One',
+      'route_id': 'route-1',
+      'seller_id': 'seller-1',
+      'seller_name': 'Seller',
+      'amount': 10,
+      'transaction_type': 'cash_out',
+      'ref_id': 'transaction-1',
+      'target_role': 'admin',
+      'read': false,
+      'tenant_id': 'tenant-1',
+      'created_by': 'seller-1',
+      'created_at': Timestamp.fromDate(now.add(const Duration(seconds: 1))),
+      'source_deleted': true,
+    }, 'transaction_transaction-1');
+
+    expect(
+      foregroundNotificationCandidates(
+        notifications: [retired],
+        deliveredNotificationIds: const {},
+        sessionStartedAt: now,
+      ),
+      isEmpty,
+    );
   });
 
   test('hides inactive and soft-deleted shop documents', () {

@@ -28,6 +28,72 @@ class ChangelogEntry {
 /// Keep language simple — no tech jargon, no internal codes.
 const List<ChangelogEntry> kChangelog = [
   ChangelogEntry(
+    version: '3.10.20',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔐',
+        text: {
+          AppLocale.en: 'Privacy details and account-deletion request pages are now linked from your profile and About screen.',
+          AppLocale.ar: 'أصبحت صفحات الخصوصية وطلب حذف الحساب متاحة من الملف الشخصي وشاشة من نحن.',
+          AppLocale.ur: 'اب پروفائل اور تعارف کی اسکرین سے رازداری اور اکاؤنٹ حذف کرنے کی درخواست کے صفحات کھولے جا سکتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔄',
+        text: {
+          AppLocale.en: 'Google Play updates can install in the background, and required updates can be enforced when configured. Android password managers can recognize the sign-in fields.',
+          AppLocale.ar: 'يمكن تنزيل تحديثات Google Play أثناء استخدام التطبيق، ويمكن فرض التحديثات المطلوبة عند تهيئتها. كما تتعرف برامج كلمات المرور على حقول تسجيل الدخول في Android.',
+          AppLocale.ur: 'Google Play کی اپ ڈیٹس ایپ استعمال کرتے ہوئے ڈاؤن لوڈ ہو سکتی ہیں، اور ترتیب دینے پر ضروری اپ ڈیٹس نافذ کی جا سکتی ہیں۔ Android کے پاس ورڈ مینیجر سائن اِن خانے بھی پہچان سکتے ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '📄',
+        text: {
+          AppLocale.en: 'Shop statements now export complete records more reliably, with clearer progress and fewer blank report pages.',
+          AppLocale.ar: 'أصبحت كشوفات المتاجر تُصدَّر بسجلات كاملة وموثوقية أكبر، مع عرض أوضح للتقدم وتقليل الصفحات الفارغة.',
+          AppLocale.ur: 'دکانوں کے گوشوارے اب مکمل ریکارڈ کے ساتھ زیادہ قابلِ اعتماد طریقے سے برآمد ہوتے ہیں، اور پیش رفت واضح جبکہ خالی صفحات کم ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.10.19',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🔤',
+        text: {
+          AppLocale.en: 'Arabic and Urdu letters now connect more reliably in PDF reports, invoices, and receipts.',
+          AppLocale.ar: 'أصبحت الحروف العربية والأردية أكثر ترابطًا في تقارير PDF والفواتير والإيصالات.',
+          AppLocale.ur: 'پی ڈی ایف رپورٹس، انوائسز اور رسیدوں میں عربی اور اردو کے حروف اب زیادہ بہتر طور پر جڑتے ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
+    version: '3.10.18',
+    date: 'October 2026',
+    items: [
+      ChangelogItem(
+        emoji: '🧭',
+        text: {
+          AppLocale.en: 'Workspace access and invoice screens now handle loading and recovery more clearly.',
+          AppLocale.ar: 'أصبحت شاشات الوصول إلى مساحة العمل والفواتير تعرض حالات التحميل والاستعادة بوضوح أكبر.',
+          AppLocale.ur: 'ورک اسپیس تک رسائی اور انوائس اسکرینز اب لوڈنگ اور بحالی کی حالت زیادہ واضح دکھاتی ہیں۔',
+        },
+      ),
+      ChangelogItem(
+        emoji: '🔔',
+        text: {
+          AppLocale.en: 'Notifications and financial checks are more reliable during workspace updates.',
+          AppLocale.ar: 'أصبحت الإشعارات والتحققات المالية أكثر موثوقية أثناء تحديث مساحة العمل.',
+          AppLocale.ur: 'ورک اسپیس اپ ڈیٹس کے دوران اطلاعات اور مالی جانچ اب زیادہ قابلِ اعتماد ہیں۔',
+        },
+      ),
+    ],
+  ),
+  ChangelogEntry(
     version: '3.10.17',
     date: 'October 2026',
     items: [

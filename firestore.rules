@@ -556,6 +556,7 @@ service cloud.firestore {
         notifId == 'transaction_' + refId &&
         exists(transactionPath) &&
         !('invoice_id' in source) &&
+        source.get('deleted', false) != true &&
         source.get('created_by', '') == request.auth.uid &&
         source.get('tenant_id', '') == request.resource.data.tenant_id &&
         source.get('shop_id', '') == request.resource.data.shop_id &&
@@ -563,6 +564,42 @@ service cloud.firestore {
         source.get('route_id', '') == request.resource.data.route_id &&
         source.get('type', '') == request.resource.data.transaction_type &&
         source.get('amount', 0) == request.resource.data.amount;
+    }
+
+    function notificationRetirementIsLinkedToTransaction(
+      notifId,
+      notificationData,
+      retiredData
+    ) {
+      let refId = notificationData.get('ref_id', '');
+      let transactionPath =
+        /databases/$(database)/documents/transactions/$(refId);
+      let sourceBefore = get(transactionPath).data;
+      let sourceAfter = getAfter(transactionPath).data;
+      return refId is string &&
+        refId.size() > 0 &&
+        notifId == 'transaction_' + refId &&
+        notificationData.get('type', '') == 'transaction' &&
+        exists(transactionPath) &&
+        existsAfter(transactionPath) &&
+        retiredData.get('source_deleted', false) == true &&
+        retiredData.get('source_deleted_at', null) == request.time &&
+        sourceBefore.tenant_id == notificationData.get('tenant_id', '') &&
+        sourceBefore.shop_id == notificationData.get('shop_id', '') &&
+        sourceBefore.type in ['cash_in', 'cash_out'] &&
+        sourceBefore.type ==
+          notificationData.get('transaction_type', sourceBefore.type) &&
+        sourceBefore.amount ==
+          notificationData.get('amount', sourceBefore.amount) &&
+        sourceBefore.get('deleted', false) != true &&
+        !('invoice_id' in sourceBefore) &&
+        sourceAfter.get('deleted', false) == true &&
+        sourceAfter.get('deleted_by', '') == request.auth.uid &&
+        sourceAfter.get('deleted_at', null) == request.time &&
+        sourceAfter.get('updated_at', null) == request.time &&
+        sourceAfter.diff(sourceBefore).affectedKeys().hasOnly([
+          'deleted', 'deleted_at', 'deleted_by', 'updated_at'
+        ]);
     }
 
     function isSellerForRoute(routeId) {
@@ -879,7 +916,10 @@ service cloud.firestore {
         sale.invoice_id == invoiceId &&
         sale.shop_id == request.resource.data.shop_id &&
         sale.route_id == request.resource.data.route_id &&
-        shop is map && shop.last_transaction_id == saleId;
+        shop is map &&
+        shop.get('active', true) == true &&
+        shop.get('deleted', false) != true &&
+        shop.last_transaction_id == saleId;
     }
 
     function nextInvoiceSequence(settingsData) {
@@ -1158,6 +1198,9 @@ service cloud.firestore {
         shopBefore is map && shopAfter is map &&
         shopBefore.tenant_id == txData.tenant_id &&
         shopAfter.tenant_id == txData.tenant_id &&
+        (txData.type != 'cash_out' ||
+          (shopBefore.get('active', true) == true &&
+            shopBefore.get('deleted', false) != true)) &&
         shopBefore.route_id == txData.route_id &&
         shopAfter.route_id == txData.route_id &&
         shopBefore.balance is number && shopAfter.balance is number &&
@@ -2577,8 +2620,22 @@ service cloud.firestore {
     // Admins and supervisors read/mark-read within their tenant. Sellers may
     // create one source-linked notification after its business write commits.
     match /notifications/{notifId} {
-      allow read: if isNotificationReaderForTenant(resource.data.tenant_id);
-      allow create: if isActiveUser()
+      allow get: if (resource != null &&
+          isNotificationReaderForTenant(resource.data.tenant_id)) ||
+        (resource == null && canReadMissingTenantDocument(false));
+      allow list: if isNotificationReaderForTenant(resource.data.tenant_id);
+      allow create: if (
+          isAdminForTenant(request.resource.data.tenant_id) &&
+          request.resource.data.keys().hasOnly([
+            'tenant_id', 'type', 'ref_id', 'shop_id',
+            'source_deleted', 'source_deleted_at'
+          ]) &&
+          notificationRetirementIsLinkedToTransaction(
+            notifId,
+            request.resource.data,
+            request.resource.data
+          )
+        ) || (isActiveUser()
           && isSeller()
           && isSellerForRoute(request.resource.data.route_id)
           && request.resource.data.created_by == request.auth.uid
@@ -2610,9 +2667,23 @@ service cloud.firestore {
               notificationIsLinkedToTransaction(notifId)
             )
           )
-          && docSizeOk();
-      allow update: if isNotificationReaderForTenant(resource.data.tenant_id)
-          && isNotificationMarkRead();
+          && docSizeOk());
+      allow update: if (
+          isNotificationReaderForTenant(resource.data.tenant_id) &&
+          isNotificationMarkRead()
+        ) || (
+          isAdminForTenant(resource.data.tenant_id) &&
+          resource.data.get('type', '') == 'transaction' &&
+          resource.data.get('source_deleted', false) != true &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'source_deleted', 'source_deleted_at'
+          ]) &&
+          notificationRetirementIsLinkedToTransaction(
+            notifId,
+            resource.data,
+            request.resource.data
+          )
+        );
       allow delete: if false;
     }
 

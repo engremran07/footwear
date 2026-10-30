@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../core/constants/app_brand.dart';
 import '../core/design/app_tokens.dart';
 import '../core/l10n/app_locale.dart';
@@ -176,17 +177,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         Navigator.of(dialogContext).pop();
         if (mounted) {
           final errorMessage = tr(AppErrorMapper.key(e), ref);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(errorSnackBar(errorMessage));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(errorSnackBar(errorMessage));
         }
       } catch (_) {
         if (!dialogContext.mounted) return;
         Navigator.of(dialogContext).pop();
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(errorSnackBar(tr('err_auth_generic', ref)));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(errorSnackBar(tr('err_auth_generic', ref)));
         }
       }
     }
@@ -258,9 +257,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
 
     if (sent && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(successSnackBar(tr('reset_email_sent', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(successSnackBar(tr('reset_email_sent', ref)));
     }
   }
 
@@ -463,9 +461,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ExcludeSemantics(
             child: Text(
               tr('login_offline', ref),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
-              ),
+              style: Theme.of(context).textTheme.labelSmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.outline),
             ),
           ),
         ],
@@ -503,7 +500,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 TextFormField(
                   controller: _emailC,
                   focusNode: _emailFocus,
-                  autofillHints: const [AutofillHints.email],
+                  autofillHints: const [
+                    AutofillHints.username,
+                    AutofillHints.email,
+                  ],
                   decoration: InputDecoration(
                     labelText: tr('email', ref),
                     prefixIcon: const Icon(Icons.person_outline),

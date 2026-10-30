@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/constants/app_brand.dart';
 import '../core/l10n/app_locale.dart';
@@ -129,16 +130,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final name = AppSanitizer.name(_nameC.text);
       if (name.isEmpty || name == me.displayName) return;
 
-      await ref.read(userManagementNotifierProvider.notifier).updateUser(
-        me.id,
-        {'display_name': name},
-      );
+      await ref
+          .read(userManagementNotifierProvider.notifier)
+          .updateOwnDisplayName(name);
       if (mounted) {
         HapticFeedback.mediumImpact();
         setState(() => _isDirty = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       }
     } catch (e) {
       if (mounted) {
@@ -198,9 +197,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               } catch (error) {
                 if (dialogContext.mounted) {
                   final key = AppErrorMapper.key(error);
-                  ScaffoldMessenger.of(
-                    dialogContext,
-                  ).showSnackBar(errorSnackBar(tr(key, ref)));
+                  ScaffoldMessenger.of(dialogContext)
+                      .showSnackBar(errorSnackBar(tr(key, ref)));
                 }
               }
             },
@@ -296,9 +294,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               } catch (e) {
                 if (ctx.mounted) {
                   final key = AppErrorMapper.key(e);
-                  ScaffoldMessenger.of(
-                    ctx,
-                  ).showSnackBar(errorSnackBar(tr(key, ref)));
+                  ScaffoldMessenger.of(ctx)
+                      .showSnackBar(errorSnackBar(tr(key, ref)));
                 }
               }
             },
@@ -307,6 +304,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _launchLegalPage(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme != 'https') {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar('${tr('err_url_open', ref)}: $url'));
+      }
+      return;
+    }
+
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } on PlatformException {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar('${tr('err_url_open', ref)}: $url'));
+      }
+      return;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar('${tr('err_url_open', ref)}: $url'));
+    }
   }
 
   @override
@@ -565,6 +588,47 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           icon: const Icon(Icons.lock_reset),
                           label: Text(tr('change_password', ref)),
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr('legal', ref),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      ListTile(
+                        key: const Key('privacy_policy_link'),
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.privacy_tip_outlined),
+                        title: Text(tr('privacy_policy', ref)),
+                        subtitle: Text(
+                          tr('privacy_policy_subtitle', ref),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        trailing: const Icon(Icons.open_in_new_outlined),
+                        onTap: () =>
+                            _launchLegalPage(AppBrand.privacyPolicyUrl),
+                      ),
+                      ListTile(
+                        key: const Key('account_deletion_request_link'),
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.person_remove_outlined),
+                        title: Text(tr('account_deletion_request', ref)),
+                        subtitle: Text(
+                          tr('account_deletion_request_subtitle', ref),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        trailing: const Icon(Icons.open_in_new_outlined),
+                        onTap: () =>
+                            _launchLegalPage(AppBrand.accountDeletionUrl),
                       ),
                     ],
                   ),

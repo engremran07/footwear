@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +10,7 @@ import '../core/l10n/app_locale.dart';
 import '../core/l10n/financial_document_localization.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/pdf_export.dart';
+import '../core/utils/report_column_naming.dart';
 import '../core/utils/snack_helper.dart';
 import '../models/invoice_model.dart';
 import '../models/settings_model.dart';
@@ -60,6 +63,7 @@ class _InvoiceHeaderSettingsScreenState
   };
   bool _isDirty = false;
   bool _saving = false;
+  bool _confirmingExit = false;
   bool _savingNonStockInvoices = false;
   bool _allowNonStockInvoices = false;
   String _template = 'classic';
@@ -147,8 +151,8 @@ class _InvoiceHeaderSettingsScreenState
     visibleFields: _visibleFields,
   );
 
-  Future<void> _save() async {
-    if (_saving || _savingNonStockInvoices) return;
+  Future<bool> _save() async {
+    if (_saving || _savingNonStockInvoices) return false;
     setState(() => _saving = true);
     try {
       final config = _config();
@@ -161,18 +165,74 @@ class _InvoiceHeaderSettingsScreenState
           _isDirty = false;
         });
         ref.invalidate(settingsProvider);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(successSnackBar(tr('saved_successfully', ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(successSnackBar(tr('saved_successfully', ref)));
       }
+      return true;
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
       }
+      return false;
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _confirmExit() async {
+    if (!_isDirty || _confirmingExit) return;
+    _confirmingExit = true;
+    try {
+      final action = await showDialog<_InvoiceHeaderExitAction>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(tr('unsaved_changes', ref)),
+          content: Text(tr('unsaved_changes_save_before_leaving', ref)),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, _InvoiceHeaderExitAction.cancel),
+              child: Text(tr('cancel', ref)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                _InvoiceHeaderExitAction.discard,
+              ),
+              child: Text(tr('discard', ref)),
+            ),
+            FilledButton(
+              onPressed: _saving || _savingNonStockInvoices
+                  ? null
+                  : () async {
+                      final saved = await _save();
+                      if (dialogContext.mounted) {
+                        Navigator.pop(
+                          dialogContext,
+                          saved
+                              ? _InvoiceHeaderExitAction.save
+                              : _InvoiceHeaderExitAction.saveFailed,
+                        );
+                      }
+                    },
+              child: Text(tr('save', ref)),
+            ),
+          ],
+        ),
+      );
+      if (!mounted ||
+          action == null ||
+          action == _InvoiceHeaderExitAction.cancel ||
+          action == _InvoiceHeaderExitAction.saveFailed) {
+        return;
+      }
+      if (action == _InvoiceHeaderExitAction.discard) {
+        setState(() => _isDirty = false);
+      }
+      Navigator.of(context).pop();
+    } finally {
+      _confirmingExit = false;
     }
   }
 
@@ -195,87 +255,239 @@ class _InvoiceHeaderSettingsScreenState
           _allowNonStockInvoices = previousValue;
           _savingNonStockInvoices = false;
         });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
       }
       return;
     }
     if (mounted) setState(() => _savingNonStockInvoices = false);
   }
 
-  Future<void> _preview(SettingsModel settings) async {
-    final config = _config();
-    final companyName = config.nameEn.isEmpty
-        ? settings.companyName
-        : config.nameEn;
+  InvoiceModel _previewInvoiceModel(
+    SettingsModel settings,
+    InvoiceHeaderConfig config, {
+    required AppLocale locale,
+    required bool receipt,
+  }) {
     final headerSnapshot = <String, dynamic>{
       ...config.toJson(),
       if (settings.logoBase64 != null) 'logo_base64': settings.logoBase64,
     };
     final now = Timestamp.now();
-    final invoice = InvoiceModel(
+    final shopName = trRead('invoice_preview_shop', locale);
+    return InvoiceModel(
       id: 'preview',
-      invoiceNumber: 'INV-2026-0001',
-      type: InvoiceModel.typeSale,
+      invoiceNumber: receipt ? 'REC-0001' : 'INV-0001',
+      type: receipt ? InvoiceModel.typeCashReceipt : InvoiceModel.typeSale,
       fulfillmentMode: InvoiceModel.fulfillmentNonStock,
       shopId: 'preview-shop',
-      shopName: tr('invoice_preview_shop', ref),
+      shopName: shopName,
       routeId: 'preview-route',
       sellerId: 'preview-seller',
-      sellerName: tr('invoice_preview_seller', ref),
-      items: const [
-        TransactionItem(
-          variantId: 'preview-variant',
-          sku: 'SKU-001',
-          productName: 'Classic Model · 40',
-          size: '40',
-          color: 'Black',
-          qty: 2,
-          unitPrice: 175,
-          subtotal: 350,
-        ),
-      ],
-      subtotal: 350,
-      total: 350,
+      sellerName: trRead('invoice_preview_seller', locale),
+      items: receipt
+          ? const []
+          : [
+              TransactionItem(
+                variantId: 'preview-variant',
+                sku: trRead('invoice_preview_sku', locale),
+                productName:
+                    '${trRead('invoice_preview_product', locale)} · 40',
+                size: '40',
+                color: trRead('invoice_preview_color', locale),
+                qty: 2,
+                unitPrice: 175,
+                subtotal: 350,
+              ),
+            ],
+      subtotal: receipt ? 100 : 350,
+      total: receipt ? 100 : 350,
       amountReceived: 100,
-      outstandingAmount: 250,
-      status: InvoiceModel.statusPartial,
+      outstandingAmount: receipt ? 0 : 250,
+      status: receipt ? InvoiceModel.statusPaid : InvoiceModel.statusPartial,
+      paymentMethod: receipt ? 'cash' : null,
+      paymentReference: receipt
+          ? trRead('invoice_preview_payment_reference', locale)
+          : null,
+      shopBalanceBefore: receipt ? 500 : null,
+      shopBalanceAfter: receipt ? 400 : null,
+      cashReceiptSequence: receipt ? 1 : null,
       createdBy: 'preview',
       createdAt: now,
       updatedAt: now,
       currency: settings.currency,
       headerSnapshot: headerSnapshot,
     );
-    final locale = ref.read(appLocaleProvider);
+  }
+
+  Future<void> _showPdfPreview({
+    required String titleKey,
+    required AppLocale locale,
+    required Future<Uint8List> Function() build,
+  }) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.9,
-        child: PdfPreview(
-          canChangeOrientation: false,
-          canChangePageFormat: false,
-          canDebug: false,
-          onError: (context, error) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
+      builder: (sheetContext) => SizedBox(
+        height: MediaQuery.sizeOf(sheetContext).height * 0.9,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
               child: Text(
-                tr(AppErrorMapper.key(error), ref),
-                textAlign: TextAlign.center,
+                trRead(titleKey, locale),
+                key: ValueKey('financial_document_preview_title_$titleKey'),
+                style: Theme.of(sheetContext).textTheme.titleMedium,
               ),
             ),
-          ),
-          build: (_) => generateInvoicePdf(
-            invoice: invoice,
-            companyName: companyName,
-            currency: settings.currency,
-            locale: locale,
-            logoBytes: settings.logoBytes,
-            header: config,
-          ),
+            Expanded(
+              child: PdfPreview(
+                canChangeOrientation: false,
+                canChangePageFormat: false,
+                canDebug: false,
+                onError: (context, error) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      trRead(AppErrorMapper.key(error), locale),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+                build: (_) => build(),
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _previewInvoice(SettingsModel settings) async {
+    final config = _config();
+    final locale = ref.read(appLocaleProvider);
+    final invoice = _previewInvoiceModel(
+      settings,
+      config,
+      locale: locale,
+      receipt: false,
+    );
+    final companyName = config.nameEn.isEmpty
+        ? settings.companyName
+        : config.nameEn;
+    await _showPdfPreview(
+      titleKey: 'invoice_header_preview',
+      locale: locale,
+      build: () => generateInvoicePdf(
+        invoice: invoice,
+        companyName: companyName,
+        currency: settings.currency,
+        locale: locale,
+        logoBytes: settings.logoBytes,
+        header: config,
+      ),
+    );
+  }
+
+  Future<void> _previewStatement(SettingsModel settings) async {
+    final config = _config();
+    final locale = ref.read(appLocaleProvider);
+    final now = DateTime.now();
+    final shopName = trRead('invoice_preview_shop', locale);
+    final transactions = [
+      TransactionModel(
+        id: 'preview-sale',
+        shopId: 'preview-shop',
+        shopName: shopName,
+        routeId: 'preview-route',
+        type: TransactionModel.typeCashOut,
+        amount: 350,
+        currency: settings.currency,
+        description: trRead('invoice_preview_sale_description', locale),
+        createdBy: 'preview',
+        createdAt: Timestamp.fromDate(now.subtract(const Duration(days: 3))),
+      ),
+      TransactionModel(
+        id: 'preview-payment',
+        shopId: 'preview-shop',
+        shopName: shopName,
+        routeId: 'preview-route',
+        type: TransactionModel.typeCashIn,
+        amount: 100,
+        currency: settings.currency,
+        description: trRead('invoice_preview_payment_description', locale),
+        createdBy: 'preview',
+        createdAt: Timestamp.fromDate(now.subtract(const Duration(days: 1))),
+      ),
+    ];
+    const labelKeys = [
+      'date',
+      'description',
+      'debit',
+      'credit',
+      'running_balance',
+      'account_statement',
+      'opening_balance',
+      'net_payable',
+      'page',
+      'report_date',
+      'cash_in',
+      'cash_out',
+      'total_entries',
+      'generated_by',
+      'entry_by',
+      'mode',
+      'duration',
+    ];
+    final labels = trilingualLabels({
+      for (final key in labelKeys) key: trRead(key, locale),
+    }, pair: config.documentLanguagePair);
+    final companyName = config.nameEn.isEmpty
+        ? settings.companyName
+        : config.nameEn;
+    await _showPdfPreview(
+      titleKey: 'invoice_header_preview_statement',
+      locale: locale,
+      build: () => buildPdfLedger(
+        shopName: shopName,
+        companyName: companyName,
+        openingBalance: 1200,
+        transactions: transactions,
+        showEntryBy: false,
+        dateFrom: transactions.first.createdAt.toDate(),
+        dateTo: transactions.last.createdAt.toDate(),
+        labels: labels,
+        locale: locale,
+        currency: settings.currency,
+        logoBytes: settings.logoBytes,
+        header: config,
+      ),
+    );
+  }
+
+  Future<void> _previewReceipt(SettingsModel settings) async {
+    final config = _config();
+    final locale = ref.read(appLocaleProvider);
+    final invoice = _previewInvoiceModel(
+      settings,
+      config,
+      locale: locale,
+      receipt: true,
+    );
+    final companyName = config.nameEn.isEmpty
+        ? settings.companyName
+        : config.nameEn;
+    await _showPdfPreview(
+      titleKey: 'invoice_header_preview_receipt',
+      locale: locale,
+      build: () => generateInvoicePdf(
+        invoice: invoice,
+        companyName: companyName,
+        currency: settings.currency,
+        locale: locale,
+        logoBytes: settings.logoBytes,
+        header: config,
       ),
     );
   }
@@ -302,9 +514,8 @@ class _InvoiceHeaderSettingsScreenState
     padding: const EdgeInsets.only(top: 16, bottom: 8),
     child: Text(
       tr(key, ref),
-      style: Theme.of(
-        context,
-      ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+      style: Theme.of(context).textTheme.titleSmall
+          ?.copyWith(fontWeight: FontWeight.bold),
     ),
   );
 
@@ -319,221 +530,224 @@ class _InvoiceHeaderSettingsScreenState
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(title: Text(tr('invoice_header_settings', ref))),
-      body: settingsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => mappedErrorState(
-          error: error,
-          ref: ref,
-          onRetry: () => ref.invalidate(settingsProvider),
-        ),
-        data: (settings) {
-          _load(settings);
-          return AppPullRefresh(
-            onRefresh: () async {
-              ref.invalidate(settingsProvider);
-              await ref.read(settingsProvider.future);
-            },
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              children: [
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  value: _allowNonStockInvoices,
-                  title: Text(tr('allow_non_stock_invoices', ref)),
-                  subtitle: Text(tr('allow_non_stock_invoices_hint', ref)),
-                  secondary: _savingNonStockInvoices
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : null,
-                  onChanged: _saving || _savingNonStockInvoices
-                      ? null
-                      : _setAllowNonStockInvoices,
-                ),
-                DropdownButtonFormField<FinancialDocumentLanguagePair>(
-                  key: const ValueKey('financial_document_language_pair'),
-                  initialValue: _documentLanguagePair,
-                  decoration: InputDecoration(
-                    labelText: tr('financial_document_language_pair', ref),
-                    helperText: tr(
-                      'financial_document_language_pair_hint',
-                      ref,
+    return PopScope(
+      canPop: !_isDirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (!didPop) await _confirmExit();
+      },
+      child: Scaffold(
+        appBar: AppBar(title: Text(tr('invoice_header_settings', ref))),
+        body: settingsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => mappedErrorState(
+            error: error,
+            ref: ref,
+            onRetry: () => ref.invalidate(settingsProvider),
+          ),
+          data: (settings) {
+            _load(settings);
+            return AppPullRefresh(
+              onRefresh: () async {
+                ref.invalidate(settingsProvider);
+                await ref.read(settingsProvider.future);
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                children: [
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    value: _allowNonStockInvoices,
+                    title: Text(tr('allow_non_stock_invoices', ref)),
+                    subtitle: Text(tr('allow_non_stock_invoices_hint', ref)),
+                    secondary: _savingNonStockInvoices
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
+                    onChanged: _saving || _savingNonStockInvoices
+                        ? null
+                        : _setAllowNonStockInvoices,
+                  ),
+                  _sectionTitle('invoice_header_english'),
+                  _textField('name_en'),
+                  _textField('subtitle_en'),
+                  _textField('address_en', maxLines: 2),
+                  _sectionTitle('invoice_header_arabic'),
+                  _textField('name_ar', rtl: true),
+                  _textField('subtitle_ar', rtl: true),
+                  _textField('address_ar', rtl: true, maxLines: 2),
+                  _sectionTitle('invoice_header_urdu'),
+                  _textField('name_ur', rtl: true),
+                  _textField('subtitle_ur', rtl: true),
+                  _textField('address_ur', rtl: true, maxLines: 2),
+                  _sectionTitle('invoice_header_contact'),
+                  _textField('phone'),
+                  _textField('receipt_phone_2'),
+                  _textField('receipt_phone_3'),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      tr('receipt_contact_numbers_hint', ref),
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
-                  items: [
-                    DropdownMenuItem(
-                      value: FinancialDocumentLanguagePair.englishArabic,
-                      child: Text(
-                        tr('financial_document_language_english_arabic', ref),
-                      ),
+                  _textField('email'),
+                  _textField('tax_number'),
+                  _textField('commercial_registration_number'),
+                  _sectionTitle('invoice_header_template'),
+                  DropdownButtonFormField<String>(
+                    initialValue: _template,
+                    decoration: InputDecoration(
+                      labelText: tr('invoice_header_template', ref),
                     ),
-                    DropdownMenuItem(
-                      value: FinancialDocumentLanguagePair.englishUrdu,
-                      child: Text(
-                        tr('financial_document_language_english_urdu', ref),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _documentLanguagePair = value;
-                        _isDirty = true;
-                      });
-                    }
-                  },
-                ),
-                _sectionTitle('invoice_header_english'),
-                _textField('name_en'),
-                _textField('subtitle_en'),
-                _textField('address_en', maxLines: 2),
-                _sectionTitle('invoice_header_arabic'),
-                _textField('name_ar', rtl: true),
-                _textField('subtitle_ar', rtl: true),
-                _textField('address_ar', rtl: true, maxLines: 2),
-                _sectionTitle('invoice_header_urdu'),
-                _textField('name_ur', rtl: true),
-                _textField('subtitle_ur', rtl: true),
-                _textField('address_ur', rtl: true, maxLines: 2),
-                _sectionTitle('invoice_header_contact'),
-                _textField('phone'),
-                _textField('receipt_phone_2'),
-                _textField('receipt_phone_3'),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    tr('receipt_contact_numbers_hint', ref),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-                _textField('email'),
-                _textField('tax_number'),
-                _textField('commercial_registration_number'),
-                _sectionTitle('invoice_header_template'),
-                DropdownButtonFormField<String>(
-                  initialValue: _template,
-                  decoration: InputDecoration(
-                    labelText: tr('invoice_header_template', ref),
-                  ),
-                  items: [
-                    for (final template in ['classic', 'compact', 'centered'])
-                      DropdownMenuItem(
-                        value: template,
-                        child: Text(tr('invoice_template_$template', ref)),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _template = value;
-                        _isDirty = true;
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _titleScale,
-                  decoration: InputDecoration(
-                    labelText: tr('invoice_header_title_scale', ref),
-                  ),
-                  items: [
-                    for (final scale in ['small', 'normal', 'large'])
-                      DropdownMenuItem(
-                        value: scale,
-                        child: Text(
-                          tr('invoice_header_title_scale_$scale', ref),
+                    items: [
+                      for (final template in ['classic', 'compact', 'centered'])
+                        DropdownMenuItem(
+                          value: template,
+                          child: Text(tr('invoice_template_$template', ref)),
                         ),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _titleScale = value;
-                        _isDirty = true;
-                      });
-                    }
-                  },
-                ),
-                _sectionTitle('invoice_header_accent'),
-                Wrap(
-                  spacing: 12,
-                  children: [
-                    for (final color in _accentColors)
-                      Semantics(
-                        label: color,
-                        selected: _accentColor == color,
-                        child: InkWell(
-                          onTap: () => setState(() {
-                            _accentColor = color;
-                            _isDirty = true;
-                          }),
-                          borderRadius: BorderRadius.circular(20),
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: CircleAvatar(
-                              radius: 16,
-                              backgroundColor: Color(
-                                int.parse(color.substring(1), radix: 16) |
-                                    0xFF000000,
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _template = value;
+                          _isDirty = true;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _titleScale,
+                    decoration: InputDecoration(
+                      labelText: tr('invoice_header_title_scale', ref),
+                    ),
+                    items: [
+                      for (final scale in ['small', 'normal', 'large'])
+                        DropdownMenuItem(
+                          value: scale,
+                          child: Text(
+                            tr('invoice_header_title_scale_$scale', ref),
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _titleScale = value;
+                          _isDirty = true;
+                        });
+                      }
+                    },
+                  ),
+                  _sectionTitle('invoice_header_accent'),
+                  Wrap(
+                    spacing: 12,
+                    children: [
+                      for (final color in _accentColors)
+                        Semantics(
+                          label: color,
+                          selected: _accentColor == color,
+                          child: InkWell(
+                            onTap: () => setState(() {
+                              _accentColor = color;
+                              _isDirty = true;
+                            }),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: CircleAvatar(
+                                radius: 16,
+                                backgroundColor: Color(
+                                  int.parse(color.substring(1), radix: 16) |
+                                      0xFF000000,
+                                ),
+                                child: _accentColor == color
+                                    ? const Icon(
+                                        Icons.check,
+                                        size: 16,
+                                        color: AppBrand.onPrimary,
+                                      )
+                                    : null,
                               ),
-                              child: _accentColor == color
-                                  ? const Icon(
-                                      Icons.check,
-                                      size: 16,
-                                      color: AppBrand.onPrimary,
-                                    )
-                                  : null,
                             ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-                _sectionTitle('invoice_header_visible_fields'),
-                for (final entry in _visibilityKeys.entries)
-                  CheckboxListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    value: _visibleFields.contains(entry.key),
-                    title: Text(tr(entry.value, ref)),
-                    onChanged: (value) => setState(() {
-                      _visibleFields = {..._visibleFields};
-                      if (value == true) {
-                        _visibleFields.add(entry.key);
-                      } else {
-                        _visibleFields.remove(entry.key);
-                      }
-                      _isDirty = true;
-                    }),
+                    ],
                   ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _preview(settings),
-                  icon: const Icon(Icons.picture_as_pdf_outlined),
-                  label: Text(tr('invoice_header_preview', ref)),
-                ),
-                const SizedBox(height: 8),
-                FilledButton.icon(
-                  onPressed: _saving || _savingNonStockInvoices ? null : _save,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save_outlined),
-                  label: Text(tr('save', ref)),
-                ),
-              ],
-            ),
-          );
-        },
+                  _sectionTitle('invoice_header_visible_fields'),
+                  for (final entry in _visibilityKeys.entries)
+                    CheckboxListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: _visibleFields.contains(entry.key),
+                      title: Text(tr(entry.value, ref)),
+                      onChanged: (value) => setState(() {
+                        _visibleFields = {..._visibleFields};
+                        if (value == true) {
+                          _visibleFields.add(entry.key);
+                        } else {
+                          _visibleFields.remove(entry.key);
+                        }
+                        _isDirty = true;
+                      }),
+                    ),
+                  const SizedBox(height: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      OutlinedButton.icon(
+                        key: const ValueKey('invoice_header_preview_button'),
+                        onPressed: () => _previewInvoice(settings),
+                        icon: const Icon(Icons.picture_as_pdf_outlined),
+                        label: Text(tr('invoice_header_preview', ref)),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        key: const ValueKey(
+                          'invoice_header_statement_preview_button',
+                        ),
+                        onPressed: () => _previewStatement(settings),
+                        icon: const Icon(Icons.account_balance_outlined),
+                        label: Text(
+                          tr('invoice_header_preview_statement', ref),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        key: const ValueKey(
+                          'invoice_header_receipt_preview_button',
+                        ),
+                        onPressed: () => _previewReceipt(settings),
+                        icon: const Icon(Icons.receipt_long_outlined),
+                        label: Text(tr('invoice_header_preview_receipt', ref)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed: _saving || _savingNonStockInvoices
+                        ? null
+                        : () => _save(),
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_outlined),
+                    label: Text(tr('save', ref)),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 }
+
+enum _InvoiceHeaderExitAction { save, discard, cancel, saveFailed }

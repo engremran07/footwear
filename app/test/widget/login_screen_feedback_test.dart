@@ -64,6 +64,38 @@ void main() {
     },
   );
 
+  testWidgets('login fields expose credentials to Android password managers', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authNotifierProvider.overrideWith(
+            () => _DelayedAuthNotifier(Completer<void>()),
+          ),
+          isOnlineProvider.overrideWith((ref) => Stream.value(true)),
+        ],
+        child: const MaterialApp(home: LoginScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final fields = tester.widgetList<EditableText>(find.byType(EditableText));
+    final emailField = fields.first;
+    final passwordField = fields.elementAt(1);
+
+    expect(emailField.autofillHints, contains(AutofillHints.username));
+    expect(passwordField.autofillHints, contains(AutofillHints.password));
+    expect(
+      find.ancestor(
+        of: find.byType(TextFormField).first,
+        matching: find.byType(AutofillGroup),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('slow sign-in hint is replaced by a persistent auth error', (
     tester,
   ) async {
