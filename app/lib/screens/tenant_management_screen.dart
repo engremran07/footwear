@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../core/l10n/app_locale.dart';
 import '../core/models/tenant_model.dart';
 import '../core/utils/error_mapper.dart';
@@ -50,17 +51,15 @@ class _TenantManagementScreenState
 
   void _showMappedError(Object error) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(errorSnackBar(tr(AppErrorMapper.key(error), ref)));
   }
 
   Future<void> _createOrUpdateTenant({TenantModel? existing}) async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(errorSnackBar(tr('workspace_name_required', ref)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(errorSnackBar(tr('workspace_name_required', ref)));
       return;
     }
 
@@ -188,9 +187,8 @@ class _TenantManagementScreenState
         if (confirmed != true || !mounted) return;
         await ref.read(authNotifierProvider.notifier).endWorkspaceAccess();
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(successSnackBar(tr('workspace_access_ended', ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(successSnackBar(tr('workspace_access_ended', ref)));
         return;
       }
 
@@ -334,15 +332,13 @@ class _TenantManagementScreenState
         mode: LaunchMode.externalApplication,
       );
       if (!opened && mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(errorSnackBar(tr('err_url_open', ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar(tr('err_url_open', ref)));
       }
     } on Exception {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(errorSnackBar(tr('err_url_open', ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar(tr('err_url_open', ref)));
       }
     }
   }
@@ -354,15 +350,13 @@ class _TenantManagementScreenState
         message: tr('whatsapp_greeting', ref),
       );
       if (!opened && mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(errorSnackBar(tr('err_whatsapp_unavailable', ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar(tr('err_whatsapp_unavailable', ref)));
       }
     } on Exception {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(errorSnackBar(tr('err_whatsapp_unavailable', ref)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(errorSnackBar(tr('err_whatsapp_unavailable', ref)));
       }
     }
   }
