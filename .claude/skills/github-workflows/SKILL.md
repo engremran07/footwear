@@ -105,6 +105,14 @@ if grep -rn "buildPdf\|PdfDocument\|pw\.Document" app/lib/ | grep -v "Isolate\.r
   exit 1
 fi
 
+# Gate 15: No StateProvider use (match the type, not authStateProvider)
+
+if grep -rnw "StateProvider" app/lib/ --include="*.dart"; then
+
+  echo "FAIL: StateProvider is banned in Riverpod 3"
+  exit 1
+fi
+
 # Gate 16: Firestore rules and indexes files present and valid
 
 if [ ! -f "firestore.rules" ] || [ ! -f "firestore.indexes.json" ]; then

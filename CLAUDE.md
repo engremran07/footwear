@@ -472,7 +472,7 @@ Add a pub package that locks a shared transitive dep (e.g. `archive`) to an old 
 
 `StateProvider` used → Riverpod 3 removed it from main export → compilation failure on upgrade  
 **Fix:** Replace every `StateProvider<T>` with `NotifierProvider<T extends Notifier<S>, S>` plus an explicit `Notifier` subclass with `build()` and a setter method. Write sites: `.notifier).state =` → `.notifier).set(value)`.  
-**This project (history):** `appLocaleProvider` and `lastGoodDashboardStatsProvider` converted in v3.6.0+47. `grep -rn "StateProvider\b" app/lib/` → zero.
+**This project (history):** `appLocaleProvider` and `lastGoodDashboardStatsProvider` converted in v3.6.0+47. `grep -rnw "StateProvider" app/lib/ --include="*.dart"` → zero; this does not match valid names such as `authStateProvider`.
 
 ## Band-Aid Loop Reversal Protocol
 

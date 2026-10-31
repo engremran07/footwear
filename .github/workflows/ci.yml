@@ -309,7 +309,7 @@ jobs:
 
       - name: Gate 15 — No StateProvider (banned in Riverpod 3)
         run: |
-          FOUND=$(grep -rn "StateProvider\b" app/lib/ --include="*.dart" || true)
+          FOUND=$(grep -rnw "StateProvider" app/lib/ --include="*.dart" || true)
           if [ -n "$FOUND" ]; then
             echo "❌ StateProvider detected — banned in Riverpod 3. Use NotifierProvider<T,S> instead:"
             echo "$FOUND"

@@ -231,7 +231,7 @@ changes.
 1. **`StateProvider` is BANNED.** Riverpod 3.x removed `StateProvider` from
   the main export. All mutable reactive state must use
   `NotifierProvider<T extends Notifier<S>, S>` with an explicit `Notifier`
-  subclass. Catch-all: `grep -rn "StateProvider" app/lib/` must return zero.
+  subclass. Catch-all: `grep -rnw "StateProvider" app/lib/ --include="*.dart"` must return zero.
 
 1. **Firestore rules MUST be deployed before signoff.** Any PR or autonomous
   agent session that changes `firestore.rules` or `firestore.indexes.json`
@@ -519,7 +519,7 @@ grep -q "allTransactionsProvider" app/lib/providers/auth_provider.dart
 # 5c — No Firestore writes in screens/widgets
 grep -rn "FirebaseFirestore\|\.collection(" app/lib/screens/ app/lib/widgets/
 # 5d — No StateProvider (banned Riverpod 3)
-grep -rn "StateProvider\b" app/lib/ --include="*.dart"
+grep -rnw "StateProvider" app/lib/ --include="*.dart"
 # 5e — No temp artifacts in git status
 git status --short | grep -E "auth-users\.json|\.txt$|\.log$|\.flag$|check_locale\."
 ```
@@ -2050,7 +2050,7 @@ Unreleased shared frontend accessibility foundation:
 - **Navigation/gesture overhaul:** WhatsApp-style double-back exit implemented in AppShell; all shell-hosted screen AppBars stripped; detail screens converted to inline action rows; back gesture works from all nav destinations
 - **flutter_lints 6 new rules in codebase:** `use_null_aware_elements`, `unnecessary_underscores` — both fully resolved
 - **All 4 CI workflows standardized:** `build-apk.yml` corrected from Flutter 3.29.2 → 3.41.6; all 4 workflows now pin Flutter 3.41.6
-- **CI Gate 15 added:** StateProvider banned — `grep -rn "StateProvider\b" app/lib/ --include="*.dart"` → zero
+- **CI Gate 15 added:** StateProvider banned — `grep -rnw "StateProvider" app/lib/ --include="*.dart"` → zero; the word-boundary match avoids false positives such as `authStateProvider`.
 - **Markdown governance hardened:** `.markdownlint.json` updated (MD024 siblings_only, MD056 disabled); all 90 existing markdown issues auto-fixed to zero; `.claude/skills/markdown-governance/SKILL.md` created; `.github/instructions/markdown-governance.instructions.md` created; pre-commit checklist Gate 8 now includes temp-artifact check
 - **Temp artifact cleanup:** `auth-users.json`, `check_locale.ps1`, `check_locale.py`, `debug.log` deleted; `.gitignore` updated to cover installer flags (`*.flag`)
 - **Governance hardened:** AGENTS.md Rules 19–22 added; CLAUDE.md Chain 6 + Anti-Bypass Enforcement Matrix + Governance Notes updated; README.md × 2 fully rewritten
