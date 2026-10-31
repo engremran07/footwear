@@ -36,6 +36,7 @@ import '../../screens/users_list_screen.dart';
 import '../../screens/tenant_management_screen.dart';
 import '../../screens/database_flush_screen.dart';
 import '../../screens/database_backup_screen.dart';
+import '../../screens/record_archive_screen.dart';
 import '../../widgets/app_shell.dart';
 import '../../widgets/role_guard.dart';
 import '../design/app_animations.dart';
@@ -431,6 +432,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   const RoleGuard(
                     capability: AppCapability.viewDataMaintenance,
                     child: DatabaseFlushScreen(),
+                  ),
+                  s,
+                ),
+              ),
+              GoRoute(
+                path: 'archive',
+                pageBuilder: (_, s) => _fadePage(
+                  const RoleGuard(
+                    capability: AppCapability.viewDataMaintenance,
+                    child: RecordArchiveScreen(),
                   ),
                   s,
                 ),

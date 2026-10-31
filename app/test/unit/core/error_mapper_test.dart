@@ -200,6 +200,12 @@ void main() {
         ),
         equals('err_permission_denied'),
       );
+      expect(
+        AppErrorMapper.key(
+          StateError('Workspace user administration is required.'),
+        ),
+        equals('err_permission_denied'),
+      );
     });
 
     test('workspace support access failures use actionable localized keys', () {

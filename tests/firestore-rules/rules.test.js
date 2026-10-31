@@ -1599,6 +1599,51 @@ describe('product_variants collection', () => {
   });
 });
 
+describe('tenant record archive queries', () => {
+  it('lists only inactive records for the active workspace', async () => {
+    await seedUser('tenant-admin-uid', 'tenant_admin');
+    await seedTenant({ tenantId: 'tenant-2', ownerUserId: 'other-admin' });
+    const collections = ['customers', 'routes', 'products', 'product_variants'];
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const batch = db.batch();
+      for (const collection of collections) {
+        batch.set(db.collection(collection).doc(`${collection}-archived`), {
+          tenant_id: 'tenant-1',
+          active: false,
+          name: 'Archived record',
+        });
+        batch.set(db.collection(collection).doc(`${collection}-active`), {
+          tenant_id: 'tenant-1',
+          active: true,
+          name: 'Active record',
+        });
+        batch.set(db.collection(collection).doc(`${collection}-foreign`), {
+          tenant_id: 'tenant-2',
+          active: false,
+          name: 'Foreign archived record',
+        });
+      }
+      await batch.commit();
+    });
+
+    const db = tenantAdminCtx(testEnv).firestore();
+    for (const collection of collections) {
+      const query = (tenantId) =>
+        db.collection(collection)
+          .where('tenant_id', '==', tenantId)
+          .where('active', '==', false);
+      const result = await assertSucceeds(query('tenant-1').get());
+      assert.deepStrictEqual(
+        result.docs.map((document) => document.id),
+        [`${collection}-archived`],
+      );
+      await assertFails(query('tenant-2').get());
+    }
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 3b. customers collection
 // ═══════════════════════════════════════════════════════════════════════════

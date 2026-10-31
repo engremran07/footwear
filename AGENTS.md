@@ -658,6 +658,71 @@ and never replace provider or Firestore authorization.
 
 ## 10) Current Audit Status
 
+2026-10-30 supervisor History and Seller Report access — local, unreleased:
+
+- History now grants tenant-wide scope to active authorized supervisors while
+  sellers remain limited to assigned routes; unassigned users and
+  unscoped/invalid-tenant profiles receive no query scope. The existing
+  seven-day window and deleted-row filtering are unchanged.
+- Seller Report now checks the centralized `viewReports` capability instead
+  of `canManageOperationalData`, which excluded supervisors despite the role
+  matrix granting report access. Supervisors discover sellers only from active
+  tenant routes' assigned seller IDs/names; the Users list remains restricted.
+- Focused History and report-widget suite:
+  `00:03 +13: All tests passed!`; `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 100.5s)`; `dart analyze test/`:
+  `No issues found!`.
+- No Rules or indexes changed. The connected Dart Tooling Daemon had no
+  running app for hot restart. No version bump, build, deployment, device
+  install, commit, or push was performed. Tenant record archive and permanent
+  purge design remains pending; no irreversible delete path was added.
+
+2026-10-31 tenant record archive — local, unreleased:
+
+- Added a tenant-scoped, cursor-paged archive view for inactive shops, routes,
+  products, and variants. Workspace admins can open it from Settings; sellers
+  and supervisors are denied by both route policy and provider guard.
+- Permanent deletion remains disabled. Client queries cannot establish
+  race-free absence of financial, inventory, invoice, or other references, and
+  there is no authorized trusted purge service. Restore controls are not part
+  of this listing-only change.
+- Focused archive, route, settings, and permission suites passed 3, 20, 6, and
+  14 tests respectively. Full Flutter suite:
+  `02:26 +834: All tests passed!`; Rules Emulator: `215 passing (1m)`.
+  `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 178.5s)`; `dart analyze test/`:
+  `No issues found!`; repository Markdown lint exited 0 with no output.
+- Rules/index deployment, web build/deployment, Android build/delivery,
+  and push remain separate release steps and have not been performed for this
+  archive change. The connected Dart Tooling Daemon had no running app for hot
+  restart; `adb devices` listed only its header.
+
+2026-10-30 workspace-management feedback and CI Gate 14 hardening — local,
+unreleased:
+
+- Workspace creation keeps its successful result if temporary support-access
+  cleanup fails and displays a localized warning. Workspace access-start
+  feedback is shown after the seat-reconciliation helper returns; a
+  reconciliation failure is shown as partial success with mapped feedback.
+- Owner-password length validation preserves leading/trailing characters.
+  Workspace user-administration errors map to permission denied. Support
+  access start/end re-read the authenticated super-admin profile from the
+  server and verify the UID is unchanged before writing.
+- CI Gate 14 now parses literal `context.go()` destinations, ignores
+  full-line comments, and rejects `new`/`edit` form routes. The exact script
+  extracted from parsed workflow YAML reports
+  `✅ No context.go() for form routes`; five positive/negative fixtures passed.
+- Focused workspace/error-mapping tests: `00:06 +58: All tests passed!`;
+  full Flutter suite: `02:21 +824: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 65.1s)`;
+  `dart analyze test/`: `No issues found!`; Firestore Rules Emulator:
+  `214 passing (1m)`; `git diff --check` exited 0.
+- No Firestore Rules or indexes changed. The reported production workspace
+  exit denial remains unverified; no production profile/event data was
+  inspected. No hot restart was possible because the Dart Tooling Daemon had
+  no connected app. No release build, install, deployment, commit, or push
+  was performed. P1-04 and Play signer confirmation remain release blockers.
+
 2026-10-30 v3.10.20+1132 all-shops export recovery — deployed locally and to
 Firebase:
 

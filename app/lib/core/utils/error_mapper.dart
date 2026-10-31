@@ -61,6 +61,7 @@ class AppErrorMapper {
       return 'flush_data_reset_unavailable';
     }
     if (msg.contains('authorized workspace administration is required') ||
+        msg.contains('workspace user administration is required') ||
         msg.contains('active platform super-admin access is required') ||
         msg.contains('active super-admin access is required')) {
       return 'err_permission_denied';

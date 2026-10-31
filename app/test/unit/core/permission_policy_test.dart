@@ -460,6 +460,30 @@ void main() {
         PermissionPolicy.canAccessRoute(supervisor, '/settings/backup'),
         isFalse,
       );
+    });
+
+    test('record archive is limited to workspace maintenance roles', () {
+      final admin = user(role: UserRole.admin);
+      final tenantAdmin = user(role: UserRole.tenantAdmin);
+      final supervisor = user(role: UserRole.supervisor);
+      final seller = user(role: UserRole.seller);
+
+      expect(
+        PermissionPolicy.routeAccessDecision(admin, '/settings/archive'),
+        RouteAccessDecision.allowed,
+      );
+      expect(
+        PermissionPolicy.routeAccessDecision(tenantAdmin, '/settings/archive'),
+        RouteAccessDecision.allowed,
+      );
+      expect(
+        PermissionPolicy.routeAccessDecision(supervisor, '/settings/archive'),
+        RouteAccessDecision.denied,
+      );
+      expect(
+        PermissionPolicy.routeAccessDecision(seller, '/settings/archive'),
+        RouteAccessDecision.denied,
+      );
       expect(PermissionPolicy.canAccessRoute(supervisor, '/unknown'), isFalse);
     });
   });

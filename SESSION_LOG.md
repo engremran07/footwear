@@ -6,6 +6,93 @@
 
 ---
 
+## SESSION-093 — 2026-10-31 — Tenant Record Archive Listing
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Add a workspace archive for deactivated business records while
+preserving tenant and financial-data integrity.
+
+- Added a Settings route and archive view for inactive shops, routes, products,
+  and variants. The provider requires the active user's concrete tenant and
+  maintenance capability and cursor-pages all four collections. Route and
+  provider guards deny sellers and supervisors.
+- Permanent deletion remains disabled. A client-side scan cannot prove
+  reference absence or prevent concurrent relinking; the current architecture
+  has no authorized trusted purge service. This implementation is listing
+  only and does not provide restore actions.
+- Focused archive, router, Settings, and capability suites passed 3, 20, 6,
+  and 14 tests respectively. Full Flutter suite:
+  `02:26 +834: All tests passed!`; Rules Emulator: `215 passing (1m)`.
+  `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 178.5s)`; `dart analyze test/`:
+  `No issues found!`; Markdown lint exited 0 with no output.
+- No Rules/indexes source changed. The connected Dart Tooling Daemon had no
+  running app for hot restart; `adb devices` listed only its header.
+  Production deployment, release builds, and device installation have not
+  been performed. The archive todo remains blocked on a reviewed
+  purge/recovery contract.
+
+## SESSION-092 — 2026-10-30 — Supervisor History and Seller Report Access
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the role-specific History and Seller Report regressions
+without expanding supervisor access to user administration.
+
+- History's query-scope helper now gives active, concrete-tenant supervisors
+  tenant-wide history and keeps sellers scoped to their assigned routes.
+  Inactive, unassigned, and invalid-tenant profiles receive no scope.
+- Seller Report previously used `canManageOperationalData` to gate both
+  visibility and generation, excluding supervisors despite their
+  `viewReports` capability. It now uses `PermissionPolicy` and derives
+  supervisor seller candidates from active route assignment IDs/names rather
+  than the restricted Users list.
+- Focused History/report suite: `00:03 +13: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 100.5s)`;
+  `dart analyze test/`: `No issues found!`. The Dart Tooling Daemon had no
+  connected Flutter app for hot restart.
+- No Rules/indexes changed. This is local, unreleased source; no version bump,
+  release build, deployment, phone delivery, commit, or push occurred.
+- The tenant-scoped deleted-record archive remains a pending design task.
+  No permanent-delete implementation was made because its eligibility,
+  retention, recovery, and safe-purge contract is not yet defined.
+
+## SESSION-091 — 2026-10-30 — Workspace Feedback and CI Gate 14
+
+**Agent:** GitHub Copilot
+
+**Trigger:** Continue the super-admin/workspace feedback audit, fix verified
+workspace creation/access and permission-mapping regressions, and repair the
+CI form-route gate without changing Rules or release state.
+
+- Exact owner-password input is preserved during minimum-length validation.
+  Workspace provisioning remains successful if support-access cleanup fails
+  after creation, and displays a localized warning. Support-access feedback
+  follows the seat-reconciliation helper result; a failure is reported as
+  mapped partial success.
+- Support-access start/end now read the active profile from the Firestore
+  server and verify that the authenticated UID is unchanged. Workspace
+  user-administration failures map to permission denied.
+- CI Gate 14 was changed from a broad grep to literal route parsing; it ignores
+  full-line comments and rejects `new`/`edit` form routes. Five positive and
+  negative fixtures passed. The exact Gate 14 script parsed from workflow YAML
+  reports `✅ No context.go() for form routes`.
+- Focused workspace/error-mapping tests: `00:06 +58: All tests passed!`;
+  full Flutter suite: `02:21 +824: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 65.1s)`;
+  `dart analyze test/`: `No issues found!`; Rules Emulator:
+  `214 passing (1m)`; Markdown lint exited 0 with no output;
+  `git diff --check` exited 0.
+- The production workspace-exit denial remains unverified; its exact Firebase
+  error and affected profile/access-event state were not inspected. No Rules
+  or indexes changed, and no production data was inspected or modified. The
+  Dart Tooling Daemon had no running app for hot restart.
+- Documentation was updated in the runtime contract, coding rules, READMEs,
+  system deep dive, and audit/session records. No release build, install,
+  deployment, commit, or push was performed. P1-04 and Play signer
+  confirmation remain release blockers.
+
 ## SESSION-090 — 2026-10-30 — All-Shops Export Recovery and v1132 Delivery
 
 **Agent:** GitHub Copilot

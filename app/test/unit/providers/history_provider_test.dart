@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:footwear_erp/models/user_model.dart';
+import 'package:footwear_erp/providers/history_provider.dart';
 // We import the provider file to test the exported constants and helper logic.
 // The _kHistoryDays constant drives the 7-day cutoff — this test ensures it
 // stays at 7 and is never accidentally changed.
@@ -15,6 +17,61 @@ import 'package:footwear_erp/models/transaction_model.dart';
 const _expectedHistoryDays = 7;
 
 void main() {
+  group('History query scope', () {
+    final now = Timestamp.now();
+
+    UserModel user({
+      required UserRole role,
+      String? tenantId = 'tenant-1',
+      bool active = true,
+      List<String> assignedRouteIds = const [],
+    }) => UserModel(
+      id: 'user-1',
+      email: 'user@example.com',
+      displayName: 'User',
+      role: role,
+      tenantId: tenantId,
+      active: active,
+      assignedRouteIds: assignedRouteIds,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    test('supervisor receives tenant-wide history scope', () {
+      expect(historyQueryScopeFor(user(role: UserRole.supervisor)), (
+        tenantId: 'tenant-1',
+        routeKey: null,
+      ));
+    });
+
+    test('seller scope contains only normalized assigned routes', () {
+      expect(
+        historyQueryScopeFor(
+          user(
+            role: UserRole.seller,
+            assignedRouteIds: ['route-b', ' route-a ', 'route-b', ' '],
+          ),
+        ),
+        (tenantId: 'tenant-1', routeKey: 'route-a,route-b'),
+      );
+    });
+
+    test('inactive and unassigned users receive no history scope', () {
+      expect(
+        historyQueryScopeFor(user(role: UserRole.supervisor, active: false)),
+        isNull,
+      );
+      expect(historyQueryScopeFor(user(role: UserRole.seller)), isNull);
+      expect(
+        historyQueryScopeFor(
+          user(role: UserRole.supervisor, tenantId: '__global__'),
+        ),
+        isNull,
+      );
+      expect(historyQueryScopeFor(user(role: UserRole.superAdmin)), isNull);
+    });
+  });
+
   group('History 7-day cutoff arithmetic', () {
     test('cutoff is exactly 7 days before midnight today', () {
       final now = DateTime.now();

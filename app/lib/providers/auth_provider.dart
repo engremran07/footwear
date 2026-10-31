@@ -13,6 +13,7 @@ import '../core/utils/role_utils.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/user_model.dart';
 import 'alert_provider.dart';
+import 'archive_provider.dart';
 import 'dashboard_provider.dart';
 import 'inventory_transaction_provider.dart';
 import 'invoice_provider.dart';
@@ -77,6 +78,7 @@ class AuthNotifier extends AsyncNotifier<void> {
     // previous account do not flash briefly when a new user signs in.
     ref.invalidate(lastGoodDashboardStatsProvider);
     ref.invalidate(settingsProvider);
+    ref.invalidate(archivedBusinessRecordsProvider);
     ref.invalidate(allTransactionsProvider);
     ref.invalidate(shopsAnalyticsTransactionsProvider);
     ref.invalidate(pendingEditRequestsProvider);
@@ -154,6 +156,25 @@ class AuthNotifier extends AsyncNotifier<void> {
       'created_at': FieldValue.serverTimestamp(),
     });
     return logRef.id;
+  }
+
+  Future<UserModel> _requireActiveSuperAdminProfileFromServer() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
+    if (uid.isEmpty) {
+      throw StateError('Active super-admin access is required.');
+    }
+    final profile = await FirebaseFirestore.instance
+        .collection(Collections.users)
+        .doc(uid)
+        .get(const GetOptions(source: Source.server));
+    if (FirebaseAuth.instance.currentUser?.uid != uid || !profile.exists) {
+      throw StateError('Active super-admin access is required.');
+    }
+    final user = UserModel.fromJson(profile.data()!, profile.id);
+    if (!user.active || !user.isSuperAdmin) {
+      throw StateError('Active super-admin access is required.');
+    }
+    return user;
   }
 
   Future<void> signIn(
@@ -442,10 +463,7 @@ class AuthNotifier extends AsyncNotifier<void> {
         'Choose a workspace and enter a reason of at least 10 characters.',
       );
     }
-    final user = await ref.read(authUserProvider.future);
-    if (user == null || !user.active || !user.isSuperAdmin) {
-      throw StateError('Active super-admin access is required.');
-    }
+    final user = await _requireActiveSuperAdminProfileFromServer();
     final db = FirebaseFirestore.instance;
     final workspace = await db
         .collection(Collections.tenants)
@@ -490,10 +508,7 @@ class AuthNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> endWorkspaceAccess() async {
-    final user = await ref.read(authUserProvider.future);
-    if (user == null || !user.active || !user.isSuperAdmin) {
-      throw StateError('Active super-admin access is required.');
-    }
+    final user = await _requireActiveSuperAdminProfileFromServer();
     final batch = FirebaseFirestore.instance.batch();
     final workspaceId = TenantScope.normalize(user.activeWorkspaceId);
     if (workspaceId == null) return;

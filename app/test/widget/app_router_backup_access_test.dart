@@ -13,12 +13,14 @@ import 'package:footwear_erp/core/models/tenant_model.dart';
 import 'package:footwear_erp/core/router/app_router.dart';
 import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
+import 'package:footwear_erp/providers/archive_provider.dart';
 import 'package:footwear_erp/providers/database_backup_provider.dart';
 import 'package:footwear_erp/providers/network_provider.dart';
 import 'package:footwear_erp/providers/notification_provider.dart';
 import 'package:footwear_erp/providers/tenant_provider.dart';
 import 'package:footwear_erp/screens/database_backup_screen.dart';
 import 'package:footwear_erp/screens/notification_center_screen.dart';
+import 'package:footwear_erp/screens/record_archive_screen.dart';
 import 'package:footwear_erp/screens/route_form_screen.dart';
 import 'package:footwear_erp/screens/shop_form_screen.dart';
 import 'package:footwear_erp/widgets/app_shell.dart';
@@ -142,6 +144,39 @@ void main() {
       '/settings/backup',
     );
     expect(find.byType(DatabaseBackupScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('workspace admin can open the tenant record archive', (
+    tester,
+  ) async {
+    final router = await _pumpBackupRoute(
+      tester,
+      role: UserRole.tenantAdmin,
+      routeIds: const [],
+      location: '/settings/archive',
+    );
+
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '/settings/archive',
+    );
+    expect(find.byType(RecordArchiveScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('supervisor is redirected away from the tenant record archive', (
+    tester,
+  ) async {
+    final router = await _pumpBackupRoute(
+      tester,
+      role: UserRole.supervisor,
+      routeIds: const [],
+      location: '/settings/archive',
+    );
+
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/');
+    expect(find.byType(RecordArchiveScreen), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -541,6 +576,9 @@ Future<GoRouter> _pumpBackupRoute(
           (ref) => Stream.value(_TestFirebaseUser(user.id)),
         ),
         authUserProvider.overrideWith((ref) => Stream.value(user)),
+        archivedBusinessRecordsProvider.overrideWith(
+          (ref) async => const ArchivedBusinessRecords(),
+        ),
         databaseBackupProvider.overrideWith(_TestBackupNotifier.new),
         isOnlineProvider.overrideWith((ref) => Stream.value(true)),
         notificationsProvider.overrideWith(

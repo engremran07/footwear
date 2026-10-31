@@ -170,6 +170,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'The selected workspace is unavailable. Refresh and try again.',
     'workspace_settings_initialization_required': 'Workspace invoice settings are missing. Ask a workspace admin to open Invoice Header settings and save them before creating invoices or receipts.',
     'workspace_access_started': 'Workspace support access started.',
+    'workspace_access_started_seat_reconciliation_failed': 'Workspace access is active, but the live seat count could not be reconciled. Retry from the workspace card.',
+    'workspace_created_access_end_failed': 'Workspace created, but support access could not be confirmed as ended. Check and end it from the workspace card.',
     'workspace_access_ended': 'Workspace support access ended.',
     'workspace_access_end_title': 'End support access?',
     'workspace_access_end_message': 'This clears the selected workspace and ends access to its business data.',
@@ -1479,6 +1481,16 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'menu': 'Menu',
 
     // ── Danger Zone / Database Flush ──
+    'record_archive_title': 'Record Archive',
+    'record_archive_subtitle':
+        'Inactive shops, routes, products, and variants are retained here.',
+    'archive_shops': 'Archived Shops',
+    'archive_routes': 'Archived Routes',
+    'archive_products': 'Archived Products',
+    'archive_variants': 'Archived Variants',
+    'archive_empty_category': 'No archived records in this category.',
+    'archive_purge_unavailable': 'Permanent deletion is disabled because the app cannot safely prove that a record has no financial, inventory, route, or other references. Records are retained.',
+    'archive_delete_permanently': 'Delete permanently',
     'danger_zone': 'Danger Zone',
     'danger_zone_subtitle': 'Irreversible database operations',
     'flush_data_reset_unavailable': 'Workspace data cleanup is disabled because client-side deletes can leave invoices, balances, inventory, routes, and user profiles inconsistent. Use an encrypted backup and an approved, audited maintenance process.',
@@ -1726,6 +1738,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'مساحة العمل المحددة غير متاحة. حدّث القائمة وحاول مرة أخرى.',
     'workspace_settings_initialization_required': 'إعدادات الفواتير لمساحة العمل غير مهيأة. اطلب من مسؤول مساحة العمل فتح إعدادات ترويسة الفاتورة وحفظها قبل إنشاء الفواتير أو الإيصالات.',
     'workspace_access_started': 'بدأ الوصول إلى مساحة العمل للدعم.',
+    'workspace_access_started_seat_reconciliation_failed': 'بدأ الوصول إلى مساحة العمل، ولكن تعذرت مطابقة عدد المقاعد المباشر. أعد المحاولة من بطاقة مساحة العمل.',
+    'workspace_created_access_end_failed': 'تم إنشاء مساحة العمل، ولكن تعذر التأكد من إنهاء وصول الدعم. تحقق من الوصول وأنهِه من بطاقة مساحة العمل.',
     'workspace_access_ended': 'انتهى الوصول إلى مساحة العمل للدعم.',
     'workspace_access_end_title': 'هل تريد إنهاء وصول الدعم؟',
     'workspace_access_end_message':
@@ -3044,6 +3058,16 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'menu': 'القائمة',
 
     // ── Danger Zone / Database Flush ──
+    'record_archive_title': 'أرشيف السجلات',
+    'record_archive_subtitle':
+        'تُحتفظ هنا بالمحلات والمسارات والمنتجات والمتغيرات غير النشطة.',
+    'archive_shops': 'المحلات المؤرشفة',
+    'archive_routes': 'المسارات المؤرشفة',
+    'archive_products': 'المنتجات المؤرشفة',
+    'archive_variants': 'المتغيرات المؤرشفة',
+    'archive_empty_category': 'لا توجد سجلات مؤرشفة في هذه الفئة.',
+    'archive_purge_unavailable': 'الحذف النهائي معطّل لأن التطبيق لا يستطيع التحقق بأمان من خلو السجل من مراجع مالية أو مخزونية أو مسارات أو مراجع أخرى. ستظل السجلات محفوظة.',
+    'archive_delete_permanently': 'حذف نهائي',
     'danger_zone': 'منطقة الخطر',
     'danger_zone_subtitle': 'عمليات قاعدة بيانات لا رجعة فيها',
     'flush_data_reset_unavailable': 'تم تعطيل تنظيف بيانات مساحة العمل لأن عمليات الحذف من التطبيق قد تؤدي إلى عدم اتساق الفواتير والأرصدة والمخزون والمسارات وملفات المستخدمين. استخدم نسخة احتياطية مشفرة وإجراء صيانة معتمداً ومسجلاً للتدقيق.',
@@ -3288,6 +3312,8 @@ const Map<AppLocale, Map<String, String>> _translations = {
         'منتخب کردہ ورک اسپیس دستیاب نہیں۔ تازہ کاری کرکے دوبارہ کوشش کریں۔',
     'workspace_settings_initialization_required': 'ورک اسپیس کی انوائس سیٹنگز تیار نہیں ہیں۔ انوائس یا رسید بنانے سے پہلے ورک اسپیس ایڈمن سے کہیں کہ انوائس ہیڈر کی ترتیبات کھول کر محفوظ کریں۔',
     'workspace_access_started': 'ورک اسپیس سپورٹ رسائی شروع ہو گئی۔',
+    'workspace_access_started_seat_reconciliation_failed': 'ورک اسپیس کی رسائی فعال ہے، لیکن لائیو نشستوں کی گنتی درست نہیں ہو سکی۔ ورک اسپیس کارڈ سے دوبارہ کوشش کریں۔',
+    'workspace_created_access_end_failed': 'ورک اسپیس بن گئی ہے، لیکن سپورٹ رسائی ختم ہونے کی تصدیق نہیں ہو سکی۔ ورک اسپیس کارڈ سے جانچ کر رسائی ختم کریں۔',
     'workspace_access_ended': 'ورک اسپیس سپورٹ رسائی ختم ہو گئی۔',
     'workspace_access_end_title': 'سپورٹ رسائی ختم کریں؟',
     'workspace_access_end_message': 'اس سے منتخب ورک اسپیس صاف ہو جائے گی اور اس کے کاروباری ڈیٹا تک رسائی ختم ہو جائے گی۔',
@@ -4611,6 +4637,16 @@ const Map<AppLocale, Map<String, String>> _translations = {
     'menu': 'مینو',
 
     // ── Danger Zone / Database Flush ──
+    'record_archive_title': 'ریکارڈ آرکائیو',
+    'record_archive_subtitle':
+        'غیر فعال دکانیں، راستے، مصنوعات اور ویرینٹس یہاں محفوظ رہتے ہیں۔',
+    'archive_shops': 'آرکائیو شدہ دکانیں',
+    'archive_routes': 'آرکائیو شدہ راستے',
+    'archive_products': 'آرکائیو شدہ مصنوعات',
+    'archive_variants': 'آرکائیو شدہ ویرینٹس',
+    'archive_empty_category': 'اس زمرے میں کوئی آرکائیو شدہ ریکارڈ نہیں۔',
+    'archive_purge_unavailable': 'مستقل حذف بند ہے کیونکہ ایپ مالی، انوینٹری، راستے یا دیگر حوالوں کی عدم موجودگی محفوظ طریقے سے ثابت نہیں کر سکتی۔ ریکارڈ محفوظ رہیں گے۔',
+    'archive_delete_permanently': 'مستقل حذف کریں',
     'danger_zone': 'خطرناک زون',
     'danger_zone_subtitle': 'ناقابل واپسی ڈیٹا بیس آپریشنز',
     'flush_data_reset_unavailable': 'ورک اسپیس ڈیٹا کی صفائی بند ہے کیونکہ ایپ سے حذف کرنے پر انوائسز، بیلنس، انوینٹری، روٹس اور صارف پروفائلز میں عدم مطابقت ہو سکتی ہے۔ تصدیق شدہ انکرپٹڈ بیک اپ اور منظور شدہ آڈٹ شدہ مینٹیننس طریقہ استعمال کریں۔',

@@ -28,6 +28,32 @@ The full Flutter suite reports `01:46 +823: All tests passed!`;
 `EXIT: 0`. The ARM64 APK was installed on the connected phone (`Success`,
 code `310193132`).
 
+## Local Supervisor History and Seller Report Fix — 2026-10-30
+
+Active supervisors receive tenant-scoped History and can use Seller Report
+without Users-list access. Sellers remain restricted to assigned routes in
+History. Supervisor report candidates come only from active route assignments,
+and report access uses the centralized `viewReports` capability. The focused
+History/report suite reports `00:03 +13: All tests passed!`; both Dart
+analyzers are clean. This change is local and unreleased; no version bump,
+build, deployment, or Git publication was performed.
+
+## Local Tenant Record Archive — 2026-10-31
+
+The Settings archive lists inactive shops, routes, products, and variants in
+the active tenant. The provider checks the workspace-admin capability and
+tenant scope, then cursor-pages all four collections. Sellers and supervisors
+are denied. Permanent deletion remains disabled because client-side reference
+checks cannot be made atomic or exhaustive; a trusted purge service and
+retention/recovery design would be required. Restore actions are not included
+in the listing-only implementation.
+
+Focused archive, routing, Settings, and capability suites passed 3, 20, 6, and
+14 tests respectively. Full Flutter suite: `02:26 +834: All tests passed!`;
+Rules Emulator: `215 passing (1m)`. Library analysis:
+`No issues found! (ran in 178.5s)`; test analysis: `No issues found!`.
+Markdown lint exited 0 with no output. The feature remains local and unreleased.
+
 ## Profile and Invoice-Header Regression Fixes — v3.10.20+1131
 
 Own display-name changes use a dedicated provider method that checks the
@@ -79,6 +105,30 @@ reports `No issues found! (ran in 26.8s)` and test analysis reports
 `No issues found!`. The real-world super-admin workspace-exit denial remains
 unreproduced; current Rules were deployed and the local suite passes, while
 the new widget test verifies localized permission-error feedback only.
+
+## Local Workspace-Management Feedback and CI Gate 14 — Unreleased
+
+Successful workspace provisioning remains successful if ending temporary
+support access fails, with a localized warning. Access-start feedback is
+shown after the seat-reconciliation helper returns; failed reconciliation
+produces mapped partial-success feedback. Password length checks preserve the
+exact input, workspace user-administration errors map to permission denied,
+and support-access start/end validate a fresh server profile for the current
+authenticated super-admin.
+
+CI Gate 14 scans literal `context.go()` destinations for `new`/`edit` form
+routes and ignores full-line comments. The exact script parsed from workflow
+YAML reports `✅ No context.go() for form routes`. Focused tests report
+`00:06 +58: All tests passed!`; full Flutter tests report
+`02:21 +824: All tests passed!`; `flutter analyze lib --no-pub` reports
+`No issues found! (ran in 65.1s)`; `dart analyze test/` reports
+`No issues found!`; and the Rules Emulator reports `214 passing (1m)`.
+
+No Rules/indexes changed. The production workspace-exit denial remains
+unverified because the affected profile/event state and exact Firebase error
+were not inspected. No Dart app was connected for hot restart. This work is
+unreleased: no release build, install, production deployment, commit, or push
+was performed. P1-04 and Play signer confirmation remain release blockers.
 
 ## v3.10.15+1126 Contextual Record Actions
 

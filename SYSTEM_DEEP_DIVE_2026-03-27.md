@@ -38,6 +38,32 @@ version defaults to `0`, so mandatory gating is not active until an owner
 configures it after the required release is available. P1-04 reconciliation
 and other Play owner-only setup gates remain open.
 
+## Local Workspace-Management Feedback and CI Gate 14 — Unreleased
+
+Workspace creation preserves success if ending temporary support access
+fails, and shows a localized cleanup warning. Support-access feedback is
+shown after the seat-reconciliation helper returns; a reconciliation failure
+shows mapped partial-success feedback. Password length validation checks the
+exact value. Workspace user-administration failures map to permission denied.
+Support-access start/end read the current super-admin profile from the server
+and recheck the authenticated UID.
+
+CI Gate 14 now uses parsed literal routes to reject `context.go()` for `new`
+or `edit` form routes while ignoring full-line comments. The complete script,
+extracted from parsed workflow YAML, reports
+`✅ No context.go() for form routes`. Focused workspace/error-mapping tests
+report `00:06 +58: All tests passed!`; the full Flutter suite reports
+`02:21 +824: All tests passed!`; `flutter analyze lib --no-pub` reports
+`No issues found! (ran in 65.1s)`; `dart analyze test/` reports
+`No issues found!`; the Rules Emulator reports `214 passing (1m)`.
+
+These are local source changes only. Rules and indexes were not modified; no
+release build, device install, production deployment, commit, or push occurred.
+No app was connected to the Dart Tooling Daemon for hot restart. The reported
+production access denial remains unverified without its exact Firebase error
+and profile/event evidence. P1-04 and Play signer confirmation still block
+release.
+
 ## Arabic/Urdu PDF Glyph Subsetting
 
 The medial Yeh corruption was caused by the TrueType subset writer in
@@ -126,6 +152,13 @@ correction/approval, invoice-void, route-seller assignment, or shop-route
 reassignment rights.
 Tenant admins may create or assign only supervisor and seller roles to eligible
 non-owner accounts; admin, tenant-admin, and platform roles remain restricted.
+
+History query scope grants authorized supervisors tenant-wide data while
+retaining assigned-route scope for sellers. Seller Report uses the centralized
+`viewReports` capability, not user-administration or operational-management
+capability. Supervisors obtain report candidates from their active tenant
+routes' assigned seller IDs and names; this does not grant access to the Users
+list. The History time window and financial data providers are unchanged.
 
 ## Platform Permission Requests
 
@@ -979,3 +1012,20 @@ passed!`; `flutter analyze lib --no-pub`: `No issues found! (ran in 11.0s)`;
 `test/all_tests.dart` run had cross-suite locale-state failures; standard
 discovery passed. No version bump, build, deployment, device delivery, commit,
 or push was performed.
+
+## 2026-10-31 Tenant Record Archive
+
+`/settings/archive` is available only to workspace administrators through
+`PermissionPolicy`. `archivedBusinessRecordsProvider` requires an active
+profile and concrete tenant, then cursor-pages inactive shops, routes,
+products, and variants using `Collections.*`. The archive screen distinguishes
+empty categories from query errors and offers retry. No archive collection or
+new Rules authorization path was introduced; emulator tests verify the
+tenant-filtered queries.
+
+The UI deliberately disables permanent deletion. A client-side check cannot
+prove that a shop, route, product, or variant has no references across all
+financial/inventory records and prevent concurrent relinking. No trusted purge
+backend or approved retention/recovery design exists. Restore controls were
+not part of this listing-only implementation. Focused tests and analyzers pass;
+production/release operations remain separate.

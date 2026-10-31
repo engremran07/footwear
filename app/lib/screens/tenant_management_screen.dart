@@ -75,8 +75,7 @@ class _TenantManagementScreenState
         );
         return;
       }
-      if (_ownerPasswordController.text.trim().length < 8 &&
-          _pendingOwnerId == null) {
+      if (_ownerPasswordController.text.length < 8 && _pendingOwnerId == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           errorSnackBar(tr('workspace_owner_password_required', ref)),
         );
@@ -136,8 +135,16 @@ class _TenantManagementScreenState
         try {
           await ref.read(authNotifierProvider.notifier).endWorkspaceAccess();
         } catch (error) {
-          saved = false;
-          _showMappedError(error);
+          if (saved && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              warningSnackBar(
+                '${tr('workspace_created_access_end_failed', ref)} '
+                '${tr(AppErrorMapper.key(error), ref)}',
+              ),
+            );
+          } else {
+            _showMappedError(error);
+          }
         }
       }
       if (mounted) setState(() => _isCreating = false);
@@ -222,11 +229,20 @@ class _TenantManagementScreenState
           .read(authNotifierProvider.notifier)
           .selectWorkspace(workspaceId: tenant.id, reason: reason);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(successSnackBar(tr('workspace_access_started', ref)));
-      if (tenant.active) {
-        await _reconcileWorkspaceSeats(tenant, showSuccess: false);
+      final reconciliationErrorKey = tenant.active
+          ? await _reconcileWorkspaceSeats(tenant, showSuccess: false)
+          : null;
+      if (!mounted) return;
+      if (reconciliationErrorKey == null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(successSnackBar(tr('workspace_access_started', ref)));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          warningSnackBar(
+            '${tr('workspace_access_started_seat_reconciliation_failed', ref)} '
+            '${tr(reconciliationErrorKey, ref)}',
+          ),
+        );
       }
     } catch (error) {
       _showMappedError(error);
@@ -235,25 +251,27 @@ class _TenantManagementScreenState
     }
   }
 
-  Future<void> _reconcileWorkspaceSeats(
+  Future<String?> _reconcileWorkspaceSeats(
     TenantModel tenant, {
     bool showSuccess = true,
   }) async {
-    if (_seatReconciliationTenantId != null || !tenant.active) return;
+    if (_seatReconciliationTenantId != null || !tenant.active) return null;
     setState(() => _seatReconciliationTenantId = tenant.id);
     try {
       await ref
           .read(tenantManagementNotifierProvider.notifier)
           .reconcileWorkspaceSeatCount(tenant.id);
-      if (!mounted) return;
+      if (!mounted) return null;
       ref.invalidate(tenantsProvider);
       if (showSuccess) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(successSnackBar(tr('workspace_seats_reconciled', ref)));
       }
+      return null;
     } catch (error) {
-      _showMappedError(error);
+      if (showSuccess) _showMappedError(error);
+      return AppErrorMapper.key(error);
     } finally {
       if (mounted) setState(() => _seatReconciliationTenantId = null);
     }

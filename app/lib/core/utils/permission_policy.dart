@@ -122,6 +122,9 @@ class PermissionPolicy {
       }
       return _routeDecision(user, AppCapability.viewDataMaintenance);
     }
+    if (path == '/settings/archive') {
+      return _routeDecision(user, AppCapability.viewDataMaintenance);
+    }
     if (path == '/settings') {
       return _routeDecision(
         user,

@@ -105,6 +105,15 @@ void main() {
       );
       expect(maintenanceEntry, findsOneWidget);
       expect(tester.widget<ListTile>(maintenanceEntry).onTap, isNotNull);
+
+      final archiveEntry = find.widgetWithText(ListTile, 'Record Archive');
+      await tester.scrollUntilVisible(
+        archiveEntry,
+        240,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(archiveEntry, findsOneWidget);
+      expect(tester.widget<ListTile>(archiveEntry).onTap, isNotNull);
     });
   }
 

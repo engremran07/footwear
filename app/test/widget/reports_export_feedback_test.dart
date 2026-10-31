@@ -4,16 +4,85 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:footwear_erp/models/route_model.dart';
 import 'package:footwear_erp/models/shop_model.dart';
 import 'package:footwear_erp/models/user_model.dart';
 import 'package:footwear_erp/providers/auth_provider.dart';
 import 'package:footwear_erp/providers/dashboard_provider.dart';
+import 'package:footwear_erp/providers/route_provider.dart';
 import 'package:footwear_erp/providers/settings_provider.dart';
 import 'package:footwear_erp/providers/shop_provider.dart';
 import 'package:footwear_erp/providers/user_provider.dart';
 import 'package:footwear_erp/screens/reports_screen.dart';
 
 void main() {
+  testWidgets(
+    'supervisor seller report loads assigned sellers without user-list access',
+    (tester) async {
+      final now = Timestamp.now();
+      final supervisor = UserModel(
+        id: 'supervisor-1',
+        email: 'supervisor@example.com',
+        displayName: 'Supervisor',
+        role: UserRole.supervisor,
+        tenantId: 'tenant-1',
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final route = RouteModel(
+        id: 'route-1',
+        routeNumber: 1,
+        name: 'North',
+        totalShops: 1,
+        assignedSellerIds: const ['seller-1'],
+        assignedSellerNames: const ['Seller One'],
+        active: true,
+        createdBy: 'admin-1',
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(supervisor)),
+            dashboardStatsProvider.overrideWithValue(
+              const AsyncData(DashboardStats()),
+            ),
+            settingsProvider.overrideWith((ref) => const Stream.empty()),
+            routesProvider.overrideWith((ref) => Stream.value([route])),
+            allUsersProvider.overrideWith((ref) => const Stream.empty()),
+            sellersProvider.overrideWith((ref) => const Stream.empty()),
+          ],
+          child: const MaterialApp(home: ReportsScreen()),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.scrollUntilVisible(
+        find.text('Seller Report'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+
+      final dropdown = find.byKey(const Key('seller_report_seller_dropdown'));
+      expect(dropdown, findsOneWidget);
+      await tester.tap(dropdown);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('Seller One'), findsOneWidget);
+      await tester.tap(find.text('Seller One').last);
+      await tester.pump();
+
+      final exportButton = tester.widget<ElevatedButton>(
+        find.byKey(const Key('seller_report_export_button')),
+      );
+      expect(exportButton.onPressed, isNotNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('report export shows progress and maps provider failures', (
     tester,
   ) async {

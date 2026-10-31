@@ -23,7 +23,11 @@ void main() {
       updatedAt: Timestamp.now(),
     );
     final tenantNotifier = _RecordingTenantManagementNotifier();
-    final authNotifier = _RecordingAuthNotifier();
+    final authNotifier = _RecordingAuthNotifier()
+      ..endError = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      );
     final ownerNotifier = _RecordingUserManagementNotifier();
 
     await tester.pumpWidget(
@@ -56,16 +60,26 @@ void main() {
       const Key('workspace_owner_password'),
     );
     await tester.ensureVisible(ownerPasswordField);
-    await tester.enterText(ownerPasswordField, 'secure-pass-123');
+    await tester.enterText(ownerPasswordField, ' 1234567');
     await tester.tap(find.widgetWithText(FilledButton, 'Create workspace'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(ownerNotifier.createdRole, 'tenant_admin');
     expect(ownerNotifier.createdTenantId, 'alpha');
+    expect(ownerNotifier.createdPassword, ' 1234567');
     expect(tenantNotifier.assignedOwnerId, 'owner-uid');
     expect(authNotifier.selectedWorkspaceId, 'alpha');
-    expect(authNotifier.accessEnded, isTrue);
+    expect(authNotifier.accessEnded, isFalse);
+    expect(
+      find.text(
+        'Workspace created, but support access could not be confirmed as '
+        'ended. Check and end it from the workspace card. You do not have '
+        'permission to perform this action.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Create workspace'), findsNothing);
   });
 
   testWidgets('existing workspace owner selector excludes seller accounts', (
@@ -553,6 +567,68 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'access start remains clear when live seat reconciliation fails',
+    (tester) async {
+      final tenant = TenantModel(
+        id: 'alpha',
+        name: 'Alpha',
+        slug: 'alpha',
+        activeUserCount: 0,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+      final user = UserModel(
+        id: 'platform-admin',
+        email: 'platform@example.com',
+        displayName: 'Platform Admin',
+        role: UserRole.superAdmin,
+        active: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+      final authNotifier = _RecordingAuthNotifier();
+      final tenantNotifier = _RecordingTenantManagementNotifier()
+        ..reconcileError = FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'permission-denied',
+        );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authUserProvider.overrideWith((ref) => Stream.value(user)),
+            tenantsProvider.overrideWith((ref) => Stream.value([tenant])),
+            authNotifierProvider.overrideWith(() => authNotifier),
+            tenantManagementNotifierProvider.overrideWith(() => tenantNotifier),
+          ],
+          child: const MaterialApp(home: TenantManagementScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Access workspace'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.enterText(
+        find.byKey(const Key('workspace_access_reason_field')),
+        'Support ticket review',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Confirm'));
+      await tester.pumpAndSettle();
+
+      expect(authNotifier.selectedWorkspaceId, tenant.id);
+      expect(
+        find.text(
+          'Workspace access is active, but the live seat count could '
+          'not be reconciled. Retry from the workspace card. You do not have '
+          'permission to perform this action.',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('expired platform context is distinct from unselected access', (
     tester,
   ) async {
@@ -661,6 +737,7 @@ class _RecordingTenantManagementNotifier extends TenantManagementNotifier {
   String? archivedTenantId;
   String? restoredTenantId;
   String? reconciledTenantId;
+  Object? reconcileError;
 
   @override
   Future<String> createTenant({
@@ -694,6 +771,7 @@ class _RecordingTenantManagementNotifier extends TenantManagementNotifier {
 
   @override
   Future<void> reconcileWorkspaceSeatCount(String tenantId) async {
+    if (reconcileError != null) throw reconcileError!;
     reconciledTenantId = tenantId;
   }
 }
@@ -725,6 +803,7 @@ class _RecordingAuthNotifier extends AuthNotifier {
 class _RecordingUserManagementNotifier extends UserManagementNotifier {
   String? createdRole;
   String? createdTenantId;
+  String? createdPassword;
 
   @override
   Future<String> createUser({
@@ -739,6 +818,7 @@ class _RecordingUserManagementNotifier extends UserManagementNotifier {
   }) async {
     createdRole = role;
     createdTenantId = tenantId;
+    createdPassword = password;
     return 'owner-uid';
   }
 }

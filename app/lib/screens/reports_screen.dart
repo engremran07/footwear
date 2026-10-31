@@ -8,6 +8,8 @@ import '../core/l10n/financial_document_localization.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/error_mapper.dart';
 import '../core/utils/name_resolver.dart';
+import '../core/utils/permission_policy.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/pdf_export.dart';
 import '../core/utils/report_column_naming.dart';
@@ -43,6 +45,76 @@ Future<Map<String, String>> _loadRouteCurrencies(WidgetRef ref) async {
 Future<List<ShopModel>> _loadExportShops(WidgetRef ref) async {
   ref.invalidate(shopsExportProvider);
   return ref.read(shopsExportProvider.future);
+}
+
+Future<List<UserModel>> _loadSellerReportUsers(WidgetRef ref) async {
+  ref.invalidate(allUsersExportProvider);
+  return ref.read(allUsersExportProvider.future);
+}
+
+class _SellerReportSeller {
+  const _SellerReportSeller({
+    required this.id,
+    required this.displayName,
+    required this.phone,
+    required this.assignedRouteIds,
+  });
+
+  final String id;
+  final String displayName;
+  final String phone;
+  final List<String> assignedRouteIds;
+}
+
+List<_SellerReportSeller> _sellerReportSellersFromUsers(
+  Iterable<UserModel> users,
+  String unknownUserLabel,
+) {
+  final sellers = users
+      .where((user) => user.active && user.isSeller)
+      .map(
+        (user) => _SellerReportSeller(
+          id: user.id,
+          displayName: user.displayName.trim().isEmpty
+              ? unknownUserLabel
+              : user.displayName.trim(),
+          phone: user.phone ?? '',
+          assignedRouteIds: user.assignedRouteIds,
+        ),
+      )
+      .toList();
+  sellers.sort((a, b) => a.displayName.compareTo(b.displayName));
+  return sellers;
+}
+
+List<_SellerReportSeller> _sellerReportSellersFromRoutes(
+  Iterable<RouteModel> routes,
+  String unknownUserLabel,
+) {
+  final sellersById = <String, _SellerReportSeller>{};
+  for (final route in routes.where((route) => route.active)) {
+    for (var index = 0; index < route.assignedSellerIds.length; index++) {
+      final id = route.assignedSellerIds[index].trim();
+      if (id.isEmpty) continue;
+      final assignedName = index < route.assignedSellerNames.length
+          ? route.assignedSellerNames[index].trim()
+          : '';
+      final current = sellersById[id];
+      final routeIds = {...?current?.assignedRouteIds, route.id}.toList()
+        ..sort();
+      sellersById[id] = _SellerReportSeller(
+        id: id,
+        displayName: current == null || current.displayName == unknownUserLabel
+            ? (assignedName.isEmpty ? unknownUserLabel : assignedName)
+            : current.displayName,
+        phone: '',
+        assignedRouteIds: routeIds,
+      );
+    }
+  }
+  final sellers = sellersById.values.toList()
+    ..sort((a, b) => a.displayName.compareTo(b.displayName));
+  return sellers;
 }
 
 class ReportsScreen extends ConsumerWidget {
@@ -992,13 +1064,24 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
     setState(() => _generating = true);
     try {
       final locale = ref.read(appLocaleProvider);
+      final user = await ref.read(authUserProvider.future);
+      if (user == null ||
+          !PermissionPolicy.can(user, AppCapability.viewReports)) {
+        throw StateError('Active report access is required');
+      }
 
-      // Use export providers (one-shot .get()) so data is always fresh and
-      // complete, regardless of whether stream providers are currently active.
-      ref.invalidate(allUsersExportProvider);
-      final users = await ref.read(allUsersExportProvider.future);
-      final seller = users.firstWhere(
-        (u) => u.id == _selectedSellerId,
+      final unknownUserLabel = tr('unknown_user', ref);
+      final sellers = user.isSupervisor
+          ? _sellerReportSellersFromRoutes(
+              await _loadExportRoutes(ref),
+              unknownUserLabel,
+            )
+          : _sellerReportSellersFromUsers(
+              await _loadSellerReportUsers(ref),
+              unknownUserLabel,
+            );
+      final seller = sellers.firstWhere(
+        (candidate) => candidate.id == _selectedSellerId,
         orElse: () => throw StateError('Seller not found: $_selectedSellerId'),
       );
 
@@ -1110,7 +1193,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
         pdfBytesBuilder: () {
           return buildPdfSellerReport(
             sellerName: seller.displayName,
-            sellerPhone: seller.phone ?? '',
+            sellerPhone: seller.phone,
             routeName: sellerRouteName,
             shops: shopMap.values.toList(),
             stockReceived: stockReceived,
@@ -1138,11 +1221,25 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
   Widget build(BuildContext context) {
     final authAsync = ref.watch(authUserProvider);
     final user = authAsync.value;
-    if (user == null || !user.canManageOperationalData) {
+    if (user == null ||
+        !PermissionPolicy.can(user, AppCapability.viewReports)) {
       return const SizedBox.shrink();
     }
 
-    final usersAsync = ref.watch(allUsersProvider);
+    final unknownUserLabel = tr('unknown_user', ref);
+    final AsyncValue<List<_SellerReportSeller>> sellersAsync = user.isSupervisor
+        ? ref
+              .watch(routesProvider)
+              .whenData(
+                (routes) =>
+                    _sellerReportSellersFromRoutes(routes, unknownUserLabel),
+              )
+        : ref
+              .watch(allUsersProvider)
+              .whenData(
+                (users) =>
+                    _sellerReportSellersFromUsers(users, unknownUserLabel),
+              );
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -1167,16 +1264,22 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
               ],
             ),
             const SizedBox(height: 10),
-            usersAsync.when(
+            sellersAsync.when(
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => mappedErrorState(
                 error: e,
                 ref: ref,
-                onRetry: () => ref.invalidate(allUsersProvider),
+                onRetry: () {
+                  if (user.isSupervisor) {
+                    ref.invalidate(routesProvider);
+                  } else {
+                    ref.invalidate(allUsersProvider);
+                  }
+                },
               ),
-              data: (users) {
-                final sellers = users.where((u) => u.isSeller).toList();
+              data: (sellers) {
                 return DropdownButtonFormField<String>(
+                  key: const Key('seller_report_seller_dropdown'),
                   initialValue: _selectedSellerId,
                   decoration: InputDecoration(
                     labelText: tr('select_seller', ref),
@@ -1185,9 +1288,9 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
                   ),
                   items: sellers
                       .map(
-                        (u) => DropdownMenuItem(
-                          value: u.id,
-                          child: Text(u.displayName),
+                        (seller) => DropdownMenuItem(
+                          value: seller.id,
+                          child: Text(seller.displayName),
                         ),
                       )
                       .toList(),
@@ -1199,6 +1302,7 @@ class _SellerReportCardState extends ConsumerState<_SellerReportCard> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
+                key: const Key('seller_report_export_button'),
                 onPressed: _selectedSellerId == null || _generating
                     ? null
                     : _generate,

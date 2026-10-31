@@ -2,12 +2,38 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/collections.dart';
+import '../core/utils/permission_policy.dart';
+import '../core/utils/role_names.dart';
 import '../core/utils/tenant_scope.dart';
 import '../models/transaction_model.dart';
+import '../models/user_model.dart';
 import 'auth_provider.dart';
 
 const _kHistoryDays = 7;
 const _kHistoryLimit = 100;
+
+({String tenantId, String? routeKey})? historyQueryScopeFor(UserModel? user) {
+  if (user == null || !user.active) return null;
+  final tenantId = TenantScope.normalize(user.tenantId);
+  if (tenantId == null) return null;
+  if (!PermissionPolicy.can(user, AppCapability.viewHistory)) return null;
+
+  if (user.isSeller) {
+    final routeIds =
+        user.assignedRouteIds
+            .map((id) => id.trim())
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    if (routeIds.isEmpty) return null;
+    return (tenantId: tenantId, routeKey: routeIds.join(','));
+  }
+
+  return user.isAdmin || user.isSupervisor
+      ? (tenantId: tenantId, routeKey: null)
+      : null;
+}
 
 /// Live 7-day transaction feed, role-aware.
 ///
@@ -19,38 +45,21 @@ const _kHistoryLimit = 100;
 ///   Seller: composite `route_id ASC + created_at DESC` (exists in firestore.indexes.json).
 final recentTransactionsProvider =
     StreamProvider.autoDispose<List<TransactionModel>>((ref) {
-      final (isAdmin, isSeller, routeKey) = ref.watch(
-        authUserProvider.select((s) {
-          final u = s.value;
-          if (u == null) return (false, false, '');
-          if (u.isAdmin) return (true, false, '');
-          if (!u.isSeller || u.assignedRouteIds.isEmpty) {
-            return (false, false, '');
-          }
-          final sorted = List<String>.from(u.assignedRouteIds)..sort();
-          return (false, true, sorted.join(','));
-        }),
+      final scope = ref.watch(
+        authUserProvider.select((s) => historyQueryScopeFor(s.value)),
       );
-
-      if (!isAdmin && (!isSeller || routeKey.isEmpty)) {
-        return const Stream.empty();
-      }
+      if (scope == null) return const Stream.empty();
 
       final cutoff = Timestamp.fromDate(
         DateTime.now().subtract(const Duration(days: _kHistoryDays)),
       );
 
-      final tenantId = ref.watch(
-        authUserProvider.select(
-          (s) => TenantScope.normalize(s.value?.tenantId),
-        ),
-      );
       final collection = TenantScope.applyToQuery(
         FirebaseFirestore.instance.collection(Collections.transactions),
-        tenantId: tenantId,
+        tenantId: scope.tenantId,
       );
 
-      if (isAdmin) {
+      if (scope.routeKey == null) {
         return collection
             .orderBy('created_at', descending: true)
             .where('created_at', isGreaterThanOrEqualTo: cutoff)
@@ -65,7 +74,7 @@ final recentTransactionsProvider =
       }
 
       // Seller: route-scoped
-      final routeIds = routeKey.split(',');
+      final routeIds = scope.routeKey!.split(',');
       return collection
           .where('route_id', whereIn: routeIds)
           .orderBy('created_at', descending: true)

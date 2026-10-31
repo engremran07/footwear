@@ -34,6 +34,34 @@ still requires confirmation against Play App Integrity, so it was not
 uploaded. The ARM64 APK was copied and installed successfully on
 `R5GL22RGT9V` (code `310193132`).
 
+## Local Supervisor History and Seller Report Fix — 2026-10-30
+
+Supervisors now receive tenant-scoped History and can use Seller Report without
+Users-list access. History remains route-scoped for sellers. Supervisor report
+candidates are derived from active route assignments; the centralized
+`viewReports` capability controls visibility and generation. Focused tests
+report `00:03 +13: All tests passed!`; both Dart analyzers are clean. This is
+local, unreleased source: no version bump, build, deployment, or Git
+publication was performed.
+
+## Local Tenant Record Archive — 2026-10-31
+
+Workspace admins can open a tenant-scoped archive of inactive shops, routes,
+products, and variants from Settings. The listing cursor-pages each collection
+and fails closed for sellers, supervisors, and unscoped users. Permanent
+deletion stays disabled: a client cannot prove arbitrary references are absent
+without race conditions, and no trusted purge service is authorized. This
+change does not include restore controls.
+
+The archive provider, screen, router, Settings, and permission suites passed
+3, 20, 6, and 14 tests respectively. The full Flutter suite reports
+`02:26 +834: All tests passed!`; the Rules Emulator reports
+`215 passing (1m)`. `flutter analyze lib --no-pub` reports
+`No issues found! (ran in 178.5s)` and `dart analyze test/` reports
+`No issues found!`. Markdown lint exited 0 with no output. Release and
+production deployment are separate and have not been performed for this
+change.
+
 ## Profile and Invoice-Header Regression Fixes — v3.10.20+1131
 
 Profile owners can now change their own display name through a self-scoped
@@ -69,6 +97,25 @@ The web build and Hosting deployment succeeded. The v3.10.20+1132 ARM64 APK
 was installed on `R5GL22RGT9V`. The signed AAB was built and verified locally,
 but has not been uploaded to Play while its signing certificate awaits
 confirmation against Play App Integrity.
+
+## Local Workspace-Management Feedback and CI Gate 14 — Unreleased
+
+Workspace creation and support-access feedback now distinguish completed
+creation/access from cleanup or seat-reconciliation failures. Password
+validation preserves the exact input, workspace-administration failures map
+to permission denied, and support-access start/end check a fresh authenticated
+super-admin profile. CI Gate 14 checks literal form-route destinations and
+ignores full-line comments.
+
+The full Flutter suite reports `02:21 +824: All tests passed!`;
+`flutter analyze lib --no-pub` reports
+`No issues found! (ran in 65.1s)`; `dart analyze test/` reports
+`No issues found!`; and the Rules Emulator reports `214 passing (1m)`.
+The complete Gate 14 script parsed from the workflow YAML reports
+`✅ No context.go() for form routes`. This work is local and unreleased. No
+Rules/indexes changed, and no build, install, deployment, commit, or push was
+performed. The production workspace-exit denial and P1-04 remain unresolved;
+Play signer confirmation is also required before AAB upload.
 
 ## Local Financial Safeguards and Minor-Unit Compatibility — Unreleased
 

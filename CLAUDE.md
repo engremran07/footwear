@@ -57,6 +57,22 @@ installed on the connected phone. Web and Rules/indexes were deployed. The
 AAB has not been uploaded because its signing certificate still needs
 confirmation against Play App Integrity.
 
+## Local Supervisor History and Seller Report Fix — 2026-10-30
+
+History query scope now includes active supervisors at tenant level and keeps
+sellers route-scoped. Seller Report checks the centralized `viewReports`
+capability rather than operational-management access, so supervisors can see
+the seller selector without access to the Users list. Supervisor candidates
+come only from active authorized routes' assigned seller metadata.
+
+The focused History/report suite reports `00:03 +13: All tests passed!`;
+`flutter analyze lib --no-pub` reports
+`No issues found! (ran in 100.5s)`; `dart analyze test/` reports
+`No issues found!`. No Rules/indexes, version, builds, deployment, device
+delivery, commit, or push changed. No Flutter app was connected for hot
+restart. Permanent deletion in the requested tenant archive remains
+unimplemented pending a retention and safe-purge decision.
+
 ## Android Updates and Password Autofill — 2026-10-30
 
 The `3.10.20+1131` source candidate adds flexible Google Play updates, an
@@ -92,6 +108,27 @@ build failure and remains visible. The actual production super-admin exit
 denial is still not reproduced; local coverage verifies error mapping and the
 Rules batch contract, not the live profile/event state.
 
+## Local Workspace-Management Feedback and CI Gate 14 — Unreleased
+
+Workspace provisioning no longer reports failure after successful creation
+when ending temporary support access fails; it displays a localized cleanup
+warning. Support-access feedback is shown after the seat-reconciliation helper
+returns; reconciliation failures show mapped partial-success feedback.
+Password length validation preserves the exact entered value. Workspace user
+administration errors map to permission denied, and support-access start/end
+validate a fresh server profile for the authenticated super-admin.
+
+CI Gate 14 now scans literal `context.go()` form destinations and ignores
+full-line comments. The exact script extracted from parsed workflow YAML
+reports `✅ No context.go() for form routes`; its positive/negative fixtures
+pass. Focused tests report `00:06 +58: All tests passed!`; the full Flutter
+suite reports `02:21 +824: All tests passed!`; both analyzers are clean, and
+the Rules Emulator reports `214 passing (1m)`. No Rules/indexes changed. The
+reported production workspace-exit denial remains unverified; no production
+profile/event data was inspected. The changes are unreleased, with no build,
+install, deployment, commit, or push. P1-04 and Play signer confirmation
+remain release blockers.
+
 ## Local Export and Shop-Detail Follow-up — 2026-10-30
 
 The route-level multi-shop statement export now uses the per-export
@@ -109,6 +146,23 @@ source only: no version bump, release build, Rules/index deployment, Hosting
 deployment, device installation, commit, or push was performed. The
 hand-aggregated `test/all_tests.dart` runner had cross-suite locale-state
 failures; the standard Flutter discovery run passed.
+
+## Local Tenant Record Archive — 2026-10-31
+
+The Settings archive lists inactive shops, routes, products, and variants for
+the authorized concrete tenant. Its provider cursor-pages each collection and
+rechecks the workspace-admin capability; sellers and supervisors cannot open
+the route or provider. Permanent deletion remains disabled because a client
+cannot securely prove that arbitrary references are absent and no trusted
+purge service is authorized. Restore controls are not included in this
+listing-only change.
+
+Focused archive, route, Settings, and capability tests passed in separate
+suites of 3, 20, 6, and 14 tests. Full Flutter suite:
+`02:26 +834: All tests passed!`; Rules Emulator: `215 passing (1m)`.
+`flutter analyze lib --no-pub`: `No issues found! (ran in 178.5s)`;
+`dart analyze test/`: `No issues found!`. Repository Markdown lint exited 0
+with no output. Release/deployment steps remain separate.
 
 ## Must-Check Before Edits
 

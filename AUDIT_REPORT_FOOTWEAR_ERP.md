@@ -8,6 +8,68 @@
 **Branch:** main  
 **Firebase project:** shoeserp-clean-20260327
 
+## Scope-Specific Addendum — 2026-10-30 Supervisor History and Reports
+
+- Fixed supervisor History scope: active authorized supervisors now query
+  tenant-wide history, sellers remain restricted to assigned routes, and
+  missing/invalid tenant scope fails closed. The existing seven-day filter
+  remains unchanged.
+- Fixed Seller Report readiness: the selector and generation path now use the
+  centralized `viewReports` capability rather than `canManageOperationalData`.
+  Supervisors discover sellers only from active route assignment metadata;
+  no Users-list capability was added.
+- Focused History/report suite: `00:03 +13: All tests passed!`;
+  `flutter analyze lib --no-pub`: `No issues found! (ran in 100.5s)`;
+  `dart analyze test/`: `No issues found!`.
+- No Rules/indexes changed. No app was connected for hot restart. This is
+  local, unreleased source; no version bump, build, deployment, device
+  installation, commit, or push was performed. The separate tenant archive
+  request remains pending a retention and irreversible-purge policy decision.
+
+## Scope-Specific Addendum — 2026-10-31 Tenant Record Archive
+
+- Implemented the tenant-admin-only archive listing for inactive shops, routes,
+  products, and variants. The provider requires a concrete tenant and
+  cursor-pages each collection; the route and provider both enforce the
+  maintenance capability.
+- The requested permanent purge remains fail-closed. Client reference scans
+  cannot guarantee that linked financial/inventory records are absent or
+  prevent a concurrent reference write. No trusted purge service or approved
+  retention/recovery contract is available. The archive is a listing only;
+  it does not add restore actions.
+- Focused archive, router, Settings, and policy suites passed 3, 20, 6, and 14
+  tests respectively. Full Flutter suite: `02:26 +834: All tests passed!`;
+  Rules Emulator: `215 passing (1m)`. `flutter analyze lib --no-pub`:
+  `No issues found! (ran in 178.5s)`; `dart analyze test/`:
+  `No issues found!`; Markdown lint exited 0 with no output.
+- Rules/indexes, Hosting, release artifacts, device delivery, commit, and push
+  have not been performed for this change. Permanent purge remains an explicit
+  design/security blocker rather than a completed requirement.
+
+## Scope-Specific Addendum — 2026-10-30 Workspace Feedback and CI Gate 14
+
+- Fixed verified local feedback issues: workspace provisioning no longer
+  appears failed after creation when access cleanup fails; support-access
+  feedback follows the reconciliation-helper result and failures use
+  localized partial-success feedback. Password validation preserves the exact
+  value, workspace user-administration errors map to permission denied, and
+  support start/end require a fresh server profile for the current Auth UID.
+- CI Gate 14 now scans literal `context.go()` routes, ignores full-line
+  comments, and detects create/edit form routes. Five positive/negative
+  fixtures passed. Executing the exact script extracted from parsed workflow
+  YAML reports `✅ No context.go() for form routes`.
+- Focused tests: `00:06 +58: All tests passed!`; full Flutter suite:
+  `02:21 +824: All tests passed!`; library analysis:
+  `No issues found! (ran in 65.1s)`; test analysis: `No issues found!`;
+  Rules Emulator: `214 passing (1m)`; `git diff --check`: exit 0.
+- The reported production workspace-exit denial was not reproduced. Its exact
+  Firebase error and affected profile/access-event state were not inspected,
+  so the underlying production cause remains unknown. No Firestore Rules or
+  indexes changed, and no production data was read or written.
+- No app was connected to the Dart Tooling Daemon for hot restart. No release
+  build, device installation, Firebase deployment, commit, or push was
+  performed. P1-04 and Play signer confirmation remain release blockers.
+
 ## Scope-Specific Addendum — 2026-10-30 v3.10.20+1132 Export and Release
 
 - The shops-list export now uses complete cursor-paged shop/route data;

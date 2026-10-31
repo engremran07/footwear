@@ -318,6 +318,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const SizedBox(height: 8),
                 if (canViewDataMaintenance)
                   Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.inventory_2_outlined),
+                      title: Text(tr('record_archive_title', ref)),
+                      subtitle: Text(tr('record_archive_subtitle', ref)),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => context.push('/settings/archive'),
+                    ),
+                  ),
+                if (canViewDataMaintenance) const SizedBox(height: 8),
+                if (canViewDataMaintenance)
+                  Card(
                     color: AppBrand.errorColor.withAlpha(12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
